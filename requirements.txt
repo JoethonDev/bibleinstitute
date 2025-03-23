@@ -11,15 +11,6 @@ Django==5.1.4
 django-crispy-forms==2.3
 django-extensions==3.2.3
 docutils==0.16
-google-api-core==2.24.0
-google-api-python-client==2.159.0
-google-auth==2.37.0
-google-auth-httplib2==0.2.0
-google-auth-oauthlib==1.2.1
-google-cloud-shell==1.11.0
-googleapis-common-protos==1.66.0
-grpcio==1.69.0
-grpcio-status==1.69.0
 httplib2==0.22.0
 idna==3.10
 jmespath==1.0.1
