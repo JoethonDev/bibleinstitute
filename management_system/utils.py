@@ -1,34 +1,34 @@
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
-import os
-import re
-import io
-import time
-import boto3
+# from google.oauth2 import service_account
+# from googleapiclient.discovery import build
+# from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+# import os
+# import re
+# import io
+# import time
+# import boto3
 
-def get_drive_client():
-    path = os.getcwd() + "\\management_system"
+# def get_drive_client():
+#     path = os.getcwd() + "\\management_system"
 
-    # Load credentials from the file
-    creds = service_account.Credentials.from_service_account_file(
-        f'{path}\\cred.json', scopes=['https://www.googleapis.com/auth/drive']
-    )
+#     # Load credentials from the file
+#     creds = service_account.Credentials.from_service_account_file(
+#         f'{path}\\cred.json', scopes=['https://www.googleapis.com/auth/drive']
+#     )
 
-    # Build the Drive service
-    service = build('drive', 'v3', credentials=creds)
+#     # Build the Drive service
+#     service = build('drive', 'v3', credentials=creds)
 
-    return service
+#     return service
 
 
-def parse_range_header(range_header):
-    range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
-    if range_match:
-        start = int(range_match.group(1))
-        end = range_match.group(2)
-        end = int(end) if end else None
-        return start, end
-    return 0, 8152
+# def parse_range_header(range_header):
+#     range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+#     if range_match:
+#         start = int(range_match.group(1))
+#         end = range_match.group(2)
+#         end = int(end) if end else None
+#         return start, end
+#     return 0, 8152
 
 
 

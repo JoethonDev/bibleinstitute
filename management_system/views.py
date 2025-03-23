@@ -17,8 +17,8 @@ from django.contrib.auth import update_session_auth_hash
 # Third Party
 from logging import getLogger
 import io
-from googleapiclient.http import MediaIoBaseDownload
-from googleapiclient.errors import HttpError
+# from googleapiclient.http import MediaIoBaseDownload
+# from googleapiclient.errors import HttpError
 import boto3
 import re
 import os
@@ -124,20 +124,20 @@ def list_current_folder(folder_name=""):
 
     return contents, parent_folder
 
-def download_from_drive(file_request):
-    in_memory = io.BytesIO()
-    downloader = MediaIoBaseDownload(in_memory, file_request)
+# def download_from_drive(file_request):
+#     in_memory = io.BytesIO()
+#     downloader = MediaIoBaseDownload(in_memory, file_request)
 
-    done = False
-    while not done:
-        try:
-            _, done = downloader.next_chunk()
-        except:
-            break
+#     done = False
+#     while not done:
+#         try:
+#             _, done = downloader.next_chunk()
+#         except:
+#             break
     
-    in_memory.seek(0)
+#     in_memory.seek(0)
 
-    return in_memory
+#     return in_memory
 
 def download_from_bucket(file_name):
     in_memory = io.BytesIO()
@@ -485,36 +485,36 @@ def stream_lesson(request, lesson_id, file_index):
         logger.error(f"Lesson with id : {lesson_id} not found for user: {username}")
         raise Http404
     
-    except HttpError as e:
-        logger.error(f"Downloading hls file is failed for user : {username}")
-        logger.error(f"Stack Trace : {str(e)}")
+    # except HttpError as e:
+    #     logger.error(f"Downloading hls file is failed for user : {username}")
+    #     logger.error(f"Stack Trace : {str(e)}")
 
-@login_required(login_url=LOGIN_URL)
-def retrieve_segment(request, lesson_id, segment_id):
-    try:
-        username = request.user
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
+# @login_required(login_url=LOGIN_URL)
+# def retrieve_segment(request, lesson_id, segment_id):
+#     try:
+#         username = request.user
+#         lesson = get_object_or_404(Lesson, pk=lesson_id)
 
-        if not lesson.has_segment(segment_id):
-            logger.error("Segment with id : {segment_id} is not found in {lesson.name}")
-            return HttpResponse('Not Found!', status=404)
+#         if not lesson.has_segment(segment_id):
+#             logger.error("Segment with id : {segment_id} is not found in {lesson.name}")
+#             return HttpResponse('Not Found!', status=404)
 
-        file_metadata = DRIVE_CLIENT.files().get(fileId=segment_id, fields="name").execute()
-        file_name = file_metadata.get("name")
+#         file_metadata = DRIVE_CLIENT.files().get(fileId=segment_id, fields="name").execute()
+#         file_name = file_metadata.get("name")
 
-        video_segment = DRIVE_CLIENT.files().get_media(fileId=segment_id)
-        ts_file = download_from_drive(video_segment)
-        logger.info(f"{file_name} TS file of {lesson.name} is loaded!")
+#         video_segment = DRIVE_CLIENT.files().get_media(fileId=segment_id)
+#         ts_file = download_from_drive(video_segment)
+#         logger.info(f"{file_name} TS file of {lesson.name} is loaded!")
 
-        return FileResponse(ts_file)
+#         return FileResponse(ts_file)
     
-    except Http404:
-        logger.error(f"Retrieving segments for lesson with id : {lesson_id} is not found for user: {username}")
-        raise Http404
+#     except Http404:
+#         logger.error(f"Retrieving segments for lesson with id : {lesson_id} is not found for user: {username}")
+#         raise Http404
 
-    except HttpError as e:
-        logger.error(f"Downloading {file_name} segments file is failed for user : {username}")
-        logger.error(f"Stack Trace : {str(e)}")
+#     except HttpError as e:
+#         logger.error(f"Downloading {file_name} segments file is failed for user : {username}")
+#         logger.error(f"Stack Trace : {str(e)}")
 
 @login_required(login_url=LOGIN_URL)
 def take_exam(request, course_id, quiz_id):
