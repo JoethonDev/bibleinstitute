@@ -1,0 +1,13 @@
+<select class="form-select filters-fields" aria-label="Year Filter" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+    {% for option in options %}
+        {% if forloop.first %}
+            <option value="">{{ option }}</option>
+        {% else %}
+            {% if filtering == option %}
+                <option value="{{ option }}" selected>{{ option }}</option>
+            {% else %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+</select>

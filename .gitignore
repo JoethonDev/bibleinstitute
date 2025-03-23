@@ -1,0 +1,8 @@
+# Folders
+**/__pycache__/
+__pycache__/
+
+# Files
+**/cred.json
+**/__pycache__/*
+__pycache__/*

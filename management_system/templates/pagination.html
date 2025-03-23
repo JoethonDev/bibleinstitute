@@ -1,0 +1,136 @@
+<nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+        
+    {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link previous" hx-select="#content" hx-get="{{ url }}?page={{ page_obj.previous_page_number }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Previous</a>
+    {% else %}
+        <li class="page-item disabled">
+            <a class="page-link previous" hx-select="#content" hx-get="{{ url }}?page=1" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Previous</a>
+    {% endif %}
+        </li>
+
+      {% for number in page_obj.paginator.page_range  %}
+            {% if number == page_obj.number %}
+                <li class="page-item active">
+            {% else %}
+                <li class="page-item">
+            {% endif %}
+                    <a class="page-link number">{{ number }}</a>
+                </li>
+      {% endfor %}
+
+    {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link next" hx-select="#content" hx-get="{{ url }}?page={{ page_obj.next_page_number }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Next</a>
+    {% else %}
+        <li class="page-item disabled">
+            <a class="page-link next" hx-select="#content" hx-get="{{ url }}?page={{ page_obj.num_pages }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Next</a>
+    {% endif %}
+        </li>
+    </ul>
+</nav>
+
+<script>
+    function initialize() {
+        // Previous
+        previous = document.querySelector(".previous")
+        previous?.addEventListener("click", moveBack)
+
+        // Next
+        next = document.querySelector(".next")
+        next?.addEventListener("click", moveForward)
+        
+        // Numbers 
+        numbers = document.querySelectorAll(".number")
+        numbers?.forEach(element => {
+            element.addEventListener("click", moveNumbers)
+        })
+
+        // Delete Buttons
+        deleteBtns = document.querySelectorAll(".delete-btn")
+        deleteBtns?.forEach(element => {
+            element.addEventListener("click", displaySuccessAlert)
+        })
+    }
+
+    function moveForward(e) {
+        let nextElement = e.target
+        let activeNumber = removeActive()
+        if (isFirstPage(activeNumber)) {
+            previous.classList.remove("disabled")
+        }
+        if (isLastPage(activeNumber)) {
+            return
+        }
+        else {
+            let nextSibling = activeNumber.nextElementSibling
+            nextsSibling.classList.add("active")
+            if (isLastPage(nextsSibling)) {
+                nextElement.classList.add("disabled")
+            }
+        }
+    }
+
+    function moveBack(e) {
+        let previousElement = e.target
+        let activeNumber = removeActive()
+        if (isLastPage(activeNumber)) {
+            next.classList.remove("disabled")
+        }
+        if (isFirstPage(activeNumber)) {
+            return
+        }
+        else {
+            let previousSibling = activeNumber.previousElementSibling
+            previousSibling.classList.add("active")
+            if (isFirstPage(previousSibling)) {
+                previousElement.classList.add("disabled")
+            }
+        }
+    }
+
+    function isFirstPage(element) {
+        return [...numbers].indexOf(element) == 0
+    }
+
+    function isLastPage(element) {
+        let numbersArray = [...numbers]
+        return numbersArray.indexOf(element) == numbersArray.length - 1
+    }
+
+    function removeActive() {
+        let activeNumber = document.querySelector(".number.active")
+        activeNumber.classList.remove("active")
+        return activeNumber
+    }
+
+    function moveNumbers(e) {
+        removeActive()
+
+        let numberElement = e.target
+        numberElement.classList.add("active")
+
+        if (isFirstPage(numberElement)) {
+            previous.classList.add("disabled")
+        } 
+        else if (isLastPage(numberElement)) {
+            next.classList.add("disabled")
+        }
+        else {
+            previous.classList.remove("disabled")
+            next.classList.remove("disabled")
+        }
+    }
+    
+    document.body.addEventListener("htmx:afterSwap", (e) => {
+        if (e.detail.target.id == "content" || e.detail.target.id == "display-page"){
+            initialize()
+        }
+    })
+
+    window.addEventListener("DOMContentLoaded", () => {
+        initialize()
+    })
+
+</script>

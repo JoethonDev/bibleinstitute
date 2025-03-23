@@ -1,0 +1,343 @@
+{% extends 'admin_panel.html' %}
+
+{% block body %}
+    <div id="content" class="d-flex flex-column h-100 overflow-y-scroll">
+
+        <button class="btn btn-primary loading m-auto mb-3 w-50" type="button" disabled>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span class="info">Loading...</span>
+        </button>
+        <div class="form w-50 m-auto overflow-y-scroll p-2">
+            <div class="mb-3">
+                <label for="folder-name" class="form-label">Folder</label>
+                <input class="form-control" type="text" id="folder-name" name="folder" dir=ltr>
+            </div>
+            <div id="drive-files" class="bg-light mb-5 w-100 vh-40 flex-grow-1 d-flex flex-column">
+                {% include 'drive_files.html' %}
+            </div>
+            <div class="mb-3">
+                <label for="formFileMultiple" class="form-label">Upload Videos</label>
+                <input class="form-control" type="file" id="formFileMultiple" multiple>
+            </div>
+    
+            <!-- Progress Bars -->
+            <div id="progress-container">
+                
+            </div>
+    
+            <button class="btn btn-primary">Upload Files</button>
+    
+        </div>
+        
+        <!-- <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js" crossorigin></script>
+          
+        -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" integrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        
+        <script>
+            ffmpeg = null
+            document.getElementById('formFileMultiple').addEventListener('change', handleFiles);
+            progressField = document.getElementById('progress-container')
+            folderName = document.getElementById("folder-name")
+
+            function getCSRFToken(){
+                let b = document.querySelector("body")
+                let csrf = JSON.parse(b.getAttribute("hx-headers"))
+                return csrf['X-CSRFToken']
+            }
+
+            function createFilePath(fileName) {
+                fileName = fileName.split(".")[0]
+                let value = folderName.value
+                let folderValue = (value.endsWith("/")) ? value : `${value}/`
+                return `${folderValue}${fileName}`
+            }
+
+            function createProgressBar(name, type){
+                let outerDiv = document.createElement("div")
+                outerDiv.className = "progress mb-3"
+                outerDiv.style.height = "40px"
+
+                // Insert Text
+                progressField.insertAdjacentHTML("beforeend", `<h4>${type} ${name}</h4>`)
+
+                // Progress Bar
+                let progressBar = document.createElement("div")
+                progressBar.innerHTML = "0%"
+                progressBar.className = `progress-bar ${type}-${name}`
+                progressBar.style.textAlign = "center"
+
+                outerDiv.insertAdjacentElement("beforeend", progressBar)
+                progressField.insertAdjacentElement("beforeend", outerDiv)
+            }
+
+            function updateProgressBar(progressBar, percent){
+                let currentProgress = `${percent}%`
+                progressBar.innerHTML = currentProgress
+                progressBar.style.width = currentProgress
+            }
+
+            async function handleFiles(event) {
+                const files = event.target.files;
+                if (files.length === 0) return;
+
+                // document.getElementById('progress-container').style.display = 'block';
+
+                for (const file of files) {
+                    console.log("Processing file:", file.name);
+                    const segments = await segmentVideo(file);
+                    console.log("Segmentation Complete:", segments.length, "segments created.");
+                    await uploadSegments(segments, file.name);
+                }
+            }
+
+            async function segmentVideo(file) {
+                try {
+                    // 1. Read file using FileReader instead of FFmpeg.fetchFile
+                    const fileData = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(new Uint8Array(e.target.result));
+                        reader.onerror = (e) => reject(e);
+                        reader.readAsArrayBuffer(file);
+                    });
+
+                    let fileName = file.name.split(".")[0]
+
+                    // 2. Write file to FFmpeg FS
+                    ffmpeg.FS('writeFile', file.name, fileData);
+
+                    // Create Progress Bar
+                    createProgressBar(fileName, "process")
+
+                    let progressClass = `process-${name}`
+                    let progressBar = document.querySelector(`.process-${fileName}`)
+                    // 3. Set progress handler
+                    ffmpeg.setProgress(({ ratio }) => {
+                        updateProgressBar(progressBar, Math.round(ratio * 100))
+                    });
+
+
+                    // 4. Run FFmpeg command with await
+                    await ffmpeg.run(
+                        '-i', file.name,
+                        '-c', 'copy',          // Copy all streams without re-encoding
+                        '-map', '0',           // Include all streams from input
+                        '-f', 'hls',           // Use HLS format instead of generic segment
+                        '-hls_time', '5',     // Segment duration in seconds
+                        '-hls_list_size', '0', // Keep all segments in playlist
+                        '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
+                        `${fileName}.m3u8`        // Main playlist file
+                    );
+
+                    // 5. Read generated files
+                    const files = [];
+                    // Add playlist file
+                    const playlistFile = ffmpeg.FS("readFile", `${fileName}.m3u8`)
+                    files.push(new Blob([playlistFile.buffer], { type: 'application/x-mpegURL' }));
+                    
+                    for (let i = 0; i < 1000; i++) {
+                        const index = String(i).padStart(3, '0');
+                        const filename = `${fileName}_${index}.ts`;
+                        
+                        try {
+                            const data = ffmpeg.FS('readFile', filename);
+                            files.push(new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" }));
+                            // Clean up filesystem
+                            ffmpeg.FS('unlink', filename);
+                        } catch (e) {
+                            break;
+                        }
+                    }
+
+                    // Clean up input file
+                    ffmpeg.FS('unlink', file.name);
+
+                    return files;
+                } catch (error) {
+                    console.error('FFmpeg error:', error);
+                    throw new Error('Video segmentation failed');
+                }
+            }
+
+            async function requestUploadUrl(fileName) {
+                // 1. Get presigned URL from your Django backend
+                const presignedResponse = await fetch('{% url "upload-link" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify({
+                        filename: fileName
+                        // content_type: file.type
+                    })
+                });
+
+                if (!presignedResponse.ok) {
+                    throw new Error('Failed to get presigned URL');
+                }
+
+                return presignedResponse
+            }
+
+            async function uploadR2(filePath, file){
+                const presignedResponse = await requestUploadUrl(filePath)
+
+                // console.log(await presignedResponse.json())
+                const { url, headers: presignedHeaders } = await presignedResponse.json();
+
+                // 2. Create upload request with progress tracking
+                const xhr = new XMLHttpRequest();
+                
+                // Progress handler
+                // xhr.upload.onprogress = (event) => {
+                //     if (event.lengthComputable) {
+                //         const percent = Math.round((event.loaded / event.total) * 100);
+                //         // document.getElementById(`upload-progress-${index}`).textContent = `${percent}%`;
+                //         document.getElementById(`upload-progress`).textContent = `${percent}%`;
+                //     }
+                // };
+
+                // Upload completion handler
+                const uploadPromise = new Promise((resolve, reject) => {
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            resolve();
+                        } else {
+                            reject(new Error('Upload failed'));
+                        }
+                    };
+                    xhr.onerror = () => reject(new Error('Network error'));
+                });
+
+                // Start upload
+                xhr.open('PUT', url, true);
+                xhr.send(file);
+
+                await uploadPromise;
+                
+            }
+
+            async function uploadSegments(files, fileName) {
+                try {
+                    fileName = fileName.split(".")[0]
+                    const uploadResults = [];
+                    createProgressBar(fileName, "upload")
+                    let uploadBar = document.querySelector(`.upload-${fileName}`)
+                    let filePath = createFilePath(fileName)
+
+                    let playlist = files[0]
+                    let playlistPath = `${filePath}.m3u8`
+                    try {
+
+                        await uploadR2(playlistPath, playlist)
+
+                    } catch (error) {
+                        console.error(`Playlist upload failed:`, error);
+                        uploadResults.push({
+                            status: 'failed',
+                            error: error.message
+                        });
+                    }
+                    
+                    // Remove m3u8 from files
+                    files.shift()
+                    for (const [i, file] of files.entries()) {
+                        try {
+                            const index = String(i).padStart(3, '0');
+                            const segmentPath = `${filePath}_${index}.ts`
+                            await uploadR2(segmentPath, file)
+                            uploadResults.push({
+                                index,
+                                status: 'success'
+                            });
+                            const percent = Math.round((uploadResults.length / files.length) * 100);
+                            updateProgressBar(uploadBar, percent)
+
+                        } catch (error) {
+                            console.error(`Segment ${i} upload failed:`, error);
+                            uploadResults.push({
+                                index,
+                                status: 'failed',
+                                error: error.message
+                            });
+                        }
+                    }
+
+                    return uploadResults;
+
+                } catch (error) {
+                    console.error('Upload process failed:', error);
+                    throw error;
+                }
+        }
+
+            function removeR2Files(){
+                document.querySelectorAll(".fa-file").forEach(e => e.parentElement.parentElement.remove())
+            }
+
+            function modifyFolderInput(folderLink){
+                let link = folderLink.split("/")
+                let folderId = link[link.length - 2]
+                let folderValue = folderId.split("-").join("/")
+                if (folderValue == "None"){
+                    folderValue = ""
+                }
+                document.getElementById("folder-name").value = decodeURI(folderValue)
+            }
+
+            function addFolderClick(){
+                document.querySelectorAll(".fa-folder").forEach(e => {
+                    e.addEventListener("click", (e) => {
+                        let element = e.target
+                        let folderLink = element.getAttribute("hx-get")
+                        modifyFolderInput(folderLink)
+                    })
+                })
+            }
+
+            window.addEventListener("htmx:afterSettle", (event) => {
+                if (!document.querySelector("#progress-container")){
+                    return
+                }
+                const requestURL = event.detail.xhr.responseURL;
+                if (!requestURL.endsWith("upload-videos/")){
+                    removeR2Files()
+                    addFolderClick()
+                    document.querySelector(".back-button")?.addEventListener("click", (e) => {
+                        let element = e.target
+                        let folderLink = element.getAttribute("hx-get")
+                        modifyFolderInput(folderLink)
+                    })
+                    return
+                }
+                
+                window.location.reload()
+
+
+            })
+
+            window.addEventListener("DOMContentLoaded", () => {
+                setTimeout( async () => {
+                    const {createFFmpeg , fetchFile} = FFmpeg
+                    ffmpeg = createFFmpeg({ log: true})
+                    await ffmpeg.load()
+                    button = document.querySelector(".loading")
+                    button.classList.remove("btn-primary")
+                    button.classList.add("btn-success")
+                    button.querySelector(".spinner-border").remove()
+                    button.querySelector(".info").innerText = "Loaded!"
+                    }
+                , 500)
+                removeR2Files()
+                addFolderClick()
+                document.querySelector(".back-button")?.addEventListener("click", (e) => {
+                    let element = e.target
+                    let folderLink = element.getAttribute("hx-get")
+                    modifyFolderInput(folderLink)
+                })
+            })
+
+        </script>
+    </div>
+{% endblock %}

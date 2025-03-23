@@ -1,0 +1,108 @@
+{% extends "course_detail.html" %}
+
+{% block content %}
+<div id="content-loaded">
+    {% block cdn %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/videojs-seek-buttons@3.0.1/dist/videojs-seek-buttons.min.css">
+    {% endblock %}
+    <div class="row">
+        {% for hls_url in links %}
+            <div class="col-12 col-xs-12 pt-2 pb-2 mb-5" oncontextmenu="return false;">
+                <video playsinline controls class="video-js w-100 mb-3" height=350 preload="none" controlsList="nodownload">
+                    <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
+            
+                    <p class="vjs-no-js">
+                    To view this video please enable JavaScript, and consider upgrading to a
+                    web browser that
+                    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                    </p>
+                </video>
+                <div class="transparent-v-overlay"></div> 
+                <audio controls class="w-100" preload="none">
+                    <source src="{{ hls_url.url }}"/>
+                </audio>         
+            </div>
+        {% endfor %}
+    </div>
+    
+    <script>
+        function initializeElements() {
+            preventContext(window)
+            // Initialize VideoJS players for both video and audio elements after content is swapped in
+            const mediaElements = document.querySelectorAll('video, audio'); // Select both video and audio elements
+
+            mediaElements.forEach(mediaElement => {
+                // Prevent long press
+                preventContext(mediaElement)
+                if (!mediaElement.player){
+                    if (mediaElement.tagName == "VIDEO"){
+                        loadVideo(mediaElement)
+                    }
+                    else {
+                        loadAudio(mediaElement)
+                    }
+                }
+                else {
+                    // Update the source if the player already exists
+                    const sourceElement = mediaElement.querySelector('source');
+                    if (sourceElement) {
+                        mediaElement.player.src({ type: sourceElement.type, src: sourceElement.src });
+                    }
+                }
+            })
+        }
+
+        function loadVideo(video){
+            const player = videojs(video, {
+                controls: true,
+                playbackRates: [0.5, 1, 1.5, 2, 3, 4],
+                controlBar: {
+                    volumePanel: true,
+                    playbackRateMenuButton: true,
+                    playToggle: true,
+                    
+                }
+            });
+            player.seekButtons({
+                forward: 10,
+                back: 10
+            });
+
+        }
+
+        function loadAudio(audio){
+            if (Hls.isSupported()) {
+                var hls = new Hls();
+                let source = audio.querySelector("source").src
+                hls.loadSource(source);
+                hls.attachMedia(audio);
+            }
+        }
+
+        function preventDownload(mediaElement){
+            if (mediaElement.tagName == "VIDEO"){
+                mediaElement.setAttribute('controlsList', 'nodownload');
+            }
+        }
+
+        function preventContext(element){
+            element.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); // Prevent right-click menu
+                e.stopPropagation();
+                e.cancelBubble = true;
+                e.returnValue = false;
+                return false;
+            });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            initializeElements
+        })
+
+        document.addEventListener('htmx:afterSwap', (event) => {
+            initializeElements()
+        });
+
+    </script>
+</div>
+{% endblock %}

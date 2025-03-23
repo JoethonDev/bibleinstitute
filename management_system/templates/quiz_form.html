@@ -1,0 +1,249 @@
+{% extends 'admin_panel.html' %}
+{% load crispy_forms_tags %}
+
+
+{% block body %}
+    <div id="content" class="d-flex flex-column h-100">
+
+        <a hx-get="{% url 'quiz-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="nav-link pe-auto mb-5">Back to quizzes</a>
+
+        <div class="row">
+            <form action="" method="post" class="col-10 col-md-8 col-lg-6 mb-5 d-flex flex-wrap m-auto mt-0">
+                <div class="input-fields d-flex flex-column w-100 mt-0">
+                    {% include 'messages.html' %}
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="quiz_name" class="form-label">عنوان الامتحان</label>
+                        <input type="text" class="form-control" id="quiz_name" name="quiz_name" required value="{{ quiz_name }}">
+                    </div>
+    
+                    <div class="form-group">
+                        <select class="form-select mb-3" required name="course">
+                            <option selected disabled>الكورس التابع له</option>
+                            {% for course in courses %}
+                                {% if course == selected_course %}
+                                    <option value="{{ course }}" selected>{{ course }}</option>
+                                {% else %}
+                                    <option value="{{ course }}">{{ course }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="opening_date" class="form-label">تاريخ فتح الامتحان</label>
+                        <input type="datetime-local" class="form-control" id="opening_date" name="opening_date" required value="{{ opening_date }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="closing_date" class="form-label">تاريخ غلق الامتحان</label>
+                        <input type="datetime-local" class="form-control" id="closing_date" name="closing_date" required value="{{ closing_date }}">
+                    </div>
+                    {% with is_student=False mode="edit" %}
+                        {% include 'questions_rendering.html' %}
+                    {% endwith %}
+                    <block class="btn btn-secondary mb-2 mt-2" id="add_question">اضافه سوال</block>
+                    <input type="submit" class="btn btn-primary">
+                </div>
+            </form>
+        </div>
+        <script>
+            ADDBTN = document.querySelector("#add_question")
+            FORM = document.querySelector(".input-fields")
+    
+            function createQuesiton() {
+                let questionNumber = getQuestionNumber()
+    
+                let questionContainer = document.createElement("div")
+                questionContainer.className = "question w-100 mt-3 mb-3 position-relative bg-light p-4"
+    
+                questionContainer.insertAdjacentHTML("beforeend", `<label>نوع السوال : </label>`)
+                questionContainer.appendChild(createQuestionType(questionNumber))
+
+                let questionName = `
+                    <div class="group mb-4 row">
+                        <div class="question-title col-12 col-md-8">
+                            <label>السوال</label>
+                            <input type="text" value="" required class="form-control" name="questions[${questionNumber}][name]" placeholder="السوال..؟">
+                        </div>
+                        <div class="points form-group col-4 col-md-4">
+                            <label>الدرجه</label>
+                            <input type="number" name="questions[${questionNumber}][grade]" class="form-control" required value="1">
+                        </div>
+                    </div>
+                `
+                questionContainer.insertAdjacentHTML("beforeend", questionName)
+    
+                let choiceOption = createAnswerForm(questionNumber)
+                questionContainer.appendChild(choiceOption)
+    
+                let correctAnswer = createAnswerField(questionNumber)
+                questionContainer.insertAdjacentHTML("beforeend", correctAnswer)
+    
+                questionContainer.insertAdjacentElement("afterbegin", createDeleteButton())
+
+                FORM.insertBefore(questionContainer, ADDBTN)
+            }
+
+            function createDeleteButton() {
+                let deleteBtn = document.createElement("button")
+                deleteBtn.className = "btn btn-danger delete-question"
+                deleteBtn.innerText = "حذف"
+                deleteBtn.addEventListener("click", (e) => {
+                    let deleteBtn = e.target
+                    removeContianers(deleteBtn.parentNode)
+                })
+                return deleteBtn
+            }
+    
+            function createQuestionType(questionNumber) {
+                let selectType = document.createElement("select")
+                selectType.className = "form-select w-50 mb-2"
+                selectType.name = `questions[${questionNumber}][type]`
+    
+                const OPTIONS = ["mcq", "written", "complete"]
+                OPTIONS.forEach(type => {
+                    selectType.insertAdjacentHTML("beforeend", `<option value="${type}">${type}</option>`)
+                })
+    
+                selectType.querySelector("option").selected = true
+                selectType.addEventListener("change" , changeQuestionType)
+                return selectType
+            }
+
+            function changeQuestionType(e) {
+                let selectElement = e.target
+                let value = selectElement.value
+                let parent = selectElement.parentNode
+
+                // remove current
+                parent.querySelectorAll(".answers").forEach(container => removeContianers(container))
+                removeContianers(parent.querySelector(".correct-answer"))
+
+                let questionNumber = getQuestionIndex(parent)
+
+                // Add new
+                let answersForm = createAnswerForm(questionNumber, value)
+                let answersField = createAnswerField(questionNumber, value)
+
+                // Add to DOM
+                parent.appendChild(answersForm)
+                parent.insertAdjacentHTML("beforeend", answersField)
+            }
+    
+            function removeContianers(container) {
+                if (container){
+                    container.remove()
+                }
+            }
+    
+            function createChoice(questionNumber, choice) {
+                let divContianer = document.createElement("div")
+                divContianer.className = "form-group mb-2 answers w-75 d-flex align-items-center"
+                divContianer.insertAdjacentHTML("beforeend", `<input class="form-control" type="text" name="questions[${questionNumber}][choices]" value="${choice}" required>`)
+                
+                let i = document.createElement("i")
+                i.style.color = "red"
+                i.className = "fa-solid fa-xmark me-3 pointer-mouse"
+                i.addEventListener('click', () => {
+                    removeContianers(divContianer)
+                })
+                divContianer.appendChild(i)
+    
+                return divContianer
+            }
+    
+            function createAnswerForm(questionNumber, type="mcq") {
+                let divContianer = document.createElement("div")
+                divContianer.className = "form-group mb-2 answers"
+    
+                if (type == "written"){
+                    let written_answer = `<textarea class="form-control" rows="3" disabled></textarea>`
+                    divContianer.insertAdjacentHTML("beforeend", written_answer)
+                }
+                else if (type == "mcq") {
+                    let input = document.createElement("input")
+                    input.className = "mt-2 mb-2 form-control w-50 mcq"
+                    input.type = "text"
+                    input.placeholder = "اختيار اخر..."
+                    input.addEventListener("blur", createMCQ)
+                    divContianer.appendChild(input)
+                }
+                else {
+                    let complete_answer = `<input class="form-control" type="text" disabled>`
+                    divContianer.insertAdjacentHTML("beforeend", complete_answer)
+                }   
+                return divContianer
+    
+            }
+    
+            function createMCQ(e) {
+                let inputElement = e.target
+                let parent = inputElement.parentNode
+                let value = inputElement.value
+                if (value) {
+                    let questionNumber = getQuestionIndex(parent.parentNode)
+                    let div = createChoice(questionNumber, value)
+                    parent.parentNode.insertBefore(div, parent)
+                    inputElement.value = ""
+                }
+            }
+
+            function createAnswerField(questionNumber, type="mcq") {
+                if (type == "written"){
+                    return ""
+                }
+    
+                return `
+                    <div class="form-group correct-answer">
+                        <label class="form-label">الاجابه الصحيحه:</label>
+                        <input class="form-control w-50" type="text" name="questions[${questionNumber}][answer]" value="">
+                    </div>
+                `
+            }
+            // Change Type Event => Answers, Correct Answer
+            function getQuestionIndex(question) {
+                return [...document.querySelectorAll(".question")].indexOf(question)
+            }
+
+            function getQuestionNumber() {
+                return [...document.querySelectorAll(".question")].length
+            }
+    
+            // Add Question Button
+            ADDBTN.addEventListener("click", () => {
+                console.log("Clicked")
+                let div = createQuesiton()
+            })
+
+            // Remove MCQ Choice
+            document.querySelectorAll(".fa-xmark").forEach(e => {
+                let divContianer = e.parentNode
+                e.addEventListener('click', () => {
+                    removeContianers(divContianer)
+                })
+            })
+
+            // Add MCQ Choice
+            document.querySelectorAll(".mcq").forEach(e => {
+                e.addEventListener('blur', createMCQ)
+            })
+
+            // Change Question Type
+            document.querySelectorAll(".question-type").forEach(e => {
+                e.addEventListener('change', changeQuestionType)
+            })
+
+            // Remove Question
+            document.querySelectorAll(".delete-question").forEach(element => {
+                element.addEventListener("click", (e) => {
+                    let deleteBtn = e.target
+                    removeContianers(deleteBtn.parentNode)
+                })
+            })
+    
+        </script>
+    </div>
+
+   
+
+{% endblock %}

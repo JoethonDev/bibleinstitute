@@ -1,0 +1,175 @@
+{% extends extended_view %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block body %}
+    <div id="{{ id }}" class="p-2 container position-relative mt-5">
+        <a 
+            {% if is_student %}
+                href="{{ back_url }}"
+            {% else %}
+                hx-get="{{ back_url }}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page"
+            {% endif %}
+            class="nav-link pe-auto mb-5"
+        >Back</a>
+
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-10">
+                {% if mode == "exam" %}
+                    <div id="timer" class="border rounded btn btn-secondary position-absolute mw-50 left-0"></div>
+                {% endif %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+                <div class="header-container row justify-content-between align-items-center">
+                    <div class="details col-10 col-md-6 mb-3">
+                        <h3>الامتحان : {{ quiz_name }}</h3>
+                        <h4>اسم الدارس : {{ username }}</h4>
+                    </div>
+                    
+                    {% if total_grade %}
+                        <div class="total-grade col-6 col-md-4">
+                            <label >الدرجه النهائيه</label>
+                            <input type="text" value="{{ total_grade }}" class="form-control" disabled readonly>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if not is_student or mode != "view" %}
+                <form action="" class="" method="post">
+                    {% csrf_token %}
+                {% endif %}
+                
+                {% include 'questions_rendering.html' %}
+
+                {% if not is_student or mode != "view" %}
+                
+                    <input type="submit" class="btn btn-primary me-4 mt-3" 
+                        {% if is_student %}
+                        value="ارسال الامتحان"
+                        {% else %}
+                        value="ارسال التصحيح"
+                        {% endif %}
+                    >
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if mode == "exam" %}
+        <script>
+            let timer = document.querySelector("#timer")
+            const startTime =  Math.floor(Date.now() / 1000)
+            const endTime = {{ closing_date }}
+            form = document.querySelector("form")
+
+            // initial setup
+            storedQuestions = localStorage.getItem("answers")
+            if (storedQuestions) {
+                answersArr = JSON.parse(storedQuestions)
+                answersArr.forEach(val => {
+                    let questionID = document.querySelector(`input[type="hidden"][value="${val['question_id']}"]`)
+                    let questionDiv = questionID.parentNode
+                    let answersFields = questionDiv.querySelectorAll(".answers input, .answers textarea")
+                    let answerVal = val['answer']
+
+                    if (answersFields.length > 1) {
+                        answersFields.forEach(field => {
+                            if (field.value == answerVal){
+                                field.checked = true
+                                return
+                            }
+                        })
+                    }
+                    else {
+                        let inputField = answersFields[0]
+                        console.log(inputField.tagName)
+                        if (inputField.tagName == "INPUT"){
+                            inputField.value = answerVal
+                        }
+                        else{
+                            inputField.innerText = answerVal
+                        }
+                    }
+                    
+                })
+            }
+
+            function countDown(){
+                let currentEpoch = Math.floor(performance.now() / 1000) + startTime
+
+                let remainingTime = endTime - currentEpoch
+
+                if (remainingTime <= 2) {
+                    
+                    clearInterval(timerInterval)
+                    form.submit()
+                    return
+                }
+
+                const hours = Math.floor(remainingTime / 3600);
+                const minutes = Math.floor((remainingTime % 3600) / 60);
+                const seconds = remainingTime % 60;
+
+                // Pad with leading zeros if necessary
+                let formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                timer.innerText = formattedTime
+            }
+
+            const timerInterval = setInterval(countDown, 500)
+
+            // Clear Session on submit
+            form.addEventListener("submit", () => {
+                localStorage.clear()
+            })
+
+            // Save Question
+            let questionsAnswers = document.querySelectorAll(".answers input, .answers textarea")
+            questionsAnswers.forEach(answerField => {
+                answerField.addEventListener("change", (event) => {
+                    let answers = []
+                    let element =  event.target
+                    let isFound = false
+
+                    if ("answers" in localStorage){
+                        answers = JSON.parse(localStorage.getItem("answers"))
+                    }
+
+                    // Get Parent
+                    let questionDiv = element.parentNode.parentNode
+                    let questionID =  questionDiv.querySelector("input:first-of-type").value
+                    
+                    // Get Answer
+                    let answer = element.value || element.innerText
+
+                    // update answer if exists
+                    answers.forEach(val => {
+                        if (val['question_id'] == questionID) {
+                            val['answer'] = answer
+                            isFound = true
+                        }
+                    })
+
+                    if (!isFound) {
+                        // add new value if there is no update
+                        answers.push({
+                            "question_id" : questionID,
+                            "answer" : answer
+                        })
+                    }
+
+                    // update key
+                    answers = JSON.stringify(answers)
+                    localStorage.setItem("answers", answers)
+
+                })
+            })
+
+        </script>
+    {% endif %}
+
+{% endblock %}

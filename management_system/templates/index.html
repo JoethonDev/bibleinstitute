@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{% block style %}
+<style>
+
+</style>
+{% endblock %}
+
+{% block body %}
+    
+    <div class="gallery mb-5">
+        <div id="carouselExampleSlidesOnly" class="carousel slide" data-bs-ride="carousel">
+            <div class="carousel-inner">
+              <div class="carousel-item active">
+                <img src="{% static 'bible-slider1.jpg' %}" class="d-block w-100" >
+              </div>
+              <div class="carousel-item">
+                <img src="{% static 'bible-slider2.jpg' %}" class="d-block w-100" >
+              </div>
+              <div class="carousel-item">
+                <img src="{% static 'bible-slider3.jpg' %}" class="d-block w-100" >
+              </div>
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleControls" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleControls" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Next</span>
+            </button>
+        </div>
+    </div>
+    <div class="content-text container">
+        <div class="row justify-content-center mb-4">
+            <h3 class="text-center">معهد الكتاب المقدس</h3>
+            <p class="col-4">
+                
+            هو معهد كنسى أرثوذكسى تابع للكنيسة القبطية الأرثوذكسية 
+            مقره كنيسة الشهيد العظيم مار جرجس – كوتسيكا 
+            مطرانية الأقباط الأرثوذكس بالمعادى
+
+            </p>
+        </div>
+        <div class="row justify-content-center mb-4">
+            <div class="text-center col-md-6 col-12">
+                <h4 class="mb-3">
+                    الرئيس الأعلى للمعهد:
+                </h4>
+                <p class="w-75 fs-5 lh-lg m-auto">
+                    صاحب الغبطة والقداسة البابا المعظم الأنبا تواضروس الثانى
+                    بابا الإسكندرية وبطريرك الكرازة المرقسية
+                    
+                    والرئيس الاعلى للمعاهد والكليات الاكليريكية 
+                </p>
+            </div>
+
+            <img src="{% static 'statement.jpg' %}" alt="" class="img-fluid col-md-4 col-12">
+
+        </div>
+        <div class="row justify-content-center mb-4">
+            <p class="col-md-6 text-center col-12 fs-5 text-secondary">
+                المشرف العام على المعهـد:
+                <br>
+                <br>
+                صاحب النيافة الحبر الجليل الأنبا دانيال
+                مطران المعادى وتوابعها
+                وسكرتير المجمع المقدس
+            </p>
+            <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g?si=Gn7QU4eywL3HVRcD" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="width: 560px !important;"></iframe>
+        </div>
+    </div>
+
+    <script>
+        let nextBtn = document.querySelector(".carousel-control-next")
+        let prevBtn = document.querySelector(".carousel-control-prev")
+        let gallery = [...document.querySelectorAll(".carousel-item")]
+        let galleryLength = gallery.length
+
+
+
+        function getActive(){
+            let activeImage = document.querySelector(".carousel-item.active")
+            activeImage.classList.remove("active")
+            return activeImage
+        }
+
+        function moveNext() {
+            let activeImage = getActive()
+            if (activeImage.nextElementSibling) {
+                activeImage.nextElementSibling.classList.add("active")
+            }
+            else{
+                gallery[0].classList.add("active")
+            }
+        }
+
+        function movePrev() {
+            let activeImage = getActive()
+            if (activeImage.previousElementSibling) {
+                activeImage.previousElementSibling.classList.add("active")
+            }
+            else{
+                gallery[gallery.length - 1].classList.add("active")
+            }
+
+        }
+
+        nextBtn.addEventListener("click", moveNext)
+        prevBtn.addEventListener("click", movePrev)
+    </script>
+{% endblock %}

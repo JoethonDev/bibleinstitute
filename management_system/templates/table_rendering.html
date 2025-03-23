@@ -1,0 +1,41 @@
+<div class="table-responsive mt-3 mb-3">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                {% for col in columns %}
+                    <th scope="col">{{ col }}</th>
+                {% endfor %}
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody class="overflow-y-scroll">
+            {% for values in page_obj %}
+                <tr>
+                    {% for value in values.rows %}
+                        <td>{{ value }}</td>
+                    {% endfor %}
+                    {% if submission_user %}
+                        <td>
+                            <button class="btn btn-primary" hx-get="{{ values.url }}" hx-swap="innerHTML" hx-target="#display-page" hx-trigger="click" hx-push-url="true" hx-select="#content">View Submission</button>
+                        </td>
+                    {% else %}
+                        {% if submission_view %}
+                            <td>
+                                <button class="btn btn-primary" hx-get="{{ values.url }}view-submission/" hx-swap="innerHTML" hx-target="#display-page" hx-trigger="click" hx-push-url="true" hx-select="#content">View Submission</button>
+                            </td>
+                        {% endif %}
+
+                        <td class="row  m-0">
+                            <button class="btn btn-secondary col-12 col-md-10 col-l-7 mb-2" hx-get="{{ values.url }}update/" hx-swap="innerHTML" hx-target="#display-page" hx-trigger="click" hx-push-url="true" hx-select="#content">Update {{ view }}</button>
+                            <button class="btn btn-danger delete-btn col-12 col-md-10 col-l-7" hx-delete="{{ values.url }}delete/" hx-swap="delete" hx-target="closest tr" hx-trigger="click">Delete {{ view }}</button>
+                        </td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                <tr>
+                   <td colspan="{{ columns|length }}" class="text-center fs-3">No Data Here!</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

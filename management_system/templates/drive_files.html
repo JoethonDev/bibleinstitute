@@ -1,0 +1,22 @@
+{% if not is_root %}
+<div class="back-button m-4 pointer-mouse" hx-get="{% url 'navigate-folder' parent_folder %}" hx-trigger="click" hx-swap="innerHTML" hx-target="#drive-files">
+    <i class="fa-solid fa-right-long"></i> 
+    Back 
+</div>
+{% endif %}
+<div class="cards align-items-start flex-wrap row justify-content-between">
+    {% for data in drive %}
+        <div class="card text-center p-2 pe-auto mb-3 col-3 me-2">
+            <div class="card-top fs-4 pointer-mouse">
+                {% if data.type == 'folder' %} 
+                    <i class="fa fa-solid fa-folder" hx-get="{% url 'navigate-folder' data.id %}" hx-trigger="click" hx-swap="innerHTML" hx-target="#drive-files"></i>
+                {% else %}
+                    <i class="fa fa-solid fa-file" data-id="{{ data.id }}"></i>
+                {% endif %}
+            </div>
+            <div class="body">
+                <h5 style="font-size: 12px;">{{ data.name }}</h5>
+            </div>
+        </div>
+    {% endfor %}
+</div>

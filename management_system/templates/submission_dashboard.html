@@ -1,0 +1,46 @@
+{% extends 'admin_panel.html' %}
+{% load crispy_forms_tags %}
+
+{% block body %}
+    <div class="container-fluid" id="content">
+        <h2>Submissions</h2>
+        <div class="submission-table">
+            <div class="options d-flex justify-content-between align-items-center">
+                <div class="filters d-flex" hx-include=".filters-fields">
+                    {% if submission %}
+                        <div class="d-flex" role="search">
+                            <input class="form-control me-2 filters-fields" type="number" placeholder="Minimum Grade" name="min-grade"  value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
+                        </div>
+                        <div class="d-flex" role="search">
+                            <input class="form-control me-2 filters-fields" type="number" placeholder="Maximum Grade" name="max-grade"  value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
+                        </div>
+                    {% endif %}
+
+                    <div class="d-flex me-2" role="filter">
+                        <select class="form-select filters-fields" aria-label="Year Filter" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+                            {% for option in options %}
+                                {% if forloop.first %}
+                                    <option value="">{{ option }}</option>
+                                {% else %}
+                                    {% if filtering == option %}
+                                        <option value="{{ option }}" selected>{{ option }}</option>
+                                    {% else %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-flex" role="search">
+                        <input class="form-control me-2 filters-fields" type="search" placeholder="Search" name="name"  value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
+                    </div>
+                </div>
+            </div>
+
+            {% include 'table_rendering.html' %}
+        </div>
+
+        {% include 'pagination.html' %}
+
+    </div>
+{% endblock %}

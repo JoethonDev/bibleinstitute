@@ -1,0 +1,22 @@
+{% extends 'admin_panel.html' %}
+{% load crispy_forms_tags %}
+
+{% block body %}
+    <div id="content" class="h-100">
+        {% with dynamic_view=view_name %}
+            <a hx-get="{% url dynamic_view|add:'-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="nav-link pe-auto mb-5">Back to {{ dynamic_view }}s</a>
+        {% endwith %}
+
+
+
+        <div class="row">
+            <form action="" method="post" class="col-11 col-md-6 mx-auto mx-md-0">
+                {% include 'messages.html' %}
+    
+                {% csrf_token %}
+                {{ form|crispy }}
+                <input type="submit" class="btn btn-primary">
+            </form>
+        </div>
+    </div>
+{% endblock %}

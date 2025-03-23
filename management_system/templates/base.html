@@ -1,0 +1,146 @@
+{% load static %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bible Institute Coptic</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <!-- CDN -->
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous"> -->
+   
+    <!-- Condition on RTL -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.rtl.min.css" integrity="sha384-gXt9imSW0VcJVHezoNQsP+TNrjYXoGcrqBZJpry9zJt8PCQjobwmhMGaDHTASo9N" crossorigin="anonymous">
+    
+    <!-- Style -->
+    <style>
+        .pointer{
+            cursor: pointer;
+        }
+
+        .vh-80{
+            height: 80vh;
+        }
+
+        .overflow-y-scroll{
+          overflow-y: scroll;
+        }
+
+        .mw-50{
+          max-width: 50%;
+        }
+        
+        .mw-75{
+          max-width: 75%;
+        }
+
+        .left-0{
+          left: 0 !important;
+        }
+
+        footer{
+          background-color: #13181c;
+        }
+
+        .footer-bottom{
+          background-color: #0f1317;
+        }
+
+        video::-internal-media-controls-download-button {
+          display:none;
+        }
+
+        /* video {
+          position: relative;
+        }
+
+        video::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+        } */
+
+        .vh-50{
+          min-height: 50vh;
+        }
+    </style>
+    {% block cdn %}
+    {% endblock %}
+    <!-- Custom Style Block -->
+    {% block style %}
+    {% endblock %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom bg-white">
+        <div class="container-fluid">
+          
+          <a class="navbar-brand" href="#">
+              <img src="{% static 'login-logo.png' %}" alt="Logo" width="125" height="40" class="d-inline-block align-text-top">
+          </a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="fa-solid fa-grip-lines"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mb-2 mb-lg-0">
+              <li class="nav-item me-2">
+                <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
+              </li>
+              <li class="nav-item me-2">
+                <a class="nav-link" href="#">About Us</a>
+              </li>
+              <li class="nav-item me-2">
+                <a class="nav-link" href="{% url 'courses' %}">Courses</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'view-profile' %}">Profile</a>
+              </li>
+              {% if request.user.role.role == "admin" or request.user.role.role == "teacher" %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'admin-panel' %}">Admin Dashboard</a>
+                </li>
+              {% endif %}
+            </ul>
+
+          </div>
+        </div>
+    </nav>
+    {% block body %}
+    {% endblock %}
+
+    {% block script %}
+    {% endblock %}
+    
+    <footer class="text-light">
+      <div class="contact d-flex justify-content-between p-5 fs-3">
+          <div class="social">
+            <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180">
+            <h6 class="mb-4">معهد الكتاب المقدس بالمعادى</h6>
+          </div>
+
+          <div class="contact-details">
+            <h6 class="mb-4">مقر المعهد</h6>
+            <h6 class="mb-4 w-75">كنيسة الشهيد العظيم مارجرجس بكوتسكا – المعادى – مصر</h6>
+            <h6 class="mb-4">
+              info@bibleinstitute-eg.org
+              <br>
+              www.bibleinstitute-eg.org</h6>
+          </div>
+      </div>
+      <div class="footer-bottom">
+        <h6 class="p-3 m-auto text-center">جميع الحقوق محفوظة لمعهد الكتاب المقدس بالمعادى</h6>
+      </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
+
+</body>
+</html>
