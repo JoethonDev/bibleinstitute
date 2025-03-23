@@ -228,12 +228,21 @@ def unpack_quiz_form(form_dict):
     return questions, quiz_data
 
 # Class Base
-class AdminPermissionView(object):
+class LoginProtection(object):
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            user = User.objects.get(username=request.user)
-            if user.role.role in MANAGEMENT_ROLES:
-                return super().dispatch(request, *args, **kwargs)
+            return super().dispatch(request, *args, **kwargs)
+        return redirect(f"{reverse('user_login')}?next={request.path}")
+
+class AdminPermissionView(LoginProtection):
+    def dispatch(self, request, *args, **kwargs):
+        authenticated_response = super().dispatch(request, *args, **kwargs) #get response from LoginProtection
+
+        if isinstance(authenticated_response, HttpResponse): #check if LoginProtection returned an HttpResponse, which means login failed.
+            return authenticated_response
+        user = User.objects.get(username=request.user)
+        if user.role.role in MANAGEMENT_ROLES:
+            return super().dispatch(request, *args, **kwargs)
         return HttpResponse("Unauthorized", status=401)    
 
 class FormBase(AdminPermissionView, FormView):
@@ -315,7 +324,7 @@ def index(request):
     return render(request, "index.html")
 
 # Detail Class [handles with and without pk routes]
-class ProfileDetail(DetailView):
+class ProfileDetail(LoginProtection, DetailView):
     model = User
     pk_url_kwarg = "user_id"
     template_name = "profile.html"
@@ -347,7 +356,7 @@ class ProfileDetail(DetailView):
         return super().get_object(queryset)
 
 # Update
-class ProfileUpdate(UpdateView):
+class ProfileUpdate(LoginProtection, UpdateView):
     form_class = ProfileUpdateForm
     model = User
     pk_url_kwarg = "user_id"
