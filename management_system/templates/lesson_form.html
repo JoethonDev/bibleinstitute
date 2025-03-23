@@ -208,57 +208,59 @@
                 })
             }
 
-            window.addEventListener("DOMContentLoaded", () => {
-                // Initialization
-                let files = document.querySelectorAll(".fa-file")
-                files = hideSegments(files)
+            // Initialization
+            files = document.querySelectorAll(".fa-file")
+            files = hideSegments(files)
 
-                renameM3u8()
-                files.forEach(element => {
-                    element.addEventListener('click', () => {
-                        create_video(element)
-                    })
+            renameM3u8()
+            files.forEach(element => {
+                element.addEventListener('click', () => {
+                    create_video(element)
                 })
+            })
+            
+            document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
+                    element.addEventListener("click", moveUp)
+            })
+            document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
+                element.addEventListener("click", moveDown)
+            })
+            document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
+                element.addEventListener('click', () => {
+                    deleteParentElement(element)
+                })
+            })
+
+            // window.addEventListener("DOMContentLoaded", () => {
                 
-                document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
-                        element.addEventListener("click", moveUp)
-                })
-                document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
-                    element.addEventListener("click", moveDown)
-                })
-                document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
-                    element.addEventListener('click', () => {
-                        deleteParentElement(element)
-                    })
-                })
-            })
+            // })
     
-            document.addEventListener("htmx:afterSettle", (eve) => {
-                if (!document.querySelector("form")){
-                    return
-                }
-                // Initialization
-                let files = document.querySelectorAll(".fa-file")
-                files = hideSegments(files)
+            // document.addEventListener("htmx:afterSettle", (eve) => {
+            //     if (!document.querySelector("form")){
+            //         return
+            //     }
+            //     // Initialization
+            //     let files = document.querySelectorAll(".fa-file")
+            //     files = hideSegments(files)
 
-                renameM3u8()
-                files.forEach(element => {
-                    element.addEventListener('click', () => {
-                        create_video(element)
-                    })
-                })
-                document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
-                        element.addEventListener("click", moveUp)
-                })
-                document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
-                    element.addEventListener("click", moveDown)
-                })
-                document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
-                    element.addEventListener('click', () => {
-                        deleteParentElement(element)
-                    })
-                })
-            })
+            //     renameM3u8()
+            //     files.forEach(element => {
+            //         element.addEventListener('click', () => {
+            //             create_video(element)
+            //         })
+            //     })
+            //     document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
+            //             element.addEventListener("click", moveUp)
+            //     })
+            //     document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
+            //         element.addEventListener("click", moveDown)
+            //     })
+            //     document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
+            //         element.addEventListener('click', () => {
+            //             deleteParentElement(element)
+            //         })
+            //     })
+            // })
         </script>
     </div>
 
