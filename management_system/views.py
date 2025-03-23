@@ -24,7 +24,7 @@ import re
 import os
 
 # Internal Import
-from .utils import get_drive_client
+# from .utils import get_drive_client
 from .models import *
 from .forms import CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
 from django.utils.timezone import now
@@ -32,7 +32,7 @@ from django.utils.timezone import now
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
 logger = getLogger(__name__)
-DRIVE_CLIENT = get_drive_client()
+# DRIVE_CLIENT = get_drive_client()
 CLOUD_CLIENT = boto3.client(
     's3',
     endpoint_url=os.getenv("endpoint"),
@@ -54,40 +54,40 @@ def is_managerial(request):
 def get_datetime(datetime_string):
     return datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M")
 
-def list_current_folder(folder_id=None, root=True):
-    query = f"'{folder_id}' in parents and trashed=false" if not root else "sharedWithMe=true and trashed=false"
+# def list_current_folder(folder_id=None, root=True):
+#     query = f"'{folder_id}' in parents and trashed=false" if not root else "sharedWithMe=true and trashed=false"
 
-    results = DRIVE_CLIENT.files().list(
-        q=query,
-        fields="files(id, name, mimeType)"
-    ).execute()
+#     results = DRIVE_CLIENT.files().list(
+#         q=query,
+#         fields="files(id, name, mimeType)"
+#     ).execute()
 
-    storage_data = results.get("files", [])
-    drive = []
+#     storage_data = results.get("files", [])
+#     drive = []
 
-    for data in storage_data:
-        file_type = "folder" if data['mimeType'] == "application/vnd.google-apps.folder" else "file"
+#     for data in storage_data:
+#         file_type = "folder" if data['mimeType'] == "application/vnd.google-apps.folder" else "file"
 
-        drive.append({
-            "id" : data['id'],
-            "name" : data['name'],
-            "type" : file_type,
-        })
+#         drive.append({
+#             "id" : data['id'],
+#             "name" : data['name'],
+#             "type" : file_type,
+#         })
 
-    if not root:
-        folder_details = DRIVE_CLIENT.files().get(
-            fileId=folder_id,
-            fields="id, name, parents"
-        ).execute()
+#     if not root:
+#         folder_details = DRIVE_CLIENT.files().get(
+#             fileId=folder_id,
+#             fields="id, name, parents"
+#         ).execute()
 
-        # Check if the queried folder has a parent
-        if "parents" in folder_details:
-            parent_id = folder_details["parents"][0]
-        else:
-            parent_id = ""
-        return drive, parent_id
+#         # Check if the queried folder has a parent
+#         if "parents" in folder_details:
+#             parent_id = folder_details["parents"][0]
+#         else:
+#             parent_id = ""
+#         return drive, parent_id
     
-    return drive
+#     return drive
 
 def list_current_folder(folder_name=""):
     parents = folder_name.split("-")
