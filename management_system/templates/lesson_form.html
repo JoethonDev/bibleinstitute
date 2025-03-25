@@ -242,10 +242,10 @@
             //     initializePage(event)
             // })
             
-            // document.querySelector("#content").addEventListener("htmx:afterSettle", (event) =>{
-            //     console.log("Entered")
-            //     initializePage(event)
-            // })
+            document.querySelector("#content").addEventListener("htmx:afterSettle", () =>{
+                // console.log("Entered")
+                initializePage()
+            })
 
         </script>
     </div>
