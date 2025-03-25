@@ -56,6 +56,8 @@
         </form>
 
         <script>
+            // document.removeEventListener("htmx:afterSettle", initializePage)
+
             videosCONTAINER = document.querySelector("#videos-input")
     
             // Functions
@@ -208,59 +210,43 @@
                 })
             }
 
-            // Initialization
-            files = document.querySelectorAll(".fa-file")
-            files = hideSegments(files)
+            function initializePage(){
+                files = document.querySelectorAll(".fa-file")
+                files = hideSegments(files)
 
-            renameM3u8()
-            files.forEach(element => {
-                element.addEventListener('click', () => {
-                    create_video(element)
+                renameM3u8()
+                files.forEach(element => {
+                    element.addEventListener('click', () => {
+                        create_video(element)
+                    })
                 })
-            })
-            
-            document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
-                    element.addEventListener("click", moveUp)
-            })
-            document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
-                element.addEventListener("click", moveDown)
-            })
-            document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
-                element.addEventListener('click', () => {
-                    deleteParentElement(element)
-                })
-            })
-
-            // window.addEventListener("DOMContentLoaded", () => {
                 
-            // })
-    
-            // document.addEventListener("htmx:afterSettle", (eve) => {
-            //     if (!document.querySelector("form")){
-            //         return
-            //     }
-            //     // Initialization
-            //     let files = document.querySelectorAll(".fa-file")
-            //     files = hideSegments(files)
+                document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
+                    element.addEventListener("click", moveUp)
+                })
+                document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
+                    element.addEventListener("click", moveDown)
+                })
+                document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
+                    console.log("Delete is adding")
+                    element.addEventListener('click', () => {
+                        deleteParentElement(element)
+                    })
+                })
+            }
 
-            //     renameM3u8()
-            //     files.forEach(element => {
-            //         element.addEventListener('click', () => {
-            //             create_video(element)
-            //         })
-            //     })
-            //     document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
-            //             element.addEventListener("click", moveUp)
-            //     })
-            //     document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
-            //         element.addEventListener("click", moveDown)
-            //     })
-            //     document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
-            //         element.addEventListener('click', () => {
-            //             deleteParentElement(element)
-            //         })
-            //     })
+            initializePage()
+            // window.addEventListener("DOMContentLoaded", (event) => {
+            //     // Initialization
+            //     console.log("Window Enter")
+            //     initializePage(event)
             // })
+            
+            // document.querySelector("#content").addEventListener("htmx:afterSettle", (event) =>{
+            //     console.log("Entered")
+            //     initializePage(event)
+            // })
+
         </script>
     </div>
 
