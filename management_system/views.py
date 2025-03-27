@@ -35,9 +35,9 @@ logger = getLogger(__name__)
 # DRIVE_CLIENT = get_drive_client()
 CLOUD_CLIENT = boto3.client(
     's3',
-    endpoint_url=os.getenv("endpoint") or "https://da59dca47179969defd66c61b710bbdb.r2.cloudflarestorage.com",
-    aws_access_key_id=os.getenv("key_id") or "34aab6f5a4a4e832bf2619260e0dbaea",
-    aws_secret_access_key=os.getenv("access_key") or "ac0690c0799ff35373e92d8ee6c1d6a986798e6578de992fe39965ea90df038e",
+    endpoint_url=os.getenv("endpoint") ,
+    aws_access_key_id=os.getenv("key_id") ,
+    aws_secret_access_key=os.getenv("access_key") ,
     region_name='auto'
 )
 
@@ -90,6 +90,9 @@ def get_datetime(datetime_string):
 #     return drive
 
 def list_current_folder(folder_name=""):
+    # Flag for getting all objects 
+    has_objects = True
+
     parents = folder_name.split("-")
     folder_id = parents or []
     parent_folder = "-".join(folder_id[:-2]) or None
@@ -101,26 +104,32 @@ def list_current_folder(folder_name=""):
     contents = [
 
     ]
-    # Files
-    if "Contents" in objects:
-        for obj in objects["Contents"]:
-            file_name = obj["Key"].split("/")[-1]
-            contents.append({
-                "id" : obj["Key"],
-                "name" : file_name,
-                "type" : "file"
-            })
+    while has_objects:
+        # Files
+        if "Contents" in objects:
+            for obj in objects["Contents"]:
+                file_name = obj["Key"].split("/")[-1]
+                contents.append({
+                    "id" : obj["Key"],
+                    "name" : file_name,
+                    "type" : "file"
+                })
 
-    # Folders
-    if "CommonPrefixes" in objects:
-        for folder in objects["CommonPrefixes"]:
-            separated_folder = folder["Prefix"].split("/")
-            folder = "-".join(separated_folder)
-            contents.insert(0, {
-                "id" : folder,
-                "name" : separated_folder[-2] ,
-                "type" : "folder"
-            })
+        # Folders
+        if "CommonPrefixes" in objects:
+            for folder in objects["CommonPrefixes"]:
+                separated_folder = folder["Prefix"].split("/")
+                folder = "-".join(separated_folder)
+                contents.insert(0, {
+                    "id" : folder,
+                    "name" : separated_folder[-2] ,
+                    "type" : "folder"
+                })
+        # More Objects
+        has_objects = objects['IsTruncated']
+        if has_objects:
+            continuation_token = objects['NextContinuationToken']
+            objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, ContinuationToken=continuation_token)
 
     return contents, parent_folder
 
