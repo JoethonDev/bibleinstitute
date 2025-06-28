@@ -43,6 +43,11 @@
                                 <input type="text" name="videos_name" hidden value="{{ video.name }}">
                                 <h5>اسم الفيديو</h5>
                                 <button class="btn btn-secondary">{{ video.name }}</button>
+                                <select name="files_type" class="form-select my-2" style="max-width: 200px;">
+                                    <option value="video" {% if video.file_type == "video" %}selected{% endif %}>فيديو</option>
+                                    <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>تسجيل صوت</option>
+                                </select>
+
                             </div>
                             <div class="video-order p-2">
                                 <i class="fa-solid fa-arrow-up pointer-mouse"></i>
@@ -56,8 +61,6 @@
         </form>
 
         <script>
-            // document.removeEventListener("htmx:afterSettle", initializePage)
-
             videosCONTAINER = document.querySelector("#videos-input")
     
             // Functions
@@ -81,11 +84,39 @@
                 // Display View
                 let label = document.createElement("h5")
                 label.innerHTML = `اسم الفيديو`
-    
+
+
                 let btn = document.createElement("button")
                 btn.innerHTML = `${name}`
                 btn.className = "btn btn-secondary"
     
+                // Create select element
+                let select = document.createElement("select");
+                select.name = "files_type";
+                select.className = "form-select my-2";
+                select.style.maxWidth = "200px";
+
+                // Create options
+                const videoOption = document.createElement("option");
+                videoOption.value = "video";
+                videoOption.text = "فيديو";
+
+                const audioOption = document.createElement("option");
+                audioOption.value = "audio";
+                audioOption.text = "تسجيل صوت";
+
+                // Append options
+                select.appendChild(videoOption);
+                select.appendChild(audioOption);
+
+                // Auto-select "audio" if name includes it
+                if (name.toLowerCase().includes("audio")) {
+                    select.value = "audio";
+                } else {
+                    select.value = "video";
+                }
+
+
                 // Video Block
                 let divVideo = document.createElement("div")
                 divVideo.className = "video-details p-2 mb-2 mt-5"
@@ -93,6 +124,7 @@
                 divVideo.appendChild(inputName)
                 divVideo.appendChild(label)
                 divVideo.appendChild(btn)
+                divVideo.appendChild(select);
     
                 // Order Block
                 let divOrder = createOrderBlock()
@@ -236,14 +268,8 @@
             }
 
             initializePage()
-            // window.addEventListener("DOMContentLoaded", (event) => {
-            //     // Initialization
-            //     console.log("Window Enter")
-            //     initializePage(event)
-            // })
             
             document.querySelector("#content").addEventListener("htmx:afterSettle", () =>{
-                // console.log("Entered")
                 initializePage()
             })
 

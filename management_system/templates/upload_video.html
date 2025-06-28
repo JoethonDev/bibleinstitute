@@ -1,7 +1,7 @@
 {% extends 'admin_panel.html' %}
 
 {% block body %}
-    <div id="content" class="d-flex flex-column h-100 overflow-y-scroll">
+    <div id="content" class="d-flex flex-column h-100">
 
         <button class="btn btn-primary loading m-auto mb-3 w-50" type="button" disabled>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -16,7 +16,7 @@
                 {% include 'drive_files.html' %}
             </div>
             <div class="mb-3">
-                <label for="formFileMultiple" class="form-label">Upload Videos</label>
+                <label for="formFileMultiple" class="form-label">Upload Files</label>
                 <input class="form-control" type="file" id="formFileMultiple" multiple>
             </div>
     
@@ -25,7 +25,7 @@
                 
             </div>
     
-            <button class="btn btn-primary">Upload Files</button>
+            <button class="btn btn-primary" id="upload-btn">Upload Files</button>
     
         </div>
         
@@ -36,7 +36,10 @@
         
         <script>
             ffmpeg = null
-            document.getElementById('formFileMultiple').addEventListener('change', handleFiles);
+            uploadBtn = document.getElementById("upload-btn")
+            uploadBtn.addEventListener("click", async (e) => {
+                await handleFiles(document.getElementById('formFileMultiple'))
+            })
             progressField = document.getElementById('progress-container')
             folderName = document.getElementById("folder-name")
 
@@ -77,34 +80,93 @@
                 progressBar.style.width = currentProgress
             }
 
-            async function handleFiles(event) {
-                const files = event.target.files;
+            async function handleFiles(input) {
+                const files = input.files;
                 if (files.length === 0) return;
 
                 // document.getElementById('progress-container').style.display = 'block';
 
                 for (const file of files) {
                     console.log("Processing file:", file.name);
-                    const segments = await segmentVideo(file);
-                    console.log("Segmentation Complete:", segments.length, "segments created.");
-                    await uploadSegments(segments, file.name);
+                    const fileName = file.name.split(" ").join("_")
+                    const isVideo = file.type.startsWith("video/");
+                    const fullFileName = file.name
+
+                    
+                    if (isVideo) {
+                        try {
+                            const fileData = await readFile(file)
+                            // 2. Write file to FFmpeg FS
+                            ffmpeg.FS('writeFile', fullFileName, fileData);
+
+                            // Segment video and audio
+                            const videoName = await segmentVideo(fullFileName);
+                            const audioName = await segmentAudio(fullFileName);
+
+                            // Read Segments
+                            const videoSegments = await readSegments(videoName)
+                            const audioSegments = await readSegments(audioName)
+
+                            console.log("Segmentation Complete:", videoSegments.length, "segments created.");
+                            await uploadSegments(videoSegments, videoName);
+                            console.log("Segmentation Complete:", audioSegments.length, "segments created.");
+                            await uploadSegments(audioSegments, audioName);
+                        } catch (error) {
+                            console.error("Video processing failed for", fileName, error);
+                        } finally {
+                            ffmpeg.FS("unlink", fullFileName)
+                        }
+                    } else {
+                        // Process non-video files (PDF, images, etc.)
+                        await uploadWholeFile(file, fileName);
+                    }
                 }
             }
 
-            async function segmentVideo(file) {
+            async function readFile(file) {
+                const fileData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(new Uint8Array(e.target.result));
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsArrayBuffer(file);
+                });
+                return fileData
+            }
+
+            async function readSegments(fileName) {
+                    try {
+                        // Read generated files
+                        const files = [];
+                        // Add playlist file
+                        const playlistFile = ffmpeg.FS("readFile", `${fileName}.m3u8`)
+                        ffmpeg.FS('unlink', `${fileName}.m3u8`);
+
+                        files.push(new Blob([playlistFile.buffer], { type: 'application/x-mpegURL' }));
+                        
+                        for (let i = 0; i < 1000; i++) {
+                            const index = String(i).padStart(3, '0');
+                            const filename = `${fileName}_${index}.ts`;
+                            
+                            try {
+                                const data = ffmpeg.FS('readFile', filename);
+                                files.push(new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" }));
+                                // Clean up filesystem
+                                ffmpeg.FS('unlink', filename);
+                            } catch (e) {
+                                break;
+                            }
+                        }
+
+                        return files;
+                    } catch (error) {
+                        console.error('FFmpeg error:', error);
+                        throw new Error(`Reading segmentation for ${fileName} has failed`);
+                    }
+            }
+            
+            async function segmentVideo(fullFileName) {
                 try {
-                    // 1. Read file using FileReader instead of FFmpeg.fetchFile
-                    const fileData = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => resolve(new Uint8Array(e.target.result));
-                        reader.onerror = (e) => reject(e);
-                        reader.readAsArrayBuffer(file);
-                    });
-
-                    let fileName = file.name.split(".")[0]
-
-                    // 2. Write file to FFmpeg FS
-                    ffmpeg.FS('writeFile', file.name, fileData);
+                    let fileName = `${fullFileName.split(".")[0]}_video`
 
                     // Create Progress Bar
                     createProgressBar(fileName, "process")
@@ -119,43 +181,45 @@
 
                     // 4. Run FFmpeg command with await
                     await ffmpeg.run(
-                        '-i', file.name,
+                        '-i', fullFileName,
                         '-c', 'copy',          // Copy all streams without re-encoding
                         '-map', '0',           // Include all streams from input
                         '-f', 'hls',           // Use HLS format instead of generic segment
-                        '-hls_time', '5',     // Segment duration in seconds
+                        '-hls_time', '1',     // Segment duration in seconds
                         '-hls_list_size', '0', // Keep all segments in playlist
                         '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
                         `${fileName}.m3u8`        // Main playlist file
                     );
 
-                    // 5. Read generated files
-                    const files = [];
-                    // Add playlist file
-                    const playlistFile = ffmpeg.FS("readFile", `${fileName}.m3u8`)
-                    files.push(new Blob([playlistFile.buffer], { type: 'application/x-mpegURL' }));
-                    
-                    for (let i = 0; i < 1000; i++) {
-                        const index = String(i).padStart(3, '0');
-                        const filename = `${fileName}_${index}.ts`;
-                        
-                        try {
-                            const data = ffmpeg.FS('readFile', filename);
-                            files.push(new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" }));
-                            // Clean up filesystem
-                            ffmpeg.FS('unlink', filename);
-                        } catch (e) {
-                            break;
-                        }
-                    }
-
-                    // Clean up input file
-                    ffmpeg.FS('unlink', file.name);
-
-                    return files;
+                    return fileName
                 } catch (error) {
                     console.error('FFmpeg error:', error);
                     throw new Error('Video segmentation failed');
+                }
+            }
+
+            async function segmentAudio(fullFileName) {
+                try {
+                    const baseName = `${fullFileName.split(".")[0]}_audio`;
+
+                    // Extract audio only and segment it
+                    await ffmpeg.run(
+                        '-i', fullFileName,
+                        '-vn',                    // no video
+                        '-acodec', 'aac',
+                        '-b:a', '128k',
+                        '-f', 'hls',
+                        '-hls_time', '30',
+                        '-hls_list_size', '0',
+                        '-hls_segment_filename', `${baseName}_%03d.ts`,
+                        `${baseName}.m3u8`
+                    );
+
+                    return baseName
+
+                } catch (error) {
+                    console.error('Audio segmentation failed:', error);
+                    throw error;
                 }
             }
 
@@ -169,7 +233,6 @@
                     },
                     body: JSON.stringify({
                         filename: fileName
-                        // content_type: file.type
                     })
                 });
 
@@ -189,14 +252,6 @@
                 // 2. Create upload request with progress tracking
                 const xhr = new XMLHttpRequest();
                 
-                // Progress handler
-                // xhr.upload.onprogress = (event) => {
-                //     if (event.lengthComputable) {
-                //         const percent = Math.round((event.loaded / event.total) * 100);
-                //         // document.getElementById(`upload-progress-${index}`).textContent = `${percent}%`;
-                //         document.getElementById(`upload-progress`).textContent = `${percent}%`;
-                //     }
-                // };
 
                 // Upload completion handler
                 const uploadPromise = new Promise((resolve, reject) => {
@@ -220,7 +275,8 @@
 
             async function uploadSegments(files, fileName) {
                 try {
-                    fileName = fileName.split(".")[0]
+                    
+                    fileName = CSS.escape(fileName.split(".")[0])
                     const uploadResults = [];
                     createProgressBar(fileName, "upload")
                     let uploadBar = document.querySelector(`.upload-${fileName}`)
@@ -270,8 +326,39 @@
                     console.error('Upload process failed:', error);
                     throw error;
                 }
-        }
+            }
 
+            async function uploadWholeFile(file, fullFileName) {
+                try {
+                    const [fileName, ext] = fullFileName.split(".")
+                    const uploadResults = [];
+                    createProgressBar(fileName, "upload")
+                    let uploadBar = document.querySelector(`.upload-${CSS.escape(fileName)}`)
+                    let filePath = createFilePath(fileName)
+
+                    let playlistPath = `${filePath}.${ext}`
+                    try {
+
+                        await uploadR2(playlistPath, file)
+                        updateProgressBar(uploadBar, 100)
+
+                    } catch (error) {
+                        console.error(`Playlist upload failed:`, error);
+                        uploadResults.push({
+                            status: 'failed',
+                            error: error.message
+                        });
+                    }
+                    
+
+                    return uploadResults;
+
+                } catch (error) {
+                    console.error('Upload process failed:', error);
+                    throw error;
+                }
+            }    
+        
             function removeR2Files(){
                 document.querySelectorAll(".fa-file").forEach(e => e.parentElement.parentElement.remove())
             }
@@ -301,7 +388,7 @@
                     return
                 }
                 const requestURL = event.detail.xhr.responseURL;
-                if (!requestURL.endsWith("upload-videos/")){
+                if (!requestURL.endsWith("upload-files/")){
                     removeR2Files()
                     addFolderClick()
                     document.querySelector(".back-button")?.addEventListener("click", (e) => {

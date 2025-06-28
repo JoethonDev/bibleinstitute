@@ -8,19 +8,23 @@
     <div class="row">
         {% for hls_url in links %}
             <div class="col-12 col-xs-12 pt-2 pb-2 mb-5" oncontextmenu="return false;">
-                <video playsinline controls class="video-js w-100 mb-3" height=350 preload="none" controlsList="nodownload">
-                    <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
-            
-                    <p class="vjs-no-js">
-                    To view this video please enable JavaScript, and consider upgrading to a
-                    web browser that
-                    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
-                    </p>
-                </video>
-                <div class="transparent-v-overlay"></div> 
-                <audio controls class="w-100" preload="none">
-                    <source src="{{ hls_url.url }}"/>
-                </audio>         
+                {% if hls_url.type == 'video' %}
+                    <video playsinline controls class="video-js w-100 mb-3" height=350 preload="none" controlsList="nodownload">
+                        <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
+                
+                        <p class="vjs-no-js">
+                        To view this video please enable JavaScript, and consider upgrading to a
+                        web browser that
+                        <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                        </p>
+                    </video>
+                    <div class="transparent-v-overlay"></div> 
+                {% else %}
+                    <audio controls class="w-100" preload="none">
+                        <source src="{{ hls_url.url }}"/>
+                    </audio>        
+                {% endif %}
+                 
             </div>
         {% endfor %}
     </div>

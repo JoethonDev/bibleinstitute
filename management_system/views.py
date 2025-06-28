@@ -35,9 +35,9 @@ logger = getLogger(__name__)
 # DRIVE_CLIENT = get_drive_client()
 CLOUD_CLIENT = boto3.client(
     's3',
-    endpoint_url=os.getenv("endpoint") ,
-    aws_access_key_id=os.getenv("key_id") ,
-    aws_secret_access_key=os.getenv("access_key") ,
+    endpoint_url=os.getenv("endpoint") or "https://da59dca47179969defd66c61b710bbdb.r2.cloudflarestorage.com",
+    aws_access_key_id=os.getenv("key_id") or "34aab6f5a4a4e832bf2619260e0dbaea",
+    aws_secret_access_key=os.getenv("access_key") or "ac0690c0799ff35373e92d8ee6c1d6a986798e6578de992fe39965ea90df038e",
     region_name='auto'
 )
 
@@ -447,7 +447,7 @@ def view_lesson_details(request, course_id, lesson_id):
                 # Add Courses here
                 "links" : [{
                     "url" : reverse("lesson-stream", args=[lesson_id, file_index]),
-                    # "type" : file['type']
+                    "type" : file['file_type']
                 } for file_index, file in enumerate(lesson_links)]
             })
         
@@ -474,24 +474,16 @@ def stream_lesson(request, lesson_id, file_index):
         file_name = file_data.get("name")
         file_key = file_data.get("id")
 
-        # hls_file = DRIVE_CLIENT.files().get_media(fileId=file_data.get("id"))
         m3u8_content = download_from_bucket(file_key).read().decode("utf-8")
-        # m3u8_content = m3u8_content.read().decode("utf-8")
 
         # Build Segments
         segments_names = re.findall(r"^.*\.ts$", m3u8_content, re.MULTILINE)
         folder = "/".join(file_key.split("/")[:-1])
         for segment in segments_names:
             segment_key = f"{folder}/{segment}" if folder else segment
-            # m3u8_content = m3u8_content.replace(segment, f"{os.getenv('worker_endpoint')}{segment_key}")
             m3u8_content = m3u8_content.replace(segment, f"https://weathered-wave-c7f0.elprincedoca.workers.dev/{segment_key}")
-            # m3u8_content = m3u8_content.replace(segment, generate_unique_url(segment_key))
             
-        # m3u8_content = download_from_drive(hls_file)
         logger.info(f"{file_name} HLS file of {lesson.name} is loaded!")
-
-        # base_url = request.build_absolute_uri("/") + f"lesson/{lesson_id}"
-        # m3u8_content = m3u8_content.read().decode("utf-8").replace("{{path}}", base_url)
 
         # Stream the file content as response
         logger.info(f"Sending {file_name} HLS file of {lesson.name} to {username}")
@@ -504,9 +496,6 @@ def stream_lesson(request, lesson_id, file_index):
         logger.error(f"Lesson with id : {lesson_id} not found for user: {username}")
         raise Http404
     
-    # except HttpError as e:
-    #     logger.error(f"Downloading hls file is failed for user : {username}")
-    #     logger.error(f"Stack Trace : {str(e)}")
 
 # @login_required(login_url=LOGIN_URL)
 # def retrieve_segment(request, lesson_id, segment_id):
@@ -815,13 +804,15 @@ def create_lesson(request):
         course_name = request.POST.get("course", "")
         videos = request.POST.getlist("videos", [])
         videos_name = request.POST.getlist("videos_name", [])
+        files_type = request.POST.getlist("files_type", [])
         if lesson_name and course_name and videos:
             try:
                 links = [
                     {
+                        "file_type": files_type[file_no],
                         "name" : videos_name[file_no],
                         "id" : videos[file_no],
-                        "prefix" : videos[file_no].split("/")[:-1]
+                        # "prefix" : videos[file_no].split("/")[:-1]
                     } for file_no in range(len(videos))
                 ]
 
@@ -885,10 +876,12 @@ def update_lesson(request, lesson_id):
         course_name = request.POST.get("course", "")
         videos = request.POST.getlist("videos", [])
         videos_name = request.POST.getlist("videos_name", [])
+        files_type = request.POST.getlist("files_type", [])
         if lesson_name and course_name and videos:
             try:
                 links = [
                     {
+                        "file_type": files_type[file_no],
                         "name" : videos_name[file_no],
                         "id" : videos[file_no],
                     } for file_no in range(len(videos))
@@ -929,7 +922,7 @@ def ffmpeg_headers(view_func):
 
 @ffmpeg_headers
 @login_required(login_url=LOGIN_URL)
-def upload_videos(request):
+def upload_file(request):
     is_manager = is_managerial(request)
     if not is_manager:
         return is_manager
@@ -959,6 +952,7 @@ def upload_link(request):
         'url': presigned_url,
         'method': 'PUT',
     })
+
 # Quiz Dashboard
 @login_required(login_url=LOGIN_URL)
 def quiz_dashboard(request):   

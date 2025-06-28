@@ -106,7 +106,7 @@
               </li>
               {% if request.user.role.role == "admin" or request.user.role.role == "teacher" %}
                 <li class="nav-item">
-                  <a class="nav-link" href="{% url 'admin-panel' %}">Admin Dashboard</a>
+                  <a class="nav-link" href="{% url 'user-dashboard' %}">Admin Dashboard</a>
                 </li>
               {% endif %}
             </ul>
