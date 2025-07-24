@@ -1,4 +1,5 @@
-<select class="form-select filters-fields" aria-label="Year Filter" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+{% load i18n %}
+<select class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
     {% for option in options %}
         {% if forloop.first %}
             <option value="">{{ option }}</option>

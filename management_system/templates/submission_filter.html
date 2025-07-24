@@ -1,4 +1,5 @@
+{% load i18n %}
 <div class="d-flex justify-content-between">
-    <input class="form-control filters-fields mb-md-0 me-3 ms-0" type="number" placeholder="Minimum Grade" name="min-grade"  value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
-    <input class="form-control filters-fields" type="number" placeholder="Maximum Grade" name="max-grade"  value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
+    <input class="form-control filters-fields mb-md-0 me-3 ms-0" type="number" placeholder="{% translate "Minimum Grade" %}" name="min-grade"  value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Minimum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
+    <input class="form-control filters-fields" type="number" placeholder="{% translate "Maximum Grade" %}" name="max-grade"  value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Maximum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
 </div>

@@ -1,46 +1,64 @@
 {% extends 'admin_panel.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
 {% block body %}
-    <div class="container-fluid" id="content">
-        <h2>Submissions</h2>
-        <div class="submission-table">
-            <div class="options d-flex justify-content-between align-items-center">
-                <div class="filters d-flex" hx-include=".filters-fields">
-                    {% if submission %}
-                        <div class="d-flex" role="search">
-                            <input class="form-control me-2 filters-fields" type="number" placeholder="Minimum Grade" name="min-grade"  value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
-                        </div>
-                        <div class="d-flex" role="search">
-                            <input class="form-control me-2 filters-fields" type="number" placeholder="Maximum Grade" name="max-grade"  value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
-                        </div>
+<div class="container-fluid py-4" id="content">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header Section -->
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h2 class="h3 mb-0 text-primary fw-bold">{% translate "Submissions" %}</h2>
+      </div>
+
+      <!-- Main Content Card -->
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <!-- Filters Section -->
+          <div class="d-flex flex-column flex-lg-row justify-content-end align-items-lg-center gap-2 mb-4">
+            <div class="filters d-flex flex-wrap gap-2" hx-include=".filters-fields">
+              {% if submission %}
+              <div class="filter-item">
+                <input class="form-control filters-fields" type="number" placeholder="{% translate "Minimum Grade" %}" name="min-grade" value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Minimum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+              </div>
+              <div class="filter-item">
+                <input class="form-control filters-fields" type="number" placeholder="{% translate "Maximum Grade" %}" name="max-grade" value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Maximum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+              </div>
+              {% endif %}
+
+              <div class="filter-item">
+                <select class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+                  {% for option in options %}
+                    {% if forloop.first %}
+                      <option value="">{% translate "All" %} {{ view_name }}</option>
+                    {% else %}
+                      {% if filtering == option %}
+                        <option value="{{ option }}" selected>{{ option }}</option>
+                      {% else %}
+                        <option value="{{ option }}">{{ option }}</option>
+                      {% endif %}
                     {% endif %}
-
-                    <div class="d-flex me-2" role="filter">
-                        <select class="form-select filters-fields" aria-label="Year Filter" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
-                            {% for option in options %}
-                                {% if forloop.first %}
-                                    <option value="">{{ option }}</option>
-                                {% else %}
-                                    {% if filtering == option %}
-                                        <option value="{{ option }}" selected>{{ option }}</option>
-                                    {% else %}
-                                        <option value="{{ option }}">{{ option }}</option>
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="d-flex" role="search">
-                        <input class="form-control me-2 filters-fields" type="search" placeholder="Search" name="name"  value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="Search" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML"> 
-                    </div>
-                </div>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="filter-item">
+                <input class="form-control me-2 filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+              </div>
             </div>
+          </div>
 
+          <!-- Table Section -->
+          <div class="table-container">
             {% include 'table_rendering.html' %}
+          </div>
+
+          <!-- Pagination Section -->
+          <div class="mt-4">
+            {% include 'pagination.html' %}
+          </div>
         </div>
-
-        {% include 'pagination.html' %}
-
+      </div>
     </div>
+  </div>
+</div>
 {% endblock %}

@@ -1,31 +1,57 @@
-{% extends 'admin_panel.html' %}
-{% load crispy_forms_tags %}
+{% extends 'admin_panel.html' %} {% load crispy_forms_tags %} {% load i18n %} 
+
 
 {% block body %}
-    <div class="container-fluid" id="content">
-        <h2>{{ header }}</h2>
-        <div class="user-table">
-            <div class="options d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                {% if not submission_user %}
-                    <button class="btn btn-primary mb-4 mb-md-0" hx-get="{{ url }}create" hx-push-url="true" hx-trigger="click" hx-target="#display-page" hx-select="#content">Create a {{ view }}</button>
-                {% endif %}                
-                <div class="filters d-flex flex-column flex-md-row " hx-include=".filters-fields">
-                    <div class="row">
-                        {% for filter in filters %}
-                            <div class="col-12 col-md-auto mb-2">
-                                {% include filter %}
-                            </div>
-                        {% endfor %}
+<div class="container-fluid py-4" id="content">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header Section -->
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h2 class="h3 mb-0 text-primary fw-bold">{% translate header %}</h2>
+      </div>
 
-                    </div>
-                    
-                </div>
+      <!-- Main Content Card -->
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <!-- Action Bar -->
+          <div
+            class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4"
+          >
+            {% if not submission_user %}
+            <button
+              class="btn btn-primary btn-lg d-flex align-items-center gap-2 px-4"
+              hx-get="{{ url }}create"
+              hx-push-url="true"
+              hx-trigger="click"
+              hx-target="#display-page"
+              hx-select="#content"
+            >
+              <i class="bi bi-plus-circle"></i>
+              {% translate "Create a" %} {{ view }}
+            </button>
+            {% endif %}
+
+            <!-- Filters Section -->
+            <div
+              class="d-flex flex-wrap gap-2 filters"
+              hx-include=".filters-fields"
+            >
+              {% for filter in filters %}
+              <div class="filter-item">{% include filter %}</div>
+              {% endfor %}
             </div>
+          </div>
 
+          <!-- Table Section -->
+          <div class="table-container">
             {% include 'table_rendering.html' %}
+          </div>
+
+          <!-- Pagination Section -->
+          <div class="mt-4">{% include 'pagination.html' %}</div>
         </div>
-
-        {% include 'pagination.html' %}
-
+      </div>
     </div>
+  </div>
+</div>
 {% endblock %}

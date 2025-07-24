@@ -1,4 +1,13 @@
 {% extends "course_detail.html" %}
+{% load i18n %}
+
+{% block style %}
+<style>
+    canvas { border: 1px solid #ccc; width: 100%; max-width: 800px; }
+    .controls { margin-top: 10px; }
+    .controls button { padding: 6px 12px; margin: 0 5px; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div id="content-loaded">
@@ -13,16 +22,26 @@
                         <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
                 
                         <p class="vjs-no-js">
-                        To view this video please enable JavaScript, and consider upgrading to a
-                        web browser that
-                        <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                        {% translate "To view this video please enable JavaScript, and consider upgrading to a web browser that" %}
+                        <a href="https://videojs.com/html5-video-support/" target="_blank">{% translate "supports HTML5 video" %}</a>
                         </p>
                     </video>
                     <div class="transparent-v-overlay"></div> 
-                {% else %}
+                {% elif hls_url.type == 'audio' %}
                     <audio controls class="w-100" preload="none">
                         <source src="{{ hls_url.url }}"/>
-                    </audio>        
+                    </audio> 
+                {% else %}
+                   <div class="pdf-viewer" data-url="{{ hls_url.url }}">
+                        <canvas class="pdf-canvas" style="width: 100%; border: 1px solid #ccc;">
+                            
+                        </canvas>
+                        <div class="controls controls d-flex justify-content-center mt-3">
+                            <button class="prev me-2 btn btn-secondary">{% translate "Previous" %}</button>
+                            <span class="page-info me-2">{% translate "Page" %} 1 / ?</span>
+                            <button class="next btn btn-secondary">{% translate "Next" %}</button>
+                        </div>
+                   </div>
                 {% endif %}
                  
             </div>
@@ -30,6 +49,27 @@
     </div>
     
     <script>
+        // Translations for JavaScript messages
+        const jsTranslations_lesson = {
+            'en': {
+                'page': 'Page',
+                'actionBlocked': 'Action blocked for content protection.'
+            },
+            'ar': {
+                'page': 'صفحة',
+                'actionBlocked': 'تم حظر الإجراء لحماية المحتوى.'
+            }
+        };
+
+        function getJsTranslation_lesson(key, params = {}) {
+            const lang = document.documentElement.lang || 'en';
+            let message = jsTranslations_lesson[lang][key] || jsTranslations_lesson['en'][key];
+            for (const param in params) {
+                message = message.replace(`{${param}}`, params[param]);
+            }
+            return message;
+        }
+
         function initializeElements() {
             preventContext(window)
             // Initialize VideoJS players for both video and audio elements after content is swapped in
@@ -54,6 +94,8 @@
                     }
                 }
             })
+            
+            loadPDFs()
         }
 
         function loadVideo(video){
@@ -99,12 +141,100 @@
             });
         }
 
+        async function loadPDFs() {
+            const viewers = document.querySelectorAll(".pdf-viewer");
+
+            for (const viewer of viewers) {
+                const url = viewer.dataset.url;
+                const canvas = viewer.querySelector(".pdf-canvas");
+                const ctx = canvas.getContext("2d");
+                const pageInfo = viewer.querySelector(".page-info");
+                const prevBtn = viewer.querySelector(".prev");
+                const nextBtn = viewer.querySelector(".next");
+
+                let pdfDoc = null;
+                let currentPage = 1;
+
+                // Fetch PDF URL from endpoint
+                const response = await fetch(url);
+                const result = await response.json();
+
+                // Load PDF into memory
+                const loadingTask = pdfjsLib.getDocument(result.url);
+                pdfDoc = await loadingTask.promise;
+
+                const renderPage = (num) => {
+                pdfDoc.getPage(num).then(page => {
+                    const scale = 1.5;
+                    const viewport = page.getViewport({ scale });
+
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                    };
+
+                    page.render(renderContext);
+                    pageInfo.textContent = `${getJsTranslation_lesson('page')} ${num} / ${pdfDoc.numPages}`;
+                });
+                };
+
+                // Initial render
+                renderPage(currentPage);
+
+                // Controls
+                prevBtn.addEventListener("click", () => {
+                if (currentPage <= 1) return;
+                currentPage--;
+                renderPage(currentPage);
+                });
+
+                nextBtn.addEventListener("click", () => {
+                if (currentPage >= pdfDoc.numPages) return;
+                currentPage++;
+                renderPage(currentPage);
+                });
+            }
+}
+        
         window.addEventListener("DOMContentLoaded", () => {
-            initializeElements
+            initializeElements()
+            // Disable right-click
+            document.addEventListener("contextmenu", e => e.preventDefault());
+
+            // Disable Ctrl+S / Ctrl+P / Ctrl+U
+            document.addEventListener("keydown", e => {
+                if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
+                    e.preventDefault();
+                    // alert("Action blocked for content protection."); // Replaced with custom message box if needed
+                    // For now, just prevent default without an alert
+                }
+            });
+
+            // Disable text selection
+            document.addEventListener("selectstart", e => e.preventDefault());
+
         })
 
         document.addEventListener('htmx:afterSwap', (event) => {
             initializeElements()
+            // Disable right-click
+            document.addEventListener("contextmenu", e => e.preventDefault());
+
+            // Disable Ctrl+S / Ctrl+P / Ctrl+U
+            document.addEventListener("keydown", e => {
+                if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
+                    e.preventDefault();
+                    // alert("Action blocked for content protection."); // Replaced with custom message box if needed
+                    // For now, just prevent default without an alert
+                }
+            });
+
+            // Disable text selection
+            document.addEventListener("selectstart", e => e.preventDefault());
+
         });
 
     </script>

@@ -1,281 +1,209 @@
 {% extends 'admin_panel.html' %}
+{% load i18n %}
 
 {% block body %}
-    <div id="content" class="d-flex flex-column h-100 overflow-y-scroll">
-
-        <a hx-get="{% url 'lesson-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="nav-link pe-auto mb-5">Back to lessons</a>
-
-        <form action="" method="post" class="w-100 mb-5 row">
-            <div class="input-fields d-flex flex-column col-12 col-md-6 mb-4 mb-md-0">
-                {% include 'messages.html' %}
-                {% csrf_token %}
-                
-                <div class="mb-3">
-                    <label for="lesson_name" class="form-label">اسم الدرس</label>
-                    <input type="text" class="form-control" id="lesson_name" name="lesson_name" required value="{{ lesson_name }}">
-                </div>
-
-                <select class="form-select mb-3" required name="course">
-                    <option selected disabled>الكورس التابع له</option>
-                    {% for course in courses %}
-                        {% if course == selected_course %}
-                            <option value="{{ course }}" selected>{{ course }}</option>
-                        {% else %}
-                            <option value="{{ course }}">{{ course }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-
-                <div id="drive-files" class="bg-light mb-5 w-100 vh-40 flex-grow-1 d-flex flex-column">
-                    {% include 'drive_files.html' %}
-                </div>
-                
-                <input type="submit" class="btn btn-primary">
-            </div>
-            <div id="lectures-display" class="col-12 col-md-6">
-                <h5>Lectures</h5>
-                <div id="videos-input" class="d-flex flex-wrap w-100">
-                   {% for video in videos %}
-                    <div class="video-container me-2 w-100 bg-light border rounded fs-5 mb-2">
-                            <i class="fa-solid fa-xmark pointer-mouse"></i>
-                            <div class="video-details p-2 mb-2 mt-5">
-                                <input type="text" name="videos" hidden value="{{ video.id }}">
-                                <input type="text" name="videos_name" hidden value="{{ video.name }}">
-                                <h5>اسم الفيديو</h5>
-                                <button class="btn btn-secondary">{{ video.name }}</button>
-                                <select name="files_type" class="form-select my-2" style="max-width: 200px;">
-                                    <option value="video" {% if video.file_type == "video" %}selected{% endif %}>فيديو</option>
-                                    <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>تسجيل صوت</option>
-                                </select>
-
-                            </div>
-                            <div class="video-order p-2">
-                                <i class="fa-solid fa-arrow-up pointer-mouse"></i>
-                                <i class="fa-solid fa-arrow-down pointer-mouse"></i>
-                            </div>
-                        </div>
-                   {% endfor %}
-                </div>
-            </div>
-
-        </form>
-
-        <script>
-            videosCONTAINER = document.querySelector("#videos-input")
-    
-            // Functions
-            function create_video(element) {
-                let name = element.parentNode.parentNode.querySelector("h5").innerHTML
-                let id = element.dataset.id
-    
-                // Input for submission
-                let inputID = document.createElement("input")
-                inputID.name = "videos"
-                inputID.type = "text"
-                inputID.hidden = true
-                inputID.setAttribute("value", id)
-    
-                let inputName = document.createElement("input")
-                inputName.name = "videos_name"
-                inputName.type = "text"
-                inputName.hidden = true
-                inputName.setAttribute("value", name)
-    
-                // Display View
-                let label = document.createElement("h5")
-                label.innerHTML = `اسم الفيديو`
-
-
-                let btn = document.createElement("button")
-                btn.innerHTML = `${name}`
-                btn.className = "btn btn-secondary"
-    
-                // Create select element
-                let select = document.createElement("select");
-                select.name = "files_type";
-                select.className = "form-select my-2";
-                select.style.maxWidth = "200px";
-
-                // Create options
-                const videoOption = document.createElement("option");
-                videoOption.value = "video";
-                videoOption.text = "فيديو";
-
-                const audioOption = document.createElement("option");
-                audioOption.value = "audio";
-                audioOption.text = "تسجيل صوت";
-
-                // Append options
-                select.appendChild(videoOption);
-                select.appendChild(audioOption);
-
-                // Auto-select "audio" if name includes it
-                if (name.toLowerCase().includes("audio")) {
-                    select.value = "audio";
-                } else {
-                    select.value = "video";
-                }
-
-
-                // Video Block
-                let divVideo = document.createElement("div")
-                divVideo.className = "video-details p-2 mb-2 mt-5"
-                divVideo.appendChild(inputID)
-                divVideo.appendChild(inputName)
-                divVideo.appendChild(label)
-                divVideo.appendChild(btn)
-                divVideo.appendChild(select);
-    
-                // Order Block
-                let divOrder = createOrderBlock()
-    
-                // Container Block
-                let divContianer = document.createElement("div")
-                divContianer.className = "video-container me-2 w-100 bg-light border rounded fs-5 mb-2"
-                divContianer.style.position = "relative"
-                
-    
-                let i = createDeleteBtn()
-    
-                divContianer.appendChild(i)
-                divContianer.appendChild(divVideo)
-                divContianer.appendChild(divOrder)
-    
-                document.querySelector("#videos-input").appendChild(divContianer)
-    
-            }
-    
-            function createDeleteBtn(){
-                let i = document.createElement("i")
-                i.className = "fa-solid fa-xmark pointer-mouse"
-                i.addEventListener('click', () => {
-                    deleteParentElement(i)
-                })
-    
-                return i
-            }
-    
-            function createOrderBlock(){
-                let div = document.createElement("div")
-                div.className = "video-order p-2"
-                let orderArrows = `
-                    <i class="fa-solid fa-arrow-up pointer-mouse"></i>
-                    <i class="fa-solid fa-arrow-down pointer-mouse"></i>
-                `
-                div.insertAdjacentHTML("afterbegin", orderArrows)
-    
-                // Add Event Listener 
-                div.querySelector(".fa-arrow-up").addEventListener("click", moveUp)
-                div.querySelector(".fa-arrow-down").addEventListener("click", moveDown)
-    
-                return div
-            }
-    
-            function moveUp(event){
-                let element = event.target
-                if (isParentFirst(element.parentNode)){
-                    return
-                }
-    
-                let videoContainer = element.parentNode.parentNode
-                let newIndex = getParentIndex(videoContainer, videosCONTAINER) - 1
-                videoContainer.remove()
-                videosCONTAINER.insertBefore(videoContainer, videosCONTAINER.children[newIndex])
-            }
-    
-            function moveDown(event){
-                let element = event.target
-                if (isParentLast(element.parentNode)){
-                    return
-                }
-    
-                let videoContainer = element.parentNode.parentNode
-                let newIndex = getParentIndex(videoContainer, videosCONTAINER) + 1
-                videoContainer.remove()
-                if (newIndex >= videosCONTAINER.children.length){
-                    videosCONTAINER.appendChild(videoContainer)
-                }
-                else{
-                    videosCONTAINER.insertBefore(videoContainer, videosCONTAINER.children[newIndex])
-                }
-            }
-    
-            function isParentFirst(element){
-                let parent = element.parentNode
-                return videosCONTAINER.firstElementChild == parent
-            }
-    
-            function isParentLast(element){
-                let parent = element.parentNode
-                return videosCONTAINER.lastElementChild == parent
-            }
-    
-            function getParentIndex(parent, container){
-                return [...container.children].indexOf(parent)
-            }
-    
-            function deleteParentElement(element) {
-                let parent = element.parentNode
-                parent.remove()
-            }
-    
-            function hideSegments(files){
-                files.forEach(file => {
-                    let fileName = file.dataset.id.split("/").slice(-1)[0]
-                    // console.log(fileName)
-                    if (fileName.endsWith(".ts")){
-                        deleteParentElement(file.parentElement)
-                    }
-                })
-                return files
-            }
-
-            function renameM3u8(){
-                document.querySelectorAll(".fa-file").forEach(video => {
-                    // Get Parent
-                    let grandParent = video.parentElement.parentElement
-                    // Get Name Place
-                    let nameSection = grandParent.querySelector("h5")
-                    let videoName = nameSection.innerText.split(".")[0]
-                    // Rename
-                    nameSection.innerText = videoName
-                })
-            }
-
-            function initializePage(){
-                files = document.querySelectorAll(".fa-file")
-                files = hideSegments(files)
-
-                renameM3u8()
-                files.forEach(element => {
-                    element.addEventListener('click', () => {
-                        create_video(element)
-                    })
-                })
-                
-                document.querySelectorAll("#videos-input .fa-arrow-up").forEach(element => {
-                    element.addEventListener("click", moveUp)
-                })
-                document.querySelectorAll("#videos-input .fa-arrow-down").forEach(element => {
-                    element.addEventListener("click", moveDown)
-                })
-                document.querySelectorAll("#videos-input .fa-xmark").forEach(element => {
-                    console.log("Delete is adding")
-                    element.addEventListener('click', () => {
-                        deleteParentElement(element)
-                    })
-                })
-            }
-
-            initializePage()
-            
-            document.querySelector("#content").addEventListener("htmx:afterSettle", () =>{
-                initializePage()
-            })
-
-        </script>
+<div id="content" class="container-fluid py-4">
+    <!-- Back Navigation -->
+    <div class="mb-4">
+        <a hx-get="{% url 'lesson-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit">
+            <i class="fas fa-arrow-left"></i>
+            {% translate "Back to lessons" %}
+        </a>
     </div>
 
-    
-    
+    <form action="" method="post" class="row g-4">
+        {% csrf_token %}
+        <!-- Left Column: Form Inputs & Drive Files -->
+        <div class="col-lg-7 d-flex flex-column gap-4">
+            <!-- Lesson Details Card -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0 fw-bold">{% translate "Lesson Details" %}</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% include 'messages.html' %}
+                    <div class="mb-3">
+                        <label for="lesson_name" class="form-label fw-semibold">{% translate "Lesson Name" %}</label>
+                        <input type="text" class="form-control" id="lesson_name" name="lesson_name" required value="{{ lesson_name }}">
+                    </div>
+                    <div>
+                        <label for="course_select" class="form-label fw-semibold">{% translate "Course" %}</label>
+                        <select class="form-select" id="course_select" required name="course">
+                            <option selected disabled>{% translate "Select a Course" %}</option>
+                            {% for course in courses %}
+                                <option value="{{ course }}" {% if course == selected_course %}selected{% endif %}>{{ course }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drive Files Card -->
+            <div class="card shadow-sm border-0 flex-grow-1">
+                <div class="card-header">
+                    <h6 class="mb-0">{% translate "Select Files from Drive" %}</h6>
+                </div>
+                <div id="drive-files" class="card-body overflow-auto" style="min-height: 300px;">
+                    {% include 'drive_files.html' %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Selected Lectures -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-header">
+                    <h5 class="mb-0">{% translate "Selected Lectures" %}</h5>
+                </div>
+                <div id="lectures-display" class="card-body p-3">
+                    <div id="videos-input" class="d-flex flex-column column-gap-2">
+                       {% for video in videos %}
+                        <div class="card video-container">
+                            <input type="text" name="videos" hidden value="{{ video.id }}">
+                            <input type="text" name="videos_name" hidden value="{{ video.name }}">
+                            <div class="card-body p-3">
+                                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close"></button>
+                                <p class="fw-bold mb-2 text-primary">{{ video.name }}</p>
+                                <select name="files_type" class="form-select form-select-sm">
+                                    <option value="video" {% if video.file_type == "video" %}selected{% endif %}>{% translate "Video" %}</option>
+                                    <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>{% translate "Audio Recording" %}</option>
+                                    <option value="book" {% if video.file_type == "book" %}selected{% endif %}>{% translate "Book" %}</option>
+                                </select>
+                            </div>
+                            <div class="card-footer bg-light p-1 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-up"><i class="fas fa-arrow-up"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-down"><i class="fas fa-arrow-down"></i></button>
+                            </div>
+                        </div>
+                       {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit Button -->
+        <div class="col-12">
+            <div class="d-grid">
+                <input type="submit" class="btn btn-primary btn-lg" value="{% translate "Submit" %}">
+            </div>
+        </div>
+    </form>
+
+    <script>
+        (() => {
+            const videosCONTAINER = document.querySelector("#videos-input");
+
+            const jsTranslations_lesson_form = {
+                'en': { 'video': 'Video', 'audioRecording': 'Audio Recording', 'book': 'Book' },
+                'ar': { 'video': 'فيديو', 'audioRecording': 'تسجيل صوتي', 'book': 'كتاب' }
+            };
+
+            function getJsTranslation_lesson_form(key) {
+                const lang = document.documentElement.lang || 'en';
+                return jsTranslations_lesson_form[lang][key] || jsTranslations_lesson_form['en'][key];
+            }
+
+            function create_video(element) {
+                const name = element.closest('.card-body').querySelector('.card-title').textContent.trim();
+                const id = element.dataset.id;
+
+                const videoCard = document.createElement("div");
+                videoCard.className = "card video-container";
+                
+                let fileType = "book";
+                if (name.toLowerCase().includes("audio")) fileType = "audio";
+                if (name.toLowerCase().includes("video")) fileType = "video";
+
+                videoCard.innerHTML = `
+                    <input type="text" name="videos" hidden value="${id}">
+                    <input type="text" name="videos_name" hidden value="${name}">
+                    <div class="card-body p-3">
+                        <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close"></button>
+                        <p class="fw-bold mb-2 text-primary">${name}</p>
+                        <select name="files_type" class="form-select form-select-sm">
+                            <option value="video" ${fileType === 'video' ? 'selected' : ''}>${getJsTranslation_lesson_form('video')}</option>
+                            <option value="audio" ${fileType === 'audio' ? 'selected' : ''}>${getJsTranslation_lesson_form('audioRecording')}</option>
+                            <option value="book" ${fileType === 'book' ? 'selected' : ''}>${getJsTranslation_lesson_form('book')}</option>
+                        </select>
+                    </div>
+                    <div class="card-footer bg-light p-1 text-end">
+                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-up"><i class="fas fa-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-down"><i class="fas fa-arrow-down"></i></button>
+                    </div>
+                `;
+                
+                videosCONTAINER.appendChild(videoCard);
+                addEventListenersToCard(videoCard);
+            }
+
+            function moveUp(event) {
+                const videoContainer = event.target.closest('.video-container');
+                const prevSibling = videoContainer.previousElementSibling;
+                if (prevSibling) {
+                    videosCONTAINER.insertBefore(videoContainer, prevSibling);
+                }
+            }
+
+            function moveDown(event) {
+                const videoContainer = event.target.closest('.video-container');
+                const nextSibling = videoContainer.nextElementSibling;
+                if (nextSibling) {
+                    videosCONTAINER.insertBefore(nextSibling, videoContainer);
+                }
+            }
+
+            function deleteCard(event) {
+                event.target.closest('.video-container').remove();
+            }
+            
+            function hideSegments(files) {
+                files.forEach(file => {
+                    if (file.dataset.id && file.dataset.id.endsWith(".ts")) {
+                        file.closest('.col').remove();
+                    }
+                });
+            }
+
+            function renameM3u8() {
+                document.querySelectorAll("#drive-files .file-icon").forEach(videoIcon => {
+                    const cardBody = videoIcon.closest('.card-body');
+                    const nameSection = cardBody.querySelector(".card-title");
+                    if (nameSection.innerText.endsWith('.m3u8')) {
+                        nameSection.innerText = nameSection.innerText.replace('.m3u8', '');
+                    }
+                });
+            }
+
+            function addEventListenersToCard(card) {
+                card.querySelector('.btn-close').addEventListener('click', deleteCard);
+                card.querySelector('.video-order-up').addEventListener('click', moveUp);
+                card.querySelector('.video-order-down').addEventListener('click', moveDown);
+            }
+
+            function initializePage() {
+                const files = document.querySelectorAll("#drive-files .file-icon");
+                hideSegments(files);
+                renameM3u8();
+
+                document.querySelectorAll("#drive-files .file-icon").forEach(element => {
+                    element.addEventListener('click', () => create_video(element));
+                });
+                
+                document.querySelectorAll("#videos-input .video-container").forEach(addEventListenersToCard);
+            }
+
+            document.addEventListener("htmx:afterSwap", () => {
+                initializePage();
+            })
+            
+            // const contentEl = document.querySelector("#content");
+            // if(contentEl) {
+            //     new MutationObserver(initializePage).observe(document.querySelector("#drive-files"), {
+            //         childList: true,
+            //         subtree: true
+            //     });
+            // }
+        })();
+    </script>
+</div>
 {% endblock %}

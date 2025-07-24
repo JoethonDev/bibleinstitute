@@ -1,7 +1,8 @@
-<select class="form-select filters-fields" aria-label="Year Filter" name="course" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+{% load i18n %}
+<select class="form-select filters-fields" aria-label="{% translate "Course Filter" %}" name="course" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
     {% for course in subjects %}
         {% if forloop.first %}
-            <option value="">{{ course }}</option>
+            <option value="">{% translate "All Courses" %}</option>
         {% else %}
             {% if course_value == course %}
                 <option value="{{ course }}" selected>{{ course }}</option>

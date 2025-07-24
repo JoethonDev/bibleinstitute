@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
 {% block body %}
 <div id="content" class="container-fluid mw-50">
@@ -7,7 +8,7 @@
         <form action="" method="post">
             {% csrf_token %}
             {{ form|crispy }}
-            <button class="btn btn-secondary" hx-post="{% url 'update-profile' object.id %}" hx-swap="innerHTML" hx-target="#profile" hx-select="#profile" hx-trigger="click">Update Profile</button>
+            <button class="btn btn-secondary" hx-post="{% url 'update-profile' object.id %}" hx-swap="innerHTML" hx-target="#profile" hx-select="#profile" hx-trigger="click">{% translate "Update Profile" %}</button>
         </form>
     </div>
 

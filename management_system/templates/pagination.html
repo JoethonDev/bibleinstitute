@@ -1,45 +1,120 @@
-<nav aria-label="Page navigation example">
-    <ul class="pagination justify-content-center">
-        
-    {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link previous" hx-select="#content" hx-get="{{ url }}?page={{ page_obj.previous_page_number }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Previous</a>
-    {% else %}
-        <li class="page-item disabled">
-            <a class="page-link previous" hx-select="#content" hx-get="{{ url }}?page=1" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Previous</a>
-    {% endif %}
-        </li>
+{% load i18n %}
+<nav aria-label="{% translate "Page navigation example" %}" class="d-flex justify-content-center">
+    <ul class="pagination pagination-lg shadow-sm">
+        <!-- Previous Button -->
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link previous d-flex align-items-center gap-2 px-3" 
+                   hx-select="#content" 
+                   hx-get="{{ url }}?page={{ page_obj.previous_page_number }}" 
+                   hx-trigger="change" 
+                   hx-target="#display-page" 
+                   hx-push-url="true" 
+                   hx-swap="innerHTML">
+                    <i class="bi bi-chevron-left"></i>
+                    {% translate "Previous" %}
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <a class="page-link previous d-flex align-items-center gap-2 px-3" 
+                   hx-select="#content" 
+                   hx-get="{{ url }}?page=1" 
+                   hx-trigger="change" 
+                   hx-target="#display-page" 
+                   hx-push-url="true" 
+                   hx-swap="innerHTML">
+                    <i class="bi bi-chevron-left"></i>
+                    {% translate "Previous" %}
+                </a>
+            </li>
+        {% endif %}
 
-      {% for number in page_obj.paginator.page_range  %}
+        <!-- Page Numbers -->
+        {% for number in page_obj.paginator.page_range %}
             {% if number == page_obj.number %}
                 <li class="page-item active">
+                    <a class="page-link number fw-bold">{{ number }}</a>
+                </li>
             {% else %}
                 <li class="page-item">
-            {% endif %}
                     <a class="page-link number">{{ number }}</a>
                 </li>
-      {% endfor %}
+            {% endif %}
+        {% endfor %}
 
-    {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link next" hx-select="#content" hx-get="{{ url }}?page={{ page_obj.next_page_number }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Next</a>
-    {% else %}
-        <li class="page-item disabled">
-            <a class="page-link next" hx-select="#content" hx-get="{{ url }}?page={{ page_obj.num_pages }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">Next</a>
-    {% endif %}
-        </li>
+        <!-- Next Button -->
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link next d-flex align-items-center gap-2 px-3" 
+                   hx-select="#content" 
+                   hx-get="{{ url }}?page={{ page_obj.next_page_number }}" 
+                   hx-trigger="change" 
+                   hx-target="#display-page" 
+                   hx-push-url="true" 
+                   hx-swap="innerHTML">
+                    {% translate "Next" %}
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <a class="page-link next d-flex align-items-center gap-2 px-3" 
+                   hx-select="#content" 
+                   hx-get="{{ url }}?page={{ page_obj.num_pages }}" 
+                   hx-trigger="change" 
+                   hx-target="#display-page" 
+                   hx-push-url="true" 
+                   hx-swap="innerHTML">
+                    {% translate "Next" %}
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        {% endif %}
     </ul>
 </nav>
 
+<!-- Pagination Info -->
+<div class="text-center mt-3">
+    <small class="text-muted">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </small>
+</div>
+
 <script>
+    // Translations for JavaScript messages
+    const jsTranslations_pagination = {
+        'en': {
+            'previous': 'Previous',
+            'next': 'Next',
+            'itemDeletedSuccess': 'Item is deleted successfully!'
+        },
+        'ar': {
+            'previous': 'السابق',
+            'next': 'التالي',
+            'itemDeletedSuccess': 'تم حذف العنصر بنجاح!'
+        }
+    };
+
+    function getJsTranslation_pagination(key) {
+        const lang = document.documentElement.lang || 'en';
+        return jsTranslations_pagination[lang][key] || jsTranslations_pagination['en'][key];
+    }
+
     function initialize() {
         // Previous
         previous = document.querySelector(".previous")
-        previous?.addEventListener("click", moveBack)
+        if (previous) {
+            previous.textContent = getJsTranslation_pagination('previous');
+            previous.addEventListener("click", moveBack);
+        }
 
         // Next
         next = document.querySelector(".next")
-        next?.addEventListener("click", moveForward)
+        if (next) {
+            next.textContent = getJsTranslation_pagination('next');
+            next.addEventListener("click", moveForward);
+        }
         
         // Numbers 
         numbers = document.querySelectorAll(".number")
@@ -65,8 +140,8 @@
         }
         else {
             let nextSibling = activeNumber.nextElementSibling
-            nextsSibling.classList.add("active")
-            if (isLastPage(nextsSibling)) {
+            nextSibling.classList.add("active")
+            if (isLastPage(nextSibling)) {
                 nextElement.classList.add("disabled")
             }
         }
@@ -132,5 +207,4 @@
     window.addEventListener("DOMContentLoaded", () => {
         initialize()
     })
-
 </script>

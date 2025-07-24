@@ -1,22 +1,52 @@
-{% extends 'admin_panel.html' %}
-{% load crispy_forms_tags %}
+{% extends 'admin_panel.html' %} {% load crispy_forms_tags %} {% load i18n %} 
 
 {% block body %}
-    <div id="content" class="h-100">
-        {% with dynamic_view=view_name %}
-            <a hx-get="{% url dynamic_view|add:'-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="nav-link pe-auto mb-5">Back to {{ dynamic_view }}s</a>
-        {% endwith %}
-
-
-
-        <div class="row">
-            <form action="" method="post" class="col-11 col-md-6 mx-auto mx-md-0">
-                {% include 'messages.html' %}
-    
-                {% csrf_token %}
-                {{ form|crispy }}
-                <input type="submit" class="btn btn-primary">
-            </form>
-        </div>
+<div id="content" class="container-fluid py-4">
+ 
+  <!-- Form Container -->
+  <div class="row justify-content-center">
+    <!-- Back Navigation -->
+    <div class="mb-4 col-12 col-md-8 col-lg-7">
+      {% with dynamic_view=view_name %}
+      <a
+        hx-get="{% url dynamic_view|add:'-dashboard' %}"
+        hx-select="#content"
+        hx-push-url="true"
+        hx-trigger="click"
+        hx-target="#display-page"
+        class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit"
+      >
+        <i class="fa-solid fa-arrow-left"></i>
+        {% translate "Back to" %} {{ dynamic_view }}s
+      </a>
+      {% endwith %}
     </div>
+    <div class="col-12 col-md-8 col-lg-6  ">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white py-3">
+          <h4 class="mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-pencil-square"></i>
+            Form Entry
+          </h4>
+        </div>
+        <div class="card-body p-4">
+          <form action="" method="post" class="needs-validation" novalidate>
+            {% include 'messages.html' %} {% csrf_token %}
+            <div class="form-content mb-4">{{ form|crispy }}</div>
+
+            <div class="d-grid">
+              <button
+                type="submit"
+                class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2"
+              >
+                <i class="bi bi-check-circle"></i>
+                {% translate 'Submit' %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

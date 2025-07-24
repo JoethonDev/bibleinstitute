@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
 {% block body %}
 <div id="content" class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-10 col-md-6">
             {% if request.user.id == object.id %}
-            <button class="btn btn-primary mb-3" hx-swap="innerHTML" hx-get="{% url 'update-profile' object.id %}" hx-trigger="click" hx-select="#profile" hx-target="#profile">Edit Profile</button>
+            <button class="btn btn-primary mb-3" hx-swap="innerHTML" hx-get="{% url 'update-profile' object.id %}" hx-trigger="click" hx-select="#profile" hx-target="#profile">{% translate "Edit Profile" %}</button>
             {% endif %}
             <div id="profile" class="mb-5">
                 {% if messages %}
@@ -17,7 +18,7 @@
                 {{ form|crispy }}
             </div>
             <div id="course" class="mb-5">
-                <h3>My Courses</h3>
+                <h3>{% translate "My Courses" %}</h3>
                 {% for level in courses %}
                     <h3>{{ level.level_name }}</h3>
                     <hr>

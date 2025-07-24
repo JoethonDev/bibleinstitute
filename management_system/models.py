@@ -5,6 +5,7 @@ from django.db.models import Sum, Prefetch, Q, prefetch_related_objects
 from django.utils.timezone import now
 from datetime import date, datetime, timedelta
 import json
+from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 
 # Constants
 MANAGEMENT_ROLES = ["admin", "teacher"]
@@ -20,10 +21,10 @@ def assign_academic_date():
 # Create your models here.
 class Role(models.Model):
     ROLES = [
-        ("admin", "مدير"),
-        ("teacher", "مصحح"),
-        ("junior", "سنه اولي"),
-        ("senior", "سنه تانيه")
+        ("admin", _("Admin")),
+        ("teacher", _("Teacher")),
+        ("junior", _("First Year")),
+        ("senior", _("Second Year"))
     ]
     # Fields
     role = models.CharField(
@@ -43,14 +44,14 @@ class Role(models.Model):
     def get_by_readable_value(readable_value):
         role_value = None
         for role in Role.ROLES:
-            if readable_value == role[1]:
+            if readable_value == str(_(role[1])): # Compare with translated value
                 role_value = role[0]
                 break
         return Role.objects.get(role=role_value)
 
     @staticmethod
     def get_readable_values():
-        return [role.get_role_display() for role in Role.objects.all()]
+        return [str(_(role.get_role_display())) for role in Role.objects.all()] # Translate display values
 
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, default=Role.get_default().id)
@@ -58,13 +59,13 @@ class User(AbstractUser):
     
     def serialize_pagination(self):
         return {
-            "rows" : [self.username, f"{self.first_name} {self.last_name}", self.role.get_role_display(), self.joined_date.strftime("%d/%m/%Y"), self.last_login],
+            "rows" : [self.username, f"{self.first_name} {self.last_name}", str(_(self.role.get_role_display())), self.joined_date.strftime("%d/%m/%Y"), self.last_login],
             "url" : reverse_lazy("user-profile", args=[self.pk,])
         }
 
     @staticmethod
     def get_columns():
-        return ["Username", "Name", "Role", "Joined Date", "Last Login"]
+        return [_("Username"), _("Name"), _("Role"), _("Joined Date"), _("Last Login")]
 
 class Course(models.Model):
     MAXIMUM_LEVEL = 2
@@ -77,8 +78,8 @@ class Course(models.Model):
 
 
     LEVELS_NAME = {
-        1 : "السنه الدراسيه الاولي",
-        2 : "السنه الدراسيه الثانيه",
+        1 : _("First Academic Year"),
+        2 : _("Second Academic Year"),
     }
 
     name = models.CharField(max_length=255, null=False, unique=True)
@@ -94,13 +95,13 @@ class Course(models.Model):
     
     def serialize_pagination(self):
         return {
-            "rows" : [self.name, self.description, self.LEVELS_NAME[self.level], self.instructor],
+            "rows" : [self.name, self.description, str(_(self.LEVELS_NAME[self.level])), self.instructor],
             "url" : reverse_lazy("course-view", args=[self.pk,])
         }
     
     @staticmethod
     def get_columns():
-            return ["Name", "Description", "Level", "Instructor"]
+            return [_("Name"), _("Description"), _("Level"), _("Instructor")]
 
     def get_name_year(self):
         return f"{self.name} - {self.LEVELS_NAME[self.level]}"
@@ -127,7 +128,7 @@ class Course(models.Model):
         # Format Course to return
         for current_level, courses_list in packed_courses.items():
             packed_levels.insert(0, {
-                "level_name" : self.LEVELS_NAME[current_level],
+                "level_name" : str(_(self.LEVELS_NAME[current_level])), # Translate level name here
                 "courses" : courses_list,
             })
             
@@ -143,9 +144,8 @@ class Course(models.Model):
     
     def fetch_quizzes(self, user):
         # Select all quizzes where user took quiz (id) or opening_date < now()
-
         # Get all quizzes
-        return self.quizzes.filter(Q(opening_date__lte=now()) & Q(grade__user=user))
+        return self.quizzes.filter(Q(opening_date__lte=now()) | Q(grade__user=user))
 
 
 class Lesson(models.Model):
@@ -161,13 +161,13 @@ class Lesson(models.Model):
 
     def serialize_pagination(self):
         return {
-            "rows" : [self.name, self.course.get_name_year(), f"Update on {self.updated_date.strftime('%d/%m/%Y')}"],
+            "rows" : [self.name, self.course.get_name_year(), _("Updated on %(date)s") % {'date': self.updated_date.strftime('%d/%m/%Y')}],
             "url" : reverse_lazy("lesson-view", args=[self.pk,])
         }
     
     @staticmethod
     def get_columns():
-        return ["Name", "Course", "Last Updated"]
+        return [_("Name"), _("Course"), _("Last Updated")]
 
     def can_access(self, user_join_date: date):
         end_range = user_join_date.replace(year=user_join_date.year + self.course.level)
@@ -225,13 +225,13 @@ class Quiz(models.Model):
 
     @staticmethod
     def get_columns():
-        return ["Name", "Course", "Grades", "Opening Date", "Closing Date", "Submissions"]
+        return [_("Name"), _("Course"), _("Grades"), _("Opening Date"), _("Closing Date"), _("Submissions")]
 
 class Question(models.Model):
     QUESTION_TYPES = [
-        ("mcq", "اختيار من متعدد"),
-        ("written", "مقالي"),
-        ("complete", "اكمل")
+        ("mcq", _("Multiple Choice")),
+        ("written", _("Written")),
+        ("complete", _("Complete"))
     ]
 
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
@@ -255,7 +255,7 @@ class Question(models.Model):
 
     @staticmethod
     def get_types():
-        return [question_type[1] for question_type in Question.QUESTION_TYPES]
+        return [str(_(question_type[1])) for question_type in Question.QUESTION_TYPES] # Translate display values
 
 class Submission(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="grades")
@@ -304,7 +304,7 @@ class Grade(models.Model):
 
     @staticmethod
     def get_columns():
-        return ["Name", "Grades", "Submission Date"]
+        return [_("Name"), _("Grades"), _("Submission Date")]
     
     @staticmethod
     def get_years(quiz_id):

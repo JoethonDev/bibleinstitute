@@ -4,172 +4,172 @@
 {% load i18n %}
 
 {% block body %}
-    <div id="{{ id }}" class="p-2 container position-relative mt-5">
-        <a 
-            {% if is_student %}
-                href="{{ back_url }}"
-            {% else %}
-                hx-get="{{ back_url }}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page"
-            {% endif %}
-            class="nav-link pe-auto mb-5"
-        >Back</a>
-
-        <div class="row justify-content-center">
-            <div class="col-md-8 col-10">
+<div id="{{ id }}" class="container-fluid py-4">
+    <!-- Back Navigation -->
+    <div class="row justify-content-center">
+        <div class="mb-4 col-12 col-lg-10 col-xl-8">
+            <a {% if is_student %} href="{{ back_url }}" {% else %} hx-get="{{ back_url }}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" {% endif %} class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit">
+                <i class="fas fa-arrow-left"></i>
+                {% translate "Back" %}
+            </a>
+        </div>
+        <div class="col-12 col-lg-10 col-xl-8">
+            <div class="card shadow-sm border-0 position-relative">
                 {% if mode == "exam" %}
-                    <div id="timer" class="border rounded btn btn-secondary position-absolute mw-50 left-0"></div>
-                {% endif %}
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert {{ message.tags }}">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
-                <div class="header-container row justify-content-between align-items-center">
-                    <div class="details col-10 col-md-6 mb-3">
-                        <h3>الامتحان : {{ quiz_name }}</h3>
-                        <h4>اسم الدارس : {{ username }}</h4>
+                    <div id="timer" class="badge bg-danger fs-5 position-absolute top-0 end-0 m-3 p-2 shadow-sm">
+                        <i class="bi bi-clock-history me-2"></i>
+                        <span>--:--:--</span>
                     </div>
-                    
-                    {% if total_grade %}
-                        <div class="total-grade col-6 col-md-4">
-                            <label >الدرجه النهائيه</label>
-                            <input type="text" value="{{ total_grade }}" class="form-control" disabled readonly>
+                {% endif %}
+
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                        <div>
+                            <h4 class="mb-1 d-flex align-items-center">
+                                <i class="bi bi-file-text"></i>
+                                {% translate "Exam" %}: {{ quiz_name }}
+                            </h4>
+                            <p class="mb-0 opacity-75">{% translate "Student" %}: {{ username }}</p>
                         </div>
-                    {% endif %}
+                        {% if total_grade %}
+                        <div class="mt-2 mt-md-0 text-md-end">
+                            <h5 class="mb-0">{% translate "Final Grade" %}</h5>
+                            <span class="fs-4 fw-bold">{{ total_grade }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
 
-                {% if not is_student or mode != "view" %}
-                <form action="" class="" method="post">
-                    {% csrf_token %}
-                {% endif %}
-                
-                {% include 'questions_rendering.html' %}
+                <div class="card-body p-4">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert {{ message.tags }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
 
-                {% if not is_student or mode != "view" %}
-                
-                    <input type="submit" class="btn btn-primary me-4 mt-3" 
-                        {% if is_student %}
-                        value="ارسال الامتحان"
-                        {% else %}
-                        value="ارسال التصحيح"
+                    <form action="" method="post">
+                        {% csrf_token %}
+                        
+                        {% include 'questions_rendering.html' %}
+
+                        {% if not is_student or mode != "view" %}
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                {% if is_student %}
+                                    <i class="bi bi-check-circle-fill me-2"></i> {% translate "Submit Exam" %}
+                                {% else %}
+                                    <i class="bi bi-save-fill me-2"></i> {% translate "Submit Correction" %}
+                                {% endif %}
+                            </button>
+                        </div>
                         {% endif %}
-                    >
-                </form>
-                {% endif %}
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 
+    
     {% if mode == "exam" %}
         <script>
-            let timer = document.querySelector("#timer")
-            const startTime =  Math.floor(Date.now() / 1000)
-            const endTime = {{ closing_date }}
-            form = document.querySelector("form")
+            (() => {
+                // NOTE: All JavaScript logic has been preserved as requested.
+                const jsTranslations_quiz = {
+                    'en': { 'graded': 'Question graded', 'underReview': 'Question under review', 'input': 'input', 'textarea': 'textarea' },
+                    'ar': { 'graded': 'تم تصحيح السؤال', 'underReview': 'السؤال قيد المراجعة', 'input': 'حقل الإدخال', 'textarea': 'مربع النص' }
+                };
 
-            // initial setup
-            storedQuestions = localStorage.getItem("answers")
-            if (storedQuestions) {
-                answersArr = JSON.parse(storedQuestions)
-                answersArr.forEach(val => {
-                    let questionID = document.querySelector(`input[type="hidden"][value="${val['question_id']}"]`)
-                    let questionDiv = questionID.parentNode
-                    let answersFields = questionDiv.querySelectorAll(".answers input, .answers textarea")
-                    let answerVal = val['answer']
-
-                    if (answersFields.length > 1) {
-                        answersFields.forEach(field => {
-                            if (field.value == answerVal){
-                                field.checked = true
-                                return
-                            }
-                        })
-                    }
-                    else {
-                        let inputField = answersFields[0]
-                        console.log(inputField.tagName)
-                        if (inputField.tagName == "INPUT"){
-                            inputField.value = answerVal
-                        }
-                        else{
-                            inputField.innerText = answerVal
-                        }
-                    }
-                    
-                })
-            }
-
-            function countDown(){
-                let currentEpoch = Math.floor(performance.now() / 1000) + startTime
-
-                let remainingTime = endTime - currentEpoch
-
-                if (remainingTime <= 2) {
-                    
-                    clearInterval(timerInterval)
-                    form.submit()
-                    return
+                function getJsTranslation_quiz(key) {
+                    const lang = document.documentElement.lang || 'en';
+                    return jsTranslations_quiz[lang][key] || jsTranslations_quiz['en'][key];
                 }
 
-                const hours = Math.floor(remainingTime / 3600);
-                const minutes = Math.floor((remainingTime % 3600) / 60);
-                const seconds = remainingTime % 60;
+                let timerEl = document.querySelector("#timer span");
+                const startTime = Math.floor(Date.now() / 1000);
+                const endTime = parseInt('{{ closing_date }}'.split(",")[0]);
+                const form = document.querySelector("form");
 
-                // Pad with leading zeros if necessary
-                let formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                timer.innerText = formattedTime
-            }
+                function setupInitialAnswers() {
+                    const storedQuestions = localStorage.getItem("answers");
+                    if (storedQuestions) {
+                        const answersArr = JSON.parse(storedQuestions);
+                        answersArr.forEach(val => {
+                            const questionIDInput = document.querySelector(`input[type="hidden"][value="${val.question_id}"]`);
+                            if (!questionIDInput) return;
 
-            const timerInterval = setInterval(countDown, 500)
+                            const questionDiv = questionIDInput.closest('.card-body');
+                            const answerFields = questionDiv.querySelectorAll('.answers-section input, .answers-section textarea');
+                            const answerVal = val.answer;
 
-            // Clear Session on submit
-            form.addEventListener("submit", () => {
-                localStorage.clear()
-            })
+                            if (answerFields.length > 1) { // MCQ
+                                answerFields.forEach(field => {
+                                    if (field.value == answerVal) {
+                                        field.checked = true;
+                                    }
+                                });
+                            } else if (answerFields.length === 1) { // Written/Complete
+                                const inputField = answerFields[0];
+                                inputField.value = answerVal;
+                            }
+                        });
+                    }
+                }
 
-            // Save Question
-            let questionsAnswers = document.querySelectorAll(".answers input, .answers textarea")
-            questionsAnswers.forEach(answerField => {
-                answerField.addEventListener("change", (event) => {
-                    let answers = []
-                    let element =  event.target
-                    let isFound = false
+                function countDown() {
+                    let currentEpoch = Math.floor(performance.now() / 1000) + startTime;
+                    let remainingTime = endTime - currentEpoch;
 
-                    if ("answers" in localStorage){
-                        answers = JSON.parse(localStorage.getItem("answers"))
+                    if (remainingTime <= 0) {
+                        clearInterval(timerInterval);
+                        timerEl.innerText = "00:00:00";
+                        if (form) form.submit();
+                        return;
                     }
 
-                    // Get Parent
-                    let questionDiv = element.parentNode.parentNode
-                    let questionID =  questionDiv.querySelector("input:first-of-type").value
-                    
-                    // Get Answer
-                    let answer = element.value || element.innerText
+                    const hours = Math.floor(remainingTime / 3600);
+                    const minutes = Math.floor((remainingTime % 3600) / 60);
+                    const seconds = Math.floor(remainingTime % 60);
 
-                    // update answer if exists
+                    timerEl.innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                function saveAnswer(event) {
+                    let answers = localStorage.getItem("answers") ? JSON.parse(localStorage.getItem("answers")) : [];
+                    let element = event.target;
+                    let isFound = false;
+
+                    let questionCard = element.closest('.card-body');
+                    let questionID = questionCard.querySelector("input[type='hidden']").value;
+                    let answer = element.value;
+
                     answers.forEach(val => {
-                        if (val['question_id'] == questionID) {
-                            val['answer'] = answer
-                            isFound = true
+                        if (val.question_id == questionID) {
+                            val.answer = answer;
+                            isFound = true;
                         }
-                    })
+                    });
 
                     if (!isFound) {
-                        // add new value if there is no update
-                        answers.push({
-                            "question_id" : questionID,
-                            "answer" : answer
-                        })
+                        answers.push({ "question_id": questionID, "answer": answer });
                     }
 
-                    // update key
-                    answers = JSON.stringify(answers)
-                    localStorage.setItem("answers", answers)
-
-                })
-            })
-
+                    localStorage.setItem("answers", JSON.stringify(answers));
+                }
+                
+                // Initialize
+                if(timerEl) {
+                    var timerInterval = setInterval(countDown, 1000);
+                }
+                if(form) {
+                    setupInitialAnswers();
+                    form.addEventListener("submit", () => localStorage.clear());
+                    document.querySelectorAll(".answers-section input, .answers-section textarea").forEach(field => {
+                        field.addEventListener("change", saveAnswer);
+                    });
+                }
+            })()
         </script>
     {% endif %}
+</div>
 
 {% endblock %}

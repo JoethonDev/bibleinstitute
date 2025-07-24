@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load i18n %}
 
 
 {% block style %}
@@ -25,35 +26,28 @@
             </div>
             <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleControls" data-bs-slide="prev">
                 <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Previous</span>
+                <span class="visually-hidden">{% translate "Previous" %}</span>
             </button>
             <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleControls" data-bs-slide="next">
                 <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Next</span>
+                <span class="visually-hidden">{% translate "Next" %}</span>
             </button>
         </div>
     </div>
     <div class="content-text container">
         <div class="row justify-content-center mb-4">
-            <h3 class="text-center">معهد الكتاب المقدس</h3>
+            <h3 class="text-center">{% translate "Bible Institute" %}</h3>
             <p class="col-4">
-                
-            هو معهد كنسى أرثوذكسى تابع للكنيسة القبطية الأرثوذكسية 
-            مقره كنيسة الشهيد العظيم مار جرجس – كوتسيكا 
-            مطرانية الأقباط الأرثوذكس بالمعادى
-
+                {% translate "It is an Orthodox church institute affiliated with the Coptic Orthodox Church, located at the Church of the Great Martyr Mar Girgis - Kotsika, Maadi Coptic Orthodox Diocese." %}
             </p>
         </div>
         <div class="row justify-content-center mb-4">
             <div class="text-center col-md-6 col-12">
                 <h4 class="mb-3">
-                    الرئيس الأعلى للمعهد:
+                    {% translate "Supreme Head of the Institute:" %}
                 </h4>
                 <p class="w-75 fs-5 lh-lg m-auto">
-                    صاحب الغبطة والقداسة البابا المعظم الأنبا تواضروس الثانى
-                    بابا الإسكندرية وبطريرك الكرازة المرقسية
-                    
-                    والرئيس الاعلى للمعاهد والكليات الاكليريكية 
+                    {% translate "His Holiness Pope Tawadros II, Pope of Alexandria and Patriarch of the See of St. Mark, and the Supreme Head of the Theological Institutes and Colleges." %}
                 </p>
             </div>
 
@@ -62,24 +56,45 @@
         </div>
         <div class="row justify-content-center mb-4">
             <p class="col-md-6 text-center col-12 fs-5 text-secondary">
-                المشرف العام على المعهـد:
+                {% translate "General Supervisor of the Institute:" %}
                 <br>
                 <br>
-                صاحب النيافة الحبر الجليل الأنبا دانيال
-                مطران المعادى وتوابعها
-                وسكرتير المجمع المقدس
+                {% translate "His Eminence Anba Daniel, Metropolitan of Maadi and its Dependencies, and Secretary of the Holy Synod." %}
             </p>
             <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g?si=Gn7QU4eywL3HVRcD" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="width: 560px !important;"></iframe>
         </div>
     </div>
 
     <script>
+        // Translations for JavaScript messages
+        const jsTranslations_index = {
+            'en': {
+                'previous': 'Previous',
+                'next': 'Next'
+            },
+            'ar': {
+                'previous': 'السابق',
+                'next': 'التالي'
+            }
+        };
+
+        function getJsTranslation_index(key) {
+            const lang = document.documentElement.lang || 'en';
+            return jsTranslations_index[lang][key] || jsTranslations_index['en'][key];
+        }
+
         let nextBtn = document.querySelector(".carousel-control-next")
         let prevBtn = document.querySelector(".carousel-control-prev")
         let gallery = [...document.querySelectorAll(".carousel-item")]
         let galleryLength = gallery.length
 
-
+        // Update button text content
+        if (nextBtn) {
+            nextBtn.querySelector(".visually-hidden").textContent = getJsTranslation_index('next');
+        }
+        if (prevBtn) {
+            prevBtn.querySelector(".visually-hidden").textContent = getJsTranslation_index('previous');
+        }
 
         function getActive(){
             let activeImage = document.querySelector(".carousel-item.active")

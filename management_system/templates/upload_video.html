@@ -1,22 +1,32 @@
 {% extends 'admin_panel.html' %}
+{% load i18n %}
 
 {% block body %}
     <div id="content" class="d-flex flex-column h-100">
 
         <button class="btn btn-primary loading m-auto mb-3 w-50" type="button" disabled>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            <span class="info">Loading...</span>
+            <span class="info">{% translate "Loading..." %}</span>
         </button>
-        <div class="form w-50 m-auto overflow-y-scroll p-2">
+        <div class="form col-12 col-md-8 col-lg-6 m-auto overflow-y-scroll p-2">
             <div class="mb-3">
-                <label for="folder-name" class="form-label">Folder</label>
+                <label for="folder-name" class="form-label">{% translate "Folder" %}</label>
                 <input class="form-control" type="text" id="folder-name" name="folder" dir=ltr>
             </div>
-            <div id="drive-files" class="bg-light mb-5 w-100 vh-40 flex-grow-1 d-flex flex-column">
+            <!-- <div id="drive-files" class="bg-light mb-5 w-100 vh-40 flex-grow-1 d-flex flex-column overflow-auto">
                 {% include 'drive_files.html' %}
+            </div> -->
+            <!-- Drive Files Card -->
+            <div class="card shadow-sm border-0 flex-grow-1">
+                <div class="card-header">
+                    <h6 class="mb-0">{% translate "Select Files from Drive" %}</h6>
+                </div>
+                <div id="drive-files" class="card-body overflow-auto" style="min-height: 300px;">
+                    {% include 'drive_files.html' %}
+                </div>
             </div>
             <div class="mb-3">
-                <label for="formFileMultiple" class="form-label">Upload Files</label>
+                <label for="formFileMultiple" class="form-label">{% translate "Upload Files" %}</label>
                 <input class="form-control" type="file" id="formFileMultiple" multiple>
             </div>
     
@@ -25,16 +35,57 @@
                 
             </div>
     
-            <button class="btn btn-primary" id="upload-btn">Upload Files</button>
+            <button class="btn btn-primary" id="upload-btn">{% translate "Upload Files" %}</button>
     
         </div>
         
-        <!-- <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js" crossorigin></script>
-          
-        -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" integrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" xintegrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         
         <script>
+            // Translations for JavaScript messages
+            const jsTranslations_upload = {
+                'en': {
+                    'loading': 'Loading...',
+                    'loaded': 'Loaded!',
+                    'process': 'Process',
+                    'upload': 'Upload',
+                    'videoProcessingFailed': 'Video processing failed for',
+                    'readingSegmentationFailed': 'Reading segmentation for {fileName} has failed',
+                    'videoSegmentationFailed': 'Video segmentation failed',
+                    'audioSegmentationFailed': 'Audio segmentation failed',
+                    'failedToGetPresignedUrl': 'Failed to get presigned URL',
+                    'uploadFailed': 'Upload failed',
+                    'playlistUploadFailed': 'Playlist upload failed:',
+                    'segmentUploadFailed': 'Segment {i} upload failed:',
+                    'uploadProcessFailed': 'Upload process failed:'
+                },
+                'ar': {
+                    'loading': 'جاري التحميل...',
+                    'loaded': 'تم التحميل!',
+                    'process': 'معالجة',
+                    'upload': 'رفع',
+                    'videoProcessingFailed': 'فشلت معالجة الفيديو لـ',
+                    'readingSegmentationFailed': 'فشل قراءة التجزئة لـ {fileName}',
+                    'videoSegmentationFailed': 'فشل تجزئة الفيديو',
+                    'audioSegmentationFailed': 'فشل تجزئة الصوت',
+                    'failedToGetPresignedUrl': 'فشل الحصول على رابط التحميل المسبق',
+                    'uploadFailed': 'فشل الرفع',
+                    'playlistUploadFailed': 'فشل رفع قائمة التشغيل:',
+                    'segmentUploadFailed': 'فشل رفع الجزء {i}:',
+                    'uploadProcessFailed': 'فشل عملية الرفع:'
+                }
+            };
+
+            function getJsTranslation_upload(key, params = {}) {
+                const lang = document.documentElement.lang || 'en';
+                let message = jsTranslations_upload[lang][key] || jsTranslations_upload['en'][key];
+                for (const param in params) {
+                    message = message.replace(`{${param}}`, params[param]);
+                }
+                return message;
+            }
+
+
             ffmpeg = null
             uploadBtn = document.getElementById("upload-btn")
             uploadBtn.addEventListener("click", async (e) => {
@@ -62,7 +113,7 @@
                 outerDiv.style.height = "40px"
 
                 // Insert Text
-                progressField.insertAdjacentHTML("beforeend", `<h4>${type} ${name}</h4>`)
+                progressField.insertAdjacentHTML("beforeend", `<h4>${getJsTranslation_upload(type)} ${name}</h4>`)
 
                 // Progress Bar
                 let progressBar = document.createElement("div")
@@ -112,7 +163,7 @@
                             console.log("Segmentation Complete:", audioSegments.length, "segments created.");
                             await uploadSegments(audioSegments, audioName);
                         } catch (error) {
-                            console.error("Video processing failed for", fileName, error);
+                            console.error(getJsTranslation_upload('videoProcessingFailed'), fileName, error);
                         } finally {
                             ffmpeg.FS("unlink", fullFileName)
                         }
@@ -160,7 +211,7 @@
                         return files;
                     } catch (error) {
                         console.error('FFmpeg error:', error);
-                        throw new Error(`Reading segmentation for ${fileName} has failed`);
+                        throw new Error(getJsTranslation_upload('readingSegmentationFailed', { fileName: fileName }));
                     }
             }
             
@@ -194,7 +245,7 @@
                     return fileName
                 } catch (error) {
                     console.error('FFmpeg error:', error);
-                    throw new Error('Video segmentation failed');
+                    throw new Error(getJsTranslation_upload('videoSegmentationFailed'));
                 }
             }
 
@@ -218,7 +269,7 @@
                     return baseName
 
                 } catch (error) {
-                    console.error('Audio segmentation failed:', error);
+                    console.error(getJsTranslation_upload('audioSegmentationFailed'), error);
                     throw error;
                 }
             }
@@ -237,7 +288,7 @@
                 });
 
                 if (!presignedResponse.ok) {
-                    throw new Error('Failed to get presigned URL');
+                    throw new Error(getJsTranslation_upload('failedToGetPresignedUrl'));
                 }
 
                 return presignedResponse
@@ -259,10 +310,10 @@
                         if (xhr.status >= 200 && xhr.status < 300) {
                             resolve();
                         } else {
-                            reject(new Error('Upload failed'));
+                            reject(new Error(getJsTranslation_upload('uploadFailed')));
                         }
                     };
-                    xhr.onerror = () => reject(new Error('Network error'));
+                    xhr.onerror = () => reject(new Error(getJsTranslation_upload('networkError'))); // Assuming networkError is defined in translations
                 });
 
                 // Start upload
@@ -289,7 +340,7 @@
                         await uploadR2(playlistPath, playlist)
 
                     } catch (error) {
-                        console.error(`Playlist upload failed:`, error);
+                        console.error(getJsTranslation_upload('playlistUploadFailed'), error);
                         uploadResults.push({
                             status: 'failed',
                             error: error.message
@@ -311,7 +362,7 @@
                             updateProgressBar(uploadBar, percent)
 
                         } catch (error) {
-                            console.error(`Segment ${i} upload failed:`, error);
+                            console.error(getJsTranslation_upload('segmentUploadFailed', { i: i }), error);
                             uploadResults.push({
                                 index,
                                 status: 'failed',
@@ -323,7 +374,7 @@
                     return uploadResults;
 
                 } catch (error) {
-                    console.error('Upload process failed:', error);
+                    console.error(getJsTranslation_upload('uploadProcessFailed'), error);
                     throw error;
                 }
             }
@@ -343,7 +394,7 @@
                         updateProgressBar(uploadBar, 100)
 
                     } catch (error) {
-                        console.error(`Playlist upload failed:`, error);
+                        console.error(getJsTranslation_upload('playlistUploadFailed'), error);
                         uploadResults.push({
                             status: 'failed',
                             error: error.message
@@ -354,13 +405,13 @@
                     return uploadResults;
 
                 } catch (error) {
-                    console.error('Upload process failed:', error);
+                    console.error(getJsTranslation_upload('uploadProcessFailed'), error);
                     throw error;
                 }
             }    
         
             function removeR2Files(){
-                document.querySelectorAll(".fa-file").forEach(e => e.parentElement.parentElement.remove())
+                document.querySelectorAll(".fa-file-alt").forEach(e => e.parentElement.parentElement.remove())
             }
 
             function modifyFolderInput(folderLink){
@@ -383,11 +434,13 @@
                 })
             }
 
-            window.addEventListener("htmx:afterSettle", (event) => {
+            document.addEventListener("htmx:afterSettle", (event) => {
                 if (!document.querySelector("#progress-container")){
                     return
                 }
+                console.log("Page is loaded!")
                 const requestURL = event.detail.xhr.responseURL;
+                console.log(event.detail.xhr.responseURL)
                 if (!requestURL.endsWith("upload-files/")){
                     removeR2Files()
                     addFolderClick()
@@ -398,7 +451,7 @@
                     })
                     return
                 }
-                
+                // console.log("HERE")
                 window.location.reload()
 
 
@@ -413,7 +466,7 @@
                     button.classList.remove("btn-primary")
                     button.classList.add("btn-success")
                     button.querySelector(".spinner-border").remove()
-                    button.querySelector(".info").innerText = "Loaded!"
+                    button.querySelector(".info").innerText = getJsTranslation_upload('loaded');
                     }
                 , 500)
                 removeR2Files()

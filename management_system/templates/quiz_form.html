@@ -1,249 +1,324 @@
 {% extends 'admin_panel.html' %}
 {% load crispy_forms_tags %}
-
+{% load i18n %}
 
 {% block body %}
-    <div id="content" class="d-flex flex-column h-100">
+    <div id="content" class="container-fluid py-4">
+    <!-- Back Navigation -->
+    <div class="mb-4">
+        <a hx-get="{% url 'quiz-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit">
+        <i class="fas fa-arrow-left"></i>
+        {% translate "Back to quizzes" %}
+        </a>
+    </div>
 
-        <a hx-get="{% url 'quiz-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="nav-link pe-auto mb-5">Back to quizzes</a>
+    <!-- Form Container -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+            <h4 class="mb-0 d-flex align-items-center gap-2">
+                <i class="fa fa-pencil-square"></i>
+                {% if quiz_name %}
+                {% translate "Edit Quiz" %}
+                {% else %}
+                {% translate "Create Quiz" %}
+                {% endif %}
+            </h4>
+            </div>
+            <div class="card-body p-4">
+            <form action="" method="post">
+                {% include 'messages.html' %}
+                {% csrf_token %}
+                
+                <div class="input-fields">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                    <label for="quiz_name" class="form-label fw-semibold">{% translate "Exam Title" %}</label>
+                    <input type="text" class="form-control" id="quiz_name" name="quiz_name" required value="{{ quiz_name }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                    <label for="course_select" class="form-label fw-semibold">{% translate "Course" %}</label>
+                    <select class="form-select" id="course_select" required name="course">
+                        <option selected disabled>{% translate "Select a Course" %}</option>
+                        {% for course in courses %}
+                        {% if course == selected_course %}
+                            <option value="{{ course }}" selected>{{ course }}</option>
+                        {% else %}
+                            <option value="{{ course }}">{{ course }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    </div>
+                </div>
 
-        <div class="row">
-            <form action="" method="post" class="col-10 col-md-8 col-lg-6 mb-5 d-flex flex-wrap m-auto mt-0">
-                <div class="input-fields d-flex flex-column w-100 mt-0">
-                    {% include 'messages.html' %}
-                    {% csrf_token %}
-                    
-                    <div class="mb-3">
-                        <label for="quiz_name" class="form-label">عنوان الامتحان</label>
-                        <input type="text" class="form-control" id="quiz_name" name="quiz_name" required value="{{ quiz_name }}">
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                    <label for="opening_date" class="form-label fw-semibold">{% translate "Exam Opening Date" %}</label>
+                    <input type="datetime-local" class="form-control" id="opening_date" name="opening_date" required value="{{ opening_date }}">
                     </div>
-    
-                    <div class="form-group">
-                        <select class="form-select mb-3" required name="course">
-                            <option selected disabled>الكورس التابع له</option>
-                            {% for course in courses %}
-                                {% if course == selected_course %}
-                                    <option value="{{ course }}" selected>{{ course }}</option>
-                                {% else %}
-                                    <option value="{{ course }}">{{ course }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
+                    <div class="col-md-6 mb-4">
+                    <label for="closing_date" class="form-label fw-semibold">{% translate "Exam Closing Date" %}</label>
+                    <input type="datetime-local" class="form-control" id="closing_date" name="closing_date" required value="{{ closing_date }}">
                     </div>
-                    <div class="mb-3">
-                        <label for="opening_date" class="form-label">تاريخ فتح الامتحان</label>
-                        <input type="datetime-local" class="form-control" id="opening_date" name="opening_date" required value="{{ opening_date }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="closing_date" class="form-label">تاريخ غلق الامتحان</label>
-                        <input type="datetime-local" class="form-control" id="closing_date" name="closing_date" required value="{{ closing_date }}">
-                    </div>
+                </div>
+
+                <div class="border-top pt-4">
+                    <h5 class="mb-3 fw-bold text-primary">{% translate "Questions" %}</h5>
                     {% with is_student=False mode="edit" %}
-                        {% include 'questions_rendering.html' %}
+                    {% include 'questions_rendering.html' %}
                     {% endwith %}
-                    <block class="btn btn-secondary mb-2 mt-2" id="add_question">اضافه سوال</block>
-                    <input type="submit" class="btn btn-primary">
+                </div>
+                
+                <div class="d-grid gap-2 mt-4">
+                    <button type="button" class="btn btn-outline-secondary" id="add_question">
+                    <i class="fa fa-plus-circle-dotted me-2"></i>{% translate "Add Question" %}
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fa fa-check-circle me-2"></i>{% translate "Submit" %}
+                    </button>
+                </div>
                 </div>
             </form>
+            </div>
         </div>
-        <script>
-            ADDBTN = document.querySelector("#add_question")
-            FORM = document.querySelector(".input-fields")
-    
-            function createQuesiton() {
-                let questionNumber = getQuestionNumber()
-    
-                let questionContainer = document.createElement("div")
-                questionContainer.className = "question w-100 mt-3 mb-3 position-relative bg-light p-4"
-    
-                questionContainer.insertAdjacentHTML("beforeend", `<label>نوع السوال : </label>`)
-                questionContainer.appendChild(createQuestionType(questionNumber))
+        </div>
+    </div>
 
-                let questionName = `
-                    <div class="group mb-4 row">
-                        <div class="question-title col-12 col-md-8">
-                            <label>السوال</label>
-                            <input type="text" value="" required class="form-control" name="questions[${questionNumber}][name]" placeholder="السوال..؟">
+    <script>
+        // This way to recall function and initialize all scope inside it as first time, prevent any conflict of redefining
+        (() => {
+            // NOTE: All JavaScript logic has been preserved as requested.
+            // Translations for JavaScript messages
+            const jsTranslations_quiz_form = {
+                'en': {
+                    'questionType': 'Question Type:',
+                    'mcq': 'Multiple Choice',
+                    'written': 'Written',
+                    'complete': 'Fill in the Blank',
+                    'question': 'Question',
+                    'questionPlaceholder': 'Enter the question text here...?',
+                    'grade': 'Grade',
+                    'anotherChoice': 'Add another choice...',
+                    'correctAnswer': 'Correct Answer:',
+                    'delete': 'Delete'
+                },
+                'ar': {
+                    'questionType': 'نوع السؤال:',
+                    'mcq': 'اختيار من متعدد',
+                    'written': 'مقالي',
+                    'complete': 'إكمال الفراغ',
+                    'question': 'السؤال',
+                    'questionPlaceholder': 'أدخل نص السؤال هنا...؟',
+                    'grade': 'الدرجة',
+                    'anotherChoice': 'أضف اختيار آخر...',
+                    'correctAnswer': 'الإجابة الصحيحة:',
+                    'delete': 'حذف'
+                }
+            };
+
+            function getJsTranslation_quiz_form(key) {
+                const lang = document.documentElement.lang || 'en';
+                return jsTranslations_quiz_form[lang][key] || jsTranslations_quiz_form['en'][key];
+            }
+
+            const ADDBTN = document.querySelector("#add_question");
+            const QUESTIONS_CONTAINER = document.querySelector(".questions-container");
+
+            function createQuesiton() {
+                let questionNumber = getQuestionNumber();
+                let questionContainer = document.createElement("div");
+                questionContainer.className = "card shadow-sm border-0 mb-4 question-card";
+                
+                const questionHTML = `
+                    <div class="card-body p-4 position-relative">
+                        <input type="hidden" name="questions[${questionNumber}][id]" value="">
+                        <button type="button" class="btn btn-danger delete-question">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary">${getJsTranslation_quiz_form('questionType')}</label>
+                            ${createQuestionType(questionNumber).outerHTML}
                         </div>
-                        <div class="points form-group col-4 col-md-4">
-                            <label>الدرجه</label>
-                            <input type="number" name="questions[${questionNumber}][grade]" class="form-control" required value="1">
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-8 mb-2 mb-md-0">
+                                <label class="form-label fw-semibold">${getJsTranslation_quiz_form('question')}</label>
+                                <input type="text" value="" required class="form-control" name="questions[${questionNumber}][name]" placeholder="${getJsTranslation_quiz_form('questionPlaceholder')}">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label fw-semibold">${getJsTranslation_quiz_form('grade')}</label>
+                                <input type="number" name="questions[${questionNumber}][grade]" class="form-control" required value="1" min="0">
+                            </div>
+                        </div>
+                        <div class="answers-section">
+                            ${createAnswerForm(questionNumber).outerHTML}
+                        </div>
+                        <div class="correct-answer-section">
+                            ${createAnswerField(questionNumber)}
                         </div>
                     </div>
-                `
-                questionContainer.insertAdjacentHTML("beforeend", questionName)
-    
-                let choiceOption = createAnswerForm(questionNumber)
-                questionContainer.appendChild(choiceOption)
-    
-                let correctAnswer = createAnswerField(questionNumber)
-                questionContainer.insertAdjacentHTML("beforeend", correctAnswer)
-    
-                questionContainer.insertAdjacentElement("afterbegin", createDeleteButton())
-
-                FORM.insertBefore(questionContainer, ADDBTN)
+                `;
+                questionContainer.innerHTML = questionHTML;
+                
+                QUESTIONS_CONTAINER.appendChild(questionContainer);
+                addEventListenersToQuestion(questionContainer);
             }
 
             function createDeleteButton() {
-                let deleteBtn = document.createElement("button")
-                deleteBtn.className = "btn btn-danger delete-question"
-                deleteBtn.innerText = "حذف"
+                let deleteBtn = document.createElement("button");
+                deleteBtn.type = "button";
+                deleteBtn.className = "btn btn-danger delete-question";
+                deleteBtn.innerHTML = `<i class="fa fa-trash"></i>`;
                 deleteBtn.addEventListener("click", (e) => {
-                    let deleteBtn = e.target
-                    removeContianers(deleteBtn.parentNode)
-                })
-                return deleteBtn
+                    e.target.closest('.question-card').remove();
+                });
+                return deleteBtn;
             }
-    
+
             function createQuestionType(questionNumber) {
-                let selectType = document.createElement("select")
-                selectType.className = "form-select w-50 mb-2"
-                selectType.name = `questions[${questionNumber}][type]`
-    
-                const OPTIONS = ["mcq", "written", "complete"]
+                let selectType = document.createElement("select");
+                selectType.className = "form-select question-type";
+                selectType.name = `questions[${questionNumber}][type]`;
+
+                const OPTIONS = ["mcq", "written", "complete"];
                 OPTIONS.forEach(type => {
-                    selectType.insertAdjacentHTML("beforeend", `<option value="${type}">${type}</option>`)
-                })
-    
-                selectType.querySelector("option").selected = true
-                selectType.addEventListener("change" , changeQuestionType)
-                return selectType
+                    selectType.insertAdjacentHTML("beforeend", `<option value="${type}">${getJsTranslation_quiz_form(type)}</option>`);
+                });
+
+                selectType.querySelector("option").selected = true;
+                return selectType;
             }
 
             function changeQuestionType(e) {
-                let selectElement = e.target
-                let value = selectElement.value
-                let parent = selectElement.parentNode
+                let selectElement = e.target;
+                let value = selectElement.value;
+                let parentCard = selectElement.closest('.card-body');
+                let questionNumber = getQuestionIndex(parentCard.closest('.question-card'));
 
-                // remove current
-                parent.querySelectorAll(".answers").forEach(container => removeContianers(container))
-                removeContianers(parent.querySelector(".correct-answer"))
+                let answersSection = parentCard.querySelector('.answers-section');
+                let correctAnswerSection = parentCard.querySelector('.correct-answer-section');
 
-                let questionNumber = getQuestionIndex(parent)
-
-                // Add new
-                let answersForm = createAnswerForm(questionNumber, value)
-                let answersField = createAnswerField(questionNumber, value)
-
-                // Add to DOM
-                parent.appendChild(answersForm)
-                parent.insertAdjacentHTML("beforeend", answersField)
-            }
-    
-            function removeContianers(container) {
-                if (container){
-                    container.remove()
-                }
-            }
-    
-            function createChoice(questionNumber, choice) {
-                let divContianer = document.createElement("div")
-                divContianer.className = "form-group mb-2 answers w-75 d-flex align-items-center"
-                divContianer.insertAdjacentHTML("beforeend", `<input class="form-control" type="text" name="questions[${questionNumber}][choices]" value="${choice}" required>`)
+                answersSection.innerHTML = createAnswerForm(questionNumber, value).outerHTML;
+                correctAnswerSection.innerHTML = createAnswerField(questionNumber, value);
                 
-                let i = document.createElement("i")
-                i.style.color = "red"
-                i.className = "fa-solid fa-xmark me-3 pointer-mouse"
-                i.addEventListener('click', () => {
-                    removeContianers(divContianer)
-                })
-                divContianer.appendChild(i)
-    
-                return divContianer
+                addEventListenersToQuestion(parentCard);
             }
-    
-            function createAnswerForm(questionNumber, type="mcq") {
-                let divContianer = document.createElement("div")
-                divContianer.className = "form-group mb-2 answers"
-    
-                if (type == "written"){
-                    let written_answer = `<textarea class="form-control" rows="3" disabled></textarea>`
-                    divContianer.insertAdjacentHTML("beforeend", written_answer)
+
+            function createAnswerForm(questionNumber, type = "mcq") {
+                let divContainer = document.createElement("div");
+                divContainer.className = "mb-3";
+
+                if (type == "written") {
+                    divContainer.innerHTML = `<label class="form-label fw-semibold text-secondary">{% translate "Answer" %}</label><textarea class="form-control" rows="4" disabled placeholder="{% translate "Student will write their answer here..." %}"></textarea>`;
+                } else if (type == "mcq") {
+                    divContainer.innerHTML = `
+                        <label class="form-label fw-semibold text-secondary mb-2">{% translate "Answer Options" %}</label>
+                        <div class="mcq-choices"></div>
+                        <div class="mt-2">
+                            <input class="form-control mcq-add" type="text" placeholder="${getJsTranslation_quiz_form('anotherChoice')}">
+                        </div>
+                    `;
+                } else { // complete
+                    divContainer.innerHTML = `<label class="form-label fw-semibold text-secondary">{% translate "Answer" %}</label><input class="form-control" type="text" disabled placeholder="{% translate "Student will complete this..." %}">`;
                 }
-                else if (type == "mcq") {
-                    let input = document.createElement("input")
-                    input.className = "mt-2 mb-2 form-control w-50 mcq"
-                    input.type = "text"
-                    input.placeholder = "اختيار اخر..."
-                    input.addEventListener("blur", createMCQ)
-                    divContianer.appendChild(input)
-                }
-                else {
-                    let complete_answer = `<input class="form-control" type="text" disabled>`
-                    divContianer.insertAdjacentHTML("beforeend", complete_answer)
-                }   
-                return divContianer
-    
+                return divContainer;
             }
-    
+
             function createMCQ(e) {
-                let inputElement = e.target
-                let parent = inputElement.parentNode
-                let value = inputElement.value
-                if (value) {
-                    let questionNumber = getQuestionIndex(parent.parentNode)
-                    let div = createChoice(questionNumber, value)
-                    parent.parentNode.insertBefore(div, parent)
-                    inputElement.value = ""
+                let inputElement = e.target;
+                if (e.key === 'Enter' || e.type === 'blur') {
+                    e.preventDefault();
+                    let value = inputElement.value.trim();
+                    if (value) {
+                        let parentCard = inputElement.closest('.card-body');
+                        let questionNumber = getQuestionIndex(parentCard.closest('.question-card'));
+                        let choicesContainer = parentCard.querySelector('.mcq-choices');
+                        let newChoice = createChoice(questionNumber, value);
+                        choicesContainer.appendChild(newChoice);
+                        inputElement.value = "";
+                    }
                 }
             }
 
-            function createAnswerField(questionNumber, type="mcq") {
-                if (type == "written"){
-                    return ""
-                }
-    
-                return `
-                    <div class="form-group correct-answer">
-                        <label class="form-label">الاجابه الصحيحه:</label>
-                        <input class="form-control w-50" type="text" name="questions[${questionNumber}][answer]" value="">
+            function createChoice(questionNumber, choice) {
+                let divContainer = document.createElement("div");
+                divContainer.className = "d-flex align-items-center mb-2";
+                divContainer.innerHTML = `
+                    <div class="flex-grow-1 me-2">
+                        <input class="form-control" type="text" name="questions[${questionNumber}][choices]" value="${choice}" required>
                     </div>
-                `
+                    <button type="button" class="btn btn-outline-danger btn-sm mcq-delete-choice d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                divContainer.querySelector('.mcq-delete-choice').addEventListener('click', (e) => {
+                    e.target.closest('.d-flex').remove();
+                });
+                return divContainer;
             }
-            // Change Type Event => Answers, Correct Answer
-            function getQuestionIndex(question) {
-                return [...document.querySelectorAll(".question")].indexOf(question)
+
+            function createAnswerField(questionNumber, type = "mcq") {
+                if (type === "written") {
+                    return "";
+                }
+                return `
+                    <div class="card bg-light border-0 p-3">
+                        <label class="form-label fw-semibold text-success mb-2">
+                            <i class="fa fa-check-circle me-2"></i>
+                            ${getJsTranslation_quiz_form('correctAnswer')}
+                        </label>
+                        <input class="form-control" id="answer_${questionNumber}" name="questions[${questionNumber}][answer]" value="">
+                    </div>
+                `;
+            }
+
+            function getQuestionIndex(questionCard) {
+                return [...document.querySelectorAll(".question-card")].indexOf(questionCard);
             }
 
             function getQuestionNumber() {
-                return [...document.querySelectorAll(".question")].length
+                return document.querySelectorAll(".question-card").length;
             }
-    
-            // Add Question Button
-            ADDBTN.addEventListener("click", () => {
-                console.log("Clicked")
-                let div = createQuesiton()
-            })
 
-            // Remove MCQ Choice
-            document.querySelectorAll(".fa-xmark").forEach(e => {
-                let divContianer = e.parentNode
-                e.addEventListener('click', () => {
-                    removeContianers(divContianer)
-                })
-            })
+            function addEventListenersToQuestion(questionEl) {
+                // Delete Question
+                const deleteBtn = questionEl.querySelector(".delete-question");
+                if (deleteBtn) {
+                    deleteBtn.addEventListener("click", (e) => {
+                        e.target.closest('.question-card').remove();
+                    });
+                }
 
-            // Add MCQ Choice
-            document.querySelectorAll(".mcq").forEach(e => {
-                e.addEventListener('blur', createMCQ)
-            })
+                // Change Question Type
+                const typeSelect = questionEl.querySelector(".question-type");
+                if (typeSelect) {
+                    typeSelect.addEventListener('change', changeQuestionType);
+                }
 
-            // Change Question Type
-            document.querySelectorAll(".question-type").forEach(e => {
-                e.addEventListener('change', changeQuestionType)
-            })
+                // Add MCQ Choice
+                const mcqInput = questionEl.querySelector(".mcq-add");
+                if (mcqInput) {
+                    mcqInput.addEventListener('blur', createMCQ);
+                    mcqInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') createMCQ(e); });
+                }
+                
+                // Remove existing MCQ choices
+                questionEl.querySelectorAll(".mcq-delete-choice").forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.target.closest('.d-flex').remove();
+                    });
+                });
+            }
 
-            // Remove Question
-            document.querySelectorAll(".delete-question").forEach(element => {
-                element.addEventListener("click", (e) => {
-                    let deleteBtn = e.target
-                    removeContianers(deleteBtn.parentNode)
-                })
-            })
-    
-        </script>
-    </div>
+            // Initial event listeners
+            // document.addEventListener("htmx:afterSwap", () => {
+            //     console.log("We are here!")
+            //     document.querySelector("#add_question")?.addEventListener("click", createQuesiton);
+            // })
+            ADDBTN.addEventListener("click", createQuesiton);
+            document.querySelectorAll(".question-card").forEach(addEventListenersToQuestion);
+        })()
+    </script>
 
-   
-
+</div>
 {% endblock %}

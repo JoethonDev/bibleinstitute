@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404, HttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
-# from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _ # Import gettext for runtime translation
 from django.utils import translation
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import views
@@ -12,6 +12,7 @@ from django.db.models import Q, Sum
 from django.db import transaction
 from django.contrib.messages import success, error, info
 from django.contrib.auth import update_session_auth_hash
+from django.conf import settings
 
 
 # Third Party
@@ -48,8 +49,8 @@ def is_managerial(request):
     user = User.objects.get(username=request.user)
     if user.role.role not in MANAGEMENT_ROLES:
         logger.warning(f"User : {user} is trying to access admin panel")
-        return HttpResponse("Unauthorized", status=401)
-    return HttpResponse("authorized", status=200)
+        return HttpResponse(_("Unauthorized"), status=401)
+    return HttpResponse(_("authorized"), status=200)
 
 def get_datetime(datetime_string):
     return datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M")
@@ -175,10 +176,10 @@ def paginate_obj(request, obj, page_size=15):
 def has_admin_permission(request, view):
     user = User.objects.get(username=request.user)
     if user.role.role not in MANAGEMENT_ROLES:
-        logger.warning(f"User : {user} is trying to access {view} dashboard")
-        return HttpResponse("Unauthorized", status=401)
+        logger.warning(f"User : {user} is trying to access admin panel")
+        return HttpResponse(_("Unauthorized"), status=401)
     
-    return HttpResponse("authorized", status=200)
+    return HttpResponse(_("authorized"), status=200)
     
 def render_dashboard(request, obj, view, context, parameters=[]):
     has_permission = has_admin_permission(request, view)
@@ -199,7 +200,7 @@ def render_dashboard(request, obj, view, context, parameters=[]):
 
     return render(request, "dashboard.html", {
         "page_obj" : page_obj,
-        "header" : view.capitalize(),
+        "header" : _(view.capitalize()), # Translate header
         "view" : view,
         "url" : reverse(f"{view}-dashboard", args=parameters),
         **context
@@ -252,7 +253,7 @@ class AdminPermissionView(LoginProtection):
         user = User.objects.get(username=request.user)
         if user.role.role in MANAGEMENT_ROLES:
             return super().dispatch(request, *args, **kwargs)
-        return HttpResponse("Unauthorized", status=401)    
+        return HttpResponse(_("Unauthorized"), status=401)    # Translate "Unauthorized"
 
 class FormBase(AdminPermissionView, FormView):
     view_name = ""
@@ -260,10 +261,10 @@ class FormBase(AdminPermissionView, FormView):
     template_name = "dashboard_form.html"
 
     def get_error_msg(self):
-        return f"{self.action} {self.view_name} is failed, Try again Please!"
+        return _("%(action)s %(view_name)s is failed, Try again Please!") % {'action': _(self.action), 'view_name': _(self.view_name)} # Translate
     
     def get_success_msg(self):
-        return f"{self.view_name} has {self.action}d successfully!"
+        return _("%(view_name)s has %(action)sd successfully!") % {'action': _(self.action), 'view_name': _(self.view_name)} # Translate
 
     def form_invalid(self, form):
         """ If the form is vaild, redirect to the supplied URL. 
@@ -287,23 +288,23 @@ class FormBase(AdminPermissionView, FormView):
 class UserBaseView(FormBase):
     model = User
     pk_url_kwarg = "user_id"
-    view_name = "user"
+    view_name = _("user") # Translate view_name
   
 class CourseBaseView(FormBase):
     model = Course
     pk_url_kwarg = "course_id"
-    view_name = "course"
+    view_name = _("course") # Translate view_name
     form_class = CourseForm
 
 class LessonBaseView(FormBase):
     model = Lesson
     pk_url_kwarg = "lesson_id"
-    view_name = "lesson"
+    view_name = _("lesson") # Translate view_name
 
 class QuizBaseView(FormBase):
     model = Quiz
     pk_url_kwarg = "quiz_id"
-    view_name = "quiz"
+    view_name = _("quiz") # Translate view_name
 
 # # Create your views here.
 class LoginView(views.LoginView):
@@ -354,7 +355,7 @@ class ProfileDetail(LoginProtection, DetailView):
         # Check request has user_id route
         # If user is not admin and pk in url
         if not request.get_full_path().endswith("/profile/") and request.user.role.role not in MANAGEMENT_ROLES:
-            return redirect(reverse("view-profile"))
+            return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
         return super().get(request, *args, **kwargs)
 
 
@@ -374,7 +375,7 @@ class ProfileUpdate(LoginProtection, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        success(self.request, "Profile is updated successfully!", extra_tags="alert-success")
+        success(self.request, _("Profile is updated successfully!"), extra_tags="alert-success") # Translate
         # If the password field was changed, update the session to keep user logged in
         if "password" in form.cleaned_data and form.cleaned_data["password"]:
             update_session_auth_hash(self.request, self.object)
@@ -413,13 +414,14 @@ def view_course_details(request, course_id):
             "lessons" : [],
             "quizzes" : course.fetch_quizzes(user)
         }
+        print(course.fetch_quizzes(user))
         if user.role.role in MANAGEMENT_ROLES:
             context['lessons'] = course.lessons.all()
             logger.info(f"User : {user} is accessing all lessons")
 
         else:
             if not course.can_access(user.role.role):
-                return HttpResponse("Unauthorized", status=401)
+                return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
             # Set Range of lesson created date
             join_date = user.joined_date
             end_date = join_date.replace(year=join_date.year + course.level)
@@ -453,7 +455,7 @@ def view_lesson_details(request, course_id, lesson_id):
         
         else:
             logger.error(f"{user.username} is not authorized to access lesson : {lesson.name}")
-            return HttpResponse('Unauthorized', status=401)
+            return HttpResponse(_('Unauthorized'), status=401) # Translate 'Unauthorized'
 
     except Http404:
         logger.error(f"Course with id: {course_id} or Lesson with id : {lesson_id} not found for user: {user.username}")
@@ -473,24 +475,29 @@ def stream_lesson(request, lesson_id, file_index):
 
         file_name = file_data.get("name")
         file_key = file_data.get("id")
+        file_type = file_data.get("file_type")
 
-        m3u8_content = download_from_bucket(file_key).read().decode("utf-8")
+        if file_type == "book":
+            return JsonResponse({"url" : f"{settings.CLOUD_WORKER}{file_key}"})
+        
+        else:
+            m3u8_content = download_from_bucket(file_key).read().decode("utf-8")
 
-        # Build Segments
-        segments_names = re.findall(r"^.*\.ts$", m3u8_content, re.MULTILINE)
-        folder = "/".join(file_key.split("/")[:-1])
-        for segment in segments_names:
-            segment_key = f"{folder}/{segment}" if folder else segment
-            m3u8_content = m3u8_content.replace(segment, f"https://weathered-wave-c7f0.elprincedoca.workers.dev/{segment_key}")
-            
-        logger.info(f"{file_name} HLS file of {lesson.name} is loaded!")
+            # Build Segments
+            segments_names = re.findall(r"^.*\.ts$", m3u8_content, re.MULTILINE)
+            folder = "/".join(file_key.split("/")[:-1])
+            for segment in segments_names:
+                segment_key = f"{folder}/{segment}" if folder else segment
+                m3u8_content = m3u8_content.replace(segment, f"{settings.CLOUD_WORKER}{segment_key}")
+                
+            logger.info(f"{file_name} HLS file of {lesson.name} is loaded!")
 
-        # Stream the file content as response
-        logger.info(f"Sending {file_name} HLS file of {lesson.name} to {username}")
-        return HttpResponse(
-            m3u8_content,
-            content_type='application/vnd.apple.mpegurl'
-        )
+            # Stream the file content as response
+            logger.info(f"Sending {file_name} HLS file of {lesson.name} to {username}")
+            return HttpResponse(
+                m3u8_content,
+                content_type='application/vnd.apple.mpegurl'
+            )
 
     except Http404:
         logger.error(f"Lesson with id : {lesson_id} not found for user: {username}")
@@ -533,7 +540,7 @@ def take_exam(request, course_id, quiz_id):
         submission_datetime = now()
         can_have_exam = quiz.closing_date + timedelta(minutes=30)  >= submission_datetime
         if not can_have_exam:
-            info(request, "Quiz is closed, You can not take it anymore!", extra_tags="alert-primary")
+            info(request, _("Quiz is closed, You can not take it anymore!"), extra_tags="alert-primary") # Translate
  
         # Check if user has taken exam
         grade = Grade.objects.filter(user=user, quiz_id=quiz_id).first()
@@ -547,7 +554,7 @@ def take_exam(request, course_id, quiz_id):
             logger.info(f"User : {user} is accessing {quiz.name} in {course.name} course")
 
             if user.role.role not in MANAGEMENT_ROLES and (not course.can_access(user.role.role) or quiz.opening_date > now()):
-                return HttpResponse("Unauthorized", status=401)
+                return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
             
             quiz_mode = "view" if grade or not can_have_exam else "exam"
             query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user) if grade else Question.objects.filter(quiz_id=quiz_id)
@@ -575,7 +582,7 @@ def take_exam(request, course_id, quiz_id):
                 # Consider making a buffer time and datetime check for submission
                 if not can_have_exam:
                     # Send back to main page with error message TODO
-                    return HttpResponse(f"Invalid Request, submission is closed!")
+                    return HttpResponse(_("Invalid Request, submission is closed!")) # Translate
                 
                 logger.info(f"User : {user} has submitted {quiz} at {submission_datetime.strftime('%d/%m/%Y, %H:%M:%S')}")
 
@@ -613,17 +620,17 @@ def take_exam(request, course_id, quiz_id):
                         Submission.objects.bulk_create(submissions)
                         Grade.objects.create(quiz=quiz, user=user, submitted_at=submission_datetime, total_grade=total_grade)
                         logger.info(f"{user}'s submission is added successfully to {quiz}")
-                    success(request, "Quiz is sent successfully!", extra_tags="alert-success")
+                    success(request, _("Quiz is sent successfully!"), extra_tags="alert-success") # Translate
 
                 except Exception as e:
-                    error(request, "Sending quiz has failed, Please Try again!", extra_tags="alert-danger")
+                    error(request, _("Sending quiz has failed, Please Try again!"), extra_tags="alert-danger") # Translate
                     logger.error(f"{user}'s submission is added successfully to {quiz}")
                     logger.error(f"Stack Traceback: {e}")
             
             return redirect(reverse("quiz-details", args=[course_id, quiz_id]))
         
         else:
-            return HttpResponse("Not allowed method", 400)
+            return HttpResponse(_("Not allowed method"), 400) # Translate
         
     except Http404:
             logger.error(f"Course with id: {course_id} or Quiz with id: {quiz_id} not found for user: {user.username}")
@@ -668,7 +675,7 @@ def user_dashboard(request):
         "name_value" : name or "",
         "filtering" : role_value or "",
         "columns" : User.get_columns(),
-        "options" : ["Choose Role", *Role.get_readable_values()]
+        "options" : [_("Choose Role"), *Role.get_readable_values()] # Translate "Choose Role"
     }
 
     return render_dashboard(request, users, view, context)
@@ -677,11 +684,11 @@ def user_dashboard(request):
 class CreateUser(UserBaseView, CreateView):
     form_class = UserCreationForm
     success_url = reverse_lazy("user-create")
-    action = "create"
+    action = _("create") # Translate action
 
 class UpdateUser(UserBaseView, UpdateView):
     form_class = UserUpdateForm
-    action = "update"
+    action = _("update") # Translate action
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -726,17 +733,17 @@ def course_dashboard(request):
         "name_value" : name or "",
         "filtering" : year or "",
         "columns" : Course.get_columns(),
-        "options" : ["Choose Academic Year", *[value for value in Course.LEVELS_NAME.values()]]
+        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]] # Translate "Choose Academic Year" and values
     }
 
     return render_dashboard(request, courses, view, context)
 
 class CreateCourse(CourseBaseView, CreateView):
-    action = "create"
+    action = _("create") # Translate action
     success_url = reverse_lazy("course-create")
 
 class UpdateCourse(CourseBaseView, UpdateView):
-    action = "update"
+    action = _("update") # Translate action
 
     def get_success_url(self):
         return reverse_lazy("course-update", args=[self.kwargs.get(self.pk_url_kwarg)])
@@ -778,8 +785,8 @@ def lesson_dashboard(request):
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Lesson.get_columns(),
-        "options" : ["Choose Academic Year", *[value for value in Course.LEVELS_NAME.values()]],
-        "subjects" : ["Choose Course", *[value for value in Course.objects.values_list("name", flat=True)]],
+        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]], # Translate "Choose Academic Year" and values
+        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]], # Translate "Choose Course"
         "filters" : ["course_filter.html"]
     }
 
@@ -818,14 +825,14 @@ def create_lesson(request):
 
                 course = get_object_or_404(Course, name=course_name)
                 Lesson.objects.create(name=lesson_name, course=course, links=json.dumps(links))
-                success(request, "Lesson is created successfully", extra_tags="alert-success")
+                success(request, _("Lesson is created successfully"), extra_tags="alert-success") # Translate
                 logger.info(f"Lesson {lesson_name} is added in course {course_name} with media length of {len(links)}")
 
             except Http404:
-                error(request, "Create lesson has failed, Try again Please!", extra_tags="alert-danger")
+                error(request, _("Create lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
                 logger.error(f"Course {course_name} is not found to create a lesson!")
         else:
-            error(request, "Create lesson has failed, Name and Videos can not be empty!", extra_tags="alert-danger")
+            error(request, _("Create lesson has failed, Name and Videos can not be empty!"), extra_tags="alert-danger") # Translate
 
         return redirect(reverse("lesson-create"))
 
@@ -896,13 +903,13 @@ def update_lesson(request, lesson_id):
                 lesson.save()
 
                 logger.info(f"Lesson {lesson_name} is updated successfully in course {course_name} with media length of {len(links)}")
-                success(request, "Lesson is updated successfully", extra_tags="alert-success")
+                success(request, _("Lesson is updated successfully"), extra_tags="alert-success") # Translate
 
             except Http404:
-                error(request, "Update lesson has failed, Try again Please!", extra_tags="alert-danger")
+                error(request, _("Update lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
                 logger.error(f"Course {course_name} or Lesson with id {lesson_id} is not found to create a lesson!")
         else:
-            error(request, "Update lesson has failed, Name and Videos can not be empty!", extra_tags="alert-danger")
+            error(request, _("Update lesson has failed, Name and Videos can not be empty!"), extra_tags="alert-danger") # Translate
 
         return redirect(reverse("lesson-update", args=[lesson_id]))
 
@@ -937,7 +944,7 @@ def upload_file(request):
 def upload_link(request):
     is_manager = is_managerial(request)
     if not is_manager:
-        return JsonResponse({"message" : "unauthorized!"}, status=401)
+        return JsonResponse({"message" : _("unauthorized!")}, status=401) # Translate "unauthorized!"
     
     body = json.loads(request.body)
     presigned_url = CLOUD_CLIENT.generate_presigned_url(
@@ -987,8 +994,8 @@ def quiz_dashboard(request):
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Quiz.get_columns(),
-        "options" : ["Choose Academic Year", *[value for value in Course.LEVELS_NAME.values()]],
-        "subjects" : ["Choose Course", *[value for value in Course.objects.values_list("name", flat=True)]],
+        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]], # Translate "Choose Academic Year" and values
+        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]], # Translate "Choose Course"
         "filters" : ["course_filter.html"],
         "submission_view" : True
     }
@@ -1030,7 +1037,7 @@ def create_quiz(request):
                 question_type = question.get("type", "")
                 choices = question.get("choices", [])
                 if correct_answer and correct_answer not in choices and question_type == "mcq":
-                    error_message = f"Correct answer is not in choices for question : {title}"
+                    error_message = _("Correct answer is not in choices for question : %(title)s") % {'title': title} # Translate
                     error(request, error_message, extra_tags="alert-danger")
                     exceptions_messages.append(error_message)
                     raise_exception = True
@@ -1050,8 +1057,8 @@ def create_quiz(request):
                 ))
 
             if closing_date <= opening_date:
-                error(request, "Closing Date can not be before or same as Openning Date!", extra_tags="alert-danger")
-                exceptions_messages.append("Closing Date can not be before or same as Openning Date!")
+                error(request, _("Closing Date can not be before or same as Openning Date!"), extra_tags="alert-danger") # Translate
+                exceptions_messages.append(_("Closing Date can not be before or same as Openning Date!")) # Translate
                 raise_exception = True
 
             if raise_exception:
@@ -1065,15 +1072,14 @@ def create_quiz(request):
                 Question.objects.bulk_create(questions_obj)
 
                 logger.info(f"Quiz {quiz.name} is added in course {course.name} with {len(questions_obj)} questions")
-                success(request, "Quiz is created successfully", extra_tags="alert-success")
+                success(request, _("Quiz is created successfully"), extra_tags="alert-success") # Translate
 
         except Http404:
-            error(request, "Create quiz is failed, Try again Please", extra_tags="alert-danger")
-
-            logger.error(f"Course {questions['course']} is not found to create a quiz!")
+            error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
+            logger.error(f"Course {questions.get('course', '')} is not found to create a quiz!")
         
         except Exception as e:
-            error(request, "Create quiz is failed, Try again Please", extra_tags="alert-danger")
+            error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
 
             logger.error(f"Create Quiz has failed : {e}")
 
@@ -1126,7 +1132,7 @@ def update_quiz(request, quiz_id):
                 choices = question.get("choices", [])
                 if choices:
                     if correct_answer not in choices:
-                        raise Exception("Correct answer is not in choices")
+                        raise Exception(_("Correct answer is not in choices")) # Translate
                     choices = json.dumps(choices)
                 grade = question['grade']
                 auto_grade = False if not correct_answer or question_type == "written" else True
@@ -1161,14 +1167,14 @@ def update_quiz(request, quiz_id):
                 quiz.save()
 
             logger.info(f"Quiz {quiz.name} is updated successfully in course {course.name} with new {len(questions_obj)} questions and existing {len(questions_exists)} questions")
-            success(request, "Quiz is updated successfully", extra_tags="alert-success")
+            success(request, _("Quiz is updated successfully"), extra_tags="alert-success") # Translate
 
         except Http404:
-            error(request, "Update quiz is failed, Try again Please", extra_tags="alert-danger")
+            error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
             logger.error(f"Course {quiz_data['course']} or Quiz with id {quiz_id} is not found ")
 
         except Exception as e:
-            error(request, "Update quiz is failed, Try again Please", extra_tags="alert-danger")
+            error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
             logger.error(f"Quiz update has failed : {e}")
         
         return redirect(reverse("quiz-update", args=[quiz_id]))
@@ -1216,7 +1222,7 @@ def submission_dashboard(request, quiz_id):
         "min_grade" : min_grade,
         "filtering" : year or "",
         "columns" : Grade.get_columns(),
-        "options" : ["Choose Academic Year", *[str(value) for value in Grade.get_years(quiz_id)]],
+        "options" : [_("Choose Academic Year"), *[str(value) for value in Grade.get_years(quiz_id)]], # Translate "Choose Academic Year"
         "filters" : ["submission_filter.html"],
         "submission_user" : True,
         "templates" : [""]
@@ -1240,11 +1246,11 @@ def submission_user(request, quiz_id, user_id):
 
     if not submissions:
         logger.error(f"Submission for quiz id : {quiz_id} with user id : {user_id} is not found to get submissions!")
-        return HttpResponse("Not Found!", 404)
+        return HttpResponse(_("Not Found!"), 404) # Translate "Not Found!"
     
     if not grade:
         logger.error(f"Grades for quiz id : {quiz_id} with user id : {user_id} is not found!")
-        return HttpResponse("Not Found!", 404)
+        return HttpResponse(_("Not Found!"), 404) # Translate "Not Found!"
 
     if request.method == "GET":
         questions = [s.serialize() for s in submissions]
@@ -1294,4 +1300,4 @@ def submission_user(request, quiz_id, user_id):
         return redirect(reverse("submission-user", args=[quiz_id, user_id]))
     
     else:
-        return HttpResponse("Not allowed method", 400)
+        return HttpResponse(_("Not allowed method"), 400) # Translate

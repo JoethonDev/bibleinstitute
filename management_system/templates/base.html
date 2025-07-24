@@ -4,17 +4,18 @@
 
 
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="{{ request.LANGUAGE_CODE }}" {% if request.LANGUAGE_CODE == 'ar' %}dir="rtl"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bible Institute Coptic</title>
-    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4" xintegrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
     <!-- CDN -->
-    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous"> -->
-   
-    <!-- Condition on RTL -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.rtl.min.css" integrity="sha384-gXt9imSW0VcJVHezoNQsP+TNrjYXoGcrqBZJpry9zJt8PCQjobwmhMGaDHTASo9N" crossorigin="anonymous">
+    {% if request.LANGUAGE_CODE == 'ar' %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.rtl.min.css" xintegrity="sha384-gXt9imSW0VcJVHezoNQsP+TNrjYXoGcrqBZJpry9zJt8PCQjobwmhMGaDHTASo9N" crossorigin="anonymous">
+    {% else %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" xintegrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    {% endif %}
     
     <!-- Style -->
     <style>
@@ -54,6 +55,10 @@
           display:none;
         }
 
+        .w-fit {
+          width: fit-content !important;
+        }
+
         /* video {
           position: relative;
         }
@@ -76,7 +81,7 @@
     <!-- Custom Style Block -->
     {% block style %}
     {% endblock %}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" xintegrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
 
 </head>
@@ -85,28 +90,28 @@
         <div class="container-fluid">
           
           <a class="navbar-brand" href="#">
-              <img src="{% static 'login-logo.png' %}" alt="Logo" width="125" height="40" class="d-inline-block align-text-top">
+              <img src="{% static 'login-logo.png' %}" alt="{% translate "Logo" %}" width="125" height="40" class="d-inline-block align-text-top">
           </a>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate "Toggle navigation" %}">
             <i class="fa-solid fa-grip-lines"></i>
           </button>
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav mb-2 mb-lg-0">
               <li class="nav-item me-2">
-                <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
+                <a class="nav-link active" aria-current="page" href="{% url 'home' %}">{% translate "Home" %}</a>
               </li>
               <li class="nav-item me-2">
-                <a class="nav-link" href="#">About Us</a>
+                <a class="nav-link" href="#">{% translate "About Us" %}</a>
               </li>
               <li class="nav-item me-2">
-                <a class="nav-link" href="{% url 'courses' %}">Courses</a>
+                <a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'view-profile' %}">Profile</a>
+                <a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a>
               </li>
               {% if request.user.role.role == "admin" or request.user.role.role == "teacher" %}
                 <li class="nav-item">
-                  <a class="nav-link" href="{% url 'user-dashboard' %}">Admin Dashboard</a>
+                  <a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Admin Dashboard" %}</a>
                 </li>
               {% endif %}
             </ul>
@@ -124,12 +129,12 @@
       <div class="contact d-flex justify-content-between p-5 fs-3">
           <div class="social">
             <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180">
-            <h6 class="mb-4">معهد الكتاب المقدس بالمعادى</h6>
+            <h6 class="mb-4">{% translate "Bible Institute Coptic" %}</h6>
           </div>
 
           <div class="contact-details">
-            <h6 class="mb-4">مقر المعهد</h6>
-            <h6 class="mb-4 w-75">كنيسة الشهيد العظيم مارجرجس بكوتسكا – المعادى – مصر</h6>
+            <h6 class="mb-4">{% translate "Institute Headquarters" %}</h6>
+            <h6 class="mb-4 w-75">{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</h6>
             <h6 class="mb-4">
               info@bibleinstitute-eg.org
               <br>
@@ -137,10 +142,10 @@
           </div>
       </div>
       <div class="footer-bottom">
-        <h6 class="p-3 m-auto text-center">جميع الحقوق محفوظة لمعهد الكتاب المقدس بالمعادى</h6>
+        <h6 class="p-3 m-auto text-center">{% translate "All rights reserved to the Bible Institute in Maadi" %}</h6>
       </div>
     </footer>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
 
 </body>
 </html>

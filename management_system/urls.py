@@ -58,7 +58,7 @@ urlpatterns = [
     path('dashboard/quizzez/<int:quiz_id>/view-submission/<int:user_id>/', submission_user, name="submission-user"),
 
     # Upload Videos
-    path('dashboard/upload-videos/', upload_file, name="upload-files"),
+    path('dashboard/upload-files/', upload_file, name="upload-files"),
     path('api/get-presigned-url/', upload_link, name="upload-link"),
 
     # Test

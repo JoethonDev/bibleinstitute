@@ -1,146 +1,135 @@
+{% load i18n %}
 <div class="questions-container">
     {% for question in questions %}
         {% with counter=forloop.counter0 %}
-            <div class="question w-100 mt-3 mb-3 position-relative bg-light p-4">
-                <input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">
+            <div class="card shadow-sm border-0 mb-4 question-card">
+                <div class="card-body p-4 position-relative">
+                    <input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">
 
-                {% if mode == "edit" and not is_student %}
-                    <button class="btn btn-danger delete-question">حذف</button>
-                    <select name="questions[{{ counter }}][type]" class="form-select w-50 mb-4 question-type">
-                        {% for type in question_types %}
-                            {% if question.type == type.0 %}
-                                <option value="{{ type.0 }}" selected>{{ type.1 }}</option>
-                            {% else %}
-                                <option value="{{ type.0 }}">{{ type.1 }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select> 
-                    <div class="group d-flex mb-4 row">
-                        <div class="question-title col-12 col-md-8">
-                            <label>السوال</label>
-                            <input type="text" value="{{ question.name }}" required class="form-control" name="questions[{{ counter }}][name]" placeholder="السوال..؟">
-                        </div>
-                        <div class="points form-group col-4 col-md-4">
-                            <label >الدرجه</label>
-                            <input type="number" name="questions[{{ counter }}][grade]" id="grade" class="form-control" required value="{{ question.grade }}">
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="group d-flex mb-4 row">
-                        <div class="question-title col-12 col-md-8">
-                            <label>السوال</label>
-                            <input type="text" value="{{ question.name }}" class="form-control" disabled readonly>
-                        </div>
-                        <div class="points form-group col-4 col-md-4">
-                            <label >الدرجه</label>
-                            <input type="text" class="form-control" disabled readonly 
-                            {% if question.is_graded %}
-                            value='{{ question.current_grade }}/{{ question.grade }}'
-                            {% elif mode != "view" %}
-                            value='{{ question.grade }}'
-                            {% endif %}
-                        >
+                    {% if mode == "edit" and not is_student %}
+                        <button type="button" class="btn btn-danger delete-question">
+                            <i class="fa fa-trash"></i>
+                        </button>
                         
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary">{% translate "Question Type" %}</label>
+                            <select name="questions[{{ counter }}][type]" class="form-select question-type">
+                                {% for type in question_types %}
+                                    <option value="{{ type.0 }}" {% if question.type == type.0 %}selected{% endif %}>{% translate type.1 %}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                    </div>
-                {% endif %}
-
-
-                {% if question.type == "mcq" %}
-                    {% for choice in question.choices %}
-                        {% if not is_student and mode == "edit" %}
-                            <div class="form-group answers w-75 d-flex align-items-center mb-4">
-                                <input class="form-control" type="text" name="questions[{{ counter }}][choices]" value="{{ choice }}">
-                                <i class="fa-solid fa-xmark me-3 pointer-mouse" style="color:red;"></i>
+                        
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-8 mb-2 mb-md-0">
+                                <label class="form-label fw-semibold">{% translate "Question" %}</label>
+                                <input type="text" value="{{ question.name }}" required class="form-control" name="questions[{{ counter }}][name]" placeholder="{% translate "Question...?" %}">
                             </div>
-                        {% else %}
-                                <div class="form-group answers w-75 d-flex align-items-center mb-4">
-                                    <input class="form-check-input me-2" type="radio" name="questions[{{ counter }}][answer]" id="questions[{{ counter }}][{{ forloop.counter0 }}]" value="{{ choice }}" 
-                                        
-                                        {% if mode == "view" %}
-                                            {% if choice == question.submitted_answer %}
-                                                checked
-                                            {% endif %}
-                                            disabled readonly
-                                        {% endif %}
-                                    >
-                                    <label class="form-check-label" for="questions[{{ counter }}][{{ forloop.counter0 }}]">{{ choice }}</label>
-                                </div>
-                        {% endif %}
-                    {% endfor %}
-
-                    {% if not is_student and mode == "edit" %}
-                        <div class="form-group answers mb-4">
-                            <input class="mt-2 mb-2 form-control w-50 mcq" type="text" placeholder="اختيار اخر...">
-                        </div>
-                    {% endif %}
-
-                {% elif question.type == "complete" %}
-                    <div class="form-group answers mb-4">
-                        {% if not is_student and mode == "edit" %}
-                            <input class="form-control" type="text">
-                        {% else %}
-                            <input class="form-control" type="text" name="questions[{{ counter }}][answer]"  
-                            {% if mode == "view" %}
-                                value="{{ question.submitted_answer }}"
-                                disabled readonly
-                            {% endif %}>
-                        {% endif %}
-                    </div>
-                {% elif question.type == "written" %}
-                    <div class="form-group answers mb-4">
-                        {% if not is_student and mode == "edit" %}
-                            <textarea class="form-control" rows="3"></textarea>
-                        {% else %}
-                            <textarea class="form-control" rows="3" name="questions[{{ counter }}][answer]" 
-                            {% if mode == "view" %}
-                                disabled readonly
-                            {% endif %}
-                        >{{ question.submitted_answer }}</textarea>
-                        {% endif %}
-                    </div>
-                {% endif %}
-
-                {% if not is_student or exam_taken  %}
-                    {% if question.auto_grade or mode == "edit" and question.type != "written" %}
-                        <div class="form-group correct-answer mb-4">
-                            <label class="form-label" for="answer_{{ counter }}">الاجابه الصحيحه:</label>
-                            <input class="form-control w-50" id="answer_{{ counter }}"  
-                            {% if mode != "exam" %}
-                                value="{{ question.correct_answer }}"
-                                {% if mode == "edit" %}
-                                    name="questions[{{ counter }}][answer]"
-                                {% endif %}
-                                {% if mode == "view" %}
-                                    disabled readonly
-                                {% endif %}
-
-                            {% endif %}
-
-                            >
-                        </div>
-                    
-                    {% elif mode == 'view' %}
-                        {% if not is_student %}
-                            <div class="form-group correct-answer mb-4">
-                                <label class="form-label" for="manual_grade_{{ counter }}">اعطي الدرجه السوال</label>
-                                <input class="form-control w-50" id="manual_grade_{{ counter }}" name="questions[{{ counter }}][manual_grade]" type="number" max="{{ question.grade }}" value="{{ question.current_grade }}">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label fw-semibold">{% translate "Grade" %}</label>
+                                <input type="number" name="questions[{{ counter }}][grade]" class="form-control" required value="{{ question.grade }}" min="0">
                             </div>
-                        {% else %}
-                            <div class="form-group correct-answer mb-4">
-                                <label class="form-label">حاله السوال : </label>
-                                <input class="form-control w-50" name="questions[{{ counter }}][manual_grade]" 
-                                {% if question.is_graded %} 
-                                value="تم تصحيح السوال"
+                        </div>
+                    {% else %}
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <p class="fw-semibold fs-5 mb-0">{% translate "Question" %} {{ forloop.counter }}: {{ question.name }}</p>
+                            <span class="badge bg-dark rounded-pill fs-6">
+                                {% if question.is_graded %}
+                                    {{ question.current_grade }}/{{ question.grade }}
                                 {% else %}
-                                value="يتم مراجعه السوال"
+                                    {{ question.grade }}
                                 {% endif %}
-                                disabled readonly>
-                            </div>
-                        {% endif %}
-        
+                                {% translate "Points" %}
+                            </span>
+                        </div>
                     {% endif %}
-                {% endif %}
+
+                    <div class="answers-section mb-3">
+                        {% if question.type == "mcq" %}
+                            <label class="form-label fw-semibold text-secondary mb-2">{% translate "Answer Options" %}</label>
+                            <div class="mcq-choices">
+                            {% for choice in question.choices %}
+                                {% if not is_student and mode == "edit" %}
+                                    <div class="d-flex align-items-center mb-2">
+                                        <div class="flex-grow-1 me-2">
+                                            <input class="form-control" type="text" name="questions[{{ counter }}][choices]" value="{{ choice }}">
+                                        </div>
+                                        <button type="button" class="btn btn-outline-danger btn-sm mcq-delete-choice d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="questions[{{ counter }}][answer]" id="q_{{ counter }}_choice_{{ forloop.counter0 }}" value="{{ choice }}" 
+                                            {% if mode == "view" and choice == question.submitted_answer %}checked{% endif %}
+                                            {% if mode == "view" %}disabled readonly{% endif %}>
+                                        <label class="form-check-label" for="q_{{ counter }}_choice_{{ forloop.counter0 }}">{{ choice }}</label>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            </div>
+                            {% if not is_student and mode == "edit" %}
+                                <div class="mt-2">
+                                    <input class="form-control mcq-add" type="text" placeholder="{% translate "Add another choice..." %}">
+                                </div>
+                            {% endif %}
+
+                        {% elif question.type == "complete" %}
+                            <label class="form-label fw-semibold text-secondary">{% translate "Answer" %}</label>
+                            {% if not is_student and mode == "edit" %}
+                                <input class="form-control" type="text" disabled placeholder="{% translate "Student will complete this..." %}">
+                            {% else %}
+                                <input class="form-control" type="text" name="questions[{{ counter }}][answer]" value="{{ question.submitted_answer|default:'' }}" {% if mode == "view" %}disabled readonly{% endif %}>
+                            {% endif %}
+                            
+                        {% elif question.type == "written" %}
+                            <label class="form-label fw-semibold text-secondary">{% translate "Answer" %}</label>
+                            {% if not is_student and mode == "edit" %}
+                                <textarea class="form-control" rows="4" disabled placeholder="{% translate "Student will write their answer here..." %}"></textarea>
+                            {% else %}
+                                <textarea class="form-control" rows="4" name="questions[{{ counter }}][answer]" {% if mode == "view" %}disabled readonly{% endif %}>{{ question.submitted_answer|default:'' }}</textarea>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+
+                    <div class="correct-answer-section">
+                    {% if not is_student or exam_taken %}
+                        {% if question.auto_grade or mode == "edit" and question.type != "written" %}
+                            <div class="card bg-light border-0 p-3">
+                                <label class="form-label fw-semibold text-success mb-2">
+                                    <i class="fa fa-check-circle me-2"></i>
+                                    {% translate "Correct Answer:" %}
+                                </label>
+                                <input class="form-control" id="answer_{{ counter }}" value="{{ question.correct_answer|default:'' }}"
+                                    {% if mode == "edit" %} name="questions[{{ counter }}][answer]" {% endif %}
+                                    {% if mode == "view" %} disabled readonly {% endif %}>
+                            </div>
+                        
+                        {% elif mode == 'view' %}
+                            {% if not is_student %}
+                                <div class="card bg-warning bg-opacity-10 border-warning border-opacity-25 p-3">
+                                    <label for="manual_grade_{{ counter }}" class="form-label fw-semibold text-warning mb-2">
+                                        <i class="fa fa-pencil-square me-2"></i>
+                                        {% translate "Give Question Grade" %}
+                                    </label>
+                                    <input class="form-control" id="manual_grade_{{ counter }}" name="questions[{{ counter }}][manual_grade]" type="number" max="{{ question.grade }}" min="0" value="{{ question.current_grade }}">
+                                </div>
+                            {% else %}
+                                <div class="card bg-info bg-opacity-10 border-info border-opacity-25 p-3">
+                                    <p class="fw-semibold text-info mb-0 d-flex align-items-center">
+                                        <i class="fa fa-info-circle me-2"></i>
+                                        {% if question.is_graded %} 
+                                            {% translate "Question graded" %}
+                                        {% else %}
+                                            {% translate "Question under review" %}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+                    </div>
+                </div>
             </div>
         {% endwith %}
     {% endfor %}

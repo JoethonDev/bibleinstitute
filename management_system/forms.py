@@ -1,22 +1,23 @@
 from django.contrib.auth.forms import AuthenticationForm, UsernameField
 from django import forms
 from .models import User, Role, Course, Lesson, assign_academic_date
+from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 
 
 class UserLoginForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
         super(UserLoginForm, self).__init__(*args, **kwargs)
-        self.fields['username'].label = "اسم المستخدم"
-        self.fields['password'].label = " كلمه المرور"
+        self.fields['username'].label = _("Username") # Localized
+        self.fields['password'].label = _("Password") # Localized
 
     username = UsernameField(widget=forms.TextInput(
         attrs={ 
-               'placeholder': 'اسم المستخدم', 
+               'placeholder': _('Username'), # Localized
                'id': 'username'
         }))
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={
-            'placeholder': 'كلمه المرور',
+            'placeholder': _('Password'), # Localized
             'id': 'password',
         }
 ))
@@ -26,28 +27,28 @@ class UserCreationForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super(UserCreationForm, self).__init__(*args, **kwargs)
-        self.fields['username'].label = "اسم المستخدم"
-        self.fields['first_name'].label = "اسم الاول"
-        self.fields['last_name'].label = "اسم الاخير"
-        self.fields['role'].label = "الحاله"
-        self.fields['joined_date'].label = "تاريخ الانضمام"
-        self.fields['password'].label = " كلمه المرور"
+        self.fields['username'].label = _("Username") # Localized
+        self.fields['first_name'].label = _("First Name") # Localized
+        self.fields['last_name'].label = _("Last Name") # Localized
+        self.fields['role'].label = _("Role") # Localized
+        self.fields['joined_date'].label = _("Joined Date") # Localized
+        self.fields['password'].label = _("Password") # Localized
 
     username = UsernameField(widget=forms.TextInput(
         attrs={ 
-               'placeholder': 'اسم المستخدم', 
+               'placeholder': _('Username'), # Localized
                'id': 'username'
         }))
     
     first_name = forms.CharField(widget=forms.TextInput(
             attrs={
-                'placeholder': 'الاسم الاول',
+                'placeholder': _('First Name'), # Localized
                 'id': 'first_name',
             }))
     
     last_name = forms.CharField(widget=forms.TextInput(
             attrs={
-                'placeholder': 'الاسم الاخير',
+                'placeholder': _('Last Name'), # Localized
                 'id': 'last_name',
             }), required=False)
     
@@ -66,7 +67,7 @@ class UserCreationForm(forms.ModelForm):
 
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={
-            'placeholder': 'كلمه المرور',
+            'placeholder': _('Password'), # Localized
             'id': 'password',
         }))
 
@@ -87,7 +88,7 @@ class UserCreationForm(forms.ModelForm):
 class UserUpdateForm(UserCreationForm):
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={
-            'placeholder': 'كلمه المرور',
+            'placeholder': _('Password'), # Localized
             'id': 'password',
         }), required=False)
 
@@ -111,12 +112,12 @@ class ProfileUpdateForm(UserUpdateForm):
 class CourseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['name'].label = "اسم الكورس"
-        self.fields['description'].label = "وصف الكورس"
+        self.fields['name'].label = _("Course Name") # Localized
+        self.fields['description'].label = _("Course Description") # Localized
         self.fields['description'].required = False
-        self.fields['instructor'].label = "المحاضر"
+        self.fields['instructor'].label = _("Instructor") # Localized
         self.fields['instructor'].required = False
-        self.fields['level'].label = "السنه الدراسيه"
+        self.fields['level'].label = _("Academic Year") # Localized
 
     level = forms.ChoiceField(
         choices=Course.LEVELS_NAME,
@@ -126,4 +127,3 @@ class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
         fields = "__all__"
-

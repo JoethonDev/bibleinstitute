@@ -1,69 +1,123 @@
 {% extends 'base.html' %}
-
+{% load i18n %}
+{% load static %}
 
 {% block cdn %}
-    <link href="https://vjs.zencdn.net/7.0.0/video-js.css" rel="stylesheet" />
-        <!-- City -->
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
     <link href="https://unpkg.com/@videojs/themes@1/dist/city/index.css" rel="stylesheet">
-
-    <!-- Fantasy -->
-    <link href="https://unpkg.com/@videojs/themes@1/dist/fantasy/index.css" rel="stylesheet">
-
-    <!-- Forest -->
-    <link href="https://unpkg.com/@videojs/themes@1/dist/forest/index.css" rel="stylesheet">
-
-    <!-- Sea -->
-    <link href="https://unpkg.com/@videojs/themes@1/dist/sea/index.css" rel="stylesheet">
 {% endblock %}
 
 {% block style %}
-    <style>
-        body { 
-            background-color: #f8f9fa !important;
-        }
-
-    </style>
+<style>
+    body {
+        background-color: #f0f2f5; /* A slightly darker gray for more contrast */
+    }
+    .sidebar .list-group-item {
+        border-radius: 0.5rem !important;
+        margin-bottom: 0.25rem;
+        border: 0;
+        font-weight: 500;
+    }
+    .sidebar .list-group-item.active {
+        background: var(--primary-gradient, #0d6efd);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+</style>
 {% endblock %}
 
 {% block body %}
-    <div class="container mt-5 mb-5 vh-50">
-        <div class="row justify-content-center">
-            <div id="display-page" class="col-12 col-md-8 order-2 order-md-1 me-2 bg-white">
-                &nbsp;
+<div class="container-fluid p-lg-4 p-2">
+    <div class="row g-4">
+        <!-- Sidebar -->
+        <div class="col-12 col-lg-4 col-xl-3">
+            <div class="card shadow-sm border-0 sidebar">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0 fw-bold">{% translate "Course Content" %}</h5>
+                </div>
+                <div class="card-body p-2">
+                    <!-- Lessons -->
+                    <h6 class="px-2 pt-2 text-muted fw-bold small text-uppercase">{% translate "Lessons" %}</h6>
+                    <div class="list-group list-group-flush mb-3" role="tablist">
+                        {% for lesson in lessons %}
+                            <a class="list-group-item list-group-item-action pointer" 
+                               hx-select="#content-loaded" 
+                               data-bs-toggle="list" 
+                               hx-get="{% url 'lesson-details' course_id=lesson.course.id lesson_id=lesson.id %}" 
+                               hx-trigger="click" 
+                               hx-target="#display-page" 
+                               hx-swap="innerHTML" 
+                               role="tab">
+                               <i class="fas fa-play-circle me-2 text-primary opacity-75"></i>{{ lesson.name }}
+                            </a>
+                        {% empty %}
+                            <span class="list-group-item text-muted">{% translate "No lessons available." %}</span>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Quizzes -->
+                    <h6 class="px-2 pt-2 text-muted fw-bold small text-uppercase">{% translate "Quizzes" %}</h6>
+                    <div class="list-group list-group-flush" role="tablist">
+                        {% for quiz in quizzes %}
+                            <a class="list-group-item list-group-item-action" href="{% url 'quiz-details' quiz.course.id quiz.id %}">
+                                <i class="fas fa-question-circle me-2 text-primary opacity-75"></i>{{ quiz.name }}
+                            </a>
+                        {% empty %}
+                            <span class="list-group-item text-muted">{% translate "No quizzes available." %}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-12 col-lg-8 col-xl-9">
+            <div id="display-page" class="card shadow-sm border-0" style="min-height: 85vh;">
                 {% block content %}
+                <div id="content-loaded" class="d-flex flex-column justify-content-center align-items-center h-100 text-muted p-4">
+                    <i class="fas fa-book-open fa-4x mb-3 text-primary opacity-50"></i>
+                    <h4>{% translate "Welcome to the course!" %}</h4>
+                    <p>{% translate "Please select a lesson or quiz from the sidebar to begin." %}</p>
+                </div>
                 {% endblock %}
             </div>
-            <div class="list-group list-group-flush col-10 col-md-3 order-1 order-md-2 text-center m-auto mt-0">
-                <div class="lectures-nav border rounded bg-white p-0 mb-3" role="tablist">
-                    {% for lesson in lessons %}
-                        <a class="list-group-item list-group-item-action pointer" hx-select="#content-loaded" data-bs-toggle="list" hx-get="{% url 'lesson-details' course_id=lesson.course.id lesson_id=lesson.id %}" hx-trigger="click" hx-target="#display-page" hx-swap="innerHTML" role="tab">{{ lesson.name }}</a>
-                    {% endfor %}
-                </div>
-
-                <div class="lectures-nav border rounded bg-white p-0 mb-3" role="tablist">
-                    {% for quiz in quizzes %}
-                        <a class="list-group-item list-group-item-action pointer" href="{% url 'quiz-details' quiz.course.id quiz.id %}">{{ quiz.name }}</a>
-                    {% endfor %}
-                </div>
-
-            </div>
-
         </div>
     </div>
+</div>
 
-    <script>
-        window.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll(".list-group-item-action").forEach(element => {
-                element.addEventListener("click", (event) => {
-                    console.log(document.querySelector(".list-group-item-action.active"))
-                    document.querySelector(".list-group-item-action.active").classList.remove("active")
-                    event.target.classList.add("active")
-                })
-            })
-        })
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://vjs.zencdn.net/7.0.0/video.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/videojs-seek-buttons@3.0.1/dist/videojs-seek-buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-seek-buttons@3.0.1/dist/videojs-seek-buttons.min.js"></script>
+<script>
+    (() => {
+        // This IIFE ensures the script runs on each HTMX swap.
+        function initializeCourseView() {
+            const lessonLinks = document.querySelectorAll(".sidebar .list-group-item-action[hx-get]");
+            if (lessonLinks.length > 0) {
+                // Check if any link is already active from a previous state
+                const isActive = Array.from(lessonLinks).some(link => link.classList.contains('active'));
+                // If no lesson is active, and the welcome message is showing, click the first lesson.
+                if (!isActive && document.querySelector("#display-page #content-loaded")) {
+                    setTimeout(()=>{
+                        lessonLinks[0].click();;
+                    }, 500)
+                    lessonLinks[0].classList.add('active');
+                }
+            }
+        }
+        
+        // Initial load
+        initializeCourseView();
 
+        // Re-initialize after HTMX swaps into the main content area
+        // document.body.addEventListener('htmx:afterSwap', function(event) {
+        //     if (event.detail.target.id === 'display-page') {
+        //          // The content inside display-page is replaced, but the sidebar remains.
+        //          // We don't need to re-run the default click logic here,
+        //          // as the user-initiated click has already set the active state.
+        //     }
+        // });
+    })();
+</script>
 {% endblock %}
