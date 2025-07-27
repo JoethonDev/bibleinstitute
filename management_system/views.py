@@ -586,7 +586,7 @@ def take_exam(request, course_id, quiz_id):
                 
                 logger.info(f"User : {user} has submitted {quiz} at {submission_datetime.strftime('%d/%m/%Y, %H:%M:%S')}")
 
-                questions_data, _ = unpack_quiz_form(request.POST)
+                questions_data, not_used = unpack_quiz_form(request.POST)
 
                 # Create Quesitons
                 submissions = []

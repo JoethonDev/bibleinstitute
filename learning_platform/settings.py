@@ -49,6 +49,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware', # Add this for localization
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -71,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.i18n',
             ],
         },
     },
@@ -125,6 +127,11 @@ USE_L10N = True
 USE_TZ = True
 TIME_ZONE = 'Africa/Cairo'
 
+# Define where Django should look for translation files
+LOCALE_PATHS = [
+    BASE_DIR / 'locale', # This is where your .po and .mo files will be
+]
+
 
 
 # Static files (CSS, JavaScript, Images)
@@ -142,6 +149,7 @@ STATIC_ROOT = "collectstatic/"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Modifications
+CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "https://weathered-wave-c7f0.elprincedoca.workers.dev/")
 
 # Change Auth Model
 AUTH_USER_MODEL = 'management_system.User'

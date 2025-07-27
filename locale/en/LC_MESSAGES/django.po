@@ -1,0 +1,767 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-27 17:59+0300\n"
+"PO-Revision-Date: 2025-07-27 18:02+0300\n"
+"Last-Translator: Gemini\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: .\management_system\forms.py:10 .\management_system\forms.py:15
+#: .\management_system\forms.py:30 .\management_system\forms.py:39
+#: .\management_system\models.py:68
+msgid "Username"
+msgstr "Username"
+
+#: .\management_system\forms.py:11 .\management_system\forms.py:20
+#: .\management_system\forms.py:35 .\management_system\forms.py:70
+#: .\management_system\forms.py:91
+msgid "Password"
+msgstr "Password"
+
+#: .\management_system\forms.py:31 .\management_system\forms.py:45
+msgid "First Name"
+msgstr "First Name"
+
+#: .\management_system\forms.py:32 .\management_system\forms.py:51
+msgid "Last Name"
+msgstr "Last Name"
+
+#: .\management_system\forms.py:33 .\management_system\models.py:68
+msgid "Role"
+msgstr "Role"
+
+#: .\management_system\forms.py:34 .\management_system\models.py:68
+msgid "Joined Date"
+msgstr "Joined Date"
+
+#: .\management_system\forms.py:115
+msgid "Course Name"
+msgstr "Course Name"
+
+#: .\management_system\forms.py:116
+msgid "Course Description"
+msgstr "Course Description"
+
+#: .\management_system\forms.py:118 .\management_system\models.py:104
+msgid "Instructor"
+msgstr "Instructor"
+
+#: .\management_system\forms.py:120
+msgid "Academic Year"
+msgstr "Academic Year"
+
+#: .\management_system\models.py:24
+msgid "Admin"
+msgstr "Admin"
+
+#: .\management_system\models.py:25
+msgid "Teacher"
+msgstr "Teacher"
+
+#: .\management_system\models.py:26
+msgid "First Year"
+msgstr "First Year"
+
+#: .\management_system\models.py:27
+msgid "Second Year"
+msgstr "Second Year"
+
+#: .\management_system\models.py:68 .\management_system\models.py:104
+#: .\management_system\models.py:170 .\management_system\models.py:228
+#: .\management_system\models.py:307
+msgid "Name"
+msgstr "Name"
+
+#: .\management_system\models.py:68
+msgid "Last Login"
+msgstr "Last Login"
+
+#: .\management_system\models.py:81
+msgid "First Academic Year"
+msgstr "First Academic Year"
+
+#: .\management_system\models.py:82
+msgid "Second Academic Year"
+msgstr "Second Academic Year"
+
+#: .\management_system\models.py:104
+msgid "Description"
+msgstr "Description"
+
+#: .\management_system\models.py:104
+msgid "Level"
+msgstr "Level"
+
+#: .\management_system\models.py:164
+#, python-format
+msgid "Updated on %(date)s"
+msgstr "Updated on %(date)s"
+
+#: .\management_system\models.py:170 .\management_system\models.py:228
+#: .\management_system\templates\lesson_form.html:30
+#: .\management_system\templates\quiz_form.html:41
+msgid "Course"
+msgstr "Course"
+
+#: .\management_system\models.py:170
+msgid "Last Updated"
+msgstr "Last Updated"
+
+#: .\management_system\models.py:228 .\management_system\models.py:307
+msgid "Grades"
+msgstr "Grades"
+
+#: .\management_system\models.py:228
+msgid "Opening Date"
+msgstr "Opening Date"
+
+#: .\management_system\models.py:228
+msgid "Closing Date"
+msgstr "Closing Date"
+
+#: .\management_system\models.py:228
+#: .\management_system\templates\submission_dashboard.html:11
+msgid "Submissions"
+msgstr "Submissions"
+
+#: .\management_system\models.py:232
+msgid "Multiple Choice"
+msgstr "Multiple Choice"
+
+#: .\management_system\models.py:233
+msgid "Written"
+msgstr "Written"
+
+#: .\management_system\models.py:234
+msgid "Complete"
+msgstr "Complete"
+
+#: .\management_system\models.py:307
+msgid "Submission Date"
+msgstr "Submission Date"
+
+#: .\management_system\templates\admin_panel.html:14
+#: .\management_system\templates\base.html:132
+#: .\management_system\templates\login.html:10
+msgid "Bible Institute Coptic"
+msgstr "Bible Institute Coptic"
+
+#: .\management_system\templates\admin_panel.html:114
+msgid "Admin Panel"
+msgstr "Admin Panel"
+
+#: .\management_system\templates\admin_panel.html:117
+msgid "Close"
+msgstr "Close"
+
+#: .\management_system\templates\admin_panel.html:133
+msgid "Users"
+msgstr "Users"
+
+#: .\management_system\templates\admin_panel.html:145
+#: .\management_system\templates\base.html:107
+msgid "Courses"
+msgstr "Courses"
+
+#: .\management_system\templates\admin_panel.html:157
+#: .\management_system\templates\course_detail.html:40
+msgid "Lessons"
+msgstr "Lessons"
+
+#: .\management_system\templates\admin_panel.html:170
+#: .\management_system\templates\upload_video.html:29
+#: .\management_system\templates\upload_video.html:38
+msgid "Upload Files"
+msgstr "Upload Files"
+
+#: .\management_system\templates\admin_panel.html:183
+#: .\management_system\templates\course_detail.html:59
+msgid "Quizzes"
+msgstr "Quizzes"
+
+#: .\management_system\templates\admin_panel.html:198
+msgid "Menu"
+msgstr "Menu"
+
+#: .\management_system\templates\admin_panel.html:215
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#: .\management_system\templates\admin_panel.html:225
+msgid "Total Users"
+msgstr "Total Users"
+
+#: .\management_system\templates\admin_panel.html:234
+msgid "Total Courses"
+msgstr "Total Courses"
+
+#: .\management_system\templates\admin_panel.html:243
+msgid "Total Lessons"
+msgstr "Total Lessons"
+
+#: .\management_system\templates\admin_panel.html:252
+msgid "Total Quizzes"
+msgstr "Total Quizzes"
+
+#: .\management_system\templates\base.html:93
+msgid "Logo"
+msgstr "Logo"
+
+#: .\management_system\templates\base.html:95
+msgid "Toggle navigation"
+msgstr "Toggle navigation"
+
+#: .\management_system\templates\base.html:101
+msgid "Home"
+msgstr "Home"
+
+#: .\management_system\templates\base.html:104
+msgid "About Us"
+msgstr "About Us"
+
+#: .\management_system\templates\base.html:110
+msgid "Profile"
+msgstr "Profile"
+
+#: .\management_system\templates\base.html:114
+msgid "Admin Dashboard"
+msgstr "Admin Dashboard"
+
+#: .\management_system\templates\base.html:136
+msgid "Institute Headquarters"
+msgstr "Institute Headquarters"
+
+#: .\management_system\templates\base.html:137
+msgid "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
+msgstr "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
+
+#: .\management_system\templates\base.html:145
+msgid "All rights reserved to the Bible Institute in Maadi"
+msgstr "All rights reserved to the Bible Institute in Maadi"
+
+#: .\management_system\templates\course_detail.html:36
+msgid "Course Content"
+msgstr "Course Content"
+
+#: .\management_system\templates\course_detail.html:54
+msgid "No lessons available."
+msgstr "No lessons available."
+
+#: .\management_system\templates\course_detail.html:66
+msgid "No quizzes available."
+msgstr "No quizzes available."
+
+#: .\management_system\templates\course_detail.html:79
+msgid "Welcome to the course!"
+msgstr "Welcome to the course!"
+
+#: .\management_system\templates\course_detail.html:80
+msgid "Please select a lesson or quiz from the sidebar to begin."
+msgstr "Please select a lesson or quiz from the sidebar to begin."
+
+#: .\management_system\templates\course_filter.html:2
+msgid "Course Filter"
+msgstr "Course Filter"
+
+#: .\management_system\templates\course_filter.html:5
+msgid "All Courses"
+msgstr "All Courses"
+
+#: .\management_system\templates\course_view.html:36
+msgid "Instructor:"
+msgstr "Instructor:"
+
+#: .\management_system\templates\course_view.html:43
+msgid "View Course"
+msgstr "View Course"
+
+#: .\management_system\templates\course_view.html:50
+msgid "No courses available in this level yet."
+msgstr "No courses available in this level yet."
+
+#: .\management_system\templates\dashboard.html:30
+msgid "Create a"
+msgstr "Create a"
+
+#: .\management_system\templates\dashboard_form.html:20
+msgid "Back to"
+msgstr "Back to"
+
+#: .\management_system\templates\dashboard_form.html:43
+#: .\management_system\templates\lesson_form.html:87
+#: .\management_system\templates\quiz_form.html:78
+msgid "Submit"
+msgstr "Submit"
+
+#: .\management_system\templates\display_quiz.html:13
+#: .\management_system\templates\drive_files.html:11
+msgid "Back"
+msgstr "Back"
+
+#: .\management_system\templates\display_quiz.html:30
+msgid "Exam"
+msgstr "Exam"
+
+#: .\management_system\templates\display_quiz.html:32
+msgid "Student"
+msgstr "Student"
+
+#: .\management_system\templates\display_quiz.html:36
+msgid "Final Grade"
+msgstr "Final Grade"
+
+#: .\management_system\templates\display_quiz.html:59
+msgid "Submit Exam"
+msgstr "Submit Exam"
+
+#: .\management_system\templates\display_quiz.html:61
+msgid "Submit Correction"
+msgstr "Submit Correction"
+
+#: .\management_system\templates\drive_files.html:44
+msgid "This folder is empty."
+msgstr "This folder is empty."
+
+#: .\management_system\templates\index.html:29
+#: .\management_system\templates\pagination.html:15
+#: .\management_system\templates\pagination.html:28
+msgid "Previous"
+msgstr "Previous"
+
+#: .\management_system\templates\index.html:33
+#: .\management_system\templates\pagination.html:56
+#: .\management_system\templates\pagination.html:69
+msgid "Next"
+msgstr "Next"
+
+#: .\management_system\templates\index.html:39
+msgid "Bible Institute"
+msgstr "Bible Institute"
+
+#: .\management_system\templates\index.html:41
+msgid ""
+"It is an Orthodox church institute affiliated with the Coptic Orthodox "
+"Church, located at the Church of the Great Martyr Mar Girgis - Kotsika, "
+"Maadi Coptic Orthodox Diocese."
+msgstr ""
+"It is an Orthodox church institute affiliated with the Coptic Orthodox "
+"Church, located at the Church of the Great Martyr Mar Girgis - Kotsika, "
+"Maadi Coptic Orthodox Diocese."
+
+#: .\management_system\templates\index.html:47
+msgid "Supreme Head of the Institute:"
+msgstr "Supreme Head of the Institute:"
+
+#: .\management_system\templates\index.html:50
+msgid ""
+"His Holiness Pope Tawadros II, Pope of Alexandria and Patriarch of the See "
+"of St. Mark, and the Supreme Head of the Theological Institutes and Colleges."
+msgstr ""
+"His Holiness Pope Tawadros II, Pope of Alexandria and Patriarch of the See "
+"of St. Mark, and the Supreme Head of the Theological Institutes and Colleges."
+
+#: .\management_system\templates\index.html:59
+msgid "General Supervisor of the Institute:"
+msgstr "General Supervisor of the Institute:"
+
+#: .\management_system\templates\index.html:62
+msgid ""
+"His Eminence Anba Daniel, Metropolitan of Maadi and its Dependencies, and "
+"Secretary of the Holy Synod."
+msgstr ""
+"His Eminence Anba Daniel, Metropolitan of Maadi and its Dependencies, and "
+"Secretary of the Holy Synod."
+
+#: .\management_system\templates\lesson_form.html:10
+msgid "Back to lessons"
+msgstr "Back to lessons"
+
+#: .\management_system\templates\lesson_form.html:21
+msgid "Lesson Details"
+msgstr "Lesson Details"
+
+#: .\management_system\templates\lesson_form.html:26
+msgid "Lesson Name"
+msgstr "Lesson Name"
+
+#: .\management_system\templates\lesson_form.html:32
+#: .\management_system\templates\quiz_form.html:43
+msgid "Select a Course"
+msgstr "Select a Course"
+
+#: .\management_system\templates\lesson_form.html:44
+#: .\management_system\templates\upload_video.html:22
+msgid "Select Files from Drive"
+msgstr "Select Files from Drive"
+
+#: .\management_system\templates\lesson_form.html:56
+msgid "Selected Lectures"
+msgstr "Selected Lectures"
+
+#: .\management_system\templates\lesson_form.html:68
+msgid "Video"
+msgstr "Video"
+
+#: .\management_system\templates\lesson_form.html:69
+msgid "Audio Recording"
+msgstr "Audio Recording"
+
+#: .\management_system\templates\lesson_form.html:70
+msgid "Book"
+msgstr "Book"
+
+#: .\management_system\templates\lesson_stream.html:34
+msgid ""
+"To view this video please enable JavaScript, and consider upgrading to a web "
+"browser that"
+msgstr ""
+"To view this video please enable JavaScript, and consider upgrading to a web "
+"browser that"
+
+#: .\management_system\templates\lesson_stream.html:35
+msgid "supports HTML5 video"
+msgstr "supports HTML5 video"
+
+#: .\management_system\templates\lesson_stream.html:49
+msgid "Page"
+msgstr "Page"
+
+#: .\management_system\templates\login.html:10
+#: .\management_system\templates\login.html:96
+msgid "Login"
+msgstr "Login"
+
+#: .\management_system\templates\login.html:87
+msgid "Welcome Back"
+msgstr "Welcome Back"
+
+#: .\management_system\templates\login.html:88
+msgid "Sign in to continue"
+msgstr "Sign in to continue"
+
+#: .\management_system\templates\naming_filter.html:2
+#: .\management_system\templates\submission_dashboard.html:45
+msgid "Search"
+msgstr "Search"
+
+#: .\management_system\templates\pagination.html:2
+msgid "Page navigation example"
+msgstr "Page navigation example"
+
+#: .\management_system\templates\profile.html:13
+msgid "My Profile"
+msgstr "My Profile"
+
+#: .\management_system\templates\profile.html:22
+msgid "Edit"
+msgstr "Edit"
+
+#: .\management_system\templates\profile.html:45
+msgid "My Courses"
+msgstr "My Courses"
+
+#: .\management_system\templates\profile.html:68
+msgid "No courses in this level."
+msgstr "No courses in this level."
+
+#: .\management_system\templates\profile.html:76
+msgid "You are not enrolled in any courses yet."
+msgstr "You are not enrolled in any courses yet."
+
+#: .\management_system\templates\questions_rendering.html:15
+msgid "Question Type"
+msgstr "Question Type"
+
+#: .\management_system\templates\questions_rendering.html:25
+#: .\management_system\templates\questions_rendering.html:35
+msgid "Question"
+msgstr "Question"
+
+#: .\management_system\templates\questions_rendering.html:26
+msgid "Question...?"
+msgstr "Question...?"
+
+#: .\management_system\templates\questions_rendering.html:29
+msgid "Grade"
+msgstr "Grade"
+
+#: .\management_system\templates\questions_rendering.html:42
+msgid "Points"
+msgstr "Points"
+
+#: .\management_system\templates\questions_rendering.html:49
+#: .\management_system\templates\quiz_form.html:215
+msgid "Answer Options"
+msgstr "Answer Options"
+
+#: .\management_system\templates\questions_rendering.html:73
+msgid "Add another choice..."
+msgstr "Add another choice..."
+
+#: .\management_system\templates\questions_rendering.html:78
+#: .\management_system\templates\questions_rendering.html:86
+#: .\management_system\templates\quiz_form.html:212
+#: .\management_system\templates\quiz_form.html:222
+msgid "Answer"
+msgstr "Answer"
+
+#: .\management_system\templates\questions_rendering.html:80
+#: .\management_system\templates\quiz_form.html:222
+msgid "Student will complete this..."
+msgstr "Student will complete this..."
+
+#: .\management_system\templates\questions_rendering.html:88
+#: .\management_system\templates\quiz_form.html:212
+msgid "Student will write their answer here..."
+msgstr "Student will write their answer here..."
+
+#: .\management_system\templates\questions_rendering.html:101
+msgid "Correct Answer:"
+msgstr "Correct Answer:"
+
+#: .\management_system\templates\questions_rendering.html:113
+msgid "Give Question Grade"
+msgstr "Give Question Grade"
+
+#: .\management_system\templates\questions_rendering.html:122
+msgid "Question graded"
+msgstr "Question graded"
+
+#: .\management_system\templates\questions_rendering.html:124
+msgid "Question under review"
+msgstr "Question under review"
+
+#: .\management_system\templates\quiz_form.html:11
+msgid "Back to quizzes"
+msgstr "Back to quizzes"
+
+#: .\management_system\templates\quiz_form.html:23
+msgid "Edit Quiz"
+msgstr "Edit Quiz"
+
+#: .\management_system\templates\quiz_form.html:25
+msgid "Create Quiz"
+msgstr "Create Quiz"
+
+#: .\management_system\templates\quiz_form.html:37
+msgid "Exam Title"
+msgstr "Exam Title"
+
+#: .\management_system\templates\quiz_form.html:57
+msgid "Exam Opening Date"
+msgstr "Exam Opening Date"
+
+#: .\management_system\templates\quiz_form.html:61
+msgid "Exam Closing Date"
+msgstr "Exam Closing Date"
+
+#: .\management_system\templates\quiz_form.html:67
+msgid "Questions"
+msgstr "Questions"
+
+#: .\management_system\templates\quiz_form.html:75
+msgid "Add Question"
+msgstr "Add Question"
+
+#: .\management_system\templates\submission_dashboard.html:22
+#: .\management_system\templates\submission_filter.html:3
+msgid "Minimum Grade"
+msgstr "Minimum Grade"
+
+#: .\management_system\templates\submission_dashboard.html:25
+#: .\management_system\templates\submission_filter.html:4
+msgid "Maximum Grade"
+msgstr "Maximum Grade"
+
+#: .\management_system\templates\submission_dashboard.html:30
+#: .\management_system\templates\year_filter.html:2
+msgid "Year Filter"
+msgstr "Year Filter"
+
+#: .\management_system\templates\submission_dashboard.html:33
+msgid "All"
+msgstr "All"
+
+#: .\management_system\templates\table_rendering.html:34
+#: .\management_system\templates\table_rendering.html:48
+msgid "View Submission"
+msgstr "View Submission"
+
+#: .\management_system\templates\table_rendering.html:63
+msgid "Update"
+msgstr "Update"
+
+#: .\management_system\templates\table_rendering.html:72
+msgid "Delete"
+msgstr "Delete"
+
+#: .\management_system\templates\table_rendering.html:84
+msgid "No Data Here!"
+msgstr "No Data Here!"
+
+#: .\management_system\templates\update_profile.html:11
+msgid "Update Profile"
+msgstr "Update Profile"
+
+#: .\management_system\templates\upload_video.html:9
+msgid "Loading..."
+msgstr "Loading..."
+
+#: .\management_system\templates\upload_video.html:13
+msgid "Folder"
+msgstr "Folder"
+
+#: .\management_system\views.py:52 .\management_system\views.py:180
+#: .\management_system\views.py:256 .\management_system\views.py:358
+#: .\management_system\views.py:424 .\management_system\views.py:458
+#: .\management_system\views.py:557
+msgid "Unauthorized"
+msgstr "Unauthorized"
+
+#: .\management_system\views.py:53 .\management_system\views.py:182
+msgid "authorized"
+msgstr "authorized"
+
+#: .\management_system\views.py:264
+#, python-format
+msgid "%(action)s %(view_name)s is failed, Try again Please!"
+msgstr "%(action)s %(view_name)s is failed, Try again Please!"
+
+#: .\management_system\views.py:267
+#, python-format
+msgid "%(view_name)s has %(action)sd successfully!"
+msgstr "%(view_name)s has %(action)sd successfully!"
+
+#: .\management_system\views.py:291
+msgid "user"
+msgstr "user"
+
+#: .\management_system\views.py:296
+msgid "course"
+msgstr "course"
+
+#: .\management_system\views.py:302
+msgid "lesson"
+msgstr "lesson"
+
+#: .\management_system\views.py:307
+msgid "quiz"
+msgstr "quiz"
+
+#: .\management_system\views.py:378
+msgid "Profile is updated successfully!"
+msgstr "Profile is updated successfully!"
+
+#: .\management_system\views.py:543
+msgid "Quiz is closed, You can not take it anymore!"
+msgstr "Quiz is closed, You can not take it anymore!"
+
+#: .\management_system\views.py:585
+msgid "Invalid Request, submission is closed!"
+msgstr "Invalid Request, submission is closed!"
+
+#: .\management_system\views.py:623
+msgid "Quiz is sent successfully!"
+msgstr "Quiz is sent successfully!"
+
+#: .\management_system\views.py:626
+msgid "Sending quiz has failed, Please Try again!"
+msgstr "Sending quiz has failed, Please Try again!"
+
+#: .\management_system\views.py:633 .\management_system\views.py:1303
+msgid "Not allowed method"
+msgstr "Not allowed method"
+
+#: .\management_system\views.py:678
+msgid "Choose Role"
+msgstr "Choose Role"
+
+#: .\management_system\views.py:687 .\management_system\views.py:742
+msgid "create"
+msgstr "create"
+
+#: .\management_system\views.py:691 .\management_system\views.py:746
+msgid "update"
+msgstr "update"
+
+#: .\management_system\views.py:736 .\management_system\views.py:788
+#: .\management_system\views.py:997 .\management_system\views.py:1225
+msgid "Choose Academic Year"
+msgstr "Choose Academic Year"
+
+#: .\management_system\views.py:789 .\management_system\views.py:998
+msgid "Choose Course"
+msgstr "Choose Course"
+
+#: .\management_system\views.py:828
+msgid "Lesson is created successfully"
+msgstr "Lesson is created successfully"
+
+#: .\management_system\views.py:832
+msgid "Create lesson has failed, Try again Please!"
+msgstr "Create lesson has failed, Try again Please!"
+
+#: .\management_system\views.py:835
+msgid "Create lesson has failed, Name and Videos can not be empty!"
+msgstr "Create lesson has failed, Name and Videos can not be empty!"
+
+#: .\management_system\views.py:906
+msgid "Lesson is updated successfully"
+msgstr "Lesson is updated successfully"
+
+#: .\management_system\views.py:909
+msgid "Update lesson has failed, Try again Please!"
+msgstr "Update lesson has failed, Try again Please!"
+
+#: .\management_system\views.py:912
+msgid "Update lesson has failed, Name and Videos can not be empty!"
+msgstr "Update lesson has failed, Name and Videos can not be empty!"
+
+#: .\management_system\views.py:947
+msgid "unauthorized!"
+msgstr "unauthorized!"
+
+#: .\management_system\views.py:1040
+#, python-format
+msgid "Correct answer is not in choices for question : %(title)s"
+msgstr "Correct answer is not in choices for question : %(title)s"
+
+#: .\management_system\views.py:1060 .\management_system\views.py:1061
+msgid "Closing Date can not be before or same as Openning Date!"
+msgstr "Closing Date can not be before or same as Openning Date!"
+
+#: .\management_system\views.py:1075
+msgid "Quiz is created successfully"
+msgstr "Quiz is created successfully"
+
+#: .\management_system\views.py:1078 .\management_system\views.py:1082
+msgid "Create quiz is failed, Try again Please"
+msgstr "Create quiz is failed, Try again Please"
+
+#: .\management_system\views.py:1135
+msgid "Correct answer is not in choices"
+msgstr "Correct answer is not in choices"
+
+#: .\management_system\views.py:1170
+msgid "Quiz is updated successfully"
+msgstr "Quiz is updated successfully"
+
+#: .\management_system\views.py:1173 .\management_system\views.py:1177
+msgid "Update quiz is failed, Try again Please"
+msgstr "Update quiz is failed, Try again Please"
+
+#: .\management_system\views.py:1249 .\management_system\views.py:1253
+msgid "Not Found!"
+msgstr "Not Found!"

@@ -3,240 +3,192 @@
 
 {% block style %}
 <style>
-    canvas { border: 1px solid #ccc; width: 100%; max-width: 800px; }
-    .controls { margin-top: 10px; }
-    .controls button { padding: 6px 12px; margin: 0 5px; }
+    /* Ensures the PDF canvas is responsive and maintains its aspect ratio */
+    .pdf-viewer canvas {
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+    }
+    /* Ensures the video player is responsive */
+    .video-js.vjs-fluid,
+    .video-js.vjs-16-9 {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="content-loaded">
-    {% block cdn %}
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/videojs-seek-buttons@3.0.1/dist/videojs-seek-buttons.min.css">
-    {% endblock %}
-    <div class="row">
-        {% for hls_url in links %}
-            <div class="col-12 col-xs-12 pt-2 pb-2 mb-5" oncontextmenu="return false;">
+<div id="content-loaded" class="p-2 p-md-3">
+    {% for hls_url in links %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light">
+                <h6 class="mb-0 fw-bold">{{ hls_url.name }}</h6>
+            </div>
+            <div class="card-body p-2 p-sm-3">
                 {% if hls_url.type == 'video' %}
-                    <video playsinline controls class="video-js w-100 mb-3" height=350 preload="none" controlsList="nodownload">
-                        <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
-                
-                        <p class="vjs-no-js">
-                        {% translate "To view this video please enable JavaScript, and consider upgrading to a web browser that" %}
-                        <a href="https://videojs.com/html5-video-support/" target="_blank">{% translate "supports HTML5 video" %}</a>
-                        </p>
-                    </video>
-                    <div class="transparent-v-overlay"></div> 
+                    <!-- Responsive video container -->
+                    <div>
+                        <video playsinline controls class="video-js vjs-theme-city" preload="auto" controlsList="nodownload">
+                            <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
+                            <p class="vjs-no-js">
+                            {% translate "To view this video please enable JavaScript, and consider upgrading to a web browser that" %}
+                            <a href="https://videojs.com/html5-video-support/" target="_blank">{% translate "supports HTML5 video" %}</a>
+                            </p>
+                        </video>
+                    </div>
                 {% elif hls_url.type == 'audio' %}
-                    <audio controls class="w-100" preload="none">
+                    <audio controls class="w-100" preload="auto" controlsList="nodownload">
                         <source src="{{ hls_url.url }}"/>
                     </audio> 
                 {% else %}
-                   <div class="pdf-viewer" data-url="{{ hls_url.url }}">
-                        <canvas class="pdf-canvas" style="width: 100%; border: 1px solid #ccc;">
-                            
-                        </canvas>
-                        <div class="controls controls d-flex justify-content-center mt-3">
-                            <button class="prev me-2 btn btn-secondary">{% translate "Previous" %}</button>
-                            <span class="page-info me-2">{% translate "Page" %} 1 / ?</span>
-                            <button class="next btn btn-secondary">{% translate "Next" %}</button>
-                        </div>
+                   <div class="d-flex justify-content-center">
+                       <div class="pdf-viewer" data-url="{{ hls_url.url }}">
+                            <canvas class="pdf-canvas shadow-sm"></canvas>
+                            <div class="controls d-flex justify-content-between align-items-center mt-3">
+                                <button class="prev btn btn-outline-secondary btn-sm"><i class="fas {% if request.LANGUAGE_CODE == 'en'  %}fa-arrow-left{% else %}fa-arrow-right{% endif %}"></i></button>
+                                <span class="page-info mx-2 text-muted small">{% translate "Page" %} 1 / ?</span>
+                                <button class="next btn btn-outline-secondary btn-sm"><i class="fas {% if request.LANGUAGE_CODE == 'en'  %}fa-arrow-right{% else %}fa-arrow-left{% endif %}"></i></button>
+                            </div>
+                       </div>
                    </div>
                 {% endif %}
-                 
             </div>
-        {% endfor %}
-    </div>
-    
+        </div>
+    {% endfor %}
+
     <script>
-        // Translations for JavaScript messages
+    (() => {
         const jsTranslations_lesson = {
-            'en': {
-                'page': 'Page',
-                'actionBlocked': 'Action blocked for content protection.'
-            },
-            'ar': {
-                'page': 'صفحة',
-                'actionBlocked': 'تم حظر الإجراء لحماية المحتوى.'
-            }
+            'en': { 'page': 'Page' },
+            'ar': { 'page': 'صفحة' }
         };
 
-        function getJsTranslation_lesson(key, params = {}) {
+        function getJsTranslation_lesson(key) {
             const lang = document.documentElement.lang || 'en';
-            let message = jsTranslations_lesson[lang][key] || jsTranslations_lesson['en'][key];
-            for (const param in params) {
-                message = message.replace(`{${param}}`, params[param]);
-            }
-            return message;
+            return jsTranslations_lesson[lang][key] || jsTranslations_lesson['en'][key];
         }
 
-        function initializeElements() {
-            preventContext(window)
-            // Initialize VideoJS players for both video and audio elements after content is swapped in
-            const mediaElements = document.querySelectorAll('video, audio'); // Select both video and audio elements
-
-            mediaElements.forEach(mediaElement => {
-                // Prevent long press
-                preventContext(mediaElement)
-                if (!mediaElement.player){
-                    if (mediaElement.tagName == "VIDEO"){
-                        loadVideo(mediaElement)
-                    }
-                    else {
-                        loadAudio(mediaElement)
-                    }
-                }
-                else {
-                    // Update the source if the player already exists
-                    const sourceElement = mediaElement.querySelector('source');
-                    if (sourceElement) {
-                        mediaElement.player.src({ type: sourceElement.type, src: sourceElement.src });
-                    }
-                }
-            })
-            
-            loadPDFs()
-        }
-
-        function loadVideo(video){
+        function initializeVideoJs(video) {
+            if (video.player) return;
+            // Use fluid option for responsiveness
             const player = videojs(video, {
                 controls: true,
-                playbackRates: [0.5, 1, 1.5, 2, 3, 4],
-                controlBar: {
-                    volumePanel: true,
-                    playbackRateMenuButton: true,
-                    playToggle: true,
-                    
-                }
+                fluid: true, // Makes the player responsive
+                playbackRates: [0.5, 1, 1.5, 2],
+                controlBar: { volumePanel: true, playbackRateMenuButton: true, playToggle: true }
             });
-            player.seekButtons({
-                forward: 10,
-                back: 10
-            });
-
+            player.seekButtons({ forward: 10, back: 10 });
         }
 
-        function loadAudio(audio){
+        function initializeHlsAudio(audio) {
+            if (audio.hls) return;
             if (Hls.isSupported()) {
-                var hls = new Hls();
-                let source = audio.querySelector("source").src
+                const hls = new Hls();
+                const source = audio.querySelector("source").src;
                 hls.loadSource(source);
                 hls.attachMedia(audio);
+                audio.hls = hls;
             }
         }
 
-        function preventDownload(mediaElement){
-            if (mediaElement.tagName == "VIDEO"){
-                mediaElement.setAttribute('controlsList', 'nodownload');
-            }
-        }
+        async function initializePdfViewer(viewer) {
+            if (viewer.pdfDoc) return;
+            
+            const url = viewer.dataset.url;
+            const canvas = viewer.querySelector(".pdf-canvas");
+            const ctx = canvas.getContext("2d");
+            const pageInfo = viewer.querySelector(".page-info");
+            const prevBtn = viewer.querySelector(".prev");
+            const nextBtn = viewer.querySelector(".next");
+            let currentPage = 1;
 
-        function preventContext(element){
-            element.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); // Prevent right-click menu
-                e.stopPropagation();
-                e.cancelBubble = true;
-                e.returnValue = false;
-                return false;
-            });
-        }
-
-        async function loadPDFs() {
-            const viewers = document.querySelectorAll(".pdf-viewer");
-
-            for (const viewer of viewers) {
-                const url = viewer.dataset.url;
-                const canvas = viewer.querySelector(".pdf-canvas");
-                const ctx = canvas.getContext("2d");
-                const pageInfo = viewer.querySelector(".page-info");
-                const prevBtn = viewer.querySelector(".prev");
-                const nextBtn = viewer.querySelector(".next");
-
-                let pdfDoc = null;
-                let currentPage = 1;
-
-                // Fetch PDF URL from endpoint
+            try {
                 const response = await fetch(url);
                 const result = await response.json();
-
-                // Load PDF into memory
                 const loadingTask = pdfjsLib.getDocument(result.url);
-                pdfDoc = await loadingTask.promise;
+                const pdfDoc = await loadingTask.promise;
+                viewer.pdfDoc = pdfDoc;
 
                 const renderPage = (num) => {
-                pdfDoc.getPage(num).then(page => {
-                    const scale = 1.5;
-                    const viewport = page.getViewport({ scale });
+                    pdfDoc.getPage(num).then(page => {
+                        // Set fixed canvas size as requested
+                        canvas.height = 600;
+                        canvas.width = 400;
+                        
+                        // Calculate scale to fit page within the fixed canvas size while maintaining aspect ratio
+                        const viewportDefault = page.getViewport({ scale: 1 });
+                        const scale = Math.min(canvas.width / viewportDefault.width, canvas.height / viewportDefault.height);
+                        const viewport = page.getViewport({ scale: scale });
+                        
+                        // Create a temporary canvas to render the page to avoid distortion
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCanvas.width = viewport.width;
+                        tempCanvas.height = viewport.height;
 
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+                        const renderContext = {
+                            canvasContext: tempCtx,
+                            viewport: viewport
+                        };
 
-                    const renderContext = {
-                    canvasContext: ctx,
-                    viewport: viewport
-                    };
-
-                    page.render(renderContext);
-                    pageInfo.textContent = `${getJsTranslation_lesson('page')} ${num} / ${pdfDoc.numPages}`;
-                });
+                        page.render(renderContext).promise.then(() => {
+                            // Clear main canvas and draw the rendered page centered
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            ctx.fillStyle = 'white'; // Set a background color
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            const xOffset = (canvas.width - viewport.width) / 2;
+                            const yOffset = (canvas.height - viewport.height) / 2;
+                            ctx.drawImage(tempCanvas, xOffset, yOffset);
+                        });
+                        
+                        pageInfo.textContent = `${getJsTranslation_lesson('page')} ${num} / ${pdfDoc.numPages}`;
+                    });
                 };
 
-                // Initial render
                 renderPage(currentPage);
 
-                // Controls
                 prevBtn.addEventListener("click", () => {
-                if (currentPage <= 1) return;
-                currentPage--;
-                renderPage(currentPage);
+                    if (currentPage <= 1) return;
+                    currentPage--;
+                    renderPage(currentPage);
                 });
-
                 nextBtn.addEventListener("click", () => {
-                if (currentPage >= pdfDoc.numPages) return;
-                currentPage++;
-                renderPage(currentPage);
+                    if (currentPage >= pdfDoc.numPages) return;
+                    currentPage++;
+                    renderPage(currentPage);
                 });
+
+            } catch (error) {
+                console.error("Error loading PDF:", error);
+                pageInfo.textContent = "Error loading PDF.";
             }
-}
+        }
         
-        window.addEventListener("DOMContentLoaded", () => {
-            initializeElements()
-            // Disable right-click
-            document.addEventListener("contextmenu", e => e.preventDefault());
+        function preventContextMenu(element) {
+            element.addEventListener('contextmenu', e => e.preventDefault());
+        }
 
-            // Disable Ctrl+S / Ctrl+P / Ctrl+U
-            document.addEventListener("keydown", e => {
-                if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
-                    e.preventDefault();
-                    // alert("Action blocked for content protection."); // Replaced with custom message box if needed
-                    // For now, just prevent default without an alert
-                }
+        function initializeAllElements() {
+            preventContextMenu(window);
+            document.querySelectorAll('video.video-js').forEach(initializeVideoJs);
+            document.querySelectorAll('audio').forEach(initializeHlsAudio);
+            document.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
+            document.querySelectorAll('video, audio').forEach(el => {
+                el.setAttribute('controlsList', 'nodownload');
+                preventContextMenu(el);
             });
+        }
+        
+        initializeAllElements();
 
-            // Disable text selection
-            document.addEventListener("selectstart", e => e.preventDefault());
-
-        })
-
-        document.addEventListener('htmx:afterSwap', (event) => {
-            initializeElements()
-            // Disable right-click
-            document.addEventListener("contextmenu", e => e.preventDefault());
-
-            // Disable Ctrl+S / Ctrl+P / Ctrl+U
-            document.addEventListener("keydown", e => {
-                if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
-                    e.preventDefault();
-                    // alert("Action blocked for content protection."); // Replaced with custom message box if needed
-                    // For now, just prevent default without an alert
-                }
-            });
-
-            // Disable text selection
-            document.addEventListener("selectstart", e => e.preventDefault());
-
+        // Security measures
+        document.addEventListener("keydown", e => {
+            if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
+                e.preventDefault();
+            }
         });
-
+        document.addEventListener("selectstart", e => e.preventDefault());
+    })();
     </script>
 </div>
 {% endblock %}

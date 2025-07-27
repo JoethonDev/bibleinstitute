@@ -1,3 +1,6 @@
-- Add messages
-- Check all TODO
-- Check Remove
+- Refactored UI 
+    1- [Admin panel - Dashboard - Dashboard Form - Table Rendering - Pagination] 10/07/2025
+    2- [Submission Dashboard - Submission Filter - Quiz Form - Questions Rendering - Display Quiz 
+    - Course Detail - Course View - Drive Files - Lesson Form - Lesson Stream - Upload video] 24/07/2025
+        Bugs need to fix [upload-files has in displaying folder_name | lesson_form has design shit when having more than lecture, issue in gap between them - Aspect Ratio for video and pdf in lesson stream need to be fixed]
+    3- Bugs fixing [upload-files has in displaying folder_name] 27/07/2025

@@ -1,151 +1,125 @@
 {% load static %}
-{% load crispy_forms_tags %}
 {% load i18n %}
-
 
 <!DOCTYPE html>
 <html lang="{{ request.LANGUAGE_CODE }}" {% if request.LANGUAGE_CODE == 'ar' %}dir="rtl"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bible Institute Coptic</title>
+    <title>{% translate "Bible Institute Coptic" %}</title>
+    
+    <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.4" xintegrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
-    <!-- CDN -->
+    
+    <!-- Bootstrap CSS -->
     {% if request.LANGUAGE_CODE == 'ar' %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.rtl.min.css" xintegrity="sha384-gXt9imSW0VcJVHezoNQsP+TNrjYXoGcrqBZJpry9zJt8PCQjobwmhMGaDHTASo9N" crossorigin="anonymous">
     {% else %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" xintegrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
     {% endif %}
     
-    <!-- Style -->
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" xintegrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- Custom Styles -->
     <style>
-        .pointer{
-            cursor: pointer;
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-
-        .vh-80{
-            height: 80vh;
+        body {
+            background-color: #f4f7f9;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
-
-        .overflow-y-scroll{
-          overflow-y: scroll;
+        main {
+            flex: 1;
         }
-
-        .mw-50{
-          max-width: 50%;
+        .navbar {
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        
-        .mw-75{
-          max-width: 75%;
+        footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
         }
-
-        .left-0{
-          left: 0 !important;
+        .footer-bottom {
+            background-color: #233140;
         }
-
-        footer{
-          background-color: #13181c;
-        }
-
-        .footer-bottom{
-          background-color: #0f1317;
-        }
-
-        video::-internal-media-controls-download-button {
-          display:none;
-        }
-
         .w-fit {
           width: fit-content !important;
         }
-
-        /* video {
-          position: relative;
-        }
-
-        video::after {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-        } */
-
-        .vh-50{
-          min-height: 50vh;
-        }
     </style>
-    {% block cdn %}
-    {% endblock %}
-    <!-- Custom Style Block -->
-    {% block style %}
-    {% endblock %}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" xintegrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
-
+    {% block cdn %}{% endblock %}
+    {% block style %}{% endblock %}
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom bg-white">
+<body class="d-flex flex-column">
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
         <div class="container-fluid">
-          
-          <a class="navbar-brand" href="#">
-              <img src="{% static 'login-logo.png' %}" alt="{% translate "Logo" %}" width="125" height="40" class="d-inline-block align-text-top">
+          <a class="navbar-brand" href="{% url 'home' %}">
+              <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
           </a>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate "Toggle navigation" %}">
-            <i class="fa-solid fa-grip-lines"></i>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
+            <i class="fas fa-bars"></i>
           </button>
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav mb-2 mb-lg-0">
-              <li class="nav-item me-2">
-                <a class="nav-link active" aria-current="page" href="{% url 'home' %}">{% translate "Home" %}</a>
-              </li>
-              <li class="nav-item me-2">
-                <a class="nav-link" href="#">{% translate "About Us" %}</a>
-              </li>
-              <li class="nav-item me-2">
-                <a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a>
-              </li>
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="#">{% translate "About Us" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
               {% if request.user.role.role == "admin" or request.user.role.role == "teacher" %}
                 <li class="nav-item">
                   <a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Admin Dashboard" %}</a>
                 </li>
               {% endif %}
             </ul>
-
+            <!-- Language Selector Form -->
+            <form action="{% url 'set_language' %}" method="post" id="language-form" class="d-flex">
+                {% csrf_token %}
+                <input name="next" type="hidden" value="{{ request.get_full_path }}">
+                <select name="language" class="form-select form-select-sm w-fit" onchange="document.getElementById('language-form').submit()">
+                    {% get_current_language as LANGUAGE_CODE %}
+                    {% get_available_languages as LANGUAGES %}
+                    {% for lang in LANGUAGES %}
+                        <option value="{{ lang.0 }}" {% if lang.0 == LANGUAGE_CODE %}selected{% endif %}>
+                            {{ lang.1 }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
           </div>
         </div>
     </nav>
-    {% block body %}
-    {% endblock %}
 
-    {% block script %}
-    {% endblock %}
+    <main>
+        {% block body %}{% endblock %}
+    </main>
+
+    {% block script %}{% endblock %}
     
-    <footer class="text-light">
-      <div class="contact d-flex justify-content-between p-5 fs-3">
-          <div class="social">
-            <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180">
-            <h6 class="mb-4">{% translate "Bible Institute Coptic" %}</h6>
-          </div>
-
-          <div class="contact-details">
-            <h6 class="mb-4">{% translate "Institute Headquarters" %}</h6>
-            <h6 class="mb-4 w-75">{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</h6>
-            <h6 class="mb-4">
-              info@bibleinstitute-eg.org
-              <br>
-              www.bibleinstitute-eg.org</h6>
+    <footer class="mt-auto">
+      <div class="container p-4">
+          <div class="row">
+              <div class="col-lg-5 col-md-12 mb-4 mb-md-0">
+                  <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180" alt="Footer Logo">
+                  <p>{% translate "Bible Institute Coptic" %}</p>
+              </div>
+              <div class="col-lg-7 col-md-12 mb-4 mb-md-0">
+                  <h5 class="text-uppercase">{% translate "Institute Headquarters" %}</h5>
+                  <p><i class="fas fa-map-marker-alt me-2"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</p>
+                  <p><i class="fas fa-envelope me-2"></i>info@bibleinstitute-eg.org</p>
+                  <p><i class="fas fa-globe me-2"></i>www.bibleinstitute-eg.org</p>
+              </div>
           </div>
       </div>
-      <div class="footer-bottom">
-        <h6 class="p-3 m-auto text-center">{% translate "All rights reserved to the Bible Institute in Maadi" %}</h6>
+      <div class="footer-bottom text-center p-3">
+        {% translate "All rights reserved to the Bible Institute in Maadi" %} &copy; {% now "Y" %}
       </div>
     </footer>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
-
 </body>
 </html>

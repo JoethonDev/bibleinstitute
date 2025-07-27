@@ -1,0 +1,764 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-27 17:59+0300\n"
+"PO-Revision-Date: 2025-07-27 18:00+0300\n"
+"Last-Translator: Gemini\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#: .\management_system\forms.py:10 .\management_system\forms.py:15
+#: .\management_system\forms.py:30 .\management_system\forms.py:39
+#: .\management_system\models.py:68
+msgid "Username"
+msgstr "اسم المستخدم"
+
+#: .\management_system\forms.py:11 .\management_system\forms.py:20
+#: .\management_system\forms.py:35 .\management_system\forms.py:70
+#: .\management_system\forms.py:91
+msgid "Password"
+msgstr "كلمة المرور"
+
+#: .\management_system\forms.py:31 .\management_system\forms.py:45
+msgid "First Name"
+msgstr "الاسم الأول"
+
+#: .\management_system\forms.py:32 .\management_system\forms.py:51
+msgid "Last Name"
+msgstr "الاسم الأخير"
+
+#: .\management_system\forms.py:33 .\management_system\models.py:68
+msgid "Role"
+msgstr "الدور"
+
+#: .\management_system\forms.py:34 .\management_system\models.py:68
+msgid "Joined Date"
+msgstr "تاريخ الانضمام"
+
+#: .\management_system\forms.py:115
+msgid "Course Name"
+msgstr "اسم الكورس"
+
+#: .\management_system\forms.py:116
+msgid "Course Description"
+msgstr "وصف الكورس"
+
+#: .\management_system\forms.py:118 .\management_system\models.py:104
+msgid "Instructor"
+msgstr "المحاضر"
+
+#: .\management_system\forms.py:120
+msgid "Academic Year"
+msgstr "السنة الدراسية"
+
+#: .\management_system\models.py:24
+msgid "Admin"
+msgstr "مدير"
+
+#: .\management_system\models.py:25
+msgid "Teacher"
+msgstr "مصحح"
+
+#: .\management_system\models.py:26
+msgid "First Year"
+msgstr "سنة أولى"
+
+#: .\management_system\models.py:27
+msgid "Second Year"
+msgstr "سنة ثانية"
+
+#: .\management_system\models.py:68 .\management_system\models.py:104
+#: .\management_system\models.py:170 .\management_system\models.py:228
+#: .\management_system\models.py:307
+msgid "Name"
+msgstr "الاسم"
+
+#: .\management_system\models.py:68
+msgid "Last Login"
+msgstr "آخر تسجيل دخول"
+
+#: .\management_system\models.py:81
+msgid "First Academic Year"
+msgstr "السنة الدراسية الأولى"
+
+#: .\management_system\models.py:82
+msgid "Second Academic Year"
+msgstr "السنة الدراسية الثانية"
+
+#: .\management_system\models.py:104
+msgid "Description"
+msgstr "الوصف"
+
+#: .\management_system\models.py:104
+msgid "Level"
+msgstr "المستوى"
+
+#: .\management_system\models.py:164
+#, python-format
+msgid "Updated on %(date)s"
+msgstr "تم التحديث في %(date)s"
+
+#: .\management_system\models.py:170 .\management_system\models.py:228
+#: .\management_system\templates\lesson_form.html:30
+#: .\management_system\templates\quiz_form.html:41
+msgid "Course"
+msgstr "الكورس"
+
+#: .\management_system\models.py:170
+msgid "Last Updated"
+msgstr "آخر تحديث"
+
+#: .\management_system\models.py:228 .\management_system\models.py:307
+msgid "Grades"
+msgstr "الدرجات"
+
+#: .\management_system\models.py:228
+msgid "Opening Date"
+msgstr "تاريخ الفتح"
+
+#: .\management_system\models.py:228
+msgid "Closing Date"
+msgstr "تاريخ الإغلاق"
+
+#: .\management_system\models.py:228
+#: .\management_system\templates\submission_dashboard.html:11
+msgid "Submissions"
+msgstr "التقديمات"
+
+#: .\management_system\models.py:232
+msgid "Multiple Choice"
+msgstr "اختيار من متعدد"
+
+#: .\management_system\models.py:233
+msgid "Written"
+msgstr "مقالي"
+
+#: .\management_system\models.py:234
+msgid "Complete"
+msgstr "أكمل"
+
+#: .\management_system\models.py:307
+msgid "Submission Date"
+msgstr "تاريخ التقديم"
+
+#: .\management_system\templates\admin_panel.html:14
+#: .\management_system\templates\base.html:132
+#: .\management_system\templates\login.html:10
+msgid "Bible Institute Coptic"
+msgstr "معهد الكتاب المقدس القبطي"
+
+#: .\management_system\templates\admin_panel.html:114
+msgid "Admin Panel"
+msgstr "لوحة التحكم"
+
+#: .\management_system\templates\admin_panel.html:117
+msgid "Close"
+msgstr "إغلاق"
+
+#: .\management_system\templates\admin_panel.html:133
+msgid "Users"
+msgstr "المستخدمون"
+
+#: .\management_system\templates\admin_panel.html:145
+#: .\management_system\templates\base.html:107
+msgid "Courses"
+msgstr "الدورات"
+
+#: .\management_system\templates\admin_panel.html:157
+#: .\management_system\templates\course_detail.html:40
+msgid "Lessons"
+msgstr "الدروس"
+
+#: .\management_system\templates\admin_panel.html:170
+#: .\management_system\templates\upload_video.html:29
+#: .\management_system\templates\upload_video.html:38
+msgid "Upload Files"
+msgstr "رفع الملفات"
+
+#: .\management_system\templates\admin_panel.html:183
+#: .\management_system\templates\course_detail.html:59
+msgid "Quizzes"
+msgstr "الاختبارات"
+
+#: .\management_system\templates\admin_panel.html:198
+msgid "Menu"
+msgstr "القائمة"
+
+#: .\management_system\templates\admin_panel.html:215
+msgid "Dashboard"
+msgstr "لوحة التحكم"
+
+#: .\management_system\templates\admin_panel.html:225
+msgid "Total Users"
+msgstr "إجمالي المستخدمين"
+
+#: .\management_system\templates\admin_panel.html:234
+msgid "Total Courses"
+msgstr "إجمالي الدورات"
+
+#: .\management_system\templates\admin_panel.html:243
+msgid "Total Lessons"
+msgstr "إجمالي الدروس"
+
+#: .\management_system\templates\admin_panel.html:252
+msgid "Total Quizzes"
+msgstr "إجمالي الاختبارات"
+
+#: .\management_system\templates\base.html:93
+msgid "Logo"
+msgstr "الشعار"
+
+#: .\management_system\templates\base.html:95
+msgid "Toggle navigation"
+msgstr "تبديل التنقل"
+
+#: .\management_system\templates\base.html:101
+msgid "Home"
+msgstr "الرئيسية"
+
+#: .\management_system\templates\base.html:104
+msgid "About Us"
+msgstr "عنا"
+
+#: .\management_system\templates\base.html:110
+msgid "Profile"
+msgstr "الملف الشخصي"
+
+#: .\management_system\templates\base.html:114
+msgid "Admin Dashboard"
+msgstr "لوحة تحكم المسؤول"
+
+#: .\management_system\templates\base.html:136
+msgid "Institute Headquarters"
+msgstr "مقر المعهد"
+
+#: .\management_system\templates\base.html:137
+msgid "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
+msgstr "كنيسة الشهيد العظيم مارجرجس بكوتسكا – المعادي – مصر"
+
+#: .\management_system\templates\base.html:145
+msgid "All rights reserved to the Bible Institute in Maadi"
+msgstr "جميع الحقوق محفوظة لمعهد الكتاب المقدس بالمعادي"
+
+#: .\management_system\templates\course_detail.html:36
+msgid "Course Content"
+msgstr "محتوى الدورة"
+
+#: .\management_system\templates\course_detail.html:54
+msgid "No lessons available."
+msgstr "لا توجد دروس متاحة."
+
+#: .\management_system\templates\course_detail.html:66
+msgid "No quizzes available."
+msgstr "لا توجد اختبارات متاحة."
+
+#: .\management_system\templates\course_detail.html:79
+msgid "Welcome to the course!"
+msgstr "أهلاً بك في الدورة!"
+
+#: .\management_system\templates\course_detail.html:80
+msgid "Please select a lesson or quiz from the sidebar to begin."
+msgstr "يرجى اختيار درس أو اختبار من الشريط الجانبي للبدء."
+
+#: .\management_system\templates\course_filter.html:2
+msgid "Course Filter"
+msgstr "فلتر الكورس"
+
+#: .\management_system\templates\course_filter.html:5
+msgid "All Courses"
+msgstr "جميع الكورسات"
+
+#: .\management_system\templates\course_view.html:36
+msgid "Instructor:"
+msgstr "المحاضر:"
+
+#: .\management_system\templates\course_view.html:43
+msgid "View Course"
+msgstr "عرض الدورة"
+
+#: .\management_system\templates\course_view.html:50
+msgid "No courses available in this level yet."
+msgstr "لا توجد دورات متاحة في هذا المستوى بعد."
+
+#: .\management_system\templates\dashboard.html:30
+msgid "Create a"
+msgstr "إنشاء"
+
+#: .\management_system\templates\dashboard_form.html:20
+msgid "Back to"
+msgstr "العودة إلى"
+
+#: .\management_system\templates\dashboard_form.html:43
+#: .\management_system\templates\lesson_form.html:87
+#: .\management_system\templates\quiz_form.html:78
+msgid "Submit"
+msgstr "إرسال"
+
+#: .\management_system\templates\display_quiz.html:13
+#: .\management_system\templates\drive_files.html:11
+msgid "Back"
+msgstr "رجوع"
+
+#: .\management_system\templates\display_quiz.html:30
+msgid "Exam"
+msgstr "الامتحان"
+
+#: .\management_system\templates\display_quiz.html:32
+msgid "Student"
+msgstr "الطالب"
+
+#: .\management_system\templates\display_quiz.html:36
+msgid "Final Grade"
+msgstr "الدرجة النهائية"
+
+#: .\management_system\templates\display_quiz.html:59
+msgid "Submit Exam"
+msgstr "إرسال الامتحان"
+
+#: .\management_system\templates\display_quiz.html:61
+msgid "Submit Correction"
+msgstr "إرسال التصحيح"
+
+#: .\management_system\templates\drive_files.html:44
+msgid "This folder is empty."
+msgstr "هذا المجلد فارغ."
+
+#: .\management_system\templates\index.html:29
+#: .\management_system\templates\pagination.html:15
+#: .\management_system\templates\pagination.html:28
+msgid "Previous"
+msgstr "السابق"
+
+#: .\management_system\templates\index.html:33
+#: .\management_system\templates\pagination.html:56
+#: .\management_system\templates\pagination.html:69
+msgid "Next"
+msgstr "التالي"
+
+#: .\management_system\templates\index.html:39
+msgid "Bible Institute"
+msgstr "معهد الكتاب المقدس"
+
+#: .\management_system\templates\index.html:41
+msgid ""
+"It is an Orthodox church institute affiliated with the Coptic Orthodox "
+"Church, located at the Church of the Great Martyr Mar Girgis - Kotsika, "
+"Maadi Coptic Orthodox Diocese."
+msgstr ""
+"هو معهد كنسي أرثوذكسي تابع للكنيسة القبطية الأرثوذكسية، ويقع بكنيسة الشهيد "
+"العظيم مارجرجس - كوتسيكا، إيبارشية المعادي القبطية الأرثوذكسية."
+
+#: .\management_system\templates\index.html:47
+msgid "Supreme Head of the Institute:"
+msgstr "الرئيس الأعلى للمعهد:"
+
+#: .\management_system\templates\index.html:50
+msgid ""
+"His Holiness Pope Tawadros II, Pope of Alexandria and Patriarch of the See "
+"of St. Mark, and the Supreme Head of the Theological Institutes and Colleges."
+msgstr ""
+"صاحب القداسة البابا تواضروس الثاني، بابا الإسكندرية وبطريرك الكرازة "
+"المرقسية، والرئيس الأعلى للمعاهد والكليات اللاهوتية."
+
+#: .\management_system\templates\index.html:59
+msgid "General Supervisor of the Institute:"
+msgstr "المشرف العام للمعهد:"
+
+#: .\management_system\templates\index.html:62
+msgid ""
+"His Eminence Anba Daniel, Metropolitan of Maadi and its Dependencies, and "
+"Secretary of the Holy Synod."
+msgstr "نيافة الأنبا دانيال، مطران المعادي وتوابعها، وسكرتير المجمع المقدس."
+
+#: .\management_system\templates\lesson_form.html:10
+msgid "Back to lessons"
+msgstr "العودة إلى الدروس"
+
+#: .\management_system\templates\lesson_form.html:21
+msgid "Lesson Details"
+msgstr "تفاصيل الدرس"
+
+#: .\management_system\templates\lesson_form.html:26
+msgid "Lesson Name"
+msgstr "اسم الدرس"
+
+#: .\management_system\templates\lesson_form.html:32
+#: .\management_system\templates\quiz_form.html:43
+msgid "Select a Course"
+msgstr "اختر دورة"
+
+#: .\management_system\templates\lesson_form.html:44
+#: .\management_system\templates\upload_video.html:22
+msgid "Select Files from Drive"
+msgstr "اختر ملفات من الدرايف"
+
+#: .\management_system\templates\lesson_form.html:56
+msgid "Selected Lectures"
+msgstr "المحاضرات المختارة"
+
+#: .\management_system\templates\lesson_form.html:68
+msgid "Video"
+msgstr "فيديو"
+
+#: .\management_system\templates\lesson_form.html:69
+msgid "Audio Recording"
+msgstr "تسجيل صوتي"
+
+#: .\management_system\templates\lesson_form.html:70
+msgid "Book"
+msgstr "كتاب"
+
+#: .\management_system\templates\lesson_stream.html:34
+msgid ""
+"To view this video please enable JavaScript, and consider upgrading to a web "
+"browser that"
+msgstr ""
+"لعرض هذا الفيديو، يرجى تمكين JavaScript، والنظر في الترقية إلى متصفح يدعم"
+
+#: .\management_system\templates\lesson_stream.html:35
+msgid "supports HTML5 video"
+msgstr "فيديو HTML5"
+
+#: .\management_system\templates\lesson_stream.html:49
+msgid "Page"
+msgstr "صفحة"
+
+#: .\management_system\templates\login.html:10
+#: .\management_system\templates\login.html:96
+msgid "Login"
+msgstr "تسجيل الدخول"
+
+#: .\management_system\templates\login.html:87
+msgid "Welcome Back"
+msgstr "أهلاً بعودتك"
+
+#: .\management_system\templates\login.html:88
+msgid "Sign in to continue"
+msgstr "سجل الدخول للمتابعة"
+
+#: .\management_system\templates\naming_filter.html:2
+#: .\management_system\templates\submission_dashboard.html:45
+msgid "Search"
+msgstr "بحث"
+
+#: .\management_system\templates\pagination.html:2
+msgid "Page navigation example"
+msgstr "مثال على التنقل بين الصفحات"
+
+#: .\management_system\templates\profile.html:13
+msgid "My Profile"
+msgstr "ملفي الشخصي"
+
+#: .\management_system\templates\profile.html:22
+msgid "Edit"
+msgstr "تعديل"
+
+#: .\management_system\templates\profile.html:45
+msgid "My Courses"
+msgstr "دوراتي"
+
+#: .\management_system\templates\profile.html:68
+msgid "No courses in this level."
+msgstr "لا توجد دورات في هذا المستوى."
+
+#: .\management_system\templates\profile.html:76
+msgid "You are not enrolled in any courses yet."
+msgstr "أنت غير مسجل في أي دورات بعد."
+
+#: .\management_system\templates\questions_rendering.html:15
+msgid "Question Type"
+msgstr "نوع السؤال"
+
+#: .\management_system\templates\questions_rendering.html:25
+#: .\management_system\templates\questions_rendering.html:35
+msgid "Question"
+msgstr "السؤال"
+
+#: .\management_system\templates\questions_rendering.html:26
+msgid "Question...?"
+msgstr "السؤال...؟"
+
+#: .\management_system\templates\questions_rendering.html:29
+msgid "Grade"
+msgstr "الدرجة"
+
+#: .\management_system\templates\questions_rendering.html:42
+msgid "Points"
+msgstr "نقاط"
+
+#: .\management_system\templates\questions_rendering.html:49
+#: .\management_system\templates\quiz_form.html:215
+msgid "Answer Options"
+msgstr "خيارات الإجابة"
+
+#: .\management_system\templates\questions_rendering.html:73
+msgid "Add another choice..."
+msgstr "أضف خيارًا آخر..."
+
+#: .\management_system\templates\questions_rendering.html:78
+#: .\management_system\templates\questions_rendering.html:86
+#: .\management_system\templates\quiz_form.html:212
+#: .\management_system\templates\quiz_form.html:222
+msgid "Answer"
+msgstr "الإجابة"
+
+#: .\management_system\templates\questions_rendering.html:80
+#: .\management_system\templates\quiz_form.html:222
+msgid "Student will complete this..."
+msgstr "سيقوم الطالب بإكمال هذا..."
+
+#: .\management_system\templates\questions_rendering.html:88
+#: .\management_system\templates\quiz_form.html:212
+msgid "Student will write their answer here..."
+msgstr "سيقوم الطالب بكتابة إجابته هنا..."
+
+#: .\management_system\templates\questions_rendering.html:101
+msgid "Correct Answer:"
+msgstr "الإجابة الصحيحة:"
+
+#: .\management_system\templates\questions_rendering.html:113
+msgid "Give Question Grade"
+msgstr "أعطِ درجة السؤال"
+
+#: .\management_system\templates\questions_rendering.html:122
+msgid "Question graded"
+msgstr "تم تصحيح السؤال"
+
+#: .\management_system\templates\questions_rendering.html:124
+msgid "Question under review"
+msgstr "السؤال قيد المراجعة"
+
+#: .\management_system\templates\quiz_form.html:11
+msgid "Back to quizzes"
+msgstr "العودة إلى الاختبارات"
+
+#: .\management_system\templates\quiz_form.html:23
+msgid "Edit Quiz"
+msgstr "تعديل الاختبار"
+
+#: .\management_system\templates\quiz_form.html:25
+msgid "Create Quiz"
+msgstr "إنشاء اختبار"
+
+#: .\management_system\templates\quiz_form.html:37
+msgid "Exam Title"
+msgstr "عنوان الامتحان"
+
+#: .\management_system\templates\quiz_form.html:57
+msgid "Exam Opening Date"
+msgstr "تاريخ فتح الامتحان"
+
+#: .\management_system\templates\quiz_form.html:61
+msgid "Exam Closing Date"
+msgstr "تاريخ إغلاق الامتحان"
+
+#: .\management_system\templates\quiz_form.html:67
+msgid "Questions"
+msgstr "الأسئلة"
+
+#: .\management_system\templates\quiz_form.html:75
+msgid "Add Question"
+msgstr "إضافة سؤال"
+
+#: .\management_system\templates\submission_dashboard.html:22
+#: .\management_system\templates\submission_filter.html:3
+msgid "Minimum Grade"
+msgstr "الحد الأدنى للدرجة"
+
+#: .\management_system\templates\submission_dashboard.html:25
+#: .\management_system\templates\submission_filter.html:4
+msgid "Maximum Grade"
+msgstr "الحد الأقصى للدرجة"
+
+#: .\management_system\templates\submission_dashboard.html:30
+#: .\management_system\templates\year_filter.html:2
+msgid "Year Filter"
+msgstr "فلتر السنة"
+
+#: .\management_system\templates\submission_dashboard.html:33
+msgid "All"
+msgstr "الكل"
+
+#: .\management_system\templates\table_rendering.html:34
+#: .\management_system\templates\table_rendering.html:48
+msgid "View Submission"
+msgstr "عرض التقديم"
+
+#: .\management_system\templates\table_rendering.html:63
+msgid "Update"
+msgstr "تحديث"
+
+#: .\management_system\templates\table_rendering.html:72
+msgid "Delete"
+msgstr "حذف"
+
+#: .\management_system\templates\table_rendering.html:84
+msgid "No Data Here!"
+msgstr "لا توجد بيانات هنا!"
+
+#: .\management_system\templates\update_profile.html:11
+msgid "Update Profile"
+msgstr "تحديث الملف الشخصي"
+
+#: .\management_system\templates\upload_video.html:9
+msgid "Loading..."
+msgstr "جاري التحميل..."
+
+#: .\management_system\templates\upload_video.html:13
+msgid "Folder"
+msgstr "مجلد"
+
+#: .\management_system\views.py:52 .\management_system\views.py:180
+#: .\management_system\views.py:256 .\management_system\views.py:358
+#: .\management_system\views.py:424 .\management_system\views.py:458
+#: .\management_system\views.py:557
+msgid "Unauthorized"
+msgstr "غير مصرح به"
+
+#: .\management_system\views.py:53 .\management_system\views.py:182
+msgid "authorized"
+msgstr "مصرح به"
+
+#: .\management_system\views.py:264
+#, python-format
+msgid "%(action)s %(view_name)s is failed, Try again Please!"
+msgstr "فشلت عملية %(action)s %(view_name)s، يرجى المحاولة مرة أخرى!"
+
+#: .\management_system\views.py:267
+#, python-format
+msgid "%(view_name)s has %(action)sd successfully!"
+msgstr "تم %(action)s %(view_name)s بنجاح!"
+
+#: .\management_system\views.py:291
+msgid "user"
+msgstr "المستخدم"
+
+#: .\management_system\views.py:296
+msgid "course"
+msgstr "الكورس"
+
+#: .\management_system\views.py:302
+msgid "lesson"
+msgstr "الدرس"
+
+#: .\management_system\views.py:307
+msgid "quiz"
+msgstr "الاختبار"
+
+#: .\management_system\views.py:378
+msgid "Profile is updated successfully!"
+msgstr "تم تحديث الملف الشخصي بنجاح!"
+
+#: .\management_system\views.py:543
+msgid "Quiz is closed, You can not take it anymore!"
+msgstr "الامتحان مغلق، لا يمكنك التقدم إليه بعد الآن!"
+
+#: .\management_system\views.py:585
+msgid "Invalid Request, submission is closed!"
+msgstr "طلب غير صالح، تم إغلاق التقديم!"
+
+#: .\management_system\views.py:623
+msgid "Quiz is sent successfully!"
+msgstr "تم إرسال الاختبار بنجاح!"
+
+#: .\management_system\views.py:626
+msgid "Sending quiz has failed, Please Try again!"
+msgstr "فشل إرسال الاختبار، يرجى المحاولة مرة أخرى!"
+
+#: .\management_system\views.py:633 .\management_system\views.py:1303
+msgid "Not allowed method"
+msgstr "طريقة غير مسموح بها"
+
+#: .\management_system\views.py:678
+msgid "Choose Role"
+msgstr "اختر الدور"
+
+#: .\management_system\views.py:687 .\management_system\views.py:742
+msgid "create"
+msgstr "إنشاء"
+
+#: .\management_system\views.py:691 .\management_system\views.py:746
+msgid "update"
+msgstr "تحديث"
+
+#: .\management_system\views.py:736 .\management_system\views.py:788
+#: .\management_system\views.py:997 .\management_system\views.py:1225
+msgid "Choose Academic Year"
+msgstr "اختر السنة الدراسية"
+
+#: .\management_system\views.py:789 .\management_system\views.py:998
+msgid "Choose Course"
+msgstr "اختر الكورس"
+
+#: .\management_system\views.py:828
+msgid "Lesson is created successfully"
+msgstr "تم إنشاء الدرس بنجاح"
+
+#: .\management_system\views.py:832
+msgid "Create lesson has failed, Try again Please!"
+msgstr "فشل إنشاء الدرس، يرجى المحاولة مرة أخرى!"
+
+#: .\management_system\views.py:835
+msgid "Create lesson has failed, Name and Videos can not be empty!"
+msgstr "فشل إنشاء الدرس، لا يمكن أن يكون الاسم والفيديوهات فارغين!"
+
+#: .\management_system\views.py:906
+msgid "Lesson is updated successfully"
+msgstr "تم تحديث الدرس بنجاح"
+
+#: .\management_system\views.py:909
+msgid "Update lesson has failed, Try again Please!"
+msgstr "فشل تحديث الدرس، يرجى المحاولة مرة أخرى!"
+
+#: .\management_system\views.py:912
+msgid "Update lesson has failed, Name and Videos can not be empty!"
+msgstr "فشل تحديث الدرس، لا يمكن أن يكون الاسم والفيديوهات فارغين!"
+
+#: .\management_system\views.py:947
+msgid "unauthorized!"
+msgstr "غير مصرح به!"
+
+#: .\management_system\views.py:1040
+#, python-format
+msgid "Correct answer is not in choices for question : %(title)s"
+msgstr "الإجابة الصحيحة ليست ضمن الخيارات للسؤال: %(title)s"
+
+#: .\management_system\views.py:1060 .\management_system\views.py:1061
+msgid "Closing Date can not be before or same as Openning Date!"
+msgstr "تاريخ الإغلاق لا يمكن أن يكون قبل أو نفس تاريخ الفتح!"
+
+#: .\management_system\views.py:1075
+msgid "Quiz is created successfully"
+msgstr "تم إنشاء الاختبار بنجاح"
+
+#: .\management_system\views.py:1078 .\management_system\views.py:1082
+msgid "Create quiz is failed, Try again Please"
+msgstr "فشل إنشاء الاختبار، يرجى المحاولة مرة أخرى"
+
+#: .\management_system\views.py:1135
+msgid "Correct answer is not in choices"
+msgstr "الإجابة الصحيحة ليست ضمن الخيارات"
+
+#: .\management_system\views.py:1170
+msgid "Quiz is updated successfully"
+msgstr "تم تحديث الاختبار بنجاح"
+
+#: .\management_system\views.py:1173 .\management_system\views.py:1177
+msgid "Update quiz is failed, Try again Please"
+msgstr "فشل تحديث الاختبار، يرجى المحاولة مرة أخرى"
+
+#: .\management_system\views.py:1249 .\management_system\views.py:1253
+msgid "Not Found!"
+msgstr "غير موجود!"

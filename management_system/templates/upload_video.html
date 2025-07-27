@@ -427,8 +427,9 @@
             function addFolderClick(){
                 document.querySelectorAll(".fa-folder").forEach(e => {
                     e.addEventListener("click", (e) => {
-                        let element = e.target
+                        let element = e.target.parentElement
                         let folderLink = element.getAttribute("hx-get")
+                        // console.log
                         modifyFolderInput(folderLink)
                     })
                 })
