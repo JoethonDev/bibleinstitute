@@ -414,7 +414,6 @@ def view_course_details(request, course_id):
             "lessons" : [],
             "quizzes" : course.fetch_quizzes(user)
         }
-        print(course.fetch_quizzes(user))
         if user.role.role in MANAGEMENT_ROLES:
             context['lessons'] = course.lessons.all()
             logger.info(f"User : {user} is accessing all lessons")
