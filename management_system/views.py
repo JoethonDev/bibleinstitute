@@ -1135,7 +1135,7 @@ def update_quiz(request, quiz_id):
                     choices = json.dumps(choices)
                 grade = question['grade']
                 auto_grade = False if not correct_answer or question_type == "written" else True
-                print(f"Question title : {title} Type : {question_type} Auto grade : {auto_grade}")
+                #print(f"Question title : {title} Type : {question_type} Auto grade : {auto_grade}")
                 
                 question_instance = Question(
                     title=title,

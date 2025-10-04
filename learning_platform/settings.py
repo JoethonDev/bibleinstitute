@@ -165,6 +165,9 @@ USE_I18N = True
 # Sessions expiry
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 # Seconds Minutes Hours Days
 
+# Make tempalte always use absolute urls
+FORCE_SCRIPT_NAME = '/'
+
 # Logging
 LOGGING = {
     "version": 1,
