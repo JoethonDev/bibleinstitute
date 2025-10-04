@@ -971,7 +971,7 @@ def quiz_dashboard(request):
     user = request.user
     view = "quiz"
     # Start with an empty Q object (matches all)
-    query = Q()
+    query = Q(course__isnull=False)
 
     # Dynamically add conditions if filters are present
     if name:
