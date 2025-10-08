@@ -1,210 +1,61 @@
 {% load i18n %}
-<nav aria-label="{% translate "Page navigation example" %}" class="d-flex justify-content-center">
-    <ul class="pagination pagination-lg shadow-sm">
-        <!-- Previous Button -->
-        {% if page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link previous d-flex align-items-center gap-2 px-3" 
-                   hx-select="#content" 
-                   hx-get="{{ url }}?page={{ page_obj.previous_page_number }}" 
-                   hx-trigger="change" 
-                   hx-target="#display-page" 
-                   hx-push-url="true" 
-                   hx-swap="innerHTML">
-                    <i class="bi bi-chevron-left"></i>
-                    {% translate "Previous" %}
-                </a>
-            </li>
-        {% else %}
-            <li class="page-item disabled">
-                <a class="page-link previous d-flex align-items-center gap-2 px-3" 
-                   hx-select="#content" 
-                   hx-get="{{ url }}?page=1" 
-                   hx-trigger="change" 
-                   hx-target="#display-page" 
-                   hx-push-url="true" 
-                   hx-swap="innerHTML">
-                    <i class="bi bi-chevron-left"></i>
-                    {% translate "Previous" %}
-                </a>
-            </li>
-        {% endif %}
 
-        <!-- Page Numbers -->
-        {% for number in page_obj.paginator.page_range %}
-            {% if number == page_obj.number %}
-                <li class="page-item active">
-                    <a class="page-link number fw-bold">{{ number }}</a>
+<div class="d-flex flex-column align-items-center gap-2">
+    <!-- Pagination Controls -->
+    <nav aria-label="{% translate "Page navigation" %}">
+        <ul class="pagination mb-0 shadow-sm rounded" hx-include=".filters" hx-target="#display-page" hx-select="#content" hx-push-url="true" hx-swap="innerHTML">
+
+            <!-- Previous Button -->
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}" hx-get="{{ url }}?page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous' %}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
                 </li>
             {% else %}
-                <li class="page-item">
-                    <a class="page-link number">{{ number }}</a>
+                <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-chevron-left"></i></span>
                 </li>
             {% endif %}
-        {% endfor %}
 
-        <!-- Next Button -->
-        {% if page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link next d-flex align-items-center gap-2 px-3" 
-                   hx-select="#content" 
-                   hx-get="{{ url }}?page={{ page_obj.next_page_number }}" 
-                   hx-trigger="change" 
-                   hx-target="#display-page" 
-                   hx-push-url="true" 
-                   hx-swap="innerHTML">
-                    {% translate "Next" %}
-                    <i class="bi bi-chevron-right"></i>
-                </a>
-            </li>
-        {% else %}
-            <li class="page-item disabled">
-                <a class="page-link next d-flex align-items-center gap-2 px-3" 
-                   hx-select="#content" 
-                   hx-get="{{ url }}?page={{ page_obj.num_pages }}" 
-                   hx-trigger="change" 
-                   hx-target="#display-page" 
-                   hx-push-url="true" 
-                   hx-swap="innerHTML">
-                    {% translate "Next" %}
-                    <i class="bi bi-chevron-right"></i>
-                </a>
-            </li>
-        {% endif %}
-    </ul>
-</nav>
+            <!-- Page Numbers Logic -->
+            {% for i in page_obj.paginator.page_range %}
+                {% if page_obj.number == i %}
+                    <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
+                {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                    <li class="page-item"><a class="page-link" href="?page={{ i }}" hx-get="{{ url }}?page={{ i }}">{{ i }}</a></li>
+                {% elif forloop.counter == 1 or forloop.revcounter == 1 %}
+                     <li class="page-item"><a class="page-link" href="?page={{ i }}" hx-get="{{ url }}?page={{ i }}">{{ i }}</a></li>
+                {% elif forloop.counter == 2 and page_obj.number > 4 %}
+                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                {% elif forloop.revcounter == 2 and page_obj.number < page_obj.paginator.num_pages|add:'-3' %}
+                     <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                {% endif %}
+            {% endfor %}
 
-<!-- Pagination Info -->
-<div class="text-center mt-3">
-    <small class="text-muted">
-        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-    </small>
+            <!-- Next Button -->
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}" hx-get="{{ url }}?page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next' %}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-chevron-right"></i></span>
+                </li>
+            {% endif %}
+
+        </ul>
+    </nav>
+
+    <!-- Pagination Info -->
+    <div class="text-center">
+        <small class="text-muted">
+             {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+                Showing {{ start }}–{{ end }} of {{ total }} results
+            {% endblocktranslate %}
+        </small>
+    </div>
 </div>
 
-<script>
-    // Translations for JavaScript messages
-    const jsTranslations_pagination = {
-        'en': {
-            'previous': 'Previous',
-            'next': 'Next',
-            'itemDeletedSuccess': 'Item is deleted successfully!'
-        },
-        'ar': {
-            'previous': 'السابق',
-            'next': 'التالي',
-            'itemDeletedSuccess': 'تم حذف العنصر بنجاح!'
-        }
-    };
-
-    function getJsTranslation_pagination(key) {
-        const lang = document.documentElement.lang || 'en';
-        return jsTranslations_pagination[lang][key] || jsTranslations_pagination['en'][key];
-    }
-
-    function initialize() {
-        // Previous
-        previous = document.querySelector(".previous")
-        if (previous) {
-            previous.textContent = getJsTranslation_pagination('previous');
-            previous.addEventListener("click", moveBack);
-        }
-
-        // Next
-        next = document.querySelector(".next")
-        if (next) {
-            next.textContent = getJsTranslation_pagination('next');
-            next.addEventListener("click", moveForward);
-        }
-        
-        // Numbers 
-        numbers = document.querySelectorAll(".number")
-        numbers?.forEach(element => {
-            element.addEventListener("click", moveNumbers)
-        })
-
-        // Delete Buttons
-        deleteBtns = document.querySelectorAll(".delete-btn")
-        deleteBtns?.forEach(element => {
-            element.addEventListener("click", displaySuccessAlert)
-        })
-    }
-
-    function moveForward(e) {
-        let nextElement = e.target
-        let activeNumber = removeActive()
-        if (isFirstPage(activeNumber)) {
-            previous.classList.remove("disabled")
-        }
-        if (isLastPage(activeNumber)) {
-            return
-        }
-        else {
-            let nextSibling = activeNumber.nextElementSibling
-            nextSibling.classList.add("active")
-            if (isLastPage(nextSibling)) {
-                nextElement.classList.add("disabled")
-            }
-        }
-    }
-
-    function moveBack(e) {
-        let previousElement = e.target
-        let activeNumber = removeActive()
-        if (isLastPage(activeNumber)) {
-            next.classList.remove("disabled")
-        }
-        if (isFirstPage(activeNumber)) {
-            return
-        }
-        else {
-            let previousSibling = activeNumber.previousElementSibling
-            previousSibling.classList.add("active")
-            if (isFirstPage(previousSibling)) {
-                previousElement.classList.add("disabled")
-            }
-        }
-    }
-
-    function isFirstPage(element) {
-        return [...numbers].indexOf(element) == 0
-    }
-
-    function isLastPage(element) {
-        let numbersArray = [...numbers]
-        return numbersArray.indexOf(element) == numbersArray.length - 1
-    }
-
-    function removeActive() {
-        let activeNumber = document.querySelector(".number.active")
-        activeNumber.classList.remove("active")
-        return activeNumber
-    }
-
-    function moveNumbers(e) {
-        removeActive()
-
-        let numberElement = e.target
-        numberElement.classList.add("active")
-
-        if (isFirstPage(numberElement)) {
-            previous.classList.add("disabled")
-        } 
-        else if (isLastPage(numberElement)) {
-            next.classList.add("disabled")
-        }
-        else {
-            previous.classList.remove("disabled")
-            next.classList.remove("disabled")
-        }
-    }
-    
-    document.body.addEventListener("htmx:afterSwap", (e) => {
-        if (e.detail.target.id == "content" || e.detail.target.id == "display-page"){
-            initialize()
-        }
-    })
-
-    window.addEventListener("DOMContentLoaded", () => {
-        initialize()
-    })
-</script>
