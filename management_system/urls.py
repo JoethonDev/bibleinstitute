@@ -28,6 +28,7 @@ urlpatterns = [
     # Users Dashboard
     path('dashboard/users/', user_dashboard, name="user-dashboard"),
     path('dashboard/users/create/', CreateUser.as_view(), name="user-create"),
+    path('dashboard/users/bulk-create/', user_bulk_create, name="user-bulk-create"),
     path('dashboard/users/<int:user_id>/', index, name="user-profile"),
     path('dashboard/users/<int:user_id>/delete/', DeleteUser.as_view(), name="user-delete"),
     path('dashboard/users/<int:user_id>/update/', UpdateUser.as_view(), name="user-update"),

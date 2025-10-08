@@ -13,6 +13,7 @@ from django.db import transaction
 from django.contrib.messages import success, error, info
 from django.contrib.auth import update_session_auth_hash
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 
 # Third Party
@@ -23,11 +24,12 @@ import io
 import boto3
 import re
 import os
+import csv
 
 # Internal Import
 # from .utils import get_drive_client
 from .models import *
-from .forms import CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
 from django.utils.timezone import now
 
 # Constants
@@ -679,6 +681,86 @@ def user_dashboard(request):
 
     return render_dashboard(request, users, view, context)
 
+@login_required(login_url=LOGIN_URL)
+def user_bulk_create(request):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+
+    if request.method == 'POST':
+        form = CSVUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            csv_file = request.FILES['csv_file']
+            if not csv_file.name.endswith('.csv'):
+                error(request, _('This is not a CSV file'), extra_tags="alert-danger")
+                return redirect('user-bulk-create')
+
+            try:
+                decoded_file = csv_file.read().decode('utf-8').splitlines()
+                reader = csv.reader(decoded_file)
+                # Skip header
+                next(reader, None)
+
+                users_to_create = []
+                errors_list = []
+                line_number = 1
+
+                with transaction.atomic():
+                    for row in reader:
+                        line_number += 1
+                        if not row: continue # skip empty rows
+                        
+                        try:
+                            username, first_name, last_name, password, role_name = row
+                            
+                            if User.objects.filter(username=username).exists():
+                                errors_list.append(f"Line {line_number}: User '{username}' already exists.")
+                                continue
+
+                            try:
+                                role = Role.objects.get(role=role_name.lower().strip())
+                            except Role.DoesNotExist:
+                                errors_list.append(f"Line {line_number}: Role '{role_name}' does not exist.")
+                                continue
+
+                            user = User(
+                                username=username.strip(),
+                                first_name=first_name.strip(),
+                                last_name=last_name.strip(),
+                                role=role
+                            )
+                            user.set_password(password)
+                            user.full_clean()
+                            user.save()
+                            users_to_create.append(user)
+
+                        except ValueError:
+                            errors_list.append(f"Line {line_number}: Incorrect number of columns. Expected 5, got {len(row)}.")
+                        except ValidationError as e:
+                            errors_list.append(f"Line {line_number}: Validation error for user '{username}': {', '.join(e.messages)}")
+                        except Exception as e:
+                             errors_list.append(f"Line {line_number}: An unexpected error occurred: {e}")
+
+                    if errors_list:
+                        # If there are errors, raise an exception to trigger a rollback of the transaction
+                        raise Exception("Errors found in CSV file.")
+
+                success(request, _(f'{len(users_to_create)} users have been created successfully!'), extra_tags="alert-success")
+                return redirect('user-dashboard')
+
+            except Exception as e:
+                # This will catch the explicit raise and any other exceptions
+                for err in errors_list:
+                    error(request, err, extra_tags="alert-danger")
+                if not errors_list:
+                     error(request, _(f"An error occurred: {e}"), extra_tags="alert-danger")
+                return redirect('user-bulk-create')
+
+    else:
+        form = CSVUploadForm()
+    
+    return render(request, 'user_bulk_form.html', {'form': form})
+
 # User Dashboard
 class CreateUser(UserBaseView, CreateView):
     form_class = UserCreationForm
@@ -971,7 +1053,7 @@ def quiz_dashboard(request):
     user = request.user
     view = "quiz"
     # Start with an empty Q object (matches all)
-    query = Q()
+    query = Q(course__isnull=False)
 
     # Dynamically add conditions if filters are present
     if name:

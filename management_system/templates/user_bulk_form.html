@@ -1,0 +1,68 @@
+{% extends 'admin_panel.html' %} {% load crispy_forms_tags %} {% load i18n %}
+
+{% block body %}
+<div id="content" class="container-fluid py-4">
+  <!-- Form Container -->
+  <div class="row justify-content-center">
+    <!-- Back Navigation -->
+    <div class="mb-4 col-12 col-md-8 col-lg-7">
+      <a
+        hx-get="{% url 'user-dashboard' %}"
+        hx-select="#content"
+        hx-push-url="true"
+        hx-trigger="click"
+        hx-target="#display-page"
+        class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit"
+      >
+        <i class="fa-solid fa-arrow-left"></i>
+        {% translate "Back to Users" %}
+      </a>
+    </div>
+    <div class="col-12 col-md-8 col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white py-3">
+          <h4 class="mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-upload"></i>
+            {% translate "Bulk Create Users from CSV" %}
+          </h4>
+        </div>
+        <div class="card-body p-4">
+          <div class="alert alert-info" role="alert">
+            <h5 class="alert-heading">{% translate "CSV File Instructions" %}</h5>
+            <p>
+              {% translate 'Please ensure your CSV file has the following columns in
+              this exact order:' %}
+            </p>
+            <code>username, first_name, last_name, password, role</code>
+            <hr />
+            <p class="mb-0">
+              {% translate "The 'role' should be one of the existing roles in the
+              system (e.g., admin, teacher, junior, senior)." %}
+            </p>
+          </div>
+          <form
+            action="{% url 'user-bulk-create' %}"
+            method="post"
+            enctype="multipart/form-data"
+            class="needs-validation"
+            novalidate
+          >
+            {% include 'messages.html' %} {% csrf_token %}
+            <div class="form-content mb-4">{{ form|crispy }}</div>
+
+            <div class="d-grid">
+              <button
+                type="submit"
+                class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2"
+              >
+                <i class="bi bi-check-circle"></i>
+                {% translate 'Upload and Create Users' %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

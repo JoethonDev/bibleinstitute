@@ -127,3 +127,6 @@ class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
         fields = "__all__"
+
+class CSVUploadForm(forms.Form):
+    csv_file = forms.FileField(label=_("CSV File"), help_text=_("Upload a .csv file with user data."))
