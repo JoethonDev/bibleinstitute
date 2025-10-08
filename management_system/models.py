@@ -218,10 +218,11 @@ class Quiz(models.Model):
         }
 
     def serialize_pagination(self):
+        if self.course:
             return {
-            "rows" : [self.name, self.course.get_name_year(), self.total_grade, self.opening_date.strftime("%H:%M:%S, %d/%m/%Y"), self.closing_date.strftime("%H:%M:%S, %d/%m/%Y")],
-            "url" : reverse_lazy("quiz-view", args=[self.pk,])
-        }
+                "rows" : [self.name, self.course.get_name_year(), self.total_grade, self.opening_date.strftime("%H:%M:%S, %d/%m/%Y"), self.closing_date.strftime("%H:%M:%S, %d/%m/%Y")],
+                "url" : reverse_lazy("quiz-view", args=[self.pk,])
+            }
 
     @staticmethod
     def get_columns():
