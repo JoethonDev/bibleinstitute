@@ -87,8 +87,12 @@ WSGI_APPLICATION = 'learning_platform.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'your_local_db_name_for_testing'),
+        'USER': os.getenv('DB_USER', 'your_local_username'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'your_local_password'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432')
     }
 }
 
