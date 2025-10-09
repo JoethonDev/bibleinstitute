@@ -236,7 +236,7 @@
                         '-c', 'copy',          // Copy all streams without re-encoding
                         '-map', '0',           // Include all streams from input
                         '-f', 'hls',           // Use HLS format instead of generic segment
-                        '-hls_time', '1',     // Segment duration in seconds
+                        '-hls_time', '10',     // Segment duration in seconds
                         '-hls_list_size', '0', // Keep all segments in playlist
                         '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
                         `${fileName}.m3u8`        // Main playlist file
