@@ -25,6 +25,7 @@ import boto3
 import re
 import os
 import csv
+from urllib.parse import unquote
 
 # Internal Import
 # from .utils import get_drive_client
@@ -95,7 +96,8 @@ def get_datetime(datetime_string):
 def list_current_folder(folder_name=""):
     # Flag for getting all objects 
     has_objects = True
-    logger.info(msg=f"Folder : {folder_name or None}")
+    if folder_name:
+        folder_name = unquote(folder_name)
     parents = folder_name.split("-")
     folder_id = parents or []
     parent_folder = "-".join(folder_id[:-2]) or None
@@ -925,7 +927,6 @@ def navigate_folder(request, folder_id=None):
 
     root = True
     parent_folder = None
-    logger.info(msg=f"Folder ID : {folder_id}")
     if folder_id and folder_id != "None":
         root = False
         drive, parent_folder = list_current_folder(folder_id)
