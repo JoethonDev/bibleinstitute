@@ -95,7 +95,7 @@ def get_datetime(datetime_string):
 def list_current_folder(folder_name=""):
     # Flag for getting all objects 
     has_objects = True
-
+    logger.log(f"Folder : {folder_name}")
     parents = folder_name.split("-")
     folder_id = parents or []
     parent_folder = "-".join(folder_id[:-2]) or None
@@ -925,6 +925,7 @@ def navigate_folder(request, folder_id=None):
 
     root = True
     parent_folder = None
+    logger.log(f"Folder ID : {folder_id}")
     if folder_id and folder_id != "None":
         root = False
         drive, parent_folder = list_current_folder(folder_id)
