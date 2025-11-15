@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-07-27 17:59+0300\n"
+"POT-Creation-Date: 2025-11-15 15:44+0200\n"
 "PO-Revision-Date: 2025-07-27 18:00+0300\n"
 "Last-Translator: Gemini\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -21,7 +21,8 @@ msgstr ""
 
 #: .\management_system\forms.py:10 .\management_system\forms.py:15
 #: .\management_system\forms.py:30 .\management_system\forms.py:39
-#: .\management_system\models.py:68
+#: .\management_system\models.py:68 .\management_system\utils\csv_export.py:21
+#: .\management_system\utils\csv_export.py:203
 msgid "Username"
 msgstr "اسم المستخدم"
 
@@ -32,18 +33,22 @@ msgid "Password"
 msgstr "كلمة المرور"
 
 #: .\management_system\forms.py:31 .\management_system\forms.py:45
+#: .\management_system\utils\csv_export.py:22
 msgid "First Name"
 msgstr "الاسم الأول"
 
 #: .\management_system\forms.py:32 .\management_system\forms.py:51
+#: .\management_system\utils\csv_export.py:23
 msgid "Last Name"
 msgstr "الاسم الأخير"
 
 #: .\management_system\forms.py:33 .\management_system\models.py:68
+#: .\management_system\utils\csv_export.py:25
 msgid "Role"
 msgstr "الدور"
 
 #: .\management_system\forms.py:34 .\management_system\models.py:68
+#: .\management_system\utils\csv_export.py:26
 msgid "Joined Date"
 msgstr "تاريخ الانضمام"
 
@@ -63,6 +68,14 @@ msgstr "المحاضر"
 msgid "Academic Year"
 msgstr "السنة الدراسية"
 
+#: .\management_system\forms.py:132
+msgid "CSV File"
+msgstr "ملف CSV"
+
+#: .\management_system\forms.py:132
+msgid "Upload a .csv file with user data."
+msgstr "تحميل ملف CSV يحتوي على بيانات المستخدم."
+
 #: .\management_system\models.py:24
 msgid "Admin"
 msgstr "مدير"
@@ -80,12 +93,12 @@ msgid "Second Year"
 msgstr "سنة ثانية"
 
 #: .\management_system\models.py:68 .\management_system\models.py:104
-#: .\management_system\models.py:170 .\management_system\models.py:228
-#: .\management_system\models.py:307
+#: .\management_system\models.py:169 .\management_system\models.py:228
+#: .\management_system\models.py:308
 msgid "Name"
 msgstr "الاسم"
 
-#: .\management_system\models.py:68
+#: .\management_system\models.py:68 .\management_system\utils\csv_export.py:27
 msgid "Last Login"
 msgstr "آخر تسجيل دخول"
 
@@ -105,30 +118,32 @@ msgstr "الوصف"
 msgid "Level"
 msgstr "المستوى"
 
-#: .\management_system\models.py:164
+#: .\management_system\models.py:163
 #, python-format
 msgid "Updated on %(date)s"
 msgstr "تم التحديث في %(date)s"
 
-#: .\management_system\models.py:170 .\management_system\models.py:228
+#: .\management_system\models.py:169 .\management_system\models.py:228
 #: .\management_system\templates\lesson_form.html:30
 #: .\management_system\templates\quiz_form.html:41
+#: .\management_system\utils\csv_export.py:74
+#: .\management_system\utils\csv_export.py:205
 msgid "Course"
 msgstr "الكورس"
 
-#: .\management_system\models.py:170
+#: .\management_system\models.py:169
 msgid "Last Updated"
 msgstr "آخر تحديث"
 
-#: .\management_system\models.py:228 .\management_system\models.py:307
+#: .\management_system\models.py:228 .\management_system\models.py:308
 msgid "Grades"
 msgstr "الدرجات"
 
-#: .\management_system\models.py:228
+#: .\management_system\models.py:228 .\management_system\utils\csv_export.py:75
 msgid "Opening Date"
 msgstr "تاريخ الفتح"
 
-#: .\management_system\models.py:228
+#: .\management_system\models.py:228 .\management_system\utils\csv_export.py:76
 msgid "Closing Date"
 msgstr "تاريخ الإغلاق"
 
@@ -149,12 +164,15 @@ msgstr "مقالي"
 msgid "Complete"
 msgstr "أكمل"
 
-#: .\management_system\models.py:307
+#: .\management_system\models.py:308
+#: .\management_system\utils\csv_export.py:123
+#: .\management_system\utils\csv_export.py:206
 msgid "Submission Date"
 msgstr "تاريخ التقديم"
 
 #: .\management_system\templates\admin_panel.html:14
-#: .\management_system\templates\base.html:132
+#: .\management_system\templates\base.html:9
+#: .\management_system\templates\base.html:148
 #: .\management_system\templates\login.html:10
 msgid "Bible Institute Coptic"
 msgstr "معهد الكتاب المقدس القبطي"
@@ -167,108 +185,115 @@ msgstr "لوحة التحكم"
 msgid "Close"
 msgstr "إغلاق"
 
-#: .\management_system\templates\admin_panel.html:133
+#: .\management_system\templates\admin_panel.html:126
+#: .\management_system\templates\base.html:89
+msgid "Home"
+msgstr "الرئيسية"
+
+#: .\management_system\templates\admin_panel.html:139
 msgid "Users"
 msgstr "المستخدمون"
 
-#: .\management_system\templates\admin_panel.html:145
-#: .\management_system\templates\base.html:107
+#: .\management_system\templates\admin_panel.html:151
+#: .\management_system\templates\base.html:91
 msgid "Courses"
 msgstr "الدورات"
 
-#: .\management_system\templates\admin_panel.html:157
-#: .\management_system\templates\course_detail.html:40
+#: .\management_system\templates\admin_panel.html:163
+#: .\management_system\templates\course_detail.html:41
 msgid "Lessons"
 msgstr "الدروس"
 
-#: .\management_system\templates\admin_panel.html:170
+#: .\management_system\templates\admin_panel.html:176
 #: .\management_system\templates\upload_video.html:29
 #: .\management_system\templates\upload_video.html:38
 msgid "Upload Files"
 msgstr "رفع الملفات"
 
-#: .\management_system\templates\admin_panel.html:183
-#: .\management_system\templates\course_detail.html:59
+#: .\management_system\templates\admin_panel.html:189
+#: .\management_system\templates\course_detail.html:60
 msgid "Quizzes"
 msgstr "الاختبارات"
 
-#: .\management_system\templates\admin_panel.html:198
+#: .\management_system\templates\admin_panel.html:204
 msgid "Menu"
 msgstr "القائمة"
 
-#: .\management_system\templates\admin_panel.html:215
+#: .\management_system\templates\admin_panel.html:221
 msgid "Dashboard"
 msgstr "لوحة التحكم"
 
-#: .\management_system\templates\admin_panel.html:225
+#: .\management_system\templates\admin_panel.html:231
 msgid "Total Users"
 msgstr "إجمالي المستخدمين"
 
-#: .\management_system\templates\admin_panel.html:234
+#: .\management_system\templates\admin_panel.html:240
 msgid "Total Courses"
 msgstr "إجمالي الدورات"
 
-#: .\management_system\templates\admin_panel.html:243
+#: .\management_system\templates\admin_panel.html:249
 msgid "Total Lessons"
 msgstr "إجمالي الدروس"
 
-#: .\management_system\templates\admin_panel.html:252
+#: .\management_system\templates\admin_panel.html:258
 msgid "Total Quizzes"
 msgstr "إجمالي الاختبارات"
 
-#: .\management_system\templates\base.html:93
+#: .\management_system\templates\base.html:79
+#, fuzzy
+#| msgid "Toggle navigation"
+msgid "Main navigation"
+msgstr "تبديل التنقل"
+
+#: .\management_system\templates\base.html:82
 msgid "Logo"
 msgstr "الشعار"
 
-#: .\management_system\templates\base.html:95
+#: .\management_system\templates\base.html:84
 msgid "Toggle navigation"
 msgstr "تبديل التنقل"
 
-#: .\management_system\templates\base.html:101
-msgid "Home"
-msgstr "الرئيسية"
-
-#: .\management_system\templates\base.html:104
+#: .\management_system\templates\base.html:90
 msgid "About Us"
 msgstr "عنا"
 
-#: .\management_system\templates\base.html:110
+#: .\management_system\templates\base.html:92
 msgid "Profile"
 msgstr "الملف الشخصي"
 
-#: .\management_system\templates\base.html:114
+#: .\management_system\templates\base.html:95
 msgid "Admin Dashboard"
 msgstr "لوحة تحكم المسؤول"
 
-#: .\management_system\templates\base.html:136
+#: .\management_system\templates\base.html:151
 msgid "Institute Headquarters"
 msgstr "مقر المعهد"
 
-#: .\management_system\templates\base.html:137
+#: .\management_system\templates\base.html:152
 msgid "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
 msgstr "كنيسة الشهيد العظيم مارجرجس بكوتسكا – المعادي – مصر"
 
-#: .\management_system\templates\base.html:145
+#: .\management_system\templates\base.html:159
 msgid "All rights reserved to the Bible Institute in Maadi"
 msgstr "جميع الحقوق محفوظة لمعهد الكتاب المقدس بالمعادي"
 
-#: .\management_system\templates\course_detail.html:36
+#: .\management_system\templates\course_detail.html:37
 msgid "Course Content"
 msgstr "محتوى الدورة"
 
-#: .\management_system\templates\course_detail.html:54
+#: .\management_system\templates\course_detail.html:55
 msgid "No lessons available."
 msgstr "لا توجد دروس متاحة."
 
-#: .\management_system\templates\course_detail.html:66
+#: .\management_system\templates\course_detail.html:67
 msgid "No quizzes available."
 msgstr "لا توجد اختبارات متاحة."
 
-#: .\management_system\templates\course_detail.html:79
+#: .\management_system\templates\course_detail.html:80
 msgid "Welcome to the course!"
 msgstr "أهلاً بك في الدورة!"
 
-#: .\management_system\templates\course_detail.html:80
+#: .\management_system\templates\course_detail.html:81
 msgid "Please select a lesson or quiz from the sidebar to begin."
 msgstr "يرجى اختيار درس أو اختبار من الشريط الجانبي للبدء."
 
@@ -292,9 +317,22 @@ msgstr "عرض الدورة"
 msgid "No courses available in this level yet."
 msgstr "لا توجد دورات متاحة في هذا المستوى بعد."
 
-#: .\management_system\templates\dashboard.html:30
+#: .\management_system\templates\dashboard.html:31
 msgid "Create a"
 msgstr "إنشاء"
+
+#: .\management_system\templates\dashboard.html:44
+msgid "Bulk Create from CSV"
+msgstr "إنشاء بالجملة من CSV"
+
+#: .\management_system\templates\dashboard.html:48
+msgid "Export Users to CSV"
+msgstr "تصدير المستخدمين إلى CSV"
+
+#: .\management_system\templates\dashboard.html:53
+#: .\management_system\templates\submission_dashboard.html:15
+msgid "Export Quiz & Submissions"
+msgstr "تصدير الاختبارات والتقديمات"
 
 #: .\management_system\templates\dashboard_form.html:20
 msgid "Back to"
@@ -316,6 +354,7 @@ msgid "Exam"
 msgstr "الامتحان"
 
 #: .\management_system\templates\display_quiz.html:32
+#: .\management_system\utils\csv_export.py:202
 msgid "Student"
 msgstr "الطالب"
 
@@ -336,14 +375,12 @@ msgid "This folder is empty."
 msgstr "هذا المجلد فارغ."
 
 #: .\management_system\templates\index.html:29
-#: .\management_system\templates\pagination.html:15
-#: .\management_system\templates\pagination.html:28
+#: .\management_system\templates\pagination.html:11
 msgid "Previous"
 msgstr "السابق"
 
 #: .\management_system\templates\index.html:33
-#: .\management_system\templates\pagination.html:56
-#: .\management_system\templates\pagination.html:69
+#: .\management_system\templates\pagination.html:39
 msgid "Next"
 msgstr "التالي"
 
@@ -431,9 +468,33 @@ msgstr ""
 msgid "supports HTML5 video"
 msgstr "فيديو HTML5"
 
-#: .\management_system\templates\lesson_stream.html:49
+#: .\management_system\templates\lesson_stream.html:48
+#: .\management_system\templates\lesson_stream.html:144
+#: .\management_system\templates\lesson_stream.html:153
+msgid "Download Audio"
+msgstr "تحميل الصوت"
+
+#: .\management_system\templates\lesson_stream.html:70
 msgid "Page"
 msgstr "صفحة"
+
+#: .\management_system\templates\lesson_stream.html:88
+#, fuzzy
+#| msgid "Loading..."
+msgid "Processing..."
+msgstr "جاري التحميل..."
+
+#: .\management_system\templates\lesson_stream.html:139
+#, fuzzy
+#| msgid "Complete"
+msgid "Complete!"
+msgstr "أكمل"
+
+#: .\management_system\templates\lesson_stream.html:149
+#, fuzzy
+#| msgid "Sending quiz has failed, Please Try again!"
+msgid "Download failed. Please try again."
+msgstr "فشل إرسال الاختبار، يرجى المحاولة مرة أخرى!"
 
 #: .\management_system\templates\login.html:10
 #: .\management_system\templates\login.html:96
@@ -449,13 +510,20 @@ msgid "Sign in to continue"
 msgstr "سجل الدخول للمتابعة"
 
 #: .\management_system\templates\naming_filter.html:2
-#: .\management_system\templates\submission_dashboard.html:45
+#: .\management_system\templates\submission_dashboard.html:51
 msgid "Search"
 msgstr "بحث"
 
-#: .\management_system\templates\pagination.html:2
-msgid "Page navigation example"
-msgstr "مثال على التنقل بين الصفحات"
+#: .\management_system\templates\pagination.html:5
+#, fuzzy
+#| msgid "Toggle navigation"
+msgid "Page navigation"
+msgstr "تبديل التنقل"
+
+#: .\management_system\templates\pagination.html:55
+#, python-format
+msgid "\n                Showing %(start)s–%(end)s of %(total)s results\n            "
+msgstr "\n                عرض %(start)s–%(end)s من %(total)s نتيجة\n            "
 
 #: .\management_system\templates\profile.html:13
 msgid "My Profile"
@@ -478,6 +546,8 @@ msgid "You are not enrolled in any courses yet."
 msgstr "أنت غير مسجل في أي دورات بعد."
 
 #: .\management_system\templates\questions_rendering.html:15
+#: .\management_system\utils\csv_export.py:86
+#: .\management_system\utils\csv_export.py:216
 msgid "Question Type"
 msgstr "نوع السؤال"
 
@@ -491,6 +561,8 @@ msgid "Question...?"
 msgstr "السؤال...؟"
 
 #: .\management_system\templates\questions_rendering.html:29
+#: .\management_system\utils\csv_export.py:87
+#: .\management_system\utils\csv_export.py:131
 msgid "Grade"
 msgstr "الدرجة"
 
@@ -572,39 +644,44 @@ msgstr "الأسئلة"
 msgid "Add Question"
 msgstr "إضافة سؤال"
 
-#: .\management_system\templates\submission_dashboard.html:22
+#: .\management_system\templates\submission_dashboard.html:28
 #: .\management_system\templates\submission_filter.html:3
 msgid "Minimum Grade"
 msgstr "الحد الأدنى للدرجة"
 
-#: .\management_system\templates\submission_dashboard.html:25
+#: .\management_system\templates\submission_dashboard.html:31
 #: .\management_system\templates\submission_filter.html:4
+#: .\management_system\utils\csv_export.py:125
 msgid "Maximum Grade"
 msgstr "الحد الأقصى للدرجة"
 
-#: .\management_system\templates\submission_dashboard.html:30
+#: .\management_system\templates\submission_dashboard.html:36
 #: .\management_system\templates\year_filter.html:2
 msgid "Year Filter"
 msgstr "فلتر السنة"
 
-#: .\management_system\templates\submission_dashboard.html:33
+#: .\management_system\templates\submission_dashboard.html:39
 msgid "All"
 msgstr "الكل"
 
-#: .\management_system\templates\table_rendering.html:34
-#: .\management_system\templates\table_rendering.html:48
+#: .\management_system\templates\table_rendering.html:36
+#: .\management_system\templates\table_rendering.html:57
 msgid "View Submission"
 msgstr "عرض التقديم"
 
-#: .\management_system\templates\table_rendering.html:63
+#: .\management_system\templates\table_rendering.html:42
+msgid "Export CSV"
+msgstr "تصدير CSV"
+
+#: .\management_system\templates\table_rendering.html:72
 msgid "Update"
 msgstr "تحديث"
 
-#: .\management_system\templates\table_rendering.html:72
+#: .\management_system\templates\table_rendering.html:81
 msgid "Delete"
 msgstr "حذف"
 
-#: .\management_system\templates\table_rendering.html:84
+#: .\management_system\templates\table_rendering.html:93
 msgid "No Data Here!"
 msgstr "لا توجد بيانات هنا!"
 
@@ -620,145 +697,277 @@ msgstr "جاري التحميل..."
 msgid "Folder"
 msgstr "مجلد"
 
-#: .\management_system\views.py:52 .\management_system\views.py:180
-#: .\management_system\views.py:256 .\management_system\views.py:358
-#: .\management_system\views.py:424 .\management_system\views.py:458
-#: .\management_system\views.py:557
+#: .\management_system\templates\user_bulk_form.html:18
+#, fuzzy
+#| msgid "Back to lessons"
+msgid "Back to Users"
+msgstr "العودة إلى الدروس"
+
+#: .\management_system\templates\user_bulk_form.html:26
+msgid "Bulk Create Users from CSV"
+msgstr "إنشاء مستخدمين بالجملة من CSV"
+
+#: .\management_system\templates\user_bulk_form.html:31
+msgid "CSV File Instructions"
+msgstr "تعليمات ملف CSV"
+
+#: .\management_system\templates\user_bulk_form.html:59
+msgid "Upload and Create Users"
+msgstr "رفع وإنشاء المستخدمين"
+
+#: .\management_system\utils\csv_export.py:24
+msgid "Email"
+msgstr "البريد الإلكتروني"
+
+#: .\management_system\utils\csv_export.py:28
+msgid "Is Active"
+msgstr "نشط"
+
+#: .\management_system\utils\csv_export.py:43
+msgid "Yes"
+msgstr "نعم"
+
+#: .\management_system\utils\csv_export.py:43
+msgid "No"
+msgstr "لا"
+
+#: .\management_system\utils\csv_export.py:72
+msgid "Quiz Export"
+msgstr "تصدير الاختبار"
+
+#: .\management_system\utils\csv_export.py:80
+msgid "QUIZ QUESTIONS AND ANSWERS"
+msgstr "أسئلة وأجوبة الاختبار"
+
+#: .\management_system\utils\csv_export.py:84
+#: .\management_system\utils\csv_export.py:214
+#, fuzzy
+#| msgid "Question Type"
+msgid "Question Number"
+msgstr "نوع السؤال"
+
+#: .\management_system\utils\csv_export.py:85
+#: .\management_system\utils\csv_export.py:215
+#, fuzzy
+#| msgid "Question Type"
+msgid "Question Text"
+msgstr "نوع السؤال"
+
+#: .\management_system\utils\csv_export.py:88
+msgid "Choices (for MCQ)"
+msgstr "الاختيارات (لأسئلة الاختيار من متعدد)"
+
+#: .\management_system\utils\csv_export.py:89
+#: .\management_system\utils\csv_export.py:218
+#, fuzzy
+#| msgid "Correct Answer:"
+msgid "Correct Answer"
+msgstr "الإجابة الصحيحة:"
+
+#: .\management_system\utils\csv_export.py:115
+msgid "STUDENT SUBMISSIONS"
+msgstr "تقديمات الطلاب"
+
+#: .\management_system\utils\csv_export.py:121
+#, fuzzy
+#| msgid "Username"
+msgid "Student Username"
+msgstr "اسم المستخدم"
+
+#: .\management_system\utils\csv_export.py:122
+#, fuzzy
+#| msgid "Student"
+msgid "Student Name"
+msgstr "الطالب"
+
+#: .\management_system\utils\csv_export.py:124
+#: .\management_system\utils\csv_export.py:207
+#, fuzzy
+#| msgid "Final Grade"
+msgid "Total Grade"
+msgstr "الدرجة النهائية"
+
+#: .\management_system\utils\csv_export.py:130
+#: .\management_system\utils\csv_export.py:131
+msgid "Q"
+msgstr "س"
+
+#: .\management_system\utils\csv_export.py:167
+msgid "No submissions found for this quiz"
+msgstr "لم يتم العثور على تقديمات لهذا الاختبار"
+
+#: .\management_system\utils\csv_export.py:201
+msgid "Individual Submission Export"
+msgstr "تصدير تقديم فردي"
+
+#: .\management_system\utils\csv_export.py:211
+msgid "DETAILED ANSWERS"
+msgstr "إجابات مفصلة"
+
+#: .\management_system\utils\csv_export.py:217
+#, fuzzy
+#| msgid "Student"
+msgid "Student Answer"
+msgstr "الطالب"
+
+#: .\management_system\utils\csv_export.py:219
+#, fuzzy
+#| msgid "Question graded"
+msgid "Question Grade"
+msgstr "تم تصحيح السؤال"
+
+#: .\management_system\utils\csv_export.py:220
+#, fuzzy
+#| msgid "Final Grade"
+msgid "Earned Grade"
+msgstr "الدرجة النهائية"
+
+#: .\management_system\views.py:57 .\management_system\views.py:186
+#: .\management_system\views.py:263 .\management_system\views.py:365
+#: .\management_system\views.py:430 .\management_system\views.py:464
+#: .\management_system\views.py:563
 msgid "Unauthorized"
 msgstr "غير مصرح به"
 
-#: .\management_system\views.py:53 .\management_system\views.py:182
+#: .\management_system\views.py:58 .\management_system\views.py:188
 msgid "authorized"
 msgstr "مصرح به"
 
-#: .\management_system\views.py:264
+#: .\management_system\views.py:271
 #, python-format
 msgid "%(action)s %(view_name)s is failed, Try again Please!"
 msgstr "فشلت عملية %(action)s %(view_name)s، يرجى المحاولة مرة أخرى!"
 
-#: .\management_system\views.py:267
+#: .\management_system\views.py:274
 #, python-format
 msgid "%(view_name)s has %(action)sd successfully!"
 msgstr "تم %(action)s %(view_name)s بنجاح!"
 
-#: .\management_system\views.py:291
+#: .\management_system\views.py:298
 msgid "user"
 msgstr "المستخدم"
 
-#: .\management_system\views.py:296
+#: .\management_system\views.py:303
 msgid "course"
 msgstr "الكورس"
 
-#: .\management_system\views.py:302
+#: .\management_system\views.py:309
 msgid "lesson"
 msgstr "الدرس"
 
-#: .\management_system\views.py:307
+#: .\management_system\views.py:314
 msgid "quiz"
 msgstr "الاختبار"
 
-#: .\management_system\views.py:378
+#: .\management_system\views.py:385
 msgid "Profile is updated successfully!"
 msgstr "تم تحديث الملف الشخصي بنجاح!"
 
-#: .\management_system\views.py:543
+#: .\management_system\views.py:549
 msgid "Quiz is closed, You can not take it anymore!"
 msgstr "الامتحان مغلق، لا يمكنك التقدم إليه بعد الآن!"
 
-#: .\management_system\views.py:585
+#: .\management_system\views.py:591
 msgid "Invalid Request, submission is closed!"
 msgstr "طلب غير صالح، تم إغلاق التقديم!"
 
-#: .\management_system\views.py:623
+#: .\management_system\views.py:629
 msgid "Quiz is sent successfully!"
 msgstr "تم إرسال الاختبار بنجاح!"
 
-#: .\management_system\views.py:626
+#: .\management_system\views.py:632
 msgid "Sending quiz has failed, Please Try again!"
 msgstr "فشل إرسال الاختبار، يرجى المحاولة مرة أخرى!"
 
-#: .\management_system\views.py:633 .\management_system\views.py:1303
+#: .\management_system\views.py:639 .\management_system\views.py:1413
 msgid "Not allowed method"
 msgstr "طريقة غير مسموح بها"
 
-#: .\management_system\views.py:678
+#: .\management_system\views.py:692
 msgid "Choose Role"
 msgstr "اختر الدور"
 
-#: .\management_system\views.py:687 .\management_system\views.py:742
+#: .\management_system\views.py:708
+msgid "This is not a CSV file"
+msgstr ""
+
+#: .\management_system\views.py:781 .\management_system\views.py:836
 msgid "create"
 msgstr "إنشاء"
 
-#: .\management_system\views.py:691 .\management_system\views.py:746
+#: .\management_system\views.py:785 .\management_system\views.py:840
 msgid "update"
 msgstr "تحديث"
 
-#: .\management_system\views.py:736 .\management_system\views.py:788
-#: .\management_system\views.py:997 .\management_system\views.py:1225
+#: .\management_system\views.py:830 .\management_system\views.py:882
+#: .\management_system\views.py:1091 .\management_system\views.py:1335
 msgid "Choose Academic Year"
 msgstr "اختر السنة الدراسية"
 
-#: .\management_system\views.py:789 .\management_system\views.py:998
+#: .\management_system\views.py:883 .\management_system\views.py:1092
 msgid "Choose Course"
 msgstr "اختر الكورس"
 
-#: .\management_system\views.py:828
+#: .\management_system\views.py:922
 msgid "Lesson is created successfully"
 msgstr "تم إنشاء الدرس بنجاح"
 
-#: .\management_system\views.py:832
+#: .\management_system\views.py:926
 msgid "Create lesson has failed, Try again Please!"
 msgstr "فشل إنشاء الدرس، يرجى المحاولة مرة أخرى!"
 
-#: .\management_system\views.py:835
+#: .\management_system\views.py:929
 msgid "Create lesson has failed, Name and Videos can not be empty!"
 msgstr "فشل إنشاء الدرس، لا يمكن أن يكون الاسم والفيديوهات فارغين!"
 
-#: .\management_system\views.py:906
+#: .\management_system\views.py:1000
 msgid "Lesson is updated successfully"
 msgstr "تم تحديث الدرس بنجاح"
 
-#: .\management_system\views.py:909
+#: .\management_system\views.py:1003
 msgid "Update lesson has failed, Try again Please!"
 msgstr "فشل تحديث الدرس، يرجى المحاولة مرة أخرى!"
 
-#: .\management_system\views.py:912
+#: .\management_system\views.py:1006
 msgid "Update lesson has failed, Name and Videos can not be empty!"
 msgstr "فشل تحديث الدرس، لا يمكن أن يكون الاسم والفيديوهات فارغين!"
 
-#: .\management_system\views.py:947
+#: .\management_system\views.py:1041
 msgid "unauthorized!"
 msgstr "غير مصرح به!"
 
-#: .\management_system\views.py:1040
+#: .\management_system\views.py:1134
 #, python-format
 msgid "Correct answer is not in choices for question : %(title)s"
 msgstr "الإجابة الصحيحة ليست ضمن الخيارات للسؤال: %(title)s"
 
-#: .\management_system\views.py:1060 .\management_system\views.py:1061
+#: .\management_system\views.py:1154 .\management_system\views.py:1155
 msgid "Closing Date can not be before or same as Openning Date!"
 msgstr "تاريخ الإغلاق لا يمكن أن يكون قبل أو نفس تاريخ الفتح!"
 
-#: .\management_system\views.py:1075
+#: .\management_system\views.py:1169
 msgid "Quiz is created successfully"
 msgstr "تم إنشاء الاختبار بنجاح"
 
-#: .\management_system\views.py:1078 .\management_system\views.py:1082
+#: .\management_system\views.py:1172 .\management_system\views.py:1176
 msgid "Create quiz is failed, Try again Please"
 msgstr "فشل إنشاء الاختبار، يرجى المحاولة مرة أخرى"
 
-#: .\management_system\views.py:1135
+#: .\management_system\views.py:1229
 msgid "Correct answer is not in choices"
 msgstr "الإجابة الصحيحة ليست ضمن الخيارات"
 
-#: .\management_system\views.py:1170
+#: .\management_system\views.py:1264
 msgid "Quiz is updated successfully"
 msgstr "تم تحديث الاختبار بنجاح"
 
-#: .\management_system\views.py:1173 .\management_system\views.py:1177
+#: .\management_system\views.py:1267 .\management_system\views.py:1271
 msgid "Update quiz is failed, Try again Please"
 msgstr "فشل تحديث الاختبار، يرجى المحاولة مرة أخرى"
 
-#: .\management_system\views.py:1249 .\management_system\views.py:1253
+#: .\management_system\views.py:1359 .\management_system\views.py:1363
 msgid "Not Found!"
 msgstr "غير موجود!"
+
+#~ msgid "Page navigation example"
+#~ msgstr "مثال على التنقل بين الصفحات"
