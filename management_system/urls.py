@@ -21,6 +21,7 @@ urlpatterns = [
     path('courses/<int:course_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
     path('courses/<int:course_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
     path('lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
+    path('lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
     # path('lesson/<int:lesson_id>/<str:segment_id>/', retrieve_segment, name="segment-stream"),
     # path('lesson/<int:lesson_id>/audio/<int:file_index>', stream_audio_lesson, name="lesson-audio-stream"),
     # Admin Routes

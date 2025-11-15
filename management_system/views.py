@@ -1384,3 +1384,31 @@ def submission_user(request, quiz_id, user_id):
     
     else:
         return HttpResponse(_("Not allowed method"), 400) # Translate
+
+@login_required(login_url=LOGIN_URL)
+def generate_audio_download(request, lesson_id):
+    try:
+        # Fetch the lesson object
+        lesson = get_object_or_404(Lesson, pk=lesson_id)
+
+        # Extract the m3u8 file URL from the lesson links
+        m3u8_url = lesson.links
+
+        # Fetch the m3u8 file content
+        response = requests.get(m3u8_url)
+        if response.status_code != 200:
+            return JsonResponse({"error": "Failed to fetch m3u8 file."}, status=500)
+
+        # Parse the m3u8 file to extract .ts file URLs
+        ts_files = []
+        base_url = os.path.dirname(m3u8_url)
+        for line in response.text.splitlines():
+            if line.endswith(".ts"):
+                ts_files.append(os.path.join(base_url, line))
+
+        # Return the .ts file URLs to the client for concatenation
+        return JsonResponse({"ts_files": ts_files})
+
+    except Exception as e:
+        logger.error(f"Error generating audio download: {str(e)}")
+        return JsonResponse({"error": "An error occurred while processing the request."}, status=500)

@@ -147,7 +147,6 @@ class Course(models.Model):
         # Get all quizzes
         return self.quizzes.filter(Q(opening_date__lte=now()) | Q(grade__user=user))
 
-
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")
