@@ -19,6 +19,7 @@ from django.core.exceptions import ValidationError
 # Third Party
 from logging import getLogger
 import io
+import requests
 # from googleapiclient.http import MediaIoBaseDownload
 # from googleapiclient.errors import HttpError
 import boto3
@@ -31,6 +32,7 @@ from urllib.parse import unquote
 # from .utils import get_drive_client
 from .models import *
 from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
+from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv
 from django.utils.timezone import now
 
 # Constants
@@ -207,6 +209,7 @@ def render_dashboard(request, obj, view, context, parameters=[]):
         "header" : _(view.capitalize()), # Translate header
         "view" : view,
         "url" : reverse(f"{view}-dashboard", args=parameters),
+        "parameters" : parameters,
         **context
     })
 
@@ -648,6 +651,14 @@ def admin_panel(request):
     
     logger.info(f"User : {request.user} accesses admin panel successfully")
     return render(request, "admin_panel.html")
+
+@login_required(login_url=LOGIN_URL)
+def export_users_csv(request):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+    
+    return export_users_to_csv()
 
 @login_required(login_url=LOGIN_URL)
 def user_dashboard(request):
@@ -1266,6 +1277,22 @@ class DeleteQuiz(QuizBaseView, DeleteView):
     success_url = reverse_lazy("lesson-dashboard")
 
 # Submission Dashboard
+@login_required(login_url=LOGIN_URL)
+def export_quiz_submissions_csv(request, quiz_id):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+    
+    return export_quiz_with_submissions_to_csv(quiz_id)
+
+@login_required(login_url=LOGIN_URL)
+def export_submission_csv(request, grade_id):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+    
+    return export_single_submission_to_csv(grade_id)
+
 @login_required(login_url=LOGIN_URL)
 def submission_dashboard(request, quiz_id):
     try:

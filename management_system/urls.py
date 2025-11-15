@@ -30,6 +30,7 @@ urlpatterns = [
     path('dashboard/users/', user_dashboard, name="user-dashboard"),
     path('dashboard/users/create/', CreateUser.as_view(), name="user-create"),
     path('dashboard/users/bulk-create/', user_bulk_create, name="user-bulk-create"),
+    path('dashboard/users/export-csv/', export_users_csv, name="export-users-csv"),
     path('dashboard/users/<int:user_id>/', index, name="user-profile"),
     path('dashboard/users/<int:user_id>/delete/', DeleteUser.as_view(), name="user-delete"),
     path('dashboard/users/<int:user_id>/update/', UpdateUser.as_view(), name="user-update"),
@@ -58,6 +59,8 @@ urlpatterns = [
     # path('dashboard/submission/', quiz_dashboard, name="submission-dashboard"),
     path('dashboard/quizzez/<int:quiz_id>/view-submission/', submission_dashboard, name="submission-dashboard"),
     path('dashboard/quizzez/<int:quiz_id>/view-submission/<int:user_id>/', submission_user, name="submission-user"),
+    path('dashboard/quizzez/<int:quiz_id>/export-csv/', export_quiz_submissions_csv, name="export-quiz-submissions-csv"),
+    path('dashboard/grade/<int:grade_id>/export-csv/', export_submission_csv, name="export-submission-csv"),
 
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),

@@ -22,17 +22,26 @@
                     
                     <!-- Action Buttons -->
                     {% if submission_user %}
-                        <td class="py-3">
-                            <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" 
-                                    hx-get="{{ values.url }}" 
-                                    hx-swap="innerHTML" 
-                                    hx-target="#display-page" 
-                                    hx-trigger="click" 
-                                    hx-push-url="true" 
-                                    hx-select="#content">
-                                <i class="bi bi-eye"></i>
-                                {% translate "View Submission" %}
-                            </button>
+                        <td class="py-3 text-center">
+                            <div class="d-flex flex-column align-items-center gap-2">
+                                <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" 
+                                        hx-get="{{ values.url }}" 
+                                        hx-swap="innerHTML" 
+                                        hx-target="#display-page" 
+                                        hx-trigger="click" 
+                                        hx-push-url="true" 
+                                        hx-select="#content"
+                                        style="min-width: 140px;">
+                                    <i class="bi bi-eye"></i>
+                                    {% translate "View Submission" %}
+                                </button>
+                                <a href="{% url 'export-submission-csv' grade_id=values.submission_id %}" 
+                                   class="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
+                                   style="min-width: 140px;">
+                                    <i class="fas fa-file-csv"></i>
+                                    {% translate "Export CSV" %}
+                                </a>
+                            </div>
                         </td>
                     {% else %}
                         {% if submission_view %}
