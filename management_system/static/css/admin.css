@@ -19,6 +19,48 @@ a {
     cursor: pointer;
 }
 
+/* Navigation Improvements */
+.navbar-brand img {
+    transition: transform 0.3s ease;
+}
+
+.navbar-brand:hover img {
+    transform: scale(1.05);
+}
+
+.menu-toggle {
+    background: var(--primary-gradient) !important;
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: var(--card-shadow);
+}
+
+.menu-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.offcanvas {
+    background: var(--sidebar-gradient) !important;
+    border: none;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.offcanvas .nav-link {
+    border-radius: var(--border-radius);
+    margin: 0.25rem 0;
+    transition: all 0.3s ease;
+    padding: 0.75rem 1rem;
+}
+
+.offcanvas .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(5px);
+}
+
 .pop-up {
     position: fixed;
     top: 1.5rem;

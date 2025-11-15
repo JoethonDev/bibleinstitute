@@ -120,6 +120,12 @@
                     <div class="border-bottom border-light mb-3 opacity-25"></div>
                     <nav>
                         <ul class="nav nav-pills flex-column mb-auto">
+                            <li class="nav-item">
+                                <a class="nav-link text-white" href="{% url 'home' %}">
+                                    <i class="fas fa-home me-2"></i>
+                                    {% translate "Home" %}
+                                </a>
+                            </li>
                             {% if request.user.role.role == "admin" %}
                                 <li class="nav-item">
                                     <a class="nav-link text-white" aria-current="page" 

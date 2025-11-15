@@ -36,9 +36,28 @@
             flex: 1;
         }
         .navbar {
-            background-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        .navbar-nav .nav-link {
+            font-weight: 500;
+            transition: color 0.3s ease;
+            border-radius: 6px;
+            margin: 0 4px;
+            padding: 8px 12px !important;
+        }
+        .navbar-nav .nav-link:hover {
+            background-color: rgba(102, 126, 234, 0.1);
+            color: #667eea !important;
+        }
+        .breadcrumb {
+            background-color: transparent;
+        }
+        .breadcrumb-item + .breadcrumb-item::before {
+            content: "/";
+            color: #6c757d;
         }
         footer {
             background-color: #2c3e50;
@@ -56,14 +75,15 @@
     {% block style %}{% endblock %}
 </head>
 <body class="d-flex flex-column">
-    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="{% url 'home' %}">
-              <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
-          </a>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
-            <i class="fas fa-bars"></i>
-          </button>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
+            <div class="container-fluid">
+              <a class="navbar-brand" href="{% url 'home' %}">
+                  <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
+              </a>
+              <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
+                <i class="fas fa-bars"></i>
+              </button>
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
@@ -75,6 +95,7 @@
                   <a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Admin Dashboard" %}</a>
                 </li>
               {% endif %}
+              </div>
             </ul>
             <!-- Language Selector Form -->
             <form action="{% url 'set_language' %}" method="post" id="language-form" class="d-flex">
@@ -90,17 +111,36 @@
                     {% endfor %}
                 </select>
             </form>
-          </div>
+              </div>
+            </div>
+        </nav>
+    </header>
+    
+    {% block breadcrumb %}
+    {% if breadcrumb_items %}
+    <nav aria-label="breadcrumb" class="bg-light py-2">
+        <div class="container-fluid">
+            <ol class="breadcrumb mb-0">
+                {% for item in breadcrumb_items %}
+                    {% if forloop.last %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ item.title }}</li>
+                    {% else %}
+                        <li class="breadcrumb-item"><a href="{{ item.url }}">{{ item.title }}</a></li>
+                    {% endif %}
+                {% endfor %}
+            </ol>
         </div>
     </nav>
+    {% endif %}
+    {% endblock %}
 
-    <main>
+    <main role="main">
         {% block body %}{% endblock %}
     </main>
 
     {% block script %}{% endblock %}
     
-    <footer class="mt-auto">
+    <footer class="mt-auto" role="contentinfo">
       <div class="container p-4">
           <div class="row">
               <div class="col-lg-5 col-md-12 mb-4 mb-md-0">
