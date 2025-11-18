@@ -76,8 +76,110 @@
             </div>
         </div>
     {% endfor %}
-    <script>
-        async function downloadAudio(m3u8Url, fileName) {
+
+        <script>
+    (() => {
+        // This IIFE runs every time this HTML fragment is swapped into the DOM.
+        
+        const jsTranslations_lesson = {
+            'en': { 'page': 'Page' },
+            'ar': { 'page': 'صفحة' }
+        };
+
+        function getJsTranslation_lesson(key) {
+            const lang = document.documentElement.lang || 'en';
+            return jsTranslations_lesson[lang][key] || jsTranslations_lesson['en'][key];
+        }
+
+        // --- LIFECYCLE MANAGEMENT ---
+        // Clean up any existing Video.js players to prevent conflicts.
+        // function disposeExistingPlayers() {
+        //     const players = document.querySelectorAll('.video-js');
+        //     players.forEach(videoEl => {
+        //         // videojs.getPlayer is the safe way to get an instance
+        //         const player = videojs.getPlayer(videoEl.id);
+        //         if (player && !player.isDisposed()) {
+        //             player.dispose();
+        //         }
+        //     });
+        // }
+
+        // --- INITIALIZATION FUNCTIONS ---
+        function initializeVideoJs(video) {
+            // Check if the element exists and hasn't been initialized
+            if (video) {
+                const player = videojs(video, {
+                    controls: true,
+                    fluid: true,
+                    playbackRates: [0.5, 1, 1.5, 2],
+                    controlBar: { volumePanel: true, playbackRateMenuButton: true, playToggle: true }
+                });
+                player.seekButtons({ forward: 10, back: 10 });
+            }
+        }
+
+        function initializeHlsAudio(audio) {
+            if (audio && !audio.hls) { // Simple check to prevent re-initialization
+                if (Hls.isSupported()) {
+                    const hls = new Hls();
+                    const source = audio.querySelector("source").src;
+                    hls.loadSource(source);
+                    hls.attachMedia(audio);
+                    audio.hls = hls; // Mark as initialized
+                }
+            }
+        }
+
+        async function initializePdfViewer(viewer) {
+            if (viewer && !viewer.pdfDoc) { // Prevent re-initialization
+                const url = viewer.dataset.url;
+                // ... (rest of PDF logic is fine, as it's self-contained)
+                const canvas = viewer.querySelector(".pdf-canvas");
+                const ctx = canvas.getContext("2d");
+                const pageInfo = viewer.querySelector(".page-info");
+                const prevBtn = viewer.querySelector(".prev");
+                const nextBtn = viewer.querySelector(".next");
+                let currentPage = 1;
+                viewer.pdfDoc = true; // Mark as initialized immediately
+
+                try {
+                    const response = await fetch(url);
+                    const result = await response.json();
+                    const loadingTask = pdfjsLib.getDocument(result.url);
+                    const pdfDoc = await loadingTask.promise;
+                    
+                    const renderPage = (num) => {
+                        pdfDoc.getPage(num).then(page => {
+                            canvas.height = 600; canvas.width = 400;
+                            const viewportDefault = page.getViewport({ scale: 1 });
+                            const scale = Math.min(canvas.width / viewportDefault.width, canvas.height / viewportDefault.height);
+                            const viewport = page.getViewport({ scale: scale });
+                            const tempCanvas = document.createElement('canvas');
+                            const tempCtx = tempCanvas.getContext('2d');
+                            tempCanvas.width = viewport.width; tempCanvas.height = viewport.height;
+                            const renderContext = { canvasContext: tempCtx, viewport: viewport };
+                            page.render(renderContext).promise.then(() => {
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                const xOffset = (canvas.width - viewport.width) / 2;
+                                const yOffset = (canvas.height - viewport.height) / 2;
+                                ctx.drawImage(tempCanvas, xOffset, yOffset);
+                            });
+                            pageInfo.textContent = `${getJsTranslation_lesson('page')} ${num} / ${pdfDoc.numPages}`;
+                        });
+                    };
+
+                    renderPage(currentPage);
+                    prevBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderPage(currentPage); }});
+                    nextBtn.addEventListener("click", () => { if (currentPage < pdfDoc.numPages) { currentPage++; renderPage(currentPage); }});
+
+                } catch (error) {
+                    console.error("Error loading PDF:", error);
+                    pageInfo.textContent = "Error loading PDF.";
+                }
+            }
+        }
+          async function downloadAudio(m3u8Url, fileName) {
             const button = event.target.closest('.audio-download-btn');
             const progressContainer = button.parentElement.querySelector('.download-progress');
             const progressBar = progressContainer.querySelector('.progress-bar');
@@ -209,6 +311,32 @@
 
             return new Blob([concatenated], { type: 'audio/mpeg' });
         }
+        
+        // --- MAIN EXECUTION ---
+        // 1. Dispose of any old players first.
+        // disposeExistingPlayers();
+        
+        // 2. Initialize all new components.
+        // A small timeout ensures the DOM is fully ready after the swap.
+        setTimeout(() => {
+            document.querySelectorAll('video.video-js').forEach(initializeVideoJs);
+            document.querySelectorAll('audio').forEach(initializeHlsAudio);
+            document.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
+            document.querySelectorAll('video, audio').forEach(el => {
+                el.setAttribute('controlsList', 'nodownload');
+                el.addEventListener('contextmenu', e => e.preventDefault());
+            });
+        }, 500);
+
+        // Security measures
+        document.addEventListener("keydown", e => {
+            if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
+                e.preventDefault();
+            }
+        });
+        document.addEventListener("selectstart", e => e.preventDefault());
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    })();
     </script>
 </div>
 {% endblock %}
