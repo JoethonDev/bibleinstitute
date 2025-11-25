@@ -108,6 +108,7 @@ def list_current_folder(folder_name=""):
         folder_name += "/"
 
     objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, Prefix=folder_name, Delimiter="/")
+
     contents = [
 
     ]
@@ -115,20 +116,26 @@ def list_current_folder(folder_name=""):
         # Files
         if "Contents" in objects:
             for obj in objects["Contents"]:
-                file_name = obj["Key"].split("/")[-1]
-                contents.append({
-                    "id" : obj["Key"],
-                    "name" : file_name,
-                    "type" : "file"
-                })
+                key = obj["Key"]
+                # Only include files directly under the current folder (no extra / after prefix)
+                rel_path = key[len(folder_name):] if folder_name else key
+                if rel_path and "/" not in rel_path.rstrip("/"):
+                    file_name = key.split("/")[-1]
+                    # Exclude .ts files
+                    if not file_name.endswith(".ts"):
+                        contents.append({
+                            "id" : key,
+                            "name" : file_name,
+                            "type" : "file"
+                        })
 
         # Folders
         if "CommonPrefixes" in objects:
             for folder in objects["CommonPrefixes"]:
                 separated_folder = folder["Prefix"].split("/")
-                folder = "-".join(separated_folder)
+                folder_id = "-".join(separated_folder)
                 contents.insert(0, {
-                    "id" : folder,
+                    "id" : folder_id,
                     "name" : separated_folder[-2] ,
                     "type" : "folder"
                 })
@@ -136,7 +143,7 @@ def list_current_folder(folder_name=""):
         has_objects = objects['IsTruncated']
         if has_objects:
             continuation_token = objects['NextContinuationToken']
-            objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, ContinuationToken=continuation_token)
+            objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, Prefix=folder_name, Delimiter="/", ContinuationToken=continuation_token)
 
     return contents, parent_folder
 
