@@ -145,7 +145,7 @@ class Course(models.Model):
     def fetch_quizzes(self, user):
         # Select all quizzes where user took quiz (id) or closing_date < now()
         # Get all quizzes
-        return self.quizzes.filter(Q(closing_date__lte=now()) | Q(grade__user=user)).distinct('id')
+        return self.quizzes.filter(Q(closing_date__gte=now()) | Q(grade__user=user)).distinct('id')
 
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
