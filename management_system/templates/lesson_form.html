@@ -2,7 +2,15 @@
 {% load i18n %}
 
 {% block body %}
-<div id="content" class="container-fluid py-4">
+<div id="content" class="container-fluid py-4" x-data="autoSave('lesson-form')" @input.debounce.2000ms="saveDraft()">
+    <!-- Auto-save Indicator -->
+    <div class="position-fixed bottom-0 end-0 m-3" style="z-index: 1050;" x-show="lastSaved">
+        <div class="alert alert-success alert-sm mb-0 d-flex align-items-center gap-2" style="font-size: 0.875rem;">
+            <i class="fas fa-check-circle"></i>
+            <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
+        </div>
+    </div>
+    
     <!-- Back Navigation -->
     <div class="mb-4">
         <a hx-get="{% url 'lesson-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit">

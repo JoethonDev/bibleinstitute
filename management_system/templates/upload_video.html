@@ -27,7 +27,27 @@
             </div>
             <div class="mb-3">
                 <label for="formFileMultiple" class="form-label">{% translate "Upload Files" %}</label>
-                <input class="form-control" type="file" id="formFileMultiple" multiple>
+                <input 
+                    class="form-control" 
+                    type="file" 
+                    id="formFileMultiple" 
+                    accept="video/mp4,audio/mp3,audio/mpeg,application/pdf,.mp4,.mp3,.pdf"
+                    multiple>
+                <small class="form-text text-muted">
+                    {% translate "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 500MB per file." %}
+                </small>
+            </div>
+
+            <!-- Validation Errors Display -->
+            <div id="validation-errors" class="alert alert-danger d-none" role="alert">
+                <h6 class="alert-heading">{% translate "Invalid Files" %}</h6>
+                <ul id="validation-error-list" class="mb-0"></ul>
+            </div>
+
+            <!-- Valid Files Display -->
+            <div id="file-list" class="mb-3 d-none">
+                <h6>{% translate "Selected Files" %}</h6>
+                <ul id="file-list-items" class="list-group"></ul>
             </div>
     
             <!-- Progress Bars -->
@@ -39,7 +59,7 @@
     
         </div>
         
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" xintegrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" integrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         
         <script>
             // Translations for JavaScript messages
@@ -72,7 +92,16 @@
                     'uploadFailed': 'فشل الرفع',
                     'playlistUploadFailed': 'فشل رفع قائمة التشغيل:',
                     'segmentUploadFailed': 'فشل رفع الجزء {i}:',
-                    'uploadProcessFailed': 'فشل عملية الرفع:'
+                    'uploadProcessFailed': 'فشل عملية الرفع:',
+                    'invalidFileType': 'Invalid file type: {type}. Allowed types: MP4, MP3, PDF',
+                    'fileSizeExceeded': 'File size exceeds maximum: {size}MB. Maximum: 500MB',
+                    'noFilesSelected': 'No files selected',
+                    'invalidFiles': 'Some files are invalid and will not be uploaded',
+                    'selectedFiles': 'Selected Files',
+                    'invalidFileTypeAr': 'نوع الملف غير مسموح: {type}. الأنواع المسموحة: MP4، MP3، PDF',
+                    'fileSizeExceededAr': 'حجم الملف يتجاوز الحد الأقصى: {size}ميجابايت. الحد الأقصى: 500 ميجابايت',
+                    'noFilesSelectedAr': 'لم يتم اختيار أي ملفات',
+                    'invalidFilesAr': 'بعض الملفات غير صالحة ولن يتم رفعها'
                 }
             };
 
@@ -84,6 +113,134 @@
                 }
                 return message;
             }
+
+            // File Validation Constants
+            const ALLOWED_TYPES = {
+                'video/mp4': { ext: '.mp4', label: 'MP4 Video', category: 'video' },
+                'audio/mp3': { ext: '.mp3', label: 'MP3 Audio', category: 'audio' },
+                'audio/mpeg': { ext: '.mp3', label: 'MP3 Audio', category: 'audio' },
+                'application/pdf': { ext: '.pdf', label: 'PDF Document', category: 'document' }
+            };
+
+            const ALLOWED_EXTENSIONS = ['.mp4', '.mp3', '.pdf'];
+            const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+
+            // File Validation Functions
+            function getFileExtension(filename) {
+                return filename.slice(filename.lastIndexOf('.')).toLowerCase();
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            }
+
+            function validateFile(file) {
+                const errors = [];
+                const ext = getFileExtension(file.name);
+                
+                // Check extension
+                if (!ALLOWED_EXTENSIONS.includes(ext)) {
+                    errors.push(getJsTranslation_upload('invalidFileType', { type: ext }));
+                }
+                
+                // Check MIME type
+                if (!ALLOWED_TYPES[file.type]) {
+                    errors.push(getJsTranslation_upload('invalidFileType', { type: file.type }));
+                }
+                
+                // Check file size
+                if (file.size > MAX_FILE_SIZE) {
+                    const sizeMB = Math.round(file.size / (1024 * 1024));
+                    errors.push(getJsTranslation_upload('fileSizeExceeded', { size: sizeMB }));
+                }
+                
+                return {
+                    file: file,
+                    isValid: errors.length === 0,
+                    errors: errors,
+                    type: ALLOWED_TYPES[file.type]?.category || 'unknown'
+                };
+            }
+
+            function validateFiles(fileList) {
+                const results = [];
+                
+                for (let i = 0; i < fileList.length; i++) {
+                    results.push(validateFile(fileList[i]));
+                }
+                
+                return {
+                    validFiles: results.filter(r => r.isValid),
+                    invalidFiles: results.filter(r => !r.isValid),
+                    allValid: results.every(r => r.isValid)
+                };
+            }
+
+            function displayValidationErrors(invalidFiles) {
+                const container = document.getElementById('validation-errors');
+                const list = document.getElementById('validation-error-list');
+                
+                if (invalidFiles.length === 0) {
+                    container.classList.add('d-none');
+                    return;
+                }
+                
+                list.innerHTML = '';
+                invalidFiles.forEach(result => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${result.file.name}</strong>: ${result.errors.join(', ')}`;
+                    list.appendChild(li);
+                });
+                
+                container.classList.remove('d-none');
+            }
+
+            function displaySelectedFiles(validFiles) {
+                const container = document.getElementById('file-list');
+                const list = document.getElementById('file-list-items');
+                
+                if (validFiles.length === 0) {
+                    container.classList.add('d-none');
+                    return;
+                }
+                
+                list.innerHTML = '';
+                validFiles.forEach(result => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    
+                    const fileInfo = document.createElement('div');
+                    fileInfo.innerHTML = `
+                        <strong>${result.file.name}</strong><br>
+                        <small class="text-muted">${ALLOWED_TYPES[result.file.type]?.label || 'Unknown'} - ${formatFileSize(result.file.size)}</small>
+                    `;
+                    
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-success';
+                    badge.textContent = 'Valid';
+                    
+                    li.appendChild(fileInfo);
+                    li.appendChild(badge);
+                    list.appendChild(li);
+                });
+                
+                container.classList.remove('d-none');
+            }
+
+            // Add validation to file input
+            document.addEventListener('DOMContentLoaded', () => {
+                const fileInput = document.getElementById('formFileMultiple');
+                
+                fileInput.addEventListener('change', (e) => {
+                    const validation = validateFiles(e.target.files);
+                    displayValidationErrors(validation.invalidFiles);
+                    displaySelectedFiles(validation.validFiles);
+                });
+            });
 
 
             ffmpeg = null
@@ -133,21 +290,41 @@
 
             async function handleFiles(input) {
                 const files = input.files;
-                if (files.length === 0) return;
+                if (files.length === 0) {
+                    alert(getJsTranslation_upload('noFilesSelected'));
+                    return;
+                }
 
-                // document.getElementById('progress-container').style.display = 'block';
+                // Validate files before processing
+                const validation = validateFiles(files);
+                
+                // Display errors if any
+                if (validation.invalidFiles.length > 0) {
+                    displayValidationErrors(validation.invalidFiles);
+                    alert(getJsTranslation_upload('invalidFiles'));
+                }
+                
+                // If no valid files, stop
+                if (validation.validFiles.length === 0) {
+                    return;
+                }
 
-                for (const file of files) {
+                // Clear previous displays
+                document.getElementById('progress-container').innerHTML = '';
+
+                // Process only valid files
+                for (const result of validation.validFiles) {
+                    const file = result.file;
                     console.log("Processing file:", file.name);
-                    const fileName = file.name.split(" ").join("_")
-                    const isVideo = file.type.startsWith("video/");
-                    const fullFileName = file.name
+                    const fileName = file.name.split(" ").join("_");
+                    const fullFileName = file.name;
+                    const fileCategory = result.type;
 
-                    
-                    if (isVideo) {
+                    if (fileCategory === 'video') {
+                        // Handle MP4 video files
                         try {
-                            const fileData = await readFile(file)
-                            // 2. Write file to FFmpeg FS
+                            const fileData = await readFile(file);
+                            // Write file to FFmpeg FS
                             ffmpeg.FS('writeFile', fullFileName, fileData);
 
                             // Segment video and audio
@@ -155,20 +332,40 @@
                             const audioName = await segmentAudio(fullFileName);
 
                             // Read Segments
-                            const videoSegments = await readSegments(videoName)
-                            const audioSegments = await readSegments(audioName)
+                            const videoSegments = await readSegments(videoName);
+                            const audioSegments = await readSegments(audioName);
 
-                            console.log("Segmentation Complete:", videoSegments.length, "segments created.");
+                            console.log("Segmentation Complete:", videoSegments.length, "video segments created.");
                             await uploadSegments(videoSegments, videoName);
-                            console.log("Segmentation Complete:", audioSegments.length, "segments created.");
+                            console.log("Segmentation Complete:", audioSegments.length, "audio segments created.");
                             await uploadSegments(audioSegments, audioName);
                         } catch (error) {
                             console.error(getJsTranslation_upload('videoProcessingFailed'), fileName, error);
                         } finally {
-                            ffmpeg.FS("unlink", fullFileName)
+                            ffmpeg.FS("unlink", fullFileName);
+                        }
+                    } else if (fileCategory === 'audio') {
+                        // Handle MP3 audio files (no video version, only audio segmentation)
+                        try {
+                            const fileData = await readFile(file);
+                            // Write file to FFmpeg FS
+                            ffmpeg.FS('writeFile', fullFileName, fileData);
+
+                            // Segment audio only (no video version)
+                            const audioName = await segmentAudioOnly(fullFileName);
+
+                            // Read Segments
+                            const audioSegments = await readSegments(audioName);
+
+                            console.log("Audio Segmentation Complete:", audioSegments.length, "segments created.");
+                            await uploadSegments(audioSegments, audioName);
+                        } catch (error) {
+                            console.error(getJsTranslation_upload('audioSegmentationFailed'), fileName, error);
+                        } finally {
+                            ffmpeg.FS("unlink", fullFileName);
                         }
                     } else {
-                        // Process non-video files (PDF, images, etc.)
+                        // Process non-media files (PDF)
                         await uploadWholeFile(file, fileName);
                     }
                 }
@@ -266,7 +463,42 @@
                         `${baseName}.m3u8`
                     );
 
-                    return baseName
+                    return baseName;
+
+                } catch (error) {
+                    console.error(getJsTranslation_upload('audioSegmentationFailed'), error);
+                    throw error;
+                }
+            }
+
+            async function segmentAudioOnly(fullFileName) {
+                try {
+                    // For MP3 files, use "audio" prefix directly
+                    const baseName = `audio_${fullFileName.split(".")[0]}`;
+
+                    // Create progress bar
+                    createProgressBar(baseName, "process");
+
+                    let progressBar = document.querySelector(`.process-${CSS.escape(baseName)}`);
+                    
+                    // Set progress handler
+                    ffmpeg.setProgress(({ ratio }) => {
+                        updateProgressBar(progressBar, Math.round(ratio * 100));
+                    });
+
+                    // Process audio file and segment it
+                    await ffmpeg.run(
+                        '-i', fullFileName,
+                        '-acodec', 'aac',
+                        '-b:a', '128k',
+                        '-f', 'hls',
+                        '-hls_time', '30',
+                        '-hls_list_size', '0',
+                        '-hls_segment_filename', `${baseName}_%03d.ts`,
+                        `${baseName}.m3u8`
+                    );
+
+                    return baseName;
 
                 } catch (error) {
                     console.error(getJsTranslation_upload('audioSegmentationFailed'), error);

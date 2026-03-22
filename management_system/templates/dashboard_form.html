@@ -30,15 +30,12 @@
           </h4>
         </div>
         <div class="card-body p-4">
-          <form action="" method="post" class="needs-validation" novalidate>
+          <form action="" method="post" class="needs-validation" novalidate x-data="{ submitValid(e) { if (!$el.checkValidity()) { e.preventDefault(); e.stopPropagation(); } $el.classList.add('was-validated'); } }" @submit="submitValid($event)">
             {% include 'messages.html' %} {% csrf_token %}
-            <div class="form-content mb-4">{{ form|crispy }}</div>
+            <div class="form-content mb-4" x-data="{ init() { let inputs = $el.querySelectorAll('input, select, textarea'); inputs.forEach(input => { input.setAttribute('x-on:blur', 'validateField($event)'); }); }, validateField(e) { let field = e.target; if (!field.checkValidity()) { field.classList.add('is-invalid'); field.classList.remove('is-valid'); } else { field.classList.remove('is-invalid'); field.classList.add('is-valid'); } } }">{{ form|crispy }}</div>
 
             <div class="d-grid">
-              <button
-                type="submit"
-                class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2"
-              >
+              <button type="submit" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2">
                 <i class="bi bi-check-circle"></i>
                 {% translate 'Submit' %}
               </button>
@@ -50,3 +47,4 @@
   </div>
 </div>
 {% endblock %}
+

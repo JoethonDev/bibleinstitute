@@ -54,8 +54,17 @@ class Role(models.Model):
         return [str(_(role.get_role_display())) for role in Role.objects.all()] # Translate display values
 
 class User(AbstractUser):
-    role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, default=Role.get_default().id)
-    joined_date = models.DateField(null=False, default=assign_academic_date())
+    role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
+    joined_date = models.DateField(null=False, default=assign_academic_date)
+    
+    def save(self, *args, **kwargs):
+        if not self.role_id:
+            try:
+                default_role = Role.objects.get(role='junior')
+                self.role = default_role
+            except Role.DoesNotExist:
+                pass  # Role will be None, handle this in your application logic
+        super().save(*args, **kwargs)
     
     def serialize_pagination(self):
         return {

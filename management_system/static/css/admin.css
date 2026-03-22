@@ -9,11 +9,21 @@
     --border-radius: 0.75rem;
 }
 
+[data-bs-theme="dark"] body {
+    background: linear-gradient(135deg, #212529 0%, #121212 100%) !important;
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .display-page {
+    background: rgba(33, 37, 41, 0.95) !important;
+}
+
 body {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     min-height: 100vh;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+
 
 a {
     cursor: pointer;

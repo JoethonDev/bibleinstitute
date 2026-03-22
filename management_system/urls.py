@@ -65,6 +65,27 @@ urlpatterns = [
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),
     path('api/get-presigned-url/', upload_link, name="upload-link"),
+    
+    # R2 File Management
+    path('dashboard/r2-management/', r2_management_dashboard, name="r2-management-dashboard"),
+    path('api/r2/files/list/', api_list_files, name="api-list-files"),
+    path('api/r2/files/delete/', api_delete_file, name="api-delete-file"),
+    path('api/r2/files/delete-m3u8/', api_delete_m3u8_file, name="api-delete-m3u8-file"),
+    path('api/r2/files/delete-batch/', api_delete_files_batch, name="api-delete-files-batch"),
+    path('api/r2/files/rename/', api_rename_file, name="api-rename-file"),
+    path('api/r2/files/move/', api_move_file, name="api-move-file"),
+    path('api/r2/files/metadata/', api_get_file_metadata, name="api-get-file-metadata"),
+    path('api/r2/files/download/', api_download_file, name="api-download-file"),
+    path('api/r2/files/search/', api_search_files, name="api-search-files"),
+    path('api/r2/folder/create/', api_create_folder, name="api-create-folder"),
+    path('api/r2/folder/delete/', api_delete_folder, name="api-delete-folder"),
+    path('api/r2/stats/', api_get_storage_stats, name="api-storage-stats"),
+    
+    # Bulk Operations
+    path('api/bulk-delete/users/', bulk_delete_users, name="bulk-delete-users"),
+    path('api/bulk-delete/courses/', bulk_delete_courses, name="bulk-delete-courses"),
+    path('api/bulk-delete/lessons/', bulk_delete_lessons, name="bulk-delete-lessons"),
+    path('api/bulk-delete/quizzes/', bulk_delete_quizzes, name="bulk-delete-quizzes"),
 
     # Test
     # path('test/', test, name="test"),

@@ -1,10 +1,59 @@
 {% load i18n %}
-<div class="table-responsive">
+<div class="table-responsive" x-data="{
+    cols: [
+        {% for col in columns %}{ name: '{{ col|escapejs }}', visible: true }{% if not forloop.last %},{% endif %}{% endfor %}
+    ],
+    selected: [],
+    toggleAll(e) {
+        if (e.target.checked) {
+            this.selected = Array.from(document.querySelectorAll('.row-checkbox')).map(cb => cb.value);
+        } else {
+            this.selected = [];
+        }
+    }
+}">
+    <div class="d-flex justify-content-between mb-2">
+        <div class="bulk-actions" x-show="selected.length > 0" style="display: none;">
+            <span x-text="`${selected.length} selected`" class="me-2 fw-bold text-primary"></span>
+            <button class="btn btn-sm btn-danger" @click="$store.notifications.add('Deleted ' + selected.length + ' items (Frontend Only)'); selected = [];">
+                <i class="fas fa-trash"></i> Delete Selected
+            </button>
+        </div>
+        <div>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-columns"></i> Columns
+                </button>
+                <ul class="dropdown-menu p-2">
+                    <template x-for="(col, index) in cols" :key="index">
+                        <li>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" x-model="col.visible" :id="'col-' + index">
+                                <label class="form-check-label" :for="'col-' + index" x-text="col.name"></label>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+    </div>
     <table class="table table-hover table-striped align-middle">
         <thead class="table-primary">
             <tr>
+                <th scope="col" style="width: 40px;">
+                    <input type="checkbox" class="form-check-input" @change="toggleAll">
+                </th>
                 {% for col in columns %}
-                    <th scope="col" class="fw-semibold py-3">{{ col }}</th>
+                    <th scope="col" class="fw-semibold py-3 position-relative" style="cursor: pointer" x-show="cols[{{ forloop.counter0 }}].visible" x-show="cols[{{ forloop.counter0 }}].visible" 
+                        hx-get="?sort={{ col }}&order={% if request.GET.sort == col and request.GET.order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.name %}&name={{ request.GET.name }}{% endif %}{% if request.GET.filtering %}&filtering={{ request.GET.filtering }}{% endif %}" 
+                        hx-target="#table-container">
+                        {{ col }}
+                        {% if request.GET.sort == col %}
+                            <i class="fas fa-sort-{{ request.GET.order|default:'up' }} ms-1"></i>
+                        {% else %}
+                            <i class="fas fa-sort text-muted ms-1" style="opacity: 0.3;"></i>
+                        {% endif %}
+                    </th>
                 {% endfor %}
                 <th scope="col" class="fw-semibold py-3 text-center">Actions</th>
             </tr>
@@ -12,10 +61,14 @@
         <tbody>
             {% for values in page_obj %}
                 <tr class="table-row">
-                    {% for value in values.rows %}
-                        <td class="py-3">
-                            <div class="d-flex align-items-start">
-                                {{ value }}
+                                      <td class="py-3">
+                            <input type="checkbox" class="form-check-input row-checkbox" :value="'{{ values.url }}'" x-model="selected">
+                        </td>
+                        {% for value in values.rows %}
+                        <td class="py-3" x-show="cols[{{ forloop.counter0 }}].visible" x-data="{ editing: false, val: '{{ value|escapejs }}' }">
+                            <div class="d-flex align-items-start" @dblclick="editing = true">
+                                <span x-show="!editing" x-text="val"></span>
+                                <input type="text" class="form-control form-control-sm" x-show="editing" x-model="val" @blur="editing = false; $store.notifications.add('Saved changes');" @keydown.enter="editing = false; $store.notifications.add('Saved changes');">
                             </div>
                         </td>
                     {% endfor %}
@@ -76,7 +129,8 @@
                                         hx-delete="{{ values.url }}delete/" 
                                         hx-swap="delete" 
                                         hx-target="closest tr" 
-                                        hx-trigger="click">
+                                        hx-trigger="click"
+                                        @click="$el.closest('tr').style.opacity = '0.5'; $store.notifications.add('Item deleted successfully.', 'danger');">
                                     <i class="bi bi-trash"></i>
                                     {% translate "Delete" %} {{ view }}
                                 </button>

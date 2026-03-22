@@ -33,6 +33,9 @@ from urllib.parse import unquote
 from .models import *
 from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv
+from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
+from .utils.r2_manager import R2Manager
+from .utils.file_validator import validate_upload_filename, FileValidator
 from django.utils.timezone import now
 
 # Constants
@@ -48,6 +51,9 @@ CLOUD_CLIENT = boto3.client(
 )
 
 bucket_name = os.getenv("bucket") or "lecture-storage"
+
+# Initialize R2 Manager
+R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name)
 
 # Helper Functions
 def is_managerial(request):
@@ -95,7 +101,17 @@ def get_datetime(datetime_string):
     
 #     return drive
 
-def list_current_folder(folder_name=""):
+def list_current_folder(folder_name="", filter_config: FileFilterConfig = None):
+    """
+    List files and folders in R2 storage with optional filtering
+    
+    Args:
+        folder_name: Path to folder (encoded with - separators)
+        filter_config: Optional FileFilterConfig for filtering results
+    
+    Returns:
+        Tuple of (contents list, parent_folder path)
+    """
     # Flag for getting all objects 
     has_objects = True
     if folder_name:
@@ -109,9 +125,11 @@ def list_current_folder(folder_name=""):
 
     objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, Prefix=folder_name, Delimiter="/")
 
-    contents = [
-
-    ]
+    contents = []
+    
+    # Initialize filter if provided
+    file_filter = R2FileFilter(filter_config) if filter_config else None
+    
     while has_objects:
         # Files
         if "Contents" in objects:
@@ -121,24 +139,39 @@ def list_current_folder(folder_name=""):
                 rel_path = key[len(folder_name):] if folder_name else key
                 if rel_path and "/" not in rel_path.rstrip("/"):
                     file_name = key.split("/")[-1]
-                    # Exclude .ts files
-                    if not file_name.endswith(".ts"):
-                        contents.append({
-                            "id" : key,
-                            "name" : file_name,
-                            "type" : "file"
-                        })
+                    
+                    file_obj = {
+                        "id": key,
+                        "name": file_name,
+                        "type": "file",
+                        "size": obj.get("Size", 0),
+                        "last_modified": obj.get("LastModified"),
+                    }
+                    
+                    # Apply filter if configured
+                    if file_filter:
+                        if file_filter.should_include_file(file_obj):
+                            contents.append(file_obj)
+                    else:
+                        # Default behavior: exclude .ts files only
+                        if not file_name.endswith(".ts"):
+                            contents.append(file_obj)
 
         # Folders
         if "CommonPrefixes" in objects:
             for folder in objects["CommonPrefixes"]:
                 separated_folder = folder["Prefix"].split("/")
                 folder_id = "-".join(separated_folder)
-                contents.insert(0, {
-                    "id" : folder_id,
-                    "name" : separated_folder[-2] ,
-                    "type" : "folder"
-                })
+                folder_obj = {
+                    "id": folder_id,
+                    "name": separated_folder[-2],
+                    "type": "folder"
+                }
+                
+                # Apply filter for folders if configured
+                if not file_filter or file_filter.should_include_file(folder_obj):
+                    contents.insert(0, folder_obj)
+        
         # More Objects
         has_objects = objects['IsTruncated']
         if has_objects:
@@ -210,6 +243,16 @@ def render_dashboard(request, obj, view, context, parameters=[]):
         context['filters'] = filters
 
     logger.info(f"User : {user} accesses page {page_obj.number} in {view} dashboard ")
+    
+    if request.headers.get("HX-Target") == "table-container":
+        return render(request, "partials/table_and_pagination.html", {
+            "page_obj": page_obj,
+            "header": _(view.capitalize()),
+            "view": view,
+            "url": reverse(f"{view}-dashboard", args=parameters),
+            "parameters": parameters,
+            **context
+        })
 
     return render(request, "dashboard.html", {
         "page_obj" : page_obj,
@@ -690,7 +733,27 @@ def user_dashboard(request):
     
     logger.info(f"User : {user} filters {view}s using {name} name and {role_value} role")
 
-    users = User.objects.filter(query).order_by("joined_date")
+    users = User.objects.filter(query)
+
+    # Apply sorting
+    sort_by = request.GET.get('sort', 'joined_date')
+    order = request.GET.get('order', 'asc')
+    
+    # Simple explicit map for safety
+    column_mapping = {
+        'Username': 'username',
+        'First Name': 'first_name',
+        'Last Name': 'last_name',
+        'Email': 'email',
+        'Role': 'role__role',
+        'Joined Date': 'joined_date'
+    }
+    
+    model_sort_by = column_mapping.get(sort_by, sort_by)  
+    if order == 'desc':
+        users = users.order_by(f'-{model_sort_by}')
+    else:
+        users = users.order_by(model_sort_by)
 
     context = {
         "name_value" : name or "",
@@ -1048,11 +1111,21 @@ def upload_link(request):
         return JsonResponse({"message" : _("unauthorized!")}, status=401) # Translate "unauthorized!"
     
     body = json.loads(request.body)
+    filename = body.get("filename", "")
+    
+    # Validate filename before generating presigned URL
+    is_valid, errors = validate_upload_filename(filename)
+    if not is_valid:
+        return JsonResponse({
+            "message": _("Invalid file"),
+            "errors": errors
+        }, status=400)
+    
     presigned_url = CLOUD_CLIENT.generate_presigned_url(
         'put_object',
         Params={
             'Bucket': bucket_name,
-            'Key': body["filename"],
+            'Key': filename,
         },
         ExpiresIn=3600  # 1 hour expiration
     )
@@ -1446,3 +1519,652 @@ def generate_audio_download(request, lesson_id):
     except Exception as e:
         logger.error(f"Error generating audio download: {str(e)}")
         return JsonResponse({"error": "An error occurred while processing the request."}, status=500)
+
+# Bulk Operations
+@login_required(login_url=LOGIN_URL)
+def bulk_delete_users(request):
+    """Bulk delete users endpoint for HTMX"""
+    if request.method != 'DELETE':
+        return HttpResponse(_("Method not allowed"), status=405)
+    
+    has_permission = has_admin_permission(request, 'users')
+    if has_permission.status_code == 401:
+        return has_permission
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        if not ids:
+            return JsonResponse({'error': _('No IDs provided')}, status=400)
+        
+        deleted_count = User.objects.filter(id__in=ids).delete()[0]
+        logger.info(f"User {request.user} deleted {deleted_count} users")
+        
+        return JsonResponse({'success': True, 'deleted': deleted_count})
+    except Exception as e:
+        logger.error(f"Bulk delete error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required(login_url=LOGIN_URL)
+def bulk_delete_courses(request):
+    """Bulk delete courses endpoint for HTMX"""
+    if request.method != 'DELETE':
+        return HttpResponse(_("Method not allowed"), status=405)
+    
+    has_permission = has_admin_permission(request, 'courses')
+    if has_permission.status_code == 401:
+        return has_permission
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        if not ids:
+            return JsonResponse({'error': _('No IDs provided')}, status=400)
+        
+        deleted_count = Course.objects.filter(id__in=ids).delete()[0]
+        logger.info(f"User {request.user} deleted {deleted_count} courses")
+        
+        return JsonResponse({'success': True, 'deleted': deleted_count})
+    except Exception as e:
+        logger.error(f"Bulk delete error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required(login_url=LOGIN_URL)
+def bulk_delete_lessons(request):
+    """Bulk delete lessons endpoint for HTMX"""
+    if request.method != 'DELETE':
+        return HttpResponse(_("Method not allowed"), status=405)
+    
+    has_permission = has_admin_permission(request, 'lessons')
+    if has_permission.status_code == 401:
+        return has_permission
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        if not ids:
+            return JsonResponse({'error': _('No IDs provided')}, status=400)
+        
+        deleted_count = Lesson.objects.filter(id__in=ids).delete()[0]
+        logger.info(f"User {request.user} deleted {deleted_count} lessons")
+        
+        return JsonResponse({'success': True, 'deleted': deleted_count})
+    except Exception as e:
+        logger.error(f"Bulk delete error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required(login_url=LOGIN_URL)
+def bulk_delete_quizzes(request):
+    """Bulk delete quizzes endpoint for HTMX"""
+    if request.method != 'DELETE':
+        return HttpResponse(_("Method not allowed"), status=405)
+    
+    has_permission = has_admin_permission(request, 'quizzes')
+    if has_permission.status_code == 401:
+        return has_permission
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        if not ids:
+            return JsonResponse({'error': _('No IDs provided')}, status=400)
+        
+        deleted_count = Quiz.objects.filter(id__in=ids).delete()[0]
+        logger.info(f"User {request.user} deleted {deleted_count} quizzes")
+        
+        return JsonResponse({'success': True, 'deleted': deleted_count})
+    except Exception as e:
+        logger.error(f"Bulk delete error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# R2 FILE MANAGEMENT API ENDPOINTS
+# ============================================================================
+
+@login_required(login_url=LOGIN_URL)
+def api_delete_file(request):
+    """
+    API endpoint to delete a single file from R2
+    """
+    if request.method != 'DELETE':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        file_key = data.get('file_key')
+        
+        if not file_key:
+            return JsonResponse({'error': _('File key required')}, status=400)
+        
+        success = R2_MANAGER.delete_file(file_key)
+        
+        if success:
+            logger.info(f"User {request.user} deleted file: {file_key}")
+            return JsonResponse({'success': True, 'message': _('File deleted successfully')})
+        else:
+            return JsonResponse({'error': _('Failed to delete file')}, status=500)
+    
+    except Exception as e:
+        logger.error(f"Error deleting file: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_delete_m3u8_file(request):
+    """
+    API endpoint to delete an m3u8 file and all its related .ts segment files
+    """
+    if request.method != 'DELETE':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        file_key = data.get('file_key')
+        
+        if not file_key:
+            return JsonResponse({'error': _('File key required')}, status=400)
+        
+        if not file_key.endswith('.m3u8'):
+            return JsonResponse({'error': _('File must be an m3u8 file')}, status=400)
+        
+        successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
+        
+        logger.info(f"User {request.user} deleted m3u8 file {file_key} with {len(successful)} related files")
+        
+        return JsonResponse({
+            'success': True,
+            'message': _('M3U8 file and segments deleted successfully'),
+            'deleted_count': len(successful),
+            'failed_count': len(failed),
+            'deleted_files': successful,
+            'failed_files': failed
+        })
+    
+    except Exception as e:
+        logger.error(f"Error deleting m3u8 file: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_delete_files_batch(request):
+    """
+    API endpoint to delete multiple files in batch
+    """
+    if request.method != 'DELETE':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        file_keys = data.get('file_keys', [])
+        
+        if not file_keys:
+            return JsonResponse({'error': _('No files specified')}, status=400)
+        
+        successful, failed = R2_MANAGER.delete_files_batch(file_keys)
+        
+        logger.info(f"User {request.user} batch deleted {len(successful)} files")
+        
+        return JsonResponse({
+            'success': True,
+            'message': _('Files deleted successfully'),
+            'deleted_count': len(successful),
+            'failed_count': len(failed),
+            'deleted_files': successful,
+            'failed_files': failed
+        })
+    
+    except Exception as e:
+        logger.error(f"Error in batch delete: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_rename_file(request):
+    """
+    API endpoint to rename a file
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        old_key = data.get('old_key')
+        new_key = data.get('new_key')
+        
+        if not old_key or not new_key:
+            return JsonResponse({'error': _('Both old and new keys required')}, status=400)
+        
+        success = R2_MANAGER.rename_file(old_key, new_key)
+        
+        if success:
+            # Update database references in Lesson model
+            # Lesson.links is a JSON string containing file IDs (which are the R2 keys)
+            from django.db.models import F
+            import json
+            
+            # Find lessons that might contain this specific file key
+            # Since it's JSON, we look for the key inside the text
+            lessons_to_update = Lesson.objects.filter(links__contains=old_key)
+            updated_count = 0
+            
+            for lesson in lessons_to_update:
+                try:
+                    links = json.loads(lesson.links)
+                    modified = False
+                    for item in links:
+                        if item.get('file_id') == old_key:
+                            item['file_id'] = new_key
+                            modified = True
+                        # Also check in segments for HLS
+                        if 'segments' in item and old_key in item['segments']:
+                            item['segments'] = [s.replace(old_key, new_key) if s == old_key else s for s in item['segments']]
+                            modified = True
+                    
+                    if modified:
+                        lesson.links = json.dumps(links)
+                        lesson.save()
+                        updated_count += 1
+                except Exception as db_err:
+                    logger.error(f"Failed to update Lesson {lesson.id} during rename: {str(db_err)}")
+
+            logger.info(f"User {request.user} renamed file from {old_key} to {new_key}. Updated {updated_count} lesson references.")
+            return JsonResponse({
+                'success': True, 
+                'message': _('File renamed successfully and %(count)d database references updated') % {'count': updated_count}, 
+                'new_key': new_key
+            })
+        else:
+            return JsonResponse({'error': _('Failed to rename file')}, status=500)
+    
+    except Exception as e:
+        logger.error(f"Error renaming file: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_move_file(request):
+    """
+    API endpoint to move a file to a different folder
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        file_key = data.get('file_key')
+        destination_folder = data.get('destination_folder')
+        
+        if not file_key or not destination_folder:
+            return JsonResponse({'error': _('File key and destination folder required')}, status=400)
+        
+        new_key = R2_MANAGER.move_file(file_key, destination_folder)
+        
+        if new_key:
+            logger.info(f"User {request.user} moved file from {file_key} to {new_key}")
+            return JsonResponse({'success': True, 'message': _('File moved successfully'), 'new_key': new_key})
+        else:
+            return JsonResponse({'error': _('Failed to move file')}, status=500)
+    
+    except Exception as e:
+        logger.error(f"Error moving file: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_create_folder(request):
+    """
+    API endpoint to create a new folder
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        folder_path = data.get('folder_path')
+        
+        if not folder_path:
+            return JsonResponse({'error': _('Folder path required')}, status=400)
+        
+        success = R2_MANAGER.create_folder(folder_path)
+        
+        if success:
+            logger.info(f"User {request.user} created folder: {folder_path}")
+            return JsonResponse({'success': True, 'message': _('Folder created successfully')})
+        else:
+            return JsonResponse({'error': _('Failed to create folder')}, status=500)
+    
+    except Exception as e:
+        logger.error(f"Error creating folder: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_delete_folder(request):
+    """
+    API endpoint to delete a folder
+    """
+    if request.method != 'DELETE':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        folder_path = data.get('folder_path')
+        recursive = data.get('recursive', False)
+        
+        if not folder_path:
+            return JsonResponse({'error': _('Folder path required')}, status=400)
+        
+        deleted_count, errors = R2_MANAGER.delete_folder(folder_path, recursive)
+        
+        if errors > 0:
+            return JsonResponse({
+                'success': False,
+                'error': _('Failed to delete some files'),
+                'deleted_count': deleted_count,
+                'error_count': errors
+            }, status=500)
+        
+        logger.info(f"User {request.user} deleted folder: {folder_path} ({deleted_count} files)")
+        return JsonResponse({
+            'success': True,
+            'message': _('Folder deleted successfully'),
+            'deleted_count': deleted_count
+        })
+    
+    except Exception as e:
+        logger.error(f"Error deleting folder: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_get_file_metadata(request):
+    """
+    API endpoint to get file metadata
+    """
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    file_key = request.GET.get('file_key')
+    
+    if not file_key:
+        return JsonResponse({'error': _('File key required')}, status=400)
+    
+    try:
+        metadata = R2_MANAGER.get_file_metadata(file_key)
+        
+        if metadata:
+            # Convert datetime to string for JSON serialization
+            if 'last_modified' in metadata and metadata['last_modified']:
+                metadata['last_modified'] = metadata['last_modified'].isoformat()
+            
+            # Add formatted size
+            metadata['size_formatted'] = R2_MANAGER.format_file_size(metadata.get('size', 0))
+            
+            return JsonResponse({'success': True, 'metadata': metadata})
+        else:
+            return JsonResponse({'error': _('File not found')}, status=404)
+    
+    except Exception as e:
+        logger.error(f"Error getting file metadata: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_get_storage_stats(request):
+    """
+    API endpoint to get storage statistics
+    """
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    prefix = request.GET.get('prefix', '')
+    
+    try:
+        stats = R2_MANAGER.get_storage_stats(prefix)
+        
+        # Format sizes
+        stats['total_size_formatted'] = R2_MANAGER.format_file_size(stats['total_size'])
+        
+        # Format extension stats
+        for ext, data in stats['by_extension'].items():
+            data['size_formatted'] = R2_MANAGER.format_file_size(data['size'])
+        
+        # Format largest files
+        for file_data in stats['largest_files']:
+            file_data['size_formatted'] = R2_MANAGER.format_file_size(file_data['size'])
+            if 'last_modified' in file_data and file_data['last_modified']:
+                file_data['last_modified'] = file_data['last_modified'].isoformat()
+        
+        return JsonResponse({'success': True, 'stats': stats})
+    
+    except Exception as e:
+        logger.error(f"Error getting storage stats: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_search_files(request):
+    """
+    API endpoint to search for files
+    """
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    query = request.GET.get('q', '')
+    prefix = request.GET.get('prefix', '')
+    extensions = request.GET.get('extensions', '')
+    
+    if not query:
+        return JsonResponse({'error': _('Search query required')}, status=400)
+    
+    try:
+        ext_list = [e.strip() for e in extensions.split(',') if e.strip()] if extensions else None
+        
+        results = R2_MANAGER.search_files(query, prefix, ext_list)
+        
+        # Format sizes and dates
+        for file_data in results:
+            file_data['size_formatted'] = R2_MANAGER.format_file_size(file_data['size'])
+            if 'last_modified' in file_data and file_data['last_modified']:
+                file_data['last_modified'] = file_data['last_modified'].isoformat()
+        
+        return JsonResponse({
+            'success': True,
+            'results': results,
+            'count': len(results)
+        })
+    
+    except Exception as e:
+        logger.error(f"Error searching files: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_list_files(request):
+    """
+    API endpoint to list files with filtering
+    """
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    folder_name = request.GET.get('folder', '')
+    filter_preset = request.GET.get('filter', 'media')
+    extensions = request.GET.get('extensions', '')
+    
+    try:
+        # Get filter configuration
+        if extensions:
+            ext_list = [e.strip() for e in extensions.split(',') if e.strip()]
+            filter_config = FileFilterConfig(
+                allowed_extensions=set(ext_list),
+                exclude_extensions={'ts'},
+                include_folders=True
+            )
+        else:
+            filter_config = get_filter_preset(filter_preset)
+        
+        # List files with filter
+        contents, parent_folder = list_current_folder(folder_name, filter_config)
+        
+        # Format sizes and dates
+        for item in contents:
+            if item['type'] == 'file':
+                item['size_formatted'] = R2_MANAGER.format_file_size(item.get('size', 0))
+                if 'last_modified' in item and item['last_modified']:
+                    item['last_modified'] = item['last_modified'].isoformat()
+        
+        return JsonResponse({
+            'success': True,
+            'contents': contents,
+            'parent_folder': parent_folder,
+            'current_folder': folder_name
+        })
+    
+    except Exception as e:
+        logger.error(f"Error listing files: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_download_file(request):
+    """
+    API endpoint to generate download URL for a file
+    """
+    has_permission = has_admin_permission(request, 'files')
+    if has_permission.status_code == 401:
+        return JsonResponse({'error': _('Unauthorized')}, status=401)
+    
+    file_key = request.GET.get('file_key')
+    
+    if not file_key:
+        return JsonResponse({'error': _('File key required')}, status=400)
+    
+    try:
+        # Generate presigned URL for download
+        download_url = generate_unique_url(file_key)
+        
+        # Redirect to the presigned URL
+        return redirect(download_url)
+    
+    except Exception as e:
+        logger.error(f"Error generating download URL: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# R2 MANAGEMENT DASHBOARD VIEW
+# ============================================================================
+
+@login_required(login_url=LOGIN_URL)
+def r2_management_dashboard(request):
+    """
+    Main R2 management dashboard view
+    """
+    has_permission = has_admin_permission(request, 'r2-management')
+    if has_permission.status_code == 401:
+        return has_permission
+    
+    folder_id = request.GET.get('folder', None)
+    filter_preset = request.GET.get('filter', 'media')
+    
+    # Get filter configuration
+    filter_config = get_filter_preset(filter_preset)
+    
+    # List files with filter
+    if folder_id and folder_id != "None":
+        contents, parent_folder = list_current_folder(folder_id, filter_config)
+    else:
+        contents, parent_folder = list_current_folder("", filter_config)
+    
+    # Get storage statistics with error handling - ONLY if requested via AJAX
+    # Skip initial page load to improve performance
+    load_stats = request.GET.get('load_stats', 'false') == 'true'
+    
+    if load_stats:
+        try:
+            stats = R2_MANAGER.get_storage_stats()
+        except Exception as e:
+            logger.error(f"Error getting storage stats: {str(e)}")
+            # Provide default stats if R2 is unavailable
+            stats = {
+                'total_files': 0,
+                'total_size': 0,
+                'by_extension': {},
+                'largest_files': []
+            }
+    else:
+        # Provide placeholder stats for initial page load
+        stats = {
+            'total_files': '...',
+            'total_size': 0,
+            'by_extension': {},
+            'largest_files': [],
+            'loading': True
+        }
+    
+    context = {
+        'drive': contents,
+        'parent_folder': parent_folder,
+        'is_root': not folder_id or folder_id == "None",
+        'current_filter': filter_preset,
+        'filter_presets': list(FILTER_PRESETS.keys()),
+        'storage_stats': stats,
+        'total_size_formatted': R2_MANAGER.format_file_size(stats.get('total_size', 0)) if isinstance(stats.get('total_size'), int) else '...',
+        'load_stats': load_stats,
+    }
+    
+    # Return partial ONLY when specifically targeting file list container
+    # This prevents returning partial when navigating from menu
+    hx_target = request.headers.get('HX-Target')
+    if hx_target in ['drive-files', 'file-list-container']:
+        return render(request, 'partials/r2_file_list.html', context)
+    
+    return render(request, 'r2_management.html', context)
