@@ -271,3 +271,63 @@
         padding: 1.25rem .75rem;
     }
 }
+
+/* ================================
+   Dark mode overrides
+   ================================ */
+[data-bs-theme="dark"] {
+    --user-surface:       #1e2128;
+    --user-bg:            #121212;
+    --user-border:        rgba(165,165,141,.18);
+    --user-border-strong: rgba(165,165,141,.32);
+    --user-accent-soft:   rgba(107,112,92,.25);
+}
+
+[data-bs-theme="dark"] .user-card,
+[data-bs-theme="dark"] .quick-link-card,
+[data-bs-theme="dark"] .course-user-card {
+    color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .quick-link-card .ql-label {
+    color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .course-user-card .card-footer {
+    border-top-color: rgba(165,165,141,.18);
+}
+
+[data-bs-theme="dark"] .course-sidebar .list-group-item {
+    color: #c8c8c8;
+}
+[data-bs-theme="dark"] .course-sidebar .list-group-item:hover {
+    background: rgba(107,112,92,.25);
+    color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .grade-chip {
+    background: rgba(107,112,92,.3);
+    color: var(--user-accent-light);
+}
+
+[data-bs-theme="dark"] .user-stat-badge {
+    background: rgba(107,112,92,.3);
+    color: var(--user-accent-light);
+}
+
+[data-bs-theme="dark"] .quiz-badge-open {
+    background: rgba(25,135,84,.25);
+    color: #75c98a;
+}
+[data-bs-theme="dark"] .quiz-badge-closed {
+    background: rgba(108,117,125,.22);
+    color: #adb5bd;
+}
+[data-bs-theme="dark"] .quiz-badge-done {
+    background: rgba(13,110,253,.2);
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] body {
+    background-color: var(--user-bg) !important;
+}
