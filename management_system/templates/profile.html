@@ -1,85 +1,145 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 {% load i18n %}
+{% load static %}
+
+{% block cdn %}
+<link rel="stylesheet" href="{% static 'css/user-theme.css' %}">
+{% endblock %}
 
 {% block body %}
-<div class="container py-5">
+<div class="container py-4 py-lg-5">
     <div class="row g-4">
-        <!-- Profile Section -->
+
+        <!-- ===== LEFT: Profile card ===== -->
         <div class="col-lg-5">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-user-circle me-2"></i>{% translate "My Profile" %}
-                    </h5>
+            <div class="user-card h-100">
+
+                <!-- Header with avatar + name -->
+                <div class="p-4 d-flex align-items-center gap-3 border-bottom" style="border-color:var(--user-border)!important;">
+                    <div class="profile-avatar flex-shrink-0">{{ initials }}</div>
+                    <div class="min-w-0">
+                        <h5 class="mb-0 fw-bold text-truncate">{{ object.get_full_name|default:object.username }}</h5>
+                        <span class="user-stat-badge mt-1 d-inline-flex" style="font-size:.8rem;">
+                            {{ object.role.get_role_display }}
+                        </span>
+                    </div>
                     {% if request.user.id == object.id %}
-                    <button class="btn btn-light btn-sm" 
-                            hx-get="{% url 'update-profile' object.id %}" 
-                            hx-trigger="click" 
-                            hx-target="#profile"
-                            hx-select="#profile"
-                            hx-swap="innerHTML">
+                    <a href="{% url 'update-profile' object.id %}"
+                       class="btn btn-sm ms-auto flex-shrink-0"
+                       style="border-color:var(--user-accent);color:var(--user-accent);">
                         <i class="fas fa-pencil-alt me-1"></i>{% translate "Edit" %}
-                    </button>
+                    </a>
                     {% endif %}
                 </div>
-                <div class="card-body p-4">
 
+                <!-- Profile form (read-only) -->
+                <div class="p-4">
                     <div id="profile">
                         {% if messages %}
-                            {% for message in messages %}   
+                            {% for message in messages %}
                                 <div class="alert {{ message.tags }}">{{ message }}</div>
                             {% endfor %}
                         {% endif %}
                         {{ form|crispy }}
                     </div>
                 </div>
+
+                <!-- Meta info -->
+                <div class="px-4 pb-4 d-flex flex-wrap gap-3 text-secondary small">
+                    {% if object.joined_date %}
+                    <span><i class="fas fa-calendar-alt me-1"></i>{% translate "Joined" %}: {{ object.joined_date|date:"d/m/Y" }}</span>
+                    {% endif %}
+                    {% if object.last_login %}
+                    <span><i class="fas fa-clock me-1"></i>{% translate "Last login" %}: {{ object.last_login|date:"d/m/Y H:i" }}</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <!-- Courses Section -->
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-book-open me-2"></i>{% translate "My Courses" %}
-                    </h5>
+        <!-- ===== RIGHT: Courses + Recent Grades ===== -->
+        <div class="col-lg-7 d-flex flex-column gap-4">
+
+            <!-- Courses accordion -->
+            <div class="user-card">
+                <div class="p-3 border-bottom d-flex align-items-center gap-2" style="border-color:var(--user-border)!important;">
+                    <i class="fas fa-book-open" style="color:var(--user-accent);"></i>
+                    <h5 class="mb-0 fw-bold">{% translate "My Courses" %}</h5>
                 </div>
-                <div class="card-body p-3">
+                <div class="p-3">
+                    {% if courses %}
                     <div class="accordion accordion-flush" id="coursesAccordion">
                         {% for level in courses %}
-                            <div class="accordion-item">
+                            <div class="accordion-item border-0">
                                 <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ forloop.counter }}">
+                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fw-semibold px-0"
+                                            type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#collapse-{{ forloop.counter }}"
+                                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                            style="background:transparent;color:var(--user-accent);box-shadow:none;">
                                         {{ level.level_name }}
                                     </button>
                                 </h2>
-                                <div id="collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading-{{ forloop.counter }}" data-bs-parent="#coursesAccordion">
-                                    <div class="accordion-body p-0">
-                                        <ul class="list-group list-group-flush">
-                                            {% for course in level.courses %}
-                                                <li class="list-group-item">
-                                                    <a href="{% url 'course-details' course.id %}" class="text-decoration-none d-flex justify-content-between align-items-center">
-                                                        {{ course.name }}
-                                                        <i class="fas fa-chevron-right text-muted small"></i>
-                                                    </a>
-                                                </li>
-                                            {% empty %}
-                                                <li class="list-group-item text-muted">{% translate "No courses in this level." %}</li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
+                                <div id="collapse-{{ forloop.counter }}"
+                                     class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                                     data-bs-parent="#coursesAccordion">
+                                    <ul class="list-unstyled mb-0 ps-1">
+                                        {% for course in level.courses %}
+                                            <li class="mb-1">
+                                                <a href="{% url 'course-details' course.id %}"
+                                                   class="d-flex align-items-center gap-2 py-2 px-3 rounded text-decoration-none"
+                                                   style="color:inherit;transition:background .2s;"
+                                                   onmouseover="this.style.background='var(--user-accent-soft)'"
+                                                   onmouseout="this.style.background='transparent'">
+                                                    <i class="fas fa-book text-muted small"></i>
+                                                    <span class="flex-grow-1">{{ course.name }}</span>
+                                                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} text-muted small"></i>
+                                                </a>
+                                            </li>
+                                        {% empty %}
+                                            <li class="text-muted small px-3 py-2">{% translate "No courses in this level." %}</li>
+                                        {% endfor %}
+                                    </ul>
                                 </div>
-                            </div>
-                        {% empty %}
-                            <div class="p-3 text-center text-muted">
-                                {% translate "You are not enrolled in any courses yet." %}
                             </div>
                         {% endfor %}
                     </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3 mb-0">{% translate "You are not enrolled in any courses yet." %}</p>
+                    {% endif %}
                 </div>
             </div>
+
+            <!-- Recent Quiz Results -->
+            {% if recent_grades %}
+            <div class="user-card">
+                <div class="p-3 border-bottom d-flex align-items-center gap-2" style="border-color:var(--user-border)!important;">
+                    <i class="fas fa-star" style="color:var(--user-accent);"></i>
+                    <h5 class="mb-0 fw-bold">{% translate "Recent Quiz Results" %}</h5>
+                </div>
+                <ul class="list-unstyled mb-0 p-3">
+                    {% for grade in recent_grades %}
+                    <li class="d-flex align-items-center gap-3 py-2 {% if not forloop.last %}border-bottom{% endif %}" style="border-color:var(--user-border)!important;">
+                        <div class="flex-grow-1 min-w-0">
+                            <p class="mb-0 fw-semibold text-truncate">{{ grade.quiz.name }}</p>
+                            <span class="text-muted small">
+                                {% if grade.quiz.course %}{{ grade.quiz.course.name }} · {% endif %}
+                                {{ grade.submitted_at|date:"d/m/Y" }}
+                            </span>
+                        </div>
+                        <span class="grade-chip flex-shrink-0">
+                            <i class="fas fa-check-circle"></i>
+                            {{ grade.total_grade }} / {{ grade.quiz.total_grade }}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
         </div>
     </div>
 </div>
 {% endblock %}
+

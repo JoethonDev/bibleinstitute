@@ -206,7 +206,7 @@ class ProfileDetail(LoginProtection, DetailView):
     template_name = "profile.html"
 
     def get_context_data(self, **kwargs):
-        context =  super().get_context_data(**kwargs)
+        context = super().get_context_data(**kwargs)
         user = self.object
         form = ProfileUpdateForm(instance=user)
         for field in form.fields.values():
@@ -214,6 +214,24 @@ class ProfileDetail(LoginProtection, DetailView):
 
         context['form'] = form
         context['courses'] = Course.fetch_courses_by_role(user.role.role)
+
+        # Recent quiz grade submissions (last 5)
+        context['recent_grades'] = (
+            Grade.objects
+            .filter(user=user)
+            .select_related('quiz', 'quiz__course')
+            .order_by('-submitted_at')[:5]
+        )
+
+        # Avatar initials
+        initials = ""
+        if user.first_name:
+            initials += user.first_name[0].upper()
+        if user.last_name:
+            initials += user.last_name[0].upper()
+        if not initials:
+            initials = user.username[0].upper() if user.username else "?"
+        context['initials'] = initials
 
         return context
 
