@@ -1,42 +1,42 @@
-import boto3.s3
+# Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404, HttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
-from django.utils.translation import gettext as _ # Import gettext for runtime translation
+from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import views
-from django.core.paginator import Paginator
+from django.contrib.auth import views, update_session_auth_hash
 from django.db.models import Q, Sum
 from django.db import transaction
 from django.contrib.messages import success, error, info
-from django.contrib.auth import update_session_auth_hash
 from django.conf import settings
 from django.core.exceptions import ValidationError
-
+from django.utils.timezone import now
 
 # Third Party
 from logging import getLogger
-import io
-import requests
-# from googleapiclient.http import MediaIoBaseDownload
-# from googleapiclient.errors import HttpError
 import boto3
+import json
 import re
 import os
 import csv
-from urllib.parse import unquote
+import requests
 
-# Internal Import
-# from .utils import get_drive_client
+# Internal Imports - Models
 from .models import *
+
+# Internal Imports - Forms
 from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
+
+# Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
 from .utils.file_validator import validate_upload_filename, FileValidator
-from django.utils.timezone import now
+from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user
+from .utils.decorators import management_required
 
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
@@ -55,244 +55,28 @@ bucket_name = os.getenv("bucket") or "lecture-storage"
 # Initialize R2 Manager
 R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name)
 
-# Helper Functions
+# Helper functions moved to utils/storage_operations.py and utils/helpers.py
+# Google Drive legacy code moved to utils/google_drive_manager.py
+
+# Permission checking helper functions (backward compatibility)
 def is_managerial(request):
-    user = User.objects.get(username=request.user)
-    if user.role.role not in MANAGEMENT_ROLES:
-        logger.warning(f"User : {user} is trying to access admin panel")
+    """Check if user has management permissions (admin or teacher)"""
+    from .utils.decorators import check_role_permission
+    user = safe_get_user(request)
+    if not user or not check_role_permission(user, 'management'):
+        logger.warning(f"User: {request.user} is trying to access admin panel")
         return HttpResponse(_("Unauthorized"), status=401)
     return HttpResponse(_("authorized"), status=200)
 
-def get_datetime(datetime_string):
-    return datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M")
-
-# def list_current_folder(folder_id=None, root=True):
-#     query = f"'{folder_id}' in parents and trashed=false" if not root else "sharedWithMe=true and trashed=false"
-
-#     results = DRIVE_CLIENT.files().list(
-#         q=query,
-#         fields="files(id, name, mimeType)"
-#     ).execute()
-
-#     storage_data = results.get("files", [])
-#     drive = []
-
-#     for data in storage_data:
-#         file_type = "folder" if data['mimeType'] == "application/vnd.google-apps.folder" else "file"
-
-#         drive.append({
-#             "id" : data['id'],
-#             "name" : data['name'],
-#             "type" : file_type,
-#         })
-
-#     if not root:
-#         folder_details = DRIVE_CLIENT.files().get(
-#             fileId=folder_id,
-#             fields="id, name, parents"
-#         ).execute()
-
-#         # Check if the queried folder has a parent
-#         if "parents" in folder_details:
-#             parent_id = folder_details["parents"][0]
-#         else:
-#             parent_id = ""
-#         return drive, parent_id
-    
-#     return drive
-
-def list_current_folder(folder_name="", filter_config: FileFilterConfig = None):
-    """
-    List files and folders in R2 storage with optional filtering
-    
-    Args:
-        folder_name: Path to folder (encoded with - separators)
-        filter_config: Optional FileFilterConfig for filtering results
-    
-    Returns:
-        Tuple of (contents list, parent_folder path)
-    """
-    # Flag for getting all objects 
-    has_objects = True
-    if folder_name:
-        folder_name = unquote(folder_name)
-    parents = folder_name.split("-")
-    folder_id = parents or []
-    parent_folder = "-".join(folder_id[:-2]) or None
-    folder_name = "/".join(folder_id) or ""
-    if folder_name and not folder_name.endswith("/"):
-        folder_name += "/"
-
-    objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, Prefix=folder_name, Delimiter="/")
-
-    contents = []
-    
-    # Initialize filter if provided
-    file_filter = R2FileFilter(filter_config) if filter_config else None
-    
-    while has_objects:
-        # Files
-        if "Contents" in objects:
-            for obj in objects["Contents"]:
-                key = obj["Key"]
-                # Only include files directly under the current folder (no extra / after prefix)
-                rel_path = key[len(folder_name):] if folder_name else key
-                if rel_path and "/" not in rel_path.rstrip("/"):
-                    file_name = key.split("/")[-1]
-                    
-                    file_obj = {
-                        "id": key,
-                        "name": file_name,
-                        "type": "file",
-                        "size": obj.get("Size", 0),
-                        "last_modified": obj.get("LastModified"),
-                    }
-                    
-                    # Apply filter if configured
-                    if file_filter:
-                        if file_filter.should_include_file(file_obj):
-                            contents.append(file_obj)
-                    else:
-                        # Default behavior: exclude .ts files only
-                        if not file_name.endswith(".ts"):
-                            contents.append(file_obj)
-
-        # Folders
-        if "CommonPrefixes" in objects:
-            for folder in objects["CommonPrefixes"]:
-                separated_folder = folder["Prefix"].split("/")
-                folder_id = "-".join(separated_folder)
-                folder_obj = {
-                    "id": folder_id,
-                    "name": separated_folder[-2],
-                    "type": "folder"
-                }
-                
-                # Apply filter for folders if configured
-                if not file_filter or file_filter.should_include_file(folder_obj):
-                    contents.insert(0, folder_obj)
-        
-        # More Objects
-        has_objects = objects['IsTruncated']
-        if has_objects:
-            continuation_token = objects['NextContinuationToken']
-            objects = CLOUD_CLIENT.list_objects_v2(Bucket=bucket_name, Prefix=folder_name, Delimiter="/", ContinuationToken=continuation_token)
-
-    return contents, parent_folder
-
-# def download_from_drive(file_request):
-#     in_memory = io.BytesIO()
-#     downloader = MediaIoBaseDownload(in_memory, file_request)
-
-#     done = False
-#     while not done:
-#         try:
-#             _, done = downloader.next_chunk()
-#         except:
-#             break
-    
-#     in_memory.seek(0)
-
-#     return in_memory
-
-def download_from_bucket(file_name):
-    in_memory = io.BytesIO()
-    response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=file_name)
-    # Write Coming Data
-    in_memory.write(response['Body'].read())
-    in_memory.seek(0)
-
-    return in_memory
-
-def generate_unique_url(segment_name):
-    url = CLOUD_CLIENT.generate_presigned_url(
-        'get_object',  # The operation you want to allow (e.g., 'get_object' for downloading)
-        Params={'Bucket': bucket_name, 'Key': segment_name},
-        ExpiresIn=3600  # Expiration time in seconds (e.g., 3600 = 1 hour)
-    )
-    return url
-
-def paginate_obj(request, obj, page_size=15):
-    paginator = Paginator(obj, page_size)
-    page_number = request.GET.get("page", 1)
-    page = paginator.get_page(page_number)
-    page.object_list = [obj.serialize_pagination() for obj in page.object_list]
-    return page
 
 def has_admin_permission(request, view):
-    user = User.objects.get(username=request.user)
-    if user.role.role not in MANAGEMENT_ROLES:
-        logger.warning(f"User : {user} is trying to access admin panel")
+    """Check if user has admin permissions for a specific view"""
+    from .utils.decorators import check_role_permission
+    user = safe_get_user(request)
+    if not user or not check_role_permission(user, 'management'):
+        logger.warning(f"User: {request.user} is trying to access {view}")
         return HttpResponse(_("Unauthorized"), status=401)
-    
     return HttpResponse(_("authorized"), status=200)
-    
-def render_dashboard(request, obj, view, context, parameters=[]):
-    has_permission = has_admin_permission(request, view)
-    if has_permission.status_code == 401:
-        return has_permission
-
-    user = request.user
- 
-    page_obj = paginate_obj(request, obj)
-    filters = ["year_filter.html", "naming_filter.html"]
-
-    if "filters" in context:
-        context['filters'].extend(filters)
-    else:
-        context['filters'] = filters
-
-    logger.info(f"User : {user} accesses page {page_obj.number} in {view} dashboard ")
-    
-    if request.headers.get("HX-Target") == "table-container":
-        return render(request, "partials/table_and_pagination.html", {
-            "page_obj": page_obj,
-            "header": _(view.capitalize()),
-            "view": view,
-            "url": reverse(f"{view}-dashboard", args=parameters),
-            "parameters": parameters,
-            **context
-        })
-
-    return render(request, "dashboard.html", {
-        "page_obj" : page_obj,
-        "header" : _(view.capitalize()), # Translate header
-        "view" : view,
-        "url" : reverse(f"{view}-dashboard", args=parameters),
-        "parameters" : parameters,
-        **context
-    })
-
-def unpack_quiz_form(form_dict):
-    questions = dict()
-    quiz_data = dict()
-
-    for key, val in form_dict.items():
-        # Case Dictionary
-        if key.startswith("questions"):
-            parts = key.split("[")
-            index = parts[1][:-1]
-            key_value = parts[2][:-1]
-            # If grade
-            if key_value == "grade":
-                quiz_data['total_grade'] = quiz_data.get("total_grade", 0) + int(val)
-
-            # To get all multiple choices!
-            if key_value == "choices":
-                val = form_dict.getlist(key)
-            # Check if added index
-            if index in questions:
-                questions[index][key_value] = val
-            else:
-                questions[index] = {
-                    key_value : val
-                }
-            
-        # Case Field
-        else:
-            quiz_data[key] = val
-    
-    return questions, quiz_data
 
 # Class Base
 class LoginProtection(object):
@@ -537,7 +321,7 @@ def stream_lesson(request, lesson_id, file_index):
             return JsonResponse({"url" : f"{settings.CLOUD_WORKER}{file_key}"})
         
         else:
-            m3u8_content = download_from_bucket(file_key).read().decode("utf-8")
+            m3u8_content = download_from_bucket(CLOUD_CLIENT, bucket_name, file_key).read().decode("utf-8")
 
             # Build Segments
             segments_names = re.findall(r"^.*\.ts$", m3u8_content, re.MULTILINE)
@@ -967,7 +751,7 @@ def create_lesson(request):
 
         return render(request, "lesson_form.html", {
             "courses" : courses,
-            "drive" : list_current_folder()[0],
+            "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
             "is_root" : True
         })
     elif request.method == "POST":
@@ -1006,18 +790,22 @@ def navigate_folder(request, folder_id=None):
     if is_manager.status_code == 401:
         return is_manager
 
+    # Check if folders_only mode is requested (for upload_video page)
+    folders_only = request.GET.get('folders_only', 'false').lower() == 'true'
+    
     root = True
     parent_folder = None
     if folder_id and folder_id != "None":
         root = False
-        drive, parent_folder = list_current_folder(folder_id)
+        drive, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_id, folders_only=folders_only)
     else:
-        drive, _ = list_current_folder()
+        drive, _ = list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=folders_only)
 
     return render(request, "drive_files.html", {
         "drive" : drive,
         "parent_folder" : parent_folder,
-        "is_root" : root
+        "is_root" : root,
+        "folders_only" : folders_only  # Pass it to template for subsequent navigations
     })
 
 @login_required(login_url=LOGIN_URL)
@@ -1032,7 +820,7 @@ def update_lesson(request, lesson_id):
             lesson = get_object_or_404(Lesson, pk=lesson_id)
             return render(request, "lesson_form.html", {
                 "courses" : courses,
-                "drive" : list_current_folder()[0],
+                "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
                 "is_root" : True,
                 "selected_course" : lesson.course.name,
                 "lesson_name" : lesson.name,
@@ -1100,7 +888,7 @@ def upload_file(request):
 
     # request.META['Cross-Origin-Resource-Policy'] = 'same-origin'
     return render(request, "upload_video.html", {
-        "drive" : list_current_folder()[0],
+        "drive" : list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=True)[0],
         "is_root" : True
     })
 
@@ -1759,10 +1547,19 @@ def api_rename_file(request):
         data = json.loads(request.body)
         old_key = data.get('old_key')
         new_key = data.get('new_key')
+        is_folder = bool(data.get('is_folder', False))
         
         if not old_key or not new_key:
             return JsonResponse({'error': _('Both old and new keys required')}, status=400)
         
+        if is_folder:
+            success = R2_MANAGER.rename_folder(old_key, new_key)
+            if success:
+                logger.info(f"User {request.user} renamed folder from {old_key} to {new_key}.")
+                return JsonResponse({'success': True, 'message': _('Folder renamed successfully'), 'new_key': new_key})
+            else:
+                return JsonResponse({'error': _('Failed to rename folder')}, status=500)
+
         success = R2_MANAGER.rename_file(old_key, new_key)
         
         if success:
@@ -2089,7 +1886,7 @@ def api_download_file(request):
     
     try:
         # Generate presigned URL for download
-        download_url = generate_unique_url(file_key)
+        download_url = generate_unique_url(CLOUD_CLIENT, bucket_name, file_key)
         
         # Redirect to the presigned URL
         return redirect(download_url)
@@ -2113,16 +1910,21 @@ def r2_management_dashboard(request):
         return has_permission
     
     folder_id = request.GET.get('folder', None)
-    filter_preset = request.GET.get('filter', 'media')
+    filter_preset = request.GET.get('filter', '') or 'media'
+    search_query = request.GET.get('search', '').strip()
     
     # Get filter configuration
     filter_config = get_filter_preset(filter_preset)
     
     # List files with filter
     if folder_id and folder_id != "None":
-        contents, parent_folder = list_current_folder(folder_id, filter_config)
+        contents, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_id, filter_config)
     else:
-        contents, parent_folder = list_current_folder("", filter_config)
+        contents, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, "", filter_config)
+    
+    # Apply search filter on the fetched contents
+    if search_query:
+        contents = [item for item in contents if search_query.lower() in item['name'].lower()]
     
     # Get storage statistics with error handling - ONLY if requested via AJAX
     # Skip initial page load to improve performance
@@ -2155,6 +1957,7 @@ def r2_management_dashboard(request):
         'parent_folder': parent_folder,
         'is_root': not folder_id or folder_id == "None",
         'current_filter': filter_preset,
+        'search_query': search_query,
         'filter_presets': list(FILTER_PRESETS.keys()),
         'storage_stats': stats,
         'total_size_formatted': R2_MANAGER.format_file_size(stats.get('total_size', 0)) if isinstance(stats.get('total_size'), int) else '...',

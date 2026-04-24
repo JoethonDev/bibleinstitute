@@ -1,3 +1,33 @@
+/* ================================================================================
+   ⚠️  DEPRECATED - DO NOT USE ⚠️
+   ================================================================================
+   
+   This file has been superseded by admin-theme.css as of December 2024
+   
+   All admin panel styles are now consolidated in:
+   - static/css/admin-theme.css (main theme system with dark/light modes)
+   - static/css/alpine-components.css (Alpine.js component styles)
+   
+   This file is kept for reference only and is NOT loaded in any templates.
+   
+   New Theme System Features:
+   - Midnight Scholar (Dark Mode) and Lumina Soft (Light Mode) themes
+   - CSS custom properties with --admin-* prefix
+   - Mobile-first responsive design
+   - RTL language support
+   - HTMX loading states
+   - Alpine.js integration
+   - Bootstrap 5 compatibility
+   
+   Migration Notes:
+   - Old gradient system (--primary-gradient, etc.) → CSS custom properties
+   - Offcanvas styles → admin-theme.css sidebar section
+   - Component styles → admin-theme.css components section
+   
+   Last Updated: December 2024
+   ================================================================================
+*/
+
 :root {
     --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);

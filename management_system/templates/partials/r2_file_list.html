@@ -1,9 +1,13 @@
 {% load i18n %}
 
-<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
+<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 row-cols-xl-6 g-2">
     {% for item in drive %}
     <div class="col">
-        <div class="card text-center shadow-sm h-100 drive-item position-relative" x-data="{ showActions: false }">
+        <div class="card admin-card text-center h-100 drive-item position-relative"
+             {% if item.type == 'file' %}data-file-key="{{ item.id }}"
+             {% else %}data-folder-id="{{ item.id }}"
+             {% endif %}
+             x-data="{ showActions: false }">
             <div class="card-body d-flex flex-column justify-content-center align-items-center p-2">
                 <!-- Checkbox for selection -->
                 <div class="position-absolute top-0 start-0 p-2">
@@ -20,7 +24,7 @@
                      @mouseenter="showActions = true" 
                      @mouseleave="showActions = false">
                     <div class="dropdown">
-                        <button class="btn btn-sm btn-light" 
+                        <button class="btn btn-sm btn-outline-secondary" 
                                 type="button" 
                                 data-bs-toggle="dropdown">
                             <i class="fas fa-ellipsis-v"></i>
@@ -51,6 +55,11 @@
                             </li>
                             {% else %}
                             <li>
+                                <a class="dropdown-item" href="#" @click.prevent="showRenameModal('{{ item.id }}', '{{ item.name }}', true)">
+                                    <i class="fas fa-edit me-2"></i>{% translate "Rename" %}
+                                </a>
+                            </li>
+                            <li>
                                 <a class="dropdown-item text-danger" href="#" @click.prevent="deleteFolder('{{ item.id }}')">
                                     <i class="fas fa-trash me-2"></i>{% translate "Delete Folder" %}
                                 </a>
@@ -65,25 +74,25 @@
                     <div class="drive-icon folder-icon text-warning w-100" 
                          style="cursor: pointer;"
                          onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ item.id }}'">
-                        <i class="fas fa-folder fa-3x"></i>
+                        <i class="fas fa-folder fa-2x"></i>
                     </div>
-                    <div class="card-title mt-2 w-100" style="word-wrap: break-word; font-size: 0.75rem;" title="{{ item.name }}">
+                    <div class="card-title mt-1 w-100" style="word-wrap: break-word; font-size: 0.7rem; line-height: 1.2;" title="{{ item.name }}">
                         {{ item.name }}
                     </div>
                 {% else %}
                     <div class="drive-icon file-icon text-muted w-100">
                         {% if '_video' in item.name or item.name|slice:'-5:' == '.m3u8' or item.name|slice:'-4:' == '.mp4' %}
-                            <i class="fas fa-file-video fa-3x text-danger"></i>
+                            <i class="fas fa-file-video fa-2x text-danger"></i>
                         {% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %}
-                            <i class="fas fa-file-audio fa-3x text-success"></i>
+                            <i class="fas fa-file-audio fa-2x text-success"></i>
                         {% elif item.name|slice:'-4:' == '.pdf' %}
-                            <i class="fas fa-file-pdf fa-3x text-danger"></i>
+                            <i class="fas fa-file-pdf fa-2x text-danger"></i>
                         {% else %}
-                            <i class="fas fa-file-alt fa-3x"></i>
+                            <i class="fas fa-file-alt fa-2x"></i>
                         {% endif %}
                     </div>
 
-                    <div class="card-title mt-2 w-100" style="word-wrap: break-word; font-size: 0.75rem;" title="{{ item.name }}">
+                    <div class="card-title mt-1 w-100" style="word-wrap: break-word; font-size: 0.65rem; line-height: 1.2;" title="{{ item.name }}">
                     {% if '_video' in item.name or item.name|slice:'-4:' == '.mp4' %}
                         {% if item.name|slice:'-5:' == '.m3u8' %}
                             {{ item.name|slice:':-5' }}

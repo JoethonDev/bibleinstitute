@@ -19,10 +19,10 @@
             <!-- Drive Files Card -->
             <div class="card shadow-sm border-0 flex-grow-1">
                 <div class="card-header">
-                    <h6 class="mb-0">{% translate "Select Files from Drive" %}</h6>
+                    <h6 class="mb-0">{% translate "Select Folder from Drive" %}</h6>
                 </div>
                 <div id="drive-files" class="card-body overflow-auto" style="min-height: 300px;">
-                    {% include 'drive_files.html' %}
+                    {% include 'drive_files.html' with folders_only=True %}
                 </div>
             </div>
             <div class="mb-3">
@@ -62,6 +62,10 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" integrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         
         <script>
+        // IIFE: wraps all constants and functions in a local scope so that HTMX
+        // re-navigation (which re-executes inline scripts) does not hit
+        // "Identifier already declared" errors from top-level const declarations.
+        (() => {
             // Translations for JavaScript messages
             const jsTranslations_upload = {
                 'en': {
@@ -696,10 +700,12 @@
                     ffmpeg = createFFmpeg({ log: true})
                     await ffmpeg.load()
                     button = document.querySelector(".loading")
-                    button.classList.remove("btn-primary")
-                    button.classList.add("btn-success")
-                    button.querySelector(".spinner-border").remove()
-                    button.querySelector(".info").innerText = getJsTranslation_upload('loaded');
+                    if (button) {
+                        button.classList.remove("btn-primary")
+                        button.classList.add("btn-success")
+                        button.querySelector(".spinner-border")?.remove()
+                        button.querySelector(".info").innerText = getJsTranslation_upload('loaded');
+                    }
                     }
                 , 500)
                 removeR2Files()
@@ -711,6 +717,7 @@
                 })
             })
 
+        })(); // end IIFE
         </script>
     </div>
 {% endblock %}

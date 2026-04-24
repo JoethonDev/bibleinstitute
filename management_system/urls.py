@@ -1,7 +1,6 @@
 from django.urls import path
 from management_system.views import *
 from management_system.forms import UserLoginForm
-# from django.contrib.auth import views
 
 urlpatterns = [
     path(
@@ -22,10 +21,10 @@ urlpatterns = [
     path('courses/<int:course_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
     path('lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
     path('lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
-    # path('lesson/<int:lesson_id>/<str:segment_id>/', retrieve_segment, name="segment-stream"),
-    # path('lesson/<int:lesson_id>/audio/<int:file_index>', stream_audio_lesson, name="lesson-audio-stream"),
+    
     # Admin Routes
     path('dashboard/', admin_panel, name="admin-panel"),
+    
     # Users Dashboard
     path('dashboard/users/', user_dashboard, name="user-dashboard"),
     path('dashboard/users/create/', CreateUser.as_view(), name="user-create"),
@@ -34,12 +33,14 @@ urlpatterns = [
     path('dashboard/users/<int:user_id>/', index, name="user-profile"),
     path('dashboard/users/<int:user_id>/delete/', DeleteUser.as_view(), name="user-delete"),
     path('dashboard/users/<int:user_id>/update/', UpdateUser.as_view(), name="user-update"),
+    
     # Courses Dashboard
     path('dashboard/courses/', course_dashboard, name="course-dashboard"),
     path('dashboard/courses/create/', CreateCourse.as_view(), name="course-create"),
     path('dashboard/courses/<int:course_id>/', index, name="course-view"),
     path('dashboard/courses/<int:course_id>/delete/', DeleteCourse.as_view(), name="course-delete"),
     path('dashboard/courses/<int:course_id>/update/', UpdateCourse.as_view(), name="course-update"),
+    
     # Lesson Dashboard
     path('dashboard/lessons/', lesson_dashboard, name="lesson-dashboard"),
     path('dashboard/lessons/<int:lesson_id>/', index, name="lesson-view"),
@@ -56,7 +57,6 @@ urlpatterns = [
     path('dashboard/quizzez/<int:quiz_id>/delete/', DeleteQuiz.as_view(), name="quiz-delete"),
 
     # Submission Dashboard
-    # path('dashboard/submission/', quiz_dashboard, name="submission-dashboard"),
     path('dashboard/quizzez/<int:quiz_id>/view-submission/', submission_dashboard, name="submission-dashboard"),
     path('dashboard/quizzez/<int:quiz_id>/view-submission/<int:user_id>/', submission_user, name="submission-user"),
     path('dashboard/quizzez/<int:quiz_id>/export-csv/', export_quiz_submissions_csv, name="export-quiz-submissions-csv"),
@@ -86,7 +86,4 @@ urlpatterns = [
     path('api/bulk-delete/courses/', bulk_delete_courses, name="bulk-delete-courses"),
     path('api/bulk-delete/lessons/', bulk_delete_lessons, name="bulk-delete-lessons"),
     path('api/bulk-delete/quizzes/', bulk_delete_quizzes, name="bulk-delete-quizzes"),
-
-    # Test
-    # path('test/', test, name="test"),
 ]

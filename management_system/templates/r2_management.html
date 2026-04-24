@@ -3,22 +3,22 @@
 {% load static %}
 
 {% block body %}
-<div class="container-fluid" id="content" x-data="r2Manager()">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col">
-            <h2 class="mb-0">
+<div class="admin-dashboard" id="content" x-data="r2Manager()" x-init="is_root = {% if is_root %}true{% else %}false{% endif %}">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="dashboard-title">
+            <h2 class="h3 mb-0">
                 <i class="fas fa-cloud me-2"></i>
                 {% translate "R2 Storage Management" %}
             </h2>
-            <p class="text-muted">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
         </div>
     </div>
+    <p class="text-muted mb-4">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
 
     <!-- Storage Statistics -->
     <div class="row mb-4" id="storage-stats-container">
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -37,7 +37,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -56,7 +56,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -75,7 +75,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -96,73 +96,74 @@
     </div>
 
     <!-- File Management Toolbar -->
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card admin-card mb-4">
         <div class="card-body">
-            <div class="row align-items-center">
-                <!-- Filter Selector -->
-                <div class="col-md-3">
-                    <label class="form-label">{% translate "File Type Filter" %}</label>
-                    <select class="form-select" 
-                            x-model="currentFilter" 
-                            @change="applyFilter()">
-                        {% for preset in filter_presets %}
-                        <option value="{{ preset }}" {% if preset == current_filter %}selected{% endif %}>
-                            {{ preset|title }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Search -->
-                <div class="col-md-4">
-                    <label class="form-label">{% translate "Search Files" %}</label>
-                    <div class="input-group">
-                        <input type="text" 
-                               class="form-control" 
-                               x-model="searchQuery" 
-                               @keyup.debounce.500ms="searchFiles()"
-                               placeholder="{% translate 'Search by filename...' %}">
-                        <button class="btn btn-outline-secondary" 
-                                type="button" 
-                                @click="searchFiles()">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Actions -->
-                <div class="col-md-5">
-                    <label class="form-label d-block">&nbsp;</label>
-                    <div class="btn-group">
-                        <button class="btn btn-primary" @click="showCreateFolderModal()">
-                            <i class="fas fa-folder-plus me-1"></i>
-                            {% translate "New Folder" %}
-                        </button>
-                        <button class="btn btn-success" onclick="window.location.href='{% url 'upload-files' %}'">
-                            <i class="fas fa-upload me-1"></i>
-                            {% translate "Upload Files" %}
-                        </button>
-                        <button class="btn btn-info" @click="refreshStats()">
-                            <i class="fas fa-chart-bar me-1"></i>
-                            {% translate "Statistics" %}
-                        </button>
-                    </div>
-                    <button class="btn btn-danger ms-2" 
+            <div class="action-bar">
+                <!-- Left Actions -->
+                <div class="action-bar-start">
+                    <button class="btn btn-primary" @click="showCreateFolderModal()">
+                        <i class="fas fa-folder-plus me-1"></i>
+                        {% translate "New Folder" %}
+                    </button>
+                    <button class="btn btn-success" onclick="window.location.href='{% url 'upload-files' %}'">
+                        <i class="fas fa-upload me-1"></i>
+                        {% translate "Upload Files" %}
+                    </button>
+                    <button class="btn btn-outline-secondary" @click="refreshStats()">
+                        <i class="fas fa-chart-bar me-1"></i>
+                        {% translate "Statistics" %}
+                    </button>
+                    <button class="btn btn-danger" 
                             x-show="selectedFiles.length > 0" 
                             @click="deleteSelectedFiles()">
                         <i class="fas fa-trash me-1"></i>
                         {% translate "Delete Selected" %} (<span x-text="selectedFiles.length"></span>)
                     </button>
                 </div>
+
+                <!-- Right Actions - Filters -->
+                <div class="action-bar-end">
+                    <div class="filters-container">
+                        <!-- Filter Selector -->
+                        <div class="filter-item">
+                            <select class="form-select" 
+                                    x-model="currentFilter" 
+                                    @change="applyFilter()">
+                                {% for preset in filter_presets %}
+                                <option value="{{ preset }}" {% if preset == current_filter %}selected{% endif %}>
+                                    {{ preset|title }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Search -->
+                        <div class="filter-item">
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       x-model="searchQuery" 
+                                       @keyup.debounce.500ms="searchFiles()"
+                                       placeholder="{% translate 'Search files...' %}">
+                                <button class="btn btn-outline-secondary" 
+                                        type="button" 
+                                        @click="searchFiles()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- File List -->
-    <div class="card border-0 shadow-sm" id="file-list-container">
+    <div class="card admin-card" id="file-list-container">
         <div class="card-body">
             <!-- Breadcrumb Navigation -->
-            <nav aria-label="breadcrumb" class="mb-3" x-show="!is_root">
+            {% if not is_root %}
+            <nav aria-label="breadcrumb" class="mb-3">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item">
                         <a href="{% url 'r2-management-dashboard' %}" class="text-decoration-none">
@@ -172,6 +173,7 @@
                     <!-- Add dynamic breadcrumb items here if needed -->
                 </ol>
             </nav>
+            {% endif %}
 
             <!-- Back Button -->
             {% if not is_root %}
@@ -227,7 +229,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
-                    <h5 class="modal-title">{% translate "Rename File" %}</h5>
+                    <h5 class="modal-title" x-text="renameIsFolder ? '{% translate "Rename Folder" %}' : '{% translate "Rename File" %}'"></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -298,432 +300,4 @@
         </div>
     </div>
 </div>
-
-<script>
-function getCSRFToken() {
-    let b = document.querySelector("body");
-    let csrf = JSON.parse(b.getAttribute("hx-headers"));
-    return csrf['X-CSRFToken'];
-}
-
-function r2Manager() {
-    return {
-        currentFilter: '{{ current_filter }}',
-        searchQuery: '',
-        selectedFiles: [],
-        newFolderName: '',
-        renameFileKey: '',
-        renameFileOldName: '',
-        renameFileNewName: '',
-        statsLoaded: {% if not storage_stats.loading %}true{% else %}false{% endif %},
-        
-        init() {
-            // Load stats asynchronously if not already loaded
-            if (!this.statsLoaded) {
-                this.loadStorageStats();
-            }
-        },
-        
-        toggleFileSelection(fileKey) {
-            const index = this.selectedFiles.indexOf(fileKey);
-            if (index > -1) {
-                this.selectedFiles.splice(index, 1);
-            } else {
-                this.selectedFiles.push(fileKey);
-            }
-        },
-        
-        downloadFile(fileKey, fileName) {
-            // Generate presigned download URL
-            window.open(`/api/r2/files/download/?file_key=${encodeURIComponent(fileKey)}`, '_blank');
-        },
-        
-        showRenameModal(fileKey, oldName) {
-            this.renameFileKey = fileKey;
-            this.renameFileOldName = oldName;
-            this.renameFileNewName = oldName;
-            const modal = new bootstrap.Modal(document.getElementById('renameFileModal'));
-            modal.show();
-        },
-        
-        renameFile() {
-            if (this.renameFileNewName.trim() === '' || this.renameFileNewName === this.renameFileOldName) {
-                const errorEl = document.getElementById('rename-file-error');
-                errorEl.textContent = '{% translate "Please enter a new name" %}';
-                errorEl.classList.remove('d-none');
-                return;
-            }
-            
-            // Extract directory path
-            const pathParts = this.renameFileKey.split('/');
-            const oldFileName = pathParts[pathParts.length - 1];
-            const directory = pathParts.slice(0, -1).join('/');
-            const newKey = directory ? `${directory}/${this.renameFileNewName}` : this.renameFileNewName;
-            
-            fetch('/api/r2/files/rename/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                },
-                body: JSON.stringify({
-                    old_key: this.renameFileKey,
-                    new_key: newKey
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('renameFileModal')).hide();
-                    location.reload();
-                } else {
-                    const errorEl = document.getElementById('rename-file-error');
-                    errorEl.textContent = data.error;
-                    errorEl.classList.remove('d-none');
-                }
-            })
-            .catch(error => {
-                console.error('Error renaming file:', error);
-                const errorEl = document.getElementById('rename-file-error');
-                errorEl.textContent = '{% translate "Failed to rename file" %}';
-                errorEl.classList.remove('d-none');
-            });
-        },
-        
-        deleteFile(fileKey, fileName, fileExt) {
-            const isM3u8 = fileExt === '.m3u8';
-            const confirmModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-            
-            document.getElementById('delete-confirm-message').textContent = `{% translate "Are you sure you want to delete" %} ${fileName}?`;
-            
-            const warningEl = document.getElementById('delete-hls-warning');
-            if (isM3u8) {
-                warningEl.classList.remove('d-none');
-            } else {
-                warningEl.classList.add('d-none');
-            }
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            // Clone button to remove old event listeners
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.addEventListener('click', () => {
-                const endpoint = isM3u8 ? '/api/r2/files/delete-m3u8/' : '/api/r2/files/delete/';
-                
-                fetch(endpoint, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({ file_key: fileKey })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert(data.error); // Fallback for critical errors
-                    }
-                })
-                .catch(error => {
-                    console.error('Delete error:', error);
-                });
-            });
-            
-            confirmModal.show();
-        },
-        
-        deleteFolder(folderId) {
-            const confirmModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-            
-            document.getElementById('delete-confirm-message').textContent = `{% translate "Are you sure you want to delete this folder and all its contents?" %}`;
-            document.getElementById('delete-hls-warning').classList.add('d-none');
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.addEventListener('click', () => {
-                fetch('/api/r2/folder/delete/', {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({
-                        folder_path: folderId.replace(/-/g, '/') + '/',
-                        recursive: true
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert(data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Delete folder error:', error);
-                });
-            });
-            
-            confirmModal.show();
-        },
-        
-        getFileMetadata(fileKey) {
-            const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
-            const bodyEl = document.getElementById('info-modal-body');
-            
-            bodyEl.innerHTML = `
-                <div class="d-flex justify-content-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            `;
-            
-            infoModal.show();
-            
-            fetch(`/api/r2/files/metadata/?file_key=${encodeURIComponent(fileKey)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const metadata = data.metadata;
-                        bodyEl.innerHTML = `
-                            <table class="table table-sm">
-                                <tr><th>{% translate "Name" %}</th><td>${metadata.name}</td></tr>
-                                <tr><th>{% translate "Size" %}</th><td>${metadata.size_formatted}</td></tr>
-                                <tr><th>{% translate "Type" %}</th><td>${metadata.content_type}</td></tr>
-                                <tr><th>{% translate "Last Modified" %}</th><td>${metadata.last_modified}</td></tr>
-                            </table>
-                        `;
-                    } else {
-                        bodyEl.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Metadata error:', error);
-                    bodyEl.innerHTML = `<div class="alert alert-danger">{% translate "Failed to load metadata" %}</div>`;
-                });
-        },
-        
-        loadStorageStats() {
-            // Call the API endpoint to get stats
-            fetch('{% url "api-storage-stats" %}')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const stats = data.stats;
-                        
-                        // Update total files
-                        document.querySelector('#stat-total-files').textContent = stats.total_files || '0';
-                        
-                        // Update total storage
-                        document.querySelector('#stat-total-storage').textContent = stats.total_size_formatted || '0 B';
-                        
-                        // Update video files (mp4 + m3u8 + webm)
-                        const videoCount = (stats.by_extension.mp4?.count || 0) + 
-                                          (stats.by_extension.m3u8?.count || 0) + 
-                                          (stats.by_extension.webm?.count || 0);
-                        document.querySelector('#stat-video-files').textContent = videoCount;
-                        
-                        // Update PDF files
-                        document.querySelector('#stat-pdf-files').textContent = stats.by_extension.pdf?.count || '0';
-                        
-                        this.statsLoaded = true;
-                    } else {
-                        throw new Error(data.error || 'Unknown error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading storage stats:', error);
-                    // Show error state
-                    document.querySelectorAll('#storage-stats-container .spinner-border').forEach(el => {
-                        el.parentElement.innerHTML = '<span class="text-danger">Error</span>';
-                    });
-                });
-        },
-        
-        applyFilter() {
-            const currentUrl = new URL(window.location.href);
-            currentUrl.searchParams.set('filter', this.currentFilter);
-            window.location.href = currentUrl.toString();
-        },
-        
-        searchFiles() {
-            if (this.searchQuery.trim() === '') {
-                return;
-            }
-            
-            fetch(`/api/r2/files/search/?q=${encodeURIComponent(this.searchQuery)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Search results:', data.results);
-                        // Update UI with search results
-                        // You can implement this based on your needs
-                    }
-                })
-                .catch(error => {
-                    console.error('Search error:', error);
-                });
-        },
-        
-        showCreateFolderModal() {
-            this.newFolderName = '';
-            const modal = new bootstrap.Modal(document.getElementById('createFolderModal'));
-            modal.show();
-        },
-        
-        createFolder() {
-            if (this.newFolderName.trim() === '') {
-                const errorEl = document.getElementById('create-folder-error');
-                errorEl.textContent = '{% translate "Please enter a folder name" %}';
-                errorEl.classList.remove('d-none');
-                return;
-            }
-            
-            fetch('/api/r2/folder/create/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                },
-                body: JSON.stringify({
-                    folder_path: this.newFolderName
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('createFolderModal')).hide();
-                    location.reload();
-                } else {
-                    const errorEl = document.getElementById('create-folder-error');
-                    errorEl.textContent = data.error;
-                    errorEl.classList.remove('d-none');
-                }
-            })
-            .catch(error => {
-                console.error('Error creating folder:', error);
-                const errorEl = document.getElementById('create-folder-error');
-                errorEl.textContent = '{% translate "Failed to create folder" %}';
-                errorEl.classList.remove('d-none');
-            });
-        },
-        
-        deleteSelectedFiles() {
-            if (this.selectedFiles.length === 0) return;
-            
-            const confirmModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-            document.getElementById('delete-confirm-message').textContent = `{% translate "Are you sure you want to delete" %} ${this.selectedFiles.length} {% translate "selected files?" %}`;
-            document.getElementById('delete-hls-warning').classList.add('d-none');
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.addEventListener('click', () => {
-                fetch('/api/r2/files/delete-batch/', {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({
-                        file_keys: this.selectedFiles
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert(data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error deleting files:', error);
-                });
-            });
-            
-            confirmModal.show();
-        },
-        
-        refreshStats() {
-            fetch('/api/r2/stats/')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Storage stats:', data.stats);
-                        location.reload();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error getting stats:', error);
-                });
-        }
-    };
-}
-</script>
-
-<style>
-.drive-item {
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.drive-item:hover, 
-.drive-item:focus-within {
-    transform: translateY(-5px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-    z-index: 1050 !important; /* Ensure hovered/active item is on top of other cards */
-}
-
-.drive-icon {
-    transition: color 0.2s;
-}
-
-.drive-item:hover .folder-icon {
-    color: #ffa500 !important;
-}
-
-.drive-item:hover .file-icon {
-    color: #007bff !important;
-}
-
-/* Fix modal stack issues */
-#content, 
-.display-page,
-.col {
-    position: static !important;
-    transform: none !important;
-}
-
-.modal-backdrop {
-    z-index: 1040 !important;
-}
-
-.modal {
-    z-index: 1050 !important;
-}
-
-.dropdown-menu {
-    z-index: 1070 !important;
-}
-
-.drive-item {
-
-
-    transition: transform 0.2s, box-shadow 0.2s;
-    /* Remove overflow:hidden from .card but only for drive-items */
-    overflow: visible !important;
-    position: relative; /* Ensure it's a stacking context for the dropdown */
-}
-
-
-
-</style>
 {% endblock %}

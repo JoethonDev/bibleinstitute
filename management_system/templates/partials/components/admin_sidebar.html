@@ -1,0 +1,89 @@
+{% load i18n %}
+
+<!-- Desktop & Tablet Sidebar -->
+<aside class="admin-sidebar d-none d-lg-flex flex-column"
+       :class="{ 'sidebar-collapsed': $store.ui.sidebarCollapsed }">
+    
+    <!-- Sidebar Header -->
+    <div class="sidebar-header">
+        <a href="{% url 'user-dashboard' %}" class="sidebar-brand">
+            <i class="fas fa-graduation-cap"></i>
+            <span x-show="!$store.ui.sidebarCollapsed" x-transition.opacity.duration.200ms>
+                {% translate "Admin Panel" %}
+            </span>
+        </a>
+        <button @click="$store.ui.toggleSidebar()" 
+                class="btn-sidebar-toggle"
+                :title="$store.ui.sidebarCollapsed ? '{% translate "Expand Sidebar" %}' : '{% translate "Collapse Sidebar" %}'">
+            <i :class="$store.ui.sidebarCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'"></i>
+        </button>
+    </div>
+    
+    <!-- Navigation Links -->
+    <nav class="sidebar-nav">
+        {% include 'partials/components/admin_nav_links.html' %}
+    </nav>
+    
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer">
+        <!-- Theme Toggle -->
+        <button @click="$store.theme.toggle()" 
+                class="btn btn-theme-toggle"
+                :title="$store.theme.mode === 'dark' ? '{% translate "Switch to Light Mode" %}' : '{% translate "Switch to Dark Mode" %}'">
+            <i :class="$store.theme.mode === 'dark' ? 'fas fa-sun' : 'fas fa-moon'"></i>
+            <span x-show="!$store.ui.sidebarCollapsed" 
+                  x-transition.opacity.duration.200ms
+                  x-text="$store.theme.mode === 'dark' ? '{% translate "Light Mode" %}' : '{% translate "Dark Mode" %}'">
+            </span>
+        </button>
+    </div>
+</aside>
+
+<!-- Mobile Offcanvas Menu -->
+<div class="offcanvas offcanvas-start d-lg-none" 
+     tabindex="-1" 
+     id="mobileAdminMenu"
+     aria-labelledby="mobileAdminMenuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="mobileAdminMenuLabel">
+            <i class="fas fa-graduation-cap me-2"></i>
+            {% translate "Admin Panel" %}
+        </h5>
+        <button type="button" 
+                class="btn-close" 
+                data-bs-dismiss="offcanvas" 
+                aria-label="{% translate 'Close' %}"></button>
+    </div>
+    <div class="offcanvas-body">
+        <nav>
+            {% include 'partials/components/admin_nav_links.html' %}
+        </nav>
+        
+        <hr class="my-3">
+        
+        <!-- Mobile Theme Toggle -->
+        <button @click="$store.theme.toggle()" 
+                class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-2"
+                x-data>
+            <i :class="$store.theme.mode === 'dark' ? 'fas fa-sun' : 'fas fa-moon'"></i>
+            <span x-text="$store.theme.mode === 'dark' ? '{% translate "Light Mode" %}' : '{% translate "Dark Mode" %}'"></span>
+        </button>
+        
+        <!-- User Info -->
+        <div class="mt-3 p-3 bg-light rounded">
+            <small class="text-muted d-flex align-items-center gap-2">
+                <i class="fas fa-user-circle"></i>
+                {{ request.user.get_full_name|default:request.user.username }}
+            </small>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Menu Toggle Button -->
+<button class="btn btn-primary mobile-menu-toggle d-lg-none"
+        type="button"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#mobileAdminMenu"
+        aria-controls="mobileAdminMenu">
+    <i class="fas fa-bars"></i>
+</button>

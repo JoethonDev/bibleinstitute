@@ -1,50 +1,100 @@
-{% extends 'admin_panel.html' %} {% load crispy_forms_tags %} {% load i18n %} 
+{% extends 'admin_panel.html' %}
+{% load crispy_forms_tags %}
+{% load i18n %}
 
 {% block body %}
-<div id="content" class="container-fluid py-4">
- 
-  <!-- Form Container -->
-  <div class="row justify-content-center">
-    <!-- Back Navigation -->
-    <div class="mb-4 col-12 col-md-8 col-lg-7">
-      {% with dynamic_view=view_name %}
-      <a
-        hx-get="{% url dynamic_view|add:'-dashboard' %}"
-        hx-select="#content"
-        hx-push-url="true"
-        hx-trigger="click"
-        hx-target="#display-page"
-        class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit"
-      >
-        <i class="fa-solid fa-arrow-left"></i>
-        {% translate "Back to" %} {{ dynamic_view }}s
-      </a>
-      {% endwith %}
-    </div>
-    <div class="col-12 col-md-8 col-lg-6  ">
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-primary text-white py-3">
-          <h4 class="mb-0 d-flex align-items-center gap-2">
-            <i class="bi bi-pencil-square"></i>
-            Form Entry
-          </h4>
+<div id="content" class="admin-form-page" x-data="autoSave('{{ view_name }}-form')" @input.debounce.2000ms="saveDraft()">
+    
+    <!-- Auto-save Indicator -->
+    <div class="auto-save-indicator" x-show="lastSaved" x-transition.opacity>
+        <div class="alert alert-success d-flex align-items-center gap-2">
+            <i class="fas fa-check-circle"></i>
+            <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
         </div>
-        <div class="card-body p-4">
-          <form action="" method="post" class="needs-validation" novalidate x-data="{ submitValid(e) { if (!$el.checkValidity()) { e.preventDefault(); e.stopPropagation(); } $el.classList.add('was-validated'); } }" @submit="submitValid($event)">
-            {% include 'messages.html' %} {% csrf_token %}
-            <div class="form-content mb-4" x-data="{ init() { let inputs = $el.querySelectorAll('input, select, textarea'); inputs.forEach(input => { input.setAttribute('x-on:blur', 'validateField($event)'); }); }, validateField(e) { let field = e.target; if (!field.checkValidity()) { field.classList.add('is-invalid'); field.classList.remove('is-valid'); } else { field.classList.remove('is-invalid'); field.classList.add('is-valid'); } } }">{{ form|crispy }}</div>
-
-            <div class="d-grid">
-              <button type="submit" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2">
-                <i class="bi bi-check-circle"></i>
-                {% translate 'Submit' %}
-              </button>
+    </div>
+    
+    <!-- Saving Indicator -->
+    <div class="auto-save-indicator" x-show="isSaving" x-transition.opacity>
+        <div class="alert alert-info d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">{% translate "Saving..." %}</span>
             </div>
-          </form>
+            <span>{% translate "Saving draft..." %}</span>
         </div>
-      </div>
     </div>
-  </div>
+    
+    <!-- Back Navigation -->
+    <div class="form-back-nav">
+        {% with dynamic_view=view_name %}
+        <a hx-get="{% url dynamic_view|add:'-dashboard' %}"
+           hx-select="#content"
+           hx-push-url="true"
+           hx-trigger="click"
+           hx-target="#display-page"
+           class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>
+            <span>{% translate "Back to" %} {{ dynamic_view }}s</span>
+        </a>
+        {% endwith %}
+    </div>
+    
+    <!-- Form Container -->
+    <div class="form-container">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-edit me-2"></i>
+                    <span>{{ header|default:"Form Entry" }}</span>
+                </h4>
+            </div>
+            
+            <div class="card-body">
+                <!-- Form with validation -->
+                <div x-data="formValidation()">
+                    <form action="" 
+                          method="post" 
+                          class="admin-form"
+                          @submit="handleSubmit($event)"
+                          novalidate>
+                        
+                        {% include 'messages.html' %}
+                        {% csrf_token %}
+                        
+                        <!-- Form Fields -->
+                        <div class="form-fields" 
+                             @focusout="validateField($event.target)">
+                            {{ form|crispy }}
+                        </div>
+                        
+                        <!-- Form Actions -->
+                        <div class="form-actions">
+                            <button type="submit" 
+                                    class="btn btn-primary btn-lg"
+                                    :disabled="submitting"
+                                    :class="{ 'loading': submitting }">
+                                <span x-show="!submitting">
+                                    <i class="fas fa-check me-2"></i>
+                                    {% translate "Submit" %}
+                                </span>
+                                <span x-show="submitting" style="display: none;">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    {% translate "Submitting..." %}
+                                </span>
+                            </button>
+                            
+                            <button type="button" 
+                                    class="btn btn-outline-secondary"
+                                    @click="$el.closest('form').reset(); $dispatch('form-reset')"
+                                    :disabled="submitting">
+                                <i class="fas fa-redo me-2"></i>
+                                {% translate "Reset" %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

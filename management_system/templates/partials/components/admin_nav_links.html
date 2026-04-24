@@ -1,0 +1,91 @@
+{% load i18n %}
+<!-- Admin Navigation Links -->
+<ul class="nav flex-column">
+    <li class="nav-item">
+        <a class="nav-link text-white" href="{% url 'home' %}">
+            <i class="fas fa-home"></i>
+            <span>{% translate "Home" %}</span>
+        </a>
+    </li>
+    
+    {% if request.user.role.role == "admin" %}
+        <li class="nav-item">
+            <a class="nav-link text-white" 
+               hx-get="{% url 'user-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-users"></i>
+                <span>{% translate "Users" %}</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               hx-get="{% url 'course-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-book-open"></i>
+                <span>{% translate "Courses" %}</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               hx-get="{% url 'lesson-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-video"></i>
+                <span>{% translate "Lessons" %}</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               hx-get="{% url 'upload-files' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content"
+               hx-refresh="true">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <span>{% translate "Upload Files" %}</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               hx-get="{% url 'r2-management-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-cloud"></i>
+                <span>{% translate "R2 Storage" %}</span>
+            </a>
+        </li>
+    {% endif %}
+    
+    <li class="nav-item">
+        <a class="nav-link text-white"
+           hx-get="{% url 'quiz-dashboard' %}"
+           hx-trigger="click"
+           hx-target="#display-page"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-select="#content">
+            <i class="fas fa-list-check"></i>
+            <span>{% translate "Quizzes" %}</span>
+        </a>
+    </li>
+</ul>

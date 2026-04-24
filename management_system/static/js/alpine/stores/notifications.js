@@ -5,7 +5,7 @@ document.addEventListener('alpine:init', () => {
         add(message, type = 'info') {
             const id = Date.now();
             this.items.push({ id, message, type });
-            setTimeout(() => this.remove(id), 5000);
+            setTimeout(() => this.remove(id), 2000);
         },
         remove(id) {
             this.items = this.items.filter(item => item.id !== id);
