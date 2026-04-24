@@ -22,11 +22,20 @@
                     </div>
                 {% endif %}
 
-                <div class="card-header bg-primary text-white py-3">
+                <!-- Card header colour changes by quiz mode -->
+                <div class="card-header py-3
+                    {% if mode == 'view' %}bg-success{% elif mode == 'closed_unsolved' %}bg-secondary{% else %}bg-primary{% endif %}
+                    text-white">
                     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
                         <div>
-                            <h4 class="mb-1 d-flex align-items-center">
-                                <i class="bi bi-file-text"></i>
+                            <h4 class="mb-1 d-flex align-items-center gap-2">
+                                {% if mode == "exam" %}
+                                    <i class="fas fa-pen-to-square"></i>
+                                {% elif mode == "view" %}
+                                    <i class="fas fa-circle-check"></i>
+                                {% else %}
+                                    <i class="fas fa-lock"></i>
+                                {% endif %}
                                 {% translate "Exam" %}: {{ quiz_name }}
                             </h4>
                             <p class="mb-0 opacity-75">{% translate "Student" %}: {{ username }}</p>
@@ -47,18 +56,32 @@
                         {% endfor %}
                     {% endif %}
 
+                    <!-- Closed / not taken banner -->
+                    {% if mode == "closed_unsolved" %}
+                    <div class="alert d-flex align-items-center gap-3 mb-4" style="background:#f1f3f1;border:1.5px solid #A5A58D;border-radius:.75rem;">
+                        <i class="fas fa-lock fa-lg" style="color:#6B705C;"></i>
+                        <div>
+                            <strong>{% translate "Quiz Closed" %}</strong>
+                            <div class="text-muted small">
+                                {% blocktranslate with date=quiz_closing_date_str %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktranslate %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <form action="" method="post">
                         {% csrf_token %}
                         
                         {% include 'questions_rendering.html' %}
 
-                        {% if not is_student or mode != "view" %}
+                        <!-- Show submit only for exam mode (student) or correction mode (management) -->
+                        {% if mode == "exam" or not is_student %}
                         <div class="d-grid mt-4">
                             <button type="submit" class="btn btn-primary btn-lg">
                                 {% if is_student %}
-                                    <i class="bi bi-check-circle-fill me-2"></i> {% translate "Submit Exam" %}
+                                    <i class="fas fa-circle-check me-2"></i> {% translate "Submit Exam" %}
                                 {% else %}
-                                    <i class="bi bi-save-fill me-2"></i> {% translate "Submit Correction" %}
+                                    <i class="fas fa-floppy-disk me-2"></i> {% translate "Submit Correction" %}
                                 {% endif %}
                             </button>
                         </div>

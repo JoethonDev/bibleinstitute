@@ -28,6 +28,41 @@ def get_datetime(datetime_string):
     return datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M")
 
 
+def is_quiz_in_user_window(quiz, user) -> bool:
+    """
+    Determine whether a quiz's opening date falls within a student's academic window.
+
+    A student's academic window spans from their joined_date up to
+    joined_date + Course.MAXIMUM_LEVEL years. This lets us distinguish between:
+      - A quiz that was originally opened *for this cohort* (in-window)
+      - A quiz that has been re-opened for a newer cohort (out-of-window)
+
+    Management roles always return True (no restriction).
+
+    Args:
+        quiz: Quiz model instance
+        user: User model instance
+
+    Returns:
+        bool – True if the quiz is within the user's academic window
+    """
+    from management_system.models import MANAGEMENT_ROLES, Course
+
+    if user.role and user.role.role in MANAGEMENT_ROLES:
+        return True
+
+    from datetime import date
+    joined: date = user.joined_date
+    try:
+        window_end = joined.replace(year=joined.year + Course.MAXIMUM_LEVEL)
+    except ValueError:
+        # Handle Feb 29 edge case
+        window_end = joined.replace(year=joined.year + Course.MAXIMUM_LEVEL, day=28)
+
+    quiz_open_date = quiz.opening_date.date() if hasattr(quiz.opening_date, "date") else quiz.opening_date
+    return joined <= quiz_open_date <= window_end
+
+
 def paginate_obj(request, obj, page_size=15):
     """
     Paginate a queryset or list of objects.

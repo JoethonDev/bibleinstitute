@@ -62,7 +62,7 @@
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="questions[{{ counter }}][answer]" id="q_{{ counter }}_choice_{{ forloop.counter0 }}" value="{{ choice }}" 
                                             {% if mode == "view" and choice == question.submitted_answer %}checked{% endif %}
-                                            {% if mode == "view" %}disabled readonly{% endif %}>
+                                            {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>
                                         <label class="form-check-label" for="q_{{ counter }}_choice_{{ forloop.counter0 }}">{{ choice }}</label>
                                     </div>
                                 {% endif %}
@@ -79,7 +79,7 @@
                             {% if not is_student and mode == "edit" %}
                                 <input class="form-control" type="text" disabled placeholder="{% translate "Student will complete this..." %}">
                             {% else %}
-                                <input class="form-control" type="text" name="questions[{{ counter }}][answer]" value="{{ question.submitted_answer|default:'' }}" {% if mode == "view" %}disabled readonly{% endif %}>
+                                <input class="form-control" type="text" name="questions[{{ counter }}][answer]" value="{{ question.submitted_answer|default:'' }}" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>
                             {% endif %}
                             
                         {% elif question.type == "written" %}
@@ -87,13 +87,14 @@
                             {% if not is_student and mode == "edit" %}
                                 <textarea class="form-control" rows="4" disabled placeholder="{% translate "Student will write their answer here..." %}"></textarea>
                             {% else %}
-                                <textarea class="form-control" rows="4" name="questions[{{ counter }}][answer]" {% if mode == "view" %}disabled readonly{% endif %}>{{ question.submitted_answer|default:'' }}</textarea>
+                                <textarea class="form-control" rows="4" name="questions[{{ counter }}][answer]" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>{{ question.submitted_answer|default:'' }}</textarea>
                             {% endif %}
                         {% endif %}
                     </div>
 
                     <div class="correct-answer-section">
-                    {% if not is_student or exam_taken %}
+                    {# Only reveal correct answers when student has submitted (exam_taken) or for management. Never for closed_unsolved. #}
+                    {% if mode != "closed_unsolved" and not is_student or mode != "closed_unsolved" and exam_taken %}
                         {% if question.auto_grade or mode == "edit" and question.type != "written" %}
                             <div class="card bg-light border-0 p-3">
                                 <label class="form-label fw-semibold text-success mb-2">

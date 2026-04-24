@@ -374,53 +374,77 @@ def stream_lesson(request, lesson_id, file_index):
 @login_required(login_url=LOGIN_URL)
 def take_exam(request, course_id, quiz_id):
     try:
+        from .utils.helpers import is_quiz_in_user_window
         quiz = get_object_or_404(Quiz, pk=quiz_id)
         user = User.objects.get(username=request.user)
-        # Check closing datetime to ensure after time responses!
+
         submission_datetime = now()
-        can_have_exam = quiz.closing_date + timedelta(minutes=30)  >= submission_datetime
-        if not can_have_exam:
-            info(request, _("Quiz is closed, You can not take it anymore!"), extra_tags="alert-primary") # Translate
- 
-        # Check if user has taken exam
+        # Buffer of 30 minutes after closing time for late submissions
+        can_submit = quiz.closing_date + timedelta(minutes=30) >= submission_datetime
+        # Quiz is currently open for taking (no buffer - just real window)
+        quiz_currently_open = quiz.opening_date <= submission_datetime <= quiz.closing_date + timedelta(minutes=30)
+
+        # Check if user has previously taken this quiz
         grade = Grade.objects.filter(user=user, quiz_id=quiz_id).first()
-        if grade:
-            total_grade = grade.total_grade
-        else:
-            total_grade = 0
+        total_grade = grade.total_grade if grade else 0
 
         if request.method == "GET":
             course = get_object_or_404(Course, pk=course_id)
             logger.info(f"User : {user} is accessing {quiz.name} in {course.name} course")
 
-            if user.role.role not in MANAGEMENT_ROLES and (not course.can_access(user.role.role) or quiz.opening_date > now()):
-                return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
-            
-            quiz_mode = "view" if grade or not can_have_exam else "exam"
-            query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user) if grade else Question.objects.filter(quiz_id=quiz_id)
-            questions =  [
-                question.serialize() for question in query_set
-            ]
-        
+            # Management roles can always access any quiz in any mode
+            is_management = user.role.role in MANAGEMENT_ROLES
+            if not is_management and not course.can_access(user.role.role):
+                return HttpResponse(_("Unauthorized"), status=401)
+
+            # Determine quiz mode using cohort-year window logic
+            if is_management:
+                # Admins/teachers always see in "view" mode for student quizzes
+                quiz_mode = "view"
+                query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user) if grade else Question.objects.filter(quiz_id=quiz_id)
+            elif grade:
+                # Student has already submitted – always show their submission
+                quiz_mode = "view"
+                query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user)
+            elif quiz_currently_open and is_quiz_in_user_window(quiz, user):
+                # Quiz is open right now AND falls within this student's academic window
+                quiz_mode = "exam"
+                query_set = Question.objects.filter(quiz_id=quiz_id)
+            else:
+                # Quiz is closed or re-opened for a newer cohort; student never submitted
+                quiz_mode = "closed_unsolved"
+                query_set = Question.objects.filter(quiz_id=quiz_id)
+
+            # Serialize questions; strip correct_answer for closed_unsolved to avoid leaking via HTML
+            if quiz_mode == "closed_unsolved":
+                questions = []
+                for q in query_set:
+                    serialized = q.serialize()
+                    serialized.pop("correct_answer", None)
+                    questions.append(serialized)
+            else:
+                questions = [q.serialize() for q in query_set]
+
             return render(request, "display_quiz.html", {
-                "quiz_name" : quiz.name,
-                "username" : request.user.username,
-                "questions" : questions,
-                "is_student" : True,
-                "mode" : quiz_mode,
-                "extended_view" : "base.html",
-                "id" : "container",
-                "total_grade" : total_grade,
-                "closing_date" : quiz.closing_date.timestamp(),
-                "exam_taken" : True if grade else False,
-                "back_url" : reverse("course-details", args=[course_id,])
+                "quiz_name": quiz.name,
+                "username": request.user.username,
+                "questions": questions,
+                "is_student": True,
+                "mode": quiz_mode,
+                "extended_view": "base.html",
+                "id": "container",
+                "total_grade": total_grade,
+                "closing_date": quiz.closing_date.timestamp(),
+                "exam_taken": True if grade else False,
+                "back_url": reverse("course-details", args=[course_id,]),
+                "quiz_closing_date_str": quiz.closing_date.strftime("%d/%m/%Y %H:%M"),
             })
         
         elif request.method == "POST":
             # Prevent another submission
             if not grade:
-                # Consider making a buffer time and datetime check for submission
-                if not can_have_exam:
+                # Guard: reject if quiz is no longer submittable
+                if not can_submit or not is_quiz_in_user_window(quiz, user):
                     # Send back to main page with error message TODO
                     return HttpResponse(_("Invalid Request, submission is closed!")) # Translate
                 
@@ -1821,6 +1845,47 @@ def api_search_files(request):
     except Exception as e:
         logger.error(f"Error searching files: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url=LOGIN_URL)
+def api_quiz_status(request, course_id):
+    """
+    API endpoint – returns quiz mode/status for every quiz in a course
+    for the requesting user. Used by the course-detail sidebar to show
+    status badges without reloading the page.
+
+    Response: { "quizzes": [ { "id": int, "status": "exam"|"view"|"closed_unsolved" }, ... ] }
+    """
+    from .utils.helpers import is_quiz_in_user_window
+    try:
+        user = User.objects.get(username=request.user)
+        course = get_object_or_404(Course, pk=course_id)
+
+        if not course.can_access(user.role.role) and user.role.role not in MANAGEMENT_ROLES:
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+
+        current_time = now()
+        quizzes = course.quizzes.all()
+        result = []
+
+        for quiz in quizzes:
+            grade = Grade.objects.filter(user=user, quiz_id=quiz.pk).first()
+            quiz_open = quiz.opening_date <= current_time <= quiz.closing_date + timedelta(minutes=30)
+
+            if grade:
+                status = "view"
+            elif quiz_open and is_quiz_in_user_window(quiz, user):
+                status = "exam"
+            else:
+                status = "closed_unsolved"
+
+            result.append({"id": quiz.pk, "status": status})
+
+        return JsonResponse({"quizzes": result})
+
+    except Exception as e:
+        logger.error(f"api_quiz_status error: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @login_required(login_url=LOGIN_URL)

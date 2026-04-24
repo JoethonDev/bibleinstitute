@@ -152,9 +152,10 @@ class Course(models.Model):
         return Course.retrieve_courses_for_level(Course, current_level)
     
     def fetch_quizzes(self, user):
-        # Select all quizzes where user took quiz (id) or closing_date < now()
-        # Get all quizzes
-        return self.quizzes.filter(Q(closing_date__gte=now()) | Q(grade__user=user)).distinct('id')
+        # Show ALL quizzes for this course regardless of open/closed state.
+        # Access-level filtering is done in take_exam; quiz-mode logic
+        # (exam / view / closed_unsolved) is determined per student in that view.
+        return self.quizzes.all()
 
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)

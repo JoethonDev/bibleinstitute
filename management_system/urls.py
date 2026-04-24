@@ -19,6 +19,7 @@ urlpatterns = [
     path('courses/<int:course_id>/', view_course_details, name="course-details"),
     path('courses/<int:course_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
     path('courses/<int:course_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
+    path('api/courses/<int:course_id>/quiz-status/', api_quiz_status, name="api-quiz-status"),
     path('lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
     path('lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
     
