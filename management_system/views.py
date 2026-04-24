@@ -172,7 +172,32 @@ class LoginView(views.LoginView):
 
 @login_required(login_url=LOGIN_URL)
 def index(request):
-    return render(request, "index.html")
+    from .utils.helpers import is_quiz_in_user_window
+    user = User.objects.get(username=request.user)
+    role = user.role.role if user.role else "junior"
+
+    # Count accessible courses
+    courses = Course.fetch_courses_by_role(role)
+    course_count = sum(len(level["courses"]) for level in courses)
+
+    # Count open quizzes for this user
+    current_time = now()
+    open_quiz_count = 0
+    for level in courses:
+        for course in level["courses"]:
+            for quiz in course.quizzes.all():
+                quiz_open = quiz.opening_date <= current_time <= quiz.closing_date + timedelta(minutes=30)
+                if quiz_open and is_quiz_in_user_window(quiz, user):
+                    grade = Grade.objects.filter(user=user, quiz=quiz).first()
+                    if not grade:
+                        open_quiz_count += 1
+
+    return render(request, "index.html", {
+        "course_count": course_count,
+        "open_quiz_count": open_quiz_count,
+        "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+        "role_display": str(_(user.role.get_role_display())) if user.role else "",
+    })
 
 # Detail Class [handles with and without pk routes]
 class ProfileDetail(LoginProtection, DetailView):
