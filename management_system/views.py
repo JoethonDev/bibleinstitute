@@ -300,8 +300,10 @@ def view_course_details(request, course_id):
         logger.info(f"User : {user} is accessing {course.name} course")
 
         context = {
-            "lessons" : [],
-            "quizzes" : course.fetch_quizzes(user)
+            "lessons": [],
+            "quizzes": course.fetch_quizzes(user),
+            "course_id": course_id,
+            "course": course,
         }
         if user.role.role in MANAGEMENT_ROLES:
             context['lessons'] = course.lessons.all()
