@@ -277,11 +277,16 @@ def view_courses(request):
 
     user = User.objects.get(username=username)
     courses = Course.fetch_courses_by_role(user.role.role)
-    logger.info(f"{username} access {len(courses)} academic years ")
+    logger.info(f"{username} access {len(courses)} academic years")
 
+    # Annotate each course with lesson/quiz counts for the template
+    for level in courses:
+        for course in level["courses"]:
+            course.lesson_count = course.lessons.count()
+            course.quiz_count = course.quizzes.count()
 
     return render(request, "course_view.html", {
-        "courses" : courses
+        "courses": courses
     })
 
 
