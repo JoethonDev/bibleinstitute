@@ -161,7 +161,58 @@ class R2Manager:
         except Exception as e:
             print(f"Error renaming file from {old_key} to {new_key}: {e}")
             return False
-    
+
+    def rename_folder(self, old_prefix: str, new_prefix: str) -> bool:
+        """
+        Rename a folder by copying all contained objects to a new prefix then deleting the originals.
+
+        Args:
+            old_prefix: Current folder path, e.g. "first year/lectures/"
+            new_prefix: New folder path,  e.g. "first year/sessions/"
+
+        Returns:
+            bool: True if successful
+        """
+        # Normalise: ensure both prefixes end with "/"
+        if not old_prefix.endswith('/'):
+            old_prefix += '/'
+        if not new_prefix.endswith('/'):
+            new_prefix += '/'
+
+        try:
+            paginator = self.client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=old_prefix)
+
+            objects_to_move = []
+            for page in pages:
+                for obj in page.get('Contents', []):
+                    objects_to_move.append(obj['Key'])
+
+            if not objects_to_move:
+                # Folder may only be a virtual prefix with no objects — succeed silently
+                return True
+
+            # Copy each object to new location
+            for old_key in objects_to_move:
+                relative = old_key[len(old_prefix):]
+                new_key = new_prefix + relative
+                self.client.copy_object(
+                    Bucket=self.bucket_name,
+                    CopySource={'Bucket': self.bucket_name, 'Key': old_key},
+                    Key=new_key
+                )
+
+            # Batch-delete originals (S3 DeleteObjects supports up to 1000 per call)
+            for i in range(0, len(objects_to_move), 1000):
+                batch = [{'Key': k} for k in objects_to_move[i:i + 1000]]
+                self.client.delete_objects(Bucket=self.bucket_name, Delete={'Objects': batch})
+
+            return True
+
+        except Exception as e:
+            print(f"Error renaming folder from {old_prefix} to {new_prefix}: {e}")
+            return False
+
     def move_file(self, file_key: str, destination_folder: str) -> Optional[str]:
         """
         Move a file to a different folder
