@@ -1,0 +1,305 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+<div class="page" style="max-width:1200px;" x-data="quizApp()">
+
+  <!-- START SCREEN -->
+  <div x-show="!started && !finished" x-cloak>
+    <div class="card" style="padding:0; overflow:hidden; border:0; box-shadow:var(--shadow);">
+      <div style="background:var(--gradient); color:#fff; padding:2.5rem 2rem;">
+        <div class="row" style="gap:.5rem; flex-wrap:wrap; margin-bottom:.85rem;">
+          <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;">Old Testament 12</span>
+          <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;">Quiz 2</span>
+          <span class="badge" style="background:var(--a); color:#1a1a1a;">Open until Friday 11:59 PM</span>
+        </div>
+        <h1 style="color:#fff; margin:0 0 .5rem; font-size:2rem;">Isaiah Deep Dive</h1>
+        <p style="opacity:.92; max-width:680px; margin:0;">
+          A focused quiz on the historical context, themes, and theology of Isaiah.
+          15 questions, 45 minutes, one attempt.
+        </p>
+      </div>
+      <div style="padding:1.75rem 2rem;">
+        <div class="grid grid-4" style="margin-bottom:1.5rem;">
+          <div class="stat"><span class="stat-icon"><i class="fa-solid fa-list"></i></span><span class="stat-label">Questions</span><span class="stat-value" style="font-size:1.5rem;">15</span></div>
+          <div class="stat"><span class="stat-icon accent"><i class="fa-regular fa-clock"></i></span><span class="stat-label">Time limit</span><span class="stat-value" style="font-size:1.5rem;">45 min</span></div>
+          <div class="stat"><span class="stat-icon"><i class="fa-solid fa-rotate"></i></span><span class="stat-label">Attempts</span><span class="stat-value" style="font-size:1.5rem;">1</span></div>
+          <div class="stat"><span class="stat-icon accent"><i class="fa-solid fa-trophy"></i></span><span class="stat-label">Passing</span><span class="stat-value" style="font-size:1.5rem;">70%</span></div>
+        </div>
+        <div class="row" style="gap:.5rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; margin-bottom:1.5rem;">
+          <i class="fa-solid fa-circle-info" style="color:var(--p);"></i>
+          <div>
+            <strong>Before you start</strong>
+            <ul style="margin:.35rem 0 0 1.1rem; font-size:.88rem; color:var(--ink-soft);">
+              <li>The timer starts as soon as you click Start.</li>
+              <li>You can review and change answers before submitting.</li>
+              <li>Your progress is auto-saved every 10 seconds.</li>
+              <li>Make sure you have a stable connection.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="row" style="gap:.5rem; justify-content:space-between; flex-wrap:wrap;">
+          <a class="btn btn-ghost" href="{% url 'theme-showcase-page' theme.id 'course_detail' %}"><i class="fa-solid fa-arrow-left"></i> Back to course</a>
+          <button type="button" class="btn btn-primary btn-lg" @click="start()">
+            <i class="fa-solid fa-circle-play"></i> Start quiz
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUIZ TAKING SCREEN -->
+  <div x-show="started && !finished" x-cloak>
+    <!-- Header: timer + progress -->
+    <div class="card" style="position:sticky; top:120px; z-index:30; padding:1rem 1.25rem; margin-bottom:1.25rem;">
+      <div class="row-between" style="gap:1rem; flex-wrap:wrap;">
+        <div>
+          <h2 style="margin:0; font-size:1.15rem;">Isaiah Deep Dive</h2>
+          <div class="muted" style="font-size:.82rem;">Question <strong x-text="currentIndex + 1"></strong> of <span x-text="questions.length"></span></div>
+        </div>
+        <div class="row" style="gap:.85rem; align-items:center;">
+          <div class="row" style="gap:.5rem;">
+            <i class="fa-regular fa-clock" style="color:var(--p);"></i>
+            <strong style="font-family:ui-monospace, monospace; font-size:1.05rem;" x-text="formatTime()"></strong>
+          </div>
+          <div class="row" style="gap:.5rem; min-width:200px;">
+            <div class="progress" style="width:140px;"><span :style="`width: ${(Object.keys(answers).length / questions.length * 100)}%`"></span></div>
+            <span class="muted" style="font-size:.82rem;" x-text="`${Object.keys(answers).length} / ${questions.length}`"></span>
+          </div>
+          <button type="button" class="btn btn-primary" @click="confirmSubmit = true">
+            <i class="fa-solid fa-paper-plane"></i> Submit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 280px 1fr; gap:1.25rem;">
+
+      <!-- Question palette -->
+      <aside class="card" style="position:sticky; top:200px; align-self:start;">
+        <div class="card-header" style="margin-bottom:.85rem;">
+          <div>
+            <div class="card-title">Questions</div>
+            <div class="card-sub">Click to jump</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.35rem; flex-wrap:wrap;">
+          <template x-for="(q, idx) in questions" :key="q.id">
+            <button type="button"
+                    @click="currentIndex = idx"
+                    :class="paletteClass(idx)"
+                    style="width:36px; height:36px; border-radius:var(--radius-sm); border:1px solid var(--border); font-weight:600; font-size:.85rem; cursor:pointer; transition:var(--transition);"
+                    :style="paletteStyle(idx)">
+              <span x-text="idx + 1"></span>
+            </button>
+          </template>
+        </div>
+        <div class="divider"></div>
+        <div class="stack" style="gap:.35rem; font-size:.78rem;">
+          <div class="row" style="gap:.5rem;"><span style="width:14px; height:14px; background:var(--p); border-radius:3px;"></span> <span class="muted">Current</span></div>
+          <div class="row" style="gap:.5rem;"><span style="width:14px; height:14px; background:var(--success); border-radius:3px;"></span> <span class="muted">Answered</span></div>
+          <div class="row" style="gap:.5rem;"><span style="width:14px; height:14px; background:var(--surface-alt); border:1px solid var(--border); border-radius:3px;"></span> <span class="muted">Not answered</span></div>
+        </div>
+      </aside>
+
+      <!-- Question -->
+      <div>
+        <template x-for="(q, idx) in questions" :key="q.id">
+          <div x-show="currentIndex === idx" class="card">
+            <div class="row-between" style="margin-bottom:.85rem;">
+              <span class="badge"><i class="fa-solid fa-circle-question"></i> <span x-text="q.type"></span></span>
+              <span class="muted" style="font-size:.82rem;"><span x-text="q.points"></span> points</span>
+            </div>
+            <h2 style="margin:0 0 1.25rem; font-size:1.3rem;" x-text="q.text"></h2>
+
+            <!-- Multiple choice -->
+            <div x-show="q.type === 'Multiple choice'" class="stack-md">
+              <template x-for="opt in q.options" :key="opt">
+                <label class="row" :class="isSelected(q.id, opt) ? 'is-active' : ''"
+                       @click="select(q.id, opt)"
+                       style="gap:.85rem; padding:1rem; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:var(--transition);"
+                       :style="isSelected(q.id, opt) ? 'border-color: var(--p); background: var(--p-soft);' : ''">
+                  <span style="width:22px; height:22px; border-radius:50%; border:2px solid var(--border); display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;"
+                        :style="isSelected(q.id, opt) ? 'border-color: var(--p);' : ''">
+                    <span x-show="isSelected(q.id, opt)" style="width:10px; height:10px; background:var(--p); border-radius:50%;"></span>
+                  </span>
+                  <span x-text="opt"></span>
+                </label>
+              </template>
+            </div>
+
+            <!-- True / false -->
+            <div x-show="q.type === 'True / false'" class="grid grid-2" style="gap:.85rem;">
+              <button type="button" @click="select(q.id, 'True')"
+                      class="btn"
+                      :style="answers[q.id] === 'True' ? 'background:var(--p); color:#fff; border-color:var(--p);' : 'background:var(--surface); color:var(--ink); border:1px solid var(--border); padding:1.25rem; font-size:1.05rem;'">
+                <i class="fa-solid fa-check"></i> True
+              </button>
+              <button type="button" @click="select(q.id, 'False')"
+                      class="btn"
+                      :style="answers[q.id] === 'False' ? 'background:var(--p); color:#fff; border-color:var(--p);' : 'background:var(--surface); color:var(--ink); border:1px solid var(--border); padding:1.25rem; font-size:1.05rem;'">
+                <i class="fa-solid fa-xmark"></i> False
+              </button>
+            </div>
+
+            <!-- Short answer -->
+            <div x-show="q.type === 'Short answer'">
+              <textarea class="input" rows="3" placeholder="Type your answer here…"
+                        @input="select(q.id, $event.target.value)"
+                        :value="answers[q.id] || ''"></textarea>
+              <div class="muted" style="font-size:.78rem; margin-top:.35rem;"><i class="fa-solid fa-info-circle"></i> 2–3 sentences expected.</div>
+            </div>
+
+            <div class="row" style="gap:.5rem; margin-top:1.5rem; justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" @click="prev()" :disabled="currentIndex === 0">
+                <i class="fa-solid fa-chevron-left"></i> Previous
+              </button>
+              <button type="button" class="btn btn-soft" @click="flag(q.id)" :class="flagged.includes(q.id) ? 'is-active' : ''" :style="flagged.includes(q.id) ? 'background:var(--a); color:#1a1a1a; border-color:var(--a);' : ''">
+                <i class="fa-solid fa-flag"></i> <span x-text="flagged.includes(q.id) ? 'Flagged' : 'Flag for review'"></span>
+              </button>
+              <button type="button" class="btn btn-primary" @click="next()" :disabled="currentIndex === questions.length - 1">
+                Next <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div x-show="finished" x-cloak>
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; max-width:680px; margin:0 auto;">
+      <span style="display:inline-flex; width:96px; height:96px; border-radius:50%; background:var(--gradient); color:#fff; align-items:center; justify-content:center; font-size:2.5rem; box-shadow:var(--shadow); margin-bottom:1rem;">
+        <i class="fa-solid fa-trophy"></i>
+      </span>
+      <h1 style="margin:0 0 .35rem;">Quiz submitted!</h1>
+      <p class="muted" style="margin:0 0 1.5rem;">Here's a quick summary. Detailed grading will be available within 24 hours.</p>
+      <div class="grid grid-3" style="margin-bottom:1.5rem;">
+        <div class="stat">
+          <span class="stat-icon success"><i class="fa-solid fa-check"></i></span>
+          <span class="stat-label">Answered</span>
+          <span class="stat-value" x-text="`${Object.keys(answers).length} / ${questions.length}`"></span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon accent"><i class="fa-regular fa-clock"></i></span>
+          <span class="stat-label">Time used</span>
+          <span class="stat-value" x-text="`${usedMinutes}m`"></span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon"><i class="fa-solid fa-flag"></i></span>
+          <span class="stat-label">Flagged</span>
+          <span class="stat-value" x-text="flagged.length"></span>
+        </div>
+      </div>
+      <div class="row" style="gap:.5rem; justify-content:center;">
+        <a class="btn btn-ghost" href="{% url 'theme-showcase-page' theme.id 'course_detail' %}"><i class="fa-solid fa-arrow-left"></i> Back to course</a>
+        <button type="button" class="btn btn-primary" @click="reset()"><i class="fa-solid fa-rotate"></i> Try again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm submit modal -->
+  <div x-show="confirmSubmit" x-cloak
+       style="position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:1rem; background:rgba(15,23,42,0.5); backdrop-filter:blur(4px);"
+       @click.self="confirmSubmit = false">
+    <div class="card" style="max-width:480px; width:100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Submit quiz?</div>
+          <div class="card-sub">This action cannot be undone</div>
+        </div>
+      </div>
+      <div class="row" style="gap:.65rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); padding:.85rem; margin-bottom:1rem;">
+        <i class="fa-solid fa-circle-info" style="color:var(--p);"></i>
+        <div>
+          <strong x-text="`${Object.keys(answers).length} of ${questions.length} answered`"></strong>
+          <div class="muted" style="font-size:.8rem;" x-text="`${questions.length - Object.keys(answers).length} unanswered · ${flagged.length} flagged`"></div>
+        </div>
+      </div>
+      <div class="row" style="gap:.5rem; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" @click="confirmSubmit = false">Keep editing</button>
+        <button type="button" class="btn btn-primary" @click="submit()"><i class="fa-solid fa-paper-plane"></i> Submit</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function quizApp() {
+    return {
+      started: false,
+      finished: false,
+      confirmSubmit: false,
+      currentIndex: 0,
+      answers: {},
+      flagged: [],
+      startedAt: null,
+      usedMinutes: 0,
+      timeLeft: 45 * 60,
+      _timer: null,
+      questions: [
+        { id: 1, type: 'Multiple choice', points: 2, text: 'In what year (approximately) did Isaiah begin his prophetic ministry?',
+          options: ['740 BC', '586 BC', '722 BC', '700 BC'] },
+        { id: 2, type: 'Multiple choice', points: 2, text: 'Which Assyrian king invaded Judah during Isaiah\'s ministry?',
+          options: ['Tiglath-Pileser III', 'Sennacherib', 'Shalmaneser V', 'Esarhaddon'] },
+        { id: 3, type: 'True / false', points: 1, text: 'Isaiah 53 is traditionally understood as a messianic prophecy about the suffering servant.' },
+        { id: 4, type: 'Multiple choice', points: 2, text: 'Which vision in Isaiah\'s calling chapter features a seraph touching his lips with a coal?',
+          options: ['Chapter 1', 'Chapter 6', 'Chapter 40', 'Chapter 53'] },
+        { id: 5, type: 'Short answer', points: 3, text: 'Briefly explain the significance of Immanuel ("God with us") in Isaiah 7:14.' },
+      ],
+      start() {
+        this.started = true;
+        this.startedAt = Date.now();
+        this._timer = setInterval(() => {
+          this.timeLeft--;
+          if (this.timeLeft <= 0) { this.submit(); }
+        }, 1000);
+      },
+      next() { if (this.currentIndex < this.questions.length - 1) this.currentIndex++; },
+      prev() { if (this.currentIndex > 0) this.currentIndex--; },
+      select(qid, value) { this.answers[qid] = value; },
+      isSelected(qid, value) { return this.answers[qid] === value; },
+      flag(qid) {
+        if (this.flagged.includes(qid)) this.flagged = this.flagged.filter(x => x !== qid);
+        else this.flagged.push(qid);
+      },
+      submit() {
+        clearInterval(this._timer);
+        this.usedMinutes = Math.round((Date.now() - this.startedAt) / 60000);
+        this.confirmSubmit = false;
+        this.finished = true;
+      },
+      reset() {
+        this.started = false;
+        this.finished = false;
+        this.confirmSubmit = false;
+        this.currentIndex = 0;
+        this.answers = {};
+        this.flagged = [];
+        this.timeLeft = 45 * 60;
+        clearInterval(this._timer);
+      },
+      formatTime() {
+        const m = Math.floor(this.timeLeft / 60);
+        const s = this.timeLeft % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      },
+      paletteClass(idx) {
+        const q = this.questions[idx];
+        const ans = this.answers[q.id] !== undefined;
+        if (idx === this.currentIndex) return 'is-current';
+        if (ans) return 'is-answered';
+        return 'is-unanswered';
+      },
+      paletteStyle(idx) {
+        const q = this.questions[idx];
+        const ans = this.answers[q.id] !== undefined;
+        if (idx === this.currentIndex) return 'background: var(--p); color: #fff; border-color: var(--p);';
+        if (ans) return 'background: var(--success); color: #fff; border-color: var(--success);';
+        return '';
+      }
+    }
+  }
+</script>
+{% endblock %}

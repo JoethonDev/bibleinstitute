@@ -1,0 +1,120 @@
+{% comment %}
+  Showcase chrome — sticky bar with theme + page switcher.
+  Collapsible so reviewers can hide the chrome and focus on
+  the page being evaluated. State persists in localStorage.
+{% endcomment %}
+{% load static %}
+
+<div class="showcase-bar"
+     x-data="showcaseChrome()"
+     x-init="init()"
+     :class="{ 'is-collapsed': collapsed }">
+
+  <div class="showcase-bar-main">
+    <div class="showcase-bar-inner">
+
+      <a class="showcase-brand" href="{% url 'theme-catalog' %}">
+        <span class="dot"></span>
+        <span>
+          Theme Showcase
+          <small>· choose a look before refactoring</small>
+        </span>
+      </a>
+
+      <div class="showcase-divider"></div>
+
+      <span class="showcase-group"><i class="fa-solid fa-palette"></i> Theme</span>
+      <div class="showcase-pills">
+        {% for t in themes %}
+          <a class="showcase-pill {% if t.id == theme.id %}is-active{% endif %}"
+             href="{% url 'theme-showcase-page' t.id active_page_id|default:'home' %}"
+             title="{{ t.tagline }}">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg, {{ t.cover.0 }} 0%, {{ t.cover.1 }} 50%, {{ t.cover.2 }} 100%);"></span>
+            <span class="pill-label">{{ t.name }}</span>
+          </a>
+        {% endfor %}
+      </div>
+
+      <div class="showcase-divider"></div>
+
+      <span class="showcase-group"><i class="fa-regular fa-file-lines"></i> Page</span>
+      <div class="showcase-pills">
+        {% for p in showcase_pages %}
+          <a class="showcase-pill {% if p.id == active_page_id %}is-active{% endif %}"
+             href="{% url 'theme-showcase-page' theme.id p.id %}"
+             title="{{ p.group }} — {{ p.name }}">
+            <i class="fa-solid {{ p.icon }}"></i>
+            <span class="pill-label">{{ p.name }}</span>
+          </a>
+        {% endfor %}
+      </div>
+
+      <div style="margin-left:auto; display:flex; align-items:center; gap:.35rem;">
+        <a class="showcase-back" href="{% url 'theme-catalog' %}">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span class="pill-label">Catalog</span>
+        </a>
+        <button type="button"
+                class="showcase-collapse-btn"
+                @click="toggle()"
+                :aria-expanded="!collapsed"
+                title="Collapse / expand the showcase chrome so you can evaluate the page in isolation">
+          <i class="fa-solid" :class="collapsed ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+          <span x-text="collapsed ? 'Show chrome' : 'Hide chrome'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="showcase-direct" x-show="!collapsed" x-collapse>
+    <div class="showcase-bar-inner">
+      <span class="showcase-group" style="color:var(--p);">
+        <i class="fa-solid fa-bolt"></i> Direct links for
+        <strong style="color:var(--ink); margin-left:.25rem;">{{ theme.name }}</strong>
+        {% if active_page_id != "catalog" %}
+          <span class="muted" style="font-weight:500; margin-left:.35rem;">/ {{ active_page_id }}</span>
+        {% endif %}
+      </span>
+      <div class="showcase-pills">
+        {% for p in showcase_pages %}
+          <a class="showcase-pill {% if p.id == active_page_id %}is-active{% endif %}"
+             href="{% url 'theme-showcase-page' theme.id p.id %}"
+             style="font-size:.76rem;">
+            <i class="fa-solid {{ p.icon }}"></i>
+            <span class="pill-label">/{{ p.id }}/</span>
+          </a>
+        {% endfor %}
+      </div>
+      <code class="showcase-permalink">
+        <i class="fa-solid fa-link"></i> /showcase/{{ theme.id }}/{{ active_page_id|default:"home" }}/
+      </code>
+    </div>
+  </div>
+</div>
+
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+
+<script>
+  function showcaseChrome() {
+    return {
+      collapsed: false,
+      _key: "showcase_chrome_collapsed",
+      init() {
+        try {
+          this.collapsed = localStorage.getItem(this._key) === "1";
+        } catch (e) { this.collapsed = false; }
+        this._sync();
+      },
+      toggle() {
+        this.collapsed = !this.collapsed;
+        try { localStorage.setItem(this._key, this.collapsed ? "1" : "0"); } catch (e) {}
+        this._sync();
+      },
+      _sync() {
+        document.body.classList.toggle("showcase-chrome-collapsed", this.collapsed);
+      }
+    }
+  }
+</script>

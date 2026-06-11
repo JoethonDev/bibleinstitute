@@ -1,0 +1,349 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+{% include "theme_showcase/partials/_navbar_user.html" %}
+
+<div class="page">
+
+  <!-- HERO -->
+  <section class="card" style="padding:0; overflow:hidden; border:0; box-shadow:var(--shadow);">
+    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:0; min-height:280px;">
+      <div style="padding:2.25rem 2rem; background:var(--gradient); color:#fff; position:relative;">
+        <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff; margin-bottom:1rem;">
+          <i class="fa-solid fa-fire"></i> New term is open
+        </span>
+        <h1 style="color:#fff; font-size:2.1rem; line-height:1.15; margin-bottom:.5rem;">
+          Welcome back, George
+        </h1>
+        <p style="opacity:.9; max-width:520px; margin:0 0 1.25rem;">
+          You have <strong>2 open quizzes</strong> and <strong>4 new lessons</strong>
+          waiting in your second-year courses this week.
+        </p>
+        <div class="row" style="gap:.5rem; flex-wrap:wrap;">
+          <a class="btn" href="{% url 'theme-showcase-page' theme.id 'courses' %}"
+             style="background:#fff; color:var(--p-strong);">
+            <i class="fa-solid fa-book-open"></i> Continue learning
+          </a>
+          <a class="btn" href="{% url 'theme-showcase-page' theme.id 'admin' %}"
+             style="background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.3);">
+            <i class="fa-solid fa-gauge-high"></i> Admin dashboard
+          </a>
+        </div>
+        <div style="position:absolute; right:-30px; bottom:-30px; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,0.06);"></div>
+      </div>
+
+      <div style="background:var(--surface); padding:1.75rem; display:flex; flex-direction:column; gap:1rem; justify-content:center;">
+        <div class="row" style="gap:1rem; align-items:center;">
+          <span class="avatar lg" style="width:80px; height:80px; font-size:1.6rem;">GE</span>
+          <div>
+            <div class="muted" style="font-size:.78rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase;">Logged in as</div>
+            <strong style="font-size:1.05rem;">George Essam</strong>
+            <div class="badge badge-accent" style="margin-top:.25rem;">Admin</div>
+          </div>
+        </div>
+        <div class="divider" style="margin:.25rem 0;"></div>
+        <div class="row-between">
+          <span class="muted" style="font-size:.85rem;">Study streak</span>
+          <strong><i class="fa-solid fa-fire" style="color:var(--a);"></i> 12 days</strong>
+        </div>
+        <div class="row-between">
+          <span class="muted" style="font-size:.85rem;">This week</span>
+          <strong>+6h watched</strong>
+        </div>
+        <div class="row-between">
+          <span class="muted" style="font-size:.85rem;">Rank</span>
+          <strong>#4 in class</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICK STATS -->
+  <div class="grid grid-4" style="margin-top:1.25rem;">
+    <div class="stat">
+      <span class="stat-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+      <span class="stat-label">Average grade</span>
+      <span class="stat-value">87%</span>
+      <span class="stat-delta"><i class="fa-solid fa-arrow-up"></i> +4% vs last term</span>
+    </div>
+    <div class="stat">
+      <span class="stat-icon accent"><i class="fa-solid fa-circle-play"></i></span>
+      <span class="stat-label">Watched hours</span>
+      <span class="stat-value">38h</span>
+      <span class="stat-delta"><i class="fa-solid fa-arrow-up"></i> +6h this week</span>
+    </div>
+    <div class="stat">
+      <span class="stat-icon"><i class="fa-solid fa-list-check"></i></span>
+      <span class="stat-label">Lessons completed</span>
+      <span class="stat-value">24 / 31</span>
+      <span class="stat-delta down"><i class="fa-solid fa-arrow-down"></i> 7 to go</span>
+    </div>
+    <div class="stat">
+      <span class="stat-icon accent"><i class="fa-solid fa-medal"></i></span>
+      <span class="stat-label">Rank in class</span>
+      <span class="stat-value">#4</span>
+      <span class="stat-delta"><i class="fa-solid fa-arrow-up"></i> +1 this month</span>
+    </div>
+  </div>
+
+  <!-- MAIN: continue + side widgets -->
+  <div class="grid" style="grid-template-columns: 1.6fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+
+    <!-- Continue where you left off -->
+    <div class="stack-lg">
+      <div class="row-between">
+        <h2 style="margin:0;">Continue where you left off</h2>
+        <a class="btn btn-ghost btn-sm" href="{% url 'theme-showcase-page' theme.id 'courses' %}">View all <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+
+      <article class="card" style="padding:0; overflow:hidden;">
+        <div style="display:grid; grid-template-columns: 200px 1fr; gap:0;">
+          <div style="background:linear-gradient(135deg, var(--p) 0%, var(--a) 100%); position:relative; min-height:160px; display:flex; align-items:flex-end; padding:1rem;">
+            <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff;">Old Testament</span>
+            <button type="button" class="btn btn-icon" style="position:absolute; top:.65rem; right:.65rem; background:rgba(255,255,255,0.2); color:#fff; border:0; width:32px; height:32px; padding:0;">
+              <i class="fa-solid fa-bookmark"></i>
+            </button>
+          </div>
+          <div style="padding:1.1rem 1.25rem;">
+            <div class="row-between" style="margin-bottom:.35rem;">
+              <span class="badge badge-warning">In progress</span>
+              <span class="muted" style="font-size:.78rem;">Last viewed 2h ago</span>
+            </div>
+            <h3 style="margin:0 0 .25rem;">Old Testament 12 — Lecture 3</h3>
+            <p class="muted" style="margin:0 0 .85rem; font-size:.88rem;">Isaiah: Context & Authorship · 32 min</p>
+            <div class="stack" style="gap:.35rem;">
+              <div class="row-between" style="font-size:.78rem;"><span class="muted">Course progress</span><strong>65%</strong></div>
+              <div class="progress"><span style="width:65%;"></span></div>
+            </div>
+            <div class="row" style="gap:.5rem; margin-top:1rem;">
+              <a class="btn btn-primary" href="{% url 'theme-showcase-page' theme.id 'course_detail' %}">
+                <i class="fa-solid fa-circle-play"></i> Resume
+              </a>
+              <a class="btn btn-ghost" href="{% url 'theme-showcase-page' theme.id 'course_detail' %}">
+                <i class="fa-regular fa-eye"></i> View course
+              </a>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <div class="grid grid-2">
+        <article class="card interactive" style="padding:0; overflow:hidden;" onclick="window.location.href='{% url 'theme-showcase-page' theme.id 'course_detail' %}'">
+          <div style="height:80px; background:linear-gradient(135deg, var(--a) 0%, var(--p) 100%); position:relative;">
+            <span class="badge" style="position:absolute; top:.6rem; left:.6rem; background:rgba(255,255,255,0.18); color:#fff;">History</span>
+          </div>
+          <div style="padding:.85rem 1rem 1rem;">
+            <div class="card-title" style="font-size:1rem; margin-bottom:.2rem;">History of the Bible</div>
+            <div class="muted" style="font-size:.8rem;">Magued Labib</div>
+            <div class="row-between" style="margin-top:.5rem; font-size:.78rem;"><span class="muted">40%</span><strong>4 of 12</strong></div>
+            <div class="progress" style="margin-top:.3rem;"><span style="width:40%;"></span></div>
+          </div>
+        </article>
+        <article class="card interactive" style="padding:0; overflow:hidden;" onclick="window.location.href='{% url 'theme-showcase-page' theme.id 'course_detail' %}'">
+          <div style="height:80px; background:linear-gradient(135deg, var(--p-strong) 0%, var(--a) 100%); position:relative;">
+            <span class="badge" style="position:absolute; top:.6rem; left:.6rem; background:rgba(255,255,255,0.18); color:#fff;">Cultures</span>
+          </div>
+          <div style="padding:.85rem 1rem 1rem;">
+            <div class="card-title" style="font-size:1rem; margin-bottom:.2rem;">OT Cultures & Backgrounds</div>
+            <div class="muted" style="font-size:.8rem;">Fr. Mousa Mikhail</div>
+            <div class="row-between" style="margin-top:.5rem; font-size:.78rem;"><span class="muted">82%</span><strong>5 of 6</strong></div>
+            <div class="progress" style="margin-top:.3rem;"><span style="width:82%;"></span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <!-- Side widgets -->
+    <div class="stack-lg">
+      <!-- Upcoming -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Upcoming</div>
+            <div class="card-sub">This week's schedule</div>
+          </div>
+          <button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-calendar-days"></i></button>
+        </div>
+        <div class="stack-md">
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <div style="text-align:center; min-width:42px;">
+              <div style="font-size:.65rem; font-weight:700; color:var(--p); text-transform:uppercase;">Jun</div>
+              <div style="font-size:1.3rem; font-weight:700; line-height:1;">12</div>
+            </div>
+            <div style="flex:1;">
+              <strong style="font-size:.88rem;">OT 12 — Lecture 4</strong>
+              <div class="muted" style="font-size:.78rem;">Today · 6:00 PM · 28 min</div>
+            </div>
+            <span class="badge badge-accent">Live</span>
+          </div>
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <div style="text-align:center; min-width:42px;">
+              <div style="font-size:.65rem; font-weight:700; color:var(--p); text-transform:uppercase;">Jun</div>
+              <div style="font-size:1.3rem; font-weight:700; line-height:1;">14</div>
+            </div>
+            <div style="flex:1;">
+              <strong style="font-size:.88rem;">OT 12 — Quiz 2 deadline</strong>
+              <div class="muted" style="font-size:.78rem;">Friday · 11:59 PM</div>
+            </div>
+            <span class="badge badge-warning">Soon</span>
+          </div>
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <div style="text-align:center; min-width:42px;">
+              <div style="font-size:.65rem; font-weight:700; color:var(--p); text-transform:uppercase;">Jun</div>
+              <div style="font-size:1.3rem; font-weight:700; line-height:1;">16</div>
+            </div>
+            <div style="flex:1;">
+              <strong style="font-size:.88rem;">Church History midterm</strong>
+              <div class="muted" style="font-size:.78rem;">Sun · 10:00 AM · 60 min</div>
+            </div>
+            <span class="badge">Exam</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Achievements -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Achievements</div>
+            <div class="card-sub">3 of 12 unlocked</div>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="#">All <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+        <div class="row" style="gap:.85rem; flex-wrap:wrap;">
+          <div class="stack" style="align-items:center; gap:.35rem;">
+            <span style="width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--a) 0%, var(--p) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; box-shadow:var(--shadow);">
+              <i class="fa-solid fa-fire"></i>
+            </span>
+            <span style="font-size:.72rem; font-weight:600;">12-day streak</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem;">
+            <span style="width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--success) 0%, var(--p) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; box-shadow:var(--shadow);">
+              <i class="fa-solid fa-book-open"></i>
+            </span>
+            <span style="font-size:.72rem; font-weight:600;">First course</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem;">
+            <span style="width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--p) 0%, var(--a) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; box-shadow:var(--shadow);">
+              <i class="fa-solid fa-medal"></i>
+            </span>
+            <span style="font-size:.72rem; font-weight:600;">Top 10</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; opacity:.35;">
+            <span style="width:56px; height:56px; border-radius:50%; background:var(--surface-alt); border:1px dashed var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink-soft);">
+              <i class="fa-solid fa-lock"></i>
+            </span>
+            <span style="font-size:.72rem; font-weight:600;">Locked</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity + announcements -->
+  <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:1.25rem; margin-top:1.5rem;">
+
+    <!-- Recent activity -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Activity</div>
+          <div class="card-sub">What you've been doing</div>
+        </div>
+        <div class="row" style="gap:.35rem;">
+          <button class="btn btn-soft btn-sm">All</button>
+          <button class="btn btn-ghost btn-sm">Lessons</button>
+          <button class="btn btn-ghost btn-sm">Quizzes</button>
+        </div>
+      </div>
+      <div class="stack-md">
+        <div class="row" style="gap:.85rem; padding:.65rem 0; border-bottom:1px solid var(--border);">
+          <span class="stat-icon success"><i class="fa-solid fa-check"></i></span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.92rem;">Completed Lecture 2</strong>
+              <span class="muted" style="font-size:.76rem;">2h ago</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">History of the Bible — 24 min watched</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.85rem; padding:.65rem 0; border-bottom:1px solid var(--border);">
+          <span class="stat-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.92rem;">Quiz submitted</strong>
+              <span class="muted" style="font-size:.76rem;">Yesterday</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">OT 12 — Quiz 1 · Scored 18 / 20</div>
+          </div>
+          <span class="badge badge-success">90%</span>
+        </div>
+        <div class="row" style="gap:.85rem; padding:.65rem 0; border-bottom:1px solid var(--border);">
+          <span class="stat-icon accent"><i class="fa-solid fa-bookmark"></i></span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.92rem;">Bookmarked a lesson</strong>
+              <span class="muted" style="font-size:.76rem;">2 days ago</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">OT Cultures — Lecture 5 at 12:34</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.85rem; padding:.65rem 0;">
+          <span class="stat-icon"><i class="fa-solid fa-circle-play"></i></span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.92rem;">Started a new course</strong>
+              <span class="muted" style="font-size:.76rem;">3 days ago</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">Church History 1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Announcements -->
+    <div class="card" id="announcements">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Announcements</div>
+          <div class="card-sub">From your instructors</div>
+        </div>
+        <span class="badge badge-accent">3 new</span>
+      </div>
+      <div class="stack-md">
+        <div class="row" style="gap:.75rem; padding:.65rem 0; border-bottom:1px solid var(--border);">
+          <span class="avatar sm">MM</span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.88rem;">Magued Makram</strong>
+              <span class="muted" style="font-size:.72rem;">2h ago</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">Reminder: Quiz 2 closes Friday at 11:59 PM.</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.75rem; padding:.65rem 0; border-bottom:1px solid var(--border);">
+          <span class="avatar sm" style="background:var(--a);">BI</span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.88rem;">Bible Institute</strong>
+              <span class="muted" style="font-size:.72rem;">Yesterday</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">New term schedule is now available.</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.75rem; padding:.65rem 0;">
+          <span class="avatar sm" style="background:var(--p-strong);">FM</span>
+          <div style="flex:1;">
+            <div class="row-between">
+              <strong style="font-size:.88rem;">Fr. Mousa</strong>
+              <span class="muted" style="font-size:.72rem;">2 days ago</span>
+            </div>
+            <div class="muted" style="font-size:.85rem;">Supplementary reading material added.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

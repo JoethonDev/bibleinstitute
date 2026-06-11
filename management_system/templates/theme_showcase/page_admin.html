@@ -1,0 +1,578 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+<div class="admin-layout" style="display:grid; grid-template-columns: 260px 1fr; min-height:100vh;" x-data="{ sidebar: window.innerWidth > 900, section: 'dashboard' }">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar" :class="{ 'is-open': sidebar }"
+         style="background:var(--surface); border-right:1px solid var(--border); padding:1.25rem 1rem; position:sticky; top:64px; align-self:start; height:calc(100vh - 64px); overflow:auto;">
+
+    <a class="showcase-brand" href="{% url 'theme-showcase-page' theme.id 'home' %}" style="margin-bottom:1.5rem;">
+      <span class="dot"></span>
+      <span>
+        Bible Institute
+        <small>· Admin console</small>
+      </span>
+    </a>
+
+    <div class="stack-lg">
+      <div class="stack" style="gap:.15rem;">
+        <span class="showcase-group">Overview</span>
+        <a class="showcase-pill" :class="section === 'dashboard' ? 'is-active' : ''" @click.prevent="section = 'dashboard'" href="#">
+          <i class="fa-solid fa-gauge-high"></i> Dashboard
+        </a>
+        <a class="showcase-pill" :class="section === 'analytics' ? 'is-active' : ''" @click.prevent="section = 'analytics'" href="#">
+          <i class="fa-solid fa-chart-line"></i> Analytics
+        </a>
+        <a class="showcase-pill" :class="section === 'notifications' ? 'is-active' : ''" @click.prevent="section = 'notifications'" href="#">
+          <i class="fa-regular fa-bell"></i> Notifications
+          <span class="badge badge-accent" style="margin-left:auto;">5</span>
+        </a>
+      </div>
+
+      <div class="stack" style="gap:.15rem;">
+        <span class="showcase-group">People</span>
+        <a class="showcase-pill" :class="section === 'users' ? 'is-active' : ''" @click.prevent="section = 'users'" href="#">
+          <i class="fa-solid fa-users"></i> Users
+          <span class="badge" style="margin-left:auto;">88</span>
+        </a>
+        <a class="showcase-pill" :class="section === 'roles' ? 'is-active' : ''" @click.prevent="section = 'roles'" href="#">
+          <i class="fa-solid fa-user-shield"></i> Roles & permissions
+        </a>
+        <a class="showcase-pill" :class="section === 'students' ? 'is-active' : ''" @click.prevent="section = 'students'" href="#">
+          <i class="fa-solid fa-user-graduate"></i> Students
+        </a>
+      </div>
+
+      <div class="stack" style="gap:.15rem;">
+        <span class="showcase-group">Content</span>
+        <a class="showcase-pill" :class="section === 'courses' ? 'is-active' : ''" @click.prevent="section = 'courses'" href="#">
+          <i class="fa-solid fa-book-open"></i> Courses
+          <span class="badge" style="margin-left:auto;">14</span>
+        </a>
+        <a class="showcase-pill" :class="section === 'lessons' ? 'is-active' : ''" @click.prevent="section = 'lessons'" href="#">
+          <i class="fa-solid fa-list"></i> Lessons
+          <span class="badge" style="margin-left:auto;">86</span>
+        </a>
+        <a class="showcase-pill" :class="section === 'quizzes' ? 'is-active' : ''" @click.prevent="section = 'quizzes'" href="#">
+          <i class="fa-solid fa-pen-to-square"></i> Quizzes
+          <span class="badge" style="margin-left:auto;">32</span>
+        </a>
+        <a class="showcase-pill" :class="section === 'submissions' ? 'is-active' : ''" @click.prevent="section = 'submissions'" href="#">
+          <i class="fa-solid fa-file-pen"></i> Submissions
+          <span class="badge badge-warning" style="margin-left:auto;">12</span>
+        </a>
+      </div>
+
+      <div class="stack" style="gap:.15rem;">
+        <span class="showcase-group">Files & Reports</span>
+        <a class="showcase-pill" :class="section === 'upload' ? 'is-active' : ''" @click.prevent="section = 'upload'" href="#">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload videos
+        </a>
+        <a class="showcase-pill" :class="section === 'storage' ? 'is-active' : ''" @click.prevent="section = 'storage'" href="#">
+          <i class="fa-solid fa-folder-tree"></i> R2 storage
+          <span class="badge" style="margin-left:auto;">42 GB</span>
+        </a>
+        <a class="showcase-pill" :class="section === 'transcript' ? 'is-active' : ''" @click.prevent="section = 'transcript'" href="#">
+          <i class="fa-solid fa-file-csv"></i> Yearly transcript
+        </a>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="row" style="gap:.65rem;">
+      <span class="avatar">GE</span>
+      <div style="min-width:0; flex:1;">
+        <div style="font-weight:600; font-size:.9rem;">George Essam</div>
+        <div class="muted" style="font-size:.76rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">admin@admin.com</div>
+      </div>
+      <button class="btn btn-ghost btn-icon btn-sm" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main style="padding:1.5rem 1.5rem 3rem; min-width:0;">
+
+    <!-- Top toolbar (mobile burger + breadcrumb) -->
+    <div class="row" style="gap:.5rem; margin-bottom:1rem;">
+      <button type="button" class="btn btn-ghost admin-burger" @click="sidebar = !sidebar" style="display:none;">
+        <i class="fa-solid" :class="sidebar ? 'fa-xmark' : 'fa-bars'"></i>
+      </button>
+      <div class="muted" style="font-size:.85rem;">
+        Admin console ·
+        <strong style="color:var(--ink);">{% if section == 'dashboard' %}Dashboard{% else %}{{ section|title }}{% endif %}</strong>
+      </div>
+    </div>
+
+    <!-- ============================= DASHBOARD ============================= -->
+    <div x-show="section === 'dashboard'" x-cloak>
+      <div class="row-between" style="margin-bottom:1.25rem;">
+        <div>
+          <span class="badge" style="margin-bottom:.35rem;">Welcome back</span>
+          <h1 style="margin:0;">Dashboard</h1>
+          <p class="muted" style="margin:.2rem 0 0;">Overview of users, courses, and recent activity · Thu, Jun 11</p>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn btn-ghost"><i class="fa-solid fa-file-export"></i> <span>Export</span></button>
+          <button class="btn btn-soft"><i class="fa-solid fa-calendar-days"></i> <span>This term</span></button>
+          <button class="btn btn-primary"><i class="fa-solid fa-plus"></i> <span>New course</span></button>
+        </div>
+      </div>
+
+      <!-- KPI stats -->
+      <div class="grid grid-4">
+        <div class="stat">
+          <span class="stat-icon"><i class="fa-solid fa-users"></i></span>
+          <span class="stat-label">Total users</span>
+          <span class="stat-value">88</span>
+          <span class="stat-delta"><i class="fa-solid fa-arrow-up"></i> +6 this month</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon accent"><i class="fa-solid fa-book-open"></i></span>
+          <span class="stat-label">Active courses</span>
+          <span class="stat-value">14</span>
+          <span class="stat-delta"><i class="fa-solid fa-arrow-up"></i> +2 this term</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+          <span class="stat-label">Open quizzes</span>
+          <span class="stat-value">5</span>
+          <span class="stat-delta down"><i class="fa-solid fa-arrow-down"></i> −2 vs last week</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon accent"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+          <span class="stat-label">Storage used</span>
+          <span class="stat-value">42.7 GB</span>
+          <span class="stat-delta"><i class="fa-solid fa-arrow-up"></i> +1.2 GB this week</span>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Enrollments over time</div>
+              <div class="card-sub">Last 8 weeks</div>
+            </div>
+            <div class="row" style="gap:.35rem;">
+              <span class="badge">2025</span>
+              <span class="badge badge-accent">2026</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:.65rem; height:200px; padding:0 .25rem;">
+            {% for h in "60,75,55,90,65,80,95,100" %}{% endfor %}
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:60%; background:var(--p-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:30%; background:var(--p); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W1</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:75%; background:var(--p-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:42%; background:var(--p); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W2</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:55%; background:var(--a-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:38%; background:var(--a); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W3</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:90%; background:var(--a-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:55%; background:var(--a); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W4</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:65%; background:var(--p-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:40%; background:var(--p); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W5</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:80%; background:var(--p-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:60%; background:var(--p); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W6</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:95%; background:var(--a-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:70%; background:var(--a); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W7</span>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:.4rem;">
+              <div style="width:100%; height:100%; background:var(--a-soft); border-radius:6px 6px 0 0; position:relative;"><div style="position:absolute; left:0; right:0; bottom:0; height:80%; background:var(--a); border-radius:6px 6px 0 0;"></div></div>
+              <span class="muted" style="font-size:.7rem;">W8</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Users by role</div>
+              <div class="card-sub">Distribution</div>
+            </div>
+          </div>
+          <div class="stack" style="gap:.85rem; margin-top:.25rem;">
+            <div>
+              <div class="row-between" style="font-size:.85rem;"><span>Admins</span><strong>4</strong></div>
+              <div class="progress" style="margin-top:.25rem;"><span style="width:5%;"></span></div>
+            </div>
+            <div>
+              <div class="row-between" style="font-size:.85rem;"><span>Teachers</span><strong>6</strong></div>
+              <div class="progress" style="margin-top:.25rem;"><span style="width:7%;"></span></div>
+            </div>
+            <div>
+              <div class="row-between" style="font-size:.85rem;"><span>Seniors</span><strong>18</strong></div>
+              <div class="progress" style="margin-top:.25rem;"><span style="width:20%; background:var(--a);"></span></div>
+            </div>
+            <div>
+              <div class="row-between" style="font-size:.85rem;"><span>Juniors</span><strong>60</strong></div>
+              <div class="progress" style="margin-top:.25rem;"><span style="width:68%; background:var(--a);"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tables row -->
+      <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+        <div class="card" style="padding:0; overflow:hidden;">
+          <div class="card-header" style="padding:1.1rem 1.25rem; margin:0; border-bottom:1px solid var(--border);">
+            <div>
+              <div class="card-title">Recent users</div>
+              <div class="card-sub">5 newest accounts</div>
+            </div>
+            <a class="btn btn-soft btn-sm" @click.prevent="section = 'users'" style="cursor:pointer;">View all <i class="fa-solid fa-arrow-right"></i></a>
+          </div>
+          <div class="table-wrap" style="border:0; border-radius:0; box-shadow:none;">
+            <table class="table">
+              <thead><tr><th>User</th><th>Role</th><th>Joined</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><div class="row" style="gap:.6rem;"><span class="avatar sm">MA</span><div><div style="font-weight:600;">Mariam Abo El Naga</div><div class="muted" style="font-size:.78rem;">@MarianaAboElNaga59</div></div></div></td><td><span class="badge">Admin</span></td><td>Oct 12</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+                <tr><td><div class="row" style="gap:.6rem;"><span class="avatar sm" style="background:var(--a);">AY</span><div><div style="font-weight:600;">Adel Yacoub</div><div class="muted" style="font-size:.78rem;">@Oyacoub2002</div></div></div></td><td><span class="badge badge-accent">Admin</span></td><td>Oct 26</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+                <tr><td><div class="row" style="gap:.6rem;"><span class="avatar sm">MA</span><div><div style="font-weight:600;">Mina Ayyad</div><div class="muted" style="font-size:.78rem;">@MinaAyyad60</div></div></div></td><td><span class="badge">Admin</span></td><td>Oct 12</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+                <tr><td><div class="row" style="gap:.6rem;"><span class="avatar sm" style="background:var(--p-strong);">NK</span><div><div style="font-weight:600;">Nancy Khalil</div><div class="muted" style="font-size:.78rem;">@NancyYoussef61</div></div></div></td><td><span class="badge">Admin</span></td><td>Oct 12</td><td><span class="badge badge-warning">Invited</span></td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+                <tr><td><div class="row" style="gap:.6rem;"><span class="avatar sm">NM</span><div><div style="font-weight:600;">Nanette Mikhail</div><div class="muted" style="font-size:.78rem;">@NanetteMikhail62</div></div></div></td><td><span class="badge">Admin</span></td><td>Oct 12</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Recent activity</div>
+              <div class="card-sub">Last 24 hours</div>
+            </div>
+          </div>
+          <div class="stack-md">
+            <div class="row" style="gap:.65rem;"><span class="stat-icon"><i class="fa-solid fa-upload"></i></span><div><strong>New video uploaded</strong><div class="muted" style="font-size:.82rem;">OT 12 — Lecture 6 by Magued Makram · 2h</div></div></div>
+            <div class="row" style="gap:.65rem;"><span class="stat-icon accent"><i class="fa-solid fa-pen-to-square"></i></span><div><strong>Quiz submitted</strong><div class="muted" style="font-size:.82rem;">Mariam Milad · History 3 · 4h</div></div></div>
+            <div class="row" style="gap:.65rem;"><span class="stat-icon"><i class="fa-solid fa-user-plus"></i></span><div><strong>3 users created</strong><div class="muted" style="font-size:.82rem;">Bulk import CSV · 6h</div></div></div>
+            <div class="row" style="gap:.65rem;"><span class="stat-icon accent"><i class="fa-solid fa-folder-plus"></i></span><div><strong>Folder created</strong><div class="muted" style="font-size:.82rem;">second-year/old-promise/ · Yesterday</div></div></div>
+            <div class="row" style="gap:.65rem;"><span class="stat-icon"><i class="fa-solid fa-file-export"></i></span><div><strong>Transcript exported</strong><div class="muted" style="font-size:.82rem;">2024-2025 yearly · 2d</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= USERS ============================= -->
+    <div x-show="section === 'users'" x-cloak>
+      <div class="row-between" style="margin-bottom:1.25rem;">
+        <div>
+          <span class="badge" style="margin-bottom:.35rem;">People</span>
+          <h1 style="margin:0;">Users</h1>
+          <p class="muted" style="margin:.2rem 0 0;">88 users · 4 admins · 6 teachers · 78 students</p>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn btn-ghost"><i class="fa-solid fa-file-export"></i> Export CSV</button>
+          <button class="btn btn-soft"><i class="fa-solid fa-file-arrow-up"></i> Bulk import</button>
+          <button class="btn btn-primary"><i class="fa-solid fa-user-plus"></i> New user</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border);">
+          <div class="row" style="gap:.75rem; flex-wrap:wrap;">
+            <div style="flex:1; min-width:240px;" class="search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input class="input" type="text" placeholder="Search by name, username, email…">
+            </div>
+            <select class="input" style="max-width:180px;">
+              <option>All roles</option><option>Admin</option><option>Teacher</option><option>Senior</option><option>Junior</option>
+            </select>
+            <select class="input" style="max-width:180px;">
+              <option>All status</option><option>Active</option><option>Invited</option><option>Disabled</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap" style="border:0; border-radius:0; box-shadow:none;">
+          <table class="table">
+            <thead><tr><th style="width:32px;"><input class="checkbox" type="checkbox"></th><th>User</th><th>Role</th><th>Email</th><th>Joined</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.6rem;"><span class="avatar sm">GE</span><div><div style="font-weight:600;">George Essam</div><div class="muted" style="font-size:.78rem;">@admin</div></div></div></td><td><span class="badge">Admin</span></td><td>admin@admin.com</td><td>Jul 30, 2025</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-icon btn-sm" title="Delete"><i class="fa-regular fa-trash-can"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.6rem;"><span class="avatar sm" style="background:var(--a);">CF</span><div><div style="font-weight:600;">Christine Faheem</div><div class="muted" style="font-size:.78rem;">@ChristineFaheem01</div></div></div></td><td><span class="badge badge-accent">Admin</span></td><td>—</td><td>Oct 9, 2025</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-icon btn-sm" title="Delete"><i class="fa-regular fa-trash-can"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.6rem;"><span class="avatar sm" style="background:var(--p-strong);">HN</span><div><div style="font-weight:600;">Hala Naoum</div><div class="muted" style="font-size:.78rem;">@HalaNaoum02</div></div></div></td><td><span class="badge">Admin</span></td><td>—</td><td>Oct 9, 2025</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-regular fa-trash-can"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.6rem;"><span class="avatar sm">AE</span><div><div style="font-weight:600;">Amgad Eskandar</div><div class="muted" style="font-size:.78rem;">@AmgadEskandar03</div></div></div></td><td><span class="badge">Admin</span></td><td>—</td><td>Oct 9, 2025</td><td><span class="badge badge-warning">Invited</span></td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-regular fa-trash-can"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.6rem;"><span class="avatar sm" style="background:var(--a);">VH</span><div><div style="font-weight:600;">Viola Habib</div><div class="muted" style="font-size:.78rem;">@ViolaHabib04</div></div></div></td><td><span class="badge">Admin</span></td><td>—</td><td>Oct 9, 2025</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-regular fa-trash-can"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.6rem;"><span class="avatar sm" style="background:var(--p-strong);">MM</span><div><div style="font-weight:600;">Magued Makram</div><div class="muted" style="font-size:.78rem;">@magued_makram</div></div></div></td><td><span class="badge">Junior</span></td><td>—</td><td>Oct 11, 2025</td><td><span class="badge badge-success">Active</span></td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-regular fa-trash-can"></i></button></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="row-between" style="padding:.85rem 1.25rem; background:var(--surface-alt); border-top:1px solid var(--border);">
+          <span class="muted" style="font-size:.85rem;">1 selected · Showing 1–6 of 88 users</span>
+          <div class="row" style="gap:.5rem;">
+            <button class="btn btn-ghost btn-sm"><i class="fa-regular fa-trash-can"></i> Delete selected</button>
+            <div class="row" style="gap:.35rem;">
+              <button class="btn btn-ghost btn-icon btn-sm" disabled><i class="fa-solid fa-chevron-left"></i></button>
+              <button class="btn btn-primary btn-icon btn-sm">1</button>
+              <button class="btn btn-ghost btn-icon btn-sm">2</button>
+              <button class="btn btn-ghost btn-icon btn-sm">3</button>
+              <button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis"></i></button>
+              <button class="btn btn-ghost btn-icon btn-sm">15</button>
+              <button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= COURSES ============================= -->
+    <div x-show="section === 'courses'" x-cloak>
+      <div class="row-between" style="margin-bottom:1.25rem;">
+        <div>
+          <span class="badge" style="margin-bottom:.35rem;">Content</span>
+          <h1 style="margin:0;">Courses</h1>
+          <p class="muted" style="margin:.2rem 0 0;">14 courses · 86 lessons · 32 quizzes</p>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <div role="tablist" style="display:inline-flex; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); padding:3px;">
+            <button type="button" class="view-toggle-btn is-active"><i class="fa-solid fa-grid-2"></i> Grid</button>
+            <button type="button" class="view-toggle-btn"><i class="fa-solid fa-list"></i> List</button>
+          </div>
+          <button class="btn btn-primary"><i class="fa-solid fa-plus"></i> New course</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        {% for c in "123456" %}
+        <article class="card interactive" style="padding:0; overflow:hidden;">
+          <div style="height:90px; background:linear-gradient(135deg, var(--p) 0%, var(--a) 100%); position:relative;">
+            <span class="badge" style="position:absolute; top:.65rem; left:.65rem; background:rgba(255,255,255,0.2); color:#fff;">Year 2</span>
+            <button class="btn btn-icon btn-sm" style="position:absolute; top:.5rem; right:.5rem; background:rgba(255,255,255,0.2); color:#fff; border:0; width:28px; height:28px; padding:0;"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+          </div>
+          <div style="padding:.9rem 1rem 1rem;">
+            <div class="row-between" style="margin-bottom:.3rem;">
+              <span class="badge badge-success">Published</span>
+              <span class="muted" style="font-size:.78rem;">{{ forloop.counter }} of 14</span>
+            </div>
+            <div class="card-title" style="font-size:1rem; margin-bottom:.2rem;">Old Testament 12</div>
+            <div class="muted" style="font-size:.82rem;">Magued Makram</div>
+            <div class="row" style="gap:.5rem; margin-top:.55rem; font-size:.76rem; color:var(--ink-soft);">
+              <span><i class="fa-solid fa-list"></i> 8</span>
+              <span><i class="fa-solid fa-pen-to-square"></i> 2</span>
+              <span><i class="fa-solid fa-users"></i> 48</span>
+            </div>
+            <div class="row" style="gap:.5rem; margin-top:.85rem;">
+              <button class="btn btn-soft btn-sm" style="flex:1; justify-content:center;"><i class="fa-solid fa-pen"></i> Edit</button>
+              <button class="btn btn-ghost btn-icon btn-sm"><i class="fa-regular fa-eye"></i></button>
+              <button class="btn btn-ghost btn-icon btn-sm"><i class="fa-regular fa-trash-can"></i></button>
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ============================= STORAGE (R2) ============================= -->
+    <div x-show="section === 'storage'" x-cloak>
+      <div class="row-between" style="margin-bottom:1.25rem;">
+        <div>
+          <span class="badge" style="margin-bottom:.35rem;">Files</span>
+          <h1 style="margin:0;">R2 Storage</h1>
+          <p class="muted" style="margin:.2rem 0 0;">42.7 GB used of 1 TB · 1,284 files · 87 folders</p>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn btn-ghost"><i class="fa-solid fa-folder-plus"></i> New folder</button>
+          <button class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</button>
+        </div>
+      </div>
+
+      <div class="grid grid-4" style="margin-bottom:1.25rem;">
+        <div class="stat"><span class="stat-icon"><i class="fa-solid fa-video"></i></span><span class="stat-label">Videos</span><span class="stat-value">864</span><span class="stat-delta">28.1 GB</span></div>
+        <div class="stat"><span class="stat-icon accent"><i class="fa-solid fa-file-audio"></i></span><span class="stat-label">Audio</span><span class="stat-value">312</span><span class="stat-delta">4.8 GB</span></div>
+        <div class="stat"><span class="stat-icon"><i class="fa-solid fa-file-pdf"></i></span><span class="stat-label">Documents</span><span class="stat-value">98</span><span class="stat-delta">412 MB</span></div>
+        <div class="stat"><span class="stat-icon accent"><i class="fa-solid fa-image"></i></span><span class="stat-label">Images</span><span class="stat-value">10</span><span class="stat-delta">68 MB</span></div>
+      </div>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:.85rem 1.25rem; background:var(--surface-alt); border-bottom:1px solid var(--border);">
+          <div class="row" style="gap:.5rem; align-items:center; flex-wrap:wrap;">
+            <a class="row" href="#" style="gap:.4rem; color:var(--ink); font-size:.85rem;">
+              <i class="fa-solid fa-house"></i> <span>lecture-storage</span>
+            </a>
+            <span class="muted">/</span>
+            <a class="row" href="#" style="gap:.4rem; color:var(--ink); font-size:.85rem;"><i class="fa-solid fa-folder"></i> second-year</a>
+            <span class="muted">/</span>
+            <a class="row" href="#" style="gap:.4rem; color:var(--ink); font-size:.85rem;"><i class="fa-solid fa-folder"></i> old-promise</a>
+            <div style="margin-left:auto;" class="search" >
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input class="input" type="text" placeholder="Search files…" style="min-width:200px;">
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap" style="border:0; border-radius:0; box-shadow:none;">
+          <table class="table">
+            <thead><tr><th style="width:32px;"><input class="checkbox" type="checkbox"></th><th>Name</th><th>Type</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.5rem;"><i class="fa-solid fa-folder" style="color:var(--a);"></i><a href="#"><strong>lecture-1</strong></a></div></td><td><span class="badge">Folder</span></td><td>—</td><td>Oct 11</td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.5rem;"><i class="fa-solid fa-file-video" style="color:var(--p);"></i><strong>lecture1_1_video.m3u8</strong></div></td><td><span class="badge">HLS</span></td><td>32.4 MB</td><td>Oct 11</td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-play"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.5rem;"><i class="fa-solid fa-file-audio" style="color:var(--success);"></i><strong>lecture1_1_audio.m3u8</strong></div></td><td><span class="badge">HLS</span></td><td>8.1 MB</td><td>Oct 11</td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-play"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.5rem;"><i class="fa-solid fa-file-video" style="color:var(--p);"></i><strong>lecture1_2_video.m3u8</strong></div></td><td><span class="badge">HLS</span></td><td>28.7 MB</td><td>Oct 11</td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-play"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></div></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.5rem;"><i class="fa-solid fa-folder" style="color:var(--a);"></i><a href="#"><strong>lecture-2</strong></a></div></td><td><span class="badge">Folder</span></td><td>—</td><td>Oct 16</td><td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></td></tr>
+              <tr><td><input class="checkbox" type="checkbox"></td><td><div class="row" style="gap:.5rem;"><i class="fa-solid fa-file-pdf" style="color:var(--danger);"></i><strong>syllabus.pdf</strong></div></td><td><span class="badge">PDF</span></td><td>1.2 MB</td><td>Oct 11</td><td style="text-align:right;"><div class="row" style="gap:.25rem; justify-content:flex-end;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-ellipsis-vertical"></i></button></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= UPLOAD ============================= -->
+    <div x-show="section === 'upload'" x-cloak>
+      <div class="row-between" style="margin-bottom:1.25rem;">
+        <div>
+          <span class="badge" style="margin-bottom:.35rem;">Files</span>
+          <h1 style="margin:0;">Upload videos</h1>
+          <p class="muted" style="margin:.2rem 0 0;">Drag &amp; drop video files or use a presigned URL.</p>
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:1.25rem;">
+        <div class="card" style="border:2px dashed var(--border); text-align:center; padding:3rem 1.5rem;">
+          <div class="empty-state">
+            <span class="empty-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+            <h3 style="margin:0 0 .25rem;">Drop files here</h3>
+            <p class="muted" style="margin:0 0 1rem;">MP4, MOV, MKV up to 2 GB each. They'll be transcoded to HLS automatically.</p>
+            <button class="btn btn-primary"><i class="fa-solid fa-folder-open"></i> Browse files</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:.85rem;">Upload settings</div>
+          <div class="stack-md">
+            <div>
+              <label class="label">Destination folder</label>
+              <select class="input">
+                <option>second-year / old-promise</option>
+                <option>second-year / history</option>
+                <option>first-year / foundations</option>
+              </select>
+            </div>
+            <div>
+              <label class="label">Visibility</label>
+              <select class="input"><option>Students in course</option><option>Admins only</option><option>Public</option></select>
+            </div>
+            <div class="row-between">
+              <span>Auto-generate captions</span>
+              <label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label>
+            </div>
+            <div class="row-between">
+              <span>Auto-transcode to HLS</span>
+              <label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label>
+            </div>
+            <div class="row-between">
+              <span>Notify enrolled students</span>
+              <label class="switch"><input type="checkbox"><span class="switch-slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= NOTIFICATIONS ============================= -->
+    <div x-show="section === 'notifications'" x-cloak>
+      <div class="row-between" style="margin-bottom:1.25rem;">
+        <div>
+          <span class="badge" style="margin-bottom:.35rem;">Overview</span>
+          <h1 style="margin:0;">Notifications</h1>
+          <p class="muted" style="margin:.2rem 0 0;">5 new · 3 from instructors · 2 system</p>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn btn-ghost"><i class="fa-solid fa-check-double"></i> Mark all read</button>
+          <button class="btn btn-soft"><i class="fa-solid fa-gear"></i> Preferences</button>
+        </div>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="stack" style="gap:0;">
+          <div class="row" style="gap:.85rem; padding:1rem 1.25rem; background:var(--p-soft); border-bottom:1px solid var(--border);">
+            <span class="stat-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+            <div style="flex:1;">
+              <strong>Quiz 2 closes in 3 days</strong>
+              <div class="muted" style="font-size:.85rem;">Isaiah Deep Dive — submit before Friday 11:59 PM · sent to 48 students</div>
+            </div>
+            <span class="badge">New</span>
+          </div>
+          <div class="row" style="gap:.85rem; padding:1rem 1.25rem; border-bottom:1px solid var(--border);">
+            <span class="stat-icon accent"><i class="fa-solid fa-circle-check"></i></span>
+            <div style="flex:1;">
+              <strong>5 new quiz submissions</strong>
+              <div class="muted" style="font-size:.85rem;">OT 12 — Quiz 1 · 5 students waiting for grading</div>
+            </div>
+          </div>
+          <div class="row" style="gap:.85rem; padding:1rem 1.25rem; border-bottom:1px solid var(--border);">
+            <span class="stat-icon"><i class="fa-solid fa-user-plus"></i></span>
+            <div style="flex:1;">
+              <strong>New user signed up</strong>
+              <div class="muted" style="font-size:.85rem;">Mariam Abo El Naga created an account</div>
+            </div>
+          </div>
+          <div class="row" style="gap:.85rem; padding:1rem 1.25rem; border-bottom:1px solid var(--border);">
+            <span class="stat-icon accent"><i class="fa-solid fa-triangle-exclamation"></i></span>
+            <div style="flex:1;">
+              <strong>Storage at 80% capacity</strong>
+              <div class="muted" style="font-size:.85rem;">42.7 GB of 50 GB used</div>
+            </div>
+            <span class="badge badge-warning">Warning</span>
+          </div>
+          <div class="row" style="gap:.85rem; padding:1rem 1.25rem;">
+            <span class="stat-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+            <div style="flex:1;">
+              <strong>Upload completed</strong>
+              <div class="muted" style="font-size:.85rem;">OT 12 — Lecture 6 finished transcoding · 1.4 GB HLS</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Other sections (roles/students/lessons/quizzes/submissions/transcript) share the
+         layout pattern; render a placeholder so the toggle is interactive in the showcase -->
+    <div x-show="['roles','students','lessons','quizzes','submissions','transcript','analytics'].includes(section)" x-cloak>
+      <div class="card" style="padding:3rem 1.5rem; text-align:center;">
+        <div class="empty-state">
+          <span class="empty-icon"><i class="fa-solid fa-swatchbook"></i></span>
+          <h3 style="margin:0 0 .25rem; text-transform:capitalize;" x-text="section + ' section'"></h3>
+          <p class="muted" style="margin:0 auto 1rem; max-width:480px;">
+            This is a placeholder for the <strong x-text="section"></strong> admin section.
+            The same table layouts, filters, search, bulk actions, and pagination you see in
+            <em>Users</em> and <em>R2 storage</em> apply here in production.
+          </p>
+          <a class="btn btn-primary" @click.prevent="section = 'dashboard'" style="cursor:pointer;"><i class="fa-solid fa-arrow-left"></i> Back to dashboard</a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<style>
+  .admin-burger { display: none; }
+  @media (max-width: 900px) {
+    .admin-burger { display: inline-flex; }
+    .admin-sidebar {
+      position: fixed !important; top: 64px; left: 0; z-index: 40;
+      transform: translateX(-100%); transition: transform .25s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .admin-sidebar.is-open { transform: translateX(0); }
+  }
+  .view-toggle-btn {
+    padding: .35rem .7rem; border: 0; background: transparent;
+    color: var(--ink-soft); font-size: .8rem; font-weight: 600;
+    border-radius: calc(var(--radius) - 3px);
+    display: inline-flex; align-items: center; gap: .35rem;
+    transition: var(--transition); cursor: pointer;
+  }
+  .view-toggle-btn:hover { color: var(--ink); }
+  .view-toggle-btn.is-active { background: var(--surface); color: var(--p); box-shadow: var(--shadow-sm); }
+</style>
+{% endblock %}

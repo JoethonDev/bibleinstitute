@@ -58,8 +58,8 @@
 
                     <!-- Closed / not taken banner -->
                     {% if mode == "closed_unsolved" %}
-                    <div class="alert d-flex align-items-center gap-3 mb-4" style="background:#f1f3f1;border:1.5px solid #A5A58D;border-radius:.75rem;">
-                        <i class="fas fa-lock fa-lg" style="color:#6B705C;"></i>
+                    <div class="alert d-flex align-items-center gap-3 mb-4 quiz-closed-banner">
+                        <i class="fas fa-lock fa-lg quiz-closed-banner__icon"></i>
                         <div>
                             <strong>{% translate "Quiz Closed" %}</strong>
                             <div class="text-muted small">
@@ -69,7 +69,7 @@
                     </div>
                     {% endif %}
 
-                    <form action="" method="post">
+                    <form action="" method="post" id="quiz-form">
                         {% csrf_token %}
                         
                         {% include 'questions_rendering.html' %}
@@ -110,17 +110,120 @@
                 let timerEl = document.querySelector("#timer span");
                 const startTime = Math.floor(Date.now() / 1000);
                 const endTime = parseInt('{{ closing_date }}'.split(",")[0]);
-                const form = document.querySelector("form");
+                const form = document.querySelector("#quiz-form");
+
+                function formatRemainingTime(totalSeconds) {
+                    let remaining = Math.max(0, Math.floor(totalSeconds));
+                    const days = Math.floor(remaining / 86400);
+                    remaining %= 86400;
+                    const hours = Math.floor(remaining / 3600);
+                    remaining %= 3600;
+                    const minutes = Math.floor(remaining / 60);
+                    const seconds = remaining % 60;
+
+                    const parts = [];
+                    if (days) parts.push(`${days} day${days === 1 ? '' : 's'}`);
+                    if (hours) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+                    if (minutes) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+                    if (!parts.length || seconds) parts.push(`${seconds} second${seconds === 1 ? '' : 's'}`);
+
+                    if (parts.length === 1) {
+                        return parts[0];
+                    }
+
+                    const lastPart = parts.pop();
+                    return `${parts.join(', ')} and ${lastPart}`;
+                }
+
+                function serializeStructuredAnswer(questionCard) {
+                    const structuredType = questionCard.querySelector('[data-structured-answer]')?.dataset.structuredType;
+
+                    if (structuredType === 'order_events') {
+                        return JSON.stringify([...questionCard.querySelectorAll('[data-order-item-row]')]
+                            .map(row => row.dataset.orderLabel || '')
+                            .filter(Boolean));
+                    }
+
+                    if (structuredType === 'match_related') {
+                        const answer = {};
+                        questionCard.querySelectorAll('[data-match-select]').forEach(select => {
+                            const leftLabel = select.dataset.matchLeftLabel || '';
+                            const rightLabel = select.value || '';
+                            if (leftLabel && rightLabel) {
+                                answer[leftLabel] = rightLabel;
+                            }
+                        });
+                        return JSON.stringify(answer);
+                    }
+
+                    return '';
+                }
+
+                function applyStructuredAnswer(questionCard, answerValue) {
+                    const structuredType = questionCard.querySelector('[data-structured-answer]')?.dataset.structuredType;
+                    if (!structuredType || !answerValue) {
+                        return;
+                    }
+
+                    try {
+                        const parsedAnswer = JSON.parse(answerValue);
+
+                        if (structuredType === 'order_events' && Array.isArray(parsedAnswer)) {
+                            const list = questionCard.querySelector('[data-order-item-list]');
+                            if (!list) {
+                                return;
+                            }
+
+                            const currentRows = [...list.querySelectorAll('[data-order-item-row]')];
+                            const orderedRows = [];
+
+                            parsedAnswer.forEach((label) => {
+                                const row = currentRows.find(item => item.dataset.orderLabel === label);
+                                if (row && !orderedRows.includes(row)) {
+                                    orderedRows.push(row);
+                                }
+                            });
+
+                            currentRows.forEach((row) => {
+                                if (!orderedRows.includes(row)) {
+                                    orderedRows.push(row);
+                                }
+                            });
+
+                            const fragment = document.createDocumentFragment();
+                            orderedRows.forEach((row) => fragment.appendChild(row));
+                            list.appendChild(fragment);
+                        }
+
+                        if (structuredType === 'match_related' && parsedAnswer && typeof parsedAnswer === 'object') {
+                            Object.entries(parsedAnswer).forEach(([leftLabel, rightLabel]) => {
+                                const select = [...questionCard.querySelectorAll('[data-match-select]')].find(item => item.dataset.matchLeftLabel === leftLabel);
+                                if (select) {
+                                    select.value = rightLabel;
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        return;
+                    }
+                }
 
                 function setupInitialAnswers() {
                     const storedQuestions = localStorage.getItem("answers");
                     if (storedQuestions) {
                         const answersArr = JSON.parse(storedQuestions);
                         answersArr.forEach(val => {
-                            const questionIDInput = document.querySelector(`input[type="hidden"][value="${val.question_id}"]`);
+                            const questionIDInput = document.querySelector(`input[type="hidden"][name$="[id]"][value="${val.question_id}"]`);
                             if (!questionIDInput) return;
 
                             const questionDiv = questionIDInput.closest('.card-body');
+                            const structuredAnswerInput = questionDiv.querySelector('[data-structured-answer]');
+                            if (structuredAnswerInput) {
+                                structuredAnswerInput.value = val.answer || '';
+                                applyStructuredAnswer(questionDiv, val.answer || '');
+                                return;
+                            }
+
                             const answerFields = questionDiv.querySelectorAll('.answers-section input, .answers-section textarea');
                             const answerVal = val.answer;
 
@@ -144,16 +247,12 @@
 
                     if (remainingTime <= 0) {
                         clearInterval(timerInterval);
-                        timerEl.innerText = "00:00:00";
+                        timerEl.innerText = formatRemainingTime(0);
                         if (form) form.submit();
                         return;
                     }
 
-                    const hours = Math.floor(remainingTime / 3600);
-                    const minutes = Math.floor((remainingTime % 3600) / 60);
-                    const seconds = Math.floor(remainingTime % 60);
-
-                    timerEl.innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timerEl.innerText = formatRemainingTime(remainingTime);
                 }
                 
                 function saveAnswer(event) {
@@ -163,7 +262,13 @@
 
                     let questionCard = element.closest('.card-body');
                     let questionID = questionCard.querySelector("input[type='hidden']").value;
+                    const structuredAnswerInput = questionCard.querySelector('[data-structured-answer]');
                     let answer = element.value;
+
+                    if (structuredAnswerInput) {
+                        structuredAnswerInput.value = serializeStructuredAnswer(questionCard);
+                        answer = structuredAnswerInput.value;
+                    }
 
                     answers.forEach(val => {
                         if (val.question_id == questionID) {
@@ -178,6 +283,32 @@
 
                     localStorage.setItem("answers", JSON.stringify(answers));
                 }
+
+                function moveOrderItem(button, direction) {
+                    const row = button.closest('[data-order-item-row]');
+                    const list = button.closest('[data-order-item-list]');
+                    console.log("Move button clicked deeeper", { button, direction, row, list });
+                    if (!row || !list) {
+                        return;
+                    }
+
+                    if (direction === 'up' && row.previousElementSibling) {
+                        list.insertBefore(row, row.previousElementSibling);
+                    } else if (direction === 'down' && row.nextElementSibling) {
+                        list.insertBefore(row.nextElementSibling, row);
+                    }
+
+                    saveAnswer({ target: button });
+                }
+
+                function handleOrderMove(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    console.log("Move button clicked");
+                    const button = event.currentTarget;
+                    const direction = button.dataset.action === 'move-order-up' ? 'up' : 'down';
+                    moveOrderItem(button, direction);
+                }
                 
                 // Initialize
                 if(timerEl) {
@@ -186,8 +317,12 @@
                 if(form) {
                     setupInitialAnswers();
                     form.addEventListener("submit", () => localStorage.clear());
-                    document.querySelectorAll(".answers-section input, .answers-section textarea").forEach(field => {
+                    document.querySelectorAll(".answers-section input, .answers-section textarea, .answers-section select").forEach(field => {
                         field.addEventListener("change", saveAnswer);
+                    });
+                    form.querySelectorAll('[data-action="move-order-up"], [data-action="move-order-down"]').forEach((button) => {
+                        console.log("Attaching move event to button", button);
+                        button.addEventListener('click', handleOrderMove);
                     });
                 }
             })()

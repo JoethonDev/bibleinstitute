@@ -1,0 +1,422 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+{% include "theme_showcase/partials/_navbar_user.html" %}
+
+<div class="page" x-data="{ tab: 'overview' }">
+
+  <!-- Profile hero -->
+  <section class="card" style="padding:0; overflow:hidden; border:0;">
+    <div style="height:160px; background:var(--gradient); position:relative;">
+      <button type="button" class="btn btn-icon"
+              style="position:absolute; right:1rem; top:1rem; background:rgba(255,255,255,0.2); color:#fff; border:0;">
+        <i class="fa-solid fa-camera"></i>
+      </button>
+      <span class="badge" style="position:absolute; right:1rem; bottom:1rem; background:rgba(255,255,255,0.2); color:#fff;">
+        <i class="fa-solid fa-shield-halved"></i> Verified
+      </span>
+    </div>
+    <div style="padding:0 1.5rem 1.5rem; position:relative;">
+      <div class="row" style="gap:1.25rem; flex-wrap:wrap; align-items:flex-end; margin-top:-56px;">
+        <div style="position:relative;">
+          <span class="avatar lg" style="border:4px solid var(--surface); box-shadow:var(--shadow);">GE</span>
+          <button type="button" class="btn btn-icon btn-sm"
+                  style="position:absolute; bottom:0; right:0; background:var(--p); color:#fff; border:2px solid var(--surface); width:30px; height:30px; padding:0;">
+            <i class="fa-solid fa-pen" style="font-size:.7rem;"></i>
+          </button>
+        </div>
+        <div style="flex:1; min-width:240px; padding-top:.85rem;">
+          <h1 style="margin:0;">George Essam</h1>
+          <p class="muted" style="margin:.2rem 0 0;">@admin · admin@admin.com</p>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn btn-ghost"><i class="fa-solid fa-share-nodes"></i> Share</button>
+          <button class="btn btn-soft"><i class="fa-solid fa-pen"></i> Edit profile</button>
+          <button class="btn btn-primary"><i class="fa-solid fa-key"></i> Change password</button>
+        </div>
+      </div>
+
+      <div class="grid grid-5" style="margin-top:1.5rem;">
+        <div class="stat">
+          <span class="stat-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+          <span class="stat-label">Role</span>
+          <span class="stat-value" style="font-size:1.15rem;">Admin</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon accent"><i class="fa-solid fa-calendar-days"></i></span>
+          <span class="stat-label">Joined</span>
+          <span class="stat-value" style="font-size:1.15rem;">Aug 30, 2024</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon"><i class="fa-solid fa-book-open"></i></span>
+          <span class="stat-label">Courses</span>
+          <span class="stat-value" style="font-size:1.15rem;">12</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon accent"><i class="fa-solid fa-medal"></i></span>
+          <span class="stat-label">Average</span>
+          <span class="stat-value" style="font-size:1.15rem;">87%</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon"><i class="fa-solid fa-fire"></i></span>
+          <span class="stat-label">Streak</span>
+          <span class="stat-value" style="font-size:1.15rem;">12d</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" style="margin-top:1.5rem;">
+        <button class="tab" :class="tab === 'overview' ? 'is-active' : ''" @click="tab = 'overview'">
+          <i class="fa-solid fa-id-badge"></i> Overview
+        </button>
+        <button class="tab" :class="tab === 'activity' ? 'is-active' : ''" @click="tab = 'activity'">
+          <i class="fa-solid fa-bolt"></i> Activity
+        </button>
+        <button class="tab" :class="tab === 'grades' ? 'is-active' : ''" @click="tab = 'grades'">
+          <i class="fa-solid fa-chart-column"></i> Grades
+        </button>
+        <button class="tab" :class="tab === 'achievements' ? 'is-active' : ''" @click="tab = 'achievements'">
+          <i class="fa-solid fa-trophy"></i> Achievements
+        </button>
+        <button class="tab" :class="tab === 'security' ? 'is-active' : ''" @click="tab = 'security'">
+          <i class="fa-solid fa-shield-halved"></i> Security
+        </button>
+        <button class="tab" :class="tab === 'notifications' ? 'is-active' : ''" @click="tab = 'notifications'">
+          <i class="fa-regular fa-bell"></i> Notifications
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tab content -->
+  <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+
+    <div>
+      <!-- OVERVIEW -->
+      <div x-show="tab === 'overview'" x-cloak class="stack-lg">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Account details</div>
+              <div class="card-sub">Personal information</div>
+            </div>
+            <span class="badge">Read-only preview</span>
+          </div>
+          <div class="grid grid-2">
+            <div><label class="label">First name</label><input class="input" value="George" disabled></div>
+            <div><label class="label">Last name</label><input class="input" value="Essam" disabled></div>
+            <div><label class="label">Username</label><input class="input" value="admin" disabled></div>
+            <div><label class="label">Email</label><input class="input" value="admin@admin.com" disabled></div>
+            <div><label class="label">Joined date</label><input class="input" value="Aug 30, 2024" disabled></div>
+            <div><label class="label">Role</label><input class="input" value="Admin" disabled></div>
+            <div><label class="label">Phone</label><input class="input" placeholder="+20 ..."></div>
+            <div><label class="label">Time zone</label><input class="input" value="Africa/Cairo" disabled></div>
+          </div>
+          <div class="divider"></div>
+          <div class="row" style="gap:.5rem; justify-content:flex-end;">
+            <button class="btn btn-ghost"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+            <button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save changes</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Transcript</div>
+              <div class="card-sub">Download your academic record</div>
+            </div>
+            <span class="badge badge-success">2024–2025 ready</span>
+          </div>
+          <div class="row-between">
+            <div>
+              <strong>Yearly transcript</strong>
+              <p class="muted" style="margin:.25rem 0 0; font-size:.88rem;">All courses, quizzes, and grades for the selected year, exportable as CSV or PDF.</p>
+            </div>
+            <div class="row" style="gap:.5rem;">
+              <button class="btn btn-soft"><i class="fa-regular fa-file-lines"></i> CSV</button>
+              <button class="btn btn-primary"><i class="fa-regular fa-file-pdf"></i> PDF</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIVITY -->
+      <div x-show="tab === 'activity'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Activity</div>
+            <div class="card-sub">All recent events</div>
+          </div>
+          <div class="row" style="gap:.35rem;">
+            <button class="btn btn-soft btn-sm">All</button>
+            <button class="btn btn-ghost btn-sm">Lessons</button>
+            <button class="btn btn-ghost btn-sm">Quizzes</button>
+            <button class="btn btn-ghost btn-sm">Logins</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Event</th><th>Course</th><th>When</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td><i class="fa-solid fa-circle-play" style="color:var(--p);"></i> Watched Lecture 2</td><td>OT 12</td><td>2h ago</td><td><span class="badge badge-success">Completed</span></td></tr>
+              <tr><td><i class="fa-solid fa-pen-to-square" style="color:var(--a);"></i> Submitted Quiz 1</td><td>OT 12</td><td>Yesterday</td><td><span class="badge badge-success">18 / 20</span></td></tr>
+              <tr><td><i class="fa-solid fa-bookmark" style="color:var(--success);"></i> Bookmarked a moment</td><td>OT Cultures</td><td>2 days ago</td><td><span class="badge">12:34</span></td></tr>
+              <tr><td><i class="fa-solid fa-circle-play" style="color:var(--p);"></i> Watched Lecture 4</td><td>History of the Bible</td><td>3 days ago</td><td><span class="badge badge-success">Completed</span></td></tr>
+              <tr><td><i class="fa-solid fa-right-to-bracket" style="color:var(--ink-soft);"></i> Logged in</td><td>—</td><td>3 days ago</td><td><span class="muted">Chrome · Cairo</span></td></tr>
+              <tr><td><i class="fa-solid fa-pen-to-square" style="color:var(--a);"></i> Submitted Quiz 3</td><td>Church History</td><td>5 days ago</td><td><span class="badge badge-warning">14 / 20</span></td></tr>
+              <tr><td><i class="fa-solid fa-medal" style="color:var(--a);"></i> Earned achievement</td><td>—</td><td>1 week ago</td><td><span class="badge badge-accent">12-day streak</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- GRADES -->
+      <div x-show="tab === 'grades'" x-cloak class="stack-lg">
+        <div class="grid grid-3">
+          <div class="stat">
+            <span class="stat-icon success"><i class="fa-solid fa-chart-line"></i></span>
+            <span class="stat-label">Overall average</span>
+            <span class="stat-value">87%</span>
+          </div>
+          <div class="stat">
+            <span class="stat-icon"><i class="fa-solid fa-list-check"></i></span>
+            <span class="stat-label">Quizzes taken</span>
+            <span class="stat-value">18</span>
+          </div>
+          <div class="stat">
+            <span class="stat-icon accent"><i class="fa-solid fa-medal"></i></span>
+            <span class="stat-label">Best quiz</span>
+            <span class="stat-value">100%</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">All grades</div>
+              <div class="card-sub">Sorted by date, newest first</div>
+            </div>
+            <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-file-export"></i> Export</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Course</th><th>Quiz</th><th>Score</th><th>Grade</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>Old Testament 12</td><td>Quiz 1 — Prophets Overview</td><td>18 / 20</td><td><span class="badge badge-success">90%</span></td><td>Nov 5</td></tr>
+                <tr><td>History of the Bible</td><td>Quiz 3 — Early Church</td><td>14 / 20</td><td><span class="badge badge-warning">70%</span></td><td>Oct 28</td></tr>
+                <tr><td>OT Cultures</td><td>Quiz 1 — Cultural Context</td><td>19 / 20</td><td><span class="badge badge-success">95%</span></td><td>Oct 20</td></tr>
+                <tr><td>New Testament 11</td><td>Final exam</td><td>92 / 100</td><td><span class="badge badge-success">92%</span></td><td>Sep 30</td></tr>
+                <tr><td>Church History 1</td><td>Quiz 2</td><td>17 / 20</td><td><span class="badge badge-success">85%</span></td><td>Sep 18</td></tr>
+                <tr><td>Coptic Language 1</td><td>Quiz 1</td><td>20 / 20</td><td><span class="badge badge-success">100%</span></td><td>Sep 10</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACHIEVEMENTS -->
+      <div x-show="tab === 'achievements'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Achievements</div>
+            <div class="card-sub">3 of 12 unlocked</div>
+          </div>
+        </div>
+        <div class="grid grid-4">
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--a) 0%, var(--p) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; box-shadow:var(--shadow);"><i class="fa-solid fa-fire fa-2x"></i></span>
+            <strong>12-day streak</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Studied 12 days in a row</span>
+            <span class="badge badge-success">Unlocked</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--success) 0%, var(--p) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; box-shadow:var(--shadow);"><i class="fa-solid fa-book-open fa-2x"></i></span>
+            <strong>First course</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Completed your first course</span>
+            <span class="badge badge-success">Unlocked</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--p) 0%, var(--a) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; box-shadow:var(--shadow);"><i class="fa-solid fa-medal fa-2x"></i></span>
+            <strong>Top 10</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Reached the top 10 in class</span>
+            <span class="badge badge-success">Unlocked</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); opacity:.5;">
+            <span style="width:64px; height:64px; border-radius:50%; background:var(--surface); border:1px dashed var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink-soft);"><i class="fa-solid fa-lock fa-2x"></i></span>
+            <strong>Quiz master</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Score 100% on 5 quizzes</span>
+            <span class="badge">2 / 5</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); opacity:.5;">
+            <span style="width:64px; height:64px; border-radius:50%; background:var(--surface); border:1px dashed var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink-soft);"><i class="fa-solid fa-lock fa-2x"></i></span>
+            <strong>Year graduate</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Complete all courses in a year</span>
+            <span class="badge">5 / 12</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); opacity:.5;">
+            <span style="width:64px; height:64px; border-radius:50%; background:var(--surface); border:1px dashed var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink-soft);"><i class="fa-solid fa-lock fa-2x"></i></span>
+            <strong>Helper</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Reply to 10 discussion threads</span>
+            <span class="badge">3 / 10</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); opacity:.5;">
+            <span style="width:64px; height:64px; border-radius:50%; background:var(--surface); border:1px dashed var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink-soft);"><i class="fa-solid fa-lock fa-2x"></i></span>
+            <strong>Early bird</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Submit a quiz 24h early</span>
+            <span class="badge">0 / 1</span>
+          </div>
+          <div class="stack" style="align-items:center; gap:.35rem; padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); opacity:.5;">
+            <span style="width:64px; height:64px; border-radius:50%; background:var(--surface); border:1px dashed var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink-soft);"><i class="fa-solid fa-lock fa-2x"></i></span>
+            <strong>Marathon</strong>
+            <span class="muted" style="font-size:.78rem; text-align:center;">Watch 50 hours of content</span>
+            <span class="badge">38 / 50</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECURITY -->
+      <div x-show="tab === 'security'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Security</div>
+            <div class="card-sub">Account protection</div>
+          </div>
+        </div>
+        <div class="stack-md">
+          <div class="row-between" style="padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <div class="row" style="gap:.85rem;">
+              <span class="stat-icon"><i class="fa-solid fa-key"></i></span>
+              <div>
+                <strong>Password</strong>
+                <div class="muted" style="font-size:.82rem;">Last changed 90 days ago</div>
+              </div>
+            </div>
+            <span class="badge badge-warning">Update</span>
+          </div>
+          <div class="row-between" style="padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <div class="row" style="gap:.85rem;">
+              <span class="stat-icon accent"><i class="fa-solid fa-mobile-screen"></i></span>
+              <div>
+                <strong>Two-factor authentication</strong>
+                <div class="muted" style="font-size:.82rem;">Not enabled</div>
+              </div>
+            </div>
+            <label class="switch"><input type="checkbox"><span class="switch-slider"></span></label>
+          </div>
+          <div class="row-between" style="padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <div class="row" style="gap:.85rem;">
+              <span class="stat-icon"><i class="fa-regular fa-bell"></i></span>
+              <div>
+                <strong>Login alerts</strong>
+                <div class="muted" style="font-size:.82rem;">Get notified on new sign-in</div>
+              </div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label>
+          </div>
+          <div class="row-between" style="padding:1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <div class="row" style="gap:.85rem;">
+              <span class="stat-icon success"><i class="fa-solid fa-laptop"></i></span>
+              <div>
+                <strong>Active sessions</strong>
+                <div class="muted" style="font-size:.82rem;">2 devices · last active now</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm">Manage</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS -->
+      <div x-show="tab === 'notifications'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Notifications</div>
+            <div class="card-sub">Recent alerts</div>
+          </div>
+          <button class="btn btn-ghost btn-sm">Mark all as read</button>
+        </div>
+        <div class="stack-md">
+          <div class="row" style="gap:.85rem; padding:.75rem; background:var(--p-soft); border:1px solid var(--p); border-radius:var(--radius);">
+            <span class="stat-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+            <div style="flex:1;">
+              <strong>Quiz 2 closes in 3 days</strong>
+              <div class="muted" style="font-size:.82rem;">Isaiah Deep Dive — submit before Friday 11:59 PM</div>
+            </div>
+            <span class="badge">New</span>
+          </div>
+          <div class="row" style="gap:.85rem; padding:.75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon accent"><i class="fa-solid fa-medal"></i></span>
+            <div style="flex:1;">
+              <strong>Achievement unlocked: 12-day streak</strong>
+              <div class="muted" style="font-size:.82rem;">Keep going to reach 30 days</div>
+            </div>
+          </div>
+          <div class="row" style="gap:.85rem; padding:.75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon"><i class="fa-regular fa-comments"></i></span>
+            <div style="flex:1;">
+              <strong>New reply in your discussion thread</strong>
+              <div class="muted" style="font-size:.82rem;">Mariam A. replied to "Isaiah 53 in Christian theology"</div>
+            </div>
+          </div>
+          <div class="row" style="gap:.85rem; padding:.75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon success"><i class="fa-solid fa-circle-check"></i></span>
+            <div style="flex:1;">
+              <strong>Quiz 1 graded: 18 / 20</strong>
+              <div class="muted" style="font-size:.82rem;">Prophets Overview</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column (always visible) -->
+    <div class="stack-lg">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:.75rem;">Recent grades</div>
+        <div class="stack-md">
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon accent"><i class="fa-solid fa-pen-to-square"></i></span>
+            <div style="flex:1;">
+              <strong>OT 12 — Quiz 1</strong>
+              <div class="muted" style="font-size:.78rem;">Nov 5</div>
+            </div>
+            <span class="badge badge-success">18 / 20</span>
+          </div>
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+            <div style="flex:1;">
+              <strong>History — Quiz 3</strong>
+              <div class="muted" style="font-size:.78rem;">Oct 28</div>
+            </div>
+            <span class="badge badge-warning">14 / 20</span>
+          </div>
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon accent"><i class="fa-solid fa-pen-to-square"></i></span>
+            <div style="flex:1;">
+              <strong>OT Cultures — Quiz 1</strong>
+              <div class="muted" style="font-size:.78rem;">Oct 20</div>
+            </div>
+            <span class="badge badge-success">19 / 20</span>
+          </div>
+          <div class="row" style="gap:.75rem; padding:.65rem .75rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="stat-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+            <div style="flex:1;">
+              <strong>NT 11 — Final</strong>
+              <div class="muted" style="font-size:.78rem;">Sep 30</div>
+            </div>
+            <span class="badge badge-success">92%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:.75rem;">Quick actions</div>
+        <div class="stack-md">
+          <a class="btn btn-primary" href="{% url 'theme-showcase-page' theme.id 'courses' %}"><i class="fa-solid fa-book-open"></i> My courses</a>
+          <a class="btn btn-soft" href="#"><i class="fa-solid fa-file-export"></i> Download transcript</a>
+          <a class="btn btn-ghost" href="#"><i class="fa-solid fa-headset"></i> Get help</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

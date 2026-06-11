@@ -8,6 +8,13 @@ from django.urls import reverse
 class CourseTest(TestCase):
 
     def setUp(self):
+        lesson_links = json.dumps([{
+            "name": "lesson.m3u8",
+            "id": "course/lesson/lesson.m3u8",
+            "file_type": "video",
+        }])
+        base_date = date(2025, 6, 11)
+
         # Role
         self.admin_role = Role.objects.create(role="admin")
         self.teacher_role = Role.objects.create(role="teacher")
@@ -17,22 +24,22 @@ class CourseTest(TestCase):
         # User
         self.admin = User.objects.create(username="admin", password="1", role=self.admin_role)
         self.teacher = User.objects.create(username="teacher", password="1", role=self.teacher_role)
-        self.senior = User.objects.create(username="senior", password="1", role=self.senior_role, joined_date=date.today().replace(year=2023, month=8))
-        self.grad = User.objects.create(username="senior2", password="1", role=self.senior_role, joined_date=date.today().replace(year=2022, month=8))
-        self.junior = User.objects.create(username="junior", password="1", role=self.junior_role, joined_date=date.today().replace(year=2024, month=8))
+        self.senior = User.objects.create(username="senior", password="1", role=self.senior_role, joined_date=date(2023, 8, 11))
+        self.grad = User.objects.create(username="senior2", password="1", role=self.senior_role, joined_date=date(2022, 8, 11))
+        self.junior = User.objects.create(username="junior", password="1", role=self.junior_role, joined_date=date(2024, 8, 11))
 
         # Course
         self.course_level_1 = Course.objects.create(name="Course 1", level=1)
         self.course_level_2 = Course.objects.create(name="Course 2", level=2)
 
         # Lesson
-        self.lesson_junior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1,  created_date=date.today())
-        self.lesson_senior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, created_date=date.today().replace(year=2024))
-        self.lesson_2_junior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, created_date=date.today().replace(year=2024, month=10))
-        self.lesson_2_senior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, created_date=date.today().replace(year=2023, month=10))
+        self.lesson_junior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, links=lesson_links, created_date=base_date)
+        self.lesson_senior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, links=lesson_links, created_date=date(2024, 6, 11))
+        self.lesson_2_junior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, links=lesson_links, created_date=date(2024, 10, 11))
+        self.lesson_2_senior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, links=lesson_links, created_date=date(2023, 10, 11))
 
-        self.lesson_senior_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, created_date=date.today())
-        self.lesson_grad_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, created_date=date.today().replace(year=2022, month=10))
+        self.lesson_senior_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, links=lesson_links, created_date=base_date)
+        self.lesson_grad_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, links=lesson_links, created_date=date(2022, 10, 11))
 
         # Clients
         self.admin = self.login_client(self.admin)

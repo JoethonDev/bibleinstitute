@@ -82,7 +82,8 @@ class Course(models.Model):
     LEVELS = {
         "junior" : 1,
         "senior" : MAXIMUM_LEVEL,
-        "management" : MAXIMUM_LEVEL
+        "management" : MAXIMUM_LEVEL,
+        "admin" : MAXIMUM_LEVEL,
     }
 
 
@@ -116,8 +117,7 @@ class Course(models.Model):
         return f"{self.name} - {self.LEVELS_NAME[self.level]}"
 
     def can_access(self, role: str):
-        print(self.level)
-        return self.level <= self.LEVELS[role] 
+        return self.level <= self.LEVELS.get(role, 0)
 
     def retrieve_courses_for_level(self, level: int):
         packed_levels = []
@@ -161,7 +161,7 @@ class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")
     links = models.TextField() # Null must be false
-    created_date = models.DateField(null=False, default=date.today())
+    created_date = models.DateField(null=False, default=date.today)
     updated_date = models.DateField(null=False, auto_now=True)
 
 
@@ -179,7 +179,10 @@ class Lesson(models.Model):
         return [_("Name"), _("Course"), _("Last Updated")]
 
     def can_access(self, user_join_date: date):
-        end_range = user_join_date.replace(year=user_join_date.year + self.course.level)
+        try:
+            end_range = user_join_date.replace(year=user_join_date.year + self.course.level)
+        except ValueError:
+            end_range = user_join_date.replace(year=user_join_date.year + self.course.level, day=28)
         return user_join_date <= self.created_date <= end_range
 
     def has_segment(self, segment: str):
@@ -211,8 +214,8 @@ class Quiz(models.Model):
     name = models.CharField(max_length=64)
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, related_name="quizzes", null=True)
     total_grade = models.PositiveSmallIntegerField(default=50)
-    opening_date = models.DateTimeField(default=now())
-    closing_date = models.DateTimeField(default=now())
+    opening_date = models.DateTimeField(default=now)
+    closing_date = models.DateTimeField(default=now)
     created_date = models.DateField(auto_now=True)
 
     def __str__(self):
@@ -241,24 +244,175 @@ class Question(models.Model):
     QUESTION_TYPES = [
         ("mcq", _("Multiple Choice")),
         ("written", _("Written")),
-        ("complete", _("Complete"))
+        ("complete", _("Complete")),
+        ("order_events", _("Order Events")),
+        ("match_related", _("Match Related"))
     ]
+
+    STRUCTURED_QUESTION_TYPES = {"order_events", "match_related"}
 
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
     title = models.CharField(max_length=255)
     correct_answer = models.CharField(max_length=255, null=True)
     question_type = models.CharField(max_length=512, choices=QUESTION_TYPES)
     choices = models.TextField(null=True)
+    config = models.JSONField(default=dict, blank=True)
     grade = models.PositiveSmallIntegerField(default=1)
     auto_grade = models.BooleanField(default=True)
 
+    def get_config(self):
+        return self.config if isinstance(self.config, dict) else {}
+
+    def get_choices_list(self):
+        config = self.get_config()
+
+        if self.question_type == "mcq":
+            try:
+                return json.loads(self.choices) if self.choices else []
+            except (TypeError, json.JSONDecodeError):
+                return []
+
+        if self.question_type == "order_events":
+            return config.get("items", [])
+
+        if self.question_type == "match_related":
+            return [pair.get("left", "") for pair in config.get("pairs", []) if isinstance(pair, dict)]
+
+        return []
+
+    def get_correct_answer_payload(self):
+        config = self.get_config()
+
+        if self.question_type == "order_events":
+            return config.get("items", [])
+
+        if self.question_type == "match_related":
+            pairs = config.get("pairs", [])
+            return {
+                str(pair.get("left", "")).strip(): str(pair.get("right", "")).strip()
+                for pair in pairs
+                if isinstance(pair, dict) and pair.get("left") is not None and pair.get("right") is not None
+            }
+
+        return self.correct_answer or ""
+
+    @staticmethod
+    def _normalize_order_events_answer(answer):
+        if answer in (None, "", "-"):
+            return []
+
+        if isinstance(answer, str):
+            try:
+                answer = json.loads(answer)
+            except (TypeError, json.JSONDecodeError):
+                return [segment.strip() for segment in answer.split("|") if segment.strip()]
+
+        if isinstance(answer, dict):
+            answer = answer.get("order") or answer.get("items") or answer.get("answer") or []
+
+        if isinstance(answer, list):
+            return [str(item).strip() for item in answer if str(item).strip()]
+
+        return [str(answer).strip()]
+
+    @staticmethod
+    def _normalize_match_related_answer(answer):
+        if answer in (None, "", "-"):
+            return {}
+
+        if isinstance(answer, str):
+            try:
+                answer = json.loads(answer)
+            except (TypeError, json.JSONDecodeError):
+                return {}
+
+        if isinstance(answer, dict):
+            return {str(key).strip(): str(value).strip() for key, value in answer.items() if str(key).strip()}
+
+        if isinstance(answer, list):
+            normalized = {}
+            for pair in answer:
+                if isinstance(pair, dict) and pair.get("left") is not None and pair.get("right") is not None:
+                    normalized[str(pair["left"]).strip()] = str(pair["right"]).strip()
+                elif isinstance(pair, (list, tuple)) and len(pair) >= 2:
+                    normalized[str(pair[0]).strip()] = str(pair[1]).strip()
+            return normalized
+
+        return {}
+
+    def get_submitted_answer_payload(self, submitted_answer):
+        if self.question_type == "order_events":
+            return self._normalize_order_events_answer(submitted_answer)
+
+        if self.question_type == "match_related":
+            return self._normalize_match_related_answer(submitted_answer)
+
+        return submitted_answer
+
+    def get_auto_grade(self, submitted_answer):
+        if not self.auto_grade:
+            return 0
+
+        if self.question_type in {"mcq", "complete"}:
+            return self.grade if self.is_answer_correct(submitted_answer) else 0
+
+        if self.question_type == "order_events":
+            correct_answer = self.get_correct_answer_payload()
+            submitted_items = self._normalize_order_events_answer(submitted_answer)
+
+            if not correct_answer:
+                return 0
+
+            matched_items = sum(
+                1
+                for index, expected_item in enumerate(correct_answer)
+                if index < len(submitted_items) and submitted_items[index] == expected_item
+            )
+            return max(0, min(self.grade, int(((matched_items / len(correct_answer)) * self.grade) + 0.5)))
+
+        if self.question_type == "match_related":
+            correct_answer = self.get_correct_answer_payload()
+            submitted_pairs = self._normalize_match_related_answer(submitted_answer)
+
+            if not correct_answer:
+                return 0
+
+            matched_pairs = sum(
+                1 for left_item, right_item in correct_answer.items()
+                if submitted_pairs.get(left_item) == right_item
+            )
+            return max(0, min(self.grade, int(((matched_pairs / len(correct_answer)) * self.grade) + 0.5)))
+
+        return self.grade if self.is_answer_correct(submitted_answer) else 0
+
+    def is_answer_correct(self, submitted_answer):
+        if not self.auto_grade:
+            return False
+
+        if self.question_type in {"mcq", "complete"}:
+            return str(submitted_answer).strip() == str(self.correct_answer or "").strip()
+
+        if self.question_type == "order_events":
+            return self._normalize_order_events_answer(submitted_answer) == self.get_correct_answer_payload()
+
+        if self.question_type == "match_related":
+            return self._normalize_match_related_answer(submitted_answer) == self.get_correct_answer_payload()
+
+        return False
+
     def serialize(self):
+        config = self.get_config()
+        answer_payload = self.get_correct_answer_payload()
         return {
             "id" : self.pk,
             "name" : self.title,
             "type" : self.question_type,
             "grade" : self.grade,
-            "choices" : json.loads(self.choices) if self.choices else [],
+            "choices" : self.get_choices_list(),
+            "config" : config,
+            "config_json" : json.dumps(config, ensure_ascii=False),
+            "answer_payload" : answer_payload,
+            "answer_payload_json" : json.dumps(answer_payload, ensure_ascii=False) if isinstance(answer_payload, (dict, list)) else (answer_payload or ""),
             "auto_grade" : self.auto_grade,
             "correct_answer" : self.correct_answer,
         }
@@ -284,13 +438,16 @@ class Submission(models.Model):
 
         else:
             self.is_graded = self.question.auto_grade
-            if self.is_graded and self.submitted_answer == self.question.correct_answer:
-                self.grade = question_grade           
+            if self.is_graded:
+                self.grade = self.question.get_auto_grade(self.submitted_answer)
         return
 
     def serialize(self):
+        submitted_answer_payload = self.question.get_submitted_answer_payload(self.submitted_answer)
         return {
             "submitted_answer" : self.submitted_answer,
+            "submitted_answer_payload" : submitted_answer_payload,
+            "submitted_answer_payload_json" : json.dumps(submitted_answer_payload, ensure_ascii=False) if isinstance(submitted_answer_payload, (dict, list)) else (submitted_answer_payload or ""),
             "current_grade" : self.grade,
             "is_graded" : self.is_graded,
             **self.question.serialize()

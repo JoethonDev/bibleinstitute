@@ -1,0 +1,111 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+<div class="page">
+
+  <section class="hero card" style="padding:2rem 2rem 1.75rem; border:0; background:var(--gradient); color:#fff;">
+    <div class="stack" style="gap:.75rem; max-width:780px;">
+      <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;">
+        <i class="fa-solid fa-swatchbook"></i> Pre-refactor visual review
+      </span>
+      <h1 style="font-size:2.1rem; color:#fff; margin:0;">Design Refactor — Theme Catalog</h1>
+      <p style="margin:0; opacity:.92; font-size:1.05rem; max-width:640px;">
+        Six distinct themes, each with its own color palette, typography and
+        component styling. Pick a theme, then walk through the main user pages
+        and the admin dashboard before we touch any production templates.
+      </p>
+      <div class="row" style="gap:.5rem; flex-wrap:wrap; margin-top:.5rem;">
+        {% for p in showcase_pages %}
+          <a class="btn btn-ghost"
+             href="{% url 'theme-showcase-page' themes.0.id p.id %}"
+             style="background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.25);">
+            <i class="fa-solid {{ p.icon }}"></i> Open {{ p.name }}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <h2 style="margin-top:2rem;">Themes</h2>
+  <p class="muted" style="margin-top:-.25rem; margin-bottom:1.25rem;">
+    Each card previews the active palette, typography and component style. Click
+    any theme to walk through the pages with that look applied.
+  </p>
+
+  <div class="grid grid-3">
+    {% for t in themes %}
+      <article class="card" style="padding:0; overflow:hidden;">
+        <div style="height:120px; background:linear-gradient(135deg, {{ t.cover.0 }} 0%, {{ t.cover.1 }} 50%, {{ t.cover.2 }} 100%); position:relative;">
+          <div style="position:absolute; inset:0; background:linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.18) 100%);"></div>
+          <span style="position:absolute; left:1rem; bottom:.65rem; color:#fff; font-family:var(--heading); font-weight:700; font-size:1.1rem; text-shadow:0 1px 2px rgba(0,0,0,0.25);">
+            {{ t.name }}
+          </span>
+        </div>
+
+        <div style="padding:1rem 1.1rem 1.2rem;">
+          <div class="row" style="gap:.4rem; flex-wrap:wrap; margin-bottom:.5rem;">
+            <span class="badge">{{ t.style|title }}</span>
+            <span class="badge badge-accent">{{ t.mood }}</span>
+          </div>
+          <p class="muted" style="margin:.25rem 0 1rem; font-size:.9rem;">{{ t.tagline }}</p>
+
+          <div class="row" style="gap:.3rem; margin-bottom:1rem;">
+            <span style="width:18px; height:18px; border-radius:5px; background:{{ t.palette.primary }}; border:1px solid rgba(0,0,0,0.06);" title="primary"></span>
+            <span style="width:18px; height:18px; border-radius:5px; background:{{ t.palette.primary_soft }}; border:1px solid rgba(0,0,0,0.06);" title="primary soft"></span>
+            <span style="width:18px; height:18px; border-radius:5px; background:{{ t.palette.accent }}; border:1px solid rgba(0,0,0,0.06);" title="accent"></span>
+            <span style="width:18px; height:18px; border-radius:5px; background:{{ t.palette.surface }}; border:1px solid rgba(0,0,0,0.06);" title="surface"></span>
+            <span style="width:18px; height:18px; border-radius:5px; background:{{ t.palette.ink }}; border:1px solid rgba(0,0,0,0.06);" title="ink"></span>
+          </div>
+
+          <div class="row" style="gap:.5rem; flex-wrap:wrap;">
+            <a class="btn btn-primary" href="{% url 'theme-showcase-page' t.id 'home' %}">
+              <i class="fa-regular fa-eye"></i> Preview
+            </a>
+            <a class="btn btn-ghost" href="{% url 'theme-showcase-page' t.id 'admin' %}">
+              <i class="fa-solid fa-gauge-high"></i> Admin
+            </a>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+
+  <h2 style="margin-top:2.5rem;">What you can compare</h2>
+  <div class="grid grid-4" style="margin-top:1rem;">
+    {% for p in showcase_pages %}
+      <a class="card row" style="text-decoration:none; color:inherit; gap:.85rem;" href="{% url 'theme-showcase-page' themes.0.id p.id %}">
+        <span class="stat-icon"><i class="fa-solid {{ p.icon }}"></i></span>
+        <div>
+          <div class="card-title" style="font-size:1rem;">{{ p.name }}</div>
+          <div class="muted" style="font-size:.78rem;">{{ p.group }}</div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="card" style="margin-top:2rem;">
+    <div class="card-header">
+      <div>
+        <div class="card-title">How this works</div>
+        <div class="card-sub">A read-only gallery — no DB writes, no auth required</div>
+      </div>
+      <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Safe to browse</span>
+    </div>
+    <div class="grid grid-3">
+      <div class="stack" style="gap:.35rem;">
+        <strong>1. Pick a theme</strong>
+        <span class="muted" style="font-size:.88rem;">Use the pills in the top bar to switch between palettes and typography.</span>
+      </div>
+      <div class="stack" style="gap:.35rem;">
+        <strong>2. Walk the pages</strong>
+        <span class="muted" style="font-size:.88rem;">Home, courses, course detail, profile and the admin dashboard re-skin instantly.</span>
+      </div>
+      <div class="stack" style="gap:.35rem;">
+        <strong>3. Decide</strong>
+        <span class="muted" style="font-size:.88rem;">Once you pick, we'll wire the chosen tokens into the real templates.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -5,7 +5,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _
 from django.utils import translation
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
 from django.db.models import Q, Sum
 from django.db import transaction
@@ -13,6 +13,7 @@ from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.timezone import now
+import random
 
 # Third Party
 from logging import getLogger
@@ -30,13 +31,14 @@ from .models import *
 from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
 
 # Internal Imports - Utilities
-from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv
+from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
 from .utils.file_validator import validate_upload_filename, FileValidator
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_can_access_course, user_has_management_role
 from .utils.decorators import management_required
+from .theme_catalog import THEMES, get_theme, SHOWCASE_PAGES
 
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
@@ -44,13 +46,13 @@ logger = getLogger(__name__)
 # DRIVE_CLIENT = get_drive_client()
 CLOUD_CLIENT = boto3.client(
     's3',
-    endpoint_url=os.getenv("endpoint") or "https://da59dca47179969defd66c61b710bbdb.r2.cloudflarestorage.com",
-    aws_access_key_id=os.getenv("key_id") or "34aab6f5a4a4e832bf2619260e0dbaea",
-    aws_secret_access_key=os.getenv("access_key") or "ac0690c0799ff35373e92d8ee6c1d6a986798e6578de992fe39965ea90df038e",
+    endpoint_url=getattr(settings, "R2_ENDPOINT_URL", None),
+    aws_access_key_id=getattr(settings, "R2_ACCESS_KEY_ID", None),
+    aws_secret_access_key=getattr(settings, "R2_SECRET_ACCESS_KEY", None),
     region_name='auto'
 )
 
-bucket_name = os.getenv("bucket") or "lecture-storage"
+bucket_name = getattr(settings, "R2_BUCKET_NAME", "")
 
 # Initialize R2 Manager
 R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name)
@@ -77,6 +79,135 @@ def has_admin_permission(request, view):
         logger.warning(f"User: {request.user} is trying to access {view}")
         return HttpResponse(_("Unauthorized"), status=401)
     return HttpResponse(_("authorized"), status=200)
+
+
+def build_question_instance(question_data, quiz):
+    """Build a Question instance from parsed form data."""
+    title = question_data.get("name", "")
+    question_type = question_data.get("type", "")
+    grade = int(question_data.get("grade", 1) or 1)
+    config = parse_json_value(question_data.get("config", {}), {}) or {}
+    choices = question_data.get("choices", [])
+    correct_answer = (question_data.get("answer", "") or "").strip()
+    auto_grade = False
+
+    if question_type in Question.STRUCTURED_QUESTION_TYPES and not isinstance(config, dict):
+        raise ValueError(_("Structured question config is invalid for question: %(title)s") % {"title": title})
+
+    def _unique_values(values, label):
+        normalized = []
+        seen = set()
+
+        for value in values:
+            text = str(value).strip()
+            if not text:
+                continue
+
+            if text in seen:
+                raise ValueError(_("Each %(label)s must be unique for question: %(title)s") % {"label": label, "title": title})
+
+            seen.add(text)
+            normalized.append(text)
+
+        if not normalized:
+            raise ValueError(_("%(label)s are required for question: %(title)s") % {"label": label.capitalize(), "title": title})
+
+        return normalized
+
+    if question_type == "mcq":
+        choices = [choice.strip() for choice in choices if str(choice).strip()]
+        if correct_answer and correct_answer not in choices:
+            raise ValueError(_("Correct answer is not in choices for question : %(title)s") % {'title': title})
+        choices = json.dumps(choices)
+        auto_grade = bool(correct_answer)
+
+    elif question_type == "written":
+        correct_answer = ""
+        choices = json.dumps([])
+        auto_grade = False
+
+    elif question_type == "complete":
+        choices = json.dumps([])
+        auto_grade = bool(correct_answer)
+
+    elif question_type == "order_events":
+        items = config.get("items") or choices or []
+        items = _unique_values(items, _("order event item"))
+        config = {"items": items}
+        choices = json.dumps(items)
+        correct_answer = ""
+        auto_grade = True
+
+    elif question_type == "match_related":
+        pairs = config.get("pairs") or []
+        normalized_pairs = []
+        seen_left_values = set()
+        seen_right_values = set()
+
+        for pair in pairs:
+            left = right = ""
+            if isinstance(pair, dict):
+                left = str(pair.get("left", "")).strip()
+                right = str(pair.get("right", "")).strip()
+            elif isinstance(pair, (list, tuple)) and len(pair) >= 2:
+                left = str(pair[0]).strip()
+                right = str(pair[1]).strip()
+
+            if left and right:
+                if left in seen_left_values:
+                    raise ValueError(_("Each match related left item must be unique for question: %(title)s") % {"title": title})
+                if right in seen_right_values:
+                    raise ValueError(_("Each match related right item must be unique for question: %(title)s") % {"title": title})
+
+                seen_left_values.add(left)
+                seen_right_values.add(right)
+                normalized_pairs.append({"left": left, "right": right})
+
+        if not normalized_pairs:
+            raise ValueError(_("Match Related questions need at least one pair"))
+
+        config = {"pairs": normalized_pairs}
+        choices = json.dumps([pair["left"] for pair in normalized_pairs])
+        correct_answer = ""
+        auto_grade = True
+
+    else:
+        choices = json.dumps([choice.strip() for choice in choices]) if choices else json.dumps([])
+        auto_grade = bool(correct_answer) and question_type != "written"
+
+    return Question(
+        title=title,
+        quiz=quiz,
+        correct_answer=correct_answer,
+        question_type=question_type,
+        choices=choices,
+        config=config,
+        grade=grade,
+        auto_grade=auto_grade,
+    )
+
+
+def prepare_exam_question(question_data):
+    """Attach randomized display payloads for exam mode without mutating answer keys."""
+    question_type = question_data.get("type")
+
+    if question_type == "order_events":
+        shuffled_items = list(question_data.get("answer_payload") or [])
+        random.shuffle(shuffled_items)
+        question_data["exam_items"] = shuffled_items
+
+    elif question_type == "match_related":
+        pairs = list((question_data.get("answer_payload") or {}).items())
+        random.shuffle(pairs)
+
+        right_options = [right for _, right in pairs]
+        random.shuffle(right_options)
+
+        question_data["exam_pairs"] = [{"left": left} for left, _ in pairs]
+        question_data["exam_right_options"] = right_options
+        question_data["exam_right_options_json"] = json.dumps(right_options)
+
+    return question_data
 
 # Class Base
 class LoginProtection(object):
@@ -172,7 +303,6 @@ class LoginView(views.LoginView):
 
 @login_required(login_url=LOGIN_URL)
 def index(request):
-    from .utils.helpers import is_quiz_in_user_window
     user = User.objects.get(username=request.user)
     role = user.role.role if user.role else "junior"
 
@@ -186,11 +316,9 @@ def index(request):
     for level in courses:
         for course in level["courses"]:
             for quiz in course.quizzes.all():
-                quiz_open = quiz.opening_date <= current_time <= quiz.closing_date + timedelta(minutes=30)
-                if quiz_open and is_quiz_in_user_window(quiz, user):
-                    grade = Grade.objects.filter(user=user, quiz=quiz).first()
-                    if not grade:
-                        open_quiz_count += 1
+                quiz_status, _ = get_student_quiz_status(quiz, user, current_time)
+                if quiz_status == "exam":
+                    open_quiz_count += 1
 
     return render(request, "index.html", {
         "course_count": course_count,
@@ -305,16 +433,19 @@ def view_course_details(request, course_id):
             "course_id": course_id,
             "course": course,
         }
-        if user.role.role in MANAGEMENT_ROLES:
+        if user_has_management_role(user):
             context['lessons'] = course.lessons.all()
             logger.info(f"User : {user} is accessing all lessons")
 
         else:
-            if not course.can_access(user.role.role):
+            if not user_can_access_course(user, course):
                 return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
             # Set Range of lesson created date
             join_date = user.joined_date
-            end_date = join_date.replace(year=join_date.year + course.level)
+            try:
+                end_date = join_date.replace(year=join_date.year + course.level)
+            except ValueError:
+                end_date = join_date.replace(year=join_date.year + course.level, day=28)
             context['lessons'] = course.lessons.filter(created_date__range=(join_date, end_date))
             logger.info(f"User : {user} is accessing lessons within range {join_date} and {end_date}")
 
@@ -333,7 +464,7 @@ def view_lesson_details(request, course_id, lesson_id):
         course = get_object_or_404(Course, pk=course_id)
         lesson = get_object_or_404(Lesson, pk=lesson_id, course=course)
         lesson_links = json.loads(lesson.links)
-        if user.role.role in MANAGEMENT_ROLES or lesson.can_access(user.joined_date):
+        if user_can_access_course(user, course) and (user_has_management_role(user) or lesson.can_access(user.joined_date)):
             logger.info(f"User : {user} is accessing {lesson.name} lesson from {course.name} course")
             return render(request, "lesson_stream.html", {
                 # Add Courses here
@@ -356,10 +487,17 @@ def view_lesson_details(request, course_id, lesson_id):
 def stream_lesson(request, lesson_id, file_index):
     try:
         username = request.user
+        user = User.objects.get(username=username)
         lesson = get_object_or_404(Lesson, pk=lesson_id)
+        if not user_can_access_course(user, lesson.course) or (not user_has_management_role(user) and not lesson.can_access(user.joined_date)):
+            logger.error(f"{user.username} is not authorized to stream lesson : {lesson.name}")
+            return HttpResponse(_('Unauthorized'), status=401)
+
         logger.info(f"User : {username} is streaming video from {lesson.name} lesson")
 
         lesson_links = json.loads(lesson.links)
+        if file_index < 0 or file_index >= len(lesson_links):
+            raise Http404
         # Refacor TODO
         file_data = [file_link for file_link in lesson_links][file_index]
 
@@ -424,31 +562,26 @@ def stream_lesson(request, lesson_id, file_index):
 @login_required(login_url=LOGIN_URL)
 def take_exam(request, course_id, quiz_id):
     try:
-        from .utils.helpers import is_quiz_in_user_window
-        quiz = get_object_or_404(Quiz, pk=quiz_id)
         user = User.objects.get(username=request.user)
+        course = get_object_or_404(Course, pk=course_id)
+        quiz = get_object_or_404(Quiz, pk=quiz_id, course=course)
 
         submission_datetime = now()
-        # Buffer of 30 minutes after closing time for late submissions
-        can_submit = quiz.closing_date + timedelta(minutes=30) >= submission_datetime
-        # Quiz is currently open for taking (no buffer - just real window)
-        quiz_currently_open = quiz.opening_date <= submission_datetime <= quiz.closing_date + timedelta(minutes=30)
+        # Quiz can be submitted from opening time through the 30-minute closing buffer
+        can_submit = quiz.opening_date <= submission_datetime <= quiz.closing_date + timedelta(minutes=30)
 
         # Check if user has previously taken this quiz
-        grade = Grade.objects.filter(user=user, quiz_id=quiz_id).first()
+        quiz_mode, grade = get_student_quiz_status(quiz, user, submission_datetime)
         total_grade = grade.total_grade if grade else 0
 
         if request.method == "GET":
-            course = get_object_or_404(Course, pk=course_id)
             logger.info(f"User : {user} is accessing {quiz.name} in {course.name} course")
 
-            # Management roles can always access any quiz in any mode
-            is_management = user.role.role in MANAGEMENT_ROLES
-            if not is_management and not course.can_access(user.role.role):
+            if not user_can_access_course(user, course):
                 return HttpResponse(_("Unauthorized"), status=401)
 
             # Determine quiz mode using cohort-year window logic
-            if is_management:
+            if user_has_management_role(user):
                 # Admins/teachers always see in "view" mode for student quizzes
                 quiz_mode = "view"
                 query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user) if grade else Question.objects.filter(quiz_id=quiz_id)
@@ -456,8 +589,7 @@ def take_exam(request, course_id, quiz_id):
                 # Student has already submitted – always show their submission
                 quiz_mode = "view"
                 query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user)
-            elif quiz_currently_open and is_quiz_in_user_window(quiz, user):
-                # Quiz is open right now AND falls within this student's academic window
+            elif quiz_mode == "exam":
                 quiz_mode = "exam"
                 query_set = Question.objects.filter(quiz_id=quiz_id)
             else:
@@ -474,6 +606,10 @@ def take_exam(request, course_id, quiz_id):
                     questions.append(serialized)
             else:
                 questions = [q.serialize() for q in query_set]
+
+            if quiz_mode == "exam":
+                random.shuffle(questions)
+                questions = [prepare_exam_question(question) for question in questions]
 
             return render(request, "display_quiz.html", {
                 "quiz_name": quiz.name,
@@ -493,6 +629,9 @@ def take_exam(request, course_id, quiz_id):
         elif request.method == "POST":
             # Prevent another submission
             if not grade:
+                if not user_can_access_course(user, course):
+                    return HttpResponse(_("Unauthorized"), status=401)
+
                 # Guard: reject if quiz is no longer submittable
                 if not can_submit or not is_quiz_in_user_window(quiz, user):
                     # Send back to main page with error message TODO
@@ -715,6 +854,7 @@ class UpdateUser(UserBaseView, UpdateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         # If the password field was changed, update the session to keep user logged in
+        print(f"condition : {self.object.pk == self.request.user.pk and 'password' in form.cleaned_data and form.cleaned_data['password']}")
         if self.object.pk == self.request.user.pk and "password" in form.cleaned_data and form.cleaned_data["password"]:
             update_session_auth_hash(self.request, self.object)
 
@@ -1068,29 +1208,13 @@ def create_quiz(request):
             exceptions_messages = []
             questions_obj = []
             for question in questions.values():
-                title = question.get("name", "")
-                correct_answer = question.get("answer", "").strip()
-                question_type = question.get("type", "")
-                choices = question.get("choices", [])
-                if correct_answer and correct_answer not in choices and question_type == "mcq":
-                    error_message = _("Correct answer is not in choices for question : %(title)s") % {'title': title} # Translate
+                try:
+                    questions_obj.append(build_question_instance(question, quiz))
+                except ValueError as validation_error:
+                    error_message = str(validation_error)
                     error(request, error_message, extra_tags="alert-danger")
                     exceptions_messages.append(error_message)
                     raise_exception = True
-
-                choices = json.dumps([choice.strip() for choice in choices])
-                grade = question.get("grade")
-                auto_grade = False if not correct_answer or question_type == "written" else True
-
-                questions_obj.append(Question(
-                    title=title,
-                    quiz=quiz,
-                    correct_answer=correct_answer,
-                    question_type=question_type,
-                    choices=choices,
-                    grade=grade,
-                    auto_grade=auto_grade
-                ))
 
             if closing_date <= opening_date:
                 error(request, _("Closing Date can not be before or same as Openning Date!"), extra_tags="alert-danger") # Translate
@@ -1162,31 +1286,12 @@ def update_quiz(request, quiz_id):
             questions_id = []
 
             for question in questions.values():
-                title = question['name']
-                correct_answer = question.get("answer", None)
-                question_type = question['type']
-                choices = question.get("choices", [])
-                if choices:
-                    if correct_answer not in choices:
-                        raise Exception(_("Correct answer is not in choices")) # Translate
-                    choices = json.dumps(choices)
-                grade = question['grade']
-                auto_grade = False if not correct_answer or question_type == "written" else True
-                #print(f"Question title : {title} Type : {question_type} Auto grade : {auto_grade}")
-                
-                question_instance = Question(
-                    title=title,
-                    quiz=quiz,
-                    correct_answer=correct_answer,
-                    question_type=question_type,
-                    choices=choices,
-                    grade=grade,
-                    auto_grade=auto_grade
-                )
+                question_instance = build_question_instance(question, quiz)
 
-                if "id" in question:
-                    question_instance.pk = question['id']
-                    questions_id.append(question['id'])
+                question_id = str(question.get("id", "")).strip()
+                if question_id:
+                    question_instance.pk = int(question_id)
+                    questions_id.append(int(question_id))
                     questions_exists.append(question_instance)
                 else:
                     questions_obj.append(question_instance)
@@ -1196,7 +1301,7 @@ def update_quiz(request, quiz_id):
                 Question.objects.filter(quiz=quiz).exclude(pk__in=questions_id).delete()
 
                 # Update Current Questions
-                Question.objects.bulk_update(questions_exists, ["title", "correct_answer", "question_type", "choices", "grade", "auto_grade"])
+                Question.objects.bulk_update(questions_exists, ["title", "correct_answer", "question_type", "choices", "config", "grade", "auto_grade"])
 
                 # Current New Questions
                 Question.objects.bulk_create(questions_obj)
@@ -1227,6 +1332,15 @@ def export_quiz_submissions_csv(request, quiz_id):
     
     return export_quiz_with_submissions_to_csv(quiz_id)
 
+
+@login_required(login_url=LOGIN_URL)
+def export_quiz_summary_csv(request, quiz_id):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+
+    return export_quiz_summary_to_csv(quiz_id)
+
 @login_required(login_url=LOGIN_URL)
 def export_submission_csv(request, grade_id):
     is_manager = is_managerial(request)
@@ -1234,6 +1348,47 @@ def export_submission_csv(request, grade_id):
         return is_manager
     
     return export_single_submission_to_csv(grade_id)
+
+
+@login_required(login_url=LOGIN_URL)
+def export_yearly_transcript_csv(request):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+
+    year = request.GET.get("year", now().year)
+    name = request.GET.get("name")
+    course = request.GET.get("course")
+    role = request.GET.get("role") or None
+    return export_yearly_transcript_to_csv(year, name=name, course=course, role=role)
+
+
+@login_required(login_url=LOGIN_URL)
+def yearly_transcript_dashboard(request):
+    is_manager = is_managerial(request)
+    if is_manager.status_code == 401:
+        return is_manager
+
+    year = request.GET.get("year", now().year)
+    name = request.GET.get("name", "").strip()
+    course = request.GET.get("course", "").strip()
+    role = request.GET.get("role", "").strip()
+
+    transcript = build_yearly_transcript_rows(year, name=name or None, course=course or None, role=role or None)
+
+    context = {
+        "title": _("Yearly Transcript"),
+        "year_value": transcript["year"],
+        "name_value": name,
+        "course_value": course,
+        "selected_role": role,
+        "role_options": Role.ROLES,
+        "transcript_rows": transcript["rows"],
+        "student_count": len({row["user_id"] for row in transcript["rows"]}),
+        "result_count": len(transcript["rows"]),
+    }
+
+    return render(request, "yearly_transcript_dashboard.html", context)
 
 @login_required(login_url=LOGIN_URL)
 def submission_dashboard(request, quiz_id):
@@ -1906,12 +2061,11 @@ def api_quiz_status(request, course_id):
 
     Response: { "quizzes": [ { "id": int, "status": "exam"|"view"|"closed_unsolved" }, ... ] }
     """
-    from .utils.helpers import is_quiz_in_user_window
     try:
         user = User.objects.get(username=request.user)
         course = get_object_or_404(Course, pk=course_id)
 
-        if not course.can_access(user.role.role) and user.role.role not in MANAGEMENT_ROLES:
+        if not user_can_access_course(user, course):
             return JsonResponse({"error": "Unauthorized"}, status=401)
 
         current_time = now()
@@ -1919,15 +2073,7 @@ def api_quiz_status(request, course_id):
         result = []
 
         for quiz in quizzes:
-            grade = Grade.objects.filter(user=user, quiz_id=quiz.pk).first()
-            quiz_open = quiz.opening_date <= current_time <= quiz.closing_date + timedelta(minutes=30)
-
-            if grade:
-                status = "view"
-            elif quiz_open and is_quiz_in_user_window(quiz, user):
-                status = "exam"
-            else:
-                status = "closed_unsolved"
+            status, _ = get_student_quiz_status(quiz, user, current_time)
 
             result.append({"id": quiz.pk, "status": status})
 
@@ -2086,3 +2232,61 @@ def r2_management_dashboard(request):
         return render(request, 'partials/r2_file_list.html', context)
     
     return render(request, 'r2_management.html', context)
+
+
+# ---------------------------------------------------------------------------
+# Design Theme Showcase
+# ---------------------------------------------------------------------------
+# Read-only gallery of the main user-side pages and the admin dashboard,
+# re-skinned for every theme in the catalog. Useful for reviewing the
+# refactor direction before any production template changes are merged.
+
+_SHOWCASE_PAGE_IDS = {p["id"] for p in SHOWCASE_PAGES}
+
+
+def _showcase_context(request, theme_id, page_id):
+    theme = get_theme(theme_id)
+    if page_id not in _SHOWCASE_PAGE_IDS:
+        page_id = "home"
+    return {
+        "theme": theme,
+        "theme_id": theme_id,
+        "page_id": page_id,
+        "themes": THEMES,
+        "showcase_pages": SHOWCASE_PAGES,
+        "active_page_id": page_id,
+    }
+
+
+def theme_catalog(request):
+    guard = _staff_guard(request)
+    if guard: return guard
+    return render(request, "theme_showcase/landing.html", {
+        "theme": get_theme("sapphire"),
+        "themes": THEMES,
+        "showcase_pages": SHOWCASE_PAGES,
+        "active_page_id": "catalog",
+        "page_id": "catalog",
+    })
+
+
+def theme_showcase(request, theme_id, page_id):
+    guard = _staff_guard(request)
+    if guard: return guard
+    return render(
+        request,
+        f"theme_showcase/page_{page_id}.html",
+        _showcase_context(request, theme_id, page_id),
+    )
+
+
+def _staff_guard(request):
+    from django.http import HttpResponseForbidden
+    if not request.user.is_authenticated:
+        return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
+    if not request.user.is_staff:
+        return HttpResponseForbidden(
+            "Theme Showcase is restricted to staff users. "
+            "Sign in with a staff account (is_staff=True) to view it."
+        )
+    return None

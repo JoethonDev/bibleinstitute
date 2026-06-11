@@ -129,6 +129,86 @@
     color: var(--admin-text-primary) !important;
 }
 
+/* Quiz answer surfaces need stronger dark-mode overrides than Bootstrap defaults */
+[data-bs-theme="dark"] .question-card .bg-light,
+[data-bs-theme="dark"] .question-card .form-control.bg-light,
+[data-bs-theme="dark"] .question-card .form-select.bg-light {
+    background-color: var(--admin-bg-elevated) !important;
+    border-color: var(--admin-border) !important;
+    color: var(--admin-text-primary) !important;
+}
+
+[data-bs-theme="dark"] .question-card .correct-answer-section .card.bg-light,
+[data-bs-theme="dark"] .question-card .correct-answer-section .card.bg-warning,
+[data-bs-theme="dark"] .question-card .correct-answer-section .card.bg-info {
+    background-color: var(--admin-bg-elevated) !important;
+    border-color: var(--admin-border) !important;
+    color: var(--admin-text-primary) !important;
+}
+
+[data-bs-theme="dark"] .question-card .correct-answer-section .card.bg-warning.bg-opacity-10,
+[data-bs-theme="dark"] .question-card .correct-answer-section .card.bg-info.bg-opacity-10 {
+    background-color: var(--admin-bg-elevated) !important;
+}
+
+[data-bs-theme="dark"] .question-card .bg-light * {
+    color: inherit;
+}
+
+.quiz-closed-banner {
+    background: #f1f3f1;
+    border: 1.5px solid #A5A58D;
+    border-radius: 0.75rem;
+}
+
+.quiz-closed-banner__icon {
+    color: #6B705C;
+}
+
+[data-bs-theme="dark"] .quiz-closed-banner {
+    background: var(--admin-bg-elevated);
+    border-color: var(--admin-border-strong);
+    color: var(--admin-text-primary);
+}
+
+[data-bs-theme="dark"] .quiz-closed-banner__icon {
+    color: var(--admin-accent-secondary);
+}
+
+/* Keep quiz answer blocks full width so options do not collapse to content width */
+.question-card .answers-section,
+.question-card .mcq-choices,
+.question-card [data-choice-list],
+.question-card [data-structured-list],
+.question-card [data-order-item-list],
+.question-card [data-order-item-row],
+.question-card [data-match-item-row],
+.question-card [data-structured-row],
+.question-card [data-choice-row] {
+    width: 100%;
+}
+
+.question-card .answers-section .form-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.question-card .answers-section .form-check-label {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+.question-card .answers-section .form-control,
+.question-card .answers-section .form-select,
+.question-card .answers-section textarea,
+.question-card .answers-section input[type="text"],
+.question-card .answers-section input[type="number"] {
+    width: 100%;
+}
+
 /* btn-light dark mode fix */
 [data-bs-theme="dark"] .btn-light {
     background-color: var(--admin-bg-elevated);

@@ -158,17 +158,20 @@
                                     <i class="fas fa-question-circle me-2"></i>
                                     {% translate "Questions" %}
                                 </h5>
-                                <button type="button" 
-                                        class="btn btn-outline-primary btn-sm"
-                                        @click="addQuestion()">
-                                    <i class="fa fa-plus-circle me-2"></i>
-                                    {% translate "Add Question" %}
-                                </button>
                             </div>
                             
                             {% with is_student=False mode="edit" %}
                             {% include 'questions_rendering.html' %}
                             {% endwith %}
+
+                            <div class="d-flex justify-content-end mt-3">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        data-action="add-question">
+                                    <i class="fa fa-plus-circle me-2"></i>
+                                    {% translate "Add Question" %}
+                                </button>
+                            </div>
                         </div>
                     </div>
 

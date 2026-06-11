@@ -95,12 +95,16 @@ class UserUpdateForm(UserCreationForm):
     def save(self, commit=True):
         password = self.cleaned_data.get("password")
         if not password:
+            print("No password provided, skipping password update.")
+
             # Temporarily add 'password' to _meta.exclude for this save so Django's
             # ModelForm doesn't write an empty raw string to the password field.
             # Restore the original list afterwards to avoid permanent class mutation.
             original_exclude = list(self._meta.exclude or [])
             self._meta.exclude = original_exclude + ['password']
             self.cleaned_data.pop('password', None)
+            print(f"Cleaned data: {self.cleaned_data}")
+            print(f"Meta exclude: {self._meta.exclude}")
             try:
                 return super(UserUpdateForm, self).save(commit)
             finally:

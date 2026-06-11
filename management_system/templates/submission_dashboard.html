@@ -9,10 +9,18 @@
       <!-- Header Section -->
       <div class="d-flex align-items-center justify-content-between mb-4">
         <h2 class="h3 mb-0 text-primary fw-bold">{% translate "Submissions" %}</h2>
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <a href="{% url 'export-quiz-summary-csv' quiz_id=quiz_id %}" class="btn btn-outline-success d-flex align-items-center gap-2">
+            <i class="fas fa-table"></i>
+            {% translate "Quiz Summary" %}
+          </a>
           <a href="{% url 'export-quiz-submissions-csv' quiz_id=quiz_id %}" class="btn btn-success d-flex align-items-center gap-2">
             <i class="fas fa-file-csv"></i>
             {% translate "Export Quiz & Submissions" %}
+          </a>
+          <a href="{% url 'yearly-transcript-dashboard' %}" class="btn btn-outline-primary d-flex align-items-center gap-2">
+            <i class="fas fa-graduation-cap"></i>
+            {% translate "Yearly Transcript" %}
           </a>
         </div>
       </div>

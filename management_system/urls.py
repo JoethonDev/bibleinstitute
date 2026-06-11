@@ -61,7 +61,10 @@ urlpatterns = [
     path('dashboard/quizzez/<int:quiz_id>/view-submission/', submission_dashboard, name="submission-dashboard"),
     path('dashboard/quizzez/<int:quiz_id>/view-submission/<int:user_id>/', submission_user, name="submission-user"),
     path('dashboard/quizzez/<int:quiz_id>/export-csv/', export_quiz_submissions_csv, name="export-quiz-submissions-csv"),
+    path('dashboard/quizzez/<int:quiz_id>/summary-csv/', export_quiz_summary_csv, name="export-quiz-summary-csv"),
     path('dashboard/grade/<int:grade_id>/export-csv/', export_submission_csv, name="export-submission-csv"),
+    path('dashboard/reports/transcript/', yearly_transcript_dashboard, name="yearly-transcript-dashboard"),
+    path('dashboard/reports/transcript/export-csv/', export_yearly_transcript_csv, name="export-yearly-transcript-csv"),
 
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),
@@ -87,4 +90,8 @@ urlpatterns = [
     path('api/bulk-delete/courses/', bulk_delete_courses, name="bulk-delete-courses"),
     path('api/bulk-delete/lessons/', bulk_delete_lessons, name="bulk-delete-lessons"),
     path('api/bulk-delete/quizzes/', bulk_delete_quizzes, name="bulk-delete-quizzes"),
+
+    # Design Theme Showcase (pre-refactor visual review)
+    path('showcase/', theme_catalog, name="theme-catalog"),
+    path('showcase/<str:theme_id>/<str:page_id>/', theme_showcase, name="theme-showcase-page"),
 ]

@@ -1,0 +1,120 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block body %}
+<div class="container-fluid py-4" id="content">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+        <div>
+          <h2 class="h3 mb-1 text-primary fw-bold">{% translate "Yearly Transcript" %}</h2>
+          <p class="text-muted mb-0">{% translate "Trace student quiz grades across the selected year." %}</p>
+        </div>
+        <a href="{% url 'export-yearly-transcript-csv' %}?year={{ year_value }}&name={{ name_value|urlencode }}&course={{ course_value|urlencode }}&role={{ selected_role|urlencode }}" class="btn btn-success d-inline-flex align-items-center gap-2">
+          <i class="fas fa-file-csv"></i>
+          {% translate "Export Transcript CSV" %}
+        </a>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold">{% translate "Year" %}</label>
+              <input type="number" name="year" class="form-control" value="{{ year_value }}" placeholder="{% translate 'Year' %}">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold">{% translate "Student name" %}</label>
+              <input type="search" name="name" class="form-control" value="{{ name_value }}" placeholder="{% translate 'Search by first, last, or username' %}">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold">{% translate "Course" %}</label>
+              <input type="search" name="course" class="form-control" value="{{ course_value }}" placeholder="{% translate 'Course name' %}">
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label fw-semibold">{% translate "Role" %}</label>
+              <select name="role" class="form-select">
+                <option value="">{% translate "All roles" %}</option>
+                {% for role_code, role_label in role_options %}
+                  <option value="{{ role_code }}" {% if selected_role == role_code %}selected{% endif %}>{{ role_label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-1 d-grid">
+              <button type="submit" class="btn btn-outline-primary">{% translate "Filter" %}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small">{% translate "Rows" %}</div>
+              <div class="h3 mb-0">{{ result_count }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small">{% translate "Students" %}</div>
+              <div class="h3 mb-0">{{ student_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>{% translate "User ID" %}</th>
+                  <th>{% translate "Username" %}</th>
+                  <th>{% translate "First Name" %}</th>
+                  <th>{% translate "Last Name" %}</th>
+                  <th>{% translate "Course" %}</th>
+                  <th>{% translate "Quiz" %}</th>
+                  <th>{% translate "Quiz Grade" %}</th>
+                  <th>{% translate "Quiz Total" %}</th>
+                  <th>{% translate "Course Grade" %}</th>
+                  <th>{% translate "Course Total" %}</th>
+                  <th>{% translate "Overall Grade" %}</th>
+                  <th>{% translate "Overall Total" %}</th>
+                  <th>{% translate "Submitted At" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in transcript_rows %}
+                  <tr>
+                    <td>{{ row.user_id }}</td>
+                    <td>{{ row.username }}</td>
+                    <td>{{ row.first_name }}</td>
+                    <td>{{ row.last_name }}</td>
+                    <td>{{ row.course_name }}</td>
+                    <td>{{ row.quiz_name }}</td>
+                    <td>{{ row.quiz_grade }}</td>
+                    <td>{{ row.quiz_total }}</td>
+                    <td>{{ row.course_accumulated_grade }}</td>
+                    <td>{{ row.course_accumulated_total }}</td>
+                    <td>{{ row.overall_accumulated_grade }}</td>
+                    <td>{{ row.overall_accumulated_total }}</td>
+                    <td>{{ row.submitted_at_display }}</td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="13" class="text-center py-5 text-muted">{% translate "No transcript rows found for the selected filters." %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

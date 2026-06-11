@@ -100,13 +100,23 @@ WSGI_APPLICATION = 'learning_platform.wsgi.application'
 # }
 
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'mydatabase',
+        'USER': 'myuser',
+        'PASSWORD': 'mypassword',
+        'HOST': 'localhost',  # Or 'db' if running Django inside Docker too
+        'PORT': '5432',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -130,7 +140,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
 LANGUAGES = [
     ('en', 'English'),
     ('ar', 'Arabic'),
@@ -166,6 +176,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Modifications
 CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "https://weathered-wave-c7f0.elprincedoca.workers.dev/")
+R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL") or os.environ.get("endpoint")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID") or os.environ.get("key_id")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY") or os.environ.get("access_key")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME") or os.environ.get("bucket") or ""
 
 # Change Auth Model
 AUTH_USER_MODEL = 'management_system.User'

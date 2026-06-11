@@ -1,0 +1,307 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+{% include "theme_showcase/partials/_navbar_user.html" %}
+
+<div class="page">
+
+  <div class="row-between" style="margin-bottom:1.25rem;">
+    <div>
+      <span class="badge" style="margin-bottom:.35rem;">Tools</span>
+      <h1 style="margin:0;">Error &amp; Empty States</h1>
+      <p class="muted" style="margin:.2rem 0 0;">Every state the user might encounter — themed.</p>
+    </div>
+  </div>
+
+  <!-- ERRORS -->
+  <h2>Error states</h2>
+  <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap:1.25rem;">
+
+    <!-- 404 -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; border:0; box-shadow:var(--shadow);">
+      <div style="font-family:var(--heading); font-weight:700; font-size:6rem; line-height:1; background:var(--gradient); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:.5rem;">404</div>
+      <h2 style="margin:0 0 .35rem;">Page not found</h2>
+      <p class="muted" style="margin:0 auto 1.5rem; max-width:380px;">
+        The page you're looking for doesn't exist or has been moved. Check the URL or head back home.
+      </p>
+      <div class="row" style="gap:.5rem; justify-content:center;">
+        <a class="btn btn-primary" href="{% url 'theme-showcase-page' theme.id 'home' %}"><i class="fa-solid fa-house"></i> Go home</a>
+        <a class="btn btn-ghost" href="#"><i class="fa-solid fa-arrow-left"></i> Go back</a>
+      </div>
+    </div>
+
+    <!-- 500 -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; border:0; box-shadow:var(--shadow);">
+      <div class="empty-state" style="padding:0;">
+        <span class="empty-icon" style="background:rgba(239,68,68,0.12); color:var(--danger); width:80px; height:80px; font-size:2rem;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </span>
+        <h2 style="margin:0 0 .35rem;">Something went wrong</h2>
+        <p class="muted" style="margin:0 auto 1.5rem; max-width:380px;">
+          We're having trouble completing your request right now. Our team has been notified.
+        </p>
+        <code style="display:inline-block; padding:.25rem .5rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px; font-size:.78rem; margin-bottom:1.25rem;">Error: 500 · Internal Server Error</code>
+        <div class="row" style="gap:.5rem; justify-content:center;">
+          <button type="button" class="btn btn-primary" onclick="location.reload()"><i class="fa-solid fa-rotate"></i> Try again</button>
+          <a class="btn btn-ghost" href="#"><i class="fa-regular fa-life-ring"></i> Get help</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 403 -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; border:0; box-shadow:var(--shadow);">
+      <div class="empty-state" style="padding:0;">
+        <span class="empty-icon" style="background:rgba(245,158,11,0.14); color:var(--warning); width:80px; height:80px; font-size:2rem;">
+          <i class="fa-solid fa-lock"></i>
+        </span>
+        <h2 style="margin:0 0 .35rem;">Access denied</h2>
+        <p class="muted" style="margin:0 auto 1.5rem; max-width:380px;">
+          You don't have permission to view this page. If you believe this is a mistake, contact your administrator.
+        </p>
+        <div class="row" style="gap:.5rem; justify-content:center;">
+          <a class="btn btn-primary" href="{% url 'theme-showcase-page' theme.id 'home' %}"><i class="fa-solid fa-house"></i> Go home</a>
+          <a class="btn btn-ghost" href="#"><i class="fa-regular fa-envelope"></i> Contact admin</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 503 maintenance -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; border:0; box-shadow:var(--shadow);">
+      <div class="empty-state" style="padding:0;">
+        <span class="empty-icon" style="width:80px; height:80px; font-size:2rem;">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+        </span>
+        <h2 style="margin:0 0 .35rem;">Under maintenance</h2>
+        <p class="muted" style="margin:0 auto 1.5rem; max-width:380px;">
+          We're performing scheduled maintenance. The platform will be back shortly.
+        </p>
+        <div class="row" style="gap:1rem; justify-content:center; margin-bottom:1.5rem;">
+          <div>
+            <div style="font-family:var(--heading); font-size:2rem; font-weight:700; color:var(--p);">02h 14m</div>
+            <div class="muted" style="font-size:.78rem;">Estimated</div>
+          </div>
+          <div class="divider-v"></div>
+          <div>
+            <div style="font-family:var(--heading); font-size:2rem; font-weight:700; color:var(--success);">99.98%</div>
+            <div class="muted" style="font-size:.78rem;">Uptime</div>
+          </div>
+        </div>
+        <a class="btn btn-primary" href="#"><i class="fa-solid fa-circle-info"></i> Status updates</a>
+      </div>
+    </div>
+
+    <!-- Offline -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; border:0; box-shadow:var(--shadow);">
+      <div class="empty-state" style="padding:0;">
+        <span class="empty-icon" style="background:rgba(100,116,139,0.14); color:var(--ink-soft); width:80px; height:80px; font-size:2rem;">
+          <i class="fa-solid fa-wifi"></i>
+        </span>
+        <h2 style="margin:0 0 .35rem;">You're offline</h2>
+        <p class="muted" style="margin:0 auto 1.5rem; max-width:380px;">
+          Check your internet connection. Your changes are saved and will sync when you're back online.
+        </p>
+        <button type="button" class="btn btn-primary" onclick="location.reload()"><i class="fa-solid fa-rotate"></i> Retry</button>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem; border:0; box-shadow:var(--shadow);">
+      <div class="empty-state" style="padding:0;">
+        <span class="empty-icon" style="background:rgba(16,185,129,0.14); color:var(--success); width:80px; height:80px; font-size:2rem;">
+          <i class="fa-solid fa-check"></i>
+        </span>
+        <h2 style="margin:0 0 .35rem;">All done!</h2>
+        <p class="muted" style="margin:0 auto 1.5rem; max-width:380px;">
+          Your quiz has been submitted successfully. You'll receive your results within 24 hours.
+        </p>
+        <div class="row" style="gap:.5rem; justify-content:center;">
+          <a class="btn btn-primary" href="{% url 'theme-showcase-page' theme.id 'home' %}"><i class="fa-solid fa-house"></i> Back home</a>
+          <a class="btn btn-ghost" href="{% url 'theme-showcase-page' theme.id 'profile' %}"><i class="fa-solid fa-chart-column"></i> See grades</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPTY STATES -->
+  <h2>Empty states</h2>
+  <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap:1.25rem;">
+
+    <div class="card">
+      <div class="empty-state" style="padding:1rem 0;">
+        <span class="empty-icon"><i class="fa-regular fa-folder-open"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.1rem;">No courses yet</h3>
+        <p style="margin:0 auto 1rem; max-width:280px;">Enroll in your first course to start learning.</p>
+        <button type="button" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Browse catalog</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="empty-state" style="padding:1rem 0;">
+        <span class="empty-icon"><i class="fa-regular fa-bell"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.1rem;">You're all caught up</h3>
+        <p style="margin:0 auto; max-width:280px;">No new notifications. We'll let you know when something happens.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="empty-state" style="padding:1rem 0;">
+        <span class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.1rem;">No results for "xyz"</h3>
+        <p style="margin:0 auto 1rem; max-width:280px;">Try a different search term or check the filters.</p>
+        <button type="button" class="btn btn-ghost btn-sm">Clear filters</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="empty-state" style="padding:1rem 0;">
+        <span class="empty-icon"><i class="fa-regular fa-comments"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.1rem;">No discussions yet</h3>
+        <p style="margin:0 auto 1rem; max-width:280px;">Start a thread and engage with your classmates.</p>
+        <button type="button" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> New thread</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="empty-state" style="padding:1rem 0;">
+        <span class="empty-icon"><i class="fa-regular fa-file"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.1rem;">No files uploaded</h3>
+        <p style="margin:0 auto 1rem; max-width:280px;">Drag &amp; drop files or click upload to get started.</p>
+        <button type="button" class="btn btn-primary btn-sm"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="empty-state" style="padding:1rem 0;">
+        <span class="empty-icon"><i class="fa-solid fa-inbox"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.1rem;">Inbox is empty</h3>
+        <p style="margin:0 auto; max-width:280px;">No new messages. Check back later or start a new conversation.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- LOADING / SKELETON -->
+  <h2>Loading &amp; skeleton</h2>
+  <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap:1.25rem;">
+
+    <!-- Spinner -->
+    <div class="card" style="text-align:center; padding:2.5rem 1.5rem;">
+      <div class="empty-state" style="padding:0;">
+        <span class="empty-icon" style="width:64px; height:64px;">
+          <i class="fa-solid fa-circle-notch fa-spin" style="font-size:1.6rem;"></i>
+        </span>
+        <h3 style="margin:0 0 .25rem; font-size:1.05rem;">Loading…</h3>
+        <p class="muted" style="margin:0; font-size:.88rem;">Fetching your courses from the server.</p>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="card" style="padding:1.5rem;">
+      <div class="row-between" style="margin-bottom:.5rem;">
+        <strong>Uploading syllabus.pdf</strong>
+        <span class="muted" style="font-size:.82rem;">64%</span>
+      </div>
+      <div class="progress" style="height:10px;"><span style="width:64%; background:var(--gradient);"></span></div>
+      <div class="muted" style="font-size:.82rem; margin-top:.5rem;">2.1 MB of 3.3 MB · ~5s remaining</div>
+    </div>
+
+    <!-- Skeleton list -->
+    <div class="card" style="padding:1.25rem;">
+      <div class="row" style="gap:.85rem; margin-bottom:1rem;">
+        <div class="skeleton" style="width:40px; height:40px; border-radius:50%;"></div>
+        <div style="flex:1;">
+          <div class="skeleton" style="width:60%; height:12px; margin-bottom:.5rem;"></div>
+          <div class="skeleton" style="width:40%; height:10px;"></div>
+        </div>
+      </div>
+      <div class="row" style="gap:.85rem; margin-bottom:1rem;">
+        <div class="skeleton" style="width:40px; height:40px; border-radius:50%;"></div>
+        <div style="flex:1;">
+          <div class="skeleton" style="width:75%; height:12px; margin-bottom:.5rem;"></div>
+          <div class="skeleton" style="width:50%; height:10px;"></div>
+        </div>
+      </div>
+      <div class="row" style="gap:.85rem;">
+        <div class="skeleton" style="width:40px; height:40px; border-radius:50%;"></div>
+        <div style="flex:1;">
+          <div class="skeleton" style="width:55%; height:12px; margin-bottom:.5rem;"></div>
+          <div class="skeleton" style="width:35%; height:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INLINE STATES -->
+  <h2>Inline states</h2>
+  <div class="grid" style="grid-template-columns: 1fr 1fr; gap:1.25rem;">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.85rem;">Alerts</div>
+      <div class="stack-md">
+        <div class="row" style="gap:.75rem; padding:.85rem 1rem; background:rgba(16,185,129,0.10); border:1px solid var(--success); border-radius:var(--radius); color:var(--ink);">
+          <i class="fa-solid fa-check-circle" style="color:var(--success);"></i>
+          <div>
+            <strong>Changes saved</strong>
+            <div style="font-size:.85rem; opacity:.85;">Your profile is up to date.</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.75rem; padding:.85rem 1rem; background:rgba(59,130,246,0.10); border:1px solid var(--p); border-radius:var(--radius); color:var(--ink);">
+          <i class="fa-solid fa-circle-info" style="color:var(--p);"></i>
+          <div>
+            <strong>New feature available</strong>
+            <div style="font-size:.85rem; opacity:.85;">Try the live theme editor in the showcase.</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.75rem; padding:.85rem 1rem; background:rgba(245,158,11,0.12); border:1px solid var(--warning); border-radius:var(--radius); color:var(--ink);">
+          <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i>
+          <div>
+            <strong>Storage at 80%</strong>
+            <div style="font-size:.85rem; opacity:.85;">Consider archiving old courses.</div>
+          </div>
+        </div>
+        <div class="row" style="gap:.75rem; padding:.85rem 1rem; background:rgba(239,68,68,0.10); border:1px solid var(--danger); border-radius:var(--radius); color:var(--ink);">
+          <i class="fa-solid fa-circle-xmark" style="color:var(--danger);"></i>
+          <div>
+            <strong>Upload failed</strong>
+            <div style="font-size:.85rem; opacity:.85;">The file is too large. Max 2 GB.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.85rem;">Progress in context</div>
+      <div class="stack-md">
+        <div>
+          <div class="row-between" style="margin-bottom:.35rem;">
+            <span><strong>Course progress</strong></span>
+            <strong>75%</strong>
+          </div>
+          <div class="progress"><span style="width:75%;"></span></div>
+        </div>
+        <div>
+          <div class="row-between" style="margin-bottom:.35rem;">
+            <span><strong>Storage used</strong></span>
+            <span class="muted" style="font-size:.82rem;">42.7 / 50 GB</span>
+          </div>
+          <div class="progress"><span style="width:85%; background:var(--warning);"></span></div>
+        </div>
+        <div>
+          <div class="row-between" style="margin-bottom:.35rem;">
+            <span><strong>Profile completeness</strong></span>
+            <strong>92%</strong>
+          </div>
+          <div class="progress"><span style="width:92%; background:var(--success);"></span></div>
+        </div>
+        <div>
+          <div class="row-between" style="margin-bottom:.35rem;">
+            <span><strong>Loading</strong></span>
+            <span class="muted" style="font-size:.82rem;">Uploading…</span>
+          </div>
+          <div class="progress"><span style="width:45%; background:var(--a);"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

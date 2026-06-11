@@ -1,0 +1,75 @@
+{% comment %}
+  User-side themed navbar. The same HTML is re-skinned purely
+  by the active theme's CSS variables. Mobile-friendly with a
+  hamburger that collapses the nav.
+{% endcomment %}
+<header class="navbar-themed" x-data="{ open: false }" style="background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:64px; z-index:30;">
+  <div class="page" style="padding-top:0; padding-bottom:0; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; padding-left:1.25rem; padding-right:1.25rem;">
+
+    <a class="showcase-brand" href="{% url 'theme-showcase-page' theme.id 'home' %}" style="padding:.85rem 0;">
+      <span class="dot" style="width:30px; height:30px;"></span>
+      <span>
+        Bible Institute
+        <small>· Student portal</small>
+      </span>
+    </a>
+
+    <button type="button"
+            class="btn btn-ghost nav-burger"
+            style="margin-left:auto; padding:.45rem .65rem;"
+            @click="open = !open"
+            :aria-expanded="open"
+            aria-label="Toggle navigation">
+      <i class="fa-solid" :class="open ? 'fa-xmark' : 'fa-bars'"></i>
+    </button>
+
+    <nav class="user-nav" :class="{ 'is-open': open }">
+      <a class="showcase-pill {% if active_page_id == 'home' %}is-active{% endif %}"
+         href="{% url 'theme-showcase-page' theme.id 'home' %}">
+        <i class="fa-solid fa-house"></i> Home
+      </a>
+      <a class="showcase-pill {% if active_page_id == 'courses' or active_page_id == 'course_detail' %}is-active{% endif %}"
+         href="{% url 'theme-showcase-page' theme.id 'courses' %}">
+        <i class="fa-solid fa-book-open"></i> Courses
+      </a>
+      <a class="showcase-pill {% if active_page_id == 'profile' %}is-active{% endif %}"
+         href="{% url 'theme-showcase-page' theme.id 'profile' %}">
+        <i class="fa-solid fa-id-badge"></i> Profile
+      </a>
+    </nav>
+
+    <div class="user-actions">
+      <button class="btn btn-soft btn-icon" type="button" title="Notifications" style="position:relative;">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge badge-accent"
+              style="position:absolute; top:-4px; right:-4px; padding:0 .35rem; min-width:18px; height:18px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-size:.65rem;">3</span>
+      </button>
+      <a class="btn btn-primary" href="{% url 'theme-showcase-page' theme.id 'profile' %}">
+        <span class="avatar sm" style="box-shadow:none;">GE</span>
+        <span class="user-actions-label">George</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<style>
+  .nav-burger { display: none; }
+  .user-nav { display: flex; gap: .25rem; flex-wrap: wrap; }
+  .user-actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+  @media (max-width: 900px) {
+    .nav-burger { display: inline-flex; }
+    .user-nav {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      padding: .5rem 0 .85rem;
+      border-top: 1px solid var(--border);
+      margin-top: .35rem;
+    }
+    .user-nav.is-open { display: flex; }
+    .user-nav .showcase-pill { padding: .55rem .75rem; justify-content: flex-start; }
+    .user-actions { margin-left: 0; }
+    .user-actions-label { display: none; }
+  }
+</style>

@@ -1,0 +1,372 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+{% include "theme_showcase/partials/_navbar_user.html" %}
+
+<div class="page" x-data="{ showModal: false, showToast: false }">
+
+  <div class="row-between" style="margin-bottom:1.25rem;">
+    <div>
+      <span class="badge" style="margin-bottom:.35rem;">Tools</span>
+      <h1 style="margin:0;">Form Components</h1>
+      <p class="muted" style="margin:.2rem 0 0;">Inputs, validation, login/signup, modals — themed.</p>
+    </div>
+  </div>
+
+  <!-- INPUT FIELDS -->
+  <h2 style="margin-top:0;">Input fields</h2>
+  <div class="card">
+    <div class="grid grid-2">
+      <div>
+        <label class="label">Text input</label>
+        <input class="input" type="text" placeholder="Your full name" value="George Essam">
+      </div>
+      <div>
+        <label class="label">Email</label>
+        <input class="input" type="email" placeholder="you@example.com" value="george@admin.com">
+      </div>
+      <div>
+        <label class="label">Password</label>
+        <input class="input" type="password" value="supersecret">
+      </div>
+      <div>
+        <label class="label">Number</label>
+        <input class="input" type="number" value="42">
+      </div>
+      <div>
+        <label class="label">Date</label>
+        <input class="input" type="date" value="2026-06-11">
+      </div>
+      <div>
+        <label class="label">Time</label>
+        <input class="input" type="time" value="14:30">
+      </div>
+      <div style="grid-column:1/-1;">
+        <label class="label">Textarea</label>
+        <textarea class="input" rows="3" placeholder="Write a short bio…">Old Testament teacher, 12 years of ministry experience.</textarea>
+      </div>
+      <div>
+        <label class="label">Search</label>
+        <div class="search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input class="input" type="search" placeholder="Search courses…">
+        </div>
+      </div>
+      <div>
+        <label class="label">Disabled</label>
+        <input class="input" disabled value="Can't change this">
+      </div>
+    </div>
+  </div>
+
+  <!-- SELECT + RADIO + CHECKBOX + SWITCH -->
+  <h2>Selection controls</h2>
+  <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap:1.25rem;">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.85rem;">Select</div>
+      <div class="stack-md">
+        <div>
+          <label class="label">Course level</label>
+          <select class="input">
+            <option>Year 1 — Foundations</option>
+            <option>Year 2 — Specialised</option>
+            <option>Year 3 — Mastery</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Multiple</label>
+          <select class="input" multiple size="3">
+            <option>Old Testament</option>
+            <option>New Testament</option>
+            <option>Church History</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.85rem;">Radio</div>
+      <div class="stack-md">
+        <label class="row" style="gap:.5rem; cursor:pointer;">
+          <input type="radio" name="r" checked style="accent-color: var(--p);">
+          <span><strong>Beginner</strong> — just starting out</span>
+        </label>
+        <label class="row" style="gap:.5rem; cursor:pointer;">
+          <input type="radio" name="r" style="accent-color: var(--p);">
+          <span><strong>Intermediate</strong> — 1–2 years</span>
+        </label>
+        <label class="row" style="gap:.5rem; cursor:pointer;">
+          <input type="radio" name="r" style="accent-color: var(--p);">
+          <span><strong>Advanced</strong> — 3+ years</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.85rem;">Checkbox &amp; switch</div>
+      <div class="stack-md">
+        <label class="row" style="gap:.5rem; cursor:pointer;">
+          <input class="checkbox" type="checkbox" checked>
+          <span>Email me when a new course opens</span>
+        </label>
+        <label class="row" style="gap:.5rem; cursor:pointer;">
+          <input class="checkbox" type="checkbox">
+          <span>Send weekly progress digest</span>
+        </label>
+        <label class="row" style="gap:.5rem; cursor:pointer;">
+          <input class="checkbox" type="checkbox">
+          <span>Allow mentions in discussions</span>
+        </label>
+        <div class="divider" style="margin:.35rem 0;"></div>
+        <label class="row-between" style="cursor:pointer;">
+          <span><strong>Public profile</strong><div class="muted" style="font-size:.8rem;">Anyone can see your achievements</div></span>
+          <label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label>
+        </label>
+        <label class="row-between" style="cursor:pointer;">
+          <span><strong>2-factor auth</strong><div class="muted" style="font-size:.8rem;">Add a layer of security</div></span>
+          <label class="switch"><input type="checkbox"><span class="switch-slider"></span></label>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- VALIDATION STATES -->
+  <h2>Validation states</h2>
+  <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap:1.25rem;">
+    <div class="card">
+      <div class="row" style="gap:.5rem; margin-bottom:.5rem;">
+        <i class="fa-solid fa-check-circle" style="color:var(--success);"></i>
+        <strong>Valid input</strong>
+      </div>
+      <label class="label">Username</label>
+      <input class="input" value="admin" style="border-color:var(--success); box-shadow: 0 0 0 3px rgba(16,185,129,0.10);">
+      <div style="color:var(--success); font-size:.78rem; margin-top:.35rem;"><i class="fa-solid fa-check"></i> Username is available.</div>
+    </div>
+    <div class="card">
+      <div class="row" style="gap:.5rem; margin-bottom:.5rem;">
+        <i class="fa-solid fa-circle-exclamation" style="color:var(--warning);"></i>
+        <strong>Warning</strong>
+      </div>
+      <label class="label">Password</label>
+      <input class="input" value="abc123" style="border-color:var(--warning); box-shadow: 0 0 0 3px rgba(245,158,11,0.10);">
+      <div style="color:var(--warning); font-size:.78rem; margin-top:.35rem;"><i class="fa-solid fa-triangle-exclamation"></i> Consider using a stronger password.</div>
+    </div>
+    <div class="card">
+      <div class="row" style="gap:.5rem; margin-bottom:.5rem;">
+        <i class="fa-solid fa-circle-xmark" style="color:var(--danger);"></i>
+        <strong>Error</strong>
+      </div>
+      <label class="label">Email</label>
+      <input class="input" value="not-an-email" style="border-color:var(--danger); box-shadow: 0 0 0 3px rgba(239,68,68,0.10);">
+      <div style="color:var(--danger); font-size:.78rem; margin-top:.35rem;"><i class="fa-solid fa-xmark"></i> Please enter a valid email address.</div>
+    </div>
+  </div>
+
+  <!-- FILE UPLOAD -->
+  <h2>File upload</h2>
+  <div class="grid" style="grid-template-columns: 1fr 1fr; gap:1.25rem;">
+    <div class="card" style="border:2px dashed var(--border); text-align:center; padding:2rem 1.5rem;">
+      <div class="empty-state" style="padding:1rem;">
+        <span class="empty-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+        <h3 style="margin:0 0 .25rem; font-size:1.05rem;">Drop files here</h3>
+        <p class="muted" style="margin:0 0 1rem; font-size:.88rem;">or click to browse</p>
+        <button type="button" class="btn btn-primary"><i class="fa-solid fa-folder-open"></i> Browse</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.85rem;">Uploaded</div>
+      <div class="stack-md">
+        <div class="row" style="gap:.65rem; padding:.65rem .75rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+          <i class="fa-regular fa-file-pdf" style="color:var(--danger);"></i>
+          <div style="flex:1;">
+            <strong style="font-size:.88rem;">syllabus.pdf</strong>
+            <div class="progress" style="margin-top:.35rem;"><span style="width:100%;"></span></div>
+          </div>
+          <span class="muted" style="font-size:.78rem;">1.2 MB</span>
+          <button class="btn btn-ghost btn-icon btn-sm" type="button"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="row" style="gap:.65rem; padding:.65rem .75rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+          <i class="fa-regular fa-file-word" style="color:var(--p);"></i>
+          <div style="flex:1;">
+            <strong style="font-size:.88rem;">reading-list.docx</strong>
+            <div class="progress" style="margin-top:.35rem;"><span style="width:64%; background:var(--a);"></span></div>
+            <div class="muted" style="font-size:.74rem; margin-top:.25rem;">Uploading… 64%</div>
+          </div>
+          <span class="muted" style="font-size:.78rem;">320 KB</span>
+          <button class="btn btn-ghost btn-icon btn-sm" type="button"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN + SIGNUP + RESET -->
+  <h2>Auth flows</h2>
+  <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap:1.25rem;">
+
+    <!-- LOGIN -->
+    <div class="card">
+      <div style="text-align:center; margin-bottom:1.25rem;">
+        <span style="display:inline-flex; width:56px; height:56px; border-radius:var(--radius); background:var(--gradient); color:#fff; align-items:center; justify-content:center; font-size:1.4rem; margin-bottom:.85rem;">
+          <i class="fa-solid fa-right-to-bracket"></i>
+        </span>
+        <h2 style="margin:0 0 .25rem;">Welcome back</h2>
+        <p class="muted" style="margin:0; font-size:.9rem;">Sign in to your account</p>
+      </div>
+      <div class="stack-md">
+        <div>
+          <label class="label">Username or email</label>
+          <input class="input" placeholder="you@example.com">
+        </div>
+        <div>
+          <div class="row-between" style="margin-bottom:.35rem;">
+            <label class="label" style="margin:0;">Password</label>
+            <a href="#" style="font-size:.78rem; font-weight:600;">Forgot?</a>
+          </div>
+          <input class="input" type="password" placeholder="••••••••">
+        </div>
+        <label class="row" style="gap:.5rem; cursor:pointer; font-size:.88rem;">
+          <input class="checkbox" type="checkbox" checked>
+          <span>Remember me for 30 days</span>
+        </label>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign in
+        </button>
+        <div class="row" style="gap:.5rem;">
+          <div style="flex:1; height:1px; background:var(--border);"></div>
+          <span class="muted" style="font-size:.78rem;">or</span>
+          <div style="flex:1; height:1px; background:var(--border);"></div>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn btn-ghost" style="flex:1; justify-content:center;"><i class="fa-brands fa-google"></i> Google</button>
+          <button class="btn btn-ghost" style="flex:1; justify-content:center;"><i class="fa-brands fa-microsoft"></i> Microsoft</button>
+        </div>
+        <p class="muted" style="margin:0; text-align:center; font-size:.85rem;">Don't have an account? <a href="#" style="font-weight:600;">Sign up</a></p>
+      </div>
+    </div>
+
+    <!-- SIGNUP -->
+    <div class="card">
+      <div style="text-align:center; margin-bottom:1.25rem;">
+        <span style="display:inline-flex; width:56px; height:56px; border-radius:var(--radius); background:var(--gradient); color:#fff; align-items:center; justify-content:center; font-size:1.4rem; margin-bottom:.85rem;">
+          <i class="fa-solid fa-user-plus"></i>
+        </span>
+        <h2 style="margin:0 0 .25rem;">Create account</h2>
+        <p class="muted" style="margin:0; font-size:.9rem;">Join the institute today</p>
+      </div>
+      <div class="stack-md">
+        <div class="grid grid-2" style="gap:.5rem;">
+          <div>
+            <label class="label">First name</label>
+            <input class="input" placeholder="George">
+          </div>
+          <div>
+            <label class="label">Last name</label>
+            <input class="input" placeholder="Essam">
+          </div>
+        </div>
+        <div>
+          <label class="label">Email</label>
+          <input class="input" type="email" placeholder="you@example.com">
+        </div>
+        <div>
+          <label class="label">Password</label>
+          <input class="input" type="password" placeholder="At least 8 characters">
+          <div class="progress" style="margin-top:.5rem;"><span style="width:75%; background:var(--success);"></span></div>
+          <div class="muted" style="font-size:.74rem; margin-top:.35rem;">Strong password</div>
+        </div>
+        <label class="row" style="gap:.5rem; cursor:pointer; font-size:.85rem; align-items:flex-start;">
+          <input class="checkbox" type="checkbox" checked>
+          <span>I agree to the <a href="#">Terms</a> and <a href="#">Privacy Policy</a></span>
+        </label>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;">
+          <i class="fa-solid fa-user-plus"></i> Create account
+        </button>
+        <p class="muted" style="margin:0; text-align:center; font-size:.85rem;">Already have an account? <a href="#" style="font-weight:600;">Sign in</a></p>
+      </div>
+    </div>
+
+    <!-- RESET -->
+    <div class="card">
+      <div style="text-align:center; margin-bottom:1.25rem;">
+        <span style="display:inline-flex; width:56px; height:56px; border-radius:var(--radius); background:var(--gradient); color:#fff; align-items:center; justify-content:center; font-size:1.4rem; margin-bottom:.85rem;">
+          <i class="fa-solid fa-key"></i>
+        </span>
+        <h2 style="margin:0 0 .25rem;">Reset password</h2>
+        <p class="muted" style="margin:0; font-size:.9rem;">We'll email you a reset link</p>
+      </div>
+      <div class="stack-md">
+        <div>
+          <label class="label">Email address</label>
+          <input class="input" type="email" placeholder="you@example.com">
+        </div>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;">
+          <i class="fa-solid fa-paper-plane"></i> Send reset link
+        </button>
+        <div class="divider" style="margin:.5rem 0;"></div>
+        <div class="row" style="gap:.65rem; padding:.85rem; background:var(--p-soft); border:1px solid var(--p); border-radius:var(--radius);">
+          <i class="fa-solid fa-circle-info" style="color:var(--p);"></i>
+          <div class="muted" style="font-size:.82rem; color:var(--ink);">Check your inbox for an email with instructions. The link expires in 30 minutes.</div>
+        </div>
+        <p class="muted" style="margin:0; text-align:center; font-size:.85rem;">Remembered it? <a href="#" style="font-weight:600;">Back to sign in</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE ELEMENTS -->
+  <h2>Modals &amp; toasts</h2>
+  <div class="card">
+    <div class="row" style="gap:.5rem; flex-wrap:wrap;">
+      <button type="button" class="btn btn-primary" @click="showModal = true">
+        <i class="fa-solid fa-rectangle-list"></i> Open modal
+      </button>
+      <button type="button" class="btn btn-soft" @click="showToast = true; setTimeout(() => showToast = false, 3000)">
+        <i class="fa-solid fa-bell"></i> Show toast
+      </button>
+      <button type="button" class="btn btn-ghost" onclick="alert('Disabled in showcase — but the modal/toast above are live.')">
+        <i class="fa-solid fa-circle-info"></i> Disabled button
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div x-show="showModal" x-cloak
+       style="position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:1rem; background:rgba(15,23,42,0.5); backdrop-filter:blur(4px);"
+       @click.self="showModal = false">
+    <div class="card" style="max-width:480px; width:100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);" x-transition>
+      <div class="card-header">
+        <div>
+          <div class="card-title">Confirm submission</div>
+          <div class="card-sub">This action cannot be undone</div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" @click="showModal = false">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <p style="margin:0 0 1rem;">You're about to submit Quiz 2 — Isaiah Deep Dive. Once submitted, you won't be able to change your answers.</p>
+      <div class="row" style="gap:.5rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; margin-bottom:1rem;">
+        <i class="fa-solid fa-circle-info" style="color:var(--p);"></i>
+        <div>
+          <strong>15 questions</strong> · <span class="muted">45 min limit</span>
+          <div class="muted" style="font-size:.8rem;">14 answered · 1 skipped</div>
+        </div>
+      </div>
+      <div class="row" style="gap:.5rem; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" @click="showModal = false">Cancel</button>
+        <button type="button" class="btn btn-primary" @click="showModal = false"><i class="fa-solid fa-paper-plane"></i> Submit quiz</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div x-show="showToast" x-cloak x-transition
+       style="position:fixed; bottom:1.5rem; right:1.5rem; z-index:101; display:flex; align-items:center; gap:.75rem; padding:.85rem 1.1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.18); max-width:380px;">
+    <span class="stat-icon success" style="width:36px; height:36px; margin:0;"><i class="fa-solid fa-check"></i></span>
+    <div style="flex:1;">
+      <strong>Saved successfully</strong>
+      <div class="muted" style="font-size:.82rem;">Your changes are live</div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-icon btn-sm" @click="showToast = false"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+</div>
+{% endblock %}

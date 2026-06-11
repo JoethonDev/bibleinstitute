@@ -1,0 +1,502 @@
+{% extends "theme_showcase/_base.html" %}
+{% block content %}
+
+{% include "theme_showcase/partials/_navbar_user.html" %}
+
+<div class="page" x-data="{ tab: 'lessons' }">
+
+  <!-- Breadcrumb -->
+  <nav style="display:flex; gap:.4rem; align-items:center; color:var(--ink-soft); font-size:.85rem; margin-bottom:1rem; flex-wrap:wrap;">
+    <a href="{% url 'theme-showcase-page' theme.id 'home' %}">Home</a>
+    <i class="fa-solid fa-chevron-right" style="font-size:.65rem;"></i>
+    <a href="{% url 'theme-showcase-page' theme.id 'courses' %}">Courses</a>
+    <i class="fa-solid fa-chevron-right" style="font-size:.65rem;"></i>
+    <span style="color:var(--ink);">Old Testament 12</span>
+  </nav>
+
+  <!-- Course header -->
+  <section class="card" style="padding:0; overflow:hidden; border:0; box-shadow:var(--shadow);">
+    <div style="background:var(--gradient); color:#fff; padding:1.75rem 1.75rem 1.5rem; position:relative;">
+      <div class="row" style="gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem;">
+        <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;">Year 2</span>
+        <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;">Old Testament</span>
+        <span class="badge" style="background:var(--a); color:#1a1a1a;">In progress</span>
+        <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;"><i class="fa-solid fa-bookmark"></i> Saved</span>
+      </div>
+      <h1 style="color:#fff; margin:0 0 .35rem; font-size:1.9rem;">Old Testament 12</h1>
+      <p style="opacity:.92; max-width:760px; margin:0;">
+        A deep dive into the prophetic literature of the Old Testament, with a
+        focus on the historical and cultural context of each book. Designed
+        for second-year students.
+      </p>
+      <div class="row" style="gap:1.25rem; flex-wrap:wrap; margin-top:1rem; color:#fff; font-size:.88rem;">
+        <span><i class="fa-solid fa-chalkboard-user"></i> Magued Makram</span>
+        <span><i class="fa-regular fa-clock"></i> 24 hours</span>
+        <span><i class="fa-solid fa-list"></i> 8 lessons</span>
+        <span><i class="fa-solid fa-pen-to-square"></i> 2 quizzes</span>
+        <span><i class="fa-solid fa-users"></i> 48 students</span>
+        <span><i class="fa-solid fa-star"></i> 4.7 (32 reviews)</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" style="padding:0 1.5rem;">
+      <button class="tab" :class="tab === 'overview' ? 'is-active' : ''" @click="tab = 'overview'">
+        <i class="fa-solid fa-circle-info"></i> Overview
+      </button>
+      <button class="tab" :class="tab === 'lessons' ? 'is-active' : ''" @click="tab = 'lessons'">
+        <i class="fa-solid fa-list"></i> Lessons <span class="badge" style="margin-left:.25rem;">8</span>
+      </button>
+      <button class="tab" :class="tab === 'quizzes' ? 'is-active' : ''" @click="tab = 'quizzes'">
+        <i class="fa-solid fa-pen-to-square"></i> Quizzes <span class="badge badge-accent" style="margin-left:.25rem;">2</span>
+      </button>
+      <button class="tab" :class="tab === 'resources' ? 'is-active' : ''" @click="tab = 'resources'">
+        <i class="fa-solid fa-folder-open"></i> Resources
+      </button>
+      <button class="tab" :class="tab === 'discussions' ? 'is-active' : ''" @click="tab = 'discussions'">
+        <i class="fa-regular fa-comments"></i> Discussions <span class="badge" style="margin-left:.25rem;">14</span>
+      </button>
+      <button class="tab" :class="tab === 'reviews' ? 'is-active' : ''" @click="tab = 'reviews'">
+        <i class="fa-solid fa-star"></i> Reviews
+      </button>
+    </div>
+  </section>
+
+  <!-- Body grid -->
+  <div class="grid" style="grid-template-columns: 1.7fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+
+    <!-- Main content per tab -->
+    <div>
+
+      <!-- OVERVIEW -->
+      <div x-show="tab === 'overview'" x-cloak class="stack-lg">
+        <!-- Video preview mock -->
+        <div class="card" style="padding:0; overflow:hidden;">
+          <div style="aspect-ratio: 16/9; background:linear-gradient(135deg, #0b1020 0%, #1e1b4b 100%); position:relative; display:flex; align-items:center; justify-content:center; color:#fff;">
+            <button type="button" style="width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,0.95); color:var(--p); border:0; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 8px 30px rgba(0,0,0,0.4); cursor:pointer;">
+              <i class="fa-solid fa-play" style="margin-left:4px; font-size:1.4rem;"></i>
+            </button>
+            <div style="position:absolute; left:1rem; top:1rem;">
+              <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff;"><i class="fa-solid fa-circle-play"></i> Preview</span>
+            </div>
+            <div style="position:absolute; right:1rem; bottom:1rem; right:1rem;">
+              <span style="background:rgba(0,0,0,0.6); color:#fff; padding:.25rem .5rem; border-radius:6px; font-size:.78rem;">3:42</span>
+            </div>
+          </div>
+          <div style="padding:1rem 1.25rem;">
+            <h3 style="margin:0 0 .35rem;">Course trailer</h3>
+            <p class="muted" style="margin:0; font-size:.88rem;">A 3-minute walkthrough of what you'll learn in this course.</p>
+          </div>
+        </div>
+
+        <!-- What you'll learn -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">What you'll learn</div>
+              <div class="card-sub">8 outcomes from 8 lessons and 2 quizzes</div>
+            </div>
+          </div>
+          <div class="grid grid-2">
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Trace the historical arc of the prophetic books</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Identify key themes in Isaiah, Jeremiah, Ezekiel</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Understand the cultural and political context</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Compare and contrast the 12 minor prophets</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Apply hermeneutical principles to prophetic text</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Connect OT prophecy to NT fulfillment</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Articulate the theology of each major prophet</span></div>
+            <div class="row" style="gap:.5rem;"><i class="fa-solid fa-check" style="color:var(--success);"></i> <span>Discuss the relevance for ministry today</span></div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom:.5rem;">About this course</div>
+          <p class="muted" style="font-size:.92rem; line-height:1.65;">
+            This course takes you through the prophetic literature of the Old
+            Testament, with a special focus on Isaiah, Jeremiah, Ezekiel, and
+            the Book of the Twelve. Each lecture pairs the biblical text with
+            the historical and cultural context, helping you see the prophets
+            as they would have been heard by their original audiences — and
+            how their message continues to speak today.
+          </p>
+          <p class="muted" style="font-size:.92rem; line-height:1.65;">
+            You'll work through 8 lectures (video and audio), 2 graded quizzes,
+            and a curated reading list. By the end of the term, you'll be able
+            to articulate the theology of each major prophet and apply
+            hermeneutical principles to prophetic passages.
+          </p>
+        </div>
+
+        <!-- Instructor -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom:.85rem;">Your instructor</div>
+          <div class="row" style="gap:1rem; align-items:flex-start;">
+            <span class="avatar lg" style="width:80px; height:80px; font-size:1.6rem;">MM</span>
+            <div style="flex:1;">
+              <h3 style="margin:0 0 .25rem;">Magued Makram</h3>
+              <p class="muted" style="margin:0 0 .65rem;">Old Testament studies · 12 years teaching</p>
+              <div class="row" style="gap:1rem; font-size:.85rem; color:var(--ink-soft); margin-bottom:.75rem;">
+                <span><i class="fa-solid fa-star" style="color:var(--a);"></i> 4.8 rating</span>
+                <span><i class="fa-solid fa-users"></i> 1,204 students</span>
+                <span><i class="fa-solid fa-play"></i> 8 courses</span>
+              </div>
+              <div class="row" style="gap:.5rem;">
+                <button class="btn btn-soft btn-sm"><i class="fa-regular fa-envelope"></i> Message</button>
+                <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-circle-info"></i> Profile</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LESSONS -->
+      <div x-show="tab === 'lessons'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Lessons</div>
+            <div class="card-sub">5 of 8 completed · 18% remaining</div>
+          </div>
+          <div class="row" style="gap:.4rem;">
+            <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-list-ul"></i> List</button>
+            <button class="btn btn-soft btn-sm"><i class="fa-solid fa-grid-2"></i> Grid</button>
+          </div>
+        </div>
+
+        <div class="stack" style="gap:.65rem;">
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--success);"><i class="fa-solid fa-check"></i></span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 1 — Introduction to the Prophets</strong>
+                <span class="badge badge-success">Done</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 18 min · <a href="#">notes</a></div>
+            </div>
+            <i class="fa-solid fa-chevron-right muted"></i>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--success);"><i class="fa-solid fa-check"></i></span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 2 — Historical Background</strong>
+                <span class="badge badge-success">Done</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 24 min</div>
+            </div>
+            <i class="fa-solid fa-chevron-right muted"></i>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--p-soft); border:1px solid var(--p); border-radius:var(--radius);">
+            <span class="avatar sm">3</span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 3 — Isaiah: Context & Authorship</strong>
+                <span class="badge">Current</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 32 min · started 2h ago</div>
+              <div class="progress" style="margin-top:.5rem;"><span style="width:42%;"></span></div>
+            </div>
+            <a class="btn btn-primary btn-sm" href="#"><i class="fa-solid fa-circle-play"></i> Resume</a>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--border); color:var(--ink-soft);">4</span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 4 — Jeremiah: The Weeping Prophet</strong>
+                <span class="badge">Upcoming</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 28 min</div>
+            </div>
+            <i class="fa-solid fa-lock muted"></i>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--border); color:var(--ink-soft);">5</span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 5 — Ezekiel: Visions & Symbolism</strong>
+                <span class="badge">Upcoming</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 36 min</div>
+            </div>
+            <i class="fa-solid fa-lock muted"></i>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--border); color:var(--ink-soft);">6</span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 6 — Daniel: Apocalyptic Literature</strong>
+                <span class="badge">Upcoming</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 30 min</div>
+            </div>
+            <i class="fa-solid fa-lock muted"></i>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--border); color:var(--ink-soft);">7</span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 7 — The Twelve: Hosea to Malachi</strong>
+                <span class="badge">Upcoming</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 40 min</div>
+            </div>
+            <i class="fa-solid fa-lock muted"></i>
+          </div>
+
+          <div class="row" style="gap:.85rem; padding:.75rem .85rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+            <span class="avatar sm" style="background:var(--border); color:var(--ink-soft);">8</span>
+            <div style="flex:1; min-width:0;">
+              <div class="row-between">
+                <strong>Lecture 8 — Synthesis & Modern Application</strong>
+                <span class="badge">Upcoming</span>
+              </div>
+              <div class="muted" style="font-size:.82rem;">2 video · 2 audio · 22 min</div>
+            </div>
+            <i class="fa-solid fa-lock muted"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUIZZES -->
+      <div x-show="tab === 'quizzes'" x-cloak class="stack-lg">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Quizzes</div>
+              <div class="card-sub">2 quizzes · 1 passed · 1 open</div>
+            </div>
+          </div>
+          <div class="stack-md">
+            <div class="row" style="gap:.75rem; padding:1rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border);">
+              <span class="stat-icon success"><i class="fa-solid fa-check"></i></span>
+              <div style="flex:1;">
+                <strong>Quiz 1 — Prophets Overview</strong>
+                <div class="muted" style="font-size:.85rem; margin-top:.15rem;">20 questions · 30 min · Score 18 / 20 · Submitted Nov 5</div>
+              </div>
+              <div class="stack" style="text-align:right;">
+                <span class="badge badge-success" style="font-size:.78rem;">Passed</span>
+                <span class="muted" style="font-size:.76rem;">90%</span>
+              </div>
+            </div>
+            <div class="row" style="gap:.75rem; padding:1rem; background:var(--a-soft); border:1px solid var(--a); border-radius:var(--radius);">
+              <span class="stat-icon" style="background:var(--a); color:#1a1a1a;"><i class="fa-solid fa-pen-to-square"></i></span>
+              <div style="flex:1;">
+                <strong>Quiz 2 — Isaiah Deep Dive</strong>
+                <div class="muted" style="font-size:.85rem; margin-top:.15rem;">15 questions · 45 min · Closes Friday · 11:59 PM</div>
+              </div>
+              <a class="btn btn-accent" href="#">Take quiz</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESOURCES -->
+      <div x-show="tab === 'resources'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Resources</div>
+            <div class="card-sub">12 files · 84.2 MB</div>
+          </div>
+          <button class="btn btn-primary btn-sm"><i class="fa-solid fa-download"></i> Download all</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Updated</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><i class="fa-regular fa-file-pdf" style="color:var(--danger);"></i> Course syllabus.pdf</td>
+                <td><span class="badge">PDF</span></td>
+                <td>1.2 MB</td>
+                <td>Oct 11</td>
+                <td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button></td>
+              </tr>
+              <tr>
+                <td><i class="fa-regular fa-file-word" style="color:var(--p);"></i> Reading list.docx</td>
+                <td><span class="badge">DOCX</span></td>
+                <td>320 KB</td>
+                <td>Oct 11</td>
+                <td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button></td>
+              </tr>
+              <tr>
+                <td><i class="fa-regular fa-file-powerpoint" style="color:var(--warning);"></i> Lecture 1 slides.pptx</td>
+                <td><span class="badge">PPTX</span></td>
+                <td>5.8 MB</td>
+                <td>Oct 11</td>
+                <td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button></td>
+              </tr>
+              <tr>
+                <td><i class="fa-regular fa-file-image" style="color:var(--a);"></i> Timeline of prophets.png</td>
+                <td><span class="badge">PNG</span></td>
+                <td>2.1 MB</td>
+                <td>Oct 12</td>
+                <td style="text-align:right;"><button class="btn btn-ghost btn-icon btn-sm"><i class="fa-solid fa-download"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DISCUSSIONS -->
+      <div x-show="tab === 'discussions'" x-cloak class="stack-lg">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Discussions</div>
+              <div class="card-sub">14 threads · 87 replies</div>
+            </div>
+            <button class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> New thread</button>
+          </div>
+          <div class="stack-md">
+            <div class="row" style="gap:.75rem; padding:.85rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+              <span class="avatar sm">MA</span>
+              <div style="flex:1;">
+                <div class="row-between">
+                  <strong style="font-size:.9rem;">How does Isaiah 53 shape Christian theology?</strong>
+                  <span class="muted" style="font-size:.76rem;">3h</span>
+                </div>
+                <div class="muted" style="font-size:.82rem; margin-top:.15rem;">Mariam A. · 12 replies · Last reply 1h ago</div>
+              </div>
+              <span class="badge">Pinned</span>
+            </div>
+            <div class="row" style="gap:.75rem; padding:.85rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+              <span class="avatar sm" style="background:var(--a);">MS</span>
+              <div style="flex:1;">
+                <div class="row-between">
+                  <strong style="font-size:.9rem;">Reading recommendations for the minor prophets</strong>
+                  <span class="muted" style="font-size:.76rem;">Yesterday</span>
+                </div>
+                <div class="muted" style="font-size:.82rem; margin-top:.15rem;">Magued S. · 7 replies</div>
+              </div>
+            </div>
+            <div class="row" style="gap:.75rem; padding:.85rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+              <span class="avatar sm" style="background:var(--p-strong);">NA</span>
+              <div style="flex:1;">
+                <div class="row-between">
+                  <strong style="font-size:.9rem;">Q&A on the historical context of Jeremiah</strong>
+                  <span class="muted" style="font-size:.76rem;">2d</span>
+                </div>
+                <div class="muted" style="font-size:.82rem; margin-top:.15rem;">Nader A. · 4 replies</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVIEWS -->
+      <div x-show="tab === 'reviews'" x-cloak class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Reviews</div>
+            <div class="card-sub">4.7 average · 32 ratings</div>
+          </div>
+          <button class="btn btn-primary btn-sm"><i class="fa-solid fa-pen"></i> Write a review</button>
+        </div>
+        <div class="grid grid-2">
+          <div class="stack-md">
+            <div class="row-between"><span>5 ★</span><div class="progress" style="width:60%;"><span style="width:75%;"></span></div><span class="muted">24</span></div>
+            <div class="row-between"><span>4 ★</span><div class="progress" style="width:60%;"><span style="width:18%;"></span></div><span class="muted">6</span></div>
+            <div class="row-between"><span>3 ★</span><div class="progress" style="width:60%;"><span style="width:5%;"></span></div><span class="muted">2</span></div>
+            <div class="row-between"><span>2 ★</span><div class="progress" style="width:60%;"><span style="width:0%;"></span></div><span class="muted">0</span></div>
+            <div class="row-between"><span>1 ★</span><div class="progress" style="width:60%;"><span style="width:0%;"></span></div><span class="muted">0</span></div>
+          </div>
+          <div class="stack-md">
+            <div class="row" style="gap:.65rem;">
+              <span class="avatar sm" style="background:var(--a);">HN</span>
+              <div>
+                <strong>Hala N.</strong>
+                <div class="muted" style="font-size:.78rem;"><i class="fa-solid fa-star" style="color:var(--a);"></i><i class="fa-solid fa-star" style="color:var(--a);"></i><i class="fa-solid fa-star" style="color:var(--a);"></i><i class="fa-solid fa-star" style="color:var(--a);"></i><i class="fa-solid fa-star" style="color:var(--a);"></i> · 1 week ago</div>
+              </div>
+            </div>
+            <p class="muted" style="font-size:.9rem; margin:0;">"Magued is an excellent teacher. The lectures are clear, well-paced, and the quizzes really test understanding."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="stack-lg">
+      <!-- Enroll / progress -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:.85rem;">Your progress</div>
+        <div class="stack-md">
+          <div class="stack" style="gap:.5rem;">
+            <div class="row-between" style="font-size:.85rem;"><span class="muted">Course progress</span><strong>65%</strong></div>
+            <div class="progress"><span style="width:65%;"></span></div>
+          </div>
+          <div class="grid grid-2">
+            <div class="stat" style="padding:.75rem .85rem;">
+              <span class="stat-label" style="font-size:.72rem;">Lessons</span>
+              <span class="stat-value" style="font-size:1.25rem;">5 / 8</span>
+            </div>
+            <div class="stat" style="padding:.75rem .85rem;">
+              <span class="stat-label" style="font-size:.72rem;">Quizzes</span>
+              <span class="stat-value" style="font-size:1.25rem;">1 / 2</span>
+            </div>
+            <div class="stat" style="padding:.75rem .85rem;">
+              <span class="stat-label" style="font-size:.72rem;">Hours</span>
+              <span class="stat-value" style="font-size:1.25rem;">14h</span>
+            </div>
+            <div class="stat" style="padding:.75rem .85rem;">
+              <span class="stat-label" style="font-size:.72rem;">Avg. grade</span>
+              <span class="stat-value" style="font-size:1.25rem;">87%</span>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%; justify-content:center;">
+            <i class="fa-solid fa-circle-play"></i> Resume lecture
+          </button>
+        </div>
+      </div>
+
+      <!-- Open quiz callout -->
+      <div class="card" style="background:var(--a-soft); border-color:var(--a);">
+        <div class="row" style="gap:.65rem; margin-bottom:.5rem;">
+          <span class="stat-icon" style="background:var(--a); color:#1a1a1a;"><i class="fa-solid fa-circle-exclamation"></i></span>
+          <div>
+            <strong>Quiz 2 closes Friday</strong>
+            <div class="muted" style="font-size:.82rem;">3 days · 11 hours left</div>
+          </div>
+        </div>
+        <p class="muted" style="font-size:.88rem; margin:0 0 .85rem;">Isaiah Deep Dive — 15 questions, 45 min.</p>
+        <a class="btn btn-accent" style="width:100%; justify-content:center;" href="#">Take quiz now</a>
+      </div>
+
+      <!-- Related courses -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:.75rem;">Related courses</div>
+        <div class="stack-md">
+          <a class="row" href="#" style="gap:.65rem; text-decoration:none; color:inherit;">
+            <span style="width:48px; height:48px; border-radius:8px; background:linear-gradient(135deg, var(--a) 0%, var(--p) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;"><i class="fa-solid fa-book-open"></i></span>
+            <div style="flex:1; min-width:0;">
+              <strong style="font-size:.9rem;">History of the Bible</strong>
+              <div class="muted" style="font-size:.78rem;">Magued Labib · 12 lessons</div>
+            </div>
+            <i class="fa-solid fa-chevron-right muted"></i>
+          </a>
+          <a class="row" href="#" style="gap:.65rem; text-decoration:none; color:inherit;">
+            <span style="width:48px; height:48px; border-radius:8px; background:linear-gradient(135deg, var(--p-strong) 0%, var(--a) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;"><i class="fa-solid fa-book-open"></i></span>
+            <div style="flex:1; min-width:0;">
+              <strong style="font-size:.9rem;">OT Cultures & Backgrounds</strong>
+              <div class="muted" style="font-size:.78rem;">Fr. Mousa · 6 lessons</div>
+            </div>
+            <i class="fa-solid fa-chevron-right muted"></i>
+          </a>
+          <a class="row" href="#" style="gap:.65rem; text-decoration:none; color:inherit;">
+            <span style="width:48px; height:48px; border-radius:8px; background:linear-gradient(135deg, var(--p) 0%, var(--a) 100%); display:inline-flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;"><i class="fa-solid fa-book-open"></i></span>
+            <div style="flex:1; min-width:0;">
+              <strong style="font-size:.9rem;">New Testament 11</strong>
+              <div class="muted" style="font-size:.78rem;">Magued Makram · 10 lessons</div>
+            </div>
+            <i class="fa-solid fa-chevron-right muted"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

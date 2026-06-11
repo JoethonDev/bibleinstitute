@@ -2,12 +2,12 @@
 <div class="questions-container">
     {% for question in questions %}
         {% with counter=forloop.counter0 %}
-            <div class="card shadow-sm border-0 mb-4 question-card">
+            <div class="card shadow-sm border-0 mb-4 question-card" data-question-card>
                 <div class="card-body p-4 position-relative">
                     <input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">
 
                     {% if mode == "edit" and not is_student %}
-                        <button type="button" class="btn btn-danger delete-question">
+                        <button type="button" class="btn btn-danger delete-question mb-3" data-action="remove-question">
                             <i class="fa fa-trash"></i>
                         </button>
                         
@@ -44,34 +44,183 @@
                         </div>
                     {% endif %}
 
-                    <div class="answers-section mb-3">
+                    <div class="answers-section mb-3 w-100">
                         {% if question.type == "mcq" %}
                             <label class="form-label fw-semibold text-secondary mb-2">{% translate "Answer Options" %}</label>
-                            <div class="mcq-choices">
+                            <div class="mcq-choices w-100" data-choice-list>
                             {% for choice in question.choices %}
                                 {% if not is_student and mode == "edit" %}
-                                    <div class="d-flex align-items-center mb-2">
-                                        <div class="flex-grow-1 me-2">
-                                            <input class="form-control" type="text" name="questions[{{ counter }}][choices]" value="{{ choice }}">
+                                    <div class="d-flex align-items-center mb-2 w-100" data-choice-row>
+                                        <div class="flex-grow-1 me-2 w-100">
+                                            <input class="form-control choice-input" type="text" name="questions[{{ counter }}][choices]" value="{{ choice }}">
                                         </div>
-                                        <button type="button" class="btn btn-outline-danger btn-sm mcq-delete-choice d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                        <button type="button" class="btn btn-outline-danger btn-sm mcq-delete-choice d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;" data-action="remove-choice">
                                             <i class="fa-solid fa-xmark"></i>
                                         </button>
                                     </div>
                                 {% else %}
-                                    <div class="form-check">
+                                    <div class="form-check w-100">
                                         <input class="form-check-input" type="radio" name="questions[{{ counter }}][answer]" id="q_{{ counter }}_choice_{{ forloop.counter0 }}" value="{{ choice }}" 
                                             {% if mode == "view" and choice == question.submitted_answer %}checked{% endif %}
                                             {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>
-                                        <label class="form-check-label" for="q_{{ counter }}_choice_{{ forloop.counter0 }}">{{ choice }}</label>
+                                        <label class="form-check-label w-100" for="q_{{ counter }}_choice_{{ forloop.counter0 }}">{{ choice }}</label>
                                     </div>
                                 {% endif %}
                             {% endfor %}
                             </div>
                             {% if not is_student and mode == "edit" %}
                                 <div class="mt-2">
-                                    <input class="form-control mcq-add" type="text" placeholder="{% translate "Add another choice..." %}">
+                                    <input class="form-control mcq-add" type="text" placeholder="{% translate "Add another choice..." %}" autocomplete="off">
                                 </div>
+                            {% endif %}
+
+                        {% elif question.type == "order_events" %}
+                            {% if not is_student and mode == "edit" %}
+                                <div class="structured-editor w-100" data-structured-editor="order_events">
+                                    <label class="form-label fw-semibold text-secondary mb-2">{% translate "Order Events" %}</label>
+                                    <input type="hidden" name="questions[{{ counter }}][config]" value='{{ question.config_json|default:"{}" }}' data-structured-config>
+                                    <div class="structured-list mb-2 w-100" data-structured-list="order_events">
+                                        {% for item in question.config.items %}
+                                            <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mb-2 w-100" data-structured-row="order_events">
+                                                <div class="flex-grow-1 w-100">
+                                                    <input class="form-control" type="text" value="{{ item }}" data-structured-value="order_events" placeholder="{% translate "Event item" %}">
+                                                </div>
+                                                <div class="d-flex gap-2 flex-wrap w-100 w-md-auto">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill flex-md-grow-0" data-action="move-structured-up" aria-label="{% translate "Move up" %}">
+                                                    <i class="fa-solid fa-arrow-up"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill flex-md-grow-0" data-action="move-structured-down" aria-label="{% translate "Move down" %}">
+                                                    <i class="fa-solid fa-arrow-down"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm flex-fill flex-md-grow-0" data-action="remove-structured-row" aria-label="{% translate "Delete" %}">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </button>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" data-action="add-order-item">
+                                            <i class="fa fa-plus-circle me-1"></i>{% translate "Add item" %}
+                                        </button>
+                                    </div>
+                                </div>
+                            {% elif mode == "exam" %}
+                                <label class="form-label fw-semibold text-secondary mb-2">{% translate "Order Events" %}</label>
+                                <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="order_events">
+                                <div class="structured-list mb-2 w-100" data-order-item-list>
+                                {% for item in question.exam_items %}
+                                    <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mb-2 w-100" data-order-item-row data-order-label="{{ item }}">
+                                        <div class="flex-grow-1 w-100">
+                                            <div class="form-control bg-light">{{ item }}</div>
+                                        </div>
+                                        <div class="d-flex gap-2 flex-wrap w-100 w-md-auto">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill flex-md-grow-0" data-action="move-order-up" aria-label="{% translate "Move up" %}">
+                                            <i class="fa-solid fa-arrow-up"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill flex-md-grow-0" data-action="move-order-down" aria-label="{% translate "Move down" %}">
+                                            <i class="fa-solid fa-arrow-down"></i>
+                                        </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            {% else %}
+                                <label class="form-label fw-semibold text-secondary mb-2">{% translate "Order Events" %}</label>
+                                {% if question.submitted_answer_payload %}
+                                    <ol class="mb-0">
+                                        {% for item in question.submitted_answer_payload %}
+                                            <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ol>
+                                {% elif question.submitted_answer %}
+                                    <pre class="mb-0">{{ question.submitted_answer }}</pre>
+                                {% else %}
+                                    <ol class="mb-0">
+                                        {% for item in question.answer_payload %}
+                                            <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ol>
+                                {% endif %}
+                            {% endif %}
+
+                        {% elif question.type == "match_related" %}
+                            {% if not is_student and mode == "edit" %}
+                                <div class="structured-editor w-100" data-structured-editor="match_related">
+                                    <label class="form-label fw-semibold text-secondary mb-2">{% translate "Match Related" %}</label>
+                                    <input type="hidden" name="questions[{{ counter }}][config]" value='{{ question.config_json|default:"{}" }}' data-structured-config>
+                                    <div class="structured-list mb-2 w-100" data-structured-list="match_related">
+                                        {% for pair in question.config.pairs %}
+                                            <div class="row g-2 align-items-stretch align-items-md-center mb-2 w-100" data-structured-row="match_related">
+                                                <div class="col-12 col-md-5">
+                                                    <input class="form-control" type="text" value="{{ pair.left }}" data-structured-left placeholder="{% translate "Left item" %}">
+                                                </div>
+                                                <div class="col-12 col-md-5">
+                                                    <input class="form-control" type="text" value="{{ pair.right }}" data-structured-right placeholder="{% translate "Right item" %}">
+                                                </div>
+                                                <div class="col-12 col-md-2 d-grid d-md-flex justify-content-md-end">
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" data-action="remove-structured-row" aria-label="{% translate "Delete" %}">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" data-action="add-match-pair">
+                                            <i class="fa fa-plus-circle me-1"></i>{% translate "Add pair" %}
+                                        </button>
+                                    </div>
+                                </div>
+                            {% elif mode == "exam" %}
+                                <label class="form-label fw-semibold text-secondary mb-2">{% translate "Match Related" %}</label>
+                                <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="match_related">
+                                {% for pair in question.exam_pairs %}
+                                    <div class="row g-2 align-items-stretch align-items-md-center mb-2 w-100" data-match-item-row data-match-left="{{ pair.left }}">
+                                        <div class="col-12 col-md-5">
+                                            <div class="form-control bg-light h-100 d-flex align-items-center">{{ pair.left }}</div>
+                                        </div>
+                                        <div class="col-12 col-md-5">
+                                            <select class="form-select w-100" data-match-select data-match-left-label="{{ pair.left }}" data-match-options='{{ question.exam_right_options_json|default:"[]"|escapejs }}' data-match-placeholder='{% translate "Select match" %}'>
+                                                <option value="">{% translate "Select match" %}</option>
+                                                {% for candidate in question.exam_right_options %}
+                                                    <option value="{{ candidate }}">{{ candidate }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <label class="form-label fw-semibold text-secondary mb-2">{% translate "Match Related" %}</label>
+                                {% if question.submitted_answer_payload %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% for left, right in question.submitted_answer_payload.items %}
+                                                    <tr>
+                                                        <td>{{ left }}</td>
+                                                        <td>{{ right }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% elif question.submitted_answer %}
+                                    <pre class="mb-0">{{ question.submitted_answer }}</pre>
+                                {% else %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% for left, right in question.answer_payload.items %}
+                                                    <tr>
+                                                        <td>{{ left }}</td>
+                                                        <td>{{ right }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% endif %}
                             {% endif %}
 
                         {% elif question.type == "complete" %}
@@ -79,7 +228,7 @@
                             {% if not is_student and mode == "edit" %}
                                 <input class="form-control" type="text" disabled placeholder="{% translate "Student will complete this..." %}">
                             {% else %}
-                                <input class="form-control" type="text" name="questions[{{ counter }}][answer]" value="{{ question.submitted_answer|default:'' }}" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>
+                                <input class="form-control w-100" type="text" name="questions[{{ counter }}][answer]" value="{{ question.submitted_answer|default:'' }}" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>
                             {% endif %}
                             
                         {% elif question.type == "written" %}
@@ -87,7 +236,7 @@
                             {% if not is_student and mode == "edit" %}
                                 <textarea class="form-control" rows="4" disabled placeholder="{% translate "Student will write their answer here..." %}"></textarea>
                             {% else %}
-                                <textarea class="form-control" rows="4" name="questions[{{ counter }}][answer]" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>{{ question.submitted_answer|default:'' }}</textarea>
+                                <textarea class="form-control w-100" rows="4" name="questions[{{ counter }}][answer]" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>{{ question.submitted_answer|default:'' }}</textarea>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -95,7 +244,33 @@
                     <div class="correct-answer-section">
                     {# Only reveal correct answers when student has submitted (exam_taken) or for management. Never for closed_unsolved. #}
                     {% if mode != "closed_unsolved" and not is_student or mode != "closed_unsolved" and exam_taken %}
-                        {% if question.auto_grade or mode == "edit" and question.type != "written" %}
+                        {% if question.type == "order_events" %}
+                            <div class="card bg-light border-0 p-3">
+                                <label class="form-label fw-semibold text-success mb-2">
+                                    <i class="fa fa-check-circle me-2"></i>
+                                    {% translate "Correct Answer:" %}
+                                </label>
+                                <ol class="mb-0">
+                                    {% for item in question.answer_payload %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+
+                        {% elif question.type == "match_related" %}
+                            <div class="card bg-light border-0 p-3">
+                                <label class="form-label fw-semibold text-success mb-2">
+                                    <i class="fa fa-check-circle me-2"></i>
+                                    {% translate "Correct Answer:" %}
+                                </label>
+                                <ul class="mb-0">
+                                    {% for left, right in question.answer_payload.items %}
+                                        <li>{{ left }} - {{ right }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+
+                        {% elif question.auto_grade or mode == "edit" and question.type != "written" %}
                             <div class="card bg-light border-0 p-3">
                                 <label class="form-label fw-semibold text-success mb-2">
                                     <i class="fa fa-check-circle me-2"></i>

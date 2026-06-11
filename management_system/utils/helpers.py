@@ -2,6 +2,8 @@
 General helper functions for views and data processing.
 Provides reusable utilities for common operations.
 """
+import json
+import re
 from datetime import datetime
 from django.core.paginator import Paginator
 from django.shortcuts import render
@@ -26,6 +28,22 @@ def get_datetime(datetime_string):
         datetime object
     """
     return datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M")
+
+
+def parse_json_value(value, default=None):
+    """
+    Safely parse a JSON string while preserving plain text values.
+    """
+    if value in (None, ""):
+        return default
+
+    if isinstance(value, (dict, list)):
+        return value
+
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return value
 
 
 def is_quiz_in_user_window(quiz, user) -> bool:
@@ -61,6 +79,43 @@ def is_quiz_in_user_window(quiz, user) -> bool:
 
     quiz_open_date = quiz.opening_date.date() if hasattr(quiz.opening_date, "date") else quiz.opening_date
     return joined <= quiz_open_date <= window_end
+
+
+def user_has_management_role(user) -> bool:
+    from management_system.models import MANAGEMENT_ROLES
+
+    return bool(user.role and user.role.role in MANAGEMENT_ROLES)
+
+
+def user_can_access_course(user, course) -> bool:
+    if user_has_management_role(user):
+        return True
+
+    if not user.role:
+        return False
+
+    return course.can_access(user.role.role)
+
+
+def get_student_quiz_status(quiz, user, current_time=None):
+    """
+    Return the student's current quiz mode using the same rule set everywhere.
+    """
+    from datetime import timedelta
+    from django.utils.timezone import now
+    from management_system.models import Grade
+
+    grade = Grade.objects.filter(user=user, quiz=quiz).first()
+    if grade:
+        return "view", grade
+
+    current_time = current_time or now()
+    quiz_open = quiz.opening_date <= current_time <= quiz.closing_date + timedelta(minutes=30)
+
+    if quiz_open and is_quiz_in_user_window(quiz, user):
+        return "exam", None
+
+    return "closed_unsolved", None
 
 
 def paginate_obj(request, obj, page_size=15):
@@ -158,12 +213,18 @@ def unpack_quiz_form(form_dict):
     questions = dict()
     quiz_data = dict()
     
-    for key, val in form_dict.items():
+    for key in form_dict.keys():
+        values = form_dict.getlist(key)
+        val = values if len(values) > 1 else values[0]
+
         # Handle nested question data
         if key.startswith("questions"):
-            parts = key.split("[")
-            index = parts[1][:-1]
-            key_value = parts[2][:-1]
+            parts = re.findall(r"\[([^\]]*)\]", key)
+            if len(parts) < 2:
+                continue
+
+            index = parts[0]
+            key_value = parts[1]
             
             # Calculate total grade from individual question grades
             if key_value == "grade":
@@ -172,6 +233,8 @@ def unpack_quiz_form(form_dict):
             # Handle multiple choices (getlist for multi-select)
             if key_value == "choices":
                 val = form_dict.getlist(key)
+            elif key_value == "config":
+                val = parse_json_value(val, {})
             
             # Add to questions dictionary
             if index in questions:
@@ -181,7 +244,7 @@ def unpack_quiz_form(form_dict):
         
         # Handle top-level quiz fields
         else:
-            quiz_data[key] = val
+            quiz_data[key] = val[-1] if isinstance(val, list) and len(val) == 1 else val
     
     return questions, quiz_data
 
