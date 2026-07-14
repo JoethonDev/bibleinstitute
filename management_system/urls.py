@@ -41,6 +41,7 @@ urlpatterns = [
     path('dashboard/courses/<int:course_id>/', index, name="course-view"),
     path('dashboard/courses/<int:course_id>/delete/', DeleteCourse.as_view(), name="course-delete"),
     path('dashboard/courses/<int:course_id>/update/', UpdateCourse.as_view(), name="course-update"),
+    path('dashboard/courses/<int:course_id>/duplicate/', duplicate_course, name="course-duplicate"),
     
     # Lesson Dashboard
     path('dashboard/lessons/', lesson_dashboard, name="lesson-dashboard"),
@@ -48,6 +49,7 @@ urlpatterns = [
     path('dashboard/lessons/create/', create_lesson, name="lesson-create"),
     path('dashboard/lessons/<int:lesson_id>/update/', update_lesson, name="lesson-update"),
     path('dashboard/lessons/<int:lesson_id>/delete/', DeleteLesson.as_view(), name="lesson-delete"),
+    path('dashboard/lessons/<int:lesson_id>/duplicate/', duplicate_lesson, name="lesson-duplicate"),
     path('dashboard/folder/<str:folder_id>/', navigate_folder, name="navigate-folder"),
 
     # Quiz Dashboard
@@ -56,6 +58,7 @@ urlpatterns = [
     path('dashboard/quizzez/create/', create_quiz, name="quiz-create"),
     path('dashboard/quizzez/<int:quiz_id>/update/', update_quiz, name="quiz-update"),
     path('dashboard/quizzez/<int:quiz_id>/delete/', DeleteQuiz.as_view(), name="quiz-delete"),
+    path('dashboard/quizzez/<int:quiz_id>/duplicate/', duplicate_quiz, name="quiz-duplicate"),
 
     # Submission Dashboard
     path('dashboard/quizzez/<int:quiz_id>/view-submission/', submission_dashboard, name="submission-dashboard"),
@@ -94,6 +97,8 @@ urlpatterns = [
     # Design Theme Showcase (pre-refactor visual review)
     path('showcase/', theme_catalog, name="theme-catalog"),
     path('showcase/<str:theme_id>/<str:page_id>/', theme_showcase, name="theme-showcase-page"),
+
+    path('dashboard/course-offerings/<int:offering_id>/copy/', copy_course_offering, name="copy-course-offering"),
 
     # Phase 3 — Student Applications
     path('signup/', signup, name="signup"),

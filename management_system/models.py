@@ -388,8 +388,6 @@ class Lesson(models.Model):
     course_offering = models.ForeignKey(
         CourseOffering,
         on_delete=models.PROTECT,
-        null=True,
-        blank=True,
         related_name="lessons",
     )
     status = models.CharField(
@@ -406,7 +404,7 @@ class Lesson(models.Model):
 
     def clean(self):
         super().clean()
-        if self.course_offering_id and self.course_offering.course_id != self.course_id:
+        if self.course_offering.course_id != self.course_id:
             raise ValidationError({"course_offering": _("Course offering must belong to the lesson course.")})
 
     def save(self, *args, **kwargs):
@@ -429,6 +427,10 @@ class Lesson(models.Model):
         except ValueError:
             end_range = user_join_date.replace(year=user_join_date.year + self.course.level, day=28)
         return user_join_date <= self.created_date <= end_range
+
+    @property
+    def can_edit(self):
+        return self.status == PublicationStatus.DRAFT
 
     def has_segment(self, segment: str):
         links = json.loads(self.links)
@@ -461,8 +463,6 @@ class Quiz(models.Model):
     course_offering = models.ForeignKey(
         CourseOffering,
         on_delete=models.PROTECT,
-        null=True,
-        blank=True,
         related_name="quizzes",
     )
     status = models.CharField(
@@ -480,12 +480,16 @@ class Quiz(models.Model):
 
     def clean(self):
         super().clean()
-        if self.course_offering_id and self.course_offering.course_id != self.course_id:
+        if self.course_offering.course_id != self.course_id:
             raise ValidationError({"course_offering": _("Course offering must belong to the quiz course.")})
 
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    @property
+    def can_edit(self):
+        return self.status == PublicationStatus.DRAFT
 
     def serialize(self):
         return {

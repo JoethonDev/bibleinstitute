@@ -116,6 +116,22 @@
                                             {% translate "Please select a course" %}
                                         </div>
                                     </div>
+
+                                    <!-- Course Offering -->
+                                    <div class="form-group">
+                                        <label for="course_offering" class="form-label">
+                                            {% translate "Course Offering" %}
+                                            <span class="required-indicator">*</span>
+                                        </label>
+                                        <select class="form-select" id="course_offering" name="course_offering" required>
+                                            <option value="">{% translate "Select Course Offering" %}</option>
+                                            {% for offering in course_offerings %}
+                                            <option value="{{ offering.pk }}" data-course="{{ offering.course.name }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
+                                                {{ offering.course.name }} - {{ offering.academic_year.name }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <!-- Drive Files Section -->
@@ -222,4 +238,27 @@
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var courseSelect = document.getElementById('course_select');
+    var offeringSelect = document.getElementById('course_offering');
+    if (courseSelect && offeringSelect) {
+        function filterOfferings() {
+            var course = courseSelect.value;
+            var hasVisible = false;
+            offeringSelect.querySelectorAll('option').forEach(function(opt) {
+                if (!opt.value) { opt.style.display = ''; return; }
+                if (opt.dataset.course === course) {
+                    opt.style.display = '';
+                    hasVisible = true;
+                } else {
+                    opt.style.display = 'none';
+                }
+            });
+        }
+        courseSelect.addEventListener('change', filterOfferings);
+        filterOfferings();
+    }
+});
+</script>
 {% endblock %}

@@ -1,5 +1,7 @@
 from django.contrib.auth.forms import AuthenticationForm, UsernameField
 from django import forms
+import secrets
+
 from django.core.exceptions import ValidationError
 from .models import User, Role, Course, Lesson, assign_academic_date
 from .utils.validators import normalize_phone, validate_identity_by_type
@@ -219,6 +221,7 @@ class SignupForm(forms.ModelForm):
         user.set_password(self.cleaned_data["password"])
         user.application_status = "pending"
         user.is_active = False
+        user.qr_token = secrets.token_urlsafe(32)
         if commit:
             user.save()
         return user

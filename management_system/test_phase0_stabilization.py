@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Course, Grade, Lesson, Question, Quiz, Role, Submission, User
+from .models import AcademicYear, Course, CourseOffering, Grade, Lesson, Question, Quiz, Role, Submission, User
 
 
 def lesson_links():
@@ -43,21 +43,29 @@ class Phase0StabilizationTests(TestCase):
         self.level_1_course = Course.objects.create(name="Foundations", level=1)
         self.level_2_course = Course.objects.create(name="Advanced", level=2)
 
+        year1 = AcademicYear.objects.create(name="2026/2027", level=1, is_current=True, starts_on=date(2026, 9, 1), ends_on=date(2027, 6, 30))
+        year2 = AcademicYear.objects.create(name="2026/2027", level=2, is_current=True, starts_on=date(2026, 9, 1), ends_on=date(2027, 6, 30))
+        self.offering_1 = CourseOffering.objects.create(course=self.level_1_course, academic_year=year1)
+        self.offering_2 = CourseOffering.objects.create(course=self.level_2_course, academic_year=year2)
+
         self.visible_lesson = Lesson.objects.create(
             name="Visible lesson",
             course=self.level_1_course,
+            course_offering=self.offering_1,
             links=lesson_links(),
             created_date=date(2024, 9, 1),
         )
         self.out_of_window_lesson = Lesson.objects.create(
             name="Old lesson",
             course=self.level_1_course,
+            course_offering=self.offering_1,
             links=lesson_links(),
             created_date=date(2022, 9, 1),
         )
         self.level_2_lesson = Lesson.objects.create(
             name="Second year lesson",
             course=self.level_2_course,
+            course_offering=self.offering_2,
             links=lesson_links(),
             created_date=date(2024, 9, 1),
         )
@@ -67,10 +75,11 @@ class Phase0StabilizationTests(TestCase):
         client.force_login(user)
         return client
 
-    def create_quiz(self, course, opening_date, closing_date):
+    def create_quiz(self, course, opening_date, closing_date, course_offering=None):
         quiz = Quiz.objects.create(
             name=f"{course.name} Quiz",
             course=course,
+            course_offering=course_offering or self.offering_1,
             opening_date=opening_date,
             closing_date=closing_date,
             total_grade=1,
@@ -106,7 +115,7 @@ class Phase0StabilizationTests(TestCase):
 
     def test_management_users_can_view_quiz_status_without_course_level_errors(self):
         now = timezone.now()
-        quiz = self.create_quiz(self.level_2_course, now - timedelta(hours=1), now + timedelta(hours=1))
+        quiz = self.create_quiz(self.level_2_course, now - timedelta(hours=1), now + timedelta(hours=1), course_offering=self.offering_2)
 
         for user in [self.admin, self.teacher]:
             client = self.login_client(user)

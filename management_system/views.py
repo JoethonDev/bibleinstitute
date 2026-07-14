@@ -978,9 +978,11 @@ def lesson_dashboard(request):
 def create_lesson(request):
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
+        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
 
         return render(request, "lesson_form.html", {
             "courses" : courses,
+            "course_offerings" : course_offerings,
             "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
             "is_root" : True
         })
@@ -1002,7 +1004,12 @@ def create_lesson(request):
                 ]
 
                 course = get_object_or_404(Course, name=course_name)
-                Lesson.objects.create(name=lesson_name, course=course, links=json.dumps(links))
+                offering_id = request.POST.get("course_offering")
+                if offering_id:
+                    course_offering = get_object_or_404(CourseOffering, pk=offering_id)
+                else:
+                    course_offering = CourseOffering.objects.filter(course=course, academic_year__is_current=True).first()
+                Lesson.objects.create(name=lesson_name, course=course, course_offering=course_offering, links=json.dumps(links))
                 success(request, _("Lesson is created successfully"), extra_tags="alert-success") # Translate
                 logger.info(f"Lesson {lesson_name} is added in course {course_name} with media length of {len(links)}")
 
@@ -1038,13 +1045,16 @@ def navigate_folder(request, folder_id=None):
 def update_lesson(request, lesson_id):
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
+        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
         try:
             lesson = get_object_or_404(Lesson, pk=lesson_id)
             return render(request, "lesson_form.html", {
                 "courses" : courses,
+                "course_offerings" : course_offerings,
                 "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
                 "is_root" : True,
                 "selected_course" : lesson.course.name,
+                "selected_offering_id" : lesson.course_offering_id,
                 "lesson_name" : lesson.name,
                 "videos" : json.loads(lesson.links)
             })
@@ -1070,6 +1080,8 @@ def update_lesson(request, lesson_id):
 
                 course = get_object_or_404(Course, name=course_name)
                 lesson = get_object_or_404(Lesson, pk=lesson_id)
+                if not lesson.can_edit:
+                    return HttpResponse(_("Published or archived lesson cannot be edited."), status=403)
 
                 lesson.name = lesson_name
                 lesson.course = course
@@ -1184,9 +1196,11 @@ def quiz_dashboard(request):
 def create_quiz(request):
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
+        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
 
         return render(request, "quiz_form.html", {
             "courses" : courses,
+            "course_offerings" : course_offerings,
             "question_types" : Question.QUESTION_TYPES,
             "questions" : request.session.pop("questions", []),
             **request.session.pop("quiz", {})
@@ -1200,7 +1214,12 @@ def create_quiz(request):
             opening_date = get_datetime(quiz.get("opening_date", ""))
             closing_date = get_datetime(quiz.get("closing_date", ""))
             
-            quiz = Quiz(name=quiz.get("quiz_name", ""), course=course, total_grade=quiz.get("total_grade", 0), opening_date=opening_date, closing_date=closing_date)
+            offering_id = request.POST.get("course_offering")
+            if offering_id:
+                course_offering = get_object_or_404(CourseOffering, pk=offering_id)
+            else:
+                course_offering = CourseOffering.objects.filter(course=course, academic_year__is_current=True).first()
+            quiz = Quiz(name=quiz.get("quiz_name", ""), course=course, course_offering=course_offering, total_grade=quiz.get("total_grade", 0), opening_date=opening_date, closing_date=closing_date)
             # Create Questions
             raise_exception = False
             exceptions_messages = []
@@ -1248,10 +1267,13 @@ def create_quiz(request):
 def update_quiz(request, quiz_id):
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
+        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
         try:
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             return render(request, "quiz_form.html", {
                 "courses" : courses,
+                "course_offerings" : course_offerings,
+                "selected_offering_id" : quiz.course_offering_id,
                 "question_types" : Question.QUESTION_TYPES,
                 "questions" : [question.serialize() for question in quiz.questions.all()],
                 **quiz.serialize()
@@ -1268,6 +1290,8 @@ def update_quiz(request, quiz_id):
 
             # Update Quiz
             quiz = get_object_or_404(Quiz, pk=quiz_id)
+            if not quiz.can_edit:
+                return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
             quiz.name = quiz_data['quiz_name']
             quiz.opening_date = get_datetime(quiz_data['opening_date'])
             quiz.closing_date = get_datetime(quiz_data['closing_date'])
@@ -1623,6 +1647,13 @@ def api_delete_file(request):
         if not file_key:
             return JsonResponse({'error': _('File key required')}, status=400)
         
+        referencing = Lesson.objects.filter(Q(links__contains=file_key))
+        if referencing.exists():
+            names = list(referencing.values_list("name", flat=True)[:5])
+            return JsonResponse({
+                "error": _("File is referenced by lessons: %(names)s. Delete lessons first or reupload.") % {"names": ", ".join(names)}
+            }, status=409)
+
         success = R2_MANAGER.delete_file(file_key)
         
         if success:
@@ -2327,3 +2358,103 @@ def bulk_application_decision(request):
         except Exception as e:
             results["errors"].append({"id": uid, "error": str(e)})
     return JsonResponse(results)
+
+
+@capability_required(can_manage_content)
+def duplicate_lesson(request, lesson_id):
+    lesson = get_object_or_404(Lesson, pk=lesson_id)
+    offering_id = request.POST.get("course_offering_id")
+    target_offering = get_object_or_404(CourseOffering, pk=offering_id) if offering_id else lesson.course_offering
+    with transaction.atomic():
+        lesson.pk = None
+        lesson.course_offering = target_offering
+        lesson.course = target_offering.course
+        lesson.status = PublicationStatus.DRAFT
+        lesson.created_date = date.today()
+        lesson.save()
+    messages.success(request, _("Lesson duplicated."))
+    return redirect("lesson-dashboard")
+
+
+@capability_required(can_manage_content)
+def duplicate_quiz(request, quiz_id):
+    quiz = get_object_or_404(Quiz, pk=quiz_id)
+    offering_id = request.POST.get("course_offering_id")
+    target_offering = get_object_or_404(CourseOffering, pk=offering_id) if offering_id else quiz.course_offering
+    with transaction.atomic():
+        questions = list(quiz.questions.all())
+        quiz.pk = None
+        quiz.course_offering = target_offering
+        quiz.course = target_offering.course
+        quiz.status = PublicationStatus.DRAFT
+        quiz.save()
+        for q in questions:
+            q.pk = None
+            q.quiz = quiz
+        Question.objects.bulk_create(questions)
+    messages.success(request, _("Quiz duplicated."))
+    return redirect("quiz-dashboard")
+
+
+@capability_required(can_manage_content)
+def copy_course_offering(request, offering_id):
+    offering = get_object_or_404(CourseOffering, pk=offering_id)
+    target_year_id = request.POST.get("academic_year_id")
+    target_year = get_object_or_404(AcademicYear, pk=target_year_id) if target_year_id else offering.academic_year
+    with transaction.atomic():
+        new_offering = CourseOffering.objects.create(
+            course=offering.course,
+            academic_year=target_year,
+            instructor=offering.instructor,
+            status="draft",
+        )
+        for lesson in offering.lessons.all():
+            lesson.pk = None
+            lesson.course_offering = new_offering
+            lesson.status = PublicationStatus.DRAFT
+            lesson.save()
+        for quiz in offering.quizzes.all():
+            questions = list(quiz.questions.all())
+            quiz.pk = None
+            quiz.course_offering = new_offering
+            quiz.status = PublicationStatus.DRAFT
+            quiz.save()
+            for q in questions:
+                q.pk = None
+                q.quiz = quiz
+            Question.objects.bulk_create(questions)
+    messages.success(request, _("Course offering copied."))
+    return redirect("course-dashboard")
+
+
+@capability_required(can_manage_content)
+def duplicate_course(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    new_name = request.POST.get("new_name", "")
+    if not new_name:
+        return HttpResponse(_("New course name is required."), status=400)
+    target_year_id = request.POST.get("academic_year_id")
+    target_year = get_object_or_404(AcademicYear, pk=target_year_id) if target_year_id else None
+    with transaction.atomic():
+        new_course = Course.objects.create(name=new_name, description=course.description, instructor=course.instructor, level=course.level)
+        if target_year:
+            new_offering = CourseOffering.objects.create(course=new_course, academic_year=target_year, status="draft")
+            for lesson in Lesson.objects.filter(course=course):
+                lesson.pk = None
+                lesson.course = new_course
+                lesson.course_offering = new_offering
+                lesson.status = PublicationStatus.DRAFT
+                lesson.save()
+            for quiz in Quiz.objects.filter(course=course):
+                questions = list(quiz.questions.all())
+                quiz.pk = None
+                quiz.course = new_course
+                quiz.course_offering = new_offering
+                quiz.status = PublicationStatus.DRAFT
+                quiz.save()
+                for q in questions:
+                    q.pk = None
+                    q.quiz = quiz
+                Question.objects.bulk_create(questions)
+    messages.success(request, _("Course duplicated."))
+    return redirect("course-dashboard")

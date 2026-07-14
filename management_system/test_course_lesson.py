@@ -1,5 +1,5 @@
 from django.test import TestCase, Client
-from .models import Course, Lesson, User, Role
+from .models import AcademicYear, Course, CourseOffering, Lesson, User, Role
 import json
 from datetime import date
 from django.urls import reverse
@@ -32,14 +32,19 @@ class CourseTest(TestCase):
         self.course_level_1 = Course.objects.create(name="Course 1", level=1)
         self.course_level_2 = Course.objects.create(name="Course 2", level=2)
 
-        # Lesson
-        self.lesson_junior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, links=lesson_links, created_date=base_date)
-        self.lesson_senior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, links=lesson_links, created_date=date(2024, 6, 11))
-        self.lesson_2_junior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, links=lesson_links, created_date=date(2024, 10, 11))
-        self.lesson_2_senior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, links=lesson_links, created_date=date(2023, 10, 11))
+        year1 = AcademicYear.objects.create(name="2026/2027", level=1, is_current=True, starts_on=date(2026, 9, 1), ends_on=date(2027, 6, 30))
+        year2 = AcademicYear.objects.create(name="2026/2027", level=2, is_current=True, starts_on=date(2026, 9, 1), ends_on=date(2027, 6, 30))
+        off1 = CourseOffering.objects.create(course=self.course_level_1, academic_year=year1)
+        off2 = CourseOffering.objects.create(course=self.course_level_2, academic_year=year2)
 
-        self.lesson_senior_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, links=lesson_links, created_date=base_date)
-        self.lesson_grad_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, links=lesson_links, created_date=date(2022, 10, 11))
+        # Lesson
+        self.lesson_junior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, course_offering=off1, links=lesson_links, created_date=base_date)
+        self.lesson_senior_course_1 = Lesson.objects.create(name="lesson 1 for course 1", course=self.course_level_1, course_offering=off1, links=lesson_links, created_date=date(2024, 6, 11))
+        self.lesson_2_junior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, course_offering=off1, links=lesson_links, created_date=date(2024, 10, 11))
+        self.lesson_2_senior_course_1 = Lesson.objects.create(name="lesson 2 for course 1", course=self.course_level_1, course_offering=off1, links=lesson_links, created_date=date(2023, 10, 11))
+
+        self.lesson_senior_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, course_offering=off2, links=lesson_links, created_date=base_date)
+        self.lesson_grad_course_2 = Lesson.objects.create(name="lesson 1 for course 2", course=self.course_level_2, course_offering=off2, links=lesson_links, created_date=date(2022, 10, 11))
 
         # Clients
         self.admin = self.login_client(self.admin)

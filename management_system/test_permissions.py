@@ -1,8 +1,10 @@
 import json
 
+from datetime import date
+
 from django.test import Client, TestCase
 from django.urls import reverse
-from .models import Course, Lesson, Quiz, Role, User
+from .models import AcademicYear, Course, CourseOffering, Lesson, Quiz, Role, User
 
 
 class PermissionRegressionTests(TestCase):
@@ -18,11 +20,13 @@ class PermissionRegressionTests(TestCase):
         self.student = User.objects.create_user(username="stud_u", password="1", role=Role.objects.get(role="student"))
 
         self.course = Course.objects.create(name="Test Course", level=1)
+        year = AcademicYear.objects.create(name="2026/2027", level=1, is_current=True, starts_on=date(2026, 9, 1), ends_on=date(2027, 6, 30))
+        off = CourseOffering.objects.create(course=self.course, academic_year=year)
         self.lesson = Lesson.objects.create(
-            name="Test Lesson", course=self.course,
+            name="Test Lesson", course=self.course, course_offering=off,
             links=json.dumps([{"name": "test.m3u8", "id": "test/test.m3u8", "file_type": "video"}]),
         )
-        self.quiz = Quiz.objects.create(name="Test Quiz", course=self.course)
+        self.quiz = Quiz.objects.create(name="Test Quiz", course=self.course, course_offering=off)
 
         self.management_urls = [
             ("manage_content", reverse("course-dashboard")),
