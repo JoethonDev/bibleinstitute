@@ -9,12 +9,37 @@ from django.utils.translation import gettext as _
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from logging import getLogger
-from management_system.models import User
+from management_system.models import MANAGEMENT_ROLES, User
 
 logger = getLogger(__name__)
 
-# Management roles constant
-MANAGEMENT_ROLES = ['admin', 'teacher']
+
+def can_manage_applications(user) -> bool:
+    return bool(user.role and user.role.role == "admin")
+
+
+def can_manage_content(user) -> bool:
+    return bool(user.role and user.role.role in ("admin", "staff"))
+
+
+def can_delete_content(user) -> bool:
+    return bool(user.role and user.role.role == "admin")
+
+
+def can_grade(user) -> bool:
+    return bool(user.role and user.role.role in ("admin", "staff"))
+
+
+def can_scan_attendance(user) -> bool:
+    return bool(user.role and user.role.role in ("admin", "staff", "moderator"))
+
+
+def can_correct_attendance(user) -> bool:
+    return bool(user.role and user.role.role == "admin")
+
+
+def can_view_reports(user) -> bool:
+    return bool(user.role and user.role.role in ("admin", "staff"))
 
 
 def login_required_with_permission(role_type=None, resource=None):
@@ -71,18 +96,6 @@ def admin_required(view_func):
     return login_required_with_permission('admin')(view_func)
 
 
-def teacher_required(view_func):
-    """
-    Shortcut decorator for teacher-only views.
-    
-    Usage:
-        @teacher_required
-        def teacher_view(request):
-            # Teacher logic...
-    """
-    return login_required_with_permission('teacher')(view_func)
-
-
 def management_required(view_func):
     """
     Shortcut decorator for views requiring admin or teacher role.
@@ -116,25 +129,41 @@ def check_role_permission(user, role_type, resource=None):
     
     Args:
         user: The User object to check
-        role_type: The required role type ('admin', 'teacher', or 'management')
+        role_type: The required role type ('admin', 'staff', 'management', etc.)
         resource: The resource being accessed (optional, for logging)
     
     Returns:
         bool: True if user has permission, False otherwise
     """
-    # Management role check (admin or teacher)
+    if not user.role:
+        return False
+
+    # Management role check (admin or staff)
     if role_type == 'management':
         return user.role.role in MANAGEMENT_ROLES
-    
-    # Specific role check
+
+    # Specific role checks
     if role_type == 'admin':
         return user.role.role == 'admin'
-    
-    if role_type == 'teacher':
-        return user.role.role in MANAGEMENT_ROLES  # Teachers and admins can access teacher resources
-    
+
+    if role_type in ('staff', 'teacher'):
+        return user.role.role in ('admin', 'staff')
+
     # Default: check if user role matches the required role
     return user.role.role == role_type
+
+
+def capability_required(cap_check):
+    def decorator(view_func):
+        @wraps(view_func)
+        @login_required(login_url=reverse_lazy("user_login"))
+        def wrapper(request, *args, **kwargs):
+            if not cap_check(request.user):
+                logger.warning(f"User {request.user} denied by {cap_check.__name__}")
+                return HttpResponse(_("Unauthorized"), status=401)
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def ajax_login_required(view_func):

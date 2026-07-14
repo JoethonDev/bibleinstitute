@@ -1,13 +1,13 @@
 # Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, FileResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.db import transaction
 from django.contrib.messages import success, error, info
 from django.conf import settings
@@ -37,7 +37,7 @@ from .utils.r2_manager import R2Manager
 from .utils.file_validator import validate_upload_filename, FileValidator
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_can_access_course, user_has_management_role
-from .utils.decorators import management_required
+from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports
 from .theme_catalog import THEMES, get_theme, SHOWCASE_PAGES
 
 # Constants
@@ -59,27 +59,6 @@ R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name)
 
 # Helper functions moved to utils/storage_operations.py and utils/helpers.py
 # Google Drive legacy code moved to utils/google_drive_manager.py
-
-# Permission checking helper functions (backward compatibility)
-def is_managerial(request):
-    """Check if user has management permissions (admin or teacher)"""
-    from .utils.decorators import check_role_permission
-    user = safe_get_user(request)
-    if not user or not check_role_permission(user, 'management'):
-        logger.warning(f"User: {request.user} is trying to access admin panel")
-        return HttpResponse(_("Unauthorized"), status=401)
-    return HttpResponse(_("authorized"), status=200)
-
-
-def has_admin_permission(request, view):
-    """Check if user has admin permissions for a specific view"""
-    from .utils.decorators import check_role_permission
-    user = safe_get_user(request)
-    if not user or not check_role_permission(user, 'management'):
-        logger.warning(f"User: {request.user} is trying to access {view}")
-        return HttpResponse(_("Unauthorized"), status=401)
-    return HttpResponse(_("authorized"), status=200)
-
 
 def build_question_instance(question_data, quiz):
     """Build a Question instance from parsed form data."""
@@ -218,14 +197,12 @@ class LoginProtection(object):
 
 class AdminPermissionView(LoginProtection):
     def dispatch(self, request, *args, **kwargs):
-        authenticated_response = super().dispatch(request, *args, **kwargs) #get response from LoginProtection
-
-        if isinstance(authenticated_response, HttpResponse): #check if LoginProtection returned an HttpResponse, which means login failed.
-            return authenticated_response
+        if not request.user.is_authenticated:
+            return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         user = User.objects.get(username=request.user)
-        if user.role.role in MANAGEMENT_ROLES:
-            return super().dispatch(request, *args, **kwargs)
-        return HttpResponse(_("Unauthorized"), status=401)    # Translate "Unauthorized"
+        if can_manage_content(user):
+            return super(LoginProtection, self).dispatch(request, *args, **kwargs)
+        return HttpResponse(_("Unauthorized"), status=401)
 
 class FormBase(AdminPermissionView, FormView):
     view_name = ""
@@ -366,7 +343,7 @@ class ProfileDetail(LoginProtection, DetailView):
     def get(self, request, *args, **kwargs):
         # Check request has user_id route
         # If user is not admin and pk in url
-        if not request.get_full_path().endswith("/profile/") and request.user.role.role not in MANAGEMENT_ROLES:
+        if not request.get_full_path().endswith("/profile/") and not can_manage_content(request.user):
             return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
         return super().get(request, *args, **kwargs)
 
@@ -404,10 +381,33 @@ def view_courses(request):
     logger.info(f"fetching available course for user : {username}")
 
     user = User.objects.get(username=username)
-    courses = Course.fetch_courses_by_role(user.role.role)
-    logger.info(f"{username} access {len(courses)} academic years")
 
-    # Annotate each course with lesson/quiz counts for the template
+    if user_has_management_role(user):
+        courses = Course.fetch_courses_by_role("management")
+        logger.info(f"{username} access all academic years")
+    else:
+        enrolled_offerings = CourseOffering.objects.filter(
+            academic_year__enrollments__student=user,
+            academic_year__enrollments__status="active",
+            status="published",
+        ).select_related("course", "academic_year")
+
+        if enrolled_offerings.exists():
+            levels_map = {}
+            for offering in enrolled_offerings:
+                level = offering.course.level
+                if level not in levels_map:
+                    levels_map[level] = {
+                        "level_name": str(_(Course.LEVELS_NAME.get(level, level))),
+                        "courses": [],
+                    }
+                levels_map[level]["courses"].append(offering.course)
+            courses = list(levels_map.values())
+            logger.info(f"{username} access {len(courses)} academic years via enrollment")
+        else:
+            courses = Course.fetch_courses_by_role(user.role.role)
+            logger.info(f"{username} access {len(courses)} academic years via role fallback")
+
     for level in courses:
         for course in level["courses"]:
             course.lesson_count = course.lessons.count()
@@ -440,14 +440,27 @@ def view_course_details(request, course_id):
         else:
             if not user_can_access_course(user, course):
                 return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
-            # Set Range of lesson created date
-            join_date = user.joined_date
-            try:
-                end_date = join_date.replace(year=join_date.year + course.level)
-            except ValueError:
-                end_date = join_date.replace(year=join_date.year + course.level, day=28)
-            context['lessons'] = course.lessons.filter(created_date__range=(join_date, end_date))
-            logger.info(f"User : {user} is accessing lessons within range {join_date} and {end_date}")
+            offerings = CourseOffering.objects.filter(
+                course=course,
+                academic_year__enrollments__student=user,
+                academic_year__enrollments__status="active",
+                status="published",
+            )
+            if offerings.exists():
+                context['lessons'] = Lesson.objects.filter(
+                    course_offering__in=offerings,
+                    status="published",
+                )
+                logger.info(f"User : {user} is accessing lessons via enrollment")
+            else:
+                # Fallback to date-range access for pre-backfill users
+                join_date = user.joined_date
+                try:
+                    end_date = join_date.replace(year=join_date.year + course.level)
+                except ValueError:
+                    end_date = join_date.replace(year=join_date.year + course.level, day=28)
+                context['lessons'] = course.lessons.filter(created_date__range=(join_date, end_date))
+                logger.info(f"User : {user} is accessing lessons within range {join_date} and {end_date}")
 
 
     except Http404:
@@ -464,7 +477,15 @@ def view_lesson_details(request, course_id, lesson_id):
         course = get_object_or_404(Course, pk=course_id)
         lesson = get_object_or_404(Lesson, pk=lesson_id, course=course)
         lesson_links = json.loads(lesson.links)
-        if user_can_access_course(user, course) and (user_has_management_role(user) or lesson.can_access(user.joined_date)):
+        can_access = user_can_access_course(user, course) and (
+            user_has_management_role(user)
+            or (lesson.course_offering_id and user.enrollments.filter(
+                academic_year__course_offerings__pk=lesson.course_offering_id,
+                status="active",
+            ).exists())
+            or lesson.can_access(user.joined_date)
+        )
+        if can_access:
             logger.info(f"User : {user} is accessing {lesson.name} lesson from {course.name} course")
             return render(request, "lesson_stream.html", {
                 # Add Courses here
@@ -489,7 +510,14 @@ def stream_lesson(request, lesson_id, file_index):
         username = request.user
         user = User.objects.get(username=username)
         lesson = get_object_or_404(Lesson, pk=lesson_id)
-        if not user_can_access_course(user, lesson.course) or (not user_has_management_role(user) and not lesson.can_access(user.joined_date)):
+        can_stream = user_has_management_role(user) or (
+            lesson.course_offering_id
+            and user.enrollments.filter(
+                academic_year__course_offerings__pk=lesson.course_offering_id,
+                status="active",
+            ).exists()
+        ) or lesson.can_access(user.joined_date)
+        if not user_can_access_course(user, lesson.course) or not can_stream:
             logger.error(f"{user.username} is not authorized to stream lesson : {lesson.name}")
             return HttpResponse(_('Unauthorized'), status=401)
 
@@ -689,29 +717,17 @@ def take_exam(request, course_id, quiz_id):
             raise Http404
     
 # Admin Views
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def admin_panel(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     logger.info(f"User : {request.user} accesses admin panel successfully")
     return render(request, "admin_panel.html")
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def export_users_csv(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     return export_users_to_csv()
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def user_dashboard(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     view = "user"
     
     name = request.GET.get("name", None)
@@ -760,12 +776,8 @@ def user_dashboard(request):
 
     return render_dashboard(request, users, view, context)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def user_bulk_create(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-
     if request.method == 'POST':
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
@@ -863,14 +875,17 @@ class UpdateUser(UserBaseView, UpdateView):
         return reverse_lazy("user-update", args=[self.kwargs.get(self.pk_url_kwarg)])
     
 class DeleteUser(UserBaseView, DeleteView):
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
+        if not can_delete_content(request.user):
+            return HttpResponse(_("Unauthorized"), status=401)
+        return super(UserBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("user-dashboard")
 
 # Course Dashboard
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def course_dashboard(request):   
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
     name = request.GET.get("name", None)
     year = request.GET.get("filtering", None)
     user = request.user
@@ -910,14 +925,17 @@ class UpdateCourse(CourseBaseView, UpdateView):
         return reverse_lazy("course-update", args=[self.kwargs.get(self.pk_url_kwarg)])
     
 class DeleteCourse(CourseBaseView, DeleteView):
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
+        if not can_delete_content(request.user):
+            return HttpResponse(_("Unauthorized"), status=401)
+        return super(CourseBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("course-dashboard")
 
 # Lesson Dashboard
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def lesson_dashboard(request):   
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
     name = request.GET.get("name", None)
     year = request.GET.get("filtering", None)
     course = request.GET.get("course", None)
@@ -953,12 +971,8 @@ def lesson_dashboard(request):
 
     return render_dashboard(request, lessons, view, context)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def create_lesson(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
 
@@ -997,12 +1011,8 @@ def create_lesson(request):
 
         return redirect(reverse("lesson-create"))
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def navigate_folder(request, folder_id=None):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-
     # Check if folders_only mode is requested (for upload_video page)
     folders_only = request.GET.get('folders_only', 'false').lower() == 'true'
     
@@ -1021,12 +1031,8 @@ def navigate_folder(request, folder_id=None):
         "folders_only" : folders_only  # Pass it to template for subsequent navigations
     })
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def update_lesson(request, lesson_id):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
         try:
@@ -1079,6 +1085,12 @@ def update_lesson(request, lesson_id):
         return redirect(reverse("lesson-update", args=[lesson_id]))
 
 class DeleteLesson(LessonBaseView, DeleteView):
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
+        if not can_delete_content(request.user):
+            return HttpResponse(_("Unauthorized"), status=401)
+        return super(LessonBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 
 # Upload Videos
@@ -1093,24 +1105,15 @@ def ffmpeg_headers(view_func):
     return wrapper
 
 @ffmpeg_headers
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def upload_file(request):
-    is_manager = is_managerial(request)
-    if not is_manager:
-        return is_manager
-
-    # request.META['Cross-Origin-Resource-Policy'] = 'same-origin'
     return render(request, "upload_video.html", {
         "drive" : list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=True)[0],
         "is_root" : True
     })
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def upload_link(request):
-    is_manager = is_managerial(request)
-    if not is_manager:
-        return JsonResponse({"message" : _("unauthorized!")}, status=401) # Translate "unauthorized!"
-    
     body = json.loads(request.body)
     filename = body.get("filename", "")
     
@@ -1136,11 +1139,8 @@ def upload_link(request):
     })
 
 # Quiz Dashboard
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def quiz_dashboard(request):   
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
     name = request.GET.get("name", None)
     year = request.GET.get("filtering", None)
     course = request.GET.get("course", None)
@@ -1177,12 +1177,8 @@ def quiz_dashboard(request):
 
     return render_dashboard(request, quizzes, view, context)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def create_quiz(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
 
@@ -1245,12 +1241,8 @@ def create_quiz(request):
 
         return redirect(reverse("quiz-create"))
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def update_quiz(request, quiz_id):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     if request.method == "GET":
         courses = [course.name for course in Course.objects.all()]
         try:
@@ -1320,41 +1312,31 @@ def update_quiz(request, quiz_id):
         return redirect(reverse("quiz-update", args=[quiz_id]))
 
 class DeleteQuiz(QuizBaseView, DeleteView):
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
+        if not can_delete_content(request.user):
+            return HttpResponse(_("Unauthorized"), status=401)
+        return super(QuizBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 
 # Submission Dashboard
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_grade)
 def export_quiz_submissions_csv(request, quiz_id):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     return export_quiz_with_submissions_to_csv(quiz_id)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_grade)
 def export_quiz_summary_csv(request, quiz_id):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-
     return export_quiz_summary_to_csv(quiz_id)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_grade)
 def export_submission_csv(request, grade_id):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     return export_single_submission_to_csv(grade_id)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_view_reports)
 def export_yearly_transcript_csv(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-
     year = request.GET.get("year", now().year)
     name = request.GET.get("name")
     course = request.GET.get("course")
@@ -1362,12 +1344,8 @@ def export_yearly_transcript_csv(request):
     return export_yearly_transcript_to_csv(year, name=name, course=course, role=role)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_view_reports)
 def yearly_transcript_dashboard(request):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-
     year = request.GET.get("year", now().year)
     name = request.GET.get("name", "").strip()
     course = request.GET.get("course", "").strip()
@@ -1389,7 +1367,7 @@ def yearly_transcript_dashboard(request):
 
     return render(request, "yearly_transcript_dashboard.html", context)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_grade)
 def submission_dashboard(request, quiz_id):
     try:
         quiz = get_object_or_404(Quiz, pk=quiz_id)
@@ -1436,12 +1414,8 @@ def submission_dashboard(request, quiz_id):
 
     return render_dashboard(request, grades, view, context, parameters=[quiz_id, ])
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_grade)
 def submission_user(request, quiz_id, user_id):
-    is_manager = is_managerial(request)
-    if is_manager.status_code == 401:
-        return is_manager
-    
     submissions = Submission.objects.filter(question__quiz_id=quiz_id, user_id=user_id)
     grade = Grade.objects.filter(quiz_id=quiz_id, user_id=user_id).first()
     try:
@@ -1537,15 +1511,11 @@ def generate_audio_download(request, lesson_id):
         return JsonResponse({"error": "An error occurred while processing the request."}, status=500)
 
 # Bulk Operations
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def bulk_delete_users(request):
     """Bulk delete users endpoint for HTMX"""
     if request.method != 'DELETE':
         return HttpResponse(_("Method not allowed"), status=405)
-    
-    has_permission = has_admin_permission(request, 'users')
-    if has_permission.status_code == 401:
-        return has_permission
     
     try:
         import json
@@ -1563,15 +1533,11 @@ def bulk_delete_users(request):
         logger.error(f"Bulk delete error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def bulk_delete_courses(request):
     """Bulk delete courses endpoint for HTMX"""
     if request.method != 'DELETE':
         return HttpResponse(_("Method not allowed"), status=405)
-    
-    has_permission = has_admin_permission(request, 'courses')
-    if has_permission.status_code == 401:
-        return has_permission
     
     try:
         import json
@@ -1589,15 +1555,11 @@ def bulk_delete_courses(request):
         logger.error(f"Bulk delete error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def bulk_delete_lessons(request):
     """Bulk delete lessons endpoint for HTMX"""
     if request.method != 'DELETE':
         return HttpResponse(_("Method not allowed"), status=405)
-    
-    has_permission = has_admin_permission(request, 'lessons')
-    if has_permission.status_code == 401:
-        return has_permission
     
     try:
         import json
@@ -1615,15 +1577,11 @@ def bulk_delete_lessons(request):
         logger.error(f"Bulk delete error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def bulk_delete_quizzes(request):
     """Bulk delete quizzes endpoint for HTMX"""
     if request.method != 'DELETE':
         return HttpResponse(_("Method not allowed"), status=405)
-    
-    has_permission = has_admin_permission(request, 'quizzes')
-    if has_permission.status_code == 401:
-        return has_permission
     
     try:
         import json
@@ -1646,17 +1604,13 @@ def bulk_delete_quizzes(request):
 # R2 FILE MANAGEMENT API ENDPOINTS
 # ============================================================================
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def api_delete_file(request):
     """
     API endpoint to delete a single file from R2
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1679,17 +1633,13 @@ def api_delete_file(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def api_delete_m3u8_file(request):
     """
     API endpoint to delete an m3u8 file and all its related .ts segment files
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1720,17 +1670,13 @@ def api_delete_m3u8_file(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def api_delete_files_batch(request):
     """
     API endpoint to delete multiple files in batch
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1758,17 +1704,13 @@ def api_delete_files_batch(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_rename_file(request):
     """
     API endpoint to rename a file
     """
     if request.method != 'POST':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1793,9 +1735,6 @@ def api_rename_file(request):
         if success:
             # Update database references in Lesson model
             # Lesson.links is a JSON string containing file IDs (which are the R2 keys)
-            from django.db.models import F
-            import json
-            
             # Find lessons that might contain this specific file key
             # Since it's JSON, we look for the key inside the text
             lessons_to_update = Lesson.objects.filter(links__contains=old_key)
@@ -1835,17 +1774,13 @@ def api_rename_file(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_move_file(request):
     """
     API endpoint to move a file to a different folder
     """
     if request.method != 'POST':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1869,17 +1804,13 @@ def api_move_file(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_create_folder(request):
     """
     API endpoint to create a new folder
     """
     if request.method != 'POST':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1902,17 +1833,13 @@ def api_create_folder(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_delete_content)
 def api_delete_folder(request):
     """
     API endpoint to delete a folder
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
     
     try:
         import json
@@ -1945,15 +1872,11 @@ def api_delete_folder(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_get_file_metadata(request):
     """
     API endpoint to get file metadata
     """
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
-    
     file_key = request.GET.get('file_key')
     
     if not file_key:
@@ -1979,15 +1902,11 @@ def api_get_file_metadata(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_get_storage_stats(request):
     """
     API endpoint to get storage statistics
     """
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
-    
     prefix = request.GET.get('prefix', '')
     
     try:
@@ -2013,15 +1932,11 @@ def api_get_storage_stats(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_search_files(request):
     """
     API endpoint to search for files
     """
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
-    
     query = request.GET.get('q', '')
     prefix = request.GET.get('prefix', '')
     extensions = request.GET.get('extensions', '')
@@ -2083,15 +1998,11 @@ def api_quiz_status(request, course_id):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_list_files(request):
     """
     API endpoint to list files with filtering
     """
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
-    
     folder_name = request.GET.get('folder', '')
     filter_preset = request.GET.get('filter', 'media')
     extensions = request.GET.get('extensions', '')
@@ -2130,15 +2041,11 @@ def api_list_files(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def api_download_file(request):
     """
     API endpoint to generate download URL for a file
     """
-    has_permission = has_admin_permission(request, 'files')
-    if has_permission.status_code == 401:
-        return JsonResponse({'error': _('Unauthorized')}, status=401)
-    
     file_key = request.GET.get('file_key')
     
     if not file_key:
@@ -2160,15 +2067,11 @@ def api_download_file(request):
 # R2 MANAGEMENT DASHBOARD VIEW
 # ============================================================================
 
-@login_required(login_url=LOGIN_URL)
+@capability_required(can_manage_content)
 def r2_management_dashboard(request):
     """
     Main R2 management dashboard view
     """
-    has_permission = has_admin_permission(request, 'r2-management')
-    if has_permission.status_code == 401:
-        return has_permission
-    
     folder_id = request.GET.get('folder', None)
     filter_preset = request.GET.get('filter', '') or 'media'
     search_query = request.GET.get('search', '').strip()
@@ -2280,7 +2183,6 @@ def theme_showcase(request, theme_id, page_id):
 
 
 def _staff_guard(request):
-    from django.http import HttpResponseForbidden
     if not request.user.is_authenticated:
         return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
     if not request.user.is_staff:

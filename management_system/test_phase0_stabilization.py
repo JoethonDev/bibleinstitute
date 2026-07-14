@@ -20,13 +20,13 @@ def lesson_links():
 
 class Phase0StabilizationTests(TestCase):
     def setUp(self):
-        self.admin_role = Role.objects.create(role="admin")
-        self.teacher_role = Role.objects.create(role="teacher")
-        self.junior_role = Role.objects.create(role="junior")
-        self.senior_role = Role.objects.create(role="senior")
+        self.admin_role, _ = Role.objects.get_or_create(role="admin")
+        self.teacher_role, _ = Role.objects.get_or_create(role="staff")
+        self.junior_role, _ = Role.objects.get_or_create(role="junior")
+        self.senior_role, _ = Role.objects.get_or_create(role="senior")
 
         self.admin = User.objects.create_user(username="admin", password="1", role=self.admin_role)
-        self.teacher = User.objects.create_user(username="teacher", password="1", role=self.teacher_role)
+        self.teacher = User.objects.create_user(username="staff_user", password="1", role=self.teacher_role)
         self.junior = User.objects.create_user(
             username="junior",
             password="1",

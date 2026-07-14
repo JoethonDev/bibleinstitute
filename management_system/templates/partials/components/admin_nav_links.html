@@ -1,4 +1,6 @@
 {% load i18n %}
+{% with role=request.user.role.role %}
+{% with is_staff='admin staff' is_admin='admin' %}
 <!-- Admin Navigation Links -->
 <ul class="nav flex-column">
     <li class="nav-item">
@@ -8,7 +10,7 @@
         </a>
     </li>
     
-    {% if request.user.role.role == "admin" %}
+    {% if role in is_staff %}
         <li class="nav-item">
             <a class="nav-link text-white" 
                hx-get="{% url 'user-dashboard' %}"
@@ -50,6 +52,19 @@
         
         <li class="nav-item">
             <a class="nav-link text-white"
+               hx-get="{% url 'quiz-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-list-check"></i>
+                <span>{% translate "Quizzes" %}</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link text-white"
                hx-get="{% url 'upload-files' %}"
                hx-trigger="click"
                hx-target="#display-page"
@@ -74,18 +89,20 @@
                 <span>{% translate "R2 Storage" %}</span>
             </a>
         </li>
+        
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               hx-get="{% url 'yearly-transcript-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-chart-bar"></i>
+                <span>{% translate "Reports" %}</span>
+            </a>
+        </li>
     {% endif %}
-    
-    <li class="nav-item">
-        <a class="nav-link text-white"
-           hx-get="{% url 'quiz-dashboard' %}"
-           hx-trigger="click"
-           hx-target="#display-page"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           hx-select="#content">
-            <i class="fas fa-list-check"></i>
-            <span>{% translate "Quizzes" %}</span>
-        </a>
-    </li>
 </ul>
+{% endwith %}
+{% endwith %}

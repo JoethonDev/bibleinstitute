@@ -4,15 +4,16 @@ Provides reusable utilities for common operations.
 """
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from django.core.paginator import Paginator
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.utils.timezone import now
 from django.http import HttpResponse
 from logging import getLogger
 from management_system.utils.decorators import check_role_permission
-from management_system.models import User
+from management_system.models import User, Enrollment, MANAGEMENT_ROLES, Course, Grade
 
 logger = getLogger(__name__)
 
@@ -64,12 +65,16 @@ def is_quiz_in_user_window(quiz, user) -> bool:
     Returns:
         bool – True if the quiz is within the user's academic window
     """
-    from management_system.models import MANAGEMENT_ROLES, Course
-
     if user.role and user.role.role in MANAGEMENT_ROLES:
         return True
 
-    from datetime import date
+    if quiz.course_offering_id and Enrollment.objects.filter(
+        student=user,
+        academic_year__course_offerings__pk=quiz.course_offering_id,
+        status="active",
+    ).exists():
+        return True
+
     joined: date = user.joined_date
     try:
         window_end = joined.replace(year=joined.year + Course.MAXIMUM_LEVEL)
@@ -82,8 +87,6 @@ def is_quiz_in_user_window(quiz, user) -> bool:
 
 
 def user_has_management_role(user) -> bool:
-    from management_system.models import MANAGEMENT_ROLES
-
     return bool(user.role and user.role.role in MANAGEMENT_ROLES)
 
 
@@ -94,6 +97,13 @@ def user_can_access_course(user, course) -> bool:
     if not user.role:
         return False
 
+    if Enrollment.objects.filter(
+        student=user,
+        academic_year__course_offerings__course=course,
+        status='active',
+    ).exists():
+        return True
+
     return course.can_access(user.role.role)
 
 
@@ -101,10 +111,6 @@ def get_student_quiz_status(quiz, user, current_time=None):
     """
     Return the student's current quiz mode using the same rule set everywhere.
     """
-    from datetime import timedelta
-    from django.utils.timezone import now
-    from management_system.models import Grade
-
     grade = Grade.objects.filter(user=user, quiz=quiz).first()
     if grade:
         return "view", grade

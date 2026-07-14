@@ -46,7 +46,7 @@
             <a href="{% url 'view-profile' %}" class="nav-link btn btn-outline-primary text-start" @click="$store.ui.closeMobileMenu()">
                 <i class="fas fa-user me-2"></i>{% translate "Profile" %}
             </a>
-            {% if request.user.role.role == "admin" or request.user.role.role == "teacher" %}
+            {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
             <a href="{% url 'user-dashboard' %}" class="nav-link btn btn-outline-primary text-start" @click="$store.ui.closeMobileMenu()">
                 <i class="fas fa-tachometer-alt me-2"></i>{% translate "Admin Dashboard" %}
             </a>

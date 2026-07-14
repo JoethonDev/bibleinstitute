@@ -153,7 +153,7 @@
               <li class="nav-item"><a class="nav-link" href="#">{% translate "About Us" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
-              {% if request.user.role.role == "admin" or request.user.role.role == "teacher" %}
+              {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
                 <li class="nav-item">
                   <a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Admin Dashboard" %}</a>
                 </li>

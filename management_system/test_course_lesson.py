@@ -16,14 +16,14 @@ class CourseTest(TestCase):
         base_date = date(2025, 6, 11)
 
         # Role
-        self.admin_role = Role.objects.create(role="admin")
-        self.teacher_role = Role.objects.create(role="teacher")
-        self.senior_role = Role.objects.create(role="senior")
-        self.junior_role = Role.objects.create(role="junior")
+        self.admin_role, _ = Role.objects.get_or_create(role="admin")
+        self.teacher_role, _ = Role.objects.get_or_create(role="staff")
+        self.senior_role, _ = Role.objects.get_or_create(role="senior")
+        self.junior_role, _ = Role.objects.get_or_create(role="junior")
 
         # User
         self.admin = User.objects.create(username="admin", password="1", role=self.admin_role)
-        self.teacher = User.objects.create(username="teacher", password="1", role=self.teacher_role)
+        self.teacher = User.objects.create(username="staff_user", password="1", role=self.teacher_role)
         self.senior = User.objects.create(username="senior", password="1", role=self.senior_role, joined_date=date(2023, 8, 11))
         self.grad = User.objects.create(username="senior2", password="1", role=self.senior_role, joined_date=date(2022, 8, 11))
         self.junior = User.objects.create(username="junior", password="1", role=self.junior_role, joined_date=date(2024, 8, 11))

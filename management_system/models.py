@@ -9,7 +9,7 @@ import json
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 
 # Constants
-MANAGEMENT_ROLES = ["admin", "teacher"]
+MANAGEMENT_ROLES = ["admin", "staff"]
 
 # Helper Function
 def assign_academic_date():
@@ -33,13 +33,13 @@ class PublicationStatus(models.TextChoices):
 class Role(models.Model):
     ROLES = [
         ("admin", _("Admin")),
-        ("teacher", _("Teacher")),
-        ("junior", _("First Year")),
-        ("senior", _("Second Year"))
+        ("staff", _("Staff")),
+        ("moderator", _("Moderator")),
+        ("student", _("Student")),
     ]
     # Fields
     role = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=ROLES, 
         unique=True
     )
@@ -49,7 +49,7 @@ class Role(models.Model):
     
     @staticmethod
     def get_default():
-        return Role.objects.get_or_create(role='junior')[0]
+        return Role.objects.get_or_create(role='student')[0]
     
     @staticmethod
     def get_by_readable_value(readable_value):
@@ -91,10 +91,14 @@ class Course(models.Model):
     MAXIMUM_LEVEL = 2
 
     LEVELS = {
-        "junior" : 1,
-        "senior" : MAXIMUM_LEVEL,
-        "management" : MAXIMUM_LEVEL,
         "admin" : MAXIMUM_LEVEL,
+        "staff" : MAXIMUM_LEVEL,
+        "management" : MAXIMUM_LEVEL,
+        "teacher" : MAXIMUM_LEVEL,
+        "moderator" : MAXIMUM_LEVEL,
+        "senior" : MAXIMUM_LEVEL,
+        "junior" : 1,
+        "student" : 0,
     }
 
 
