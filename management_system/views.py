@@ -14,6 +14,8 @@ from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.timezone import now
+from django.views.decorators.http import require_POST
+import secrets
 import random
 
 # Third Party
@@ -38,9 +40,10 @@ from .utils.r2_manager import R2Manager
 from .utils.file_validator import validate_upload_filename, FileValidator
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_can_access_course, user_has_management_role
-from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications
+from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
+from .utils.attendance import is_expected_date, get_attendance_summary
 from .theme_catalog import THEMES, get_theme, SHOWCASE_PAGES
 
 # Constants
@@ -2458,3 +2461,158 @@ def duplicate_course(request, course_id):
                 Question.objects.bulk_create(questions)
     messages.success(request, _("Course duplicated."))
     return redirect("course-dashboard")
+
+
+# ============================================================================
+# PHASE 5 — Attendance Calendar, QR, and Scanning
+# ============================================================================
+
+
+@capability_required(can_manage_content)
+def calendar_management(request):
+    years = AcademicYear.objects.filter(is_current=True)
+    return render(request, "calendar_management.html", {"years": years})
+
+
+@capability_required(can_manage_content)
+def add_holiday(request):
+    if request.method == "POST":
+        year_id = request.POST.get("academic_year_id")
+        date_val = request.POST.get("date")
+        name = request.POST.get("name")
+        year = get_object_or_404(AcademicYear, pk=year_id)
+        AcademicHoliday.objects.create(academic_year=year, date=date_val, name=name)
+        messages.success(request, _("Holiday added."))
+        return redirect("calendar-management")
+    years = AcademicYear.objects.filter(is_current=True)
+    return render(request, "calendar_management.html", {"years": years})
+
+
+@capability_required(can_correct_attendance)
+def delete_holiday(request, holiday_id):
+    holiday = get_object_or_404(AcademicHoliday, pk=holiday_id)
+    holiday.delete()
+    messages.success(request, _("Holiday removed."))
+    return redirect("calendar-management")
+
+
+@login_required
+def student_calendar(request):
+    enrollments = Enrollment.objects.filter(student=request.user).select_related("academic_year")
+    years = [e.academic_year for e in enrollments]
+    return render(request, "student_calendar.html", {"years": years})
+
+
+@login_required
+def download_qr(request):
+    if not request.user.qr_token:
+        request.user.qr_token = secrets.token_urlsafe(32)
+        request.user.save(update_fields=["qr_token"])
+    qr_data = request.build_absolute_uri(reverse("scan-preview", args=[request.user.qr_token]))
+    import qrcode
+    from io import BytesIO
+    img = qrcode.make(qr_data)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return HttpResponse(buf, content_type="image/png")
+
+
+@capability_required(can_correct_attendance)
+def regenerate_qr(request, user_id):
+    user = get_object_or_404(User, pk=user_id)
+    user.qr_token = secrets.token_urlsafe(32)
+    user.save(update_fields=["qr_token"])
+    messages.success(request, _("QR token regenerated."))
+    return redirect("application-review", user_id=user.id)
+
+
+@capability_required(can_scan_attendance)
+def scanner(request):
+    return render(request, "scanner.html")
+
+
+@capability_required(can_scan_attendance)
+def scan_preview(request, token):
+    user = get_object_or_404(User, qr_token=token)
+    academic_year = AcademicYear.objects.filter(
+        level__in=Enrollment.objects.filter(student=user).values("academic_year__level"),
+        is_current=True,
+    ).first()
+    today = now().date()
+    already_recorded = AttendanceRecord.objects.filter(
+        student=user, attendance_date=today
+    ).values_list("action", flat=True)
+    return render(request, "scan_preview.html", {
+        "student": user,
+        "academic_year": academic_year,
+        "today": today,
+        "already_recorded": list(already_recorded),
+    })
+
+
+@require_POST
+@capability_required(can_scan_attendance)
+def record_attendance(request, token, action):
+    if action not in ("entrance", "exit"):
+        return JsonResponse({"error": _("Invalid action.")}, status=400)
+    user = get_object_or_404(User, qr_token=token)
+    if user.study_mode == "online":
+        return JsonResponse({"error": _("Online students cannot record attendance.")}, status=400)
+    academic_year = AcademicYear.objects.filter(
+        level__in=Enrollment.objects.filter(student=user).values("academic_year__level"),
+        is_current=True,
+    ).first()
+    if not academic_year:
+        return JsonResponse({"error": _("No active enrollment.")}, status=400)
+    today = now().date()
+    if not is_expected_date(academic_year, today):
+        return JsonResponse({"error": _("Today is not an expected attendance day.")}, status=400)
+    rec, created = AttendanceRecord.objects.get_or_create(
+        student=user,
+        academic_year=academic_year,
+        attendance_date=today,
+        action=action,
+        defaults={"scanned_by": request.user},
+    )
+    if created:
+        return JsonResponse({"status": "recorded", "action": action})
+    return JsonResponse({"status": "already_recorded", "action": action})
+
+
+@capability_required(can_correct_attendance)
+def attendance_management(request):
+    year_id = request.GET.get("academic_year")
+    records = AttendanceRecord.objects.all().select_related("student", "academic_year", "scanned_by")
+    if year_id:
+        records = records.filter(academic_year_id=year_id)
+    years = AcademicYear.objects.all()
+    return render(request, "attendance_management.html", {
+        "records": records,
+        "years": years,
+        "selected_year": int(year_id) if year_id else None,
+    })
+
+
+@capability_required(can_correct_attendance)
+def attendance_correction(request, record_id):
+    record = get_object_or_404(AttendanceRecord, pk=record_id)
+    if request.method == "POST":
+        new_date = request.POST.get("attendance_date")
+        new_action = request.POST.get("action")
+        record.attendance_date = new_date or record.attendance_date
+        record.action = new_action or record.action
+        record.corrected_by = request.user
+        record.corrected_at = now()
+        record.save()
+        messages.success(request, _("Attendance record corrected."))
+        return redirect("attendance-management")
+    return render(request, "attendance_correction.html", {"record": record})
+
+
+@capability_required(can_correct_attendance)
+def delete_attendance(request, record_id):
+    record = get_object_or_404(AttendanceRecord, pk=record_id)
+    record.delete()
+    messages.success(request, _("Attendance record deleted."))
+    return redirect("attendance-management")

@@ -106,4 +106,18 @@ urlpatterns = [
     path('dashboard/applications/<int:user_id>/', application_review, name="application-review"),
     path('dashboard/applications/<int:user_id>/<str:decision>/', application_decision, name="application-decision"),
     path('api/bulk-application-decision/', bulk_application_decision, name="bulk-application-decision"),
+
+    # Phase 5 — Attendance Calendar, QR, and Scanning
+    path('dashboard/calendar/', calendar_management, name="calendar-management"),
+    path('dashboard/calendar/holiday/add/', add_holiday, name="add-holiday"),
+    path('dashboard/calendar/holiday/<int:holiday_id>/delete/', delete_holiday, name="delete-holiday"),
+    path('my-calendar/', student_calendar, name="student-calendar"),
+    path('my-qr/', download_qr, name="download-qr"),
+    path('dashboard/users/<int:user_id>/regenerate-qr/', regenerate_qr, name="regenerate-qr"),
+    path('scanner/', scanner, name="scanner"),
+    path('scan/<str:token>/', scan_preview, name="scan-preview"),
+    path('scan/<str:token>/<str:action>/', record_attendance, name="record-attendance"),
+    path('dashboard/attendance/', attendance_management, name="attendance-management"),
+    path('dashboard/attendance/<int:record_id>/correct/', attendance_correction, name="attendance-correction"),
+    path('dashboard/attendance/<int:record_id>/delete/', delete_attendance, name="attendance-delete"),
 ]

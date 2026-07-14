@@ -381,6 +381,40 @@ class MigrationReviewItem(models.Model):
     def __str__(self):
         return f"[{self.severity}] {self.item_type}"
 
+
+class AcademicHoliday(models.Model):
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name="holidays")
+    date = models.DateField()
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        unique_together = [("academic_year", "date")]
+
+    def __str__(self):
+        return f"{self.name} - {self.date}"
+
+
+class AttendanceRecord(models.Model):
+    class Action(models.TextChoices):
+        ENTRANCE = "entrance", _("Entrance")
+        EXIT = "exit", _("Exit")
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="attendance_records")
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name="attendance_records")
+    attendance_date = models.DateField()
+    action = models.CharField(max_length=10, choices=Action.choices)
+    scanned_at = models.DateTimeField(auto_now_add=True)
+    scanned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="scanned_records")
+    corrected_at = models.DateTimeField(null=True, blank=True)
+    corrected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="corrected_records")
+
+    class Meta:
+        unique_together = [("student", "academic_year", "attendance_date", "action")]
+
+    def __str__(self):
+        return f"{self.student.username} {self.action} on {self.attendance_date}"
+
+
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")

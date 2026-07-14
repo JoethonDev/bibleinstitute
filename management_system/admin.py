@@ -45,6 +45,21 @@ class OfflineCityAdmin(admin.ModelAdmin):
     search_fields = ["name"]
 
 
+@admin.register(AcademicHoliday)
+class AcademicHolidayAdmin(admin.ModelAdmin):
+    list_display = ["academic_year", "date", "name"]
+    list_filter = ["academic_year"]
+    search_fields = ["name"]
+
+
+@admin.register(AttendanceRecord)
+class AttendanceRecordAdmin(admin.ModelAdmin):
+    list_display = ["student", "academic_year", "attendance_date", "action", "scanned_at", "scanned_by"]
+    list_filter = ["action", "academic_year"]
+    search_fields = ["student__username"]
+    raw_id_fields = ["student", "scanned_by"]
+
+
 @admin.register(MigrationReviewItem)
 class MigrationReviewItemAdmin(admin.ModelAdmin):
     list_display = ["item_type", "severity", "object_id", "resolved", "created_at"]

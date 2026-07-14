@@ -53,8 +53,8 @@ def is_quiz_in_user_window(quiz, user) -> bool:
 
     A student's academic window spans from their joined_date up to
     joined_date + Course.MAXIMUM_LEVEL years. This lets us distinguish between:
-      - A quiz that was originally opened *for this cohort* (in-window)
-      - A quiz that has been re-opened for a newer cohort (out-of-window)
+      - A quiz originally opened for this student's level (in-window)
+      - A quiz re-opened for a newer level (out-of-window)
 
     Management roles always return True (no restriction).
 

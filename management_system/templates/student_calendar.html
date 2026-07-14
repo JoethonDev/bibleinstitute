@@ -1,0 +1,39 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% translate "My Calendar" %}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <h1 class="mb-4">{% translate "My Academic Calendar" %}</h1>
+
+  {% for y in years %}
+    <div class="card mb-4">
+      <div class="card-header">
+        <strong>{{ y }}</strong>
+        <span class="badge bg-info ms-2">{{ y.starts_on }} – {{ y.ends_on }}</span>
+      </div>
+      <div class="card-body">
+        {% with holidays=y.holidays.all %}
+          {% if holidays %}
+            <h6>{% translate "Holidays" %}</h6>
+            <ul class="list-group mb-3">
+              {% for h in holidays %}
+                <li class="list-group-item">{{ h.date }} – {{ h.name }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+        <p class="text-muted">{% translate "Meeting days" %}: {{ y.meeting_weekdays }}</p>
+      </div>
+    </div>
+  {% empty %}
+    <div class="alert alert-info">{% translate "You are not enrolled in any academic year." %}</div>
+  {% endfor %}
+</div>
+</body>
+</html>
