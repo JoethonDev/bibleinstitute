@@ -127,4 +127,9 @@ urlpatterns = [
     path('api/worker/receipt/', worker_receipt, name="worker-receipt"),
     path('api/progress/heartbeat/', progress_heartbeat, name="progress-heartbeat"),
     path('dashboard/progress/', progress_dashboard, name="progress-dashboard"),
+
+    # Phase 7 — Reports and Exports
+    path('dashboard/reports/', report_dashboard, name="report-dashboard"),
+    path('dashboard/reports/export-csv/', export_report_csv, name="export-report-csv"),
+    path('dashboard/reports/export-xlsx/', export_report_xlsx, name="export-report-xlsx"),
 ]

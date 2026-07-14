@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 import hashlib
 import hmac
+import io
 import secrets
 import random
 
@@ -38,7 +39,8 @@ from .models import *
 from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm
 
 # Internal Imports - Utilities
-from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows
+from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, _csv_safe_cell, _safe_filename
+from .utils.reports import build_report_data
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
 from .utils.file_validator import validate_upload_filename, FileValidator
@@ -2733,3 +2735,168 @@ def progress_dashboard(request):
         "lessons": lessons,
         "selected_lesson": int(lesson_id) if lesson_id else None,
     })
+
+
+@capability_required(can_view_reports)
+def report_dashboard(request):
+    academic_year_id = request.GET.get("academic_year")
+    student_id = request.GET.get("student") or None
+    study_mode = request.GET.get("study_mode") or None
+    course_offering_id = request.GET.get("course_offering") or None
+
+    levels = AcademicYear.objects.values_list("level", flat=True).distinct().order_by("level")
+    academic_years = AcademicYear.objects.all().order_by("-level", "-name")
+    selected_year = None
+    rows = []
+
+    if academic_year_id:
+        selected_year = get_object_or_404(AcademicYear, pk=academic_year_id)
+        students = User.objects.filter(enrollments__academic_year=selected_year).distinct()
+        course_offerings = CourseOffering.objects.filter(academic_year=selected_year)
+        rows = build_report_data(
+            selected_year,
+            student_id=int(student_id) if student_id else None,
+            study_mode=study_mode,
+            course_offering_id=int(course_offering_id) if course_offering_id else None,
+        )
+
+    context = {
+        "title": _("Combined Report"),
+        "levels": levels,
+        "academic_years": academic_years,
+        "selected_year": selected_year,
+        "selected_level": request.GET.get("level", ""),
+        "selected_student": student_id,
+        "selected_study_mode": study_mode or "",
+        "selected_course_offering": course_offering_id or "",
+        "students": students if academic_year_id else [],
+        "course_offerings": course_offerings if academic_year_id else [],
+        "rows": rows,
+        "row_count": len(rows),
+    }
+    return render(request, "report_dashboard.html", context)
+
+
+@capability_required(can_view_reports)
+def export_report_csv(request):
+    academic_year_id = request.GET.get("academic_year")
+    if not academic_year_id:
+        return HttpResponse("Missing academic_year", status=400)
+    year = get_object_or_404(AcademicYear, pk=academic_year_id)
+
+    rows = build_report_data(
+        year,
+        student_id=request.GET.get("student") or None,
+        study_mode=request.GET.get("study_mode") or None,
+        course_offering_id=request.GET.get("course_offering") or None,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Identity", "Username", "First Name", "Last Name", "Study Mode",
+                      "Level", "Academic Year",
+                      "Grade Earned", "Grade Available", "Grade %",
+                      "Expected", "Valid", "Invalid", "Absent",
+                      "Attendance %", "Absence %"])
+    for row in rows:
+        writer.writerow([
+            row["student_id"],
+            _csv_safe_cell(row["username"]),
+            _csv_safe_cell(row["first_name"]),
+            _csv_safe_cell(row["last_name"]),
+            _csv_safe_cell(row["study_mode"]),
+            row["level"],
+            _csv_safe_cell(row["year_name"]),
+            row["grade_earned"],
+            row["grade_available"],
+            row["grade_percent"],
+            row["expected"],
+            row["valid"],
+            row["invalid"],
+            row["absent"],
+            row["attendance_rate"],
+            row["absence_rate"],
+        ])
+
+    output.seek(0)
+    safe_name = _safe_filename(year.name)
+    response = HttpResponse(output.read(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    return response
+
+
+@capability_required(can_view_reports)
+def export_report_xlsx(request):
+    academic_year_id = request.GET.get("academic_year")
+    if not academic_year_id:
+        return HttpResponse("Missing academic_year", status=400)
+    year = get_object_or_404(AcademicYear, pk=academic_year_id)
+
+    rows = build_report_data(
+        year,
+        student_id=request.GET.get("student") or None,
+        study_mode=request.GET.get("study_mode") or None,
+        course_offering_id=request.GET.get("course_offering") or None,
+    )
+
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    ws1 = wb.active
+    ws1.title = "Grades Summary"
+    headers = ["Student ID", "Username", "First Name", "Last Name", "Course", "Quiz",
+               "Grade", "Total", "Percent"]
+    ws1.append(headers)
+    for row in rows:
+        for detail in row["grade_details"]:
+            pct = round(detail["grade"] / detail["total"] * 100, 1) if detail["total"] else 0
+            ws1.append([
+                row["student_id"], row["username"], row["first_name"], row["last_name"],
+                detail["course_name"], detail["quiz_name"],
+                detail["grade"], detail["total"], pct,
+            ])
+
+    ws1.freeze_panes = "A2"
+    ws1.auto_filter.ref = ws1.dimensions
+
+    ws2 = wb.create_sheet("Attendance Summary")
+    ws2.append(["Student ID", "Username", "First Name", "Last Name",
+                "Expected", "Valid", "Invalid", "Absent",
+                "Attendance %", "Absence %"])
+    for row in rows:
+        ws2.append([
+            row["student_id"], row["username"], row["first_name"], row["last_name"],
+            row["expected"], row["valid"], row["invalid"], row["absent"],
+            row["attendance_rate"], row["absence_rate"],
+        ])
+
+    ws2.freeze_panes = "A2"
+    ws2.auto_filter.ref = ws2.dimensions
+
+    ws3 = wb.create_sheet("Attendance Daily")
+    ws3.append(["Student ID", "Username", "First Name", "Last Name",
+                "Date", "Day", "Action"])
+    for row in rows:
+        records = AttendanceRecord.objects.filter(
+            student_id=row["student_id"], academic_year=year
+        ).order_by("attendance_date")
+        for rec in records:
+            ws3.append([
+                row["student_id"], row["username"], row["first_name"], row["last_name"],
+                rec.attendance_date.isoformat(),
+                rec.attendance_date.strftime("%A"),
+                rec.action,
+            ])
+    ws3.freeze_panes = "A2"
+    ws3.auto_filter.ref = ws3.dimensions
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe_name = _safe_filename(year.name)
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    return response
