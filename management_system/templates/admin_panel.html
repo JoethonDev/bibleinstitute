@@ -138,6 +138,7 @@
     <script defer src="{% static 'js/alpine/components/dashboardManager.js' %}"></script>
     <script defer src="{% static 'js/alpine/components/filterManager.js' %}"></script>
     <script defer src="{% static 'js/alpine/components/tableManager.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/progressTracker.js' %}"></script>
     
     <!-- 4. Alpine.js Global Component Registration (MUST be before Alpine Core) -->
     <script defer>
@@ -153,6 +154,7 @@
             Alpine.data('dashboardManager', dashboardManager);
             Alpine.data('filterManager', filterManager);
             Alpine.data('tableManager', tableManager);
+            Alpine.data('progressTracker', progressTracker);
         });
 
         // NOTE: We do NOT manually call Alpine.initTree() after HTMX swaps.

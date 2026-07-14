@@ -1,0 +1,64 @@
+{% extends "admin_panel.html" %}
+{% load i18n %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>{% translate "Lecture Progress" %}</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 mb-4">
+                <div class="col-auto">
+                    <select name="lesson" class="form-select" onchange="this.form.submit()">
+                        <option value="">{% translate "All Lessons" %}</option>
+                        {% for l in lessons %}
+                        <option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>{% translate "Student" %}</th>
+                            <th>{% translate "Lesson" %}</th>
+                            <th>{% translate "Part" %}</th>
+                            <th>{% translate "Progress" %}</th>
+                            <th>{% translate "Completed" context "progress" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in progress %}
+                        <tr>
+                            <td>{{ p.student.get_full_name|default:p.student.username }}</td>
+                            <td>{{ p.lesson.name }}</td>
+                            <td><code>{{ p.part_id }}</code></td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar" role="progressbar" style="width: {{ p.percent }}%;" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">
+                                        {{ p.percent }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if p.completed_at %}
+                                <span class="badge bg-success">{% translate "Yes" %}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{% translate "No" %}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">{% translate "No progress records found." %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

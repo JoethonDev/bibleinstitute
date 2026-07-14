@@ -60,6 +60,25 @@ class AttendanceRecordAdmin(admin.ModelAdmin):
     raw_id_fields = ["student", "scanned_by"]
 
 
+@admin.register(ViewingSession)
+class ViewingSessionAdmin(admin.ModelAdmin):
+    list_display = ["student", "lesson", "part_id", "session_id", "expires_at"]
+    raw_id_fields = ["student"]
+
+
+@admin.register(LectureProgress)
+class LectureProgressAdmin(admin.ModelAdmin):
+    list_display = ["student", "lesson", "part_id", "unique_seconds", "percent", "completed_at"]
+    list_filter = ["lesson"]
+    raw_id_fields = ["student"]
+
+
+@admin.register(VerifiedSegmentRequest)
+class VerifiedSegmentRequestAdmin(admin.ModelAdmin):
+    list_display = ["session", "segment_key", "requested_at"]
+    raw_id_fields = ["session"]
+
+
 @admin.register(MigrationReviewItem)
 class MigrationReviewItemAdmin(admin.ModelAdmin):
     list_display = ["item_type", "severity", "object_id", "resolved", "created_at"]

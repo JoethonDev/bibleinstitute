@@ -415,6 +415,49 @@ class AttendanceRecord(models.Model):
         return f"{self.student.username} {self.action} on {self.attendance_date}"
 
 
+class ViewingSession(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="viewing_sessions")
+    lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="viewing_sessions")
+    part_id = models.CharField(max_length=100)
+    session_id = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    last_heartbeat = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["session_id"])]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.lesson.name} part {self.part_id}"
+
+
+class VerifiedSegmentRequest(models.Model):
+    session = models.ForeignKey(ViewingSession, on_delete=models.CASCADE, related_name="verified_requests")
+    segment_key = models.CharField(max_length=500)
+    requested_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("session", "segment_key")]
+
+    def __str__(self):
+        return f"{self.session.session_id} - {self.segment_key}"
+
+
+class LectureProgress(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lecture_progress")
+    lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="lecture_progress")
+    part_id = models.CharField(max_length=100)
+    merged_ranges = models.JSONField(default=list)
+    unique_seconds = models.PositiveIntegerField(default=0)
+    percent = models.PositiveSmallIntegerField(default=0)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [("student", "lesson", "part_id")]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.lesson.name} part {self.part_id}: {self.percent}%"
+
+
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")

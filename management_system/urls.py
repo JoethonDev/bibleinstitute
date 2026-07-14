@@ -120,4 +120,11 @@ urlpatterns = [
     path('dashboard/attendance/', attendance_management, name="attendance-management"),
     path('dashboard/attendance/<int:record_id>/correct/', attendance_correction, name="attendance-correction"),
     path('dashboard/attendance/<int:record_id>/delete/', delete_attendance, name="attendance-delete"),
+
+    # Phase 6 — Online Lecture Progress Tracking
+    path('api/lesson/<int:lesson_id>/start-session/<str:part_id>/', start_viewing_session, name="start-viewing-session"),
+    path('lesson/<int:lesson_id>/manifest/<int:file_index>/', lesson_manifest, name="lesson-manifest"),
+    path('api/worker/receipt/', worker_receipt, name="worker-receipt"),
+    path('api/progress/heartbeat/', progress_heartbeat, name="progress-heartbeat"),
+    path('dashboard/progress/', progress_dashboard, name="progress-dashboard"),
 ]

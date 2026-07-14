@@ -13,8 +13,12 @@ from django.contrib import messages
 from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+import hashlib
+import hmac
 import secrets
 import random
 
@@ -494,10 +498,12 @@ def view_lesson_details(request, course_id, lesson_id):
         if can_access:
             logger.info(f"User : {user} is accessing {lesson.name} lesson from {course.name} course")
             return render(request, "lesson_stream.html", {
-                # Add Courses here
+                "lesson_id": lesson_id,
                 "links" : [{
                     "url" : reverse("lesson-stream", args=[lesson_id, file_index]),
-                    "type" : file['file_type']
+                    "name" : file.get("name", ""),
+                    "type" : file['file_type'],
+                    "part_id" : file.get("part_id", ""),
                 } for file_index, file in enumerate(lesson_links)]
             })
         
@@ -2616,3 +2622,114 @@ def delete_attendance(request, record_id):
     record.delete()
     messages.success(request, _("Attendance record deleted."))
     return redirect("attendance-management")
+
+
+# ============================================================================
+# PHASE 6 — Online Lecture Progress Tracking
+# ============================================================================
+
+
+def create_viewing_session(student, lesson, part_id):
+    session_id = secrets.token_urlsafe(32)
+    expires_at = timezone.now() + timedelta(hours=2)
+    session = ViewingSession.objects.create(
+        student=student,
+        lesson=lesson,
+        part_id=part_id,
+        session_id=session_id,
+        expires_at=expires_at,
+    )
+    return session
+
+
+def sign_session(session_id, expires_at):
+    message = f"{session_id}:{int(expires_at.timestamp())}"
+    secret = settings.SECRET_KEY.encode()
+    signature = hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
+    return f"{message}:{signature}"
+
+
+@capability_required(can_manage_content)
+def start_viewing_session(request, lesson_id, part_id):
+    lesson = get_object_or_404(Lesson, pk=lesson_id)
+    session = create_viewing_session(request.user, lesson, part_id)
+    token = sign_session(session.session_id, session.expires_at)
+    return JsonResponse({
+        "session_id": session.session_id,
+        "token": token,
+        "expires_at": session.expires_at.isoformat(),
+    })
+
+
+@login_required
+def lesson_manifest(request, lesson_id, file_index):
+    lesson = get_object_or_404(Lesson, pk=lesson_id)
+    links = json.loads(lesson.links)
+    if file_index >= len(links):
+        return HttpResponse(status=404)
+    file_info = links[file_index]
+    key = file_info["id"]
+    try:
+        response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
+        playlist = response["Body"].read().decode()
+    except Exception:
+        return HttpResponse(status=404)
+    return HttpResponse(playlist, content_type="application/vnd.apple.mpegurl")
+
+
+@csrf_exempt
+@require_POST
+def worker_receipt(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    session_id = data.get("session_id")
+    segment_key = data.get("segment_key")
+    signature = data.get("signature")
+
+    if not all([session_id, segment_key, signature]):
+        return JsonResponse({"error": "Missing fields"}, status=400)
+
+    session = get_object_or_404(ViewingSession, session_id=session_id)
+    expected = sign_session(session.session_id, session.expires_at).split(":")[-1]
+    if not hmac.compare_digest(signature, expected):
+        return JsonResponse({"error": "Invalid signature"}, status=403)
+
+    if timezone.now() > session.expires_at:
+        return JsonResponse({"error": "Session expired"}, status=410)
+
+    VerifiedSegmentRequest.objects.get_or_create(session=session, segment_key=segment_key)
+    return JsonResponse({"status": "recorded"})
+
+
+@csrf_exempt
+@require_POST
+def progress_heartbeat(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+    data = json.loads(request.body)
+    session_id = data.get("session_id")
+    ranges = data.get("ranges", [])
+
+    session = get_object_or_404(ViewingSession, session_id=session_id, student=request.user)
+
+    session.last_heartbeat = timezone.now()
+    session.save(update_fields=["last_heartbeat"])
+
+    return JsonResponse({"status": "ok"})
+
+
+@capability_required(can_view_reports)
+def progress_dashboard(request):
+    lesson_id = request.GET.get("lesson")
+    lessons = Lesson.objects.all()
+    progress = LectureProgress.objects.all().select_related("student", "lesson")
+    if lesson_id:
+        progress = progress.filter(lesson_id=lesson_id)
+    return render(request, "progress_dashboard.html", {
+        "progress": progress,
+        "lessons": lessons,
+        "selected_lesson": int(lesson_id) if lesson_id else None,
+    })
