@@ -10,6 +10,20 @@
         </a>
     </li>
     
+    {% if role in is_admin %}
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               hx-get="{% url 'applications-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-file-alt"></i>
+                <span>{% translate "Applications" %}</span>
+            </a>
+        </li>
+    {% endif %}
     {% if role in is_staff %}
         <li class="nav-item">
             <a class="nav-link text-white" 

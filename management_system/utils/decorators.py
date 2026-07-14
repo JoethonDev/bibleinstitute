@@ -84,43 +84,7 @@ def login_required_with_permission(role_type=None, resource=None):
     return decorator
 
 
-def admin_required(view_func):
-    """
-    Shortcut decorator for admin-only views.
-    
-    Usage:
-        @admin_required
-        def admin_only_view(request):
-            # Admin-only logic...
-    """
-    return login_required_with_permission('admin')(view_func)
 
-
-def management_required(view_func):
-    """
-    Shortcut decorator for views requiring admin or teacher role.
-    
-    Usage:
-        @management_required
-        def management_view(request):
-            # Management logic...
-    """
-    @wraps(view_func)
-    @login_required(login_url=reverse_lazy("user_login"))
-    def wrapper(request, *args, **kwargs):
-        try:
-            user = User.objects.get(username=request.user)
-        except User.DoesNotExist:
-            logger.warning(f"User {request.user} not found in database")
-            return HttpResponse(_("Unauthorized"), status=401)
-        
-        if user.role.role not in MANAGEMENT_ROLES:
-            logger.warning(f"User: {user} attempted to access management panel")
-            return HttpResponse(_("Unauthorized"), status=401)
-        
-        return view_func(request, *args, **kwargs)
-    
-    return wrapper
 
 
 def check_role_permission(user, role_type, resource=None):

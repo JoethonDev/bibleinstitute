@@ -67,14 +67,42 @@ class Role(models.Model):
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
     joined_date = models.DateField(null=False, default=assign_academic_date)
-    
+
+    phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    priest_name = models.CharField(max_length=255, null=True, blank=True)
+    priest_phone = models.CharField(max_length=20, null=True, blank=True)
+    church = models.CharField(max_length=255, null=True, blank=True)
+    city = models.CharField(max_length=255, null=True, blank=True)
+
+    STUDY_MODES = [("online", _("Online")), ("offline", _("Offline"))]
+    study_mode = models.CharField(max_length=10, choices=STUDY_MODES, null=True, blank=True)
+    study_mode_override = models.BooleanField(default=False)
+
+    IDENTITY_TYPES = [("national_id", _("National ID")), ("passport", _("Passport"))]
+    identity_type = models.CharField(max_length=20, choices=IDENTITY_TYPES, null=True, blank=True)
+    identity_number = models.CharField(max_length=50, null=True, blank=True)
+
+    identity_front_key = models.CharField(max_length=500, null=True, blank=True)
+    identity_back_key = models.CharField(max_length=500, null=True, blank=True)
+    payment_key = models.CharField(max_length=500, null=True, blank=True)
+    profile_image_key = models.CharField(max_length=500, null=True, blank=True)
+
+    APPLICATION_STATUSES = [("pending", _("Pending")), ("active", _("Active")), ("declined", _("Declined"))]
+    application_status = models.CharField(max_length=10, choices=APPLICATION_STATUSES, default="active")
+
+    decided_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_notes = models.TextField(null=True, blank=True)
+
+    qr_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+
     def save(self, *args, **kwargs):
         if not self.role_id:
             try:
-                default_role = Role.objects.get(role='junior')
+                default_role = Role.objects.get(role='student')
                 self.role = default_role
             except Role.DoesNotExist:
-                pass  # Role will be None, handle this in your application logic
+                pass
         super().save(*args, **kwargs)
     
     def serialize_pagination(self):
@@ -86,6 +114,14 @@ class User(AbstractUser):
     @staticmethod
     def get_columns():
         return [_("Username"), _("Name"), _("Role"), _("Joined Date"), _("Last Login")]
+
+
+class OfflineCity(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
 
 class Course(models.Model):
     MAXIMUM_LEVEL = 2

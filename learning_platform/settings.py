@@ -198,6 +198,8 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 # Seconds Minutes Hours Days
 # Make tempalte always use absolute urls
 FORCE_SCRIPT_NAME = '/'
 
+DEFAULT_FROM_EMAIL = "noreply@bibleinstitute.edu"
+
 # Logging
 LOGGING = {
     "version": 1,

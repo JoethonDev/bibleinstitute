@@ -1,0 +1,91 @@
+{% load i18n %}
+{% load static %}
+<div class="container-fluid py-3" id="content">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active">{% translate "Applications" %}</li>
+        </ol>
+    </nav>
+
+    <h4 class="mb-3">{% translate "Student Applications" %}</h4>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if current_status == 'pending' %}active{% endif %}" href="?status=pending">{% translate "Pending" %}</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_status == 'active' %}active{% endif %}" href="?status=active">{% translate "Active" %}</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_status == 'declined' %}active{% endif %}" href="?status=declined">{% translate "Declined" %}</a>
+        </li>
+    </ul>
+
+    {% if users %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th><input type="checkbox" id="select-all"></th>
+                    <th>{% translate "Name" %}</th>
+                    <th>{% translate "Phone" %}</th>
+                    <th>{% translate "City" %}</th>
+                    <th>{% translate "Status" %}</th>
+                    <th>{% translate "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><input type="checkbox" class="user-checkbox" value="{{ u.id }}"></td>
+                    <td>{{ u.get_full_name|default:u.username }}</td>
+                    <td>{{ u.phone|default:"—" }}</td>
+                    <td>{{ u.city|default:"—" }}</td>
+                    <td><span class="badge {% if u.application_status == 'active' %}bg-success{% elif u.application_status == 'declined' %}bg-danger{% else %}bg-warning{% endif %}">{{ u.get_application_status_display }}</span></td>
+                    <td>
+                        <a href="{% url 'application-review' u.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> {% translate "Review" %}
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if current_status == "pending" %}
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-success" id="bulk-activate" data-decision="activate">
+            <i class="fas fa-check me-1"></i>{% translate "Activate Selected" %}
+        </button>
+        <button class="btn btn-danger" id="bulk-decline" data-decision="decline">
+            <i class="fas fa-times me-1"></i>{% translate "Decline Selected" %}
+        </button>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="alert alert-info">{% translate "No applications found." %}</div>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('select-all')?.addEventListener('change', function() {
+    document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = this.checked);
+});
+
+document.querySelectorAll('#bulk-activate, #bulk-decline').forEach(btn => {
+    btn?.addEventListener('click', function() {
+        const selected = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => parseInt(cb.value));
+        if (selected.length === 0) return;
+        if (!confirm('{% translate "Are you sure?" %}')) return;
+        fetch('{% url "bulk-application-decision" %}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({decision: this.dataset.decision, user_ids: selected})
+        }).then(r => r.json()).then(data => {
+            if (data.success) location.reload();
+        });
+    });
+});
+</script>

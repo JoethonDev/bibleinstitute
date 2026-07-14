@@ -94,4 +94,11 @@ urlpatterns = [
     # Design Theme Showcase (pre-refactor visual review)
     path('showcase/', theme_catalog, name="theme-catalog"),
     path('showcase/<str:theme_id>/<str:page_id>/', theme_showcase, name="theme-showcase-page"),
+
+    # Phase 3 — Student Applications
+    path('signup/', signup, name="signup"),
+    path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
+    path('dashboard/applications/<int:user_id>/', application_review, name="application-review"),
+    path('dashboard/applications/<int:user_id>/<str:decision>/', application_decision, name="application-decision"),
+    path('api/bulk-application-decision/', bulk_application_decision, name="bulk-application-decision"),
 ]

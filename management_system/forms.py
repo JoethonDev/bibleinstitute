@@ -1,6 +1,8 @@
 from django.contrib.auth.forms import AuthenticationForm, UsernameField
 from django import forms
+from django.core.exceptions import ValidationError
 from .models import User, Role, Course, Lesson, assign_academic_date
+from .utils.validators import normalize_phone, validate_identity_by_type
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 
 
@@ -141,3 +143,82 @@ class CourseForm(forms.ModelForm):
 
 class CSVUploadForm(forms.Form):
     csv_file = forms.FileField(label=_("CSV File"), help_text=_("Upload a .csv file with user data."))
+
+
+class SignupForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}))
+    agree_terms = forms.BooleanField(required=True, label=_("I agree to the Terms and Conditions"))
+
+    class Meta:
+        model = User
+        fields = ["username", "password", "first_name", "last_name", "email", "phone", "priest_name", "priest_phone", "church", "city", "identity_type", "identity_number"]
+        widgets = {
+            'username': forms.TextInput(attrs={'placeholder': _('Username'), 'id': 'username'}),
+            'first_name': forms.TextInput(attrs={'placeholder': _('First Name'), 'id': 'first_name'}),
+            'last_name': forms.TextInput(attrs={'placeholder': _('Last Name'), 'id': 'last_name'}),
+            'email': forms.EmailInput(attrs={'placeholder': _('Email'), 'id': 'email'}),
+            'phone': forms.TextInput(attrs={'placeholder': _('Phone'), 'id': 'phone'}),
+            'priest_name': forms.TextInput(attrs={'placeholder': _('Priest Name'), 'id': 'priest_name'}),
+            'priest_phone': forms.TextInput(attrs={'placeholder': _('Priest Phone'), 'id': 'priest_phone'}),
+            'church': forms.TextInput(attrs={'placeholder': _('Church'), 'id': 'church'}),
+            'city': forms.TextInput(attrs={'placeholder': _('City'), 'id': 'city'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].required = False
+        self.fields['phone'].required = False
+        self.fields['priest_name'].required = False
+        self.fields['priest_phone'].required = False
+        self.fields['church'].required = False
+        self.fields['city'].required = False
+        self.fields['identity_type'].required = False
+        self.fields['identity_number'].required = False
+        self.fields['last_name'].required = False
+        self.fields['first_name'].label = _("First Name")
+        self.fields['last_name'].label = _("Last Name")
+        self.fields['email'].label = _("Email")
+        self.fields['phone'].label = _("Phone")
+        self.fields['priest_name'].label = _("Priest Name")
+        self.fields['priest_phone'].label = _("Priest Phone")
+        self.fields['church'].label = _("Church")
+        self.fields['city'].label = _("City")
+        self.fields['identity_type'].label = _("Identity Type")
+        self.fields['identity_number'].label = _("Identity Number")
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        if not phone:
+            return phone
+        phone = normalize_phone(phone)
+        qs = User.objects.filter(phone=phone)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(_("This phone number is already in use."))
+        return phone
+
+    def clean_identity_number(self):
+        identity_number = self.cleaned_data.get("identity_number")
+        identity_type = self.cleaned_data.get("identity_type")
+        if identity_type and identity_number:
+            try:
+                validate_identity_by_type(identity_type, identity_number)
+            except ValidationError as e:
+                raise forms.ValidationError(e.message if hasattr(e, 'message') else str(e))
+        return identity_number
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get("agree_terms"):
+            raise forms.ValidationError(_("You must agree to the Terms and Conditions."))
+        return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password"])
+        user.application_status = "pending"
+        user.is_active = False
+        if commit:
+            user.save()
+        return user

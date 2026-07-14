@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
 from django.db.models import F, Q, Sum
 from django.db import transaction
+from django.contrib import messages
 from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -28,7 +29,7 @@ import requests
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows
@@ -37,7 +38,9 @@ from .utils.r2_manager import R2Manager
 from .utils.file_validator import validate_upload_filename, FileValidator
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_can_access_course, user_has_management_role
-from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports
+from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications
+from .utils.email import send_application_received, send_application_activated, send_application_declined
+from .utils.application_uploads import upload_application_file
 from .theme_catalog import THEMES, get_theme, SHOWCASE_PAGES
 
 # Constants
@@ -2191,3 +2194,136 @@ def _staff_guard(request):
             "Sign in with a staff account (is_staff=True) to view it."
         )
     return None
+
+
+# ============================================================================
+# PHASE 3 — Student Applications
+# ============================================================================
+
+def signup(request):
+    if request.method == "POST":
+        form = SignupForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_keys = []
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    if user.city:
+                        is_offline = OfflineCity.objects.filter(name__iexact=user.city, is_active=True).exists()
+                        user.study_mode = "offline" if is_offline else "online"
+                    for file_type in ["identity_front", "identity_back", "payment", "profile"]:
+                        if file_type in request.FILES:
+                            key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, request.FILES[file_type], file_type)
+                            if key:
+                                setattr(user, f"{file_type}_key", key)
+                                uploaded_keys.append(key)
+                    if uploaded_keys:
+                        user.save(update_fields=[f"{t}_key" for t in ["identity_front", "identity_back", "payment", "profile"] if getattr(user, f"{t}_key", None)] + ["study_mode"])
+                    elif user.study_mode:
+                        user.save(update_fields=["study_mode"])
+                    send_application_received(user)
+            except Exception:
+                for key in uploaded_keys:
+                    try:
+                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+                    except Exception:
+                        pass
+                raise
+            return render(request, "signup_success.html")
+    else:
+        form = SignupForm()
+    return render(request, "signup.html", {"form": form})
+
+
+@capability_required(can_manage_applications)
+def applications_dashboard(request):
+    status_filter = request.GET.get("status", "pending")
+    users = User.objects.filter(application_status=status_filter).select_related("role")
+    return render(request, "applications_dashboard.html", {
+        "users": users,
+        "current_status": status_filter,
+    })
+
+
+@capability_required(can_manage_applications)
+def application_review(request, user_id):
+    user = get_object_or_404(User, pk=user_id)
+    return render(request, "application_review.html", {"app_user": user})
+
+
+@capability_required(can_manage_applications)
+def application_decision(request, user_id, decision):
+    if decision not in ("activate", "decline"):
+        return HttpResponse(_("Invalid decision"), status=400)
+    level = request.POST.get("level", 1)
+    try:
+        level = int(level)
+    except (TypeError, ValueError):
+        level = 1
+    user = get_object_or_404(User, pk=user_id)
+    with transaction.atomic():
+        if decision == "activate":
+            user.application_status = "active"
+            user.is_active = True
+            student_role = Role.objects.get(role="student")
+            user.role = student_role
+            user.decided_by = request.user
+            user.decided_at = now()
+            user.save()
+            current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
+            if current_year:
+                Enrollment.objects.get_or_create(
+                    student=user,
+                    academic_year=current_year,
+                    defaults={"enrolled_by": request.user}
+                )
+            send_application_activated(user)
+            messages.success(request, _("%(name)s activated.") % {"name": user.get_full_name() or user.username})
+        else:
+            user.application_status = "declined"
+            user.is_active = False
+            user.decided_by = request.user
+            user.decided_at = now()
+            user.save()
+            send_application_declined(user)
+            messages.success(request, _("%(name)s declined.") % {"name": user.get_full_name() or user.username})
+    return redirect("applications-dashboard")
+
+
+@capability_required(can_manage_applications)
+def bulk_application_decision(request):
+    if request.method != "POST":
+        return JsonResponse({"error": _("Method not allowed")}, status=405)
+    data = json.loads(request.body)
+    decision = data.get("decision")
+    user_ids = data.get("user_ids", [])
+    level = int(data.get("level", 1))
+    if decision not in ("activate", "decline"):
+        return JsonResponse({"error": _("Invalid decision")}, status=400)
+    results = {"success": [], "errors": []}
+    for uid in user_ids:
+        try:
+            user = User.objects.get(pk=uid)
+            with transaction.atomic():
+                if decision == "activate":
+                    user.application_status = "active"
+                    user.is_active = True
+                    user.role = Role.objects.get(role="student")
+                    user.decided_by = request.user
+                    user.decided_at = now()
+                    user.save()
+                    current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
+                    if current_year:
+                        Enrollment.objects.get_or_create(student=user, academic_year=current_year, defaults={"enrolled_by": request.user})
+                    send_application_activated(user)
+                else:
+                    user.application_status = "declined"
+                    user.is_active = False
+                    user.decided_by = request.user
+                    user.decided_at = now()
+                    user.save()
+                    send_application_declined(user)
+                results["success"].append(uid)
+        except Exception as e:
+            results["errors"].append({"id": uid, "error": str(e)})
+    return JsonResponse(results)

@@ -39,6 +39,12 @@ class EnrollmentAdmin(admin.ModelAdmin):
     raw_id_fields = ["student", "enrolled_by"]
 
 
+@admin.register(OfflineCity)
+class OfflineCityAdmin(admin.ModelAdmin):
+    list_display = ["name", "is_active"]
+    search_fields = ["name"]
+
+
 @admin.register(MigrationReviewItem)
 class MigrationReviewItemAdmin(admin.ModelAdmin):
     list_display = ["item_type", "severity", "object_id", "resolved", "created_at"]

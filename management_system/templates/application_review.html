@@ -1,0 +1,89 @@
+{% load i18n %}
+{% load static %}
+<div class="container-fluid py-3" id="content">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'applications-dashboard' %}">{% translate "Applications" %}</a></li>
+            <li class="breadcrumb-item active">{{ app_user.get_full_name|default:app_user.username }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>{% translate "Application Review" %}</h4>
+        <span class="badge fs-6 {% if app_user.application_status == 'active' %}bg-success{% elif app_user.application_status == 'declined' %}bg-danger{% else %}bg-warning{% endif %}">
+            {{ app_user.get_application_status_display }}
+        </span>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><strong>{% translate "Personal Information" %}</strong></div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr><th>{% translate "Username" %}</th><td>{{ app_user.username }}</td></tr>
+                        <tr><th>{% translate "Full Name" %}</th><td>{{ app_user.get_full_name|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Email" %}</th><td>{{ app_user.email|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Phone" %}</th><td>{{ app_user.phone|default:"—" }}</td></tr>
+                        <tr><th>{% translate "City" %}</th><td>{{ app_user.city|default:"—" }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><strong>{% translate "Church Information" %}</strong></div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr><th>{% translate "Priest Name" %}</th><td>{{ app_user.priest_name|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Priest Phone" %}</th><td>{{ app_user.priest_phone|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Church" %}</th><td>{{ app_user.church|default:"—" }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><strong>{% translate "Identity" %}</strong></div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr><th>{% translate "Identity Type" %}</th><td>{{ app_user.get_identity_type_display|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Identity Number" %}</th><td>{{ app_user.identity_number|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Identity Front" %}</th><td>{% if app_user.identity_front_key %}<code>{{ app_user.identity_front_key }}</code>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "Identity Back" %}</th><td>{% if app_user.identity_back_key %}<code>{{ app_user.identity_back_key }}</code>{% else %}—{% endif %}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><strong>{% translate "Documents" %}</strong></div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr><th>{% translate "Payment" %}</th><td>{% if app_user.payment_key %}<code>{{ app_user.payment_key }}</code>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "Profile Image" %}</th><td>{% if app_user.profile_image_key %}<code>{{ app_user.profile_image_key }}</code>{% else %}—{% endif %}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if app_user.application_status == "pending" %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'application-decision' app_user.id 'activate' %}" class="btn btn-success">
+            <i class="fas fa-check me-1"></i>{% translate "Activate" %}
+        </a>
+        <a href="{% url 'application-decision' app_user.id 'decline' %}" class="btn btn-danger">
+            <i class="fas fa-times me-1"></i>{% translate "Decline" %}
+        </a>
+    </div>
+    {% elif app_user.decided_by %}
+    <div class="alert alert-secondary mt-3">
+        <small>{% translate "Decided by" %}: {{ app_user.decided_by.get_full_name|default:app_user.decided_by.username }} — {{ app_user.decided_at|date:"Y-m-d H:i" }}</small>
+    </div>
+    {% endif %}
+</div>
