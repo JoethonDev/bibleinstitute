@@ -420,10 +420,10 @@ def view_courses(request):
 
 @login_required(login_url=LOGIN_URL)
 def view_course_details(request, course_id):
-    # Get Course
+    user = User.objects.get(username=request.user)
+
     try:
         course = get_object_or_404(Course, pk=course_id)
-        user = User.objects.get(username=request.user)
 
         logger.info(f"User : {user} is accessing {course.name} course")
 
@@ -498,8 +498,7 @@ def stream_lesson(request, lesson_id, file_index):
         lesson_links = json.loads(lesson.links)
         if file_index < 0 or file_index >= len(lesson_links):
             raise Http404
-        # Refacor TODO
-        file_data = [file_link for file_link in lesson_links][file_index]
+        file_data = lesson_links[file_index]
 
         file_name = file_data.get("name")
         file_key = file_data.get("id")
@@ -646,7 +645,7 @@ def take_exam(request, course_id, quiz_id):
                 repeated_submissions = set()
                 total_grade = 0
                 for data in questions_data.values():
-                    question_id = data['id']
+                    question_id = int(data['id'])
                     submitted_answer = data.get("answer", "")
                     if question_id in repeated_submissions:
                         continue
@@ -677,7 +676,7 @@ def take_exam(request, course_id, quiz_id):
 
                 except Exception as e:
                     error(request, _("Sending quiz has failed, Please Try again!"), extra_tags="alert-danger") # Translate
-                    logger.error(f"{user}'s submission is added successfully to {quiz}")
+                    logger.error(f"{user}'s submission failed for {quiz.name}")
                     logger.error(f"Stack Traceback: {e}")
             
             return redirect(reverse("quiz-details", args=[course_id, quiz_id]))

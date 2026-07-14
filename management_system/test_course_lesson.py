@@ -100,7 +100,7 @@ class CourseTest(TestCase):
         """
             Test checks available lessons for course in level 1
         """
-        course_1 = reverse("course-details", args=[1])
+        course_1 = reverse("course-details", args=[self.course_level_1.pk])
         all_lessons = set(self.course_level_1.lessons.all())
 
         # Admin&Teacher Check
@@ -143,7 +143,7 @@ class CourseTest(TestCase):
         """
             Test checks available lessons for course in level 1
         """
-        course_2 = reverse("course-details", args=[2])
+        course_2 = reverse("course-details", args=[self.course_level_2.pk])
         all_lessons = set(self.course_level_2.lessons.all())
 
         # Admin&Teacher Check
@@ -177,3 +177,11 @@ class CourseTest(TestCase):
         # Junior
         junior_res = self.junior.get(course_2)
         self.assertEqual(junior_res.status_code, 401)
+
+    def test_view_course_details_missing_course_returns_404_not_500(self):
+        missing_pk = self.course_level_2.pk + 1000
+        url = reverse("course-details", args=[missing_pk])
+
+        response = self.junior.get(url)
+
+        self.assertEqual(response.status_code, 404)

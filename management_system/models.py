@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.urls import reverse_lazy
 from django.db.models import Sum, Prefetch, Q, prefetch_related_objects
 from django.utils.timezone import now
@@ -16,6 +17,16 @@ def assign_academic_date():
     if today.month < 8 :
         today = today.replace(year=today.year-1)
     return today.replace(month=8)
+
+
+def default_meeting_weekdays():
+    return [6, 1]  # Sunday and Tuesday using datetime.date.weekday().
+
+
+class PublicationStatus(models.TextChoices):
+    DRAFT = "draft", _("Draft")
+    PUBLISHED = "published", _("Published")
+    ARCHIVED = "archived", _("Archived")
 
 
 # Create your models here.
@@ -157,16 +168,210 @@ class Course(models.Model):
         # (exam / view / closed_unsolved) is determined per student in that view.
         return self.quizzes.all()
 
+
+class AcademicYear(models.Model):
+    name = models.CharField(max_length=20)
+    level = models.PositiveIntegerField()
+    starts_on = models.DateField()
+    ends_on = models.DateField()
+    is_current = models.BooleanField(default=False)
+    meeting_weekdays = models.JSONField(default=default_meeting_weekdays)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-starts_on", "level"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["level", "name"],
+                name="academic_year_unique_level_name",
+            ),
+            models.UniqueConstraint(
+                fields=["level"],
+                condition=models.Q(is_current=True),
+                name="academic_year_one_current_per_level",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ends_on__gt=models.F("starts_on")),
+                name="academic_year_ends_after_starts",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Level {self.level} - {self.name}"
+
+    def clean(self):
+        super().clean()
+        if self.starts_on and self.ends_on and self.ends_on <= self.starts_on:
+            raise ValidationError({"ends_on": _("End date must be after start date.")})
+
+        if self.is_current and self.level:
+            current_years = AcademicYear.objects.filter(level=self.level, is_current=True)
+            if self.pk:
+                current_years = current_years.exclude(pk=self.pk)
+            if current_years.exists():
+                raise ValidationError({"is_current": _("Only one academic year can be current per level.")})
+
+
+class CourseOffering(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.PROTECT, related_name="offerings")
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="course_offerings")
+    instructor = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=PublicationStatus.choices,
+        default=PublicationStatus.DRAFT,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-academic_year__starts_on", "course__name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "academic_year"],
+                name="course_offering_unique_course_year",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.course.name} @ {self.academic_year}"
+
+    def clean(self):
+        super().clean()
+        if self.course_id and self.academic_year_id and self.course.level != self.academic_year.level:
+            raise ValidationError(_("Course level must match the academic year level."))
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class Enrollment(models.Model):
+    class Type(models.TextChoices):
+        NORMAL = "normal", _("Normal")
+        REPEAT = "repeat", _("Repeat")
+        REMEDIAL = "remedial", _("Remedial")
+        MANUAL = "manual", _("Manual")
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", _("Active")
+        INACTIVE = "inactive", _("Inactive")
+        COMPLETED = "completed", _("Completed")
+        WITHDRAWN = "withdrawn", _("Withdrawn")
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="enrollments")
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="enrollments")
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="enrollments",
+    )
+    enrollment_type = models.CharField(max_length=20, choices=Type.choices, default=Type.NORMAL)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    enrolled_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_enrollments",
+    )
+
+    class Meta:
+        ordering = ["-enrolled_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(enrollment_type="normal", course_offering__isnull=True)
+                    | models.Q(
+                        enrollment_type__in=["repeat", "remedial", "manual"],
+                        course_offering__isnull=False,
+                    )
+                ),
+                name="enrollment_target_matches_type",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "academic_year"],
+                condition=models.Q(course_offering__isnull=True),
+                name="enrollment_unique_full_year",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "course_offering"],
+                condition=models.Q(course_offering__isnull=False),
+                name="enrollment_unique_course_offering",
+            ),
+        ]
+
+    def __str__(self):
+        target = self.course_offering or self.academic_year
+        return f"{self.student.username} -> {target} ({self.enrollment_type})"
+
+    def clean(self):
+        super().clean()
+        if self.course_offering_id:
+            if self.course_offering.academic_year_id != self.academic_year_id:
+                raise ValidationError({"course_offering": _("Course offering must belong to the selected academic year.")})
+            if self.enrollment_type == self.Type.NORMAL:
+                raise ValidationError({"enrollment_type": _("Normal enrollment grants the full academic year.")})
+        elif self.enrollment_type != self.Type.NORMAL:
+            raise ValidationError({"course_offering": _("This enrollment type requires a course offering.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class MigrationReviewItem(models.Model):
+    class Severity(models.TextChoices):
+        INFO = "info", _("Info")
+        WARNING = "warning", _("Warning")
+        ERROR = "error", _("Error")
+
+    item_type = models.CharField(max_length=50)
+    object_id = models.PositiveBigIntegerField(null=True, blank=True)
+    message = models.TextField()
+    severity = models.CharField(max_length=20, choices=Severity.choices, default=Severity.INFO)
+    resolved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.severity}] {self.item_type}"
+
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")
     links = models.TextField() # Null must be false
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lessons",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=PublicationStatus.choices,
+        default=PublicationStatus.DRAFT,
+    )
     created_date = models.DateField(null=False, default=date.today)
     updated_date = models.DateField(null=False, auto_now=True)
 
 
     def __str__(self):
         return f"{self.name} for course : {self.course.name}"
+
+    def clean(self):
+        super().clean()
+        if self.course_offering_id and self.course_offering.course_id != self.course_id:
+            raise ValidationError({"course_offering": _("Course offering must belong to the lesson course.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def serialize_pagination(self):
         return {
@@ -213,6 +418,18 @@ class Lesson(models.Model):
 class Quiz(models.Model):
     name = models.CharField(max_length=64)
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, related_name="quizzes", null=True)
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="quizzes",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=PublicationStatus.choices,
+        default=PublicationStatus.DRAFT,
+    )
     total_grade = models.PositiveSmallIntegerField(default=50)
     opening_date = models.DateTimeField(default=now)
     closing_date = models.DateTimeField(default=now)
@@ -220,6 +437,15 @@ class Quiz(models.Model):
 
     def __str__(self):
         return f"Quiz {self.name}"
+
+    def clean(self):
+        super().clean()
+        if self.course_offering_id and self.course_offering.course_id != self.course_id:
+            raise ValidationError({"course_offering": _("Course offering must belong to the quiz course.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def serialize(self):
         return {
