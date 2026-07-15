@@ -159,6 +159,10 @@ class CSVUploadForm(forms.Form):
 class SignupForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}))
     agree_terms = forms.BooleanField(required=True, label=_("I agree to the Terms and Conditions"))
+    identity_front = forms.FileField(required=False, label=_("National ID / Passport (Front)"))
+    identity_back = forms.FileField(required=False, label=_("National ID / Passport (Back)"))
+    payment = forms.FileField(required=False, label=_("Payment Receipt"))
+    profile = forms.FileField(required=False, label=_("Profile Photo"))
 
     class Meta:
         model = User
@@ -178,24 +182,24 @@ class SignupForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['email'].required = False
-        self.fields['phone'].required = False
-        self.fields['priest_name'].required = False
-        self.fields['priest_phone'].required = False
-        self.fields['church'].required = False
-        self.fields['city'].required = False
-        self.fields['identity_type'].required = False
-        self.fields['identity_number'].required = False
         self.fields['last_name'].required = False
-        self.fields['first_name'].label = _("First Name")
+        self.fields['first_name'].label = _("Name")
         self.fields['last_name'].label = _("Last Name")
         self.fields['email'].label = _("Email")
         self.fields['phone'].label = _("Phone")
+        self.fields['phone'].required = True
         self.fields['priest_name'].label = _("Priest Name")
+        self.fields['priest_name'].required = True
         self.fields['priest_phone'].label = _("Priest Phone")
+        self.fields['priest_phone'].required = True
         self.fields['church'].label = _("Church")
+        self.fields['church'].required = True
         self.fields['city'].label = _("City")
+        self.fields['city'].required = True
         self.fields['identity_type'].label = _("Identity Type")
+        self.fields['identity_type'].required = True
         self.fields['identity_number'].label = _("Identity Number")
+        self.fields['identity_number'].required = True
 
     def clean_phone(self):
         phone = self.cleaned_data.get("phone")

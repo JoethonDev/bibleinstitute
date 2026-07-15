@@ -40,6 +40,13 @@ class SignupFormTests(TestCase):
             "password": "testpass123",
             "first_name": "Test",
             "last_name": "Student",
+            "phone": "+201234567890",
+            "priest_name": "Fr. John",
+            "priest_phone": "+201234567891",
+            "church": "St. Mary Church",
+            "city": "Cairo",
+            "identity_type": "national_id",
+            "identity_number": "12345678901234",
             "agree_terms": True,
         }
 
@@ -71,14 +78,19 @@ class SignupViewTests(TestCase):
         resp = c.get(reverse("signup"))
         self.assertEqual(resp.status_code, 200)
 
+    def _full_signup_data(self, username="newstudent", **kw):
+        data = {
+            "username": username, "password": "testpass123", "first_name": "Test",
+            "phone": "+201234567890", "priest_name": "Fr. John", "priest_phone": "+201234567891",
+            "church": "St. Mary", "city": "Cairo", "identity_type": "national_id",
+            "identity_number": "12345678901234", "agree_terms": True,
+        }
+        data.update(kw)
+        return data
+
     def test_post_valid_signup(self):
         c = Client()
-        resp = c.post(reverse("signup"), {
-            "username": "newstudent",
-            "password": "testpass123",
-            "first_name": "Test",
-            "agree_terms": True,
-        })
+        resp = c.post(reverse("signup"), self._full_signup_data())
         self.assertIn(resp.status_code, (200, 302))
         user = User.objects.get(username="newstudent")
         self.assertEqual(user.application_status, "pending")
@@ -87,12 +99,7 @@ class SignupViewTests(TestCase):
     def test_duplicate_username_rejected(self):
         User.objects.create_user(username="existing", password="1")
         c = Client()
-        resp = c.post(reverse("signup"), {
-            "username": "existing",
-            "password": "testpass123",
-            "first_name": "Test",
-            "agree_terms": True,
-        })
+        resp = c.post(reverse("signup"), self._full_signup_data(username="existing"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "already exists", status_code=200)
 

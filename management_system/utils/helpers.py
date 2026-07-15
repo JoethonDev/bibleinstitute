@@ -48,23 +48,6 @@ def parse_json_value(value, default=None):
 
 
 def is_quiz_in_user_window(quiz, user) -> bool:
-    """
-    Determine whether a quiz's opening date falls within a student's academic window.
-
-    A student's academic window spans from their joined_date up to
-    joined_date + Course.MAXIMUM_LEVEL years. This lets us distinguish between:
-      - A quiz originally opened for this student's level (in-window)
-      - A quiz re-opened for a newer level (out-of-window)
-
-    Management roles always return True (no restriction).
-
-    Args:
-        quiz: Quiz model instance
-        user: User model instance
-
-    Returns:
-        bool – True if the quiz is within the user's academic window
-    """
     if user.role and user.role.role in MANAGEMENT_ROLES:
         return True
 
@@ -75,15 +58,7 @@ def is_quiz_in_user_window(quiz, user) -> bool:
     ).exists():
         return True
 
-    joined: date = user.joined_date
-    try:
-        window_end = joined.replace(year=joined.year + Course.MAXIMUM_LEVEL)
-    except ValueError:
-        # Handle Feb 29 edge case
-        window_end = joined.replace(year=joined.year + Course.MAXIMUM_LEVEL, day=28)
-
-    quiz_open_date = quiz.opening_date.date() if hasattr(quiz.opening_date, "date") else quiz.opening_date
-    return joined <= quiz_open_date <= window_end
+    return False
 
 
 def user_has_management_role(user) -> bool:
@@ -103,8 +78,7 @@ def user_can_access_course(user, course) -> bool:
     )
 
     if not active_enrollments.exists():
-        # ponytail: legacy fallback for pre-backfill users; remove in LMS-REV-002
-        return course.can_access(user.role.role)
+        return False
 
     # Normal enrollment grants access to all courses in the AcademicYear.
     if active_enrollments.filter(

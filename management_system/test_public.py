@@ -52,8 +52,8 @@ class PublicViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/xml")
         self.assertIn("/about/", resp.content.decode())
-        self.assertIn("/courses/", resp.content.decode())
         self.assertIn("/signup/", resp.content.decode())
+        self.assertNotIn("/courses/", resp.content.decode())
 
     def test_nav_links_for_anonymous(self):
         resp = self.client.get(reverse("home"))

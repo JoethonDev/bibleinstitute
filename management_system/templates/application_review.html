@@ -64,8 +64,10 @@
                 <div class="card-header"><strong>{% translate "Documents" %}</strong></div>
                 <div class="card-body">
                     <table class="table table-sm">
-                        <tr><th>{% translate "Payment" %}</th><td>{% if app_user.payment_key %}<code>{{ app_user.payment_key }}</code>{% else %}—{% endif %}</td></tr>
-                        <tr><th>{% translate "Profile Image" %}</th><td>{% if app_user.profile_image_key %}<code>{{ app_user.profile_image_key }}</code>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "ID Front" %}</th><td>{% if doc_urls.identity_front %}<a href="{{ doc_urls.identity_front }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "ID Back" %}</th><td>{% if doc_urls.identity_back %}<a href="{{ doc_urls.identity_back }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "Payment" %}</th><td>{% if doc_urls.payment %}<a href="{{ doc_urls.payment }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "Profile" %}</th><td>{% if doc_urls.profile %}<a href="{{ doc_urls.profile }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                     </table>
                 </div>
             </div>

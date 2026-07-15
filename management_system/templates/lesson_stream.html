@@ -296,18 +296,8 @@
             document.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
             document.querySelectorAll('video, audio').forEach(el => {
                 el.setAttribute('controlsList', 'nodownload');
-                el.addEventListener('contextmenu', e => e.preventDefault());
             });
         }, 500);
-
-        // Security measures
-        document.addEventListener("keydown", e => {
-            if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
-                e.preventDefault();
-            }
-        });
-        document.addEventListener("selectstart", e => e.preventDefault());
-        document.addEventListener('contextmenu', e => e.preventDefault());
     })();
     </script>
 </div>

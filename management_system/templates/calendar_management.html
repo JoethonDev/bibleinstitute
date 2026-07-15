@@ -1,13 +1,11 @@
+{% extends 'base.html' %}
 {% load i18n %}
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+
+{% block head_meta %}
 <title>{% translate "Calendar Management" %}</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+{% endblock %}
+
+{% block body %}
 <div class="container py-4">
   <h1 class="mb-4">{% translate "Calendar Management" %}</h1>
   {% if messages %}
@@ -56,7 +54,10 @@
                     <td>{{ h.date }}</td>
                     <td>{{ h.name }}</td>
                     <td>
-                      <a href="{% url 'delete-holiday' h.id %}" class="btn btn-sm btn-danger" onclick="return confirm('{% translate "Delete this holiday?" %}')">{% translate "Delete" %}</a>
+                      <form method="post" action="{% url 'delete-holiday' h.id %}" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{% translate "Delete this holiday?" %}')">{% translate "Delete" %}</button>
+                      </form>
                     </td>
                   </tr>
                 {% endfor %}
@@ -70,5 +71,4 @@
     </div>
   {% endfor %}
 </div>
-</body>
-</html>
+{% endblock %}

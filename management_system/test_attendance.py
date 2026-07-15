@@ -180,12 +180,13 @@ class AttendanceRecordViewTests(TestCase):
         resp = c.get(reverse("scan-preview", args=["offline_token_test"]))
         self.assertEqual(resp.status_code, 401)
 
-    def test_online_student_cannot_record_attendance(self):
+    def test_online_student_attendance_is_noop(self):
         c = Client()
         c.login(username="admin", password="1")
         resp = c.post(reverse("record-attendance", args=["online_token_test", "entrance"]))
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("online", resp.json()["error"].lower())
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], "noop")
+        self.assertFalse(AttendanceRecord.objects.filter(student=self.online_student).exists())
 
     def test_admin_correct_attendance(self):
         record = AttendanceRecord.objects.create(

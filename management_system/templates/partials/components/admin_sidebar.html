@@ -26,16 +26,6 @@
     
     <!-- Sidebar Footer -->
     <div class="sidebar-footer">
-        <!-- Theme Toggle -->
-        <button @click="$store.theme.toggle()" 
-                class="btn btn-theme-toggle"
-                :title="$store.theme.mode === 'dark' ? '{% translate "Switch to Light Mode" %}' : '{% translate "Switch to Dark Mode" %}'">
-            <i :class="$store.theme.mode === 'dark' ? 'fas fa-sun' : 'fas fa-moon'"></i>
-            <span x-show="!$store.ui.sidebarCollapsed" 
-                  x-transition.opacity.duration.200ms
-                  x-text="$store.theme.mode === 'dark' ? '{% translate "Light Mode" %}' : '{% translate "Dark Mode" %}'">
-            </span>
-        </button>
     </div>
 </aside>
 
@@ -60,14 +50,6 @@
         </nav>
         
         <hr class="my-3">
-        
-        <!-- Mobile Theme Toggle -->
-        <button @click="$store.theme.toggle()" 
-                class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-2"
-                x-data>
-            <i :class="$store.theme.mode === 'dark' ? 'fas fa-sun' : 'fas fa-moon'"></i>
-            <span x-text="$store.theme.mode === 'dark' ? '{% translate "Light Mode" %}' : '{% translate "Dark Mode" %}'"></span>
-        </button>
         
         <!-- User Info -->
         <div class="mt-3 p-3 bg-light rounded">

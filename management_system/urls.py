@@ -135,6 +135,9 @@ urlpatterns = [
     path('dashboard/reports/export-csv/', export_report_csv, name="export-report-csv"),
     path('dashboard/reports/export-xlsx/', export_report_xlsx, name="export-report-xlsx"),
 
+    # Logout
+    path('logout/', views.LogoutView.as_view(next_page='home'), name='logout'),
+
     # P8-T04 — SEO
     path('robots.txt', robots_txt, name="robots-txt"),
     path('sitemap.xml', sitemap_xml, name="sitemap-xml"),

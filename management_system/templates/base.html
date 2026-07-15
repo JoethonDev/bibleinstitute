@@ -2,7 +2,7 @@
 {% load i18n %}
 
 <!DOCTYPE html>
-<html lang="{{ request.LANGUAGE_CODE }}" {% if request.LANGUAGE_CODE == 'ar' %}dir="rtl"{% endif %} x-data :data-bs-theme="$store.theme.mode">
+<html lang="{{ request.LANGUAGE_CODE }}" {% if request.LANGUAGE_CODE == 'ar' %}dir="rtl"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,11 +11,11 @@
     <title>{% translate "Bible Institute Coptic" %}</title>
     <meta name="description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
     <meta name="keywords" content="{% translate 'Bible institute, Coptic, theological education, online learning, Egypt' %}">
-    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    <link rel="canonical" href="{% if request.get_full_path %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% else %}{{ request.build_absolute_uri }}{% endif %}">
     <link rel="alternate" hreflang="x-default" href="https://bibleinstitute-eg.org">
     <link rel="alternate" hreflang="en" href="https://bibleinstitute-eg.org/en{{ request.get_full_path|slice:'3:' }}">
     <link rel="alternate" hreflang="ar" href="https://bibleinstitute-eg.org/ar{{ request.get_full_path|slice:'3:' }}">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{% if user.is_authenticated %}noindex, nofollow{% else %}index, follow{% endif %}">
     <meta property="og:title" content="{% translate 'Bible Institute Coptic' %}">
     <meta property="og:description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
     <meta property="og:type" content="website">
@@ -59,14 +59,6 @@
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        [data-bs-theme="light"] {
-            --navbar-bg: rgba(255, 255, 255, 0.95);
-            --body-bg: #f4f7f9;
-        }
-        [data-bs-theme="dark"] {
-            --navbar-bg: rgba(33, 37, 41, 0.95);
-            --body-bg: #121212;
         }
         body {
             background-color: var(--body-bg);
@@ -182,22 +174,28 @@
               {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
+              {% if request.user.role.role == "student" %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'download-qr' %}">{% translate "My QR" %}</a></li>
+              {% endif %}
+              {% if request.user.role.role == "moderator" %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
+              {% endif %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">{% translate "Logout" %}</a></li>
               {% else %}
               <li class="nav-item"><a class="nav-link" href="{% url 'user_login' %}">{% translate "Login" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'signup' %}">{% translate "Sign Up" %}</a></li>
               {% endif %}
               {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
-                <li class="nav-item">
-                  <a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Admin Dashboard" %}</a>
-                </li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Dashboard" %}</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'calendar-management' %}">{% translate "Calendar" %}</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'attendance-management' %}">{% translate "Attendance" %}</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'progress-dashboard' %}">{% translate "Progress" %}</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'report-dashboard' %}">{% translate "Reports" %}</a></li>
               {% endif %}
             </ul>
             
-            <!-- Dark Mode Toggle -->
-            <button class="btn btn-link nav-link me-2 text-reset d-flex align-items-center" aria-label="Toggle Dark Mode" @click="$store.theme.toggle()" x-data>
-                <i class="fas" :class="$store.theme.mode === 'dark' ? 'fa-sun text-warning' : 'fa-moon'"></i>
-            </button>
-
             <!-- Language Selector Form -->
             <form action="{% url 'set_language' %}" method="post" id="language-form" class="d-flex">
                 {% csrf_token %}
@@ -278,20 +276,6 @@
     <!-- Alpine.js Initialization -->
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.store('theme', {
-                mode: localStorage.getItem('theme') || 'light',
-                toggle() {
-                    this.mode = this.mode === 'light' ? 'dark' : 'light';
-                    localStorage.setItem('theme', this.mode);
-                    document.documentElement.setAttribute('data-bs-theme', this.mode);
-                },
-                init() {
-                    document.documentElement.setAttribute('data-bs-theme', this.mode);
-                }
-            });
-
-            Alpine.store('theme').init();
-
             Alpine.store('notifications', {
                 items: [],
                 add(message, type = 'success') {
@@ -305,12 +289,6 @@
             });
 
         });
-        
-        // Prevent flash of incorrect theme before Alpine loads
-        (function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-bs-theme', savedTheme);
-        })();
     </script>
 </body>
 </html>

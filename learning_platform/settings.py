@@ -12,7 +12,10 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -51,7 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'management_system.middleware.CrossOriginOpenerPolicyMiddleware',
+    # ponytail: removed global COEP — breaks CDN resources; scoped to upload view via ffmpeg_headers
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware', # Add this for localization
     'django.middleware.common.CommonMiddleware',
@@ -198,7 +201,17 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 # Seconds Minutes Hours Days
 # Make tempalte always use absolute urls
 FORCE_SCRIPT_NAME = '/'
 
-DEFAULT_FROM_EMAIL = "noreply@bibleinstitute.edu"
+# Email — set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD for Gmail SMTP
+EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('DJANGO_EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('DJANGO_EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('DJANGO_EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.getenv('DJANGO_EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('DJANGO_EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'noreply@bibleinstitute.edu')
+LOGIN_URL_REVERSE = 'user_login'
+
+ADMIN_EMAIL = os.getenv('DJANGO_ADMIN_EMAIL', '')
 
 # Logging
 LOGGING = {

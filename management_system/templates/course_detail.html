@@ -20,7 +20,8 @@
             async load(courseId) {
                 if (this.loaded) return;
                 try {
-                    const res = await fetch(`/api/courses/${courseId}/quiz-status/`);
+                    const url = "{% url 'api-quiz-status' 0 %}".replace('/0/', `/${courseId}/`);
+                    const res = await fetch(url);
                     if (!res.ok) return;
                     const data = await res.json();
                     const map = {};
@@ -227,19 +228,10 @@
             }
         }
 
-        function preventContextMenu(element) {
-            element.addEventListener('contextmenu', e => e.preventDefault());
-        }
-
         function initializeAllElements() {
-            preventContextMenu(window);
             document.querySelectorAll('video.video-js').forEach(initializeVideoJs);
             document.querySelectorAll('audio').forEach(initializeHlsAudio);
             document.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
-            document.querySelectorAll('video, audio').forEach(el => {
-                el.setAttribute('controlsList', 'nodownload');
-                preventContextMenu(el);
-            });
         }
         
         const lessonLinks = document.querySelectorAll(".course-sidebar .list-group-item-action[hx-get]");
@@ -262,12 +254,6 @@
             }
         });
 
-        document.addEventListener("keydown", e => {
-            if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
-                e.preventDefault();
-            }
-        });
-        document.addEventListener("selectstart", e => e.preventDefault());
     })();
 </script>
 {% endblock %}

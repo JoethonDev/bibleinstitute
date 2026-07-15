@@ -1,10 +1,14 @@
+import os
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from logging import getLogger
 
 logger = getLogger(__name__)
+
+SITE_DOMAIN = os.getenv('DJANGO_SITE_DOMAIN', 'http://localhost:8000')
 
 
 def _send_html_email(subject, template_name, context, recipient_email):
@@ -17,6 +21,10 @@ def _send_html_email(subject, template_name, context, recipient_email):
         html_message=html_message,
         fail_silently=True,
     )
+
+
+def _absolute_login_url():
+    return f"{SITE_DOMAIN}{reverse(settings.LOGIN_URL_REVERSE)}"
 
 
 def send_application_received(user):
@@ -42,7 +50,7 @@ def send_application_activated(user):
             template_name="emails/application_activated.html",
             context={
                 "name": user.get_full_name() or user.username,
-                "login_url": f"{settings.DEFAULT_FROM_EMAIL}",
+                "login_url": _absolute_login_url(),
             },
             recipient_email=user.email,
         )

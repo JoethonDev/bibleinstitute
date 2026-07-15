@@ -25,6 +25,9 @@ def get_expected_dates(academic_year, student=None):
 
 
 def get_attendance_summary(student, academic_year):
+    if student.study_mode == "online":
+        return {"expected": 0, "valid": 0, "invalid": 0, "absent": 0, "attendance_rate": None, "absence_rate": None}
+
     records = AttendanceRecord.objects.filter(
         student=student, academic_year=academic_year
     )
@@ -33,14 +36,17 @@ def get_attendance_summary(student, academic_year):
 
     expected = get_expected_dates(academic_year, student)
     valid = entrance_dates & exit_dates
-    invalid = entrance_dates - valid
-    absent = [d for d in expected if d not in entrance_dates]
+    invalid = (entrance_dates - valid) | (exit_dates - valid)
+    absent = [d for d in expected if d not in entrance_dates and d not in exit_dates]
 
+    expected_count = len(expected)
     return {
-        "expected": len(expected),
+        "expected": expected_count,
         "valid": len(valid),
         "invalid": len(invalid),
         "absent": len(absent),
+        "attendance_rate": len(valid) / expected_count if expected_count else 0,
+        "absence_rate": len(absent) / expected_count if expected_count else 0,
     }
 
 

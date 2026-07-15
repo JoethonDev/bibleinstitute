@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AcademicYear, Course, CourseOffering, Grade, Lesson, Question, Quiz, Role, Submission, User
+from .models import AcademicYear, Course, CourseOffering, Enrollment, Grade, Lesson, Question, Quiz, Role, Submission, User
 
 
 def lesson_links():
@@ -47,6 +47,9 @@ class Phase0StabilizationTests(TestCase):
         year2 = AcademicYear.objects.create(name="2026/2027", level=2, is_current=True, starts_on=date(2026, 9, 1), ends_on=date(2027, 6, 30))
         self.offering_1 = CourseOffering.objects.create(course=self.level_1_course, academic_year=year1)
         self.offering_2 = CourseOffering.objects.create(course=self.level_2_course, academic_year=year2)
+
+        Enrollment.objects.create(student=self.junior, academic_year=year1)
+        Enrollment.objects.create(student=self.senior, academic_year=year2)
 
         self.visible_lesson = Lesson.objects.create(
             name="Visible lesson",
@@ -95,20 +98,15 @@ class Phase0StabilizationTests(TestCase):
         )
         return quiz
 
-    def test_lesson_detail_and_stream_require_same_course_and_date_access(self):
+    def test_lesson_detail_and_stream_require_enrollment(self):
         client = self.login_client(self.junior)
 
         visible_detail = client.get(reverse("lesson-details", args=[self.level_1_course.pk, self.visible_lesson.pk]))
         self.assertEqual(visible_detail.status_code, 200)
 
-        old_detail = client.get(reverse("lesson-details", args=[self.level_1_course.pk, self.out_of_window_lesson.pk]))
-        self.assertEqual(old_detail.status_code, 401)
-
+        # Level 2 course not accessible — junior enrolled in level 1 only
         level_2_detail = client.get(reverse("lesson-details", args=[self.level_2_course.pk, self.level_2_lesson.pk]))
         self.assertEqual(level_2_detail.status_code, 401)
-
-        old_stream = client.get(reverse("lesson-stream", args=[self.out_of_window_lesson.pk, 0]))
-        self.assertEqual(old_stream.status_code, 401)
 
         level_2_stream = client.get(reverse("lesson-stream", args=[self.level_2_lesson.pk, 0]))
         self.assertEqual(level_2_stream.status_code, 401)
@@ -124,33 +122,22 @@ class Phase0StabilizationTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["quizzes"], [{"id": quiz.pk, "status": "exam"}])
 
-    def test_quiz_status_and_take_page_both_require_student_academic_window(self):
+    def test_senior_with_old_enrollment_cannot_take_current_quiz(self):
         now = timezone.now()
-        reopened_for_newer_cohort = self.create_quiz(
+        year1 = AcademicYear.objects.get(level=1, is_current=True)
+        quiz = self.create_quiz(
             self.level_1_course,
             now - timedelta(hours=1),
             now + timedelta(hours=1),
         )
-        self.senior.joined_date = date(2020, 8, 1)
-        self.senior.save(update_fields=["joined_date"])
-
+        # Senior has enrollment in year2 only, not year1 — so no access to level 1 quizzes
         client = self.login_client(self.senior)
 
         status_response = client.get(reverse("api-quiz-status", args=[self.level_1_course.pk]))
-        self.assertEqual(status_response.status_code, 200)
-        self.assertEqual(status_response.json()["quizzes"], [{"id": reopened_for_newer_cohort.pk, "status": "closed_unsolved"}])
+        self.assertEqual(status_response.status_code, 401)
 
-        take_response = client.get(reverse("quiz-details", args=[self.level_1_course.pk, reopened_for_newer_cohort.pk]))
-        self.assertEqual(take_response.status_code, 200)
-        self.assertEqual(take_response.context["mode"], "closed_unsolved")
-
-        post_response = client.post(
-            reverse("quiz-details", args=[self.level_1_course.pk, reopened_for_newer_cohort.pk]),
-            data={"questions[0][id]": reopened_for_newer_cohort.questions.first().pk, "questions[0][answer]": "A"},
-        )
-        self.assertEqual(post_response.status_code, 200)
-        self.assertContains(post_response, "submission is closed")
-        self.assertFalse(Grade.objects.filter(user=self.senior, quiz=reopened_for_newer_cohort).exists())
+        take_response = client.get(reverse("quiz-details", args=[self.level_1_course.pk, quiz.pk]))
+        self.assertEqual(take_response.status_code, 401)
 
     def test_student_cannot_retake_after_submission(self):
         now = timezone.now()

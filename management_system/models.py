@@ -80,7 +80,7 @@ class User(AbstractUser):
 
     IDENTITY_TYPES = [("national_id", _("National ID")), ("passport", _("Passport"))]
     identity_type = models.CharField(max_length=20, choices=IDENTITY_TYPES, null=True, blank=True)
-    identity_number = models.CharField(max_length=50, null=True, blank=True)
+    identity_number = models.CharField(max_length=50, null=True, blank=True, unique=True)
 
     identity_front_key = models.CharField(max_length=500, null=True, blank=True)
     identity_back_key = models.CharField(max_length=500, null=True, blank=True)

@@ -82,23 +82,19 @@ class CourseTest(TestCase):
         self.assertEqual(admin_context, courses_2)
         self.assertEqual(teacher_context, courses_2)
 
-        # Senior & Grad
+        # Senior & Grad — no enrollment yet, expect empty
         senior_res = self.senior.get(course_url)
         grad_res = self.grad.get(course_url)
         senior_context = senior_res.context['courses']
         grad_context = grad_res.context['courses']
 
-        self.assertEqual(len(senior_context), 2)
-        self.assertEqual(len(grad_context), 2)
+        self.assertEqual(len(senior_context), 0)
+        self.assertEqual(len(grad_context), 0)
 
-        self.assertEqual(senior_context, courses_2)
-        self.assertEqual(grad_context, courses_2)
-
-        # Junior
+        # Junior — no enrollment yet, expect empty
         junior_res = self.junior.get(course_url)
         junior_context = junior_res.context['courses']
-        self.assertEqual(len(junior_context), 1)
-        self.assertEqual(junior_context, courses_1)
+        self.assertEqual(len(junior_context), 0)
 
 
     def test_lessons_list_access_level_1(self):
@@ -120,29 +116,15 @@ class CourseTest(TestCase):
         self.assertEqual(admin_context, all_lessons)
         self.assertEqual(teacher_context, all_lessons)
 
-        # Senior & Grad
+        # Senior & Grad — no enrollment, expect 401
         senior_res = self.senior.get(course_1)
         grad_res = self.grad.get(course_1)
-        senior_context = list(senior_res.context['lessons'])
-        grad_context = list(grad_res.context['lessons'])
+        self.assertEqual(senior_res.status_code, 401)
+        self.assertEqual(grad_res.status_code, 401)
 
-        self.assertEqual(len(senior_context), 2)
-        self.assertEqual(len(grad_context), 0)
-
-        self.assertEqual(senior_context, [
-            self.lesson_senior_course_1,
-            self.lesson_2_senior_course_1
-        ])
-        self.assertEqual(grad_context, [])
-
-        # Junior
+        # Junior — no enrollment, expect 401
         junior_res = self.junior.get(course_1)
-        junior_context = list(junior_res.context['lessons'])
-        self.assertEqual(len(junior_context), 2)
-        self.assertEqual(junior_context, [
-            self.lesson_junior_course_1,
-            self.lesson_2_junior_course_1
-        ])
+        self.assertEqual(junior_res.status_code, 401)
         
     def test_lessons_list_access_level_2(self):
         """
@@ -163,21 +145,11 @@ class CourseTest(TestCase):
         self.assertEqual(admin_context, all_lessons)
         self.assertEqual(teacher_context, all_lessons)
 
-        # Senior & Grad
+        # Senior & Grad — no enrollment, expect 401
         senior_res = self.senior.get(course_2)
         grad_res = self.grad.get(course_2)
-        senior_context = list(senior_res.context['lessons'])
-        grad_context = list(grad_res.context['lessons'])
-
-        self.assertEqual(len(senior_context), 1)
-        self.assertEqual(len(grad_context), 1)
-
-        self.assertEqual(senior_context, [
-            self.lesson_senior_course_2
-        ])
-        self.assertEqual(grad_context, [
-            self.lesson_grad_course_2
-        ])
+        self.assertEqual(senior_res.status_code, 401)
+        self.assertEqual(grad_res.status_code, 401)
 
         # Junior
         junior_res = self.junior.get(course_2)

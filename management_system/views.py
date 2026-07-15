@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import F, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.db import transaction
 from django.contrib import messages
 from django.contrib.messages import success, error, info
@@ -22,6 +22,7 @@ import hmac
 import io
 import secrets
 import random
+from collections import defaultdict
 
 # Third Party
 from logging import getLogger
@@ -49,7 +50,7 @@ from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
-from .utils.attendance import is_expected_date, get_attendance_summary
+from .utils.attendance import is_expected_date, get_expected_dates, get_attendance_summary
 from .theme_catalog import THEMES, get_theme, SHOWCASE_PAGES
 
 # Constants
@@ -313,9 +314,14 @@ def portal(request):
 
     current_time = now()
     open_quiz_count = 0
+    course_ids = [c.pk for level in courses for c in level["courses"]]
+    quizzes = Quiz.objects.filter(course_id__in=course_ids).select_related("course").prefetch_related("course_offering")
+    quizzes_by_course = defaultdict(list)
+    for quiz in quizzes:
+        quizzes_by_course[quiz.course_id].append(quiz)
     for level in courses:
         for course in level["courses"]:
-            for quiz in course.quizzes.all():
+            for quiz in quizzes_by_course.get(course.pk, []):
                 quiz_status, __ = get_student_quiz_status(quiz, user, current_time)
                 if quiz_status == "exam":
                     open_quiz_count += 1
@@ -432,13 +438,16 @@ def view_courses(request):
             courses = list(levels_map.values())
             logger.info(f"{username} access {len(courses)} academic years via enrollment")
         else:
-            courses = Course.fetch_courses_by_role(user.role.role)
-            logger.info(f"{username} access {len(courses)} academic years via role fallback")
+            courses = []
+            logger.info(f"{username} has no enrollments")
 
+    course_ids = [c.pk for level in courses for c in level["courses"]]
+    lesson_counts = dict(Course.objects.filter(pk__in=course_ids).annotate(cnt=Count("lessons")).values_list("pk", "cnt"))
+    quiz_counts = dict(Course.objects.filter(pk__in=course_ids).annotate(cnt=Count("quizzes")).values_list("pk", "cnt"))
     for level in courses:
         for course in level["courses"]:
-            course.lesson_count = course.lessons.count()
-            course.quiz_count = course.quizzes.count()
+            course.lesson_count = lesson_counts.get(course.pk, 0)
+            course.quiz_count = quiz_counts.get(course.pk, 0)
 
     return render(request, "course_view.html", {
         "courses": courses
@@ -480,14 +489,7 @@ def view_course_details(request, course_id):
                 )
                 logger.info(f"User : {user} is accessing lessons via enrollment")
             else:
-                # Fallback to date-range access for pre-backfill users
-                join_date = user.joined_date
-                try:
-                    end_date = join_date.replace(year=join_date.year + course.level)
-                except ValueError:
-                    end_date = join_date.replace(year=join_date.year + course.level, day=28)
-                context['lessons'] = course.lessons.filter(created_date__range=(join_date, end_date))
-                logger.info(f"User : {user} is accessing lessons within range {join_date} and {end_date}")
+                context['lessons'] = Lesson.objects.none()
 
 
     except Http404:
@@ -510,7 +512,6 @@ def view_lesson_details(request, course_id, lesson_id):
                 academic_year__course_offerings__pk=lesson.course_offering_id,
                 status="active",
             ).exists())
-            or lesson.can_access(user.joined_date)
         )
         if can_access:
             logger.info(f"User : {user} is accessing {lesson.name} lesson from {course.name} course")
@@ -545,7 +546,7 @@ def stream_lesson(request, lesson_id, file_index):
                 academic_year__course_offerings__pk=lesson.course_offering_id,
                 status="active",
             ).exists()
-        ) or lesson.can_access(user.joined_date)
+        )
         if not user_can_access_course(user, lesson.course) or not can_stream:
             logger.error(f"{user.username} is not authorized to stream lesson : {lesson.name}")
             return HttpResponse(_('Unauthorized'), status=401)
@@ -1349,11 +1350,12 @@ def update_quiz(request, quiz_id):
             questions_exists = []
             questions_id = []
 
+            valid_question_ids = set(quiz.questions.values_list("pk", flat=True))
             for question in questions.values():
                 question_instance = build_question_instance(question, quiz)
 
                 question_id = str(question.get("id", "")).strip()
-                if question_id:
+                if question_id and int(question_id) in valid_question_ids:
                     question_instance.pk = int(question_id)
                     questions_id.append(int(question_id))
                     questions_exists.append(question_instance)
@@ -2288,14 +2290,15 @@ def signup(request):
                     if user.city:
                         is_offline = OfflineCity.objects.filter(name__iexact=user.city, is_active=True).exists()
                         user.study_mode = "offline" if is_offline else "online"
-                    for file_type in ["identity_front", "identity_back", "payment", "profile"]:
-                        if file_type in request.FILES:
-                            key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, request.FILES[file_type], file_type)
+                    file_type_map = {"identity_front": "identity_front_key", "identity_back": "identity_back_key", "payment": "payment_key", "profile": "profile_image_key"}
+                    for upload_type, model_field in file_type_map.items():
+                        if upload_type in request.FILES:
+                            key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, request.FILES[upload_type], upload_type)
                             if key:
-                                setattr(user, f"{file_type}_key", key)
+                                setattr(user, model_field, key)
                                 uploaded_keys.append(key)
                     if uploaded_keys:
-                        user.save(update_fields=[f"{t}_key" for t in ["identity_front", "identity_back", "payment", "profile"] if getattr(user, f"{t}_key", None)] + ["study_mode"])
+                        user.save(update_fields=[v for v in file_type_map.values() if getattr(user, v, None)] + ["study_mode"])
                     elif user.study_mode:
                         user.save(update_fields=["study_mode"])
                     send_application_received(user)
@@ -2325,7 +2328,14 @@ def applications_dashboard(request):
 @capability_required(can_manage_applications)
 def application_review(request, user_id):
     user = get_object_or_404(User, pk=user_id)
-    return render(request, "application_review.html", {"app_user": user})
+    doc_fields = {"identity_front_key": "identity_front", "identity_back_key": "identity_back", "payment_key": "payment", "profile_image_key": "profile"}
+    doc_urls = {}
+    for field, label in doc_fields.items():
+        key = getattr(user, field, None)
+        if key:
+            url = generate_unique_url(CLOUD_CLIENT, bucket_name, key, expires_in=300)
+            doc_urls[label] = url
+    return render(request, "application_review.html", {"app_user": user, "doc_urls": doc_urls})
 
 
 @capability_required(can_manage_applications)
@@ -2357,6 +2367,12 @@ def application_decision(request, user_id, decision):
 
     with transaction.atomic():
         if decision == "activate":
+            current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
+            if not current_year:
+                return HttpResponse(
+                    _("No current academic year exists for level %(level)d.") % {"level": level},
+                    status=400,
+                )
             user.application_status = "active"
             user.is_active = True
             student_role = Role.objects.get(role="student")
@@ -2364,13 +2380,11 @@ def application_decision(request, user_id, decision):
             user.decided_by = request.user
             user.decided_at = now()
             user.save()
-            current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
-            if current_year:
-                Enrollment.objects.get_or_create(
-                    student=user,
-                    academic_year=current_year,
-                    defaults={"enrolled_by": request.user}
-                )
+            Enrollment.objects.get_or_create(
+                student=user,
+                academic_year=current_year,
+                defaults={"enrolled_by": request.user}
+            )
             send_application_activated(user)
             messages.success(request, _("%(name)s activated.") % {"name": user.get_full_name() or user.username})
         else:
@@ -2409,15 +2423,17 @@ def bulk_application_decision(request):
                 continue
             with transaction.atomic():
                 if decision == "activate":
+                    current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
+                    if not current_year:
+                        results["errors"].append({"id": uid, "error": _("No current academic year for level %(level)d.") % {"level": level}})
+                        continue
                     user.application_status = "active"
                     user.is_active = True
                     user.role = Role.objects.get(role="student")
                     user.decided_by = request.user
                     user.decided_at = now()
                     user.save()
-                    current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
-                    if current_year:
-                        Enrollment.objects.get_or_create(student=user, academic_year=current_year, defaults={"enrolled_by": request.user})
+                    Enrollment.objects.get_or_create(student=user, academic_year=current_year, defaults={"enrolled_by": request.user})
                     send_application_activated(user)
                 else:
                     user.application_status = "declined"
@@ -2610,19 +2626,19 @@ def scanner(request):
 @capability_required(can_scan_attendance)
 def scan_preview(request, token):
     user = get_object_or_404(User, qr_token=token)
-    academic_year = AcademicYear.objects.filter(
-        level__in=Enrollment.objects.filter(student=user).values("academic_year__level"),
-        is_current=True,
-    ).first()
+    active_enrollment = Enrollment.objects.filter(
+        student=user, status="active", enrollment_type="normal"
+    ).select_related("academic_year").first()
+    academic_year = active_enrollment.academic_year if active_enrollment else None
     today = now().date()
-    already_recorded = AttendanceRecord.objects.filter(
+    already_recorded = list(AttendanceRecord.objects.filter(
         student=user, attendance_date=today
-    ).values_list("action", flat=True)
+    ).values_list("action", flat=True))
     return render(request, "scan_preview.html", {
         "student": user,
         "academic_year": academic_year,
         "today": today,
-        "already_recorded": list(already_recorded),
+        "already_recorded": already_recorded,
     })
 
 
@@ -2633,11 +2649,11 @@ def record_attendance(request, token, action):
         return JsonResponse({"error": _("Invalid action.")}, status=400)
     user = get_object_or_404(User, qr_token=token)
     if user.study_mode == "online":
-        return JsonResponse({"error": _("Online students cannot record attendance.")}, status=400)
-    academic_year = AcademicYear.objects.filter(
-        level__in=Enrollment.objects.filter(student=user).values("academic_year__level"),
-        is_current=True,
-    ).first()
+        return JsonResponse({"status": "noop", "action": action, "note": _("Online student — no attendance recorded.")})
+    active_enrollment = Enrollment.objects.filter(
+        student=user, status="active", enrollment_type="normal"
+    ).select_related("academic_year").first()
+    academic_year = active_enrollment.academic_year if active_enrollment else None
     if not academic_year:
         return JsonResponse({"error": _("No active enrollment.")}, status=400)
     today = now().date()
@@ -2675,6 +2691,24 @@ def attendance_correction(request, record_id):
     if request.method == "POST":
         new_date = request.POST.get("attendance_date")
         new_action = request.POST.get("action")
+        if new_action and new_action not in ("entrance", "exit"):
+            return HttpResponse(_("Invalid action."), status=400)
+        academic_year = record.academic_year
+        if new_date:
+            from datetime import datetime
+            try:
+                new_date = datetime.strptime(new_date, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                return HttpResponse(_("Invalid date format."), status=400)
+            if new_date < academic_year.starts_on or new_date > academic_year.ends_on:
+                return HttpResponse(_("Date outside academic year bounds."), status=400)
+            if not is_expected_date(academic_year, new_date):
+                return HttpResponse(_("Date is not a scheduled day or is a holiday."), status=400)
+            if AttendanceRecord.objects.filter(
+                student=record.student, academic_year=academic_year,
+                attendance_date=new_date, action=new_action or record.action,
+            ).exclude(pk=record.pk).exists():
+                return HttpResponse(_("A record already exists for this student, date, and action."), status=400)
         record.attendance_date = new_date or record.attendance_date
         record.action = new_action or record.action
         record.corrected_by = request.user
@@ -2860,7 +2894,7 @@ def export_report_csv(request):
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Identity", "Username", "First Name", "Last Name", "Study Mode",
+    writer.writerow(["Student ID", "Username", "First Name", "Last Name", "Study Mode",
                       "Level", "Academic Year",
                       "Grade Earned", "Grade Available", "Grade %",
                       "Expected", "Valid", "Invalid", "Absent",
@@ -2945,17 +2979,36 @@ def export_report_xlsx(request):
 
     ws3 = wb.create_sheet("Attendance Daily")
     ws3.append(["Student ID", "Username", "First Name", "Last Name",
-                "Date", "Day", "Action"])
+                "Date", "Day", "Entrance", "Exit", "Status"])
+    holidays = set(AcademicHoliday.objects.filter(academic_year=year).values_list("date", flat=True))
+    all_records = AttendanceRecord.objects.filter(academic_year=year).order_by("student_id", "attendance_date")
+    records_by_student = defaultdict(list)
+    for rec in all_records:
+        records_by_student[rec.student_id].append(rec)
     for row in rows:
-        records = AttendanceRecord.objects.filter(
-            student_id=row["student_id"], academic_year=year
-        ).order_by("attendance_date")
-        for rec in records:
+        student_records = records_by_student.get(row["student_id"], [])
+        entrance_by_date = {}
+        exit_by_date = {}
+        for rec in student_records:
+            if rec.action == "entrance":
+                entrance_by_date[rec.attendance_date] = rec
+            else:
+                exit_by_date[rec.attendance_date] = rec
+        expected = get_expected_dates(year)
+        for d in expected:
+            has_entrance = d in entrance_by_date
+            has_exit = d in exit_by_date
+            if has_entrance and has_exit:
+                status = "Valid"
+            elif has_entrance or has_exit:
+                status = "Invalid"
+            else:
+                status = "Absent"
             ws3.append([
                 row["student_id"], row["username"], row["first_name"], row["last_name"],
-                rec.attendance_date.isoformat(),
-                rec.attendance_date.strftime("%A"),
-                rec.action,
+                d.isoformat(), d.strftime("%A"),
+                d.isoformat() if has_entrance else "", d.isoformat() if has_exit else "",
+                status,
             ])
     ws3.freeze_panes = "A2"
     ws3.auto_filter.ref = ws3.dimensions
@@ -2973,10 +3026,21 @@ def robots_txt(request):
     return HttpResponse(
         "User-agent: *\n"
         "Disallow: /dashboard/\n"
+        "Disallow: /en/dashboard/\n"
+        "Disallow: /ar/dashboard/\n"
         "Disallow: /portal/\n"
+        "Disallow: /en/portal/\n"
+        "Disallow: /ar/portal/\n"
         "Disallow: /scanner/\n"
+        "Disallow: /en/scanner/\n"
+        "Disallow: /ar/scanner/\n"
         "Disallow: /api/\n"
-        "Sitemap: https://bibleinstitute-eg.org/sitemap.xml\n",
+        "Disallow: /en/api/\n"
+        "Disallow: /ar/api/\n"
+        "Disallow: /profile/\n"
+        "Disallow: /en/profile/\n"
+        "Disallow: /ar/profile/\n"
+        f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}\n",
         content_type="text/plain",
     )
 
@@ -2985,7 +3049,6 @@ def sitemap_xml(request):
     urls = [
         (reverse("home"), "weekly", "1.0"),
         (reverse("about"), "monthly", "0.8"),
-        (reverse("courses"), "daily", "0.9"),
         (reverse("user_login"), "monthly", "0.3"),
         (reverse("signup"), "monthly", "0.5"),
     ]
