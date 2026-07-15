@@ -6,8 +6,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    {% block head_meta %}
     <title>{% translate "Bible Institute Coptic" %}</title>
-    
+    <meta name="description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
+    <meta name="keywords" content="{% translate 'Bible institute, Coptic, theological education, online learning, Egypt' %}">
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    <link rel="alternate" hreflang="x-default" href="https://bibleinstitute-eg.org">
+    <link rel="alternate" hreflang="en" href="https://bibleinstitute-eg.org/en{{ request.get_full_path|slice:'3:' }}">
+    <link rel="alternate" hreflang="ar" href="https://bibleinstitute-eg.org/ar{{ request.get_full_path|slice:'3:' }}">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="{% translate 'Bible Institute Coptic' %}">
+    <meta property="og:description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:image" content="{% static 'login-logo.png' %}">
+    {% endblock head_meta %}
+
+    {% block structured_data %}
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Bible Institute Coptic",
+        "url": "https://bibleinstitute-eg.org",
+        "logo": "{% static 'login-logo.png' %}",
+        "sameAs": []
+    }
+    </script>
+    {% endblock structured_data %}
+
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     
@@ -150,9 +178,14 @@
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="#">{% translate "About Us" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">{% translate "About Us" %}</a></li>
+              {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
+              {% else %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'user_login' %}">{% translate "Login" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'signup' %}">{% translate "Sign Up" %}</a></li>
+              {% endif %}
               {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
                 <li class="nav-item">
                   <a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Admin Dashboard" %}</a>

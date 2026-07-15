@@ -290,22 +290,33 @@ class LoginView(views.LoginView):
         return response
 
 
-@login_required(login_url=LOGIN_URL)
 def index(request):
+    if request.user.is_authenticated:
+        user = User.objects.get(username=request.user)
+        role = user.role.role if user.role else "junior"
+
+        if role in ("admin", "staff"):
+            return redirect("user-dashboard")
+
+        return portal(request)
+
+    return render(request, "home.html")
+
+
+@login_required(login_url=LOGIN_URL)
+def portal(request):
     user = User.objects.get(username=request.user)
     role = user.role.role if user.role else "junior"
 
-    # Count accessible courses
     courses = Course.fetch_courses_by_role(role)
     course_count = sum(len(level["courses"]) for level in courses)
 
-    # Count open quizzes for this user
     current_time = now()
     open_quiz_count = 0
     for level in courses:
         for course in level["courses"]:
             for quiz in course.quizzes.all():
-                quiz_status, _ = get_student_quiz_status(quiz, user, current_time)
+                quiz_status, __ = get_student_quiz_status(quiz, user, current_time)
                 if quiz_status == "exam":
                     open_quiz_count += 1
 
@@ -315,6 +326,10 @@ def index(request):
         "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
         "role_display": str(_(user.role.get_role_display())) if user.role else "",
     })
+
+
+def about_page(request):
+    return render(request, "about.html")
 
 # Detail Class [handles with and without pk routes]
 class ProfileDetail(LoginProtection, DetailView):
@@ -2478,7 +2493,7 @@ def duplicate_course(request, course_id):
 
 @capability_required(can_manage_content)
 def calendar_management(request):
-    years = AcademicYear.objects.filter(is_current=True)
+    years = AcademicYear.objects.filter(is_current=True).prefetch_related("holidays")
     return render(request, "calendar_management.html", {"years": years})
 
 
@@ -2492,7 +2507,7 @@ def add_holiday(request):
         AcademicHoliday.objects.create(academic_year=year, date=date_val, name=name)
         messages.success(request, _("Holiday added."))
         return redirect("calendar-management")
-    years = AcademicYear.objects.filter(is_current=True)
+    years = AcademicYear.objects.filter(is_current=True).prefetch_related("holidays")
     return render(request, "calendar_management.html", {"years": years})
 
 
@@ -2900,3 +2915,40 @@ def export_report_xlsx(request):
     response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
     return response
+
+
+def robots_txt(request):
+    return HttpResponse(
+        "User-agent: *\n"
+        "Disallow: /dashboard/\n"
+        "Disallow: /portal/\n"
+        "Disallow: /scanner/\n"
+        "Disallow: /api/\n"
+        "Sitemap: https://bibleinstitute-eg.org/sitemap.xml\n",
+        content_type="text/plain",
+    )
+
+
+def sitemap_xml(request):
+    urls = [
+        (reverse("home"), "weekly", "1.0"),
+        (reverse("about"), "monthly", "0.8"),
+        (reverse("courses"), "daily", "0.9"),
+        (reverse("user_login"), "monthly", "0.3"),
+        (reverse("signup"), "monthly", "0.5"),
+    ]
+    entries = "\n".join(
+        f"  <url>\n"
+        f"    <loc>{loc}</loc>\n"
+        f"    <changefreq>{freq}</changefreq>\n"
+        f"    <priority>{prio}</priority>\n"
+        f"  </url>"
+        for loc, freq, prio in urls
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{entries}\n"
+        "</urlset>"
+    )
+    return HttpResponse(xml, content_type="application/xml")

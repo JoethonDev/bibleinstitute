@@ -8,7 +8,7 @@ def get_grade_summary(student, academic_year):
     grades = Grade.objects.filter(
         user=student,
         quiz__course_offering__academic_year=academic_year,
-    ).select_related("quiz")
+    ).select_related("quiz__course_offering__course")
     earned = 0
     available = 0
     details = []

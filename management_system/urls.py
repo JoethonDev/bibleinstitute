@@ -12,6 +12,8 @@ urlpatterns = [
         name='user_login'
     ),       
     path('', index, name="home"),
+    path('portal/', portal, name="student-portal"),
+    path('about/', about_page, name="about"),
     path('profile/', ProfileDetail.as_view(), name="view-profile"),
     path('profile/<int:user_id>/', ProfileDetail.as_view(), name="check-profile"),
     path('profile/<int:user_id>/update/', ProfileUpdate.as_view(), name="update-profile"),
@@ -132,4 +134,8 @@ urlpatterns = [
     path('dashboard/reports/', report_dashboard, name="report-dashboard"),
     path('dashboard/reports/export-csv/', export_report_csv, name="export-report-csv"),
     path('dashboard/reports/export-xlsx/', export_report_xlsx, name="export-report-xlsx"),
+
+    # P8-T04 — SEO
+    path('robots.txt', robots_txt, name="robots-txt"),
+    path('sitemap.xml', sitemap_xml, name="sitemap-xml"),
 ]
