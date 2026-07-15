@@ -8,6 +8,7 @@ from django.utils import timezone
 from unittest import skipIf
 
 from .models import AcademicYear, Course, CourseOffering, Enrollment, Lesson, Quiz, Role, User
+from .utils.helpers import user_can_access_course
 
 
 class AcademicModelTests(TestCase):
@@ -167,6 +168,31 @@ class AcademicModelTests(TestCase):
                 opening_date=timezone.now(),
                 closing_date=timezone.now(),
             )
+
+    def test_normal_enrollment_grants_access_to_all_offerings(self):
+        sibling = Course.objects.create(name="Sibling Course", level=1)
+        sibling_offering = CourseOffering.objects.create(
+            course=sibling, academic_year=self.level_1_year,
+        )
+        Enrollment.objects.create(
+            student=self.student, academic_year=self.level_1_year,
+        )
+        self.assertTrue(user_can_access_course(self.student, self.level_1_course))
+        self.assertTrue(user_can_access_course(self.student, sibling))
+
+    def test_targeted_enrollment_denies_sibling_offering(self):
+        sibling = Course.objects.create(name="Sibling Course", level=1)
+        sibling_offering = CourseOffering.objects.create(
+            course=sibling, academic_year=self.level_1_year,
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            academic_year=self.level_1_year,
+            course_offering=self.level_1_offering,
+            enrollment_type=Enrollment.Type.REPEAT,
+        )
+        self.assertTrue(user_can_access_course(self.student, self.level_1_course))
+        self.assertFalse(user_can_access_course(self.student, sibling))
 
 
 class AcademicSchemaMigrationTests(TransactionTestCase):

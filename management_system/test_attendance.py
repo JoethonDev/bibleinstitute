@@ -209,7 +209,7 @@ class AttendanceRecordViewTests(TestCase):
         )
         c = Client()
         c.login(username="admin", password="1")
-        resp = c.get(reverse("attendance-delete", args=[record.id]))
+        resp = c.post(reverse("attendance-delete", args=[record.id]))
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(AttendanceRecord.objects.filter(pk=record.pk).exists())
 
@@ -237,7 +237,7 @@ class QRTests(TestCase):
         old_token = self.student.qr_token
         c = Client()
         c.login(username="adminqr", password="1")
-        resp = c.get(reverse("regenerate-qr", args=[self.student.id]))
+        resp = c.post(reverse("regenerate-qr", args=[self.student.id]))
         self.assertEqual(resp.status_code, 302)
         self.student.refresh_from_db()
         self.assertNotEqual(self.student.qr_token, old_token)

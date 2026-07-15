@@ -97,14 +97,30 @@ def user_can_access_course(user, course) -> bool:
     if not user.role:
         return False
 
-    if Enrollment.objects.filter(
+    active_enrollments = Enrollment.objects.filter(
         student=user,
-        academic_year__course_offerings__course=course,
         status='active',
+    )
+
+    if not active_enrollments.exists():
+        # ponytail: legacy fallback for pre-backfill users; remove in LMS-REV-002
+        return course.can_access(user.role.role)
+
+    # Normal enrollment grants access to all courses in the AcademicYear.
+    if active_enrollments.filter(
+        enrollment_type="normal",
+        academic_year__course_offerings__course=course,
     ).exists():
         return True
 
-    return course.can_access(user.role.role)
+    # Targeted enrollment (repeat/remedial/manual) grants access only to its specific offering.
+    if active_enrollments.filter(
+        enrollment_type__in=["repeat", "remedial", "manual"],
+        course_offering__course=course,
+    ).exists():
+        return True
+
+    return False
 
 
 def get_student_quiz_status(quiz, user, current_time=None):

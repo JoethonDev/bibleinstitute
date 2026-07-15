@@ -764,6 +764,14 @@ class Question(models.Model):
             "correct_answer" : self.correct_answer,
         }
 
+    def serialize_student(self):
+        base = self.serialize()
+        base.pop("correct_answer", None)
+        base.pop("answer_payload", None)
+        base.pop("answer_payload_json", None)
+        base.pop("config_json", None)
+        return base
+
     @staticmethod
     def get_types():
         return [str(_(question_type[1])) for question_type in Question.QUESTION_TYPES] # Translate display values

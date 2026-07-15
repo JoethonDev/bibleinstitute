@@ -653,19 +653,21 @@ def take_exam(request, course_id, quiz_id):
                 quiz_mode = "closed_unsolved"
                 query_set = Question.objects.filter(quiz_id=quiz_id)
 
-            # Serialize questions; strip correct_answer for closed_unsolved to avoid leaking via HTML
-            if quiz_mode == "closed_unsolved":
-                questions = []
-                for q in query_set:
-                    serialized = q.serialize()
-                    serialized.pop("correct_answer", None)
-                    questions.append(serialized)
+            # Serialize questions; strip answer data to prevent leakage
+            if quiz_mode == "exam":
+                questions = [q.serialize() for q in query_set]
+                random.shuffle(questions)
+                questions = [prepare_exam_question(q) for q in questions]
+                for q in questions:
+                    q.pop("answer_payload", None)
+                    q.pop("answer_payload_json", None)
+                    q.pop("config_json", None)
+                    q.pop("correct_answer", None)
+                    q.pop("config", None)
+            elif quiz_mode == "closed_unsolved":
+                questions = [q.serialize_student() for q in query_set]
             else:
                 questions = [q.serialize() for q in query_set]
-
-            if quiz_mode == "exam":
-                random.shuffle(questions)
-                questions = [prepare_exam_question(question) for question in questions]
 
             return render(request, "display_quiz.html", {
                 "quiz_name": quiz.name,
@@ -696,6 +698,7 @@ def take_exam(request, course_id, quiz_id):
                 logger.info(f"User : {user} has submitted {quiz} at {submission_datetime.strftime('%d/%m/%Y, %H:%M:%S')}")
 
                 questions_data, not_used = unpack_quiz_form(request.POST)
+                valid_question_ids = set(Question.objects.filter(quiz_id=quiz_id).values_list("pk", flat=True))
 
                 # Create Quesitons
                 submissions = []
@@ -703,6 +706,8 @@ def take_exam(request, course_id, quiz_id):
                 total_grade = 0
                 for data in questions_data.values():
                     question_id = int(data['id'])
+                    if question_id not in valid_question_ids:
+                        continue
                     submitted_answer = data.get("answer", "")
                     if question_id in repeated_submissions:
                         continue
@@ -718,10 +723,10 @@ def take_exam(request, course_id, quiz_id):
                     submissions.append(submission)
                 
                 # For leaved questions or error of not submitting all questions
-                unanswered_questions = Question.objects.filter(quiz_id=quiz_id).exclude(pk__in=repeated_submissions)
-                for data in unanswered_questions:
+                unanswered_questions = valid_question_ids - repeated_submissions
+                for qid in unanswered_questions:
                     submissions.append(
-                        Submission(question_id=data.pk, submitted_answer="-", user=user)
+                        Submission(question_id=qid, submitted_answer="-", user=user)
                     )
 
                 try:
@@ -887,14 +892,29 @@ class CreateUser(UserBaseView, CreateView):
     success_url = reverse_lazy("user-create")
     action = _("create") # Translate action
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        user = User.objects.get(username=self.request.user)
+        if user.role and user.role.role != "admin":
+            form.fields.pop("role", None)
+            form.fields.pop("password", None)
+        return form
+
 class UpdateUser(UserBaseView, UpdateView):
     form_class = UserUpdateForm
     action = _("update") # Translate action
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        user = User.objects.get(username=self.request.user)
+        if user.role and user.role.role != "admin":
+            form.fields.pop("role", None)
+            form.fields.pop("password", None)
+        return form
+
     def form_valid(self, form):
         response = super().form_valid(form)
         # If the password field was changed, update the session to keep user logged in
-        print(f"condition : {self.object.pk == self.request.user.pk and 'password' in form.cleaned_data and form.cleaned_data['password']}")
         if self.object.pk == self.request.user.pk and "password" in form.cleaned_data and form.cleaned_data["password"]:
             update_session_auth_hash(self.request, self.object)
 
@@ -2312,12 +2332,29 @@ def application_review(request, user_id):
 def application_decision(request, user_id, decision):
     if decision not in ("activate", "decline"):
         return HttpResponse(_("Invalid decision"), status=400)
+    if request.method != "POST":
+        return HttpResponse(_("Method not allowed"), status=405)
     level = request.POST.get("level", 1)
     try:
         level = int(level)
     except (TypeError, ValueError):
         level = 1
     user = get_object_or_404(User, pk=user_id)
+
+    if user.application_status == "active" and decision == "activate":
+        messages.info(request, _("%(name)s is already active.") % {"name": user.get_full_name() or user.username})
+        return redirect("applications-dashboard")
+
+    if user.application_status == "declined" and decision == "decline":
+        messages.info(request, _("%(name)s is already declined.") % {"name": user.get_full_name() or user.username})
+        return redirect("applications-dashboard")
+
+    if user.application_status != "pending":
+        return HttpResponse(
+            _("Cannot decide on a %(status)s application.") % {"status": user.application_status},
+            status=400,
+        )
+
     with transaction.atomic():
         if decision == "activate":
             user.application_status = "active"
@@ -2361,6 +2398,15 @@ def bulk_application_decision(request):
     for uid in user_ids:
         try:
             user = User.objects.get(pk=uid)
+            if user.application_status == "active" and decision == "activate":
+                results["success"].append(uid)
+                continue
+            if user.application_status == "declined" and decision == "decline":
+                results["success"].append(uid)
+                continue
+            if user.application_status != "pending":
+                results["errors"].append({"id": uid, "error": _("Cannot decide on a %(status)s application.") % {"status": user.application_status}})
+                continue
             with transaction.atomic():
                 if decision == "activate":
                     user.application_status = "active"
@@ -2386,6 +2432,7 @@ def bulk_application_decision(request):
     return JsonResponse(results)
 
 
+@require_POST
 @capability_required(can_manage_content)
 def duplicate_lesson(request, lesson_id):
     lesson = get_object_or_404(Lesson, pk=lesson_id)
@@ -2402,6 +2449,7 @@ def duplicate_lesson(request, lesson_id):
     return redirect("lesson-dashboard")
 
 
+@require_POST
 @capability_required(can_manage_content)
 def duplicate_quiz(request, quiz_id):
     quiz = get_object_or_404(Quiz, pk=quiz_id)
@@ -2422,6 +2470,7 @@ def duplicate_quiz(request, quiz_id):
     return redirect("quiz-dashboard")
 
 
+@require_POST
 @capability_required(can_manage_content)
 def copy_course_offering(request, offering_id):
     offering = get_object_or_404(CourseOffering, pk=offering_id)
@@ -2453,6 +2502,7 @@ def copy_course_offering(request, offering_id):
     return redirect("course-dashboard")
 
 
+@require_POST
 @capability_required(can_manage_content)
 def duplicate_course(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
@@ -2511,6 +2561,7 @@ def add_holiday(request):
     return render(request, "calendar_management.html", {"years": years})
 
 
+@require_POST
 @capability_required(can_correct_attendance)
 def delete_holiday(request, holiday_id):
     holiday = get_object_or_404(AcademicHoliday, pk=holiday_id)
@@ -2521,7 +2572,7 @@ def delete_holiday(request, holiday_id):
 
 @login_required
 def student_calendar(request):
-    enrollments = Enrollment.objects.filter(student=request.user).select_related("academic_year")
+    enrollments = Enrollment.objects.filter(student=request.user, status="active").select_related("academic_year")
     years = [e.academic_year for e in enrollments]
     return render(request, "student_calendar.html", {"years": years})
 
@@ -2541,6 +2592,7 @@ def download_qr(request):
     return HttpResponse(buf, content_type="image/png")
 
 
+@require_POST
 @capability_required(can_correct_attendance)
 def regenerate_qr(request, user_id):
     user = get_object_or_404(User, pk=user_id)
@@ -2603,7 +2655,7 @@ def record_attendance(request, token, action):
     return JsonResponse({"status": "already_recorded", "action": action})
 
 
-@capability_required(can_correct_attendance)
+@capability_required(can_scan_attendance)
 def attendance_management(request):
     year_id = request.GET.get("academic_year")
     records = AttendanceRecord.objects.all().select_related("student", "academic_year", "scanned_by")
@@ -2633,6 +2685,7 @@ def attendance_correction(request, record_id):
     return render(request, "attendance_correction.html", {"record": record})
 
 
+@require_POST
 @capability_required(can_correct_attendance)
 def delete_attendance(request, record_id):
     record = get_object_or_404(AttendanceRecord, pk=record_id)
@@ -2721,7 +2774,6 @@ def worker_receipt(request):
     return JsonResponse({"status": "recorded"})
 
 
-@csrf_exempt
 @require_POST
 def progress_heartbeat(request):
     if not request.user.is_authenticated:

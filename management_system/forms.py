@@ -117,11 +117,20 @@ class UserUpdateForm(UserCreationForm):
     
 
 class ProfileUpdateForm(UserUpdateForm):
+    readonly_fields = {"username", "joined_date"}
+
     def __init__(self, *args, **kwargs):
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
         self.fields.pop("role", None)
-        self.fields['joined_date'].widget.attrs['readonly'] = True
-        self.fields['username'].widget.attrs['readonly'] = True
+        for fname in self.readonly_fields:
+            if fname in self.fields:
+                self.fields[fname].disabled = True
+
+    def clean_username(self):
+        return self.instance.username
+
+    def clean_joined_date(self):
+        return self.instance.joined_date
 
 
 class CourseForm(forms.ModelForm):
