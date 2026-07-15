@@ -51,7 +51,6 @@ from .utils.decorators import capability_required, can_manage_content, can_delet
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
 from .utils.attendance import is_expected_date, get_expected_dates, get_attendance_summary
-from .theme_catalog import THEMES, get_theme, SHOWCASE_PAGES
 
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
@@ -2216,63 +2215,6 @@ def r2_management_dashboard(request):
         return render(request, 'partials/r2_file_list.html', context)
     
     return render(request, 'r2_management.html', context)
-
-
-# ---------------------------------------------------------------------------
-# Design Theme Showcase
-# ---------------------------------------------------------------------------
-# Read-only gallery of the main user-side pages and the admin dashboard,
-# re-skinned for every theme in the catalog. Useful for reviewing the
-# refactor direction before any production template changes are merged.
-
-_SHOWCASE_PAGE_IDS = {p["id"] for p in SHOWCASE_PAGES}
-
-
-def _showcase_context(request, theme_id, page_id):
-    theme = get_theme(theme_id)
-    if page_id not in _SHOWCASE_PAGE_IDS:
-        page_id = "home"
-    return {
-        "theme": theme,
-        "theme_id": theme_id,
-        "page_id": page_id,
-        "themes": THEMES,
-        "showcase_pages": SHOWCASE_PAGES,
-        "active_page_id": page_id,
-    }
-
-
-def theme_catalog(request):
-    guard = _staff_guard(request)
-    if guard: return guard
-    return render(request, "theme_showcase/landing.html", {
-        "theme": get_theme("sapphire"),
-        "themes": THEMES,
-        "showcase_pages": SHOWCASE_PAGES,
-        "active_page_id": "catalog",
-        "page_id": "catalog",
-    })
-
-
-def theme_showcase(request, theme_id, page_id):
-    guard = _staff_guard(request)
-    if guard: return guard
-    return render(
-        request,
-        f"theme_showcase/page_{page_id}.html",
-        _showcase_context(request, theme_id, page_id),
-    )
-
-
-def _staff_guard(request):
-    if not request.user.is_authenticated:
-        return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
-    if not request.user.is_staff:
-        return HttpResponseForbidden(
-            "Theme Showcase is restricted to staff users. "
-            "Sign in with a staff account (is_staff=True) to view it."
-        )
-    return None
 
 
 # ============================================================================

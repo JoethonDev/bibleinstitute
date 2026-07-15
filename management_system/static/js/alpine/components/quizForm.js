@@ -138,8 +138,7 @@ function quizForm() {
                                value="${this.escapeHtml(choice)}">
                     </div>
                     <button type="button"
-                            class="btn btn-outline-danger btn-sm d-flex align-items-center justify-content-center"
-                            style="width: 38px; height: 38px;"
+                            class="btn btn-outline-danger btn-sm btn-icon-sm d-flex align-items-center justify-content-center"
                             data-action="remove-choice"
                             aria-label="${this.t('delete')}">
                         <i class="fa-solid fa-xmark"></i>

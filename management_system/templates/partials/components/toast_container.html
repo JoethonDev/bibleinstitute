@@ -1,9 +1,9 @@
 {% load i18n %}
 <!-- Toast Notifications Container -->
-<div x-data class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+<div x-data class="toast-container app-toast-stack position-fixed top-0 end-0 p-3">
     <template x-for="notification in $store.notifications.items" :key="notification.id">
         <div 
-            class="toast show mb-2"
+            class="toast app-toast show mb-2"
             :class="`border-${notification.type}`"
             role="alert" 
             aria-live="assertive" 
@@ -14,7 +14,6 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 transform translate-x-0"
             x-transition:leave-end="opacity-0 transform translate-x-full"
-            style="min-width: 300px;"
         >
             <div class="toast-header" :class="`bg-${notification.type} text-white`">
                 <i class="fas me-2" 

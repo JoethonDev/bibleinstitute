@@ -16,7 +16,7 @@
     <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 row-cols-xl-6 g-2">
         {% for data in drive %}
         <div class="col">
-            <div class="card admin-card text-center h-100 drive-item" style="cursor: pointer;">
+            <div class="card admin-card text-center h-100 drive-item is-clickable">
                 <div class="card-body d-flex flex-column justify-content-center align-items-center p-2">
                     {% if data.type == 'folder' %} 
                         <div class="drive-icon folder-icon text-warning w-100" 
@@ -35,7 +35,7 @@
                             <i class="fas fa-file-alt fa-2x"></i>
                         </div>
                     {% endif %}
-                    <div class="card-title mt-2 w-100" style="word-wrap: break-word; font-size: 0.7rem; line-height: 1.2;" title="{{ data.name }}">
+                    <div class="card-title drive-title mt-2 w-100" title="{{ data.name }}">
                         {{ data.name }}
                     </div>
                 </div>

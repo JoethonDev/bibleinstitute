@@ -18,7 +18,7 @@
     <!-- Bulk Actions & Column Controls -->
     <div class="table-controls">
         <!-- Bulk Actions (shown when items selected) -->
-        <div class="bulk-actions" x-show="selected.length > 0" x-transition style="display: none;">
+        <div class="bulk-actions" x-show="selected.length > 0" x-transition x-cloak>
             <span class="bulk-count">
                 <i class="fas fa-check-circle me-1"></i>
                 <span x-text="selected.length"></span> {% translate "selected" %}
@@ -96,7 +96,7 @@
                         {% if request.GET.sort == col %}
                             <i class="fas fa-sort-{{ request.GET.order|default:'up' }} ms-1"></i>
                         {% else %}
-                            <i class="fas fa-sort text-muted ms-1" style="opacity: 0.3;"></i>
+                            <i class="fas fa-sort text-muted ms-1 sort-icon"></i>
                         {% endif %}
                     </th>
                     {% endfor %}

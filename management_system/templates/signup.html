@@ -8,42 +8,17 @@
 {% endblock %}
 
 {% block style %}
-<style>
-    body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem 0;
-    }
-    .signup-card {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 1.2rem;
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-        overflow: hidden;
-    }
-    .signup-card .card-body { padding: 2rem; }
-    .form-control, .form-select { min-height: 44px; border-radius: 0.75rem; }
-    .btn-primary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        border-radius: 0.85rem;
-        font-weight: 600;
-        min-height: 48px;
-    }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-</style>
 {% endblock %}
 
 {% block body %}
+<section class="signup-page">
 <div class="container">
     <div class="row justify-content-center">
-        <div class="col-11 col-sm-10 col-md-8 col-lg-6 col-xl-5">
+        <div class="col-12 col-md-10 col-lg-8 col-xl-7">
             <div class="card signup-card">
                 <div class="card-body p-4 p-sm-5">
                     <div class="text-center mb-4">
-                        <h4 class="card-title">{% translate "Student Application" %}</h4>
+                        <h1 class="h3 card-title">{% translate "Student Application" %}</h1>
                         <p class="text-muted">{% translate "Fill in your details to apply" %}</p>
                     </div>
 
@@ -96,4 +71,5 @@
         </div>
     </div>
 </div>
+</section>
 {% endblock %}

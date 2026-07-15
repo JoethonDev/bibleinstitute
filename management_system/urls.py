@@ -96,10 +96,6 @@ urlpatterns = [
     path('api/bulk-delete/lessons/', bulk_delete_lessons, name="bulk-delete-lessons"),
     path('api/bulk-delete/quizzes/', bulk_delete_quizzes, name="bulk-delete-quizzes"),
 
-    # Design Theme Showcase (pre-refactor visual review)
-    path('showcase/', theme_catalog, name="theme-catalog"),
-    path('showcase/<str:theme_id>/<str:page_id>/', theme_showcase, name="theme-showcase-page"),
-
     path('dashboard/course-offerings/<int:offering_id>/copy/', copy_course_offering, name="copy-course-offering"),
 
     # Phase 3 — Student Applications

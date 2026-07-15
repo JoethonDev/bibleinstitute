@@ -30,7 +30,7 @@ Last Updated: December 2024
     }
 }">
     <div class="d-flex justify-content-between mb-2">
-        <div class="bulk-actions" x-show="selected.length > 0" style="display: none;">
+        <div class="bulk-actions" x-show="selected.length > 0" x-cloak>
             <span x-text="`${selected.length} selected`" class="me-2 fw-bold text-primary"></span>
             <button class="btn btn-sm btn-danger" @click="$store.notifications.add('Deleted ' + selected.length + ' items (Frontend Only)'); selected = [];">
                 <i class="fas fa-trash"></i> Delete Selected
@@ -57,18 +57,18 @@ Last Updated: December 2024
     <table class="table table-hover table-striped align-middle">
         <thead class="table-primary">
             <tr>
-                <th scope="col" style="width: 40px;">
+                <th scope="col" class="column-check">
                     <input type="checkbox" class="form-check-input" @change="toggleAll">
                 </th>
                 {% for col in columns %}
-                    <th scope="col" class="fw-semibold py-3 position-relative" style="cursor: pointer" x-show="cols[{{ forloop.counter0 }}].visible" x-show="cols[{{ forloop.counter0 }}].visible" 
+                    <th scope="col" class="fw-semibold py-3 position-relative is-clickable" x-show="cols[{{ forloop.counter0 }}].visible"
                         hx-get="?sort={{ col }}&order={% if request.GET.sort == col and request.GET.order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.name %}&name={{ request.GET.name }}{% endif %}{% if request.GET.filtering %}&filtering={{ request.GET.filtering }}{% endif %}" 
                         hx-target="#table-container">
                         {{ col }}
                         {% if request.GET.sort == col %}
                             <i class="fas fa-sort-{{ request.GET.order|default:'up' }} ms-1"></i>
                         {% else %}
-                            <i class="fas fa-sort text-muted ms-1" style="opacity: 0.3;"></i>
+                            <i class="fas fa-sort text-muted ms-1 sort-icon"></i>
                         {% endif %}
                     </th>
                 {% endfor %}
@@ -94,20 +94,18 @@ Last Updated: December 2024
                     {% if submission_user %}
                         <td class="py-3 text-center">
                             <div class="d-flex flex-column align-items-center gap-2">
-                                <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" 
+                                <button class="btn btn-primary btn-sm min-w-140 d-flex align-items-center gap-1"
                                         hx-get="{{ values.url }}" 
                                         hx-swap="innerHTML" 
                                         hx-target="#display-page" 
                                         hx-trigger="click" 
                                         hx-push-url="true" 
-                                        hx-select="#content"
-                                        style="min-width: 140px;">
+                                        hx-select="#content">
                                     <i class="bi bi-eye"></i>
                                     {% translate "View Submission" %}
                                 </button>
                                 <a href="{% url 'export-submission-csv' grade_id=values.submission_id %}" 
-                                   class="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
-                                   style="min-width: 140px;">
+                                   class="btn btn-outline-success btn-sm min-w-140 d-flex align-items-center gap-1">
                                     <i class="fas fa-file-csv"></i>
                                     {% translate "Export CSV" %}
                                 </a>

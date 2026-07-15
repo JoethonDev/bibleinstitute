@@ -2,19 +2,6 @@
 {% load i18n %}
 
 {% block style %}
-<style>
-    /* Ensures the PDF canvas is responsive and maintains its aspect ratio */
-    .pdf-viewer canvas {
-        border: 1px solid #dee2e6;
-        border-radius: 0.5rem;
-    }
-    /* Ensures the video player is responsive */
-    .video-js.vjs-fluid,
-    .video-js.vjs-16-9 {
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -37,9 +24,7 @@
                         </video>
                         <div class="mt-2 d-flex align-items-center gap-2">
                             <span class="text-muted small">{% translate "Progress" %}:</span>
-                            <div class="progress flex-grow-1" style="height: 8px;">
-                                <div class="progress-bar progress-bar-striped" :style="'width: ' + (playedRanges.flat().length > 0 ? '25' : '0') + '%'" style="width: 0%;"></div>
-                            </div>
+                            <progress class="app-progress progress-thin flex-grow-1" :value="playedRanges.flat().length > 0 ? 25 : 0" max="100"></progress>
                         </div>
                     </div>
                 {% elif hls_url.type == 'audio' %}
@@ -48,17 +33,15 @@
                     </audio>
                     <!-- Audio Download Button -->
                     <div class="mt-3">
-                        <button class="btn btn-primary audio-download-btn d-flex align-items-center justify-content-center" 
-                                onclick="downloadAudio('{{ hls_url.url }}', '{{ hls_url.name }}')" 
-                                style="min-width: 160px;">
+                        <button class="btn btn-primary audio-download-btn min-w-160 d-flex align-items-center justify-content-center"
+                                onclick="downloadAudio('{{ hls_url.url }}', '{{ hls_url.name }}')">
                             <i class="fas fa-download me-2"></i>{% translate "Download Audio" %}
                         </button>
-                        <div class="download-progress mt-3" id="progress-{{ forloop.counter }}" style="display: none;">
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                        <div class="download-progress hidden-initially mt-3" id="progress-{{ forloop.counter }}">
+                            <div class="progress progress-download">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success progress-zero"
                                      id="progress-bar-{{ forloop.counter }}" 
-                                     role="progressbar" 
-                                     style="width: 0%;" 
+                                     role="progressbar"
                                      aria-valuenow="0" 
                                      aria-valuemin="0" 
                                      aria-valuemax="100">

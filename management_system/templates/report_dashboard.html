@@ -44,7 +44,7 @@
                 {% for ay in academic_years %}
                   <option value="{{ ay.id }}" data-level="{{ ay.level }}"
                     {% if selected_year and ay.id == selected_year.id %}selected{% endif %}
-                    {% if selected_level and ay.level != selected_level|add:0 %}style="display:none"{% endif %}>
+                    {% if selected_level and ay.level != selected_level|add:0 %}class="d-none"{% endif %}>
                     {{ ay.name }} — {% translate "Level" %} {{ ay.level }}
                   </option>
                 {% endfor %}

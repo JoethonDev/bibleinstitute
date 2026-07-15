@@ -3,7 +3,6 @@
 {% load static %}
 
 {% block cdn %}
-    <link rel="stylesheet" href="{% static 'css/user-theme.css' %}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.20.3/video-js.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.20.3/video.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/videojs-seek-buttons@3.0.1/dist/videojs-seek-buttons.min.js"></script>
@@ -43,16 +42,16 @@
         <div class="col-12 col-lg-4 col-xl-3">
             <div class="user-card course-sidebar h-100">
                 <!-- Header -->
-                <div class="p-3 d-flex align-items-center gap-2" style="background:var(--user-accent);border-radius:var(--user-radius-md) var(--user-radius-md) 0 0;">
+                <div class="p-3 d-flex align-items-center gap-2 course-sidebar-header">
                     <i class="fas fa-bars text-white opacity-75"></i>
                     <h5 class="mb-0 fw-bold text-white">{% translate "Course Content" %}</h5>
                 </div>
 
                 <div class="p-2">
                     <!-- Lessons section -->
-                    <p class="px-2 pt-2 mb-1 text-muted fw-bold small text-uppercase" style="letter-spacing:.05em;">
+                    <p class="px-2 pt-2 mb-1 text-muted fw-bold small text-uppercase section-kicker">
                         <i class="fas fa-play-circle me-1"></i>{% translate "Lessons" %}
-                        {% if lessons %}<span class="ms-1 badge rounded-pill" style="background:var(--user-accent-soft);color:var(--user-accent);">{{ lessons|length }}</span>{% endif %}
+                        {% if lessons %}<span class="ms-1 badge rounded-pill badge-soft">{{ lessons|length }}</span>{% endif %}
                     </p>
                     <div class="list-group list-group-flush mb-3" role="tablist">
                         {% for lesson in lessons %}
@@ -72,9 +71,9 @@
                     </div>
 
                     <!-- Quizzes section -->
-                    <p class="px-2 pt-1 mb-1 text-muted fw-bold small text-uppercase" style="letter-spacing:.05em;">
+                    <p class="px-2 pt-1 mb-1 text-muted fw-bold small text-uppercase section-kicker">
                         <i class="fas fa-pen-to-square me-1"></i>{% translate "Quizzes" %}
-                        {% if quizzes %}<span class="ms-1 badge rounded-pill" style="background:var(--user-accent-soft);color:var(--user-accent);">{{ quizzes|length }}</span>{% endif %}
+                        {% if quizzes %}<span class="ms-1 badge rounded-pill badge-soft">{{ quizzes|length }}</span>{% endif %}
                     </p>
                     <div class="list-group list-group-flush" role="tablist" x-data>
                         {% for quiz in quizzes %}
@@ -102,10 +101,10 @@
 
         <!-- ===== MAIN CONTENT ===== -->
         <div class="col-12 col-lg-8 col-xl-9">
-            <div id="display-page" class="user-card" style="min-height:85vh;border-radius:var(--user-radius-md);">
+            <div id="display-page" class="user-card content-panel">
                 {% block content %}
-                <div id="content-loaded" class="d-flex flex-column justify-content-center align-items-center h-100 text-muted p-4" style="min-height:60vh;">
-                    <i class="fas fa-book-open fa-4x mb-3 opacity-25" style="color:var(--user-accent);"></i>
+                <div id="content-loaded" class="d-flex flex-column justify-content-center align-items-center h-100 text-muted p-4 content-empty">
+                    <i class="fas fa-book-open fa-4x mb-3 opacity-25 text-accent"></i>
                     <h4>{% translate "Welcome to the course!" %}</h4>
                     <p class="text-center">{% translate "Please select a lesson or quiz from the sidebar to begin." %}</p>
                 </div>

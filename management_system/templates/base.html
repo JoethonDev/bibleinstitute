@@ -52,115 +52,15 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
-    <!-- Alpine Components CSS -->
-    <link rel="stylesheet" href="{% static 'css/alpine-components.css' %}">
-    
-    <!-- Custom Styles -->
-    <style>
-        :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        body {
-            background-color: var(--body-bg);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        main {
-            flex: 1;
-        }
-        .navbar {
-            background-color: var(--navbar-bg);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-        }
-        .navbar-nav .nav-link {
-            font-weight: 500;
-            transition: color 0.3s ease;
-            border-radius: 6px;
-            margin: 0 4px;
-            padding: 8px 12px !important;
-        }
-        .navbar-nav .nav-link:hover {
-            background-color: rgba(102, 126, 234, 0.1);
-            color: #667eea !important;
-        }
-        .breadcrumb {
-            background-color: transparent;
-        }
-        .breadcrumb-item + .breadcrumb-item::before {
-            content: "/";
-            color: #6c757d;
-        }
-        footer {
-            background-color: #2c3e50;
-            color: #ecf0f1;
-        }
-        .footer-bottom {
-            background-color: #233140;
-        }
-        .w-fit {
-          width: fit-content !important;
-        }
-        
-        /* HTMX Indicators */
-        .htmx-indicator {
-            display: none;
-        }
-        .htmx-request .htmx-indicator {
-            display: inline-block;
-        }
-        .htmx-request.htmx-indicator {
-            display: inline-block;
-        }
-        
-        /* Bulk Actions Toolbar */
-        .bulk-actions-toolbar {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            background: var(--bs-body-bg);
-            border-bottom: 2px solid var(--bs-primary);
-            animation: slideDown 0.3s ease-out;
-        }
-        
-        @keyframes slideDown {
-            from {
-                transform: translateY(-100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        /* Inline Edit */
-        .inline-edit-input {
-            border: 2px dashed var(--bs-primary);
-            background: var(--bs-light);
-        }
-        
-        /* Mobile Responsive Tables */
-        @media (max-width: 768px) {
-            .table-responsive {
-                font-size: 0.875rem;
-            }
-            .table th, .table td {
-                padding: 0.5rem !important;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
     
     {% block cdn %}{% endblock %}
     {% block style %}{% endblock %}
 </head>
 <body class="d-flex flex-column">
     <header>
-        <nav class="navbar navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
-            <div class="container-fluid">
+        <nav class="navbar app-navbar navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
+            <div class="container">
               <a class="navbar-brand" href="{% url 'home' %}">
                   <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
               </a>
@@ -168,7 +68,7 @@
                 <i class="fas fa-bars"></i>
               </button>
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">{% translate "About Us" %}</a></li>
               {% if user.is_authenticated %}
@@ -181,23 +81,14 @@
               {% if request.user.role.role == "moderator" %}
               <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
               {% endif %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">{% translate "Logout" %}</a></li>
-              {% else %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'user_login' %}">{% translate "Login" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'signup' %}">{% translate "Sign Up" %}</a></li>
-              {% endif %}
               {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
                 <li class="nav-item"><a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Dashboard" %}</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'calendar-management' %}">{% translate "Calendar" %}</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'attendance-management' %}">{% translate "Attendance" %}</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'progress-dashboard' %}">{% translate "Progress" %}</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'report-dashboard' %}">{% translate "Reports" %}</a></li>
+              {% endif %}
               {% endif %}
             </ul>
-            
-            <!-- Language Selector Form -->
-            <form action="{% url 'set_language' %}" method="post" id="language-form" class="d-flex">
+
+            <div class="app-nav-actions">
+              <form action="{% url 'set_language' %}" method="post" id="language-form">
                 {% csrf_token %}
                 <input name="next" type="hidden" value="{{ request.get_full_path }}">
                 <select name="language" class="form-select form-select-sm w-fit" onchange="document.getElementById('language-form').submit()">
@@ -209,7 +100,14 @@
                         </option>
                     {% endfor %}
                 </select>
-            </form>
+              </form>
+              {% if user.is_authenticated %}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'logout' %}"><i class="fas fa-right-from-bracket"></i>{% translate "Logout" %}</a>
+              {% else %}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'user_login' %}">{% translate "Login" %}</a>
+                <a class="btn btn-primary btn-sm" href="{% url 'signup' %}">{% translate "Sign Up" %}</a>
+              {% endif %}
+            </div>
               </div>
             </div>
         </nav>
@@ -234,7 +132,7 @@
     {% endblock %}
 
     <!-- Toast Notifications -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1070;" x-data>
+    <div class="toast-container app-toast-stack position-fixed bottom-0 end-0 p-3" x-data>
         <template x-for="notification in $store.notifications.items" :key="notification.id">
             <div class="toast show align-items-center text-white border-0 mb-2" :class="`bg-${notification.type}`" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="d-flex">

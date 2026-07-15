@@ -8,65 +8,10 @@
 {% endblock %}
 
 {% block style %}
-<style>
-    body {
-        background-image: url('{% static "login-bg.jpg" %}');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        min-height: 100vh;
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1.5rem 0;
-    }
-    body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        background: linear-gradient(135deg, rgba(24, 24, 24, 0.34), rgba(24, 24, 24, 0.18));
-        pointer-events: none;
-    }
-    .login-card {
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(6px);
-        border: 1px solid rgba(255, 255, 255, 0.45);
-        border-radius: 1.2rem;
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-        overflow: hidden;
-        position: relative;
-        z-index: 1;
-    }
-    .login-card .card-body { padding: 2rem; }
-    .form-control, .form-select {
-        min-height: 48px;
-        border-radius: 0.85rem;
-        border-color: #d8d5c7;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: #6b705c;
-        box-shadow: 0 0 0 0.2rem rgba(107, 112, 92, 0.15);
-    }
-    .btn-primary {
-        background: linear-gradient(135deg, #6b705c 0%, #5a5f4f 100%);
-        border: none;
-        border-radius: 0.85rem;
-        font-weight: 600;
-        min-height: 48px;
-    }
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        background: linear-gradient(135deg, #5d6352 0%, #4f5446 100%);
-    }
-    .login-logo { max-width: 160px; width: 100%; height: auto; }
-    .language-switcher { position: relative; z-index: 1; }
-</style>
 {% endblock %}
 
 {% block body %}
+<section class="login-page">
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-11 col-sm-8 col-md-6 col-lg-5 col-xl-4">
@@ -104,4 +49,5 @@
         </div>
     </div>
 </div>
+</section>
 {% endblock %}

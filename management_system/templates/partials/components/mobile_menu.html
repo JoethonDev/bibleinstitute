@@ -1,8 +1,7 @@
 {% load i18n %}
 <!-- Mobile Menu Toggle Button -->
 <button 
-    class="btn btn-primary d-md-none position-fixed" 
-    style="bottom: 20px; right: 20px; z-index: 1040; border-radius: 50%; width: 56px; height: 56px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+    class="btn btn-primary mobile-fab d-md-none position-fixed"
     @click="$store.ui.toggleMobileMenu()"
     x-data
     aria-label="Toggle Menu"
@@ -21,17 +20,15 @@
     x-transition:leave="transition ease-in duration-150"
     x-transition:leave-start="opacity-100 transform translate-y-0"
     x-transition:leave-end="opacity-0 transform translate-y-full"
-    class="d-md-none position-fixed bottom-0 start-0 w-100 bg-white shadow-lg rounded-top-3"
-    style="z-index: 1039; max-height: 70vh; overflow-y: auto;"
+    class="mobile-menu-panel d-md-none position-fixed bottom-0 start-0 w-100 bg-white shadow-lg rounded-top-3"
     x-cloak
 >
     <div class="p-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">{% translate "Menu" %}</h5>
             <button 
-                class="btn btn-sm btn-outline-secondary rounded-circle" 
+                class="btn btn-sm btn-outline-secondary rounded-circle mobile-menu-close"
                 @click="$store.ui.closeMobileMenu()"
-                style="width: 32px; height: 32px; padding: 0;"
             >
                 <i class="fas fa-times"></i>
             </button>

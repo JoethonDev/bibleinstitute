@@ -36,11 +36,7 @@
                             <td>{{ p.lesson.name }}</td>
                             <td><code>{{ p.part_id }}</code></td>
                             <td>
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar" role="progressbar" style="width: {{ p.percent }}%;" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">
-                                        {{ p.percent }}%
-                                    </div>
-                                </div>
+                                <progress class="app-progress progress-medium" value="{{ p.percent }}" max="100" aria-label="{{ p.percent }}%">{{ p.percent }}%</progress>
                             </td>
                             <td>
                                 {% if p.completed_at %}

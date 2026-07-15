@@ -3,10 +3,6 @@
 {% load i18n %}
 {% load static %}
 
-{% block cdn %}
-<link rel="stylesheet" href="{% static 'css/user-theme.css' %}">
-{% endblock %}
-
 {% block body %}
 <div class="container py-4 py-lg-5">
     <div class="row g-4">
@@ -16,18 +12,17 @@
             <div class="user-card h-100">
 
                 <!-- Header with avatar + name -->
-                <div class="p-4 d-flex align-items-center gap-3 border-bottom" style="border-color:var(--user-border)!important;">
+                <div class="p-4 d-flex align-items-center gap-3 border-bottom user-border">
                     <div class="profile-avatar flex-shrink-0">{{ initials }}</div>
                     <div class="min-w-0">
                         <h5 class="mb-0 fw-bold text-truncate">{{ object.get_full_name|default:object.username }}</h5>
-                        <span class="user-stat-badge mt-1 d-inline-flex" style="font-size:.8rem;">
+                        <span class="user-stat-badge profile-role mt-1 d-inline-flex">
                             {{ object.role.get_role_display }}
                         </span>
                     </div>
                     {% if request.user.id == object.id %}
                     <a href="{% url 'update-profile' object.id %}"
-                       class="btn btn-sm ms-auto flex-shrink-0"
-                       style="border-color:var(--user-accent);color:var(--user-accent);">
+                       class="btn btn-sm btn-accent-outline ms-auto flex-shrink-0">
                         <i class="fas fa-pencil-alt me-1"></i>{% translate "Edit" %}
                     </a>
                     {% endif %}
@@ -62,8 +57,8 @@
 
             <!-- Courses accordion -->
             <div class="user-card">
-                <div class="p-3 border-bottom d-flex align-items-center gap-2" style="border-color:var(--user-border)!important;">
-                    <i class="fas fa-book-open" style="color:var(--user-accent);"></i>
+                <div class="p-3 border-bottom d-flex align-items-center gap-2 user-border">
+                    <i class="fas fa-book-open text-accent"></i>
                     <h5 class="mb-0 fw-bold">{% translate "My Courses" %}</h5>
                 </div>
                 <div class="p-3">
@@ -72,12 +67,11 @@
                         {% for level in courses %}
                             <div class="accordion-item border-0">
                                 <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fw-semibold px-0"
+                                    <button class="accordion-button btn-accent-quiet {% if not forloop.first %}collapsed{% endif %} fw-semibold px-0"
                                             type="button"
                                             data-bs-toggle="collapse"
                                             data-bs-target="#collapse-{{ forloop.counter }}"
-                                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
-                                            style="background:transparent;color:var(--user-accent);box-shadow:none;">
+                                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
                                         {{ level.level_name }}
                                     </button>
                                 </h2>
@@ -88,10 +82,7 @@
                                         {% for course in level.courses %}
                                             <li class="mb-1">
                                                 <a href="{% url 'course-details' course.id %}"
-                                                   class="d-flex align-items-center gap-2 py-2 px-3 rounded text-decoration-none"
-                                                   style="color:inherit;transition:background .2s;"
-                                                   onmouseover="this.style.background='var(--user-accent-soft)'"
-                                                   onmouseout="this.style.background='transparent'">
+                                                   class="d-flex align-items-center gap-2 py-2 px-3 rounded text-decoration-none inherit-link hover-soft">
                                                     <i class="fas fa-book text-muted small"></i>
                                                     <span class="flex-grow-1">{{ course.name }}</span>
                                                     <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} text-muted small"></i>
@@ -114,13 +105,13 @@
             <!-- Recent Quiz Results -->
             {% if recent_grades %}
             <div class="user-card">
-                <div class="p-3 border-bottom d-flex align-items-center gap-2" style="border-color:var(--user-border)!important;">
-                    <i class="fas fa-star" style="color:var(--user-accent);"></i>
+                <div class="p-3 border-bottom d-flex align-items-center gap-2 user-border">
+                    <i class="fas fa-star text-accent"></i>
                     <h5 class="mb-0 fw-bold">{% translate "Recent Quiz Results" %}</h5>
                 </div>
                 <ul class="list-unstyled mb-0 p-3">
                     {% for grade in recent_grades %}
-                    <li class="d-flex align-items-center gap-3 py-2 {% if not forloop.last %}border-bottom{% endif %}" style="border-color:var(--user-border)!important;">
+                    <li class="d-flex align-items-center gap-3 py-2 user-border {% if not forloop.last %}border-bottom{% endif %}">
                         <div class="flex-grow-1 min-w-0">
                             <p class="mb-0 fw-semibold text-truncate">{{ grade.quiz.name }}</p>
                             <span class="text-muted small">
@@ -142,4 +133,3 @@
     </div>
 </div>
 {% endblock %}
-

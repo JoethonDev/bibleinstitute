@@ -1,5 +1,5 @@
 {% load i18n %}
-{# 
+{% comment %}
     Reusable Modal Component
     
     Parameters:
@@ -24,7 +24,7 @@
             <p>Modal body content here</p>
         </div>
     {% endinclude %}
-#}
+{% endcomment %}
 
 {% if not modal_centered %}{% with modal_centered=True %}{% endwith %}{% endif %}
 {% if not show_footer %}{% with show_footer=True %}{% endwith %}{% endif %}

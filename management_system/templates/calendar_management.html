@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'admin_panel.html' %}
 {% load i18n %}
 
 {% block head_meta %}
@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block body %}
-<div class="container py-4">
+<div id="content" class="container-fluid py-4">
   <h1 class="mb-4">{% translate "Calendar Management" %}</h1>
   {% if messages %}
     {% for msg in messages %}
@@ -54,7 +54,7 @@
                     <td>{{ h.date }}</td>
                     <td>{{ h.name }}</td>
                     <td>
-                      <form method="post" action="{% url 'delete-holiday' h.id %}" style="display:inline">
+                      <form method="post" action="{% url 'delete-holiday' h.id %}" class="inline-action">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{% translate "Delete this holiday?" %}')">{% translate "Delete" %}</button>
                       </form>

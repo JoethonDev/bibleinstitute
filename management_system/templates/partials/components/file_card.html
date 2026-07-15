@@ -42,8 +42,7 @@
         {# Icon and Name #}
         {% if item.type == 'folder' %}
             {# Folder Icon #}
-            <div class="drive-icon folder-icon text-warning w-100" 
-                 style="cursor: pointer;"
+            <div class="drive-icon folder-icon text-warning w-100 is-clickable"
                  {% if mode == 'simple' %}
                      hx-get="{% url 'navigate-folder' item.id %}" 
                      hx-trigger="click" 
@@ -55,8 +54,7 @@
                 <i class="fas fa-folder fa-3x"></i>
             </div>
             
-            <div class="card-title mt-2 w-100" 
-                 style="word-wrap: break-word; font-size: {% if mode == 'advanced' %}0.75rem{% else %}0.85rem{% endif %};" 
+            <div class="card-title file-name {% if mode == 'advanced' %}file-name-sm{% else %}file-name-md{% endif %} mt-2 w-100"
                  title="{{ item.name }}">
                 {{ item.name }}
             </div>
@@ -80,8 +78,7 @@
             </div>
             
             {# File Name with Badge #}
-            <div class="card-title mt-2 w-100" 
-                 style="word-wrap: break-word; font-size: {% if mode == 'advanced' %}0.75rem{% else %}0.85rem{% endif %};" 
+            <div class="card-title file-name {% if mode == 'advanced' %}file-name-sm{% else %}file-name-md{% endif %} mt-2 w-100"
                  title="{{ item.name }}">
                 {% if mode == 'advanced' %}
                     {% if '_video' in item.name or item.name|slice:'-4:' == '.mp4' %}
@@ -114,7 +111,7 @@
             
             {# File Size (if enabled) #}
             {% if show_size and item.size %}
-            <div class="text-muted" style="font-size: 0.7rem;">
+            <div class="text-muted file-meta">
                 {% if item.size < 1024 %}
                     {{ item.size }} B
                 {% elif item.size < 1048576 %}
