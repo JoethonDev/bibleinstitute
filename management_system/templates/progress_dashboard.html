@@ -2,24 +2,55 @@
 {% load i18n %}
 
 {% block body %}
-<div class="container-fluid">
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>{% translate "Lecture Progress" %}</h5>
+<div class="container-fluid py-3" id="content">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active">{% translate "Progress" %}</li>
+        </ol>
+    </nav>
+
+    <h4 class="mb-3">{% translate "Lecture Progress" %}</h4>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto">
+            <select name="academic_year" class="form-select" onchange="this.form.submit()">
+                <option value="">{% translate "Academic year..." %}</option>
+                {% for y in academic_years %}
+                <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y.name }}</option>
+                {% endfor %}
+            </select>
         </div>
-        <div class="card-body">
-            <form method="get" class="row g-3 mb-4">
-                <div class="col-auto">
-                    <select name="lesson" class="form-select" onchange="this.form.submit()">
-                        <option value="">{% translate "All Lessons" %}</option>
-                        {% for l in lessons %}
-                        <option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </form>
+        <div class="col-auto">
+            <select name="course_offering" class="form-select" onchange="this.form.submit()">
+                <option value="">{% translate "Course offering..." %}</option>
+                {% for o in offerings %}
+                <option value="{{ o.id }}" {% if selected_offering == o.id %}selected{% endif %}>{{ o.course.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <select name="lesson" class="form-select" onchange="this.form.submit()">
+                <option value="">{% translate "Lesson..." %}</option>
+                {% for l in lessons %}
+                <option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <select name="student" class="form-select" onchange="this.form.submit()">
+                <option value="">{% translate "Student..." %}</option>
+                {% for s in students %}
+                <option value="{{ s.id }}" {% if selected_student == s.id %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    <div class="card admin-card">
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-striped">
+                <table class="table table-hover admin-table mb-0">
                     <thead>
                         <tr>
                             <th>{% translate "Student" %}</th>
@@ -36,7 +67,9 @@
                             <td>{{ p.lesson.name }}</td>
                             <td><code>{{ p.part_id }}</code></td>
                             <td>
-                                <progress class="app-progress progress-medium" value="{{ p.percent }}" max="100" aria-label="{{ p.percent }}%">{{ p.percent }}%</progress>
+                                <div class="progress" style="height:20px;max-width:200px">
+                                    <div class="progress-bar" role="progressbar" style="width:{{ p.percent }}%" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">{{ p.percent }}%</div>
+                                </div>
                             </td>
                             <td>
                                 {% if p.completed_at %}
@@ -48,7 +81,15 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">{% translate "No progress records found." %}</td>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                {% if selected_year %}
+                                <i class="fas fa-inbox fs-1 mb-2"></i>
+                                <p>{% translate "No progress records for this selection." %}</p>
+                                {% else %}
+                                <i class="fas fa-filter fs-1 mb-2"></i>
+                                <p>{% translate "Select an academic year to load progress data." %}</p>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

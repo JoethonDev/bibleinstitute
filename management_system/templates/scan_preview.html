@@ -34,13 +34,13 @@
   {% endif %}
 
   <div class="d-flex gap-2">
-    <form method="post" action="{% url 'record-attendance' token=student.qr_token action='entrance' %}">
+    <form method="post" action="{% url 'record-attendance' token=token action='entrance' %}">
       {% csrf_token %}
       <button type="submit" class="btn btn-success btn-lg" {% if 'entrance' in already_recorded %}disabled{% endif %}>
         {% translate "Record Entrance" %}
       </button>
     </form>
-    <form method="post" action="{% url 'record-attendance' token=student.qr_token action='exit' %}">
+    <form method="post" action="{% url 'record-attendance' token=token action='exit' %}">
       {% csrf_token %}
       <button type="submit" class="btn btn-warning btn-lg" {% if 'exit' in already_recorded %}disabled{% endif %}>
         {% translate "Record Exit" %}

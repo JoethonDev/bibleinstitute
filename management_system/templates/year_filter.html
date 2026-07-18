@@ -1,6 +1,6 @@
 {% load i18n %}
 <div class="position-relative d-flex align-items-center">
-  <select class="form-select filters-fields pe-4" aria-label="{% translate 'Year Filter' %}" name="filtering" hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}" hx-trigger="change" hx-target="#table-container" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#year-spinner">
+  <select class="form-select filters-fields pe-4" aria-label="{% translate 'Year Filter' %}" name="filtering" hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}" hx-include=".filters-fields" hx-trigger="change" hx-target="#table-container" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#year-spinner">
     {% for option in options %}
         {% if forloop.first %}
             <option value="">{{ option }}</option>

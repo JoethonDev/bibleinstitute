@@ -112,6 +112,20 @@
         </li>
 
         <li class="nav-item">
+            <a class="nav-link text-white"
+               href="{% url 'academic-setup' %}"
+               hx-get="{% url 'academic-setup' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-school"></i>
+                <span>{% translate "Academic Setup" %}</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
             <a class="nav-link text-white" href="{% url 'calendar-management' %}">
                 <i class="fas fa-calendar-days"></i>
                 <span>{% translate "Calendar" %}</span>

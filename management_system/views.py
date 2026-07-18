@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
@@ -37,7 +38,7 @@ import requests
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, AcademicYearForm, CourseOfferingForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, _csv_safe_cell, _safe_filename
@@ -51,6 +52,7 @@ from .utils.decorators import capability_required, can_manage_content, can_delet
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
 from .utils.attendance import is_expected_date, get_expected_dates, get_attendance_summary
+from .public_content import get_institute_copy
 
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
@@ -244,6 +246,7 @@ class FormBase(AdminPermissionView, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["view_name"] = self.view_name  # Example shared context
+        context["object_id"] = self.object.pk if self.object else 'new'
         return context
 
 class UserBaseView(FormBase):
@@ -300,7 +303,7 @@ def index(request):
 
         return portal(request)
 
-    return render(request, "home.html")
+    return render(request, "home.html", get_institute_copy(translation.get_language(), "home"))
 
 
 @login_required(login_url=LOGIN_URL)
@@ -334,7 +337,11 @@ def portal(request):
 
 
 def about_page(request):
-    return render(request, "about.html")
+    return render(request, "about.html", get_institute_copy(translation.get_language(), "about"))
+
+
+def program_page(request):
+    return render(request, "program.html", get_institute_copy(translation.get_language(), "courses"))
 
 # Detail Class [handles with and without pk routes]
 class ProfileDetail(LoginProtection, DetailView):
@@ -767,19 +774,16 @@ def user_dashboard(request):
     name = request.GET.get("name", None)
     role_value = request.GET.get("filtering", None)
     user = request.user
-    # Start with an empty Q object (matches all)
-    query = Q()
 
-    # Dynamically add conditions if filters are present
+    query = Q()
     if name:
         query &= Q(username__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
     if role_value:
         role_name = Role.get_by_readable_value(role_value)
-        query &= Q(role=role_name)  # Assuming `role` is a field in the User model
+        query &= Q(role=role_name)
+    users = User.objects.filter(query)
     
     logger.info(f"User : {user} filters {view}s using {name} name and {role_value} role")
-
-    users = User.objects.filter(query)
 
     # Apply sorting
     sort_by = request.GET.get('sort', 'joined_date')
@@ -805,7 +809,7 @@ def user_dashboard(request):
         "name_value" : name or "",
         "filtering" : role_value or "",
         "columns" : User.get_columns(),
-        "options" : [_("Choose Role"), *Role.get_readable_values()] # Translate "Choose Role"
+        "options" : [_("Choose Role"), *Role.get_readable_values()],
     }
 
     return render_dashboard(request, users, view, context)
@@ -939,26 +943,24 @@ def course_dashboard(request):
     year = request.GET.get("filtering", None)
     user = request.user
     view = "course"
-    # Start with an empty Q object (matches all)
     query = Q()
-
-    # Dynamically add conditions if filters are present
     if name:
         query &= Q(name__icontains=name)
     if year:
         for key, val in Course.LEVELS_NAME.items():
             if val == year:
                 query &= Q(level=key)
+    courses = Course.objects.filter(query)
     
     logger.info(f"User : {user} filters users using {name} name and {year} level")
 
-    courses = Course.objects.filter(query).order_by("name")
+    courses = courses.order_by("name")
 
     context = {
         "name_value" : name or "",
         "filtering" : year or "",
         "columns" : Course.get_columns(),
-        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]] # Translate "Choose Academic Year" and values
+        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]],
     }
 
     return render_dashboard(request, courses, view, context)
@@ -990,10 +992,7 @@ def lesson_dashboard(request):
     course = request.GET.get("course", None)
     user = request.user
     view = "lesson"
-    # Start with an empty Q object (matches all)
     query = Q()
-
-    # Dynamically add conditions if filters are present
     if name:
         query &= Q(name__icontains=name)
     if year:
@@ -1003,19 +1002,20 @@ def lesson_dashboard(request):
     if course:
         course_obj = Course.objects.filter(name=course).first()
         query &= Q(course=course_obj)
+    lessons = Lesson.objects.filter(query)
     
     logger.info(f"User : {user} filters users using {name} name and {year} level and {course} course")
 
-    lessons = Lesson.objects.filter(query).order_by("name")
+    lessons = lessons.order_by("name")
 
     context = {
         "name_value" : name or "",
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Lesson.get_columns(),
-        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]], # Translate "Choose Academic Year" and values
-        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]], # Translate "Choose Course"
-        "filters" : ["course_filter.html"]
+        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]],
+        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]],
+        "filters" : ["course_filter.html"],
     }
 
     return render_dashboard(request, lessons, view, context)
@@ -1072,6 +1072,10 @@ def navigate_folder(request, folder_id=None):
     # Check if folders_only mode is requested (for upload_video page)
     folders_only = request.GET.get('folders_only', 'false').lower() == 'true'
     
+    # Redirect raw (non-HTMX) requests to the parent page rather than rendering a fragment
+    if not request.headers.get("HX-Request"):
+        return redirect("r2-management")
+
     root = True
     parent_folder = None
     if folder_id and folder_id != "None":
@@ -1207,10 +1211,7 @@ def quiz_dashboard(request):
     course = request.GET.get("course", None)
     user = request.user
     view = "quiz"
-    # Start with an empty Q object (matches all)
     query = Q(course__isnull=False)
-
-    # Dynamically add conditions if filters are present
     if name:
         query &= Q(name__icontains=name)
     if year:
@@ -1220,20 +1221,21 @@ def quiz_dashboard(request):
     if course:
         course_obj = Course.objects.filter(name=course).first()
         query &= Q(course=course_obj)
+    quizzes = Quiz.objects.filter(query)
     
     logger.info(f"User : {user} filters users using {name} name and {year} level and {course} course")
 
-    quizzes = Quiz.objects.filter(query).order_by("name")
+    quizzes = quizzes.order_by("name")
 
     context = {
         "name_value" : name or "",
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Quiz.get_columns(),
-        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]], # Translate "Choose Academic Year" and values
-        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]], # Translate "Choose Course"
+        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]],
+        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]],
         "filters" : ["course_filter.html"],
-        "submission_view" : True
+        "submission_view" : True,
     }
 
     return render_dashboard(request, quizzes, view, context)
@@ -2259,10 +2261,24 @@ def signup(request):
 
 @capability_required(can_manage_applications)
 def applications_dashboard(request):
-    status_filter = request.GET.get("status", "pending")
-    users = User.objects.filter(application_status=status_filter).select_related("role")
+    from django.core.paginator import Paginator
+    status_filter = request.GET.get("status", "all")
+    if status_filter == "all":
+        users = User.objects.filter(
+            Q(application_status__in=["pending", "active", "declined"])
+        ).select_related("role").order_by("date_joined")
+    elif status_filter in ("pending", "active", "declined"):
+        users = User.objects.filter(application_status=status_filter).select_related("role").order_by("date_joined")
+    else:
+        status_filter = "all"
+        users = User.objects.filter(
+            Q(application_status__in=["pending", "active", "declined"])
+        ).select_related("role").order_by("date_joined")
+    paginator = Paginator(users, 15)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
     return render(request, "applications_dashboard.html", {
-        "users": users,
+        "page_obj": page_obj,
         "current_status": status_filter,
     })
 
@@ -2460,6 +2476,111 @@ def copy_course_offering(request, offering_id):
     return redirect("course-dashboard")
 
 
+@capability_required(can_manage_content)
+def academic_setup(request):
+    years = AcademicYear.objects.all().order_by("-starts_on")
+    selected_year = request.GET.get("academic_year")
+    offerings = CourseOffering.objects.none()
+    if selected_year:
+        offerings = CourseOffering.objects.filter(academic_year_id=selected_year).select_related("course", "academic_year")
+    year_form = AcademicYearForm()
+    offering_form = CourseOfferingForm()
+    return render(request, "academic_setup.html", {
+        "years": years,
+        "offerings": offerings,
+        "selected_year": int(selected_year) if selected_year else None,
+        "year_form": year_form,
+        "offering_form": offering_form,
+    })
+
+
+@capability_required(can_manage_content)
+def academic_year_create(request):
+    if request.method == "POST":
+        form = AcademicYearForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Academic year created."))
+        else:
+            for field, errors in form.errors.items():
+                for err in errors:
+                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+        return redirect("academic-setup")
+
+
+@capability_required(can_manage_content)
+def academic_year_edit(request, year_id):
+    year = get_object_or_404(AcademicYear, pk=year_id)
+    if request.method == "POST":
+        form = AcademicYearForm(request.POST, instance=year)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Academic year updated."))
+        else:
+            for field, errors in form.errors.items():
+                for err in errors:
+                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+        return redirect("academic-setup")
+
+
+@require_POST
+@capability_required(can_manage_content)
+def academic_year_delete(request, year_id):
+    year = get_object_or_404(AcademicYear, pk=year_id)
+    enrollments_count = Enrollment.objects.filter(academic_year=year).count()
+    if CourseOffering.objects.filter(academic_year=year).exists():
+        messages.error(request, _("Cannot delete a year that has course offerings."))
+    elif enrollments_count:
+        messages.error(request, _("Cannot delete a year that has %(count)d enrollment(s).") % {"count": enrollments_count})
+    else:
+        year.delete()
+        messages.success(request, _("Academic year deleted."))
+    return redirect("academic-setup")
+
+
+@capability_required(can_manage_content)
+def course_offering_create(request):
+    if request.method == "POST":
+        form = CourseOfferingForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Course offering created."))
+        else:
+            for field, errors in form.errors.items():
+                for err in errors:
+                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+        year_id = request.POST.get("academic_year")
+        return redirect(f"{reverse('academic-setup')}?academic_year={year_id}" if year_id else "academic-setup")
+
+
+@capability_required(can_manage_content)
+def course_offering_edit(request, offering_id):
+    offering = get_object_or_404(CourseOffering, pk=offering_id)
+    if request.method == "POST":
+        form = CourseOfferingForm(request.POST, instance=offering)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Course offering updated."))
+        else:
+            for field, errors in form.errors.items():
+                for err in errors:
+                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+        return redirect(f"{reverse('academic-setup')}?academic_year={offering.academic_year_id}")
+
+
+@require_POST
+@capability_required(can_manage_content)
+def course_offering_delete(request, offering_id):
+    offering = get_object_or_404(CourseOffering, pk=offering_id)
+    year_id = offering.academic_year_id
+    try:
+        offering.delete()
+        messages.success(request, _("Course offering deleted."))
+    except ProtectedError as e:
+        messages.error(request, _("Cannot delete this course offering: it is referenced by other records (%s).") % str(e))
+    return redirect(f"{reverse('academic-setup')}?academic_year={year_id}")
+
+
 @require_POST
 @capability_required(can_manage_content)
 def duplicate_course(request, course_id):
@@ -2501,31 +2622,185 @@ def duplicate_course(request, course_id):
 
 @capability_required(can_manage_content)
 def calendar_management(request):
-    years = AcademicYear.objects.filter(is_current=True).prefetch_related("holidays")
-    return render(request, "calendar_management.html", {"years": years})
+    import calendar as cal_mod
+    from datetime import date, datetime
 
+    years = AcademicYear.objects.all().order_by("-starts_on")
+    selected_year_id = request.GET.get("academic_year")
+    year = None
+    month_grid = None
+    prev_month = None
+    next_month = None
+    today = date.today()
+    cur_month = today.month
+    cur_year = today.year
 
-@capability_required(can_manage_content)
-def add_holiday(request):
-    if request.method == "POST":
-        year_id = request.POST.get("academic_year_id")
-        date_val = request.POST.get("date")
-        name = request.POST.get("name")
-        year = get_object_or_404(AcademicYear, pk=year_id)
-        AcademicHoliday.objects.create(academic_year=year, date=date_val, name=name)
-        messages.success(request, _("Holiday added."))
-        return redirect("calendar-management")
-    years = AcademicYear.objects.filter(is_current=True).prefetch_related("holidays")
-    return render(request, "calendar_management.html", {"years": years})
+    if selected_year_id:
+        year = get_object_or_404(AcademicYear, pk=selected_year_id)
+        year_id = year.id
+        year_start = year.starts_on
+        year_end = year.ends_on
+        cur_month = today.month
+        cur_year = today.year
+        if today < year_start or today > year_end:
+            cur_month = year_start.month
+            cur_year = year_start.year
+        else:
+            cur_month = today.month
+            cur_year = today.year
+
+        year_param = request.GET.get("year")
+        month_param = request.GET.get("month")
+        if year_param:
+            try:
+                cur_year = int(year_param)
+            except (ValueError, TypeError):
+                pass
+        if month_param:
+            try:
+                cur_month = int(month_param)
+            except (ValueError, TypeError):
+                try:
+                    cur_year, cur_month = [int(x) for x in month_param.split("-")]
+                except (ValueError, IndexError):
+                    pass
+        if cur_month < 1 or cur_month > 12:
+            cur_month = 1
+
+        # Clamp to academic year bounds
+        first_month = year_start.year * 12 + year_start.month
+        last_month = year_end.year * 12 + year_end.month
+        current_cell = cur_year * 12 + cur_month
+        if current_cell < first_month:
+            cur_year = year_start.year
+            cur_month = year_start.month
+            current_cell = cur_year * 12 + cur_month
+        elif current_cell > last_month:
+            cur_year = year_end.year
+            cur_month = year_end.month
+            current_cell = cur_year * 12 + cur_month
+
+        if current_cell > first_month:
+            pm = current_cell - 1
+            prev_month = f"year={((pm - 1) // 12)}&month={((pm - 1) % 12) + 1}"
+        if current_cell < last_month:
+            nm = current_cell + 1
+            next_month = f"year={((nm - 1) // 12)}&month={((nm - 1) % 12) + 1}"
+
+        cal = cal_mod.Calendar()
+        month_days = cal.monthdatescalendar(cur_year, cur_month)
+
+        holidays = {
+            h.date: h
+            for h in AcademicHoliday.objects.filter(academic_year=year, date__year=cur_year, date__month=cur_month)
+        }
+
+        meeting_weekdays = set(year.meeting_weekdays or [])
+
+        month_grid = []
+        for week in month_days:
+            week_data = []
+            for d in week:
+                in_year = year_start <= d <= year_end
+                is_meeting = d.weekday() in meeting_weekdays
+                is_today = d == today
+                is_holiday = d in holidays
+                week_data.append({
+                    "day": d.day,
+                    "date": d.isoformat(),
+                    "in_year": in_year,
+                    "is_meeting": is_meeting,
+                    "is_today": is_today,
+                    "is_holiday": is_holiday,
+                    "holiday_name": holidays[d].name if is_holiday else "",
+                    "holiday_id": holidays[d].id if is_holiday else None,
+                    "disabled": not in_year,
+                    "outside_month": d.month != cur_month,
+                })
+            month_grid.append(week_data)
+    else:
+        year_id = None
+
+    months_list = []
+    for i in range(1, 13):
+        d = date(2000, i, 1)
+        months_list.append({
+            "value": i,
+            "name": d.strftime("%B"),
+        })
+
+    # Generate year options within the academic year range
+    year_options = []
+    if year:
+        for y in range(year.starts_on.year, year.ends_on.year + 1):
+            year_options.append(y)
+
+    return render(request, "calendar_management.html", {
+        "years": years,
+        "year": year,
+        "year_id": year_id,
+        "month_grid": month_grid,
+        "prev_month": prev_month,
+        "next_month": next_month,
+        "cur_month": cur_month,
+        "cur_year": cur_year,
+        "today": today,
+        "month_name": date(cur_year, cur_month, 1).strftime("%B %Y") if month_grid else "",
+        "months": months_list,
+        "year_options": year_options,
+    })
 
 
 @require_POST
-@capability_required(can_correct_attendance)
+@capability_required(can_manage_content)
+def add_holiday(request):
+    from datetime import datetime as dt
+
+    year_id = request.POST.get("academic_year_id")
+    date_val = request.POST.get("date")
+    name = request.POST.get("name", "").strip()
+
+    if not year_id or not date_val:
+        messages.error(request, _("Missing required fields."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year_id or ''}")
+
+    try:
+        year = AcademicYear.objects.get(pk=year_id)
+    except (AcademicYear.DoesNotExist, ValueError):
+        messages.error(request, _("Invalid academic year."))
+        return redirect("calendar-management")
+
+    if not name:
+        messages.error(request, _("Holiday name is required."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+
+    try:
+        holiday_date = dt.strptime(date_val, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        messages.error(request, _("Invalid date format."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+
+    if holiday_date < year.starts_on or holiday_date > year.ends_on:
+        messages.error(request, _("Date is outside the academic year range."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+
+    if AcademicHoliday.objects.filter(academic_year=year, date=holiday_date).exists():
+        messages.error(request, _("A holiday already exists on this date."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+
+    AcademicHoliday.objects.create(academic_year=year, date=holiday_date, name=name)
+    messages.success(request, _("Holiday added."))
+    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+
+
+@require_POST
+@capability_required(can_manage_content)
 def delete_holiday(request, holiday_id):
     holiday = get_object_or_404(AcademicHoliday, pk=holiday_id)
+    year_id = holiday.academic_year_id
     holiday.delete()
-    messages.success(request, _("Holiday removed."))
-    return redirect("calendar-management")
+    messages.success(request, _("Holiday deleted."))
+    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
 
 
 @login_required
@@ -2566,8 +2841,48 @@ def scanner(request):
 
 
 @capability_required(can_scan_attendance)
+def student_lookup(request):
+    if request.method != "POST":
+        return JsonResponse({"error": _("Method not allowed")}, status=405)
+
+    query = request.POST.get("query", "").strip()
+    if not query:
+        return JsonResponse({"error": _("Query is required.")}, status=400)
+
+    user = None
+    if query.isdigit():
+        try:
+            user = User.objects.get(pk=int(query))
+        except User.DoesNotExist:
+            pass
+
+    if not user:
+        try:
+            user = User.objects.get(username__iexact=query)
+        except User.DoesNotExist:
+            pass
+
+    if not user:
+        messages.error(request, _("Student not found."))
+        return redirect("scanner")
+
+    if user.role and user.role.role != "student":
+        messages.error(request, _("Student not found."))
+        return redirect("scanner")
+
+    return redirect("scan-preview", token=user.qr_token or user.id)
+
+
+@capability_required(can_scan_attendance)
 def scan_preview(request, token):
-    user = get_object_or_404(User, qr_token=token)
+    if not token:
+        return HttpResponse(_("Token or ID required."), status=400)
+    user = User.objects.filter(qr_token=token).first()
+    if not user:
+        try:
+            user = get_object_or_404(User, pk=int(token))
+        except (ValueError, TypeError):
+            raise Http404
     active_enrollment = Enrollment.objects.filter(
         student=user, status="active", enrollment_type="normal"
     ).select_related("academic_year").first()
@@ -2581,6 +2896,7 @@ def scan_preview(request, token):
         "academic_year": academic_year,
         "today": today,
         "already_recorded": already_recorded,
+        "token": token,
     })
 
 
@@ -2589,7 +2905,10 @@ def scan_preview(request, token):
 def record_attendance(request, token, action):
     if action not in ("entrance", "exit"):
         return JsonResponse({"error": _("Invalid action.")}, status=400)
-    user = get_object_or_404(User, qr_token=token)
+    try:
+        user = User.objects.get(Q(qr_token=token) | Q(pk=token))
+    except (ValueError, TypeError):
+        user = get_object_or_404(User, qr_token=token)
     if user.study_mode == "online":
         return JsonResponse({"status": "noop", "action": action, "note": _("Online student — no attendance recorded.")})
     active_enrollment = Enrollment.objects.filter(
@@ -2616,14 +2935,16 @@ def record_attendance(request, token, action):
 @capability_required(can_scan_attendance)
 def attendance_management(request):
     year_id = request.GET.get("academic_year")
-    records = AttendanceRecord.objects.all().select_related("student", "academic_year", "scanned_by")
-    if year_id:
-        records = records.filter(academic_year_id=year_id)
     years = AcademicYear.objects.all()
+    if year_id:
+        records = AttendanceRecord.objects.all().select_related("student", "academic_year", "scanned_by").filter(academic_year_id=year_id)
+    else:
+        records = AttendanceRecord.objects.none()
     return render(request, "attendance_management.html", {
         "records": records,
         "years": years,
         "selected_year": int(year_id) if year_id else None,
+        "has_filter": bool(year_id),
     })
 
 
@@ -2695,9 +3016,25 @@ def sign_session(session_id, expires_at):
     return f"{message}:{signature}"
 
 
-@capability_required(can_manage_content)
+def sign_receipt(session_id, segment_key):
+    message = f"{session_id}:{segment_key}"
+    secret = settings.SECRET_KEY.encode()
+    return hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
+
+
+@login_required
 def start_viewing_session(request, lesson_id, part_id):
     lesson = get_object_or_404(Lesson, pk=lesson_id)
+    # Verify the logged-in user may access this lesson
+    if not user_can_access_course(request.user, lesson.course_offering.course):
+        if not user_has_management_role(request.user):
+            return JsonResponse({"error": _("Access denied.")}, status=403)
+    # Validate part_id belongs to lesson
+    lesson_segments = get_lesson_segments(lesson.links)
+    valid_parts = [s["key"] for s in lesson_segments]
+    if part_id not in valid_parts:
+        return JsonResponse({"error": _("Invalid part ID.")}, status=400)
+
     session = create_viewing_session(request.user, lesson, part_id)
     token = sign_session(session.session_id, session.expires_at)
     return JsonResponse({
@@ -2739,12 +3076,13 @@ def worker_receipt(request):
         return JsonResponse({"error": "Missing fields"}, status=400)
 
     session = get_object_or_404(ViewingSession, session_id=session_id)
-    expected = sign_session(session.session_id, session.expires_at).split(":")[-1]
-    if not hmac.compare_digest(signature, expected):
-        return JsonResponse({"error": "Invalid signature"}, status=403)
 
     if timezone.now() > session.expires_at:
         return JsonResponse({"error": "Session expired"}, status=410)
+
+    expected = sign_receipt(session_id, segment_key)
+    if not hmac.compare_digest(signature, expected):
+        return JsonResponse({"error": "Invalid signature"}, status=403)
 
     VerifiedSegmentRequest.objects.get_or_create(session=session, segment_key=segment_key)
     return JsonResponse({"status": "recorded"})
@@ -2754,29 +3092,130 @@ def worker_receipt(request):
 def progress_heartbeat(request):
     if not request.user.is_authenticated:
         return JsonResponse({"error": "Authentication required"}, status=401)
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
     session_id = data.get("session_id")
     ranges = data.get("ranges", [])
 
-    session = get_object_or_404(ViewingSession, session_id=session_id, student=request.user)
+    if not session_id or not isinstance(ranges, list):
+        return JsonResponse({"error": "Missing session_id or ranges"}, status=400)
+
+    # Validate ranges are numeric
+    try:
+        ranges = [[float(s), float(e)] for s, e in ranges]
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Invalid range format"}, status=400)
+
+    session = get_object_or_404(ViewingSession, session_id=session_id)
+
+    # Reject another user's session
+    if session.student != request.user:
+        return JsonResponse({"error": "Session belongs to another user"}, status=403)
+
+    if timezone.now() > session.expires_at:
+        return JsonResponse({"error": "Session expired"}, status=403)
 
     session.last_heartbeat = timezone.now()
     session.save(update_fields=["last_heartbeat"])
 
-    return JsonResponse({"status": "ok"})
+    # Get verified segment requests for this session
+    verified = list(session.verified_requests.values_list("segment_key", flat=True))
+    if not verified:
+        return JsonResponse({"status": "ok", "note": "No verified segments yet"})
+
+    # Get segment time ranges from lesson and filter to verified ones
+    lesson_segments = get_lesson_segments(session.lesson.links)
+    verified_ranges = []
+    for sr in lesson_segments:
+        if sr.get("key") in verified:
+            verified_ranges.append([float(sr.get("start", 0)), float(sr.get("end", 0))])
+
+    if not verified_ranges:
+        return JsonResponse({"status": "ok", "note": "No verified segment ranges"})
+
+    from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
+
+    intersected = intersect_verified(ranges, verified_ranges)
+    merged = merge_ranges(intersected)
+    unique_secs = unique_seconds(merged)
+    total_secs = sum(end - start for start, end in verified_ranges)
+    percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
+
+    progress, created = LectureProgress.objects.update_or_create(
+        student=request.user,
+        lesson=session.lesson,
+        part_id=session.part_id,
+        defaults={
+            "percent": percent,
+        }
+    )
+
+    # Merge with existing ranges
+    if not created and progress.merged_ranges:
+        all_ranges = merge_ranges(list(progress.merged_ranges) + merged)
+        progress.merged_ranges = all_ranges
+        unique_secs = unique_seconds(all_ranges)
+        percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
+        progress.percent = percent
+    else:
+        progress.merged_ranges = merged
+
+    COMPLETION_THRESHOLD = 80
+    if not progress.completed_at and percent >= COMPLETION_THRESHOLD:
+        progress.completed_at = timezone.now()
+
+    progress.save()
+
+    return JsonResponse({
+        "status": "ok",
+        "percent": percent,
+        "completed": progress.completed_at is not None,
+    })
 
 
-@capability_required(can_view_reports)
+@capability_required(can_manage_content)
 def progress_dashboard(request):
+    academic_year_id = request.GET.get("academic_year")
+    offering_id = request.GET.get("course_offering")
     lesson_id = request.GET.get("lesson")
-    lessons = Lesson.objects.all()
-    progress = LectureProgress.objects.all().select_related("student", "lesson")
+    student_id = request.GET.get("student")
+
+    academic_years = AcademicYear.objects.all().order_by("-starts_on")
+    offerings = CourseOffering.objects.none()
+    lessons = Lesson.objects.none()
+    students = User.objects.none()
+    progress = LectureProgress.objects.none()
+
+    if academic_year_id:
+        offerings = CourseOffering.objects.filter(academic_year_id=academic_year_id).select_related("course")
+        progress = LectureProgress.objects.filter(lesson__course_offering__academic_year_id=academic_year_id)
+        students = User.objects.filter(enrollments__academic_year_id=academic_year_id, enrollments__status="active").distinct()
+
+    if offering_id:
+        progress = progress.filter(lesson__course_offering_id=offering_id)
+        lessons = Lesson.objects.filter(course_offering_id=offering_id)
+
     if lesson_id:
         progress = progress.filter(lesson_id=lesson_id)
+
+    if student_id:
+        progress = progress.filter(student_id=student_id)
+
+    progress = progress.select_related("student", "lesson").order_by("-lesson__name", "student__username")
+
     return render(request, "progress_dashboard.html", {
         "progress": progress,
+        "academic_years": academic_years,
+        "offerings": offerings,
         "lessons": lessons,
+        "students": students,
+        "selected_year": int(academic_year_id) if academic_year_id else None,
+        "selected_offering": int(offering_id) if offering_id else None,
         "selected_lesson": int(lesson_id) if lesson_id else None,
+        "selected_student": int(student_id) if student_id else None,
     })
 
 
@@ -2991,6 +3430,7 @@ def sitemap_xml(request):
     urls = [
         (reverse("home"), "weekly", "1.0"),
         (reverse("about"), "monthly", "0.8"),
+        (reverse("program"), "monthly", "0.9"),
         (reverse("user_login"), "monthly", "0.3"),
         (reverse("signup"), "monthly", "0.5"),
     ]

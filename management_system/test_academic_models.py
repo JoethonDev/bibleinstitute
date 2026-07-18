@@ -3,7 +3,8 @@ from datetime import date
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase
+from django.test import Client, TestCase, TransactionTestCase
+from django.urls import reverse
 from django.utils import timezone
 from unittest import skipIf
 
@@ -231,3 +232,102 @@ class AcademicSchemaMigrationTests(TransactionTestCase):
         self.assertEqual(migrated_quiz.status, "published")
         self.assertIsNone(migrated_lesson.course_offering_id)
         self.assertIsNone(migrated_quiz.course_offering_id)
+
+
+class AcademicSetupViewTests(TestCase):
+    def setUp(self):
+        self.admin_role, _ = Role.objects.get_or_create(role="admin")
+        self.admin = User.objects.create_user(
+            username="admin", password="1", role=self.admin_role,
+            is_active=True,
+        )
+        self.year = AcademicYear.objects.create(
+            name="2026/2027", level=1,
+            starts_on=date(2026, 9, 20), ends_on=date(2027, 5, 20),
+        )
+        self.course = Course.objects.create(name="Test Course", level=1)
+        self.offering = CourseOffering.objects.create(course=self.course, academic_year=self.year)
+
+    def test_academic_setup_page_loads(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.get(reverse("academic-setup"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "css/app.css")
+        self.assertContains(resp, "admin-layout")
+        self.assertContains(resp, "id=\"content\"")
+
+    def test_academic_year_create_via_post(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.post(reverse("academic-year-create"), {
+            "name": "2027/2028",
+            "level": 1,
+            "starts_on": "2027-09-20",
+            "ends_on": "2028-05-20",
+            "meeting_weekdays": [0, 1],
+            "is_current": "false",
+        }, follow=True)
+        self.assertIn(resp.status_code, (200, 302))
+        exists = AcademicYear.objects.filter(name="2027/2028").exists()
+        if not exists:
+            for m in list(resp.context.get("messages", [])):
+                print("MSG:", m)
+        self.assertTrue(exists)
+
+    def test_course_offering_create_via_post(self):
+        other = Course.objects.create(name="Other Course", level=1)
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.post(reverse("course-offering-create"), {
+            "course": other.id,
+            "academic_year": self.year.id,
+            "status": "draft",
+        }, follow=True)
+        self.assertIn(resp.status_code, (200, 302))
+        count = CourseOffering.objects.filter(academic_year=self.year).count()
+        self.assertEqual(count, 2)
+
+    def test_level_mismatch_shows_error(self):
+        level_2_year = AcademicYear.objects.create(
+            name="2026/2027", level=2,
+            starts_on=date(2026, 9, 20), ends_on=date(2027, 5, 20),
+        )
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.post(reverse("course-offering-create"), {
+            "course": self.course.id,
+            "academic_year": level_2_year.id,
+            "status": "draft",
+        })
+        self.assertIn(resp.status_code, (200, 302))
+        self.assertFalse(CourseOffering.objects.filter(course=self.course, academic_year=level_2_year).exists())
+
+    def test_delete_year_with_offerings_blocked(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.post(reverse("academic-year-delete", args=[self.year.id]))
+        self.assertIn(resp.status_code, (200, 302))
+        self.assertTrue(AcademicYear.objects.filter(pk=self.year.id).exists())
+
+    def test_delete_year_without_offerings_succeeds(self):
+        empty_year = AcademicYear.objects.create(
+            name="2025/2026", level=1,
+            starts_on=date(2025, 9, 20), ends_on=date(2026, 5, 20),
+        )
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.post(reverse("academic-year-delete", args=[empty_year.id]))
+        self.assertIn(resp.status_code, (200, 302))
+        self.assertFalse(AcademicYear.objects.filter(pk=empty_year.id).exists())
+
+    def test_academic_setup_requires_staff(self):
+        student_role, _ = Role.objects.get_or_create(role="student")
+        User.objects.create_user(
+            username="student", password="1", role=student_role,
+            is_active=True,
+        )
+        c = Client()
+        c.login(username="student", password="1")
+        resp = c.get(reverse("academic-setup"))
+        self.assertEqual(resp.status_code, 401)

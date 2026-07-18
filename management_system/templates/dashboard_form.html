@@ -3,7 +3,7 @@
 {% load i18n %}
 
 {% block body %}
-<div id="content" class="admin-form-page" x-data="autoSave('{{ view_name }}-form')" @input.debounce.2000ms="saveDraft()">
+<div id="content" class="admin-form-page" x-data="autoSave('{{ view_name }}-form-{{ object_id }}')" @input.debounce.2000ms="saveDraft()">
     
     <!-- Auto-save Indicator -->
     <div class="auto-save-indicator" x-show="lastSaved" x-transition.opacity>

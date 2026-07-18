@@ -12,16 +12,17 @@
         ...tableManager(),
         columns: [{% for col in columns %}{ name: '{{ col|escapejs }}', visible: true }{% if not forloop.last %},{% endif %}{% endfor %}],
         viewKey: '{{ view|default:'default'|escapejs }}',
-        bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}'
+         bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}',
+        pageSize: {{ page_obj.paginator.per_page|default:15 }}
      }" class="table-wrapper">
     
-    <!-- Bulk Actions & Column Controls -->
+        <!-- Bulk Actions & Column Controls -->
     <div class="table-controls">
         <!-- Bulk Actions (shown when items selected) -->
         <div class="bulk-actions" x-show="selected.length > 0" x-transition x-cloak>
             <span class="bulk-count">
                 <i class="fas fa-check-circle me-1"></i>
-                <span x-text="selected.length"></span> {% translate "selected" %}
+                <span x-text="selectionLabel"></span>
             </span>
             <button class="btn btn-sm btn-danger" 
                     @click="deleteSelected()"
@@ -30,7 +31,7 @@
                 <span>{% translate "Delete Selected" %}</span>
             </button>
             <button class="btn btn-sm btn-outline-secondary" 
-                    @click="selected = []">
+                    @click="selected = []; selectAll = false">
                 <i class="fas fa-times me-1"></i>
                 <span>{% translate "Clear" %}</span>
             </button>
@@ -49,16 +50,13 @@
                 <ul class="dropdown-menu column-menu">
                     <template x-for="(col, index) in columns" :key="index">
                         <li>
-                            <div class="form-check">
-                                <input class="form-check-input" 
+                            <label class="column-option dropdown-item d-flex align-items-center gap-2">
+                                <input class="form-check-input m-0" 
                                        type="checkbox" 
-                                       x-model="col.visible" 
-                                       :id="'col-' + index"
+                                       x-model="col.visible"
                                        @change="saveColumnPreferences()">
-                                <label class="form-check-label" 
-                                       :for="'col-' + index" 
-                                       x-text="col.name"></label>
-                            </div>
+                                <span x-text="col.name"></span>
+                            </label>
                         </li>
                     </template>
                     <li><hr class="dropdown-divider"></li>

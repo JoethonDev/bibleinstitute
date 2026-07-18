@@ -1,67 +1,12 @@
 {% extends 'base.html' %}
-{% load static %}
-{% load i18n %}
-
 {% block body %}
-
-<div class="container py-5">
-    <!-- Page Header -->
-    <h1 class="display-4 fw-bold text-center mb-5">{% translate "About Us" %}</h1>
-
-    <!-- Description -->
-    <div class="row justify-content-center mb-5">
-        <div class="col-lg-8">
-            <p class="fs-5 lh-lg text-secondary">
-                {% translate "The Bible Institute is an Orthodox church institute affiliated with the Coptic Orthodox Church. It is located at the Church of the Great Martyr Mar Girgis – Kotsika, Maadi, under the Coptic Orthodox Diocese of Maadi and its Dependencies." %}
-            </p>
-            <p class="fs-5 lh-lg text-secondary">
-                {% translate "The institute is dedicated to providing sound theological education and spiritual formation to Orthodox Christians, equipping them with the knowledge and understanding of their faith." %}
-            </p>
-        </div>
-    </div>
-
-    <!-- Mission & Vision -->
-    <div class="row g-4 mb-5">
-        <div class="col-md-6">
-            <div class="card h-100 border-0 shadow-sm p-4">
-                <h3 class="fw-bold mb-3"><i class="fas fa-bullseye me-2 text-primary"></i>{% translate "Our Mission" %}</h3>
-                <p class="text-secondary mb-0 fs-5">
-                    {% translate "To provide accessible, high-quality Orthodox theological education that deepens faith, nurtures spiritual growth, and prepares servants for the Church." %}
-                </p>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100 border-0 shadow-sm p-4">
-                <h3 class="fw-bold mb-3"><i class="fas fa-eye me-2 text-primary"></i>{% translate "Our Vision" %}</h3>
-                <p class="text-secondary mb-0 fs-5">
-                    {% translate "To be a leading Orthodox theological institute that forms faithful servants and knowledgeable Orthodox Christians who positively impact their communities and the Church." %}
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contact Information -->
-    <div class="row justify-content-center mb-5">
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm p-4">
-                <h3 class="fw-bold mb-4 text-center">{% translate "Contact Us" %}</h3>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <p class="mb-2"><i class="fas fa-map-marker-alt me-2 text-primary"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-2"><i class="fas fa-envelope me-2 text-primary"></i>info@bibleinstitute-eg.org</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-2"><i class="fas fa-globe me-2 text-primary"></i>www.bibleinstitute-eg.org</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-2"><i class="fas fa-phone me-2 text-primary"></i>{% translate "+20 2 0000 0000" %}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="public-site">
+<section class="public-inner-hero"><div class="container"><p class="public-kicker">{{ copy.hero_kicker }}</p><h1>{{ copy.hero_title }}</h1><p>{{ copy.hero_text }}</p></div></section>
+<section class="public-section container public-story"><div><p class="public-kicker">{{ copy.story_kicker }}</p><h2>{{ copy.story_title }}</h2></div><div><p>{{ copy.story_text_1 }}</p><p>{{ copy.story_text_2 }}</p></div></section>
+<section class="public-timeline"><div class="container">{% for year, text in copy.timeline %}<div><strong>{{ year }}</strong><span></span><p>{{ text }}</p></div>{% endfor %}</div></section>
+<section class="public-section container"><div class="public-heading"><p class="public-kicker">{{ copy.purpose_kicker }}</p><h2>{{ copy.purpose_title }}</h2></div><div class="public-purpose-grid">{% for item in copy.purpose %}<article><span>0{{ forloop.counter }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p></article>{% endfor %}</div></section>
+<section class="public-values"><div class="container"><div><p class="public-kicker">{{ copy.values_kicker }}</p><h2>{{ copy.values_title }}</h2></div><div>{% for title, text in copy.values %}<article><span>✦</span><div><h3>{{ title }}</h3><p>{{ text }}</p></div></article>{% endfor %}</div></div></section>
+<section class="public-section container"><div class="public-intro"><p class="public-kicker">{{ copy.leadership_kicker }}</p><h2>{{ copy.leadership_title }}</h2></div><div class="public-leader-grid">{% for leader in copy.leaders %}<article><div>✝</div><span>{{ leader.role }}</span><h3>{{ leader.name }}</h3><p>{{ leader.detail }}</p></article>{% endfor %}</div></section>
+<section class="public-campus"><div></div><div><p class="public-kicker">{{ copy.place_kicker }}</p><h2>{{ copy.place_title }}</h2><p>{{ copy.place_text }}</p><a href="#site-contact">{{ copy.contact_us }} ←</a></div></section>
 </div>
-
 {% endblock %}

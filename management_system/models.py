@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.urls import reverse_lazy
 from django.db.models import Sum, Prefetch, Q, prefetch_related_objects
+from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, timedelta
 import json
@@ -421,7 +422,7 @@ class ViewingSession(models.Model):
     part_id = models.CharField(max_length=100)
     session_id = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField()
-    last_heartbeat = models.DateTimeField(auto_now=True)
+    last_heartbeat = models.DateTimeField(default=timezone.now)
 
     class Meta:
         indexes = [models.Index(fields=["session_id"])]
@@ -433,6 +434,8 @@ class ViewingSession(models.Model):
 class VerifiedSegmentRequest(models.Model):
     session = models.ForeignKey(ViewingSession, on_delete=models.CASCADE, related_name="verified_requests")
     segment_key = models.CharField(max_length=500)
+    signature = models.CharField(max_length=128, blank=True, default='')
+    expires_at = models.DateTimeField(null=True, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

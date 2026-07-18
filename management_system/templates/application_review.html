@@ -1,5 +1,8 @@
+{% extends 'admin_panel.html' %}
 {% load i18n %}
 {% load static %}
+
+{% block body %}
 <div class="container-fluid py-3" id="content">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -76,12 +79,18 @@
 
     {% if app_user.application_status == "pending" %}
     <div class="d-flex gap-2">
-        <a href="{% url 'application-decision' app_user.id 'activate' %}" class="btn btn-success">
-            <i class="fas fa-check me-1"></i>{% translate "Activate" %}
-        </a>
-        <a href="{% url 'application-decision' app_user.id 'decline' %}" class="btn btn-danger">
-            <i class="fas fa-times me-1"></i>{% translate "Decline" %}
-        </a>
+        <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" class="application-decision-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-check me-1"></i>{% translate "Activate" %}
+            </button>
+        </form>
+        <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" class="application-decision-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">
+                <i class="fas fa-times me-1"></i>{% translate "Decline" %}
+            </button>
+        </form>
     </div>
     {% elif app_user.decided_by %}
     <div class="alert alert-secondary mt-3">
@@ -89,3 +98,4 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load static %}
 
 {% block head_meta %}
 <title>{% translate "Attendance Scanner" %}</title>
@@ -8,34 +9,134 @@
 {% block body %}
 <div class="container py-4">
   <h1 class="mb-4">{% translate "Attendance Scanner" %}</h1>
-  <div class="card">
-    <div class="card-body">
-      <p>{% translate "Enter or scan the QR token to record attendance." %}</p>
-      <form id="scan-form">
-        <div class="mb-3">
-          <label for="token-input" class="form-label">{% translate "QR Token" %}</label>
-          <input type="text" id="token-input" class="form-control form-control-lg" placeholder="{% translate "Paste or type QR token" %}" required>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-3">
+    {# --- Camera Scanner --- #}
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-camera me-2"></i>{% translate "Scan Camera" %}</h5>
         </div>
-        <button type="submit" class="btn btn-primary btn-lg">{% translate "Look up" %}</button>
-      </form>
-      <div id="scan-error" class="alert alert-danger mt-3 d-none"></div>
+        <div class="card-body text-center">
+          <button id="start-camera" class="btn btn-primary mb-3">
+            <i class="fas fa-camera me-1"></i>{% translate "Open Camera" %}
+          </button>
+          <button id="stop-camera" class="btn btn-secondary mb-3 d-none">
+            <i class="fas fa-stop me-1"></i>{% translate "Stop Camera" %}
+          </button>
+          <div id="camera-error" class="alert alert-danger d-none"></div>
+          <video id="scanner-video" playsinline class="scanner-video w-100 rounded border d-none" autoplay muted></video>
+          <div id="scan-result" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+    {# --- Find Student --- #}
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-search me-2"></i>{% translate "Find Student" %}</h5>
+        </div>
+        <div class="card-body">
+          <form id="student-lookup-form" method="post" action="{% url 'student-lookup' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="query" class="form-label">{% translate "Username or ID" %}</label>
+              <input type="text" name="query" id="query" class="form-control form-control-lg" placeholder="{% translate "Enter username or numeric ID" %}" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+              <i class="fas fa-search me-1"></i>{% translate "Look up" %}
+            </button>
+          </form>
+          <div id="lookup-error" class="alert alert-danger mt-3 d-none"></div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="mt-3">
-    <a href="{% url 'attendance-management' %}" class="btn btn-secondary">{% translate "Attendance Records" %}</a>
-  </div>
 </div>
+
 <script>
-document.getElementById('scan-form').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const token = document.getElementById('token-input').value.trim();
-  const errorEl = document.getElementById('scan-error');
-  if (!token) {
-    errorEl.textContent = '{% translate "Please enter a token." %}';
-    errorEl.classList.remove('d-none');
-    return;
+document.addEventListener('DOMContentLoaded', function() {
+  let mediaStream = null;
+  const video = document.getElementById('scanner-video');
+  const startBtn = document.getElementById('start-camera');
+  const stopBtn = document.getElementById('stop-camera');
+  const cameraError = document.getElementById('camera-error');
+  const scanResult = document.getElementById('scan-result');
+
+  function stopMedia() {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+    video.style.display = 'none';
+    startBtn.classList.remove('d-none');
+    stopBtn.classList.add('d-none');
   }
-  window.location.href = '{% url "scan-preview" "TOKEN_PLACEHOLDER" %}'.replace('TOKEN_PLACEHOLDER', encodeURIComponent(token));
+
+  startBtn.addEventListener('click', async function() {
+    cameraError.classList.add('d-none');
+    scanResult.innerHTML = '';
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+      video.srcObject = mediaStream;
+      video.style.display = 'block';
+      startBtn.classList.add('d-none');
+      stopBtn.classList.remove('d-none');
+      await video.play();
+      startScanning();
+    } catch (err) {
+      cameraError.textContent = '{% translate "Camera access denied or unavailable." %}';
+      cameraError.classList.remove('d-none');
+    }
+  });
+
+  stopBtn.addEventListener('click', stopMedia);
+
+  function startScanning() {
+    if (!('BarcodeDetector' in window)) {
+      scanResult.innerHTML = '<div class="alert alert-info">{% translate "BarcodeDetector not available. Type the QR token in the Find Student field as a fallback." %}</div>';
+      return;
+    }
+    const detector = new BarcodeDetector({formats: ['qr_code']});
+    let scanning = true;
+
+    async function detect() {
+      if (!scanning || !mediaStream) return;
+      try {
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0) {
+          stopMedia();
+          scanning = false;
+          const scannedUrl = barcodes[0].rawValue;
+          try {
+            const parsed = new URL(scannedUrl);
+            if (parsed.origin !== window.location.origin) {
+              scanResult.innerHTML = '<div class="alert alert-danger">{% translate "Scanned QR is from a different origin. Rejected." %}</div>';
+              return;
+            }
+          } catch(e) {
+            scanResult.innerHTML = '<div class="alert alert-danger">{% translate "Invalid QR content." %}</div>';
+            return;
+          }
+          window.location.href = scannedUrl;
+          return;
+        }
+      } catch (e) {
+        // Detection error, keep trying
+      }
+      if (scanning) requestAnimationFrame(detect);
+    }
+    detect();
+  }
+
+  window.addEventListener('beforeunload', stopMedia);
 });
 </script>
 {% endblock %}

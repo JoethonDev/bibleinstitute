@@ -1,0 +1,285 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block body %}
+<div class="container-fluid py-3" id="content">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active">{% translate "Academic Setup" %}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>{% translate "Academic Setup" %}</h4>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#yearModal">
+                <i class="fas fa-plus me-1"></i>{% translate "New Academic Year" %}
+            </button>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {# --- Academic Years Section --- #}
+    <h5>{% translate "Academic Years" %}</h5>
+    <div class="table-responsive mb-4">
+        <table class="table table-hover admin-table">
+            <thead>
+                <tr>
+                    <th>{% translate "Name" %}</th>
+                    <th>{% translate "Level" %}</th>
+                    <th>{% translate "Start" %}</th>
+                    <th>{% translate "End" %}</th>
+                    <th>{% translate "Current" %}</th>
+                    <th>{% translate "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for y in years %}
+                <tr>
+                    <td>{{ y.name }}</td>
+                    <td>{{ y.level }}</td>
+                    <td>{{ y.starts_on }}</td>
+                    <td>{{ y.ends_on }}</td>
+                    <td>{% if y.is_current %}<span class="badge bg-success">{% translate "Yes" %}</span>{% else %}<span class="badge bg-secondary">{% translate "No" %}</span>{% endif %}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <form method="post" action="{% url 'academic-year-delete' y.id %}" style="display:inline" onsubmit="return confirm('{% translate "Delete this year?" %}')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted">{% translate "No academic years yet." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# --- Course Offerings Section --- #}
+    <h5>{% translate "Course Offerings" %}</h5>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto">
+            <select name="academic_year" class="form-select" onchange="this.form.submit()">
+                <option value="">{% translate "Select academic year..." %}</option>
+                {% for y in years %}
+                <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y.name }} ({% translate "Level" %} {{ y.level }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if selected_year %}
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#offeringModal">
+                <i class="fas fa-plus me-1"></i>{% translate "New Offering" %}
+            </button>
+        </div>
+        {% endif %}
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover admin-table">
+            <thead>
+                <tr>
+                    <th>{% translate "Course" %}</th>
+                    <th>{% translate "Academic Year" %}</th>
+                    <th>{% translate "Instructor" %}</th>
+                    <th>{% translate "Status" %}</th>
+                    <th>{% translate "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in offerings %}
+                <tr>
+                    <td>{{ o.course.name }}</td>
+                    <td>{{ o.academic_year.name }}</td>
+                    <td>{{ o.instructor|default:"—" }}</td>
+                    <td>{{ o.get_status_display }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <form method="post" action="{% url 'course-offering-delete' o.id %}" style="display:inline" onsubmit="return confirm('{% translate "Delete this offering?" %}')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted">{% if selected_year %}{% translate "No offerings for this year." %}{% else %}{% translate "Select an academic year to load offerings." %}{% endif %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{# --- Create Year Modal --- #}
+<div class="modal fade" id="yearModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{% url 'academic-year-create' %}">
+                {% csrf_token %}
+                <div class="modal-header"><h5>{% translate "New Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    {% for field in year_form %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# --- Create Offering Modal --- #}
+{% if selected_year %}
+<div class="modal fade" id="offeringModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{% url 'course-offering-create' %}">
+                {% csrf_token %}
+                <input type="hidden" name="academic_year" value="{{ selected_year }}">
+                <div class="modal-header"><h5>{% translate "New Course Offering" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    {% for field in offering_form %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# --- Edit Year Modals --- #}
+{% for y in years %}
+<div class="modal fade" id="yearModal{{ y.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{% url 'academic-year-edit' y.id %}">
+                {% csrf_token %}
+                <div class="modal-header"><h5>{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Name" %}</label>
+                        <input type="text" name="name" value="{{ y.name }}" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Level" %}</label>
+                        <input type="number" name="level" value="{{ y.level }}" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Start Date" %}</label>
+                        <input type="date" name="starts_on" value="{{ y.starts_on|date:'Y-m-d' }}" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "End Date" %}</label>
+                        <input type="date" name="ends_on" value="{{ y.ends_on|date:'Y-m-d' }}" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Is Current" %}</label>
+                        <select name="is_current" class="form-select">
+                            <option value="false" {% if not y.is_current %}selected{% endif %}>{% translate "No" %}</option>
+                            <option value="true" {% if y.is_current %}selected{% endif %}>{% translate "Yes" %}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{# --- Edit Offering Modals --- #}
+{% for o in offerings %}
+<div class="modal fade" id="offeringModal{{ o.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{% url 'course-offering-edit' o.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="academic_year" value="{{ o.academic_year_id }}">
+                <div class="modal-header"><h5>{% translate "Edit Offering" %}: {{ o.course.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Course" %}</label>
+                        <select name="course" class="form-select">
+                            {% for c in o.academic_year.course_set.all %}
+                            <option value="{{ c.id }}" {% if c.id == o.course_id %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Instructor" %}</label>
+                        <input type="text" name="instructor" value="{{ o.instructor|default:'' }}" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Status" %}</label>
+                        <select name="status" class="form-select">
+                            <option value="draft" {% if o.status == 'draft' %}selected{% endif %}>{% translate "Draft" %}</option>
+                            <option value="published" {% if o.status == 'published' %}selected{% endif %}>{% translate "Published" %}</option>
+                            <option value="archived" {% if o.status == 'archived' %}selected{% endif %}>{% translate "Archived" %}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+(function() {
+    // Reinitialize all Bootstrap modals after HTMX swaps
+    function initModals() {
+        document.querySelectorAll('.modal.fade').forEach(function(el) {
+            try {
+                if (window.bootstrap) {
+                    var modal = bootstrap.Modal.getInstance(el);
+                    if (!modal) {
+                        new bootstrap.Modal(el, {});
+                    }
+                }
+            } catch(e) {
+                // Modal init might fail for non-standard elements
+            }
+        });
+    }
+    initModals();
+    document.addEventListener('htmx:afterSwap', initModals);
+})();
+</script>
+{% endblock %}

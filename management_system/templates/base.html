@@ -53,16 +53,24 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/public_site.css' %}">
     
     {% block cdn %}{% endblock %}
     {% block style %}{% endblock %}
 </head>
 <body class="d-flex flex-column">
     <header>
-        <nav class="navbar app-navbar navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
+        <div class="institute-topbar">
+          <div class="container">
+            <span>{% if request.LANGUAGE_CODE == 'ar' %}معهد الكتاب المقدس - المعادي - القاهرة{% else %}Bible Institute - Maadi - Cairo{% endif %}</span>
+            <div><a href="mailto:info@bibleinstitute-eg.org">info@bibleinstitute-eg.org</a> · <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener">Facebook</a> · <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener">YouTube</a></div>
+          </div>
+        </div>
+        <nav class="navbar app-navbar institute-navbar navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
             <div class="container">
               <a class="navbar-brand" href="{% url 'home' %}">
                   <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
+                  <span class="institute-brand-copy"><strong>{% if request.LANGUAGE_CODE == 'ar' %}معهد الكتاب المقدس{% else %}Bible Institute{% endif %}</strong><small>{% if request.LANGUAGE_CODE == 'ar' %}بالمعادي · دراسة أكاديمية بروح كنسية{% else %}Maadi · Academic study with an ecclesial spirit{% endif %}</small></span>
               </a>
               <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <i class="fas fa-bars"></i>
@@ -71,6 +79,11 @@
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">{% translate "About Us" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#study-system">{% if request.LANGUAGE_CODE == 'ar' %}نظام الدراسة{% else %}Study System{% endif %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#curriculum">{% if request.LANGUAGE_CODE == 'ar' %}المواد{% else %}Program{% endif %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#admission">{% if request.LANGUAGE_CODE == 'ar' %}الالتحاق{% else %}Admissions{% endif %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#news">{% if request.LANGUAGE_CODE == 'ar' %}الأخبار{% else %}News{% endif %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="#site-contact">{% if request.LANGUAGE_CODE == 'ar' %}اتصل بنا{% else %}Contact{% endif %}</a></li>
               {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
@@ -149,14 +162,21 @@
 
     {% block script %}{% endblock %}
     
-    <footer class="mt-auto" role="contentinfo">
-      <div class="container p-4">
+    <footer id="site-contact" class="mt-auto institute-footer" role="contentinfo">
+      <div class="container py-5">
           <div class="row">
-              <div class="col-lg-5 col-md-12 mb-4 mb-md-0">
+              <div class="col-lg-5 col-md-12 mb-4">
                   <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180" alt="Footer Logo">
-                  <p>{% translate "Bible Institute Coptic" %}</p>
+                  <p>{% if request.LANGUAGE_CODE == 'ar' %}معهد كنسي أرثوذكسي تابع للكنيسة القبطية الأرثوذكسية، يخدم كل محبي دراسة الكتاب المقدس داخل مصر وخارجها.{% else %}A Coptic Orthodox ecclesiastical institute serving everyone who loves to study Scripture in Egypt and worldwide.{% endif %}</p>
               </div>
-              <div class="col-lg-7 col-md-12 mb-4 mb-md-0">
+              <div class="col-lg-3 col-md-6 mb-4">
+                  <h2>{% if request.LANGUAGE_CODE == 'ar' %}روابط سريعة{% else %}Quick Links{% endif %}</h2>
+                  <p><a href="{% url 'about' %}">{% translate "About Us" %}</a></p>
+                  <p><a href="{% url 'program' %}#study-system">{% if request.LANGUAGE_CODE == 'ar' %}نظام الدراسة{% else %}Study System{% endif %}</a></p>
+                  <p><a href="{% url 'program' %}#curriculum">{% if request.LANGUAGE_CODE == 'ar' %}المواد الدراسية{% else %}Program{% endif %}</a></p>
+                  <p><a href="{% url 'signup' %}">{% translate "Sign Up" %}</a></p>
+              </div>
+              <div class="col-lg-4 col-md-6 mb-4">
                   <h5 class="text-uppercase">{% translate "Institute Headquarters" %}</h5>
                   <p><i class="fas fa-map-marker-alt me-2"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</p>
                   <p><i class="fas fa-envelope me-2"></i>info@bibleinstitute-eg.org</p>
@@ -164,7 +184,7 @@
               </div>
           </div>
       </div>
-      <div class="footer-bottom text-center p-3">
+      <div class="footer-bottom institute-footer-bottom text-center p-3">
         {% translate "All rights reserved to the Bible Institute in Maadi" %} &copy; {% now "Y" %}
       </div>
     </footer>

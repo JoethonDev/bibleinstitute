@@ -167,3 +167,41 @@ class ApplicationAdminTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.applicant.refresh_from_db()
         self.assertEqual(self.applicant.application_status, "active")
+
+    # --- Workstream 1 regression checks ---
+
+    def test_direct_applications_dashboard_has_admin_shell(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.get(reverse("applications-dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "css/app.css")
+        self.assertContains(resp, "admin-layout")
+        self.assertContains(resp, "id=\"content\"")
+
+    def test_direct_application_review_has_admin_shell(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.get(reverse("application-review", args=[self.applicant.id]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "css/app.css")
+        self.assertContains(resp, "admin-layout")
+        self.assertContains(resp, "id=\"content\"")
+
+    def test_get_decision_returns_405(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.get(reverse("application-decision", args=[self.applicant.id, "activate"]))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_invalid_status_falls_back_to_pending(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.get(reverse("applications-dashboard") + "?status=invalid")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_invalid_decision_returns_400(self):
+        c = Client()
+        c.login(username="admin", password="1")
+        resp = c.post(reverse("application-decision", args=[self.applicant.id, "invalid"]))
+        self.assertEqual(resp.status_code, 400)

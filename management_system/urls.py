@@ -14,6 +14,7 @@ urlpatterns = [
     path('', index, name="home"),
     path('portal/', portal, name="student-portal"),
     path('about/', about_page, name="about"),
+    path('program/', program_page, name="program"),
     path('profile/', ProfileDetail.as_view(), name="view-profile"),
     path('profile/<int:user_id>/', ProfileDetail.as_view(), name="check-profile"),
     path('profile/<int:user_id>/update/', ProfileUpdate.as_view(), name="update-profile"),
@@ -98,6 +99,15 @@ urlpatterns = [
 
     path('dashboard/course-offerings/<int:offering_id>/copy/', copy_course_offering, name="copy-course-offering"),
 
+    # Academic Setup
+    path('dashboard/academic/', academic_setup, name="academic-setup"),
+    path('dashboard/academic/year/create/', academic_year_create, name="academic-year-create"),
+    path('dashboard/academic/year/<int:year_id>/edit/', academic_year_edit, name="academic-year-edit"),
+    path('dashboard/academic/year/<int:year_id>/delete/', academic_year_delete, name="academic-year-delete"),
+    path('dashboard/academic/offering/create/', course_offering_create, name="course-offering-create"),
+    path('dashboard/academic/offering/<int:offering_id>/edit/', course_offering_edit, name="course-offering-edit"),
+    path('dashboard/academic/offering/<int:offering_id>/delete/', course_offering_delete, name="course-offering-delete"),
+
     # Phase 3 — Student Applications
     path('signup/', signup, name="signup"),
     path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
@@ -113,6 +123,7 @@ urlpatterns = [
     path('my-qr/', download_qr, name="download-qr"),
     path('dashboard/users/<int:user_id>/regenerate-qr/', regenerate_qr, name="regenerate-qr"),
     path('scanner/', scanner, name="scanner"),
+    path('scanner/lookup/', student_lookup, name="student-lookup"),
     path('scan/<str:token>/', scan_preview, name="scan-preview"),
     path('scan/<str:token>/<str:action>/', record_attendance, name="record-attendance"),
     path('dashboard/attendance/', attendance_management, name="attendance-management"),

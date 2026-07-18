@@ -3,7 +3,7 @@ from django import forms
 import secrets
 
 from django.core.exceptions import ValidationError
-from .models import User, Role, Course, Lesson, assign_academic_date
+from .models import User, Role, Course, Lesson, AcademicYear, CourseOffering, assign_academic_date
 from .utils.validators import normalize_phone, validate_identity_by_type
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 
@@ -151,6 +151,68 @@ class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
         fields = "__all__"
+
+class AcademicYearForm(forms.ModelForm):
+    class Meta:
+        model = AcademicYear
+        fields = ["name", "level", "starts_on", "ends_on", "meeting_weekdays", "is_current"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "required": True}),
+            "level": forms.NumberInput(attrs={"class": "form-control", "required": True}),
+            "starts_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "ends_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "meeting_weekdays": forms.CheckboxSelectMultiple(
+                choices=[(0, _("Monday")), (1, _("Tuesday")), (2, _("Wednesday")), (3, _("Thursday")), (4, _("Friday")), (5, _("Saturday")), (6, _("Sunday"))]
+            ),
+            "is_current": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def clean_meeting_weekdays(self):
+        value = self.cleaned_data.get("meeting_weekdays")
+        if value:
+            return [int(v) for v in value]
+        return value
+
+    def clean(self):
+        cleaned = super().clean()
+        starts_on = cleaned.get("starts_on")
+        ends_on = cleaned.get("ends_on")
+        if starts_on and ends_on and starts_on >= ends_on:
+            raise forms.ValidationError(_("End date must be after start date."))
+        level = cleaned.get("level")
+        name = cleaned.get("name")
+        if name and level:
+            qs = AcademicYear.objects.filter(level=level, name=name)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(_("Academic year with this name and level already exists."))
+        return cleaned
+
+
+class CourseOfferingForm(forms.ModelForm):
+    class Meta:
+        model = CourseOffering
+        fields = ["course", "academic_year", "instructor", "status"]
+        widgets = {
+            "course": forms.Select(attrs={"class": "form-select"}),
+            "academic_year": forms.Select(attrs={"class": "form-select"}),
+            "instructor": forms.TextInput(attrs={"class": "form-control"}),
+            "status": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "academic_year" in self.data:
+            try:
+                year_id = int(self.data.get("academic_year"))
+                year = AcademicYear.objects.get(pk=year_id)
+                self.fields["course"].queryset = Course.objects.filter(level=year.level)
+            except (ValueError, TypeError, AcademicYear.DoesNotExist):
+                pass
+        elif self.instance and self.instance.pk and self.instance.academic_year_id:
+            self.fields["course"].queryset = Course.objects.filter(level=self.instance.academic_year.level)
+
 
 class CSVUploadForm(forms.Form):
     csv_file = forms.FileField(label=_("CSV File"), help_text=_("Upload a .csv file with user data."))

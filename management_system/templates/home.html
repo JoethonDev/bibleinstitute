@@ -1,75 +1,24 @@
-{% extends 'base.html' %}
-{% load static %}
-{% load i18n %}
-
+{% extends 'base.html' %}{% load static %}
 {% block body %}
-
-<!-- ========== HERO SECTION ========== -->
-<section class="hero-section public-hero text-center d-flex align-items-center justify-content-center">
-    <div class="container py-5">
-        <h1 class="display-3 fw-bold mb-3">{% translate "Bible Institute Coptic" %}</h1>
-        <p class="lead mb-4 fs-3">{% translate "Deepening Faith Through Knowledge" %}</p>
-        <p class="fs-5 mb-5 opacity-75">{% translate "An Orthodox church institute affiliated with the Coptic Orthodox Church, dedicated to theological education and spiritual growth." %}</p>
-        <div class="d-flex justify-content-center gap-3 flex-wrap">
-            <a href="{% url 'signup' %}" class="btn btn-light btn-lg px-4 fw-bold">{% translate "Apply Now" %}</a>
-            <a href="{% url 'user_login' %}" class="btn btn-outline-light btn-lg px-4">{% translate "Login" %}</a>
-            <a href="{% url 'courses' %}" class="btn btn-outline-light btn-lg px-4">{% translate "View Courses" %}</a>
-        </div>
-    </div>
+<div class="public-site">
+<section class="public-home-hero">
+  <div class="public-hero-shade"></div>
+  <div class="container public-hero-inner"><div><p class="public-kicker">{{ copy.hero_kicker }}</p><h1>{{ copy.hero_title }}</h1><p>{{ copy.hero_text }}</p><div class="public-actions"><a class="public-btn public-btn-gold" href="{% url 'signup' %}">{{ copy.apply_now }}</a><a class="public-btn public-btn-line" href="{% url 'program' %}">{{ copy.discover }}</a><a class="public-btn public-btn-text" href="#message">▶ {{ copy.watch_message }}</a></div></div></div>
+  <div class="container public-stats">{% for value, label in copy.stats %}<div><strong>{{ value }}</strong><span>{{ label }}</span></div>{% endfor %}</div>
 </section>
 
-<!-- ========== FEATURES SECTION ========== -->
-<section class="features-section py-5">
-    <div class="container">
-        <h2 class="text-center mb-5 fw-bold">{% translate "Why Choose Us" %}</h2>
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 border-0 shadow-sm text-center p-4">
-                    <div class="card-body">
-                        <i class="fas fa-laptop-house fa-3x mb-3 text-primary"></i>
-                        <h5 class="card-title">{% translate "Online Learning" %}</h5>
-                        <p class="card-text text-muted">{% translate "Study from anywhere with our flexible online platform, accessible anytime." %}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 border-0 shadow-sm text-center p-4">
-                    <div class="card-body">
-                        <i class="fas fa-chalkboard-user fa-3x mb-3 text-primary"></i>
-                        <h5 class="card-title">{% translate "Expert Instructors" %}</h5>
-                        <p class="card-text text-muted">{% translate "Learn from knowledgeable clergy and theologians dedicated to your spiritual growth." %}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 border-0 shadow-sm text-center p-4">
-                    <div class="card-body">
-                        <i class="fas fa-calendar-alt fa-3x mb-3 text-primary"></i>
-                        <h5 class="card-title">{% translate "Flexible Schedule" %}</h5>
-                        <p class="card-text text-muted">{% translate "Balance your studies with work and family through our adaptable program schedules." %}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 border-0 shadow-sm text-center p-4">
-                    <div class="card-body">
-                        <i class="fas fa-certificate fa-3x mb-3 text-primary"></i>
-                        <h5 class="card-title">{% translate "Accredited Programs" %}</h5>
-                        <p class="card-text text-muted">{% translate "Receive recognized certification upon completion of our accredited theological programs." %}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+<section class="public-section container"><div class="public-intro"><p class="public-kicker">{{ copy.identity_kicker }}</p><h2>{{ copy.identity_title }}</h2><p>{{ copy.identity_text }}</p></div><div class="public-pillar-grid">{% for item in copy.pillars %}<article><span>{{ item.number }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p></article>{% endfor %}</div></section>
 
-<!-- ========== CALL TO ACTION SECTION ========== -->
-<section class="cta-section public-cta text-center py-5">
-    <div class="container">
-        <h2 class="fw-bold mb-3">{% translate "Begin Your Theological Journey Today" %}</h2>
-        <p class="lead mb-4">{% translate "Join our community of learners dedicated to deepening their faith and understanding of Orthodox Christianity." %}</p>
-        <a href="{% url 'signup' %}" class="btn btn-light btn-lg px-5 fw-bold">{% translate "Apply Now" %}</a>
-    </div>
-</section>
+<section id="news" class="public-news"><div class="container public-news-card"><div class="public-date"><small>{{ copy.news_kicker }}</small><strong>20</strong><span>09 · 2026</span></div><div><span class="public-status">{{ copy.news_badge }}</span><h2>{{ copy.news_title }}</h2><p>{{ copy.news_text }}</p><a href="{% url 'program' %}#study-system">{{ copy.news_link }} ←</a></div></div></section>
 
+<section class="public-section container"><div class="public-heading"><p class="public-kicker">{{ copy.path_kicker }}</p><h2>{{ copy.path_title }}</h2></div><div class="public-path-grid">{% for item in copy.paths %}<article><div class="public-path-image public-path-image-{{ forloop.counter }}"></div><div><span>{{ item.label }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p><a href="{% url 'program' %}#study-system">{{ item.action }} ←</a></div></article>{% endfor %}</div></section>
+
+<section class="public-quote"><div class="container"><span aria-hidden="true">✣</span><blockquote><p>“{{ copy.quote }}”</p><cite>{{ copy.quote_label }}</cite></blockquote></div></section>
+
+<section class="public-section container public-curriculum-preview"><div class="public-book-art"><span>66</span></div><div><p class="public-kicker">{{ copy.curriculum_kicker }}</p><h2>{{ copy.curriculum_title }}</h2><p>{{ copy.curriculum_text }}</p><a class="public-btn public-btn-dark" href="{% url 'program' %}#curriculum">{{ copy.curriculum_action }}</a></div></section>
+
+<section id="message" class="public-section public-video"><div class="container public-video-grid"><div><p class="public-kicker">{{ copy.video_kicker }}</p><h2>{{ copy.video_title }}</h2><p>{{ copy.video_text }}</p></div><div class="public-video-frame"><iframe src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g" title="{{ copy.video_title }}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div></div></section>
+
+<section class="public-cta"><div class="container"><div><h2>{{ copy.cta_title }}</h2><p>{{ copy.cta_text }}</p></div><a class="public-btn public-btn-cream" href="{% url 'signup' %}">{{ copy.apply_now }}</a></div></section>
+</div>
 {% endblock %}

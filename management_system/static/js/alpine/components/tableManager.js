@@ -18,6 +18,7 @@ function tableManager() {
         bulkDeleteUrl: '',  // overridden by template via spread
         selected: [],
         selectAll: false,
+        pageSize: 15,
 
         init() {
             this.loadColumnPreferences();
@@ -37,6 +38,13 @@ function tableManager() {
         updateSelectAll() {
             const checkboxes = this.$el.querySelectorAll('.row-checkbox');
             this.selectAll = this.selected.length === checkboxes.length && checkboxes.length > 0;
+        },
+
+        get selectionLabel() {
+            if (this.selected.length > 0) {
+                return `${this.selected.length} selected on this page`;
+            }
+            return '';
         },
 
         deleteSelected() {
@@ -127,9 +135,13 @@ function tableManager() {
             if (saved) {
                 try {
                     const savedColumns = JSON.parse(saved);
-                    this.columns = this.columns.map((col, index) => {
-                        const savedCol = savedColumns[index];
-                        return savedCol ? { ...col, ...savedCol } : col;
+                    const lookup = {};
+                    savedColumns.forEach(sc => { lookup[sc.name] = sc.visible; });
+                    this.columns = this.columns.map(col => {
+                        if (col.name in lookup) {
+                            col.visible = lookup[col.name];
+                        }
+                        return col;
                     });
                 } catch (e) {
                     console.error('tableManager: failed to load column preferences', e);
@@ -138,9 +150,10 @@ function tableManager() {
         },
 
         saveColumnPreferences() {
+            const prefs = this.columns.map(col => ({ name: col.name, visible: col.visible }));
             localStorage.setItem(
                 `admin-table-columns-${this.viewKey}`,
-                JSON.stringify(this.columns)
+                JSON.stringify(prefs)
             );
         },
 

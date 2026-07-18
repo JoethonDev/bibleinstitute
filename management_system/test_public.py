@@ -1,5 +1,6 @@
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import translation
 from .models import Role, User
 
 
@@ -23,6 +24,19 @@ class PublicViewTests(TestCase):
     def test_about_page_loads(self):
         resp = self.client.get(reverse("about"))
         self.assertEqual(resp.status_code, 200)
+
+    def test_program_page_loads_for_anonymous_user(self):
+        resp = self.client.get(reverse("program"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Study System")
+        self.assertContains(resp, "EGP 850")
+
+    def test_arabic_public_pages_use_arabic_copy(self):
+        with translation.override("ar"):
+            for name in ("home", "about", "program"):
+                resp = self.client.get(reverse(name))
+                self.assertEqual(resp.status_code, 200)
+                self.assertContains(resp, "معهد الكتاب المقدس")
 
     def test_authenticated_user_sees_dashboard_at_root(self):
         c = self._login(self.student)
@@ -52,6 +66,7 @@ class PublicViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/xml")
         self.assertIn("/about/", resp.content.decode())
+        self.assertIn("/program/", resp.content.decode())
         self.assertIn("/signup/", resp.content.decode())
         self.assertNotIn("/courses/", resp.content.decode())
 
@@ -59,6 +74,7 @@ class PublicViewTests(TestCase):
         resp = self.client.get(reverse("home"))
         self.assertContains(resp, "Login")
         self.assertContains(resp, "Sign Up")
+        self.assertContains(resp, reverse("program"))
 
     def test_nav_links_for_authenticated(self):
         c = self._login(self.student)
