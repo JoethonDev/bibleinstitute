@@ -24,13 +24,11 @@ function r2Manager() {
         is_root: true, // Will be set by x-init in template
         
         init() {
-            // Initialize filter and search from URL params so they survive page reloads
             const params = new URLSearchParams(window.location.search);
             this.currentFilter = params.get('filter') || 'media';
             this.searchQuery = params.get('search') || '';
 
-            // Always load stats fresh on each page init.
-            // statsLoaded flag prevents a double-load if refreshStats() is also called.
+            // Load stats on full page load only.
             if (!this.statsLoaded) {
                 this.loadStorageStats();
             }
@@ -49,16 +47,16 @@ function r2Manager() {
         },
         
         /**
-         * Apply filter and reload file list
+         * Apply filter — HTMX partial swap, no full page reload
          */
         applyFilter() {
             const url = new URL(window.location.href);
             url.searchParams.set('filter', this.currentFilter);
-            window.location.href = url.toString();
+            htmx.ajax('GET', url.toString(), { target: '#file-list-container', pushUrl: true });
         },
         
         /**
-         * Search files (debounced)
+         * Search files — HTMX partial swap, no full page reload
          */
         searchFiles() {
             const url = new URL(window.location.href);
@@ -67,7 +65,7 @@ function r2Manager() {
             } else {
                 url.searchParams.delete('search');
             }
-            window.location.href = url.toString();
+            htmx.ajax('GET', url.toString(), { target: '#file-list-container', pushUrl: true });
         },
         
         /**
@@ -78,6 +76,19 @@ function r2Manager() {
         },
         
         /**
+         * Hide a modal and fire ``onHidden`` after the fade animation ends.
+         * Prevents a ``location.reload()`` from interrupting the hide transition
+         * and leaving a stale backdrop in the DOM.
+         */
+        _hideModal(el, onHidden) {
+            const modal = bootstrap.Modal.getOrCreateInstance(el);
+            modal.hide();
+            if (onHidden) {
+                el.addEventListener('hidden.bs.modal', onHidden, { once: true });
+            }
+        },
+
+        /**
          * Show rename modal
          */
         showRenameModal(fileKey, oldName, isFolder = false) {
@@ -85,7 +96,6 @@ function r2Manager() {
             this.renameFileOldName = oldName;
             this.renameFileNewName = oldName;
             this.renameIsFolder = isFolder;
-            // Reset any previous error state
             const errorEl = document.getElementById('rename-file-error');
             if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('d-none'); }
             bootstrap.Modal.getOrCreateInstance(document.getElementById('renameFileModal')).show();
@@ -104,12 +114,11 @@ function r2Manager() {
             let oldKey, newKey;
 
             if (this.renameIsFolder) {
-                // For folders the key is a hyphen-encoded path like "parent-child-"
-                // Convert to slash path and ensure trailing slash for the API
-                const slashPath = this.renameFileKey.replace(/-/g, '/');
-                const parentParts = slashPath.split('/').slice(0, -2); // remove last segment & trailing ''
+                // Key is already a slash path like "Academic Year - 2025-2026/"
+                const parts = this.renameFileKey.replace(/\/$/, '').split('/');
+                const parentParts = parts.slice(0, -1);
                 const parentPath = parentParts.length ? parentParts.join('/') + '/' : '';
-                oldKey = slashPath;  // e.g. "second year/old promise/"
+                oldKey = this.renameFileKey;
                 newKey = parentPath + this.renameFileNewName + '/';
             } else {
                 const pathParts = this.renameFileKey.split('/');
@@ -131,8 +140,7 @@ function r2Manager() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    bootstrap.Modal.getOrCreateInstance(document.getElementById('renameFileModal')).hide();
-                    location.reload();
+                    this._hideModal(document.getElementById('renameFileModal'), () => location.reload());
                 } else {
                     const errorEl = document.getElementById('rename-file-error');
                     if (errorEl) { errorEl.textContent = data.error || 'Rename failed'; errorEl.classList.remove('d-none'); }
@@ -207,7 +215,7 @@ function r2Manager() {
                 fetch('/api/r2/folder/delete/', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
-                    body: JSON.stringify({ folder_path: folderId.replace(/-/g, '/') + '/', recursive: true })
+                    body: JSON.stringify({ folder_path: folderId, recursive: true })
                 })
                 .then(r => r.json())
                 .then(data => {
@@ -232,7 +240,6 @@ function r2Manager() {
          */
         deleteSelectedFiles() {
             if (this.selectedFiles.length === 0) return;
-            
             const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
             document.getElementById('delete-confirm-message').textContent =
                 `Are you sure you want to delete ${this.selectedFiles.length} selected file(s)?`;
@@ -348,8 +355,7 @@ function r2Manager() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    bootstrap.Modal.getOrCreateInstance(document.getElementById('createFolderModal')).hide();
-                    location.reload();
+                    this._hideModal(document.getElementById('createFolderModal'), () => location.reload());
                 } else {
                     const errorEl = document.getElementById('create-folder-error');
                     errorEl.textContent = data.error;
@@ -402,6 +408,11 @@ function r2Manager() {
             if (totalStorageEl) totalStorageEl.textContent = stats.total_size_formatted || '0 B';
             if (videoFilesEl) videoFilesEl.textContent = stats.by_extension?.mp4?.count || 0;
             if (pdfFilesEl) pdfFilesEl.textContent = stats.by_extension?.pdf?.count || 0;
+            
+            // Toggle approximate badges
+            const show = stats.approximate ? 'block' : 'none';
+            const approxEls = document.querySelectorAll('[id$="-approx"]');
+            approxEls.forEach(el => el.style.display = show);
         },
         
         /**

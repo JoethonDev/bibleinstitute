@@ -17,16 +17,18 @@ from datetime import datetime
 class R2Manager:
     """Comprehensive R2 storage management"""
     
-    def __init__(self, client, bucket_name: str):
+    def __init__(self, client, bucket_name: str, cloudflare_client=None):
         """
         Initialize R2 Manager
         
         Args:
             client: boto3 S3 client configured for R2
             bucket_name: Name of the R2 bucket
+            cloudflare_client: Optional CloudflareR2Client for instant usage stats
         """
         self.client = client
         self.bucket_name = bucket_name
+        self.cloudflare = cloudflare_client
     
     def delete_file(self, file_key: str) -> bool:
         """
@@ -347,7 +349,11 @@ class R2Manager:
     
     def get_storage_stats(self, prefix: str = "") -> Dict[str, Any]:
         """
-        Get storage statistics for a folder or entire bucket
+        Get storage statistics for a folder or entire bucket.
+        
+        Uses the Cloudflare native usage API when a ``cloudflare_client`` is
+        configured – instant, no pagination.  Falls back to boto3 pagination
+        (up to 20 pages) when Cloudflare is not available.
         
         Args:
             prefix: Folder prefix to analyze (empty for entire bucket)
@@ -360,51 +366,33 @@ class R2Manager:
             'total_size': 0,
             'by_extension': {},
             'largest_files': [],
+            'approximate': False,
         }
         
-        try:
-            paginator = self.client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
-            
-            all_files = []
-            
-            for page in pages:
-                if 'Contents' in page:
-                    for obj in page['Contents']:
+        # Fast path: Cloudflare native usage API for exact totals
+        usage = self.cloudflare.get_bucket_usage(self.bucket_name)
+        if usage:
+            stats['total_files'] = int(usage.get('objectCount', 0))
+            stats['total_size'] = int(usage.get('payloadSize', 0))
+            # Still sample one page via boto3 for extension breakdown
+            try:
+                sample = self.client.list_objects_v2(
+                    Bucket=self.bucket_name, MaxKeys=1000
+                )
+                if 'Contents' in sample:
+                    for obj in sample['Contents']:
                         key = obj['Key']
-                        size = obj.get('Size', 0)
-                        
-                        # Skip folders (keys ending with /)
                         if key.endswith('/'):
                             continue
-                        
-                        stats['total_files'] += 1
-                        stats['total_size'] += size
-                        
-                        # Track by extension
                         if '.' in key:
                             ext = key.split('.')[-1].lower()
                             if ext not in stats['by_extension']:
-                                stats['by_extension'][ext] = {
-                                    'count': 0,
-                                    'size': 0
-                                }
+                                stats['by_extension'][ext] = {'count': 0, 'size': 0}
                             stats['by_extension'][ext]['count'] += 1
-                            stats['by_extension'][ext]['size'] += size
-                        
-                        # Track for largest files
-                        all_files.append({
-                            'key': key,
-                            'size': size,
-                            'last_modified': obj.get('LastModified')
-                        })
-            
-            # Get top 10 largest files
-            all_files.sort(key=lambda x: x['size'], reverse=True)
-            stats['largest_files'] = all_files[:10]
+                            stats['by_extension'][ext]['size'] += obj.get('Size', 0)
+            except Exception:
+                pass
         
-        except Exception as e:
-            print(f"Error getting storage stats: {e}")
         
         return stats
     

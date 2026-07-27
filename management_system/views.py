@@ -45,6 +45,7 @@ from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_
 from .utils.reports import build_report_data
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
+from .utils.cloudflare_provider import CloudflareR2Client
 from .utils.file_validator import validate_upload_filename, FileValidator
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_can_access_course, user_has_management_role
@@ -68,8 +69,12 @@ CLOUD_CLIENT = boto3.client(
 
 bucket_name = getattr(settings, "R2_BUCKET_NAME", "")
 
+cf_account_id = getattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
+cf_api_token = getattr(settings, "CLOUDFLARE_API_TOKEN", "")
+cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_account_id and cf_api_token else None
+
 # Initialize R2 Manager
-R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name)
+R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name, cloudflare_client)
 
 # Helper functions moved to utils/storage_operations.py and utils/helpers.py
 # Google Drive legacy code moved to utils/google_drive_manager.py
@@ -2103,7 +2108,7 @@ def api_list_files(request):
             filter_config = get_filter_preset(filter_preset)
         
         # List files with filter
-        contents, parent_folder = list_current_folder(folder_name, filter_config)
+        contents, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_name, filter_config)
         
         # Format sizes and dates
         for item in contents:
@@ -2210,10 +2215,11 @@ def r2_management_dashboard(request):
         'load_stats': load_stats,
     }
     
-    # Return partial ONLY when specifically targeting file list container
-    # This prevents returning partial when navigating from menu
+    # Return partial for HTMX folder navigation (breadcrumb + back + grid)
     hx_target = request.headers.get('HX-Target')
-    if hx_target in ['drive-files', 'file-list-container']:
+    if hx_target == 'file-list-container':
+        return render(request, 'partials/r2_browse.html', context)
+    if hx_target == 'drive-files':
         return render(request, 'partials/r2_file_list.html', context)
     
     return render(request, 'r2_management.html', context)

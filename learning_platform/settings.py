@@ -186,6 +186,8 @@ R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL") or os.environ.get("endpoint"
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID") or os.environ.get("key_id")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY") or os.environ.get("access_key")
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME") or os.environ.get("bucket") or ""
+CLOUDFLARE_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+CLOUDFLARE_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 
 # Change Auth Model
 AUTH_USER_MODEL = 'management_system.User'

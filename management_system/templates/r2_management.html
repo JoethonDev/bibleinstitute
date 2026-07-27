@@ -27,6 +27,7 @@
                                 {% if storage_stats.loading %}
                                 <span class="spinner-border spinner-border-sm"></span>
                                 {% else %}{{ storage_stats.total_files }}{% endif %}
+                                <span id="stat-total-files-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
                             </h3>
                         </div>
                         <div class="text-primary">
@@ -46,6 +47,7 @@
                                 {% if storage_stats.loading %}
                                 <span class="spinner-border spinner-border-sm"></span>
                                 {% else %}{{ total_size_formatted }}{% endif %}
+                                <span id="stat-total-storage-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
                             </h3>
                         </div>
                         <div class="text-success">
@@ -65,6 +67,7 @@
                                 {% if storage_stats.loading %}
                                 <span class="spinner-border spinner-border-sm"></span>
                                 {% elif storage_stats.by_extension.mp4 %}{{ storage_stats.by_extension.mp4.count }}{% else %}0{% endif %}
+                                <span id="stat-video-files-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
                             </h3>
                         </div>
                         <div class="text-danger">
@@ -84,6 +87,7 @@
                                 {% if storage_stats.loading %}
                                 <span class="spinner-border spinner-border-sm"></span>
                                 {% elif storage_stats.by_extension.pdf %}{{ storage_stats.by_extension.pdf.count }}{% else %}0{% endif %}
+                                <span id="stat-pdf-files-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
                             </h3>
                         </div>
                         <div class="text-warning">
@@ -158,43 +162,12 @@
         </div>
     </div>
 
-    <!-- File List -->
+    <!-- File List (browse partial — breadcrumb, back, grid) -->
     <div class="card admin-card" id="file-list-container">
-        <div class="card-body">
-            <!-- Breadcrumb Navigation -->
-            {% if not is_root %}
-            <nav aria-label="breadcrumb" class="mb-3">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'r2-management-dashboard' %}" class="text-decoration-none">
-                            <i class="fas fa-home"></i> {% translate "Root" %}
-                        </a>
-                    </li>
-                    <!-- Add dynamic breadcrumb items here if needed -->
-                </ol>
-            </nav>
-            {% endif %}
-
-            <!-- Back Button -->
-            {% if not is_root %}
-            <div class="mb-3">
-                <button class="btn btn-outline-secondary" 
-                        onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ parent_folder }}'">
-                    <i class="fas fa-arrow-left me-2"></i>
-                    {% translate "Back" %}
-                </button>
-            </div>
-            {% endif %}
-
-            <!-- File Grid -->
-            <div id="drive-files">
-                {% include 'partials/r2_file_list.html' %}
-            </div>
-        </div>
+        {% include 'partials/r2_browse.html' %}
     </div>
 
-    <!-- Create Folder Modal -->
-    <div class="modal fade" id="createFolderModal" tabindex="-1">
+    <div class="modal fade" id="createFolderModal" tabindex="-1" data-bs-backdrop="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
@@ -205,9 +178,8 @@
                     <div id="create-folder-error" class="alert alert-danger d-none"></div>
                     <div class="mb-3">
                         <label class="form-label">{% translate "Folder Name" %}</label>
-                        <input type="text" 
-                               class="form-control" 
-                               x-model="newFolderName" 
+                        <input type="text" class="form-control"
+                               x-model="newFolderName"
                                @keyup.enter="createFolder()"
                                placeholder="{% translate 'Enter folder name' %}">
                     </div>
@@ -224,8 +196,7 @@
         </div>
     </div>
 
-    <!-- Rename File Modal -->
-    <div class="modal fade" id="renameFileModal" tabindex="-1">
+    <div class="modal fade" id="renameFileModal" tabindex="-1" data-bs-backdrop="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
@@ -236,7 +207,7 @@
                     <div id="rename-file-error" class="alert alert-danger d-none"></div>
                     <div class="mb-3">
                         <label class="form-label">{% translate "Current Name" %}</label>
-                        <input type="text" class="form-control" x-model="renameFileOldName" readonly>
+                        <input type="text" class="form-control" x-model="renameFileOldName" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{% translate "New Name" %}</label>
@@ -255,8 +226,7 @@
         </div>
     </div>
 
-    <!-- Confirm Delete Modal -->
-    <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" data-bs-backdrop="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header bg-danger text-white">
@@ -277,9 +247,7 @@
         </div>
     </div>
 
-
-    <!-- Info Modal -->
-    <div class="modal fade" id="infoModal" tabindex="-1">
+    <div class="modal fade" id="infoModal" tabindex="-1" data-bs-backdrop="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">

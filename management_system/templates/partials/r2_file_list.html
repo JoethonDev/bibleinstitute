@@ -72,7 +72,9 @@
                 <!-- Icon and Name -->
                 {% if item.type == 'folder' %}
                     <div class="drive-icon folder-icon text-warning w-100 is-clickable"
-                         onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ item.id }}'">
+                         hx-get="{% url 'r2-management-dashboard' %}?folder={{ item.id }}"
+                         hx-target="#file-list-container"
+                         hx-push-url="true">
                         <i class="fas fa-folder fa-2x"></i>
                     </div>
                     <div class="card-title file-name file-name-sm mt-1 w-100" title="{{ item.name }}">

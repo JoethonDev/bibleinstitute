@@ -4,6 +4,7 @@ Provides common interface for file operations with R2/Cloud storage.
 """
 import io
 import os
+from typing import Optional
 from urllib.parse import unquote
 from logging import getLogger
 from management_system.utils.r2_filters import R2FileFilter, FileFilterConfig
@@ -11,93 +12,83 @@ from management_system.utils.r2_filters import R2FileFilter, FileFilterConfig
 logger = getLogger(__name__)
 
 
-def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config: FileFilterConfig = None, folders_only=False):
+def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config: Optional[FileFilterConfig] = None, folders_only=False):
     """
     List files and folders in R2 storage with optional filtering.
+    Uses a single ListObjectsV2 call (no brute-force pagination) for fast navigation.
+    
+    The ``folder_name`` param is an R2 key prefix — a slash-delimited path.
+    (Previously it used ``-`` as a segment separator, which broke on any
+    folder name containing a hyphen.)
     
     Args:
         cloud_client: Boto3 S3 client configured for R2
         bucket_name: Name of the R2 bucket
-        folder_name: Path to folder (encoded with - separators)
+        folder_name: Slash-delimited folder prefix from the URL
         filter_config: Optional FileFilterConfig for filtering results
         folders_only: If True, only return folders (no files)
     
     Returns:
         Tuple of (contents list, parent_folder path)
     """
-    # Flag for getting all objects 
-    has_objects = True
-    
     if folder_name:
         folder_name = unquote(folder_name)
     
-    parents = folder_name.split("-")
-    folder_id = parents or []
-    parent_folder = "-".join(folder_id[:-2]) or None
-    folder_name = "/".join(folder_id) or ""
+    # Compute parent by removing the last path segment
+    parent_folder = None
+    if folder_name and '/' in folder_name.rstrip('/'):
+        parent_folder = folder_name.rstrip('/').rsplit('/', 1)[0] + '/'
     
+    # Normalise trailing slash
     if folder_name and not folder_name.endswith("/"):
         folder_name += "/"
     
-    objects = cloud_client.list_objects_v2(Bucket=bucket_name, Prefix=folder_name, Delimiter="/")
+    response = cloud_client.list_objects_v2(
+        Bucket=bucket_name,
+        Prefix=folder_name,
+        Delimiter="/",
+        MaxKeys=1000,
+    )
     
     contents = []
     
-    # Initialize filter if provided
     file_filter = R2FileFilter(filter_config) if filter_config else None
     
-    while has_objects:
-        # Files
-        if "Contents" in objects and not folders_only:  # Skip files if folders_only=True
-            for obj in objects["Contents"]:
-                key = obj["Key"]
-                # Only include files directly under the current folder (no extra / after prefix)
-                rel_path = key[len(folder_name):] if folder_name else key
-                if rel_path and "/" not in rel_path.rstrip("/"):
-                    file_name = key.split("/")[-1]
-                    
-                    file_obj = {
-                        "id": key,
-                        "name": file_name,
-                        "type": "file",
-                        "size": obj.get("Size", 0),
-                        "last_modified": obj.get("LastModified"),
-                    }
-                    
-                    # Apply filter if configured
-                    if file_filter:
-                        if file_filter.should_include_file(file_obj):
-                            contents.append(file_obj)
-                    else:
-                        # Default behavior: exclude .ts files only
-                        if not file_name.endswith(".ts"):
-                            contents.append(file_obj)
-        
-        # Folders
-        if "CommonPrefixes" in objects:
-            for folder in objects["CommonPrefixes"]:
-                separated_folder = folder["Prefix"].split("/")
-                folder_id = "-".join(separated_folder)
-                folder_obj = {
-                    "id": folder_id,
-                    "name": separated_folder[-2],
-                    "type": "folder"
+    # Files – only process when not folders_only
+    if "Contents" in response and not folders_only:
+        for obj in response["Contents"]:
+            key = obj["Key"]
+            rel_path = key[len(folder_name):] if folder_name else key
+            if rel_path and "/" not in rel_path.rstrip("/"):
+                file_name = key.split("/")[-1]
+                
+                file_obj = {
+                    "id": key,
+                    "name": file_name,
+                    "type": "file",
+                    "size": obj.get("Size", 0),
+                    "last_modified": obj.get("LastModified"),
                 }
                 
-                # Apply filter for folders if configured
-                if not file_filter or file_filter.should_include_file(folder_obj):
-                    contents.insert(0, folder_obj)
-        
-        # More Objects
-        has_objects = objects['IsTruncated']
-        if has_objects:
-            continuation_token = objects['NextContinuationToken']
-            objects = cloud_client.list_objects_v2(
-                Bucket=bucket_name, 
-                Prefix=folder_name, 
-                Delimiter="/", 
-                ContinuationToken=continuation_token
-            )
+                if file_filter:
+                    if file_filter.should_include_file(file_obj):
+                        contents.append(file_obj)
+                else:
+                    if not file_name.endswith(".ts"):
+                        contents.append(file_obj)
+    
+    # Folders — use the raw R2 prefix as the folder ID (no hyphen encoding)
+    if "CommonPrefixes" in response:
+        for folder in response["CommonPrefixes"]:
+            prefix = folder["Prefix"]
+            name = prefix.rstrip('/').rsplit('/', 1)[-1]
+            folder_obj = {
+                "id": prefix,
+                "name": name,
+                "type": "folder"
+            }
+            if not file_filter or file_filter.should_include_file(folder_obj):
+                contents.insert(0, folder_obj)
     
     return contents, parent_folder
 
