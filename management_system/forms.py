@@ -158,13 +158,13 @@ class AcademicYearForm(forms.ModelForm):
         fields = ["name", "level", "starts_on", "ends_on", "meeting_weekdays", "is_current"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "required": True}),
-            "level": forms.NumberInput(attrs={"class": "form-control", "required": True}),
+            "level": forms.Select(choices=Course.LEVELS_NAME, attrs={"class": "form-select", "required": True}),
             "starts_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "ends_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "meeting_weekdays": forms.CheckboxSelectMultiple(
                 choices=[(0, _("Monday")), (1, _("Tuesday")), (2, _("Wednesday")), (3, _("Thursday")), (4, _("Friday")), (5, _("Saturday")), (6, _("Sunday"))]
             ),
-            "is_current": forms.Select(attrs={"class": "form-select"}),
+            "is_current": forms.Select(choices=[(True, _("Yes")), (False, _("No"))], attrs={"class": "form-select"}),
         }
 
     def clean_meeting_weekdays(self):

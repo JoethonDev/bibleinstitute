@@ -64,7 +64,7 @@ def build_report_data(academic_year, student_id=None, study_mode=None, course_of
             "first_name": student.first_name,
             "last_name": student.last_name,
             "study_mode": student.study_mode or "",
-            "level": academic_year.level,
+            "level": enrollment.level or 1,
             "year_name": academic_year.name,
             "grade_earned": grade_info["earned"],
             "grade_available": grade_info["available"],

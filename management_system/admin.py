@@ -18,7 +18,7 @@ class AcademicYearAdmin(admin.ModelAdmin):
     list_display = ["name", "level", "starts_on", "ends_on", "is_current"]
     list_filter = ["level", "is_current"]
     search_fields = ["name"]
-    ordering = ["-starts_on"]
+    ordering = ["-starts_on", "level"]
 
 
 @admin.register(CourseOffering)
@@ -31,7 +31,7 @@ class CourseOfferingAdmin(admin.ModelAdmin):
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
     list_display = [
-        "student", "academic_year", "course_offering",
+        "student", "academic_year", "level", "course_offering",
         "enrollment_type", "status", "enrolled_at",
     ]
     list_filter = ["enrollment_type", "status", "academic_year__level"]

@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
+from django.urls import reverse_lazy
 
 load_dotenv()
 
@@ -210,6 +211,8 @@ EMAIL_HOST_USER = os.getenv('DJANGO_EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('DJANGO_EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'noreply@bibleinstitute.edu')
 LOGIN_URL_REVERSE = 'user_login'
+LOGIN_URL = reverse_lazy('user_login')
+LOGIN_REDIRECT_URL = 'home'
 
 ADMIN_EMAIL = os.getenv('DJANGO_ADMIN_EMAIL', '')
 

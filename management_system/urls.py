@@ -100,6 +100,7 @@ urlpatterns = [
     path('dashboard/course-offerings/<int:offering_id>/copy/', copy_course_offering, name="copy-course-offering"),
 
     # Academic Setup
+    path('courses-by-level/<int:level>/', courses_by_level, name="courses-by-level"),
     path('dashboard/academic/', academic_setup, name="academic-setup"),
     path('dashboard/academic/year/create/', academic_year_create, name="academic-year-create"),
     path('dashboard/academic/year/<int:year_id>/edit/', academic_year_edit, name="academic-year-edit"),

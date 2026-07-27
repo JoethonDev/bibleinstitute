@@ -56,6 +56,12 @@
             <div class="table-controls d-flex justify-content-between align-items-center px-3 py-2">
                 <div class="d-flex gap-2">
                     {% if current_status == "pending" %}
+                    <select name="bulk-level" id="bulk-level" class="form-select form-select-sm" style="width:auto">
+                        <option value="">{% translate "Select level..." %}</option>
+                        {% for key, label in COURSE_LEVELS %}
+                        <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
                     <button class="btn btn-success btn-sm" id="bulk-activate" data-decision="activate">
                         <i class="fas fa-check me-1"></i>{% translate "Activate Selected" %}
                     </button>
@@ -147,11 +153,17 @@
         if (!btn) return;
         var selected = Array.from(section.querySelectorAll('.user-checkbox:checked')).map(function(cb) { return parseInt(cb.value); });
         if (selected.length === 0) return;
+        var levelSelect = document.getElementById('bulk-level');
+        var level = levelSelect ? levelSelect.value : '';
+        if (btn.dataset.decision === 'activate' && !level) {
+            alert('{% translate "Please select an academic level." %}');
+            return;
+        }
         if (!confirm('{% translate "Are you sure?" %}')) return;
         fetch('{% url "bulk-application-decision" %}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected})
+            body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, level: parseInt(level)})
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.success) location.reload();
         });

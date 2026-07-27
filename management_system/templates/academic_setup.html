@@ -44,7 +44,7 @@
                 {% for y in years %}
                 <tr>
                     <td>{{ y.name }}</td>
-                    <td>{{ y.level }}</td>
+                    <td>{{ y.level_display }}</td>
                     <td>{{ y.starts_on }}</td>
                     <td>{{ y.ends_on }}</td>
                     <td>{% if y.is_current %}<span class="badge bg-success">{% translate "Yes" %}</span>{% else %}<span class="badge bg-secondary">{% translate "No" %}</span>{% endif %}</td>
@@ -72,7 +72,7 @@
             <select name="academic_year" class="form-select" onchange="this.form.submit()">
                 <option value="">{% translate "Select academic year..." %}</option>
                 {% for y in years %}
-                <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y.name }} ({% translate "Level" %} {{ y.level }})</option>
+                <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y.name }} — {{ y.level_display }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -90,6 +90,7 @@
             <thead>
                 <tr>
                     <th>{% translate "Course" %}</th>
+                    <th>{% translate "Level" %}</th>
                     <th>{% translate "Academic Year" %}</th>
                     <th>{% translate "Instructor" %}</th>
                     <th>{% translate "Status" %}</th>
@@ -100,6 +101,7 @@
                 {% for o in offerings %}
                 <tr>
                     <td>{{ o.course.name }}</td>
+                    <td>{{ o.course.level }}</td>
                     <td>{{ o.academic_year.name }}</td>
                     <td>{{ o.instructor|default:"—" }}</td>
                     <td>{{ o.get_status_display }}</td>
@@ -114,7 +116,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="text-center text-muted">{% if selected_year %}{% translate "No offerings for this year." %}{% else %}{% translate "Select an academic year to load offerings." %}{% endif %}</td></tr>
+                <tr><td colspan="6" class="text-center text-muted">{% if selected_year %}{% translate "No offerings for this year." %}{% else %}{% translate "Select an academic year to load offerings." %}{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -159,13 +161,33 @@
                 <input type="hidden" name="academic_year" value="{{ selected_year }}">
                 <div class="modal-header"><h5>{% translate "New Course Offering" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    {% for field in offering_form %}
                     <div class="mb-3">
-                        <label class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+                        <label class="form-label">{% translate "Level" %}</label>
+                        <select class="form-select offering-level-select" required>
+                            <option value="">{% translate "Select level..." %}</option>
+                            {% for key, label in COURSE_LEVELS %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                    {% endfor %}
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Course" %}</label>
+                        <select name="course" class="form-select offering-course-select" required>
+                            <option value="">{% translate "Select level first..." %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Instructor" %}</label>
+                        <input type="text" name="instructor" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Status" %}</label>
+                        <select name="status" class="form-select">
+                            <option value="draft">{% translate "Draft" %}</option>
+                            <option value="published">{% translate "Published" %}</option>
+                            <option value="archived">{% translate "Archived" %}</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
@@ -192,7 +214,11 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{% translate "Level" %}</label>
-                        <input type="number" name="level" value="{{ y.level }}" class="form-control" required>
+                        <select name="level" class="form-select" required>
+                            {% for key, label in COURSE_LEVELS %}
+                            <option value="{{ key }}" {% if key == y.level %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{% translate "Start Date" %}</label>
@@ -205,8 +231,8 @@
                     <div class="mb-3">
                         <label class="form-label">{% translate "Is Current" %}</label>
                         <select name="is_current" class="form-select">
-                            <option value="false" {% if not y.is_current %}selected{% endif %}>{% translate "No" %}</option>
-                            <option value="true" {% if y.is_current %}selected{% endif %}>{% translate "Yes" %}</option>
+                            <option value="False" {% if not y.is_current %}selected{% endif %}>{% translate "No" %}</option>
+                            <option value="True" {% if y.is_current %}selected{% endif %}>{% translate "Yes" %}</option>
                         </select>
                     </div>
                 </div>
@@ -231,9 +257,18 @@
                 <div class="modal-header"><h5>{% translate "Edit Offering" %}: {{ o.course.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <div class="mb-3">
+                        <label class="form-label">{% translate "Level" %}</label>
+                        <select class="form-select offering-level-select" data-selected="{{ o.course.level }}" required>
+                            <option value="">{% translate "Select level..." %}</option>
+                            {% for key, label in COURSE_LEVELS %}
+                            <option value="{{ key }}" {% if key == o.course.level %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">{% translate "Course" %}</label>
-                        <select name="course" class="form-select">
-                            {% for c in o.academic_year.course_set.all %}
+                        <select name="course" class="form-select offering-course-select" required>
+                            {% for c in o.level_courses %}
                             <option value="{{ c.id }}" {% if c.id == o.course_id %}selected{% endif %}>{{ c.name }}</option>
                             {% endfor %}
                         </select>
@@ -263,23 +298,32 @@
 
 <script>
 (function() {
-    // Reinitialize all Bootstrap modals after HTMX swaps
-    function initModals() {
-        document.querySelectorAll('.modal.fade').forEach(function(el) {
-            try {
-                if (window.bootstrap) {
-                    var modal = bootstrap.Modal.getInstance(el);
-                    if (!modal) {
-                        new bootstrap.Modal(el, {});
-                    }
-                }
-            } catch(e) {
-                // Modal init might fail for non-standard elements
+    document.querySelectorAll('.offering-level-select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            var level = this.value;
+            var modal = this.closest('.modal');
+            var courseSel = modal.querySelector('.offering-course-select');
+            courseSel.innerHTML = '<option value="">{% translate "Loading..." %}</option>';
+            if (!level) {
+                courseSel.innerHTML = '<option value="">{% translate "Select level first..." %}</option>';
+                return;
             }
+            fetch('/{{ LANGUAGE_CODE }}/courses-by-level/' + level + '/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    courseSel.innerHTML = '<option value="">{% translate "Select course..." %}</option>';
+                    data.forEach(function(c) {
+                        var opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.name;
+                        courseSel.appendChild(opt);
+                    });
+                })
+                .catch(function() {
+                    courseSel.innerHTML = '<option value="">{% translate "Error loading courses" %}</option>';
+                });
         });
-    }
-    initModals();
-    document.addEventListener('htmx:afterSwap', initModals);
+    });
 })();
 </script>
 {% endblock %}

@@ -115,7 +115,7 @@
                 </select>
               </form>
               {% if user.is_authenticated %}
-                <a class="btn btn-outline-primary btn-sm" href="{% url 'logout' %}"><i class="fas fa-right-from-bracket"></i>{% translate "Logout" %}</a>
+                <form method="post" action="{% url 'logout' %}" style="display:inline">{% csrf_token %}<button type="submit" class="btn btn-outline-primary btn-sm"><i class="fas fa-right-from-bracket"></i>{% translate "Logout" %}</button></form>
               {% else %}
                 <a class="btn btn-outline-primary btn-sm" href="{% url 'user_login' %}">{% translate "Login" %}</a>
                 <a class="btn btn-primary btn-sm" href="{% url 'signup' %}">{% translate "Sign Up" %}</a>

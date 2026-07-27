@@ -212,7 +212,7 @@ class Course(models.Model):
 
 class AcademicYear(models.Model):
     name = models.CharField(max_length=20)
-    level = models.PositiveIntegerField()
+    level = models.PositiveIntegerField(default=1)
     starts_on = models.DateField()
     ends_on = models.DateField()
     is_current = models.BooleanField(default=False)
@@ -238,7 +238,10 @@ class AcademicYear(models.Model):
         ]
 
     def __str__(self):
-        return f"Level {self.level} - {self.name}"
+        return f"{self.name}"
+
+    def level_display(self):
+        return Course.LEVELS_NAME.get(self.level, "")
 
     def clean(self):
         super().clean()
@@ -278,8 +281,6 @@ class CourseOffering(models.Model):
 
     def clean(self):
         super().clean()
-        if self.course_id and self.academic_year_id and self.course.level != self.academic_year.level:
-            raise ValidationError(_("Course level must match the academic year level."))
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -301,6 +302,7 @@ class Enrollment(models.Model):
 
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="enrollments")
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="enrollments")
+    level = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("Academic Level"))
     course_offering = models.ForeignKey(
         CourseOffering,
         on_delete=models.PROTECT,
@@ -350,6 +352,8 @@ class Enrollment(models.Model):
 
     def clean(self):
         super().clean()
+        if self.course_id and self.academic_year_id and self.course.level != self.academic_year.level:
+            raise ValidationError(_("Course level must match the academic year level."))
         if self.course_offering_id:
             if self.course_offering.academic_year_id != self.academic_year_id:
                 raise ValidationError({"course_offering": _("Course offering must belong to the selected academic year.")})

@@ -2280,6 +2280,7 @@ def applications_dashboard(request):
     return render(request, "applications_dashboard.html", {
         "page_obj": page_obj,
         "current_status": status_filter,
+        "COURSE_LEVELS": Course.LEVELS_NAME.items(),
     })
 
 
@@ -2293,7 +2294,11 @@ def application_review(request, user_id):
         if key:
             url = generate_unique_url(CLOUD_CLIENT, bucket_name, key, expires_in=300)
             doc_urls[label] = url
-    return render(request, "application_review.html", {"app_user": user, "doc_urls": doc_urls})
+    return render(request, "application_review.html", {
+        "app_user": user,
+        "doc_urls": doc_urls,
+        "COURSE_LEVELS": Course.LEVELS_NAME.items(),
+    })
 
 
 @capability_required(can_manage_applications)
@@ -2341,7 +2346,7 @@ def application_decision(request, user_id, decision):
             Enrollment.objects.get_or_create(
                 student=user,
                 academic_year=current_year,
-                defaults={"enrolled_by": request.user}
+                defaults={"enrolled_by": request.user, "level": level}
             )
             send_application_activated(user)
             messages.success(request, _("%(name)s activated.") % {"name": user.get_full_name() or user.username})
@@ -2391,7 +2396,7 @@ def bulk_application_decision(request):
                     user.decided_by = request.user
                     user.decided_at = now()
                     user.save()
-                    Enrollment.objects.get_or_create(student=user, academic_year=current_year, defaults={"enrolled_by": request.user})
+                    Enrollment.objects.get_or_create(student=user, academic_year=current_year, defaults={"enrolled_by": request.user, "level": level})
                     send_application_activated(user)
                 else:
                     user.application_status = "declined"
@@ -2478,11 +2483,13 @@ def copy_course_offering(request, offering_id):
 
 @capability_required(can_manage_content)
 def academic_setup(request):
-    years = AcademicYear.objects.all().order_by("-starts_on")
+    years = AcademicYear.objects.all().order_by("-starts_on", "level")
     selected_year = request.GET.get("academic_year")
     offerings = CourseOffering.objects.none()
     if selected_year:
         offerings = CourseOffering.objects.filter(academic_year_id=selected_year).select_related("course", "academic_year")
+        for o in offerings:
+            o.level_courses = Course.objects.filter(level=o.course.level)
     year_form = AcademicYearForm()
     offering_form = CourseOfferingForm()
     return render(request, "academic_setup.html", {
@@ -2491,6 +2498,7 @@ def academic_setup(request):
         "selected_year": int(selected_year) if selected_year else None,
         "year_form": year_form,
         "offering_form": offering_form,
+        "COURSE_LEVELS": Course.LEVELS_NAME.items(),
     })
 
 
@@ -2579,6 +2587,12 @@ def course_offering_delete(request, offering_id):
     except ProtectedError as e:
         messages.error(request, _("Cannot delete this course offering: it is referenced by other records (%s).") % str(e))
     return redirect(f"{reverse('academic-setup')}?academic_year={year_id}")
+
+
+@capability_required(can_manage_content)
+def courses_by_level(request, level):
+    courses = Course.objects.filter(level=level).values("id", "name")
+    return JsonResponse(list(courses), safe=False)
 
 
 @require_POST
