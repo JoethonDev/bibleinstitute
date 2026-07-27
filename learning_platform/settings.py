@@ -15,6 +15,8 @@ import os
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
+import pymysql
+pymysql.install_as_MySQLdb()
 
 load_dotenv()
 
@@ -92,19 +94,19 @@ WSGI_APPLICATION = 'learning_platform.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': os.getenv('DB_NAME', 'your_local_db_name_for_testing'),
-#         'USER': os.getenv('DB_USER', 'your_local_username'),
-#         'PASSWORD': os.getenv('DB_PASSWORD', 'your_local_password'),
-#         'HOST': os.getenv('DB_HOST', 'localhost'),
-#         'PORT': os.getenv('DB_PORT', '3306'),
-#         'OPTIONS': {
-#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-#         },
-#     }
-# }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME', 'your_local_db_name_for_testing'),
+        'USER': os.getenv('DB_USER', 'your_local_username'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'your_local_password'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '3306'),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
+}
 
 
 # DATABASES = {
@@ -115,12 +117,12 @@ WSGI_APPLICATION = 'learning_platform.wsgi.application'
 # }
 
 # ponytail: switch to SQLite for local dev since PostgreSQL is down
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
