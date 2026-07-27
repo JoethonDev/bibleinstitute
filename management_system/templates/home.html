@@ -17,7 +17,13 @@
 
 <section class="public-section container public-curriculum-preview"><div class="public-book-art"><span>66</span></div><div><p class="public-kicker">{{ copy.curriculum_kicker }}</p><h2>{{ copy.curriculum_title }}</h2><p>{{ copy.curriculum_text }}</p><a class="public-btn public-btn-dark" href="{% url 'program' %}#curriculum">{{ copy.curriculum_action }}</a></div></section>
 
-<section id="message" class="public-section public-video"><div class="container public-video-grid"><div><p class="public-kicker">{{ copy.video_kicker }}</p><h2>{{ copy.video_title }}</h2><p>{{ copy.video_text }}</p></div><div class="public-video-frame"><iframe src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g" title="{{ copy.video_title }}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div></div></section>
+<section id="message" class="public-section public-video"><div class="container public-video-grid"><div><p class="public-kicker">{{ copy.video_kicker }}</p><h2>{{ copy.video_title }}</h2><p>{{ copy.video_text }}</p></div><div class="public-video-frame">
+  <iframe src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g?si=Gn7QU4eywL3HVRcD"
+                                title="YouTube video player"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen></iframe>
+</div></div></section>
 
 <section class="public-cta"><div class="container"><div><h2>{{ copy.cta_title }}</h2><p>{{ copy.cta_text }}</p></div><a class="public-btn public-btn-cream" href="{% url 'signup' %}">{{ copy.apply_now }}</a></div></section>
 </div>
