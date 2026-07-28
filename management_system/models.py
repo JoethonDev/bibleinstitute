@@ -8,6 +8,7 @@ from django.utils.timezone import now
 from datetime import date, datetime, timedelta
 import json
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
+from django.db.models import Max
 
 # Constants
 MANAGEMENT_ROLES = ["admin", "staff"]
@@ -125,25 +126,6 @@ class OfflineCity(models.Model):
         return self.name
 
 class Course(models.Model):
-    MAXIMUM_LEVEL = 2
-
-    LEVELS = {
-        "admin" : MAXIMUM_LEVEL,
-        "staff" : MAXIMUM_LEVEL,
-        "management" : MAXIMUM_LEVEL,
-        "teacher" : MAXIMUM_LEVEL,
-        "moderator" : MAXIMUM_LEVEL,
-        "senior" : MAXIMUM_LEVEL,
-        "junior" : 1,
-        "student" : 0,
-    }
-
-
-    LEVELS_NAME = {
-        1 : _("First Academic Year"),
-        2 : _("Second Academic Year"),
-    }
-
     name = models.CharField(max_length=255, null=False, unique=True)
     description = models.TextField(null=True)
     instructor = models.CharField(max_length=255, null=True)
@@ -154,30 +136,77 @@ class Course(models.Model):
 
     def __str__(self):
         return f"Course : {self.name} in level : {self.level}"
-    
+
+    # ── Dynamic level helpers ──────────────────────────────────────
+    @classmethod
+    def get_level_name(cls, level):
+        try:
+            entry = LevelName.objects.get(level=level)
+            from django.utils import translation
+            lang = translation.get_language()
+            name = entry.name_ar if lang == "ar" else entry.name_en
+            if name:
+                return name
+        except LevelName.DoesNotExist:
+            pass
+        names = {
+            1: _("First Academic Year"),
+            2: _("Second Academic Year"),
+            3: _("Third Academic Year"),
+            4: _("Fourth Academic Year"),
+        }
+        return names.get(level, _("Level %(level)d") % {"level": level})
+
+    @classmethod
+    def get_levels_name(cls):
+        levels = (
+            AcademicYear.objects.values_list("level", flat=True)
+            .distinct()
+            .order_by("level")
+        )
+        return {lvl: cls.get_level_name(lvl) for lvl in levels}
+
+    @classmethod
+    def get_max_level(cls):
+        max_level = AcademicYear.objects.aggregate(max=Max("level"))["max"]
+        return max_level or 2
+
+    @classmethod
+    def get_role_level(cls, role):
+        max_lvl = cls.get_max_level()
+        mapping = {
+            "admin": max_lvl,
+            "staff": max_lvl,
+            "management": max_lvl,
+            "teacher": max_lvl,
+            "moderator": max_lvl,
+            "senior": max_lvl,
+            "junior": 1,
+            "student": 0,
+        }
+        return mapping.get(role, 0)
+
+    # ── Instance methods ───────────────────────────────────────────
     def serialize_pagination(self):
         return {
-            "rows" : [self.name, self.description, str(_(self.LEVELS_NAME[self.level])), self.instructor],
+            "rows" : [self.name, self.description, Course.get_level_name(self.level), self.instructor],
             "url" : reverse_lazy("course-view", args=[self.pk,])
         }
-    
+
     @staticmethod
     def get_columns():
             return [_("Name"), _("Description"), _("Level"), _("Instructor")]
 
     def get_name_year(self):
-        return f"{self.name} - {self.LEVELS_NAME[self.level]}"
+        return f"{self.name} - {Course.get_level_name(self.level)}"
 
     def can_access(self, role: str):
-        return self.level <= self.LEVELS.get(role, 0)
+        return self.level <= Course.get_role_level(role)
 
     def retrieve_courses_for_level(self, level: int):
         packed_levels = []
-        # Get All levels
         levels = [number for number in range(1, level+1)]
-        # Query Optimization for making a single hit to database
         courses = self.objects.filter(level__in=levels)
-        # Collect and Sort Course based on level
         packed_courses = {}
         for course in courses:
             current_level = course.level
@@ -185,22 +214,18 @@ class Course(models.Model):
                 packed_courses[current_level].append(course)
             else:
                 packed_courses[current_level] = [course]
-
-        # Format Course to return
         for current_level, courses_list in packed_courses.items():
             packed_levels.insert(0, {
-                "level_name" : str(_(self.LEVELS_NAME[current_level])), # Translate level name here
-                "courses" : courses_list,
+                "level_name": Course.get_level_name(current_level),
+                "courses": courses_list,
             })
-            
         return packed_levels
 
     @staticmethod
     def fetch_courses_by_role(role: str):
         if role in MANAGEMENT_ROLES:
             role = "management"
-               
-        current_level = Course.LEVELS.get(role, 0)
+        current_level = Course.get_role_level(role)
         return Course.retrieve_courses_for_level(Course, current_level)
     
     def fetch_quizzes(self, user):
@@ -241,7 +266,7 @@ class AcademicYear(models.Model):
         return f"{self.name}"
 
     def level_display(self):
-        return Course.LEVELS_NAME.get(self.level, "")
+        return Course.get_level_name(self.level)
 
     def clean(self):
         super().clean()
@@ -281,6 +306,8 @@ class CourseOffering(models.Model):
 
     def clean(self):
         super().clean()
+        if self.course_id and self.academic_year_id and self.course.level != self.academic_year.level:
+            raise ValidationError({"course": _("Course level must match the academic year level.")})
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -352,7 +379,7 @@ class Enrollment(models.Model):
 
     def clean(self):
         super().clean()
-        if self.course_id and self.academic_year_id and self.course.level != self.academic_year.level:
+        if self.course_offering_id and self.academic_year_id and self.course_offering.course.level != self.academic_year.level:
             raise ValidationError(_("Course level must match the academic year level."))
         if self.course_offering_id:
             if self.course_offering.academic_year_id != self.academic_year_id:
@@ -846,4 +873,13 @@ class Grade(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.quiz.name} ({self.total_grade})"
+
+
+class LevelName(models.Model):
+    level = models.PositiveIntegerField(unique=True)
+    name_en = models.CharField(max_length=255, blank=True, default="")
+    name_ar = models.CharField(max_length=255, blank=True, default="")
+
+    def __str__(self):
+        return f"Level {self.level}: {self.name_en or self.name_ar}"
         

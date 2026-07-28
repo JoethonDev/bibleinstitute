@@ -32,7 +32,7 @@
 {% if not submit_button_color %}{% with submit_button_color="primary" %}{% endwith %}{% endif %}
 {% if not cancel_button_text %}{% with cancel_button_text=_("Cancel") %}{% endwith %}{% endif %}
 
-<div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-labelledby="{{ modal_id }}Label" aria-hidden="true">
+<div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-labelledby="{{ modal_id }}Label" aria-hidden="true" data-bs-backdrop="false">
     <div class="modal-dialog {% if modal_centered %}modal-dialog-centered{% endif %} {% if modal_size %}modal-{{ modal_size }}{% endif %}">
         <div class="modal-content">
             

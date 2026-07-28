@@ -142,23 +142,33 @@ class CourseForm(forms.ModelForm):
         self.fields['instructor'].label = _("Instructor") # Localized
         self.fields['instructor'].required = False
         self.fields['level'].label = _("Academic Year") # Localized
-
-    level = forms.ChoiceField(
-        choices=Course.LEVELS_NAME,
-        widget=forms.Select()
-    )
+        self.fields['level'].choices = [
+            (lvl, Course.get_level_name(lvl))
+            for lvl in sorted(set(
+                list(AcademicYear.objects.values_list("level", flat=True).distinct())
+                + list(Course.objects.values_list("level", flat=True).distinct())
+            ))
+        ] or [(1, _("Level 1"))]
 
     class Meta:
         model = Course
         fields = "__all__"
 
 class AcademicYearForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        levels = Course.get_levels_name()
+        if not levels:
+            levels = {1: _("Level 1")}
+        self.fields["level"].widget.choices = list(levels.items())
+        self.fields["meeting_weekdays"].required = False
+
     class Meta:
         model = AcademicYear
         fields = ["name", "level", "starts_on", "ends_on", "meeting_weekdays", "is_current"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "required": True}),
-            "level": forms.Select(choices=Course.LEVELS_NAME, attrs={"class": "form-select", "required": True}),
+            "level": forms.Select(attrs={"class": "form-select", "required": True}),
             "starts_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "ends_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "meeting_weekdays": forms.CheckboxSelectMultiple(

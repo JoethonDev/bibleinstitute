@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load static %}
 
+{% block breadcrumbs %}{% endblock %}
 {% block body %}
 <div class="container-fluid py-3" id="content">
     <nav aria-label="breadcrumb">
@@ -67,6 +68,9 @@
                     </button>
                     <button class="btn btn-danger btn-sm" id="bulk-decline" data-decision="decline">
                         <i class="fas fa-times me-1"></i>{% translate "Decline Selected" %}
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm d-none" id="select-all-records">
+                        {% translate "Select all matching records" %}
                     </button>
                     {% endif %}
                 </div>
@@ -141,18 +145,28 @@
 (function() {
     var section = document.getElementById('app-table-section');
     if (!section) return;
+    var selectAllRecords = false;
     section.addEventListener('change', function(e) {
         if (e.target && e.target.id === 'select-all') {
             section.querySelectorAll('.user-checkbox').forEach(function(cb) {
                 cb.checked = e.target.checked;
             });
+            selectAllRecords = false;
+            var allButton = section.querySelector('#select-all-records');
+            if (allButton) allButton.classList.toggle('d-none', !e.target.checked);
+        }
+    });
+    section.addEventListener('click', function(e) {
+        if (e.target.closest('#select-all-records')) {
+            selectAllRecords = true;
+            e.target.closest('#select-all-records').classList.add('d-none');
         }
     });
     section.addEventListener('click', function(e) {
         var btn = e.target.closest('#bulk-activate, #bulk-decline');
         if (!btn) return;
         var selected = Array.from(section.querySelectorAll('.user-checkbox:checked')).map(function(cb) { return parseInt(cb.value); });
-        if (selected.length === 0) return;
+        if (selected.length === 0 && !selectAllRecords) return;
         var levelSelect = document.getElementById('bulk-level');
         var level = levelSelect ? levelSelect.value : '';
         if (btn.dataset.decision === 'activate' && !level) {
@@ -163,7 +177,7 @@
         fetch('{% url "bulk-application-decision" %}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, level: parseInt(level)})
+            body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, select_all: selectAllRecords, status: '{{ current_status }}', level: parseInt(level)})
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.success) location.reload();
         });

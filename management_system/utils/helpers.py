@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.timezone import now
 from django.http import HttpResponse
+from django.db.models import Q, F
 from logging import getLogger
 from management_system.utils.decorators import check_role_permission
 from management_system.models import User, Enrollment, MANAGEMENT_ROLES, Course, Grade
@@ -51,10 +52,9 @@ def is_quiz_in_user_window(quiz, user) -> bool:
     if user.role and user.role.role in MANAGEMENT_ROLES:
         return True
 
-    if quiz.course_offering_id and Enrollment.objects.filter(
-        student=user,
-        academic_year__course_offerings__pk=quiz.course_offering_id,
-        status="active",
+    if quiz.course_offering_id and Enrollment.objects.filter(student=user, status="active").filter(
+        Q(enrollment_type="normal", academic_year_id=quiz.course_offering.academic_year_id)
+        | Q(course_offering_id=quiz.course_offering_id)
     ).exists():
         return True
 

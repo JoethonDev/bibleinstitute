@@ -247,7 +247,7 @@
             });
 
 
-            ffmpeg = null
+            if (typeof ffmpeg === 'undefined') ffmpeg = null
             uploadBtn = document.getElementById("upload-btn")
             uploadBtn.addEventListener("click", async (e) => {
                 await handleFiles(document.getElementById('formFileMultiple'))
@@ -261,9 +261,9 @@
                 return csrf['X-CSRFToken']
             }
 
-            function createFilePath(fileName) {
+            function createFilePath(fileName, folder = folderName.value) {
                 fileName = fileName.split(".")[0]
-                let value = folderName.value
+                let value = folder
                 let folderValue = (value.endsWith("/")) ? value : `${value}/`
                 return `${folderValue}${fileName}`
             }
@@ -292,6 +292,8 @@
                 progressBar.style.width = currentProgress
             }
 
+            window.__adminUploadQueue = window.__adminUploadQueue || { items: [], running: false };
+
             async function handleFiles(input) {
                 const files = input.files;
                 if (files.length === 0) {
@@ -313,13 +315,25 @@
                     return;
                 }
 
-                // Clear previous displays
-                document.getElementById('progress-container').innerHTML = '';
+                const folder = folderName.value;
+                validation.validFiles.forEach(result => window.__adminUploadQueue.items.push({ ...result, folder }));
+                input.value = '';
+                drainUploadQueue();
+            }
 
-                // Process only valid files
-                for (const result of validation.validFiles) {
+            async function drainUploadQueue() {
+                const queue = window.__adminUploadQueue;
+                if (queue.running) return;
+                queue.running = true;
+                try {
+                    while (queue.items.length) await processUploadItem(queue.items.shift());
+                } finally {
+                    queue.running = false;
+                }
+            }
+
+            async function processUploadItem(result) {
                     const file = result.file;
-                    console.log("Processing file:", file.name);
                     const fileName = file.name.split(" ").join("_");
                     const fullFileName = file.name;
                     const fileCategory = result.type;
@@ -340,9 +354,8 @@
                             const audioSegments = await readSegments(audioName);
 
                             console.log("Segmentation Complete:", videoSegments.length, "video segments created.");
-                            await uploadSegments(videoSegments, videoName);
-                            console.log("Segmentation Complete:", audioSegments.length, "audio segments created.");
-                            await uploadSegments(audioSegments, audioName);
+                            await uploadSegments(videoSegments, videoName, result.folder);
+                            await uploadSegments(audioSegments, audioName, result.folder);
                         } catch (error) {
                             console.error(getJsTranslation_upload('videoProcessingFailed'), fileName, error);
                         } finally {
@@ -362,7 +375,7 @@
                             const audioSegments = await readSegments(audioName);
 
                             console.log("Audio Segmentation Complete:", audioSegments.length, "segments created.");
-                            await uploadSegments(audioSegments, audioName);
+                            await uploadSegments(audioSegments, audioName, result.folder);
                         } catch (error) {
                             console.error(getJsTranslation_upload('audioSegmentationFailed'), fileName, error);
                         } finally {
@@ -370,10 +383,9 @@
                         }
                     } else {
                         // Process non-media files (PDF)
-                        await uploadWholeFile(file, fileName);
+                        await uploadWholeFile(file, fileName, result.folder);
                     }
                 }
-            }
 
             async function readFile(file) {
                 const fileData = await new Promise((resolve, reject) => {
@@ -560,14 +572,14 @@
                 
             }
 
-            async function uploadSegments(files, fileName) {
+            async function uploadSegments(files, fileName, folder) {
                 try {
                     
                     fileName = CSS.escape(fileName.split(".")[0])
                     const uploadResults = [];
                     createProgressBar(fileName, "upload")
                     let uploadBar = document.querySelector(`.upload-${fileName}`)
-                    let filePath = createFilePath(fileName)
+                    let filePath = createFilePath(fileName, folder)
 
                     let playlist = files[0]
                     let playlistPath = `${filePath}.m3u8`
@@ -615,13 +627,13 @@
                 }
             }
 
-            async function uploadWholeFile(file, fullFileName) {
+            async function uploadWholeFile(file, fullFileName, folder) {
                 try {
                     const [fileName, ext] = fullFileName.split(".")
                     const uploadResults = [];
                     createProgressBar(fileName, "upload")
                     let uploadBar = document.querySelector(`.upload-${CSS.escape(fileName)}`)
-                    let filePath = createFilePath(fileName)
+                    let filePath = createFilePath(fileName, folder)
 
                     let playlistPath = `${filePath}.${ext}`
                     try {

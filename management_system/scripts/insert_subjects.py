@@ -1,8 +1,19 @@
-from management_system.models import Course
+from management_system.models import Course, AcademicYear
 
 def run():
     courses = []
     Course.objects.all().delete()
+    # Create AcademicYears for levels that don't exist yet
+    from datetime import date
+    for lvl in range(1, 4):
+        if not AcademicYear.objects.filter(level=lvl, is_current=True).exists():
+            AcademicYear.objects.create(
+                name=f"Year {lvl}",
+                level=lvl,
+                starts_on=date(date.today().year if date.today().month >= 8 else date.today().year - 1, 8, 1),
+                ends_on=date((date.today().year if date.today().month >= 8 else date.today().year - 1) + 1, 7, 31),
+                is_current=not AcademicYear.objects.filter(is_current=True).exists(),
+            )
     text = """
 3 مادة عهد قديم
 العهد الجديد ترم اول – 1
@@ -23,14 +34,17 @@ def run():
 مادة القراءات الكنسية – القطمارس
 مادة تاريخ الكتاب المقدس
 """
-    level = 1
+    levels = sorted(set(
+        list(AcademicYear.objects.values_list("level", flat=True).distinct())
+        + list(Course.objects.values_list("level", flat=True).distinct())
+    )) or [1, 2, 3]
+    level_idx = 0
     for course in text.split("\n"):
         if course:
             course = course.strip()
             courses.append(
-                Course(name=course, level=level)
+                Course(name=course, level=levels[level_idx % len(levels)])
             )
-
-        level = 1 if level == 2 else 2
+            level_idx += 1
     
     Course.objects.bulk_create(courses)

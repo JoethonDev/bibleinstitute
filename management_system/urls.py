@@ -53,7 +53,7 @@ urlpatterns = [
     path('dashboard/lessons/<int:lesson_id>/update/', update_lesson, name="lesson-update"),
     path('dashboard/lessons/<int:lesson_id>/delete/', DeleteLesson.as_view(), name="lesson-delete"),
     path('dashboard/lessons/<int:lesson_id>/duplicate/', duplicate_lesson, name="lesson-duplicate"),
-    path('dashboard/folder/<str:folder_id>/', navigate_folder, name="navigate-folder"),
+    path('dashboard/folder/<path:folder_id>/', navigate_folder, name="navigate-folder"),
 
     # Quiz Dashboard
     path('dashboard/quizzez/', quiz_dashboard, name="quiz-dashboard"),
@@ -101,6 +101,10 @@ urlpatterns = [
 
     # Academic Setup
     path('courses-by-level/<int:level>/', courses_by_level, name="courses-by-level"),
+    path('dashboard/levels/', levels_dashboard, name="levels-dashboard"),
+    path('dashboard/levels/create/', level_create, name="level-create"),
+    path('dashboard/levels/<int:level>/edit/', level_edit, name="level-edit"),
+    path('dashboard/levels/<int:level>/delete/', level_delete, name="level-delete"),
     path('dashboard/academic/', academic_setup, name="academic-setup"),
     path('dashboard/academic/year/create/', academic_year_create, name="academic-year-create"),
     path('dashboard/academic/year/<int:year_id>/edit/', academic_year_edit, name="academic-year-edit"),

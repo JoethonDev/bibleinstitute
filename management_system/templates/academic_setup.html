@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load static %}
 
+{% block breadcrumbs %}{% endblock %}
 {% block body %}
 <div class="container-fluid py-3" id="content">
     <nav aria-label="breadcrumb">
@@ -126,7 +127,7 @@
 
 {% block extra_scripts %}
 {# --- Create Year Modal --- #}
-<div class="modal fade" id="yearModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="yearModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="post" action="{% url 'academic-year-create' %}">
@@ -153,7 +154,7 @@
 
 {# --- Create Offering Modal --- #}
 {% if selected_year %}
-<div class="modal fade" id="offeringModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="offeringModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="post" action="{% url 'course-offering-create' %}">
@@ -201,7 +202,7 @@
 
 {# --- Edit Year Modals --- #}
 {% for y in years %}
-<div class="modal fade" id="yearModal{{ y.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="yearModal{{ y.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="post" action="{% url 'academic-year-edit' y.id %}">
@@ -229,6 +230,17 @@
                         <input type="date" name="ends_on" value="{{ y.ends_on|date:'Y-m-d' }}" class="form-control" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">{% translate "Meeting Weekdays" %}</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for wd_val, wd_label in meeting_weekday_choices %}
+                            <div class="form-check">
+                                <input type="checkbox" name="meeting_weekdays" value="{{ wd_val }}" class="form-check-input" id="edit-wd-{{ y.id }}-{{ wd_val }}" {% if wd_val in y.meeting_weekdays %}checked{% endif %}>
+                                <label class="form-check-label" for="edit-wd-{{ y.id }}-{{ wd_val }}">{{ wd_label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">{% translate "Is Current" %}</label>
                         <select name="is_current" class="form-select">
                             <option value="False" {% if not y.is_current %}selected{% endif %}>{% translate "No" %}</option>
@@ -248,7 +260,7 @@
 
 {# --- Edit Offering Modals --- #}
 {% for o in offerings %}
-<div class="modal fade" id="offeringModal{{ o.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="offeringModal{{ o.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="post" action="{% url 'course-offering-edit' o.id %}">

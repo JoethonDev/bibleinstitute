@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Avg, Count, F, Q, Sum
 from django.db import transaction
 from django.contrib import messages
 from django.contrib.messages import success, error, info
@@ -52,6 +52,7 @@ from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
+from .utils.r2_references import rewrite_lesson_r2_references
 from .utils.attendance import is_expected_date, get_expected_dates, get_attendance_summary
 from .public_content import get_institute_copy
 
@@ -431,10 +432,11 @@ def view_courses(request):
         logger.info(f"{username} access all academic years")
     else:
         enrolled_offerings = CourseOffering.objects.filter(
-            academic_year__enrollments__student=user,
-            academic_year__enrollments__status="active",
             status="published",
-        ).select_related("course", "academic_year")
+        ).filter(
+            Q(academic_year__enrollments__student=user, academic_year__enrollments__status="active", academic_year__enrollments__enrollment_type="normal")
+            | Q(enrollments__student=user, enrollments__status="active", enrollments__course_offering=F("pk"))
+        ).select_related("course", "academic_year").distinct()
 
         if enrolled_offerings.exists():
             levels_map = {}
@@ -442,7 +444,7 @@ def view_courses(request):
                 level = offering.course.level
                 if level not in levels_map:
                     levels_map[level] = {
-                        "level_name": str(_(Course.LEVELS_NAME.get(level, level))),
+                        "level_name": Course.get_level_name(level),
                         "courses": [],
                     }
                 levels_map[level]["courses"].append(offering.course)
@@ -489,10 +491,11 @@ def view_course_details(request, course_id):
                 return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
             offerings = CourseOffering.objects.filter(
                 course=course,
-                academic_year__enrollments__student=user,
-                academic_year__enrollments__status="active",
                 status="published",
-            )
+            ).filter(
+                Q(academic_year__enrollments__student=user, academic_year__enrollments__status="active", academic_year__enrollments__enrollment_type="normal")
+                | Q(enrollments__student=user, enrollments__status="active", enrollments__course_offering=F("pk"))
+            ).distinct()
             if offerings.exists():
                 context['lessons'] = Lesson.objects.filter(
                     course_offering__in=offerings,
@@ -519,10 +522,14 @@ def view_lesson_details(request, course_id, lesson_id):
         lesson_links = json.loads(lesson.links)
         can_access = user_can_access_course(user, course) and (
             user_has_management_role(user)
-            or (lesson.course_offering_id and user.enrollments.filter(
-                academic_year__course_offerings__pk=lesson.course_offering_id,
-                status="active",
-            ).exists())
+            or (
+                lesson.status == PublicationStatus.PUBLISHED
+                and lesson.course_offering.status == PublicationStatus.PUBLISHED
+                and user.enrollments.filter(status="active").filter(
+                    Q(enrollment_type="normal", academic_year_id=lesson.course_offering.academic_year_id)
+                    | Q(course_offering_id=lesson.course_offering_id)
+                ).exists()
+            )
         )
         if can_access:
             logger.info(f"User : {user} is accessing {lesson.name} lesson from {course.name} course")
@@ -553,12 +560,15 @@ def stream_lesson(request, lesson_id, file_index):
         lesson = get_object_or_404(Lesson, pk=lesson_id)
         can_stream = user_has_management_role(user) or (
             lesson.course_offering_id
-            and user.enrollments.filter(
-                academic_year__course_offerings__pk=lesson.course_offering_id,
-                status="active",
+            and user.enrollments.filter(status="active").filter(
+                Q(enrollment_type="normal", academic_year_id=lesson.course_offering.academic_year_id)
+                | Q(course_offering_id=lesson.course_offering_id)
             ).exists()
         )
-        if not user_can_access_course(user, lesson.course) or not can_stream:
+        if not user_can_access_course(user, lesson.course) or not can_stream or (
+            not user_has_management_role(user)
+            and (lesson.status != PublicationStatus.PUBLISHED or lesson.course_offering.status != PublicationStatus.PUBLISHED)
+        ):
             logger.error(f"{user.username} is not authorized to stream lesson : {lesson.name}")
             return HttpResponse(_('Unauthorized'), status=401)
 
@@ -766,7 +776,162 @@ def take_exam(request, course_id, quiz_id):
 @capability_required(can_manage_content)
 def admin_panel(request):
     logger.info(f"User : {request.user} accesses admin panel successfully")
-    return render(request, "admin_panel.html")
+
+    today = timezone.now().date()
+    first_of_month = today.replace(day=1)
+    week_ago = today - timedelta(days=7)
+
+    # ====== 1. USER ANALYTICS ======
+    users_total = User.objects.count()
+
+    users_by_role = list(
+        User.objects.values('role__role').annotate(count=Count('id'))
+    )
+    users_by_app_status = list(
+        User.objects.values('application_status').annotate(count=Count('id'))
+    )
+    users_by_study_mode = list(
+        User.objects.values('study_mode').annotate(count=Count('id'))
+    )
+
+    new_users_month = User.objects.filter(joined_date__gte=first_of_month).count()
+    new_users_week = User.objects.filter(joined_date__gte=week_ago).count()
+
+    top_cities = list(
+        User.objects.values('city')
+        .annotate(count=Count('id'))
+        .filter(city__isnull=False)
+        .exclude(city='')
+        .order_by('-count')[:10]
+    )
+
+    # ====== 2. COURSE & LESSON ANALYTICS ======
+    courses_total = Course.objects.count()
+    courses_by_level = list(
+        Course.objects.values('level').annotate(count=Count('id')).order_by('level')
+    )
+
+    lessons_total = Lesson.objects.count()
+    lessons_by_status = list(
+        Lesson.objects.values('status').annotate(count=Count('id'))
+    )
+    avg_lessons_per_course = round(lessons_total / courses_total, 1) if courses_total else 0
+
+    # ====== 3. OFFERING & ACADEMIC YEAR ANALYTICS ======
+    offerings_total = CourseOffering.objects.count()
+    offerings_by_status = list(
+        CourseOffering.objects.values('status').annotate(count=Count('id'))
+    )
+    academic_years_total = AcademicYear.objects.count()
+    current_academic_years = AcademicYear.objects.filter(is_current=True)
+
+    # ====== 4. ENROLLMENT ANALYTICS ======
+    enrollments_total = Enrollment.objects.count()
+    enrollments_by_status = list(
+        Enrollment.objects.values('status').annotate(count=Count('id'))
+    )
+    enrollments_by_type = list(
+        Enrollment.objects.values('enrollment_type').annotate(count=Count('id'))
+    )
+    enrollments_by_year = list(
+        Enrollment.objects.values('academic_year__name', 'academic_year__level')
+        .annotate(count=Count('id'))
+        .order_by('-academic_year__starts_on')
+    )
+    enrollments_by_level = list(
+        Enrollment.objects.values('level').annotate(count=Count('id')).order_by('level')
+    )
+
+    # ====== 5. QUIZ & GRADE ANALYTICS ======
+    quizzes_total = Quiz.objects.count()
+    quizzes_by_status = list(
+        Quiz.objects.values('status').annotate(count=Count('id'))
+    )
+    total_submissions = Grade.objects.count()
+    avg_grade = Grade.objects.aggregate(avg=Avg('total_grade'))['avg'] or 0
+    max_quiz_grade = Quiz.objects.aggregate(max=Sum('total_grade'))['max'] or 0
+
+    # ====== 6. LECTURE PROGRESS ANALYTICS ======
+    progress_total = LectureProgress.objects.count()
+    students_with_progress = (
+        LectureProgress.objects.values('student').distinct().count()
+    )
+    completed_lectures = LectureProgress.objects.filter(
+        completed_at__isnull=False
+    ).count()
+    avg_completion = (
+        LectureProgress.objects.aggregate(avg=Avg('percent'))['avg'] or 0
+    )
+
+    # ====== 7. ATTENDANCE ANALYTICS ======
+    attendance_total = AttendanceRecord.objects.count()
+    today_attendance = AttendanceRecord.objects.filter(
+        attendance_date=today
+    ).count()
+    today_students = (
+        AttendanceRecord.objects.filter(attendance_date=today)
+        .values('student')
+        .distinct()
+        .count()
+    )
+
+    # ====== 8. RECENT ACTIVITY ======
+    recent_enrollments = Enrollment.objects.select_related(
+        'student', 'academic_year'
+    ).order_by('-enrolled_at')[:5]
+
+    recent_submissions = Grade.objects.select_related(
+        'user', 'quiz__course_offering__course'
+    ).order_by('-submitted_at')[:5]
+
+    return render(request, "admin_panel.html", {
+        "today": today,
+        "admin_metrics": {
+            "users": users_total,
+            "courses": courses_total,
+            "lessons": lessons_total,
+            "quizzes": quizzes_total,
+            "academic_years": academic_years_total,
+            "offerings": offerings_total,
+        },
+        # User Analytics
+        "users_by_role": users_by_role,
+        "users_by_app_status": users_by_app_status,
+        "users_by_study_mode": users_by_study_mode,
+        "new_users_month": new_users_month,
+        "new_users_week": new_users_week,
+        "top_cities": top_cities,
+        # Course & Lesson Analytics
+        "courses_by_level": courses_by_level,
+        "lessons_by_status": lessons_by_status,
+        "avg_lessons_per_course": avg_lessons_per_course,
+        # Offering & Academic Year Analytics
+        "offerings_by_status": offerings_by_status,
+        "current_academic_years": current_academic_years,
+        # Enrollment Analytics
+        "enrollments_total": enrollments_total,
+        "enrollments_by_status": enrollments_by_status,
+        "enrollments_by_type": enrollments_by_type,
+        "enrollments_by_year": enrollments_by_year,
+        "enrollments_by_level": enrollments_by_level,
+        # Quiz & Grade Analytics
+        "quizzes_by_status": quizzes_by_status,
+        "total_submissions": total_submissions,
+        "avg_grade": round(avg_grade, 1),
+        # Progress Analytics
+        "progress_total": progress_total,
+        "students_with_progress": students_with_progress,
+        "completed_lectures": completed_lectures,
+        "avg_completion": round(avg_completion, 1),
+        # Attendance Analytics
+        "attendance_total": attendance_total,
+        "today_attendance": today_attendance,
+        "today_students": today_students,
+        # Recent Activity
+        "recent_enrollments": recent_enrollments,
+        "recent_submissions": recent_submissions,
+    })
+
 
 @capability_required(can_manage_content)
 def export_users_csv(request):
@@ -952,7 +1117,7 @@ def course_dashboard(request):
     if name:
         query &= Q(name__icontains=name)
     if year:
-        for key, val in Course.LEVELS_NAME.items():
+        for key, val in Course.get_levels_name().items():
             if val == year:
                 query &= Q(level=key)
     courses = Course.objects.filter(query)
@@ -965,7 +1130,7 @@ def course_dashboard(request):
         "name_value" : name or "",
         "filtering" : year or "",
         "columns" : Course.get_columns(),
-        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]],
+        "options" : [_("Choose Academic Year"), *list(Course.get_levels_name().values())],
     }
 
     return render_dashboard(request, courses, view, context)
@@ -1001,7 +1166,7 @@ def lesson_dashboard(request):
     if name:
         query &= Q(name__icontains=name)
     if year:
-        for key, val in Course.LEVELS_NAME.items():
+        for key, val in Course.get_levels_name().items():
             if val == year:
                 query &= Q(course__level=key)
     if course:
@@ -1018,7 +1183,7 @@ def lesson_dashboard(request):
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Lesson.get_columns(),
-        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]],
+        "options" : [_("Choose Academic Year"), *list(Course.get_levels_name().values())],
         "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]],
         "filters" : ["course_filter.html"],
     }
@@ -1140,6 +1305,10 @@ def update_lesson(request, lesson_id):
 
                 lesson.name = lesson_name
                 lesson.course = course
+                offering_id = request.POST.get("course_offering")
+                lesson.course_offering = get_object_or_404(
+                    CourseOffering, pk=offering_id, course=course
+                )
                 lesson.links = json.dumps(links)
                 lesson.save()
 
@@ -1220,7 +1389,7 @@ def quiz_dashboard(request):
     if name:
         query &= Q(name__icontains=name)
     if year:
-        for key, val in Course.LEVELS_NAME.items():
+        for key, val in Course.get_levels_name().items():
             if val == year:
                 query &= Q(course__level=key)
     if course:
@@ -1237,7 +1406,7 @@ def quiz_dashboard(request):
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Quiz.get_columns(),
-        "options" : [_("Choose Academic Year"), *[str(_(value)) for value in Course.LEVELS_NAME.values()]],
+        "options" : [_("Choose Academic Year"), *list(Course.get_levels_name().values())],
         "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]],
         "filters" : ["course_filter.html"],
         "submission_view" : True,
@@ -1350,6 +1519,8 @@ def update_quiz(request, quiz_id):
             quiz.closing_date = get_datetime(quiz_data['closing_date'])
             quiz.total_grade = quiz_data['total_grade']
             quiz.course = course
+            offering_id = request.POST.get("course_offering")
+            quiz.course_offering = get_object_or_404(CourseOffering, pk=offering_id, course=course)
 
             # Create Questions
             questions_obj = []
@@ -1813,40 +1984,16 @@ def api_rename_file(request):
         if is_folder:
             success = R2_MANAGER.rename_folder(old_key, new_key)
             if success:
-                logger.info(f"User {request.user} renamed folder from {old_key} to {new_key}.")
-                return JsonResponse({'success': True, 'message': _('Folder renamed successfully'), 'new_key': new_key})
+                updated_count = rewrite_lesson_r2_references(old_key, new_key, is_folder=True)
+                logger.info(f"User {request.user} renamed folder from {old_key} to {new_key}. Updated {updated_count} lesson references.")
+                return JsonResponse({'success': True, 'message': _('Folder renamed successfully and %(count)d database references updated') % {'count': updated_count}, 'new_key': new_key})
             else:
                 return JsonResponse({'error': _('Failed to rename folder')}, status=500)
 
         success = R2_MANAGER.rename_file(old_key, new_key)
         
         if success:
-            # Update database references in Lesson model
-            # Lesson.links is a JSON string containing file IDs (which are the R2 keys)
-            # Find lessons that might contain this specific file key
-            # Since it's JSON, we look for the key inside the text
-            lessons_to_update = Lesson.objects.filter(links__contains=old_key)
-            updated_count = 0
-            
-            for lesson in lessons_to_update:
-                try:
-                    links = json.loads(lesson.links)
-                    modified = False
-                    for item in links:
-                        if item.get('file_id') == old_key:
-                            item['file_id'] = new_key
-                            modified = True
-                        # Also check in segments for HLS
-                        if 'segments' in item and old_key in item['segments']:
-                            item['segments'] = [s.replace(old_key, new_key) if s == old_key else s for s in item['segments']]
-                            modified = True
-                    
-                    if modified:
-                        lesson.links = json.dumps(links)
-                        lesson.save()
-                        updated_count += 1
-                except Exception as db_err:
-                    logger.error(f"Failed to update Lesson {lesson.id} during rename: {str(db_err)}")
+            updated_count = rewrite_lesson_r2_references(old_key, new_key)
 
             logger.info(f"User {request.user} renamed file from {old_key} to {new_key}. Updated {updated_count} lesson references.")
             return JsonResponse({
@@ -1882,8 +2029,9 @@ def api_move_file(request):
         new_key = R2_MANAGER.move_file(file_key, destination_folder)
         
         if new_key:
-            logger.info(f"User {request.user} moved file from {file_key} to {new_key}")
-            return JsonResponse({'success': True, 'message': _('File moved successfully'), 'new_key': new_key})
+            updated_count = rewrite_lesson_r2_references(file_key, new_key)
+            logger.info(f"User {request.user} moved file from {file_key} to {new_key}. Updated {updated_count} lesson references.")
+            return JsonResponse({'success': True, 'message': _('File moved successfully and %(count)d database references updated') % {'count': updated_count}, 'new_key': new_key})
         else:
             return JsonResponse({'error': _('Failed to move file')}, status=500)
     
@@ -2286,7 +2434,7 @@ def applications_dashboard(request):
     return render(request, "applications_dashboard.html", {
         "page_obj": page_obj,
         "current_status": status_filter,
-        "COURSE_LEVELS": Course.LEVELS_NAME.items(),
+        "COURSE_LEVELS": Course.get_levels_name().items(),
     })
 
 
@@ -2303,7 +2451,7 @@ def application_review(request, user_id):
     return render(request, "application_review.html", {
         "app_user": user,
         "doc_urls": doc_urls,
-        "COURSE_LEVELS": Course.LEVELS_NAME.items(),
+        "COURSE_LEVELS": Course.get_levels_name().items(),
     })
 
 
@@ -2374,6 +2522,9 @@ def bulk_application_decision(request):
     data = json.loads(request.body)
     decision = data.get("decision")
     user_ids = data.get("user_ids", [])
+    if data.get("select_all"):
+        status = data.get("status", "pending")
+        user_ids = User.objects.filter(application_status=status).values_list("id", flat=True)
     level = int(data.get("level", 1))
     if decision not in ("activate", "decline"):
         return JsonResponse({"error": _("Invalid decision")}, status=400)
@@ -2488,6 +2639,88 @@ def copy_course_offering(request, offering_id):
 
 
 @capability_required(can_manage_content)
+def levels_dashboard(request):
+    levels = (
+        AcademicYear.objects.values("level")
+        .annotate(
+            year_count=Count("id"),
+            offering_count=Count("course_offerings", distinct=True),
+        )
+        .order_by("level")
+    )
+    level_list = []
+    for entry in levels:
+        lvl = entry["level"]
+        ln = LevelName.objects.filter(level=lvl).first()
+        level_list.append({
+            "level": lvl,
+            "name": Course.get_level_name(lvl),
+            "name_en": ln.name_en if ln else "",
+            "name_ar": ln.name_ar if ln else "",
+            "year_count": entry["year_count"],
+            "offering_count": entry["offering_count"],
+            "course_count": Course.objects.filter(level=lvl).count(),
+            "enrollment_count": Enrollment.objects.filter(level=lvl).count(),
+        })
+    return render(request, "levels.html", {
+        "levels": level_list,
+    })
+
+
+@require_POST
+@capability_required(can_manage_content)
+def level_create(request):
+    try:
+        level = int(request.POST.get("level", 0))
+    except (TypeError, ValueError):
+        level = 0
+    name_en = request.POST.get("name_en", "").strip()
+    name_ar = request.POST.get("name_ar", "").strip()
+    if level < 1:
+        messages.error(request, _("Invalid level number."))
+        return redirect("levels-dashboard")
+    if LevelName.objects.filter(level=level).exists():
+        messages.error(request, _("Level %(level)d already exists.") % {"level": level})
+        return redirect("levels-dashboard")
+    LevelName.objects.create(level=level, name_en=name_en, name_ar=name_ar)
+    messages.success(request, _("Level %(level)d created.") % {"level": level})
+    return redirect("levels-dashboard")
+
+
+@require_POST
+@capability_required(can_manage_content)
+def level_edit(request, level):
+    name_en = request.POST.get("name_en", "").strip()
+    name_ar = request.POST.get("name_ar", "").strip()
+    entry, created = LevelName.objects.get_or_create(level=level)
+    entry.name_en = name_en
+    entry.name_ar = name_ar
+    entry.save()
+    messages.success(request, _("Level %(level)d updated.") % {"level": level})
+    return redirect("levels-dashboard")
+
+
+@require_POST
+@capability_required(can_manage_content)
+def level_delete(request, level):
+    years = AcademicYear.objects.filter(level=level)
+    if not years.exists():
+        messages.error(request, _("Level not found."))
+        return redirect("levels-dashboard")
+    has_offerings = CourseOffering.objects.filter(academic_year__level=level).exists()
+    has_enrollments = Enrollment.objects.filter(level=level).exists()
+    if has_offerings:
+        messages.error(request, _("Cannot delete level %(level)d: it has course offerings.") % {"level": level})
+    elif has_enrollments:
+        messages.error(request, _("Cannot delete level %(level)d: it has enrollments.") % {"level": level})
+    else:
+        count = years.count()
+        years.delete()
+        Course.objects.filter(level=level).delete()
+        messages.success(request, _("Level %(level)d and all its data deleted.") % {"level": level})
+    return redirect("levels-dashboard")
+
+@capability_required(can_manage_content)
 def academic_setup(request):
     years = AcademicYear.objects.all().order_by("-starts_on", "level")
     selected_year = request.GET.get("academic_year")
@@ -2504,7 +2737,8 @@ def academic_setup(request):
         "selected_year": int(selected_year) if selected_year else None,
         "year_form": year_form,
         "offering_form": offering_form,
-        "COURSE_LEVELS": Course.LEVELS_NAME.items(),
+        "COURSE_LEVELS": Course.get_levels_name().items(),
+        "meeting_weekday_choices": [(0, _("Monday")), (1, _("Tuesday")), (2, _("Wednesday")), (3, _("Thursday")), (4, _("Friday")), (5, _("Saturday")), (6, _("Sunday"))],
     })
 
 
@@ -2516,9 +2750,14 @@ def academic_year_create(request):
             form.save()
             messages.success(request, _("Academic year created."))
         else:
-            for field, errors in form.errors.items():
-                for err in errors:
-                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+            for err in form.errors.get("__all__", []):
+                messages.error(request, err)
+            for field in form.errors:
+                if field == "__all__":
+                    continue
+                label = form.fields[field].label if field in form.fields else field
+                for err in form.errors[field]:
+                    messages.error(request, f"{label}: {err}")
         return redirect("academic-setup")
 
 
@@ -2531,9 +2770,14 @@ def academic_year_edit(request, year_id):
             form.save()
             messages.success(request, _("Academic year updated."))
         else:
-            for field, errors in form.errors.items():
-                for err in errors:
-                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+            for err in form.errors.get("__all__", []):
+                messages.error(request, err)
+            for field in form.errors:
+                if field == "__all__":
+                    continue
+                label = form.fields[field].label if field in form.fields else field
+                for err in form.errors[field]:
+                    messages.error(request, f"{label}: {err}")
         return redirect("academic-setup")
 
 
@@ -2560,9 +2804,14 @@ def course_offering_create(request):
             form.save()
             messages.success(request, _("Course offering created."))
         else:
-            for field, errors in form.errors.items():
-                for err in errors:
-                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+            for err in form.errors.get("__all__", []):
+                messages.error(request, err)
+            for field in form.errors:
+                if field == "__all__":
+                    continue
+                label = form.fields[field].label if field in form.fields else field
+                for err in form.errors[field]:
+                    messages.error(request, f"{label}: {err}")
         year_id = request.POST.get("academic_year")
         return redirect(f"{reverse('academic-setup')}?academic_year={year_id}" if year_id else "academic-setup")
 
@@ -2576,9 +2825,14 @@ def course_offering_edit(request, offering_id):
             form.save()
             messages.success(request, _("Course offering updated."))
         else:
-            for field, errors in form.errors.items():
-                for err in errors:
-                    messages.error(request, f"{field}: {err}" if field != "__all__" else err)
+            for err in form.errors.get("__all__", []):
+                messages.error(request, err)
+            for field in form.errors:
+                if field == "__all__":
+                    continue
+                label = form.fields[field].label if field in form.fields else field
+                for err in form.errors[field]:
+                    messages.error(request, f"{label}: {err}")
         return redirect(f"{reverse('academic-setup')}?academic_year={offering.academic_year_id}")
 
 

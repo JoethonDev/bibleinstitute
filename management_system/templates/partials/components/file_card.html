@@ -40,7 +40,7 @@
         {% endif %}
         
         {# Icon and Name #}
-        {% if item.type == 'folder' %}
+        {% if item.type == 'folder' and item.id %}
             {# Folder Icon #}
             <div class="drive-icon folder-icon text-warning w-100 is-clickable"
                  {% if mode == 'simple' %}

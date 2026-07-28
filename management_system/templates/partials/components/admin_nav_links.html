@@ -4,7 +4,7 @@
 <!-- Admin Navigation Links -->
 <ul class="nav flex-column">
     <li class="nav-item">
-        <a class="nav-link text-white" href="{% url 'home' %}">
+        <a class="nav-link text-white" href="{% url 'admin-panel' %}">
             <i class="fas fa-home"></i>
             <span>{% translate "Home" %}</span>
         </a>
@@ -108,6 +108,20 @@
                hx-select="#content">
                 <i class="fas fa-cloud"></i>
                 <span>{% translate "R2 Storage" %}</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link text-white"
+               href="{% url 'levels-dashboard' %}"
+               hx-get="{% url 'levels-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-layer-group"></i>
+                <span>{% translate "Levels" %}</span>
             </a>
         </li>
 

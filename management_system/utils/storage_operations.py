@@ -34,10 +34,9 @@ def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config
     if folder_name:
         folder_name = unquote(folder_name)
     
-    # Compute parent by removing the last path segment
     parent_folder = None
     if folder_name and '/' in folder_name.rstrip('/'):
-        parent_folder = folder_name.rstrip('/').rsplit('/', 1)[0] + '/'
+        parent_folder = folder_name.rstrip('/').rsplit('/', 1)[0]
     
     # Normalise trailing slash
     if folder_name and not folder_name.endswith("/"):
@@ -77,13 +76,16 @@ def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config
                     if not file_name.endswith(".ts"):
                         contents.append(file_obj)
     
-    # Folders — use the raw R2 prefix as the folder ID (no hyphen encoding)
+    # Folders — ID is the R2 prefix without trailing slash for clean URL reversal
     if "CommonPrefixes" in response:
         for folder in response["CommonPrefixes"]:
             prefix = folder["Prefix"]
             name = prefix.rstrip('/').rsplit('/', 1)[-1]
+            folder_id = prefix.rstrip('/')
+            if not folder_id:
+                continue
             folder_obj = {
-                "id": prefix,
+                "id": folder_id,
                 "name": name,
                 "type": "folder"
             }
