@@ -1,0 +1,41 @@
+services:
+  # ── PostgreSQL 18 ───────────────────────────────────────────────
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lms_database}
+      POSTGRES_USER: ${POSTGRES_USER:-lms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
+    volumes:
+      - lms_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lms_user} -d ${POSTGRES_DB:-lms_database}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - lms_network
+
+  # ── Nginx ──────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - lms_static_data:/usr/share/nginx/html/static:ro
+    networks:
+      - lms_network
+
+volumes:
+  lms_postgres_data:
+    name: lms_postgres_data
+  lms_static_data:
+    name: lms_static_data
+
+networks:
+  lms_network:
+    name: lms_network

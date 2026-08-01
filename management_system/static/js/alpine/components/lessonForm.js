@@ -12,11 +12,6 @@
 function lessonForm() {
     return {
         // Translations
-        translations: {
-            en: { video: 'Video', audioRecording: 'Audio Recording', book: 'Book' },
-            ar: { video: 'فيديو', audioRecording: 'تسجيل صوتي', book: 'كتاب' }
-        },
-
         init() {
             // Initialize on page load and after HTMX swaps
             this.initializeDriveFiles();
@@ -31,8 +26,16 @@ function lessonForm() {
          * Get translated string
          */
         getTranslation(key) {
-            const lang = document.documentElement.lang || 'en';
-            return this.translations[lang][key] || this.translations['en'][key];
+            const root = this.$root || document.getElementById('content');
+            const translations = {
+                close: root?.dataset.lessonClose,
+                video: root?.dataset.lessonVideo,
+                audioRecording: root?.dataset.lessonAudioRecording,
+                book: root?.dataset.lessonBook,
+                moveUp: root?.dataset.lessonMoveUp,
+                moveDown: root?.dataset.lessonMoveDown,
+            };
+            return translations[key] || key;
         },
 
         /**
@@ -61,8 +64,14 @@ function lessonForm() {
          */
         addFile(event) {
             const fileIcon = event.currentTarget;
-            const name = fileIcon.closest('.card-body').querySelector('.card-title').textContent.trim();
+            if (!fileIcon || !fileIcon.dataset) return;
             const id = fileIcon.dataset.id;
+            if (!id) return;
+
+            const cardBody = fileIcon.closest('.card-body');
+            const titleEl = cardBody && cardBody.querySelector('.card-title');
+            const name = titleEl ? titleEl.textContent.trim() : id;
+            if (!name) return;
 
             // Auto-detect file type from name
             let fileType = 'book';
@@ -77,7 +86,7 @@ function lessonForm() {
                     <input type="hidden" name="videos_name" value="${name}">
                     <div class="card-body p-3">
                         <button type="button" class="btn-close position-absolute top-0 end-0 m-2" 
-                                @click="removeFile($event)" aria-label="Close"></button>
+                                @click="removeFile($event)" aria-label="${this.getTranslation('close')}"></button>
                         <p class="fw-bold mb-2 text-primary">${name}</p>
                         <select name="files_type" class="form-select form-select-sm">
                             <option value="video" ${fileType === 'video' ? 'selected' : ''}>${this.getTranslation('video')}</option>
@@ -87,19 +96,21 @@ function lessonForm() {
                     </div>
                     <div class="card-footer bg-light p-1 text-end">
                         <button type="button" class="btn btn-sm btn-outline-secondary border-0" 
-                                @click="moveUp($event)" title="Move up">
+                                @click="moveUp($event)" title="${this.getTranslation('moveUp')}">
                             <i class="fas fa-arrow-up"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-secondary border-0" 
-                                @click="moveDown($event)" title="Move down">
+                                @click="moveDown($event)" title="${this.getTranslation('moveDown')}">
                             <i class="fas fa-arrow-down"></i>
                         </button>
                     </div>
                 </div>
             `;
 
-            // Append to videos input container
-            const container = this.$el.querySelector('#videos-input');
+            // Append to the page-level selected-lectures container
+            const container = document.getElementById('videos-input');
+            if (!container) return;
+
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = videoCard;
             container.appendChild(tempDiv.firstElementChild);

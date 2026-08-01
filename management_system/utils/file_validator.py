@@ -190,3 +190,114 @@ def get_file_category(filename: str) -> str:
         '.pdf': 'document'
     }
     return categories.get(ext, 'unknown')
+
+
+def validate_hls_object_key(key: str) -> Tuple[bool, List[str]]:
+    """
+    Validate an HLS object key (manifest .m3u8 or segment .ts) for R2 storage.
+
+    Valid manifest: a safe R2 path ending in .m3u8 whose parent path does NOT
+    contain 'Video Segments' or 'Audio Segments' as a path component.
+    A root-level manifest (e.g. "lecture.m3u8") is valid.
+
+    Valid segment: a safe R2 path ending in .ts whose immediate parent
+    component is exactly 'Video Segments' or 'Audio Segments'.
+
+    Rejects absolute paths, backslashes, empty components, '.'/'..' components,
+    control characters, query/fragment characters, keys longer than 1024
+    characters, unsupported extensions, and segment keys without the required
+    media-folder structure.
+
+    Returns:
+        Tuple of (is_valid, list_of_translated_error_messages)
+    """
+    errors: List[str] = []
+
+    if not key:
+        errors.append(_("HLS object key cannot be empty."))
+        return False, errors
+
+    if len(key) > 1024:
+        errors.append(_("HLS object key is too long (maximum 1024 characters)."))
+        return False, errors
+
+    if key.startswith("/"):
+        errors.append(_("HLS object key must not be an absolute path."))
+        return False, errors
+
+    if "\\" in key:
+        errors.append(_("HLS object key must not contain backslashes."))
+        return False, errors
+
+    if "?" in key or "#" in key:
+        errors.append(
+            _("HLS object key must not contain query or fragment characters.")
+        )
+        return False, errors
+
+    for ch in key:
+        if ord(ch) < 32 or ord(ch) == 127:
+            errors.append(
+                _("HLS object key must not contain control characters.")
+            )
+            return False, errors
+
+    parts = key.split("/")
+
+    if any(not part for part in parts):
+        errors.append(
+            _("HLS object key must not contain empty path components.")
+        )
+        return False, errors
+
+    if any(part in {".", ".."} for part in parts):
+        errors.append(
+            _('HLS object key must not contain "." or ".." path components.')
+        )
+        return False, errors
+
+    filename = parts[-1]
+
+    if not (filename.endswith(".m3u8") or filename.endswith(".ts")):
+        ext = os.path.splitext(filename)[1] or _("(no extension)")
+        errors.append(
+            _('File type "%(ext)s" is not allowed. Allowed HLS types: .m3u8, .ts')
+            % {"ext": ext}
+        )
+        return False, errors
+
+    if filename.endswith(".m3u8"):
+        # Manifest check: no Video Segments or Audio Segments in parent path
+        parent_parts = parts[:-1]
+        for component in parent_parts:
+            if component == "Video Segments" or component == "Audio Segments":
+                errors.append(
+                    _(
+                        'HLS manifest key must not contain "Video Segments" '
+                        'or "Audio Segments" in its path.'
+                    )
+                )
+                return False, errors
+        return True, []
+
+    # Segment check (ends with .ts)
+    if len(parts) < 2:
+        errors.append(
+            _(
+                'HLS segment key must have a "Video Segments" or '
+                '"Audio Segments" media folder.'
+            )
+        )
+        return False, errors
+
+    parent_folder = parts[-2]
+    if parent_folder not in ("Video Segments", "Audio Segments"):
+        errors.append(
+            _(
+                'HLS segment key must have "Video Segments" or '
+                '"Audio Segments" as the immediate parent folder.'
+            )
+        )
+        return False, errors
+
+    return True, []

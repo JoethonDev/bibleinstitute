@@ -18,6 +18,10 @@ def can_manage_applications(user) -> bool:
     return bool(user.role and user.role.role == "admin")
 
 
+def can_manage_academic_setup(user) -> bool:
+    return bool(user.role and user.role.role == "admin")
+
+
 def can_manage_content(user) -> bool:
     return bool(user.role and user.role.role in ("admin", "staff"))
 
@@ -66,7 +70,7 @@ def login_required_with_permission(role_type=None, resource=None):
                 user = User.objects.get(username=request.user)
             except User.DoesNotExist:
                 logger.warning(f"User {request.user} not found in database")
-                return HttpResponse(_("Unauthorized"), status=401)
+                return HttpResponse(_("Unauthorized"), status=403)
             
             # Check if role type is specified and validate
             if role_type:
@@ -75,7 +79,7 @@ def login_required_with_permission(role_type=None, resource=None):
                         f"User: {user} (role: {user.role.role}) attempted to access "
                         f"{resource or 'resource'} requiring {role_type} permission"
                     )
-                    return HttpResponse(_("Unauthorized"), status=401)
+                    return HttpResponse(_("Unauthorized"), status=403)
             
             # User is authorized, proceed with view
             return view_func(request, *args, **kwargs)
@@ -124,7 +128,7 @@ def capability_required(cap_check):
         def wrapper(request, *args, **kwargs):
             if not cap_check(request.user):
                 logger.warning(f"User {request.user} denied by {cap_check.__name__}")
-                return HttpResponse(_("Unauthorized"), status=401)
+                return HttpResponse(_("Unauthorized"), status=403)
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator

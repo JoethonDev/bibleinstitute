@@ -10,6 +10,8 @@ db.sqlite3
 collectstatic/
 collectstatic/**
 docs/**
+!docs/LMS_PHASE_0_8_HARD_REVIEW_AND_EXECUTION_PROMPTS.md
+!docs/ADMIN_UX_AND_ACADEMIC_WORKFLOW_HANDOFF.md
 **/.env
 **/.env.*
 .env
@@ -29,3 +31,6 @@ docs/**
 .md
 .md.*
 **/*.pyc*
+tmp/
+migration-dry-run.json
+opencode.json

@@ -102,20 +102,20 @@
                         {% else %}
                             {{ item.name }}
                         {% endif %}
-                        <span class="badge bg-danger">Video</span>
+                        <span class="badge bg-danger">{% translate "Video" %}</span>
                     {% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %}
                         {% if item.name|slice:'-4:' == '.mp3' %}
                             {{ item.name|slice:':-4' }}
                         {% else %}
                             {{ item.name }}
                         {% endif %}
-                        <span class="badge bg-success">Audio</span>
+                        <span class="badge bg-success">{% translate "Audio" %}</span>
                     {% elif item.name|slice:'-4:' == '.pdf' %}
                         {{ item.name|slice:':-4' }}
-                        <span class="badge bg-warning">PDF</span>
+                        <span class="badge bg-warning">{% translate "PDF" %}</span>
                     {% else %}
                         {{ item.name }}
-                        <span class="badge bg-secondary">Document</span>
+                        <span class="badge bg-secondary">{% translate "Document" %}</span>
                     {% endif %}
                     </div>
 

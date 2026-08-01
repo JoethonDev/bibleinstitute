@@ -52,7 +52,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260801-lesson-ui-3">
     <link rel="stylesheet" href="{% static 'css/public_site.css' %}">
     
     {% block cdn %}{% endblock %}
@@ -62,7 +62,7 @@
     <header>
         <div class="institute-topbar">
           <div class="container">
-            <span>{% if request.LANGUAGE_CODE == 'ar' %}معهد الكتاب المقدس - المعادي - القاهرة{% else %}Bible Institute - Maadi - Cairo{% endif %}</span>
+            <span>{% translate "Bible Institute - Maadi - Cairo" %}</span>
             <div><a href="mailto:info@bibleinstitute-eg.org">info@bibleinstitute-eg.org</a> · <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener">Facebook</a> · <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener">YouTube</a></div>
           </div>
         </div>
@@ -70,7 +70,7 @@
             <div class="container">
               <a class="navbar-brand" href="{% url 'home' %}">
                   <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
-                  <span class="institute-brand-copy"><strong>{% if request.LANGUAGE_CODE == 'ar' %}معهد الكتاب المقدس{% else %}Bible Institute{% endif %}</strong><small>{% if request.LANGUAGE_CODE == 'ar' %}بالمعادي · دراسة أكاديمية بروح كنسية{% else %}Maadi · Academic study with an ecclesial spirit{% endif %}</small></span>
+                  <span class="institute-brand-copy"><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Maadi · Academic study with an ecclesial spirit" %}</small></span>
               </a>
               <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <i class="fas fa-bars"></i>
@@ -79,19 +79,25 @@
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">{% translate "About Us" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#study-system">{% if request.LANGUAGE_CODE == 'ar' %}نظام الدراسة{% else %}Study System{% endif %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#curriculum">{% if request.LANGUAGE_CODE == 'ar' %}المواد{% else %}Program{% endif %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#admission">{% if request.LANGUAGE_CODE == 'ar' %}الالتحاق{% else %}Admissions{% endif %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#news">{% if request.LANGUAGE_CODE == 'ar' %}الأخبار{% else %}News{% endif %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="#site-contact">{% if request.LANGUAGE_CODE == 'ar' %}اتصل بنا{% else %}Contact{% endif %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#study-system">{% translate "Study System" %}</a></li>
+              {% if not user.is_authenticated %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#curriculum">{% translate "Program" %}</a></li>
+              {% endif %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#admission">{% translate "Admissions" %}</a></li>
+              {% if not user.is_authenticated %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#news">{% translate "News" %}</a></li>
+              <li class="nav-item"><a class="nav-link" href="#site-contact">{% translate "Contact" %}</a></li>
+              {% endif %}
               {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
               {% if request.user.role.role == "student" %}
               <li class="nav-item"><a class="nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
+              {% endif %}
+              {% if request.user.role.role == "student" or request.user.role.role == "admin" %}
               <li class="nav-item"><a class="nav-link" href="{% url 'download-qr' %}">{% translate "My QR" %}</a></li>
               {% endif %}
-              {% if request.user.role.role == "moderator" %}
+              {% if request.user.role.role == "admin" or request.user.role.role == "staff" or request.user.role.role == "moderator" %}
               <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
               {% endif %}
               {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
@@ -128,7 +134,7 @@
     
     {% block breadcrumb %}
     {% if breadcrumb_items %}
-    <nav aria-label="breadcrumb" class="bg-light py-2">
+    <nav aria-label="{% translate 'Breadcrumb' %}" class="bg-light py-2">
         <div class="container-fluid">
             <ol class="breadcrumb mb-0">
                 {% for item in breadcrumb_items %}
@@ -150,7 +156,7 @@
             <div class="toast show align-items-center text-white border-0 mb-2" :class="`bg-${notification.type}`" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="d-flex">
                     <div class="toast-body" x-text="notification.message"></div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="$store.notifications.remove(notification.id)" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="$store.notifications.remove(notification.id)" aria-label="{% translate 'Close' %}"></button>
                 </div>
             </div>
         </template>
@@ -166,14 +172,16 @@
       <div class="container py-5">
           <div class="row">
               <div class="col-lg-5 col-md-12 mb-4">
-                  <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180" alt="Footer Logo">
-                  <p>{% if request.LANGUAGE_CODE == 'ar' %}معهد كنسي أرثوذكسي تابع للكنيسة القبطية الأرثوذكسية، يخدم كل محبي دراسة الكتاب المقدس داخل مصر وخارجها.{% else %}A Coptic Orthodox ecclesiastical institute serving everyone who loves to study Scripture in Egypt and worldwide.{% endif %}</p>
+                  <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180" alt="{% translate 'Footer Logo' %}">
+                  <p>{% translate "A Coptic Orthodox ecclesiastical institute serving everyone who loves to study Scripture in Egypt and worldwide." %}</p>
               </div>
               <div class="col-lg-3 col-md-6 mb-4">
-                  <h2>{% if request.LANGUAGE_CODE == 'ar' %}روابط سريعة{% else %}Quick Links{% endif %}</h2>
+                  <h2>{% translate "Quick Links" %}</h2>
                   <p><a href="{% url 'about' %}">{% translate "About Us" %}</a></p>
-                  <p><a href="{% url 'program' %}#study-system">{% if request.LANGUAGE_CODE == 'ar' %}نظام الدراسة{% else %}Study System{% endif %}</a></p>
-                  <p><a href="{% url 'program' %}#curriculum">{% if request.LANGUAGE_CODE == 'ar' %}المواد الدراسية{% else %}Program{% endif %}</a></p>
+                  <p><a href="{% url 'program' %}#study-system">{% translate "Study System" %}</a></p>
+                  {% if not user.is_authenticated %}
+                  <p><a href="{% url 'program' %}#curriculum">{% translate "Program" %}</a></p>
+                  {% endif %}
                   <p><a href="{% url 'signup' %}">{% translate "Sign Up" %}</a></p>
               </div>
               <div class="col-lg-4 col-md-6 mb-4">

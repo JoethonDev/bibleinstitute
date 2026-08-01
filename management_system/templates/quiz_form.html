@@ -3,12 +3,39 @@
 {% load i18n %}
 
 {% block body %}
-<div id="content" class="admin-form-page" 
+<div id="content" class="admin-form-page"
      x-data="{
          ...autoSave('quiz-form-{{ request.resolver_match.kwargs.quiz_id|default:'new' }}'),
          ...quizForm()
-     }" 
+      }"
      @input.debounce.2000ms="saveDraft()">
+    <script id="quiz-form-translations" type="application/json">
+        {
+            "questionType": "{% translate 'Question Type:'|escapejs %}",
+            "mcq": "{% translate 'Multiple Choice'|escapejs %}",
+            "written": "{% translate 'Written'|escapejs %}",
+            "complete": "{% translate 'Fill in the Blank'|escapejs %}",
+            "orderEvents": "{% translate 'Order Events'|escapejs %}",
+            "matchRelated": "{% translate 'Match Related'|escapejs %}",
+            "question": "{% translate 'Question'|escapejs %}",
+            "questionPlaceholder": "{% translate 'Enter the question text here...?'|escapejs %}",
+            "grade": "{% translate 'Grade'|escapejs %}",
+            "anotherChoice": "{% translate 'Add another choice...'|escapejs %}",
+            "correctAnswer": "{% translate 'Correct Answer:'|escapejs %}",
+            "delete": "{% translate 'Delete'|escapejs %}",
+            "answerOptions": "{% translate 'Answer Options'|escapejs %}",
+            "studentAnswer": "{% translate 'Student will write their answer here...'|escapejs %}",
+            "studentComplete": "{% translate 'Student will complete this...'|escapejs %}",
+            "answer": "{% translate 'Answer'|escapejs %}",
+            "addItem": "{% translate 'Add item'|escapejs %}",
+            "addPair": "{% translate 'Add pair'|escapejs %}",
+            "eventItem": "{% translate 'Event item'|escapejs %}",
+            "leftItem": "{% translate 'Left item'|escapejs %}",
+            "rightItem": "{% translate 'Right item'|escapejs %}",
+            "moveUp": "{% translate 'Move up'|escapejs %}",
+            "moveDown": "{% translate 'Move down'|escapejs %}"
+        }
+    </script>
     
     <!-- Auto-save Indicator -->
     <div class="auto-save-indicator" x-show="lastSaved" x-transition.opacity>
@@ -89,49 +116,52 @@
                                 </div>
                             </div>
 
-                            <!-- Course Selection -->
-                            <div class="form-group" @focusout="validateField($event)">
-                                <label for="course_select" class="form-label">
-                                    {% translate "Course" %}
+                            <!-- Course Offering (determines course and level) -->
+                            <div class="form-group">
+                                <label for="course_offering" class="form-label">
+                                    {% translate "Course Offering" %}
                                     <span class="required-indicator">*</span>
                                 </label>
-                                <select class="form-select" 
-                                        id="course_select" 
-                                        name="course" 
-                                        required>
-                                    <option value="" disabled {% if not selected_course %}selected{% endif %}>
-                                        {% translate "Select a Course" %}
+                                <select class="form-select" id="course_offering" name="course_offering" required>
+                                    <option value="">{% translate "Select Course Offering" %}</option>
+                                    {% for offering in course_offerings %}
+                                    <option value="{{ offering.pk }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
+                                        {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
                                     </option>
-                                    {% for course in courses %}
-                                        <option value="{{ course }}" 
-                                                {% if course == selected_course %}selected{% endif %}>
-                                            {{ course }}
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">{% translate "The offering determines the course, level, and academic year." %}</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="quiz_type" class="form-label">
+                                    {% translate "Quiz Type" %}
+                                    <span class="required-indicator">*</span>
+                                </label>
+                                <select class="form-select" id="quiz_type" name="quiz_type" required>
+                                    <option value="">{% translate "Select quiz type" %}</option>
+                                    {% for quiz_type in quiz_types %}
+                                        <option value="{{ quiz_type.pk }}" {% if quiz_type.pk == selected_quiz_type_id %}selected{% endif %}>
+                                            {{ quiz_type.name_en }}{% if quiz_type.name_ar %} — {{ quiz_type.name_ar }}{% endif %}
                                         </option>
                                     {% endfor %}
                                 </select>
-                                        <div class="invalid-feedback">
-                                            {% translate "Please select a course" %}
-                                        </div>
-                                    </div>
+                            </div>
+                        </div>
 
-                                    <!-- Course Offering -->
-                                    <div class="form-group">
-                                        <label for="course_offering" class="form-label">
-                                            {% translate "Course Offering" %}
-                                            <span class="required-indicator">*</span>
-                                        </label>
-                                        <select class="form-select" id="course_offering" name="course_offering" required>
-                                            <option value="">{% translate "Select Course Offering" %}</option>
-                                            {% for offering in course_offerings %}
-                                            <option value="{{ offering.pk }}" data-course="{{ offering.course.name }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
-                                                {{ offering.course.name }} - {{ offering.academic_year.name }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
+                            <!-- Publication Status -->
+                            <div class="form-group mt-3">
+                                <label for="quiz-status" class="form-label">{% translate "Status" %}</label>
+                                <select class="form-select" id="quiz-status" name="status" required>
+                                    {% for status_value, status_label in publication_statuses %}
+                                    <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
 
-                        <div class="form-row">
+                         <div class="form-row">
                             <!-- Opening Date -->
                             <div class="form-group" @focusout="validateField($event)">
                                 <label for="opening_date" class="form-label">
@@ -217,27 +247,4 @@
         </div>
     </div>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var courseSelect = document.getElementById('course_select');
-    var offeringSelect = document.getElementById('course_offering');
-    if (courseSelect && offeringSelect) {
-        function filterOfferings() {
-            var course = courseSelect.value;
-            var hasVisible = false;
-            offeringSelect.querySelectorAll('option').forEach(function(opt) {
-                if (!opt.value) { opt.style.display = ''; return; }
-                if (opt.dataset.course === course) {
-                    opt.style.display = '';
-                    hasVisible = true;
-                } else {
-                    opt.style.display = 'none';
-                }
-            });
-        }
-        courseSelect.addEventListener('change', filterOfferings);
-        filterOfferings();
-    }
-});
-</script>
 {% endblock %}

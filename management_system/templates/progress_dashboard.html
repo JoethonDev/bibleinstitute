@@ -15,15 +15,15 @@
 
     <form method="get" class="row g-2 mb-3">
         <div class="col-auto">
-            <select name="academic_year" class="form-select" onchange="this.form.submit()">
+            <select name="academic_year" class="form-select" onchange="this.form.submit()" aria-label="{% translate 'Academic year and level' %}">
                 <option value="">{% translate "Academic year..." %}</option>
-                {% for y in academic_years %}
-                <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y.name }}</option>
+                {% for scope in scopes %}
+                <option value="{{ scope.id }}" {% if selected_year == scope.id %}selected{% endif %}>{{ scope.academic_year.name }} — {{ scope.level.display_name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-auto">
-            <select name="course_offering" class="form-select" onchange="this.form.submit()">
+            <select name="course_offering" class="form-select" onchange="this.form.submit()" aria-label="{% translate 'Course offering' %}">
                 <option value="">{% translate "Course offering..." %}</option>
                 {% for o in offerings %}
                 <option value="{{ o.id }}" {% if selected_offering == o.id %}selected{% endif %}>{{ o.course.name }}</option>
@@ -31,7 +31,7 @@
             </select>
         </div>
         <div class="col-auto">
-            <select name="lesson" class="form-select" onchange="this.form.submit()">
+            <select name="lesson" class="form-select" onchange="this.form.submit()" aria-label="{% translate 'Lesson' %}">
                 <option value="">{% translate "Lesson..." %}</option>
                 {% for l in lessons %}
                 <option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>
@@ -39,12 +39,8 @@
             </select>
         </div>
         <div class="col-auto">
-            <select name="student" class="form-select" onchange="this.form.submit()">
-                <option value="">{% translate "Student..." %}</option>
-                {% for s in students %}
-                <option value="{{ s.id }}" {% if selected_student == s.id %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
-                {% endfor %}
-            </select>
+            <label class="visually-hidden" for="progress-student-search">{% translate "Student" %}</label>
+            <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Student search...' %}">
         </div>
     </form>
 
@@ -54,11 +50,11 @@
                 <table class="table table-hover admin-table mb-0">
                     <thead>
                         <tr>
-                            <th>{% translate "Student" %}</th>
-                            <th>{% translate "Lesson" %}</th>
-                            <th>{% translate "Part" %}</th>
-                            <th>{% translate "Progress" %}</th>
-                            <th>{% translate "Completed" context "progress" %}</th>
+                            <th scope="col">{% translate "Student" %}</th>
+                            <th scope="col">{% translate "Lesson" %}</th>
+                            <th scope="col">{% translate "Part" %}</th>
+                            <th scope="col">{% translate "Progress" %}</th>
+                            <th scope="col">{% translate "Completed" context "progress" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -97,6 +93,51 @@
                 </table>
             </div>
         </div>
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="card-footer bg-transparent">
+            <nav aria-label="{% translate 'Progress pagination' %}">
+                <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled" aria-disabled="true">
+                        <span class="page-link rounded-pill">
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                        </span>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
+                        <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
+                    </li>
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+                            <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled" aria-disabled="true">
+                        <span class="page-link rounded-pill">
+                            <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

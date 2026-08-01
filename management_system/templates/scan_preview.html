@@ -9,6 +9,7 @@
 <div class="container py-4">
   <h1 class="mb-4">{% translate "Attendance Scan" %}</h1>
 
+  {# --- Student info card --- #}
   <div class="card mb-4">
     <div class="card-body">
       <h5 class="card-title">{{ student.get_full_name|default:student.username }}</h5>
@@ -23,26 +24,56 @@
         {% endif %}
         <dt class="col-sm-4">{% translate "Date" %}</dt>
         <dd class="col-sm-8">{{ today }}</dd>
-        <dt class="col-sm-4">{% translate "Already recorded" %}</dt>
-        <dd class="col-sm-8">{{ already_recorded|join:", "|default:"—" }}</dd>
       </dl>
     </div>
   </div>
 
-  {% if already_recorded %}
-    <div class="alert alert-info">{% translate "Some actions already recorded for today." %}</div>
-  {% endif %}
+  {# --- Course offering selector --- #}
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="mb-3">
+        <label for="course-offering-select" class="form-label fw-semibold">{% translate "Course" %}</label>
+        <select id="course-offering-select" class="form-select form-select-lg" required>
+          <option value="">{% translate "Select a course..." %}</option>
+          {% for offering in offerings %}
+            <option value="{{ offering.id }}" {% if selected_offering_id == offering.id %}selected{% endif %}>
+              {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
+      {% if already_recorded_by_offering %}
+        <div class="mt-2">
+          <p class="text-muted small mb-1">{% translate "Today's records per course:" %}</p>
+          <ul class="list-unstyled mb-0">
+            {% for off_id, actions in already_recorded_by_offering.items %}
+              <li class="small">
+                {% for offering in offerings %}
+                  {% if offering.id == off_id %}{{ offering.course.name }}:{% endif %}
+                {% endfor %}
+                {{ actions|join:", " }}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- Entrance / Exit buttons --- #}
   <div class="d-flex gap-2">
-    <form method="post" action="{% url 'record-attendance' token=token action='entrance' %}">
+    <form id="entrance-form" method="post" action="{% url 'record-attendance' token=token action='entrance' %}">
       {% csrf_token %}
-      <button type="submit" class="btn btn-success btn-lg" {% if 'entrance' in already_recorded %}disabled{% endif %}>
+      <input type="hidden" name="course_offering" id="entrance-offering" value="">
+      <button id="entrance-btn" type="submit" class="btn btn-success btn-lg" disabled>
         {% translate "Record Entrance" %}
       </button>
     </form>
-    <form method="post" action="{% url 'record-attendance' token=token action='exit' %}">
+    <form id="exit-form" method="post" action="{% url 'record-attendance' token=token action='exit' %}">
       {% csrf_token %}
-      <button type="submit" class="btn btn-warning btn-lg" {% if 'exit' in already_recorded %}disabled{% endif %}>
+      <input type="hidden" name="course_offering" id="exit-offering" value="">
+      <button id="exit-btn" type="submit" class="btn btn-warning btn-lg" disabled>
         {% translate "Record Exit" %}
       </button>
     </form>
@@ -56,27 +87,53 @@
 </div>
 
 <script>
-document.querySelectorAll('form[action*="/scan/"]').forEach(function(form) {
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const btn = form.querySelector('button[type="submit"]');
-    btn.disabled = true;
-    fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value } })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.error) {
-          document.getElementById('record-error').textContent = data.error;
-          document.getElementById('record-error').classList.remove('d-none');
-          btn.disabled = false;
-        } else {
-          document.getElementById('record-error').classList.add('d-none');
-          btn.textContent = '{% translate "Done" %}';
-          btn.classList.remove('btn-success', 'btn-warning');
-          btn.classList.add('btn-secondary');
-        }
-      })
-      .catch(function() { btn.disabled = false; });
+(function() {
+  var selectEl = document.getElementById('course-offering-select');
+  var entranceOffering = document.getElementById('entrance-offering');
+  var exitOffering = document.getElementById('exit-offering');
+  var entranceBtn = document.getElementById('entrance-btn');
+  var exitBtn = document.getElementById('exit-btn');
+  var alreadyByOffering = {{ already_recorded_json|default:"{}"|safe }};
+
+  function updateButtons() {
+    var val = selectEl.value;
+    entranceOffering.value = val;
+    exitOffering.value = val;
+    if (!val) {
+      entranceBtn.disabled = true;
+      exitBtn.disabled = true;
+      return;
+    }
+    var actions = alreadyByOffering[val] || [];
+    entranceBtn.disabled = actions.indexOf('entrance') !== -1;
+    exitBtn.disabled = actions.indexOf('exit') !== -1;
+  }
+
+  selectEl.addEventListener('change', updateButtons);
+  updateButtons();
+
+  document.querySelectorAll('form[id$="-form"]').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            document.getElementById('record-error').textContent = data.error;
+            document.getElementById('record-error').classList.remove('d-none');
+            btn.disabled = false;
+          } else {
+            document.getElementById('record-error').classList.add('d-none');
+            btn.textContent = '{% translate "Done" %}';
+            btn.classList.remove('btn-success', 'btn-warning');
+            btn.classList.add('btn-secondary');
+          }
+        })
+        .catch(function() { btn.disabled = false; });
+    });
   });
-});
+})();
 </script>
 {% endblock %}

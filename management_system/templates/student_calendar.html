@@ -8,14 +8,14 @@
 {% block body %}
 <div class="container py-4">
   <h1 class="mb-4">{% translate "My Academic Calendar" %}</h1>
-  {% for y in years %}
+  {% for scope in scopes %}
     <div class="card mb-4">
       <div class="card-header">
-        <strong>{{ y }}</strong>
-        <span class="badge bg-info ms-2">{{ y.starts_on }} – {{ y.ends_on }}</span>
+        <strong>{{ scope.academic_year }} — {{ scope.level.display_name }}</strong>
+        <span class="badge bg-info ms-2">{{ scope.academic_year.starts_on }} – {{ scope.academic_year.ends_on }}</span>
       </div>
       <div class="card-body">
-        {% with holidays=y.holidays.all %}
+        {% with holidays=scope.academic_year.holidays.all %}
           {% if holidays %}
             <h6>{% translate "Holidays" %}</h6>
             <ul class="list-group mb-3">
@@ -25,7 +25,9 @@
             </ul>
           {% endif %}
         {% endwith %}
-        <p class="text-muted">{% translate "Meeting days" %}: {{ y.meeting_weekdays|join:", " }}</p>
+        <p class="text-muted">{% translate "Meeting days" %}:
+            {{ scope.meeting_weekdays|join:", " }}
+        </p>
       </div>
     </div>
   {% empty %}

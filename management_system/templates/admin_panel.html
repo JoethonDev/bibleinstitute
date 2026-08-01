@@ -24,7 +24,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260801-lesson-ui-3">
     
     <style>
         :root {
@@ -527,16 +527,20 @@
                                 {% for year in current_academic_years %}
                                 <div class="mb-3">
                                     <div class="stat-value">{{ year.name }}</div>
-                                    <div class="stat-label" style="font-size:0.76rem;text-transform:none;letter-spacing:0;">{% translate "Level" %} {{ year.level }} &middot; {{ year.starts_on|date:"Y-m-d" }} &rarr; {{ year.ends_on|date:"Y-m-d" }}</div>
+                                    <div class="stat-label" style="font-size:0.76rem;text-transform:none;letter-spacing:0;">{{ year.starts_on|date:"Y-m-d" }} &rarr; {{ year.ends_on|date:"Y-m-d" }}</div>
                                 </div>
-                                {% if year.meeting_weekdays %}
+                                {% if year.level_links.all %}
                                 <div>
                                     <span class="stat-label" style="display:inline-block;margin-bottom:0.3rem;">{% translate "Meeting Days" %}</span>
                                     <div>
-                                        {% for wd in year.meeting_weekdays %}
+                                        {% for link in year.level_links.all %}
+                                        <span class="fw-semibold me-1" style="font-size:0.76rem;">{{ link.level.display_name }}:</span>
+                                        {% for wd in link.meeting_weekdays %}
                                         <span class="badge bg-light text-dark me-1 px-2 py-1" style="font-weight:500;">
                                             {% if wd == 0 %}{% translate "Mon" %}{% elif wd == 1 %}{% translate "Tue" %}{% elif wd == 2 %}{% translate "Wed" %}{% elif wd == 3 %}{% translate "Thu" %}{% elif wd == 4 %}{% translate "Fri" %}{% elif wd == 5 %}{% translate "Sat" %}{% elif wd == 6 %}{% translate "Sun" %}{% endif %}
                                         </span>
+                                        {% endfor %}
+                                        {% if not forloop.last %}<br>{% endif %}
                                         {% endfor %}
                                     </div>
                                 </div>
@@ -633,7 +637,7 @@
                                 <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "Enrollments by Year" %}</h6>
                                 {% for item in enrollments_by_year|slice:":5" %}
                                 <div class="kv-row" style="padding:0.2rem 0;">
-                                    <span class="kv-label">{{ item.academic_year__name }} ({% translate "Level" %} {{ item.academic_year__level }})</span>
+                                    <span class="kv-label">{{ item.academic_year_level__academic_year__name }} — {% translate "Level" %} {{ item.academic_year_level__level__ordering }}</span>
                                     <span class="kv-value">{{ item.count }}</span>
                                 </div>
                                 {% empty %}
@@ -693,7 +697,7 @@
                                         <div>
                                             <div class="activity-name">{{ enrollment.student.get_full_name|default:enrollment.student.username }}</div>
                                             <div class="activity-meta">
-                                                {{ enrollment.academic_year.name }} &middot; 
+                                                {{ enrollment.academic_year_level.academic_year.name }} &middot;
                                                 {% if enrollment.course_offering %}
                                                 {{ enrollment.course_offering.course.name }}
                                                 {% else %}
@@ -770,7 +774,7 @@
     <script defer src="{% static 'js/alpine/components/dashboardManager.js' %}"></script>
     <script defer src="{% static 'js/alpine/components/filterManager.js' %}"></script>
     <script defer src="{% static 'js/alpine/components/tableManager.js' %}"></script>
-    <script defer src="{% static 'js/alpine/components/progressTracker.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/progressTracker.js' %}?v=20260801-lesson-ui-3"></script>
     
     <!-- 4. Alpine.js Global Component Registration (MUST be before Alpine Core) -->
     <script defer>

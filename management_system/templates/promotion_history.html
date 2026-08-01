@@ -1,0 +1,107 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active">{% translate "Promotion History" %}</li>
+        </ol>
+    </nav>
+    <div class="page-header d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-history me-2 text-primary"></i>{% translate "Immutable Promotion History" %}</h4>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'promotion-formula' %}">
+            <i class="fas fa-calculator me-1"></i>{% translate "Evaluation" %}
+        </a>
+    </div>
+    <div class="card dashboard-card">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end mb-3">
+                <div class="col-md-5">
+                    <label class="form-label" for="promotion-history-search">{% translate "Student" %}</label>
+                    <input id="promotion-history-search" class="form-control" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email…' %}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="promotion-history-outcome">{% translate "Outcome" %}</label>
+                    <select id="promotion-history-outcome" class="form-select" name="outcome">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="passed" {% if outcome == 'passed' %}selected{% endif %}>{% translate "Passed" %}</option>
+                        <option value="repeated" {% if outcome == 'repeated' %}selected{% endif %}>{% translate "Repeated" %}</option>
+                        <option value="graduated" {% if outcome == 'graduated' %}selected{% endif %}>{% translate "Graduated" %}</option>
+                    </select>
+                </div>
+                <div class="col-md-auto"><button class="btn btn-primary" type="submit">{% translate "Filter" %}</button></div>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-hover admin-table">
+                    <caption class="visually-hidden">{% translate "Immutable promotion history" %}</caption>
+                    <thead><tr>
+                        <th scope="col">{% translate "Student" %}</th>
+                        <th scope="col">{% translate "From" %}</th>
+                        <th scope="col">{% translate "To" %}</th>
+                        <th scope="col">{% translate "Outcome" %}</th>
+                        <th scope="col">{% translate "Score" %}</th>
+                        <th scope="col">{% translate "Recorded" %}</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for item in page_obj %}
+                    <tr>
+                        <td>{{ item.student.get_full_name|default:item.student.username }}</td>
+                        <td>{{ item.source_year_level.academic_year.name }} — {{ item.source_year_level.level.display_name }}</td>
+                        <td>{% if item.destination_year_level %}{{ item.destination_year_level.academic_year.name }} — {{ item.destination_year_level.level.display_name }}{% else %}<span class="text-muted">{% translate "Graduated" %}</span>{% endif %}</td>
+                        <td>{{ item.get_outcome_display|default:item.outcome }}</td>
+                        <td>{{ item.score|floatformat:1 }}%</td>
+                        <td>{{ item.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="6" class="text-center text-muted">{% translate "No promotion history found." %}</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if page_obj.paginator.num_pages > 1 %}
+            <nav aria-label="{% translate 'Promotion history pagination' %}">
+                <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link rounded-pill" href="?search={{ search|urlencode }}&amp;outcome={{ outcome }}&amp;page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled" aria-disabled="true">
+                        <span class="page-link rounded-pill">
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                        </span>
+                    </li>
+                    {% endif %}
+                    {% for number in page_obj.paginator.page_range %}
+                    <li class="page-item {% if number == page_obj.number %}active{% endif %}">
+                        <a class="page-link rounded-pill" href="?search={{ search|urlencode }}&amp;outcome={{ outcome }}&amp;page={{ number }}"{% if number == page_obj.number %} aria-current="page"{% endif %}>{{ number }}</a>
+                    </li>
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link rounded-pill" href="?search={{ search|urlencode }}&amp;outcome={{ outcome }}&amp;page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+                            <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled" aria-disabled="true">
+                        <span class="page-link rounded-pill">
+                            <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

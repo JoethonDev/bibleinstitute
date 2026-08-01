@@ -1,6 +1,6 @@
 # Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpResponse, FileResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, FileResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse, StreamingHttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _
@@ -12,18 +12,23 @@ from django.db import transaction
 from django.contrib import messages
 from django.contrib.messages import success, error, info
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
+from django.utils import formats
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
+from django.forms import formset_factory
 import hashlib
 import hmac
 import io
 import secrets
 import random
+import posixpath
 from collections import defaultdict
+from itertools import islice
+from urllib.parse import quote
 
 # Third Party
 from logging import getLogger
@@ -38,23 +43,43 @@ import requests
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, AcademicYearForm, CourseOfferingForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm
 
 # Internal Imports - Utilities
-from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, _csv_safe_cell, _safe_filename
-from .utils.reports import build_report_data
+from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, yearly_transcript_queryset, _csv_safe_cell, _safe_filename
+from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
-from .utils.file_validator import validate_upload_filename, FileValidator
+from .utils.file_validator import validate_upload_filename, validate_hls_object_key, FileValidator
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_can_access_course, user_has_management_role
-from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_scan_attendance, can_correct_attendance
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_has_management_role
+from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
 from .utils.r2_references import rewrite_lesson_r2_references
-from .utils.attendance import is_expected_date, get_expected_dates, get_attendance_summary
+from .utils.attendance import is_expected_date, get_expected_dates
 from .public_content import get_institute_copy
+from .academic_enrollment import (
+    activate_academic_year,
+    accept_application,
+    decline_application,
+    promote_evaluation_result,
+    promote_evaluation_results,
+)
+from .academic_copy import copy_offerings
+from .academic_formula import normalize_formula_rules, save_promotion_formula
+from .academic_evaluation import (
+    build_evaluation_plan,
+    evaluation_enrollments,
+    evaluate_enrollment,
+    override_evaluation_result,
+    save_formula_and_results,
+)
+from .evaluation_export import build_evaluation_workbook
+from .academic_access import accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
+from .utils.hls_parser import get_lesson_segments, get_segment_number
+from .scheduled_lessons import create_scheduled_lesson, finalize_scheduled_lesson
 
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
@@ -73,6 +98,8 @@ bucket_name = getattr(settings, "R2_BUCKET_NAME", "")
 cf_account_id = getattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
 cf_api_token = getattr(settings, "CLOUDFLARE_API_TOKEN", "")
 cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_account_id and cf_api_token else None
+
+PromotionRuleFormSet = formset_factory(PromotionRuleForm, extra=0, can_delete=True)
 
 # Initialize R2 Manager
 R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name, cloudflare_client)
@@ -185,7 +212,6 @@ def build_question_instance(question_data, quiz):
         auto_grade=auto_grade,
     )
 
-
 def prepare_exam_question(question_data):
     """Attach randomized display payloads for exam mode without mutating answer keys."""
     question_type = question_data.get("type")
@@ -222,7 +248,7 @@ class AdminPermissionView(LoginProtection):
         user = User.objects.get(username=request.user)
         if can_manage_content(user):
             return super(LoginProtection, self).dispatch(request, *args, **kwargs)
-        return HttpResponse(_("Unauthorized"), status=401)
+        return HttpResponse(_("Unauthorized"), status=403)
 
 class FormBase(AdminPermissionView, FormView):
     view_name = ""
@@ -298,53 +324,273 @@ class LoginView(views.LoginView):
         
         return response
 
-
 def index(request):
-    if request.user.is_authenticated:
-        user = User.objects.get(username=request.user)
-        role = user.role.role if user.role else "junior"
-
-        if role in ("admin", "staff"):
-            return redirect("user-dashboard")
-
-        return portal(request)
-
     return render(request, "home.html", get_institute_copy(translation.get_language(), "home"))
-
 
 @login_required(login_url=LOGIN_URL)
 def portal(request):
-    user = User.objects.get(username=request.user)
-    role = user.role.role if user.role else "junior"
+    return redirect("home")
 
-    courses = Course.fetch_courses_by_role(role)
-    course_count = sum(len(level["courses"]) for level in courses)
+@login_required(login_url=LOGIN_URL)
+def student_ui_proposal(request):
+    """Read-only design proposal page presenting all student screens with the Psalmodia theme."""
+    return render(request, "theme_showcase/student_proposal.html")
 
-    current_time = now()
-    open_quiz_count = 0
-    course_ids = [c.pk for level in courses for c in level["courses"]]
-    quizzes = Quiz.objects.filter(course_id__in=course_ids).select_related("course").prefetch_related("course_offering")
-    quizzes_by_course = defaultdict(list)
-    for quiz in quizzes:
-        quizzes_by_course[quiz.course_id].append(quiz)
-    for level in courses:
-        for course in level["courses"]:
-            for quiz in quizzes_by_course.get(course.pk, []):
-                quiz_status, __ = get_student_quiz_status(quiz, user, current_time)
-                if quiz_status == "exam":
-                    open_quiz_count += 1
 
-    return render(request, "index.html", {
-        "course_count": course_count,
-        "open_quiz_count": open_quiz_count,
-        "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
-        "role_display": str(_(user.role.get_role_display())) if user.role else "",
+@login_required(login_url=LOGIN_URL)
+def admin_ui_proposal(request):
+    """Interactive admin-dashboard design proposal with live bounded data (admin only)."""
+    role = getattr(getattr(request.user, "role", None), "role", "")
+    if role != "admin":
+        raise PermissionDenied
+
+    today = timezone.localdate()
+
+    # --- People ---
+    role_counts = {
+        row["role__role"]: row["n"]
+        for row in User.objects.values("role__role").annotate(n=Count("id"))
+    }
+    pending_applications = User.objects.filter(application_status="pending")
+    recent_users = User.objects.select_related("role").order_by("-date_joined")[:6]
+
+    # --- Content ---
+    courses = (
+        Course.objects.select_related("level")
+        .annotate(
+            offering_count=Count("offerings", distinct=True),
+            lesson_count=Count("offerings__lessons", distinct=True),
+            quiz_count=Count("offerings__quizzes", distinct=True),
+        )
+        .order_by("level__ordering", "name")[:8]
+    )
+    lesson_status_counts = {
+        row["status"]: row["n"]
+        for row in Lesson.objects.values("status").annotate(n=Count("id"))
+    }
+    recent_lessons = (
+        Lesson.objects.select_related(
+            "course_offering__course",
+            "course_offering__academic_year_level__level",
+        )
+        .order_by("-updated_date")[:6]
+    )
+    quiz_status_counts = {
+        row["status"]: row["n"]
+        for row in Quiz.objects.values("status").annotate(n=Count("id"))
+    }
+    recent_quizzes = (
+        Quiz.objects.select_related("course_offering__course", "quiz_type")
+        .annotate(question_count=Count("questions", distinct=True))
+        .order_by("-created_date")[:6]
+    )
+    draft_lessons = (
+        Lesson.objects.filter(status=PublicationStatus.DRAFT)
+        .select_related("course_offering__course")
+        .order_by("-updated_date")[:5]
+    )
+    lessons_total = Lesson.objects.count()
+    lessons_with_media = sum(
+        1 for links in Lesson.objects.values_list("links", flat=True) if links
+    )
+
+    # --- Academic setup ---
+    levels = (
+        Level.objects.order_by("ordering")
+        .annotate(
+            course_count=Count("courses", distinct=True),
+            offering_count=Count("courses__offerings", distinct=True),
+            enrollment_count=Count("year_links__enrollments", distinct=True),
+        )
+    )
+    years = (
+        AcademicYear.objects.annotate(
+            scope_count=Count("level_links", distinct=True),
+            offering_count=Count("level_links__course_offerings", distinct=True),
+            enrollment_count=Count("level_links__enrollments", distinct=True),
+        ).order_by("-ordering")
+    )
+    weekday_labels = [str(label) for label in (
+        _("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
+        _("Friday"), _("Saturday"), _("Sunday"),
+    )]
+    active_year = AcademicYear.objects.filter(is_active=True).first()
+    active_scopes = (
+        AcademicYearLevel.objects.filter(academic_year__is_active=True)
+        .select_related("academic_year", "level")
+        .order_by("level__ordering")
+    )
+    calendar_scopes = [
+        {
+            "scope": scope,
+            "weekdays": [
+                weekday_labels[i] for i in (scope.meeting_weekdays or [])
+                if 0 <= i < 7
+            ],
+        }
+        for scope in active_scopes
+    ]
+    holidays = (
+        AcademicHoliday.objects.filter(academic_year__is_active=True)
+        .order_by("date")[:6]
+    )
+
+    import calendar as py_calendar
+
+    meeting_weekday_numbers = sorted({
+        weekday
+        for scope in active_scopes
+        for weekday in (scope.meeting_weekdays or [])
     })
+    month_holidays = {
+        holiday.date: holiday.name
+        for holiday in AcademicHoliday.objects.filter(
+            academic_year__is_active=True,
+            date__year=today.year,
+            date__month=today.month,
+        )
+    }
+    calendar_cells = []
+    for week in py_calendar.Calendar(firstweekday=6).monthdatescalendar(
+        today.year, today.month
+    ):
+        for day in week:
+            in_year = bool(
+                active_year and active_year.starts_on <= day <= active_year.ends_on
+            )
+            calendar_cells.append({
+                "day": day.day,
+                "in_month": day.month == today.month,
+                "is_today": day == today,
+                "is_meeting": in_year and day.weekday() in meeting_weekday_numbers,
+                "holiday_name": month_holidays.get(day, ""),
+            })
+    calendar_month = today.replace(day=1)
 
+    detail_offering = (
+        CourseOffering.objects.filter(status=PublicationStatus.PUBLISHED)
+        .select_related(
+            "course", "academic_year_level__level",
+            "academic_year_level__academic_year",
+        )
+        .prefetch_related("lessons", "quizzes")
+        .order_by("course__name")
+        .first()
+    )
+
+    # --- Participation ---
+    attendance_by_action = {
+        row["action"]: row["n"]
+        for row in AttendanceRecord.objects.values("action").annotate(n=Count("id"))
+    }
+    recent_attendance = (
+        AttendanceRecord.objects.select_related("student", "course_offering__course")
+        .order_by("-scanned_at")[:6]
+    )
+    progress_total = LectureProgress.objects.count()
+    progress_avg = LectureProgress.objects.aggregate(avg=Avg("percent"))["avg"] or 0
+    progress_completed = LectureProgress.objects.filter(
+        completed_at__isnull=False
+    ).count()
+    recent_progress = (
+        LectureProgress.objects.select_related("student", "lesson")
+        .order_by("-id")[:5]
+    )
+
+    # --- Analytics ---
+    formulas = (
+        PromotionFormula.objects.select_related(
+            "academic_year_level", "academic_year_level__level",
+            "academic_year_level__academic_year", "course_offering__course",
+        )
+        .annotate(rule_count=Count("rules", distinct=True))
+        .order_by("-updated_at")[:5]
+    )
+    result_counts = {
+        row["final_status"]: row["n"]
+        for row in EvaluationResult.objects.values("final_status").annotate(n=Count("id"))
+    }
+    recent_history = (
+        PromotionHistory.objects.select_related("student")
+        .order_by("-id")[:5]
+    )
+    report_scopes = []
+    for scope in active_scopes:
+        report_scopes.append({
+            "scope": scope,
+            "students": Enrollment.objects.filter(
+                academic_year_level=scope,
+                enrollment_type=Enrollment.Type.NORMAL,
+            ).count(),
+            "grade_avg": Grade.objects.filter(
+                quiz__course_offering__academic_year_level=scope
+            ).aggregate(avg=Avg("total_grade"))["avg"],
+        })
+    recent_grades = (
+        Grade.objects.select_related(
+            "user", "quiz", "quiz__course_offering__course",
+        )
+        .order_by("-submitted_at")[:6]
+    )
+    grades_average = Grade.objects.aggregate(avg=Avg("total_grade"))["avg"] or 0
+
+    context = {
+        "users_total": User.objects.count(),
+        "role_counts": role_counts,
+        "pending_applications": pending_applications[:5],
+        "pending_applications_count": pending_applications.count(),
+        "recent_users": recent_users,
+        "courses_total": Course.objects.count(),
+        "courses": courses,
+        "offerings_total": CourseOffering.objects.count(),
+        "offerings_published": CourseOffering.objects.filter(
+            status=PublicationStatus.PUBLISHED,
+        ).count(),
+        "lessons_total": lessons_total,
+        "lesson_status_counts": lesson_status_counts,
+        "recent_lessons": recent_lessons,
+        "quizzes_total": Quiz.objects.count(),
+        "quiz_status_counts": quiz_status_counts,
+        "recent_quizzes": recent_quizzes,
+        "draft_lessons": draft_lessons,
+        "lessons_with_media": lessons_with_media,
+        "levels": levels,
+        "years": years,
+        "calendar_scopes": calendar_scopes,
+        "holidays": holidays,
+        "calendar_cells": calendar_cells,
+        "calendar_month": calendar_month,
+        "meeting_weekday_numbers": meeting_weekday_numbers,
+        "detail_offering": detail_offering,
+        "enrollments_total": Enrollment.objects.count(),
+        "recent_enrollments": (
+            Enrollment.objects.select_related(
+                "student", "academic_year_level", "academic_year_level__level",
+            ).order_by("-enrolled_at")[:5]
+        ),
+        "grades_total": Grade.objects.count(),
+        "submissions_total": Submission.objects.count(),
+        "attendance_by_action": attendance_by_action,
+        "attendance_today": AttendanceRecord.objects.filter(
+            attendance_date=today,
+        ).count(),
+        "recent_attendance": recent_attendance,
+        "students_with_qr": User.objects.filter(qr_token__isnull=False).count(),
+        "progress_total": progress_total,
+        "progress_avg": progress_avg,
+        "progress_completed": progress_completed,
+        "recent_progress": recent_progress,
+        "formulas": formulas,
+        "result_counts": result_counts,
+        "recent_history": recent_history,
+        "report_scopes": report_scopes,
+        "recent_grades": recent_grades,
+        "grades_average": grades_average,
+    }
+    return render(request, "theme_showcase/admin_proposal.html", context)
 
 def about_page(request):
     return render(request, "about.html", get_institute_copy(translation.get_language(), "about"))
-
 
 def program_page(request):
     return render(request, "program.html", get_institute_copy(translation.get_language(), "courses"))
@@ -358,18 +604,51 @@ class ProfileDetail(LoginProtection, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.object
-        form = ProfileUpdateForm(instance=user)
-        for field in form.fields.values():
-            field.disabled = True
+        form = context.get("form") or ProfileUpdateForm(instance=user)
+        profile_editable = user == self.request.user
+        if not profile_editable:
+            for field in form.fields.values():
+                field.disabled = True
 
         context['form'] = form
-        context['courses'] = Course.fetch_courses_by_role(user.role.role)
+        context['profile_editable'] = profile_editable
+        if user_has_management_role(user):
+            offerings = CourseOffering.objects.select_related(
+                "course", "academic_year_level__academic_year", "academic_year_level__level"
+            ).filter(
+                academic_year_level__academic_year__is_active=True,
+            ).order_by("academic_year_level__level__ordering", "course__name")
+        else:
+            offerings = accessible_offerings(user).order_by(
+                "academic_year_level__academic_year__ordering",
+                "academic_year_level__level__ordering",
+                "course__name",
+            )
+        levels_map = {}
+        for o in offerings:
+            lvl = o.academic_year_level.level
+            scope = o.academic_year_level
+            group_key = (scope.academic_year_id, scope.level_id)
+            if group_key not in levels_map:
+                levels_map[group_key] = {
+                    "level_name": lvl.display_name,
+                    "academic_year_name": scope.academic_year.name,
+                    "section_name": f"{lvl.display_name} — {scope.academic_year.name}",
+                    "offerings": [],
+                }
+            levels_map[group_key]["offerings"].append(o)
+        context['courses'] = list(levels_map.values())
+        context['show_profile_qr'] = bool(
+            user == self.request.user
+            and user.role
+            and user.role.role in {"student", "admin"}
+        )
 
         # Recent quiz grade submissions (last 5)
         context['recent_grades'] = (
             Grade.objects
             .filter(user=user)
-            .select_related('quiz', 'quiz__course')
+            .select_related('quiz', 'quiz__course_offering__course')
             .order_by('-submitted_at')[:5]
         )
 
@@ -389,9 +668,26 @@ class ProfileDetail(LoginProtection, DetailView):
         # Check request has user_id route
         # If user is not admin and pk in url
         if not request.get_full_path().endswith("/profile/") and not can_manage_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
+            return HttpResponse(_("Unauthorized"), status=403) # Translate "Unauthorized"
         return super().get(request, *args, **kwargs)
 
+    def post(self, request, *args, **kwargs):
+        if self.kwargs.get(self.pk_url_kwarg) and not can_manage_content(request.user):
+            return HttpResponse(_("Unauthorized"), status=403)
+
+        self.object = self.get_object()
+        if self.object != request.user:
+            return HttpResponse(_("Unauthorized"), status=403)
+
+        form = ProfileUpdateForm(request.POST, instance=self.object)
+        if form.is_valid():
+            self.object = form.save()
+            if form.cleaned_data.get("password"):
+                update_session_auth_hash(request, self.object)
+            success(request, _("Profile is updated successfully!"), extra_tags="alert-success")
+            return redirect("view-profile")
+
+        return self.render_to_response(self.get_context_data(form=form))
 
     def get_object(self, queryset = None):
         # if not pk in route
@@ -422,192 +718,112 @@ class ProfileUpdate(LoginProtection, UpdateView):
 # Course Routes
 @login_required(login_url=LOGIN_URL)
 def view_courses(request):
-    username = request.user
-    logger.info(f"fetching available course for user : {username}")
+    user = User.objects.get(pk=request.user.pk)
+    management_preview = user_has_management_role(user)
+    offerings_queryset = accessible_offerings(user, include_management=management_preview).order_by(
+        "-academic_year_level__academic_year__ordering",
+        "-academic_year_level__level__ordering",
+        "course__name",
+    )
+    offerings = list(offerings_queryset)
+    normal_scopes = set()
+    targeted_offerings = set()
+    if not management_preview:
+        enrollments = Enrollment.objects.filter(
+            student=user,
+            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
+        ).values_list("enrollment_type", "academic_year_level_id", "course_offering_id")
+        normal_scopes = {scope_id for enrollment_type, scope_id, _ in enrollments if enrollment_type == Enrollment.Type.NORMAL}
+        targeted_offerings = {offering_id for enrollment_type, _, offering_id in enrollments if enrollment_type != Enrollment.Type.NORMAL and offering_id}
 
-    user = User.objects.get(username=username)
-
-    if user_has_management_role(user):
-        courses = Course.fetch_courses_by_role("management")
-        logger.info(f"{username} access all academic years")
-    else:
-        enrolled_offerings = CourseOffering.objects.filter(
-            status="published",
-        ).filter(
-            Q(academic_year__enrollments__student=user, academic_year__enrollments__status="active", academic_year__enrollments__enrollment_type="normal")
-            | Q(enrollments__student=user, enrollments__status="active", enrollments__course_offering=F("pk"))
-        ).select_related("course", "academic_year").distinct()
-
-        if enrolled_offerings.exists():
-            levels_map = {}
-            for offering in enrolled_offerings:
-                level = offering.course.level
-                if level not in levels_map:
-                    levels_map[level] = {
-                        "level_name": Course.get_level_name(level),
-                        "courses": [],
-                    }
-                levels_map[level]["courses"].append(offering.course)
-            courses = list(levels_map.values())
-            logger.info(f"{username} access {len(courses)} academic years via enrollment")
+    grouped = defaultdict(list)
+    for offering in offerings:
+        scope = offering.academic_year_level
+        grouped[(scope.academic_year_id, scope.level_id)].append(offering)
+    sections = []
+    for (year_id, level_id), section_offerings in grouped.items():
+        first = section_offerings[0]
+        scope = first.academic_year_level
+        if management_preview:
+            access_kind = "management"
+        elif first.academic_year_level_id in normal_scopes:
+            access_kind = "current" if scope.academic_year.is_active else "historical"
         else:
-            courses = []
-            logger.info(f"{username} has no enrollments")
-
-    course_ids = [c.pk for level in courses for c in level["courses"]]
-    lesson_counts = dict(Course.objects.filter(pk__in=course_ids).annotate(cnt=Count("lessons")).values_list("pk", "cnt"))
-    quiz_counts = dict(Course.objects.filter(pk__in=course_ids).annotate(cnt=Count("quizzes")).values_list("pk", "cnt"))
-    for level in courses:
-        for course in level["courses"]:
-            course.lesson_count = lesson_counts.get(course.pk, 0)
-            course.quiz_count = quiz_counts.get(course.pk, 0)
+            access_kind = "exceptional"
+        sections.append({
+            "academic_year": scope.academic_year,
+            "level": scope.level,
+            "level_name": scope.level.display_name,
+            "access_kind": access_kind,
+            "offerings": section_offerings,
+        })
 
     return render(request, "course_view.html", {
-        "courses": courses
+        "sections": sections
     })
 
+@login_required(login_url=LOGIN_URL)
+def view_course_details(request, offering_id):
+    user = User.objects.get(pk=request.user.pk)
+    offering = get_accessible_offering_or_403(user, offering_id)
+    management_preview = user_has_management_role(user)
+    lessons = offering.lessons.all() if management_preview else offering.lessons.filter(status=PublicationStatus.PUBLISHED)
+    quizzes = offering.quizzes.all() if management_preview else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
+    return render(request, "course_detail.html", {
+        "offering": offering,
+        "offering_id": offering.pk,
+        "course": offering.course,
+        "lessons": lessons,
+        "quizzes": quizzes,
+        "management_preview": management_preview,
+    })
 
 @login_required(login_url=LOGIN_URL)
-def view_course_details(request, course_id):
-    user = User.objects.get(username=request.user)
-
-    try:
-        course = get_object_or_404(Course, pk=course_id)
-
-        logger.info(f"User : {user} is accessing {course.name} course")
-
-        context = {
-            "lessons": [],
-            "quizzes": course.fetch_quizzes(user),
-            "course_id": course_id,
-            "course": course,
-        }
-        if user_has_management_role(user):
-            context['lessons'] = course.lessons.all()
-            logger.info(f"User : {user} is accessing all lessons")
-
-        else:
-            if not user_can_access_course(user, course):
-                return HttpResponse(_("Unauthorized"), status=401) # Translate "Unauthorized"
-            offerings = CourseOffering.objects.filter(
-                course=course,
-                status="published",
-            ).filter(
-                Q(academic_year__enrollments__student=user, academic_year__enrollments__status="active", academic_year__enrollments__enrollment_type="normal")
-                | Q(enrollments__student=user, enrollments__status="active", enrollments__course_offering=F("pk"))
-            ).distinct()
-            if offerings.exists():
-                context['lessons'] = Lesson.objects.filter(
-                    course_offering__in=offerings,
-                    status="published",
-                )
-                logger.info(f"User : {user} is accessing lessons via enrollment")
-            else:
-                context['lessons'] = Lesson.objects.none()
-
-
-    except Http404:
-        logger.error(f"Course with id: {course_id} not found for user: {user.username}")
-        raise Http404
-    
-    return render(request, 'course_detail.html', context)
-
+def view_lesson_details(request, offering_id, lesson_id):
+    user = User.objects.get(pk=request.user.pk)
+    offering = get_accessible_offering_or_403(user, offering_id)
+    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
+    if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
+        raise PermissionDenied(_("You do not have access to this lesson."))
+    lesson_links = json.loads(lesson.links)
+    return render(request, "lesson_stream.html", {
+        "offering_id": offering.pk,
+        "lesson_id": lesson_id,
+        "links": [{
+            "url": reverse(
+                "lesson-manifest" if file.get("file_type") in {"video", "audio"} else "lesson-stream",
+                args=[offering.pk, lesson_id, file_index],
+            ),
+            "name": file.get("name", ""),
+            "type": file.get("file_type", ""),
+            "part_id": file.get("part_id", ""),
+            "file_index": file_index,
+        } for file_index, file in enumerate(lesson_links)]
+    })
 
 @login_required(login_url=LOGIN_URL)
-def view_lesson_details(request, course_id, lesson_id):
-    try:
-        user = User.objects.get(username=request.user)
-        course = get_object_or_404(Course, pk=course_id)
-        lesson = get_object_or_404(Lesson, pk=lesson_id, course=course)
-        lesson_links = json.loads(lesson.links)
-        can_access = user_can_access_course(user, course) and (
-            user_has_management_role(user)
-            or (
-                lesson.status == PublicationStatus.PUBLISHED
-                and lesson.course_offering.status == PublicationStatus.PUBLISHED
-                and user.enrollments.filter(status="active").filter(
-                    Q(enrollment_type="normal", academic_year_id=lesson.course_offering.academic_year_id)
-                    | Q(course_offering_id=lesson.course_offering_id)
-                ).exists()
-            )
-        )
-        if can_access:
-            logger.info(f"User : {user} is accessing {lesson.name} lesson from {course.name} course")
-            return render(request, "lesson_stream.html", {
-                "lesson_id": lesson_id,
-                "links" : [{
-                    "url" : reverse("lesson-stream", args=[lesson_id, file_index]),
-                    "name" : file.get("name", ""),
-                    "type" : file['file_type'],
-                    "part_id" : file.get("part_id", ""),
-                } for file_index, file in enumerate(lesson_links)]
-            })
-        
-        else:
-            logger.error(f"{user.username} is not authorized to access lesson : {lesson.name}")
-            return HttpResponse(_('Unauthorized'), status=401) # Translate 'Unauthorized'
-
-    except Http404:
-        logger.error(f"Course with id: {course_id} or Lesson with id : {lesson_id} not found for user: {user.username}")
+def stream_lesson(request, offering_id, lesson_id, file_index):
+    user = User.objects.get(pk=request.user.pk)
+    offering = get_accessible_offering_or_403(user, offering_id)
+    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
+    if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
+        raise PermissionDenied(_("You do not have access to this lesson."))
+    lesson_links = json.loads(lesson.links)
+    if file_index < 0 or file_index >= len(lesson_links):
         raise Http404
+    file_data = lesson_links[file_index]
 
+    file_name = file_data.get("name")
+    file_key = file_data.get("id")
+    file_type = file_data.get("file_type")
 
-@login_required(login_url=LOGIN_URL)
-def stream_lesson(request, lesson_id, file_index):
-    try:
-        username = request.user
-        user = User.objects.get(username=username)
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
-        can_stream = user_has_management_role(user) or (
-            lesson.course_offering_id
-            and user.enrollments.filter(status="active").filter(
-                Q(enrollment_type="normal", academic_year_id=lesson.course_offering.academic_year_id)
-                | Q(course_offering_id=lesson.course_offering_id)
-            ).exists()
-        )
-        if not user_can_access_course(user, lesson.course) or not can_stream or (
-            not user_has_management_role(user)
-            and (lesson.status != PublicationStatus.PUBLISHED or lesson.course_offering.status != PublicationStatus.PUBLISHED)
-        ):
-            logger.error(f"{user.username} is not authorized to stream lesson : {lesson.name}")
-            return HttpResponse(_('Unauthorized'), status=401)
+    if file_type == "book":
+        return JsonResponse({"url": generate_unique_url(CLOUD_CLIENT, bucket_name, file_key, expires_in=3600)})
 
-        logger.info(f"User : {username} is streaming video from {lesson.name} lesson")
-
-        lesson_links = json.loads(lesson.links)
-        if file_index < 0 or file_index >= len(lesson_links):
-            raise Http404
-        file_data = lesson_links[file_index]
-
-        file_name = file_data.get("name")
-        file_key = file_data.get("id")
-        file_type = file_data.get("file_type")
-
-        if file_type == "book":
-            return JsonResponse({"url" : f"{settings.CLOUD_WORKER}{file_key}"})
-        
-        else:
-            m3u8_content = download_from_bucket(CLOUD_CLIENT, bucket_name, file_key).read().decode("utf-8")
-
-            # Build Segments
-            segments_names = re.findall(r"^.*\.ts$", m3u8_content, re.MULTILINE)
-            folder = "/".join(file_key.split("/")[:-1])
-            for segment in segments_names:
-                segment_key = f"{folder}/{segment}" if folder else segment
-                m3u8_content = m3u8_content.replace(segment, f"{settings.CLOUD_WORKER}{segment_key}")
-                
-            logger.info(f"{file_name} HLS file of {lesson.name} is loaded!")
-
-            # Stream the file content as response
-            logger.info(f"Sending {file_name} HLS file of {lesson.name} to {username}")
-            return HttpResponse(
-                m3u8_content,
-                content_type='application/vnd.apple.mpegurl'
-            )
-
-    except Http404:
-        logger.error(f"Lesson with id : {lesson_id} not found for user: {username}")
-        raise Http404
+    return JsonResponse(
+        {"error": _("Media playback requires a viewing session.")},
+        status=410,
+    )
     
 
 # @login_required(login_url=LOGIN_URL)
@@ -638,11 +854,11 @@ def stream_lesson(request, lesson_id, file_index):
 #         logger.error(f"Stack Trace : {str(e)}")
 
 @login_required(login_url=LOGIN_URL)
-def take_exam(request, course_id, quiz_id):
+def take_exam(request, offering_id, quiz_id):
     try:
-        user = User.objects.get(username=request.user)
-        course = get_object_or_404(Course, pk=course_id)
-        quiz = get_object_or_404(Quiz, pk=quiz_id, course=course)
+        user = User.objects.get(pk=request.user.pk)
+        offering = get_accessible_offering_or_403(user, offering_id, write=request.method == "POST")
+        quiz = get_object_or_404(Quiz, pk=quiz_id, course_offering=offering)
 
         submission_datetime = now()
         # Quiz can be submitted from opening time through the 30-minute closing buffer
@@ -653,10 +869,7 @@ def take_exam(request, course_id, quiz_id):
         total_grade = grade.total_grade if grade else 0
 
         if request.method == "GET":
-            logger.info(f"User : {user} is accessing {quiz.name} in {course.name} course")
-
-            if not user_can_access_course(user, course):
-                return HttpResponse(_("Unauthorized"), status=401)
+            logger.info(f"User : {user} is accessing {quiz.name} in {offering.course.name} offering")
 
             # Determine quiz mode using cohort-year window logic
             if user_has_management_role(user):
@@ -702,16 +915,13 @@ def take_exam(request, course_id, quiz_id):
                 "total_grade": total_grade,
                 "closing_date": quiz.closing_date.timestamp(),
                 "exam_taken": True if grade else False,
-                "back_url": reverse("course-details", args=[course_id,]),
+                "back_url": reverse("course-details", args=[offering_id]),
                 "quiz_closing_date_str": quiz.closing_date.strftime("%d/%m/%Y %H:%M"),
             })
         
         elif request.method == "POST":
             # Prevent another submission
             if not grade:
-                if not user_can_access_course(user, course):
-                    return HttpResponse(_("Unauthorized"), status=401)
-
                 # Guard: reject if quiz is no longer submittable
                 if not can_submit or not is_quiz_in_user_window(quiz, user):
                     # Send back to main page with error message TODO
@@ -763,13 +973,13 @@ def take_exam(request, course_id, quiz_id):
                     logger.error(f"{user}'s submission failed for {quiz.name}")
                     logger.error(f"Stack Traceback: {e}")
             
-            return redirect(reverse("quiz-details", args=[course_id, quiz_id]))
+            return redirect(reverse("quiz-details", args=[offering_id, quiz_id]))
         
         else:
             return HttpResponse(_("Not allowed method"), 400) # Translate
         
     except Http404:
-            logger.error(f"Course with id: {course_id} or Quiz with id: {quiz_id} not found for user: {user.username}")
+            logger.error(f"Offering with id: {offering_id} or Quiz with id: {quiz_id} not found for user: {user.username}")
             raise Http404
     
 # Admin Views
@@ -808,7 +1018,7 @@ def admin_panel(request):
     # ====== 2. COURSE & LESSON ANALYTICS ======
     courses_total = Course.objects.count()
     courses_by_level = list(
-        Course.objects.values('level').annotate(count=Count('id')).order_by('level')
+        Course.objects.values('level__ordering').annotate(count=Count('id')).order_by('level__ordering')
     )
 
     lessons_total = Lesson.objects.count()
@@ -823,7 +1033,7 @@ def admin_panel(request):
         CourseOffering.objects.values('status').annotate(count=Count('id'))
     )
     academic_years_total = AcademicYear.objects.count()
-    current_academic_years = AcademicYear.objects.filter(is_current=True)
+    current_academic_years = AcademicYear.objects.filter(is_active=True)
 
     # ====== 4. ENROLLMENT ANALYTICS ======
     enrollments_total = Enrollment.objects.count()
@@ -834,12 +1044,14 @@ def admin_panel(request):
         Enrollment.objects.values('enrollment_type').annotate(count=Count('id'))
     )
     enrollments_by_year = list(
-        Enrollment.objects.values('academic_year__name', 'academic_year__level')
+        Enrollment.objects.values('academic_year_level__academic_year__name', 'academic_year_level__academic_year__pk')
         .annotate(count=Count('id'))
-        .order_by('-academic_year__starts_on')
+        .order_by('-academic_year_level__academic_year__starts_on')
     )
     enrollments_by_level = list(
-        Enrollment.objects.values('level').annotate(count=Count('id')).order_by('level')
+        Enrollment.objects.values('academic_year_level__level__ordering')
+        .annotate(count=Count('id'))
+        .order_by('academic_year_level__level__ordering')
     )
 
     # ====== 5. QUIZ & GRADE ANALYTICS ======
@@ -877,7 +1089,7 @@ def admin_panel(request):
 
     # ====== 8. RECENT ACTIVITY ======
     recent_enrollments = Enrollment.objects.select_related(
-        'student', 'academic_year'
+        'student', 'academic_year_level__academic_year'
     ).order_by('-enrolled_at')[:5]
 
     recent_submissions = Grade.objects.select_related(
@@ -931,7 +1143,6 @@ def admin_panel(request):
         "recent_enrollments": recent_enrollments,
         "recent_submissions": recent_submissions,
     })
-
 
 @capability_required(can_manage_content)
 def export_users_csv(request):
@@ -1013,13 +1224,19 @@ def user_bulk_create(request):
                             username, first_name, last_name, password, role_name = row
                             
                             if User.objects.filter(username=username).exists():
-                                errors_list.append(f"Line {line_number}: User '{username}' already exists.")
+                                errors_list.append(_("Line %(line)d: User '%(username)s' already exists.") % {
+                                    "line": line_number,
+                                    "username": username,
+                                })
                                 continue
 
                             try:
                                 role = Role.objects.get(role=role_name.lower().strip())
                             except Role.DoesNotExist:
-                                errors_list.append(f"Line {line_number}: Role '{role_name}' does not exist.")
+                                errors_list.append(_("Line %(line)d: Role '%(role)s' does not exist.") % {
+                                    "line": line_number,
+                                    "role": role_name,
+                                })
                                 continue
 
                             user = User(
@@ -1034,17 +1251,29 @@ def user_bulk_create(request):
                             users_to_create.append(user)
 
                         except ValueError:
-                            errors_list.append(f"Line {line_number}: Incorrect number of columns. Expected 5, got {len(row)}.")
+                            errors_list.append(_("Line %(line)d: Incorrect number of columns. Expected 5, got %(count)d.") % {
+                                "line": line_number,
+                                "count": len(row),
+                            })
                         except ValidationError as e:
-                            errors_list.append(f"Line {line_number}: Validation error for user '{username}': {', '.join(e.messages)}")
+                            errors_list.append(_("Line %(line)d: Validation error for user '%(username)s': %(errors)s") % {
+                                "line": line_number,
+                                "username": username,
+                                "errors": ", ".join(e.messages),
+                            })
                         except Exception as e:
-                             errors_list.append(f"Line {line_number}: An unexpected error occurred: {e}")
+                             errors_list.append(_("Line %(line)d: An unexpected error occurred: %(error)s") % {
+                                 "line": line_number,
+                                 "error": e,
+                             })
 
                     if errors_list:
                         # If there are errors, raise an exception to trigger a rollback of the transaction
                         raise Exception("Errors found in CSV file.")
 
-                success(request, _(f'{len(users_to_create)} users have been created successfully!'), extra_tags="alert-success")
+                success(request, _("%(count)d users have been created successfully!") % {
+                    "count": len(users_to_create),
+                }, extra_tags="alert-success")
                 return redirect('user-dashboard')
 
             except Exception as e:
@@ -1052,7 +1281,7 @@ def user_bulk_create(request):
                 for err in errors_list:
                     error(request, err, extra_tags="alert-danger")
                 if not errors_list:
-                     error(request, _(f"An error occurred: {e}"), extra_tags="alert-danger")
+                     error(request, _("An error occurred: %(error)s") % {"error": e}, extra_tags="alert-danger")
                 return redirect('user-bulk-create')
 
     else:
@@ -1102,7 +1331,7 @@ class DeleteUser(UserBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=401)
+            return HttpResponse(_("Unauthorized"), status=403)
         return super(UserBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("user-dashboard")
 
@@ -1117,9 +1346,9 @@ def course_dashboard(request):
     if name:
         query &= Q(name__icontains=name)
     if year:
-        for key, val in Course.get_levels_name().items():
-            if val == year:
-                query &= Q(level=key)
+        for level_obj in Level.objects.order_by("ordering"):
+            if level_obj.display_name == year:
+                query &= Q(level__ordering=level_obj.ordering)
     courses = Course.objects.filter(query)
     
     logger.info(f"User : {user} filters users using {name} name and {year} level")
@@ -1130,7 +1359,7 @@ def course_dashboard(request):
         "name_value" : name or "",
         "filtering" : year or "",
         "columns" : Course.get_columns(),
-        "options" : [_("Choose Academic Year"), *list(Course.get_levels_name().values())],
+        "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
     }
 
     return render_dashboard(request, courses, view, context)
@@ -1150,9 +1379,97 @@ class DeleteCourse(CourseBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=401)
+            return HttpResponse(_("Unauthorized"), status=403)
         return super(CourseBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("course-dashboard")
+
+
+def _content_offering_filter_options():
+    offerings = CourseOffering.objects.select_related(
+        "course", "academic_year_level__level", "academic_year_level__academic_year"
+    ).order_by(
+        "course__name",
+        "academic_year_level__level__ordering",
+        "academic_year_level__academic_year__ordering",
+    )
+    return [
+        {
+            "value": str(offering.pk),
+            "label": (
+                f"{offering.course.name} — "
+                f"{offering.academic_year_level.level.display_name} — "
+                f"{offering.academic_year_level.academic_year.name}"
+            ),
+        }
+        for offering in offerings
+    ]
+
+
+def _requested_publication_status(request):
+    status = request.POST.get("status")
+    return status if status in PublicationStatus.values else None
+
+
+@capability_required(can_manage_content)
+def lesson_detail(request, lesson_id):
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            "course_offering__course",
+            "course_offering__academic_year_level__level",
+            "course_offering__academic_year_level__academic_year",
+        ),
+        pk=lesson_id,
+    )
+    try:
+        lesson_links = json.loads(lesson.links) if lesson.links else []
+    except (TypeError, json.JSONDecodeError):
+        lesson_links = []
+    normalized_links = []
+    if isinstance(lesson_links, list):
+        for link in lesson_links:
+            if not isinstance(link, dict):
+                continue
+            normalized_links.append({
+                "name": link.get("name", ""),
+                "file_type": link.get("file_type", ""),
+                "id": link.get("id", ""),
+                "file_id": link.get("file_id", ""),
+                "type": link.get("type", ""),
+            })
+    return render(request, "content_detail.html", {
+        "content": lesson,
+        "content_kind": "lesson",
+        "offering": lesson.course_offering,
+        "is_quiz": False,
+        "lesson_links": normalized_links,
+        "questions": (),
+        "back_url": reverse("lesson-dashboard"),
+        "edit_url": reverse("lesson-update", args=[lesson.pk]),
+    })
+
+
+@capability_required(can_manage_content)
+def quiz_detail(request, quiz_id):
+    quiz = get_object_or_404(
+        Quiz.objects.select_related(
+            "course_offering__course",
+            "course_offering__academic_year_level__level",
+            "course_offering__academic_year_level__academic_year",
+            "quiz_type",
+        ).prefetch_related("questions"),
+        pk=quiz_id,
+    )
+    return render(request, "content_detail.html", {
+        "content": quiz,
+        "content_kind": "quiz",
+        "offering": quiz.course_offering,
+        "is_quiz": True,
+        "lesson_links": (),
+        "questions": quiz.questions.all(),
+        "back_url": reverse("quiz-dashboard"),
+        "edit_url": reverse("quiz-update", args=[quiz.pk]),
+    })
+
 
 # Lesson Dashboard
 @capability_required(can_manage_content)
@@ -1166,13 +1483,16 @@ def lesson_dashboard(request):
     if name:
         query &= Q(name__icontains=name)
     if year:
-        for key, val in Course.get_levels_name().items():
-            if val == year:
-                query &= Q(course__level=key)
+        for level_obj in Level.objects.order_by("ordering"):
+            if level_obj.display_name == year:
+                query &= Q(course_offering__course__level__ordering=level_obj.ordering)
     if course:
-        course_obj = Course.objects.filter(name=course).first()
-        query &= Q(course=course_obj)
-    lessons = Lesson.objects.filter(query)
+        query &= Q(course_offering_id=course) if course.isdigit() else Q(pk__in=[])
+    lessons = Lesson.objects.filter(query).select_related(
+        "course_offering__course",
+        "course_offering__academic_year_level__level",
+        "course_offering__academic_year_level__academic_year",
+    )
     
     logger.info(f"User : {user} filters users using {name} name and {year} level and {course} course")
 
@@ -1183,8 +1503,8 @@ def lesson_dashboard(request):
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Lesson.get_columns(),
-        "options" : [_("Choose Academic Year"), *list(Course.get_levels_name().values())],
-        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]],
+        "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
+        "subjects" : _content_offering_filter_options(),
         "filters" : ["course_filter.html"],
     }
 
@@ -1193,22 +1513,28 @@ def lesson_dashboard(request):
 @capability_required(can_manage_content)
 def create_lesson(request):
     if request.method == "GET":
-        courses = [course.name for course in Course.objects.all()]
-        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
+        course_offerings = CourseOffering.objects.filter(
+            academic_year_level__academic_year__is_active=True
+        ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
 
         return render(request, "lesson_form.html", {
-            "courses" : courses,
             "course_offerings" : course_offerings,
             "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
-            "is_root" : True
+            "is_root" : True,
+            "content_status" : PublicationStatus.DRAFT,
+            "content_status_display" : PublicationStatus.DRAFT.label,
+            "publication_statuses" : PublicationStatus.choices,
         })
     elif request.method == "POST":
+        publication_status = _requested_publication_status(request)
+        if publication_status is None:
+            return HttpResponse(_("Invalid publication status."), status=400)
         lesson_name = request.POST.get("lesson_name", "")
-        course_name = request.POST.get("course", "")
+        offering_id = request.POST.get("course_offering")
         videos = request.POST.getlist("videos", [])
         videos_name = request.POST.getlist("videos_name", [])
         files_type = request.POST.getlist("files_type", [])
-        if lesson_name and course_name and videos:
+        if lesson_name and offering_id and videos:
             try:
                 links = [
                     {
@@ -1219,21 +1545,30 @@ def create_lesson(request):
                     } for file_no in range(len(videos))
                 ]
 
-                course = get_object_or_404(Course, name=course_name)
-                offering_id = request.POST.get("course_offering")
-                if offering_id:
-                    course_offering = get_object_or_404(CourseOffering, pk=offering_id)
-                else:
-                    course_offering = CourseOffering.objects.filter(course=course, academic_year__is_current=True).first()
-                Lesson.objects.create(name=lesson_name, course=course, course_offering=course_offering, links=json.dumps(links))
+                course_offering = get_object_or_404(
+                    CourseOffering,
+                    pk=offering_id,
+                    academic_year_level__academic_year__is_active=True,
+                )
+                Lesson.objects.create(
+                    name=lesson_name,
+                    course_offering=course_offering,
+                    links=json.dumps(links),
+                    status=publication_status,
+                )
                 success(request, _("Lesson is created successfully"), extra_tags="alert-success") # Translate
-                logger.info(f"Lesson {lesson_name} is added in course {course_name} with media length of {len(links)}")
+                logger.info(
+                    "Lesson %s is added in offering %s with media length of %s",
+                    lesson_name,
+                    course_offering.pk,
+                    len(links),
+                )
 
             except Http404:
                 error(request, _("Create lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
-                logger.error(f"Course {course_name} is not found to create a lesson!")
+                logger.error("Offering %s is not found to create a lesson!", offering_id)
         else:
-            error(request, _("Create lesson has failed, Name and Videos can not be empty!"), extra_tags="alert-danger") # Translate
+            error(request, _("Create lesson has failed, offering, name, and files are required!"), extra_tags="alert-danger")
 
         return redirect(reverse("lesson-create"))
 
@@ -1264,31 +1599,44 @@ def navigate_folder(request, folder_id=None):
 @capability_required(can_manage_content)
 def update_lesson(request, lesson_id):
     if request.method == "GET":
-        courses = [course.name for course in Course.objects.all()]
-        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
         try:
             lesson = get_object_or_404(Lesson, pk=lesson_id)
+            course_offerings = CourseOffering.objects.filter(
+                Q(academic_year_level__academic_year__is_active=True) | Q(pk=lesson.course_offering_id)
+            ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
             return render(request, "lesson_form.html", {
-                "courses" : courses,
                 "course_offerings" : course_offerings,
                 "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
                 "is_root" : True,
-                "selected_course" : lesson.course.name,
                 "selected_offering_id" : lesson.course_offering_id,
                 "lesson_name" : lesson.name,
-                "videos" : json.loads(lesson.links)
+                "videos" : json.loads(lesson.links),
+                "content_status" : lesson.status,
+                "content_status_display" : lesson.get_status_display(),
+                "publication_statuses" : PublicationStatus.choices,
             })
         except Http404:
             logger.error(f"Lesson with id : {lesson_id} is not found!")
             return redirect(reverse("lesson-dashboard"))
 
     elif request.method == "POST":
+        publication_status = _requested_publication_status(request)
+        if publication_status is None:
+            return HttpResponse(_("Invalid publication status."), status=400)
+        lesson = get_object_or_404(Lesson, pk=lesson_id)
+        if not lesson.can_edit:
+            if publication_status == lesson.status:
+                return HttpResponse(_("Published or archived lesson cannot be edited."), status=403)
+            lesson.status = publication_status
+            lesson.save(update_fields=["status", "updated_date"])
+            success(request, _("Lesson status is updated successfully"), extra_tags="alert-success")
+            return redirect(reverse("lesson-update", args=[lesson_id]))
         lesson_name = request.POST.get("lesson_name", "")
-        course_name = request.POST.get("course", "")
+        offering_id = request.POST.get("course_offering")
         videos = request.POST.getlist("videos", [])
         videos_name = request.POST.getlist("videos_name", [])
         files_type = request.POST.getlist("files_type", [])
-        if lesson_name and course_name and videos:
+        if lesson_name and offering_id and videos:
             try:
                 links = [
                     {
@@ -1298,28 +1646,27 @@ def update_lesson(request, lesson_id):
                     } for file_no in range(len(videos))
                 ]
 
-                course = get_object_or_404(Course, name=course_name)
-                lesson = get_object_or_404(Lesson, pk=lesson_id)
-                if not lesson.can_edit:
-                    return HttpResponse(_("Published or archived lesson cannot be edited."), status=403)
-
                 lesson.name = lesson_name
-                lesson.course = course
-                offering_id = request.POST.get("course_offering")
                 lesson.course_offering = get_object_or_404(
-                    CourseOffering, pk=offering_id, course=course
+                    CourseOffering, pk=offering_id
                 )
                 lesson.links = json.dumps(links)
+                lesson.status = publication_status
                 lesson.save()
 
-                logger.info(f"Lesson {lesson_name} is updated successfully in course {course_name} with media length of {len(links)}")
+                logger.info(
+                    "Lesson %s is updated successfully in offering %s with media length of %s",
+                    lesson_name,
+                    offering_id,
+                    len(links),
+                )
                 success(request, _("Lesson is updated successfully"), extra_tags="alert-success") # Translate
 
             except Http404:
                 error(request, _("Update lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
-                logger.error(f"Course {course_name} or Lesson with id {lesson_id} is not found to create a lesson!")
+            logger.error("Offering %s or Lesson with id %s was not found", offering_id, lesson_id)
         else:
-            error(request, _("Update lesson has failed, Name and Videos can not be empty!"), extra_tags="alert-danger") # Translate
+            error(request, _("Update lesson has failed, offering, name, and files are required!"), extra_tags="alert-danger")
 
         return redirect(reverse("lesson-update", args=[lesson_id]))
 
@@ -1328,7 +1675,7 @@ class DeleteLesson(LessonBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=401)
+            return HttpResponse(_("Unauthorized"), status=403)
         return super(LessonBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 
@@ -1346,18 +1693,72 @@ def ffmpeg_headers(view_func):
 @ffmpeg_headers
 @capability_required(can_manage_content)
 def upload_file(request):
+    course_offerings = CourseOffering.objects.filter(
+        academic_year_level__academic_year__is_active=True,
+    ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
     return render(request, "upload_video.html", {
         "drive" : list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=True)[0],
-        "is_root" : True
+        "is_root" : True,
+        "course_offerings": course_offerings,
+        "scheduled_lesson_finalize_url_template": reverse("scheduled-lesson-finalize", args=[0]),
     })
+
+
+@require_POST
+@capability_required(can_manage_content)
+def scheduled_lesson_create(request):
+    try:
+        payload = json.loads(request.body)
+        lesson = create_scheduled_lesson(
+            lesson_name=payload.get("lesson_name"),
+            offering_id=int(payload.get("course_offering")),
+            expected_media=payload.get("expected_media"),
+        )
+    except (json.JSONDecodeError, TypeError, ValueError, OverflowError, ValidationError) as exc:
+        message = str(exc) or _("Unable to create lesson draft.")
+        return JsonResponse({"message": message}, status=400)
+    return JsonResponse({"lesson_id": lesson.pk, "status": "draft"})
+
+
+@require_POST
+@capability_required(can_manage_content)
+def scheduled_lesson_finalize(request, lesson_id):
+    try:
+        lesson = finalize_scheduled_lesson(
+            lesson_id=lesson_id,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+        )
+    except Lesson.DoesNotExist:
+        return JsonResponse({"message": _("Scheduled lesson was not found.")}, status=404)
+    except ValidationError as exc:
+        if hasattr(exc, "message_dict"):
+            return JsonResponse(
+                {
+                    "message": _("Upload is incomplete; expected files are missing."),
+                    "errors": exc.message_dict,
+                },
+                status=400,
+            )
+        return JsonResponse({"message": exc.messages}, status=400)
+    return JsonResponse({"lesson_id": lesson.pk, "status": "published"})
 
 @capability_required(can_manage_content)
 def upload_link(request):
-    body = json.loads(request.body)
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"message": _("Invalid request format.")}, status=400)
     filename = body.get("filename", "")
+    if not isinstance(filename, str):
+        return JsonResponse({"message": _("Invalid file name.")}, status=400)
     
-    # Validate filename before generating presigned URL
-    is_valid, errors = validate_upload_filename(filename)
+    # Generated HLS objects use a separate, exact folder contract. Ordinary
+    # uploads retain the existing MP4/MP3/PDF validation.
+    if filename.lower().endswith((".m3u8", ".ts")):
+        is_valid, errors = validate_hls_object_key(filename)
+    else:
+        is_valid, errors = validate_upload_filename(filename)
     if not is_valid:
         return JsonResponse({
             "message": _("Invalid file"),
@@ -1378,6 +1779,318 @@ def upload_link(request):
     })
 
 # Quiz Dashboard
+@capability_required(can_view_reports)
+def promotion_formula(request):
+    scope_id = request.GET.get("scope") or request.POST.get("academic_year_level")
+    offering_id = request.GET.get("course_offering") or request.POST.get("course_offering")
+    selected_scope = None
+    if scope_id and str(scope_id).isdigit():
+        selected_scope = get_object_or_404(
+            AcademicYearLevel.objects.select_related("academic_year", "level"),
+            pk=scope_id,
+            academic_year__is_active=True,
+        )
+
+    selected_offering = None
+    if selected_scope and offering_id and str(offering_id).isdigit():
+        selected_offering = get_object_or_404(
+            CourseOffering.objects.select_related("course", "academic_year_level"),
+            pk=int(offering_id),
+            academic_year_level=selected_scope,
+            status=PublicationStatus.PUBLISHED,
+        )
+    formula = None
+    if selected_scope:
+        formula = PromotionFormula.objects.filter(
+            academic_year_level=selected_scope,
+            course_offering=selected_offering,
+        ).prefetch_related("rules").first()
+    preview_formula = formula
+    if request.method == "POST":
+        if not request.user.role or request.user.role.role != "admin":
+            raise PermissionDenied(_("Only administrators can save promotion formulas."))
+        formula_form = PromotionFormulaForm(request.POST)
+        rule_formset = PromotionRuleFormSet(request.POST, prefix="rules")
+        if formula_form.is_valid() and rule_formset.is_valid():
+            submitted_rules = [
+                form.cleaned_data
+                for form in rule_formset
+                if form.cleaned_data and not form.cleaned_data.get("DELETE")
+            ]
+            try:
+                rules = normalize_formula_rules(submitted_rules)
+            except ValidationError as exc:
+                formula_form.add_error(None, exc)
+                rules = []
+            if rules and request.POST.get("action") == "preview":
+                preview_formula = PromotionFormula(
+                    academic_year_level=formula_form.cleaned_data["academic_year_level"],
+                    course_offering=formula_form.cleaned_data["course_offering"],
+                    overall_pass_percent=formula_form.cleaned_data["overall_pass_percent"],
+                    evaluation_starts_on=formula_form.cleaned_data["evaluation_starts_on"],
+                    evaluation_ends_on=formula_form.cleaned_data["evaluation_ends_on"],
+                    failed_courses_repeat_threshold=formula_form.cleaned_data["failed_courses_repeat_threshold"],
+                )
+                preview_formula._preview_rules = tuple(
+                    PromotionRule(
+                        pk=100000000 + index,
+                        formula=preview_formula,
+                        metric=rule["metric"],
+                        quiz_type=rule.get("quiz_type"),
+                        weight_percent=rule["weight_percent"],
+                        minimum_percent=rule["minimum_percent"],
+                        ordering=index,
+                    )
+                    for index, rule in enumerate(rules, start=1)
+                )
+                messages.info(request, _("Preview generated without saving the formula or results."))
+            elif rules:
+                try:
+                    saved, _result_counts = save_formula_and_results(
+                        scope=formula_form.cleaned_data["academic_year_level"],
+                        course_offering=formula_form.cleaned_data["course_offering"],
+                        overall_pass_percent=formula_form.cleaned_data["overall_pass_percent"],
+                        evaluation_starts_on=formula_form.cleaned_data["evaluation_starts_on"],
+                        evaluation_ends_on=formula_form.cleaned_data["evaluation_ends_on"],
+                        failed_courses_repeat_threshold=formula_form.cleaned_data["failed_courses_repeat_threshold"],
+                        rules=rules,
+                        actor=request.user,
+                    )
+                    messages.success(request, _("Promotion formula and evaluation results saved."))
+                    query = f"scope={saved.academic_year_level_id}"
+                    if saved.course_offering_id:
+                        query += f"&course_offering={saved.course_offering_id}"
+                    return redirect(f"{reverse('promotion-formula')}?{query}")
+                except (ValidationError, PermissionDenied) as exc:
+                    formula_form.add_error(None, str(exc))
+    else:
+        if formula:
+            formula_form = PromotionFormulaForm(initial={
+                "academic_year_level": formula.academic_year_level_id,
+                "course_offering": formula.course_offering_id,
+                "overall_pass_percent": formula.overall_pass_percent,
+                "evaluation_starts_on": formula.evaluation_starts_on,
+                "evaluation_ends_on": formula.evaluation_ends_on,
+                "failed_courses_repeat_threshold": formula.failed_courses_repeat_threshold,
+            })
+            rule_formset = PromotionRuleFormSet(
+                prefix="rules",
+                initial=[{
+                    "metric": rule.metric,
+                    "quiz_type": rule.quiz_type_id,
+                    "weight_percent": rule.weight_percent,
+                    "minimum_percent": rule.minimum_percent,
+                } for rule in formula.rules.all()],
+            )
+        else:
+            initial_date = timezone.localdate()
+            if selected_scope:
+                initial_date = min(max(initial_date, selected_scope.academic_year.starts_on), selected_scope.academic_year.ends_on)
+            formula_form = PromotionFormulaForm(initial={
+                "academic_year_level": selected_scope.pk if selected_scope else None,
+                "course_offering": selected_offering.pk if selected_offering else None,
+                "overall_pass_percent": 50,
+                "evaluation_starts_on": selected_scope.academic_year.starts_on if selected_scope else initial_date,
+                "evaluation_ends_on": initial_date,
+                "failed_courses_repeat_threshold": 3,
+            })
+            rule_formset = PromotionRuleFormSet(prefix="rules", initial=[{
+                "metric": PromotionRule.Metric.QUIZ,
+                "weight_percent": 100,
+                "minimum_percent": 50,
+            }])
+
+    preview_rows = None
+    preview_page_obj = None
+    preview_grading_errors = ()
+    results_page_obj = None
+    result_search = request.GET.get("result_search", "").strip()
+    result_computed_status = request.GET.get("computed_status", "")
+    result_final_status = request.GET.get("final_status", "")
+    result_override = request.GET.get("override", "")
+    result_study_mode = request.GET.get("study_mode", "")
+    result_grading_errors = request.GET.get("grading_errors", "")
+    preview_search = request.GET.get("search", "").strip()
+    preview_offering_id = request.GET.get("preview_offering") or offering_id
+    preview_offering = None
+    if preview_formula:
+        if preview_formula.course_offering_id:
+            preview_offering = preview_formula.course_offering
+        elif preview_offering_id and str(preview_offering_id).isdigit():
+            preview_offering = CourseOffering.objects.filter(
+                pk=int(preview_offering_id),
+                academic_year_level=preview_formula.academic_year_level,
+                status=PublicationStatus.PUBLISHED,
+            ).select_related("course").first()
+    if preview_formula:
+        from django.core.paginator import Paginator
+        plan = build_evaluation_plan(
+            preview_formula,
+            getattr(preview_formula, "_preview_rules", None),
+            course_offering=preview_offering,
+        ) if preview_offering else None
+        enrollments = evaluation_enrollments(plan) if plan else Enrollment.objects.none()
+        if preview_search:
+            enrollments = enrollments.filter(
+                Q(student__username__icontains=preview_search)
+                | Q(student__first_name__icontains=preview_search)
+                | Q(student__last_name__icontains=preview_search)
+                | Q(student__email__icontains=preview_search)
+            )
+        enrollments = enrollments.order_by("student__last_name", "student__first_name", "student__username")
+        preview_page_obj = Paginator(enrollments, 25).get_page(request.GET.get("page", 1))
+        preview_rows = [evaluate_enrollment(enrollment, plan) for enrollment in preview_page_obj] if plan else []
+        preview_grading_errors = plan.grading_errors if plan else ()
+        from django.core.paginator import Paginator
+        saved_results = EvaluationResult.objects.filter(
+            formula=formula,
+            course_offering__isnull=formula.course_offering_id is None,
+        ).select_related(
+            "enrollment__student", "enrollment__academic_year_level__level", "overridden_by", "promotion_history"
+        ).order_by("enrollment__student__last_name", "enrollment__student__first_name", "enrollment__student__username")
+        if result_search:
+            saved_results = saved_results.filter(
+                Q(enrollment__student__username__icontains=result_search)
+                | Q(enrollment__student__first_name__icontains=result_search)
+                | Q(enrollment__student__last_name__icontains=result_search)
+                | Q(enrollment__student__email__icontains=result_search)
+            )
+        if result_computed_status in EvaluationResult.Status.values:
+            saved_results = saved_results.filter(computed_status=result_computed_status)
+        if result_final_status in EvaluationResult.Status.values:
+            saved_results = saved_results.filter(final_status=result_final_status)
+        if result_override == "overridden":
+            saved_results = saved_results.filter(overridden_by__isnull=False)
+        elif result_override == "not_overridden":
+            saved_results = saved_results.filter(overridden_by__isnull=True)
+        if result_study_mode in ("online", "offline"):
+            saved_results = saved_results.filter(enrollment__student__study_mode=result_study_mode)
+        if result_grading_errors == "yes":
+            saved_results = saved_results.filter(metric_snapshot__grading_errors__0__isnull=False)
+        elif result_grading_errors == "no":
+            saved_results = saved_results.filter(metric_snapshot__grading_errors__0__isnull=True)
+        results_page_obj = (
+            Paginator(saved_results, 25).get_page(request.GET.get("result_page", 1))
+            if formula else None
+        )
+
+    return render(request, "promotion_evaluation.html", {
+        "formula_form": formula_form,
+        "rule_formset": rule_formset,
+        "selected_scope": selected_scope,
+        "selected_offering": selected_offering,
+        "selected_offering_id": selected_offering.pk if selected_offering else None,
+        "course_offerings": CourseOffering.objects.filter(
+            academic_year_level=selected_scope,
+            status=PublicationStatus.PUBLISHED,
+        ).select_related("course").order_by("course__name", "pk") if selected_scope else CourseOffering.objects.none(),
+        "scopes": AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by(
+            "academic_year__ordering", "level__ordering"
+        ),
+        "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
+        "preview_rows": preview_rows,
+        "preview_page_obj": preview_page_obj,
+        "preview_search": preview_search,
+        "preview_scope_id": selected_scope.pk if selected_scope else None,
+        "preview_offering": preview_offering,
+        "preview_offering_id": preview_offering.pk if preview_offering else None,
+        "preview_grading_errors": preview_grading_errors,
+        "results_page_obj": results_page_obj,
+        "result_search": result_search,
+        "result_computed_status": result_computed_status,
+        "result_final_status": result_final_status,
+        "result_override": result_override,
+        "result_study_mode": result_study_mode,
+        "result_grading_errors": result_grading_errors,
+        "is_formula_admin": bool(request.user.role and request.user.role.role == "admin"),
+        "is_aggregate_formula": bool(formula and formula.course_offering_id is None),
+    })
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def evaluation_result_override(request, result_id):
+    result = get_object_or_404(EvaluationResult.objects.select_related("formula"), pk=result_id)
+    final_status = request.POST.get("final_status", "")
+    note = request.POST.get("override_note", "")
+    try:
+        override_evaluation_result(
+            result_id=result.id,
+            final_status=final_status,
+            note=note,
+            actor=request.user,
+        )
+        messages.success(request, _("Evaluation result override saved."))
+    except (ValidationError, ValueError, PermissionError) as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('promotion-formula')}?scope={result.formula.academic_year_level_id}")
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def promotion_result(request, result_id):
+    result = get_object_or_404(
+        EvaluationResult.objects.select_related("formula__academic_year_level"), pk=result_id
+    )
+    try:
+        promote_evaluation_result(
+            result_id=result.pk,
+            actor=request.user,
+        )
+        messages.success(request, _("Student promotion was recorded."))
+    except (ValidationError, PermissionDenied, ValueError) as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('promotion-formula')}?scope={result.formula.academic_year_level_id}")
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def bulk_promotion_results(request):
+    result_ids = [value for value in request.POST.getlist("result_ids") if value.isdigit()]
+    try:
+        histories, errors = promote_evaluation_results(result_ids=[int(value) for value in result_ids], actor=request.user)
+    except (ValidationError, PermissionDenied) as exc:
+        messages.error(request, str(exc))
+        histories, errors = [], []
+    if histories:
+        messages.success(request, _("%(count)d student promotion(s) were recorded.") % {"count": len(histories)})
+    if errors:
+        messages.error(request, _("%(count)d promotion(s) could not be recorded.") % {"count": len(errors)})
+    scope_id = request.POST.get("scope", "")
+    return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
+
+
+@capability_required(can_view_reports)
+def promotion_history(request):
+    from django.core.paginator import Paginator
+
+    history = PromotionHistory.objects.select_related(
+        "student",
+        "source_year_level__academic_year",
+        "source_year_level__level",
+        "destination_year_level__academic_year",
+        "destination_year_level__level",
+        "actor",
+    ).order_by("-created_at", "-pk")
+    search = request.GET.get("search", "").strip()
+    outcome = request.GET.get("outcome", "")
+    if search:
+        history = history.filter(
+            Q(student__username__icontains=search)
+            | Q(student__first_name__icontains=search)
+            | Q(student__last_name__icontains=search)
+            | Q(student__email__icontains=search)
+        )
+    if outcome in {"passed", "passed_with_exceptions", "repeated", "graduated", "last_level_exceptional"}:
+        history = history.filter(outcome=outcome)
+    page_obj = Paginator(history, 25).get_page(request.GET.get("page", 1))
+    return render(request, "promotion_history.html", {
+        "page_obj": page_obj,
+        "search": search,
+        "outcome": outcome,
+    })
+
+
 @capability_required(can_manage_content)
 def quiz_dashboard(request):   
     name = request.GET.get("name", None)
@@ -1385,17 +2098,21 @@ def quiz_dashboard(request):
     course = request.GET.get("course", None)
     user = request.user
     view = "quiz"
-    query = Q(course__isnull=False)
+    query = Q(course_offering__isnull=False)
     if name:
         query &= Q(name__icontains=name)
     if year:
-        for key, val in Course.get_levels_name().items():
-            if val == year:
-                query &= Q(course__level=key)
+        for level_obj in Level.objects.order_by("ordering"):
+            if level_obj.display_name == year:
+                query &= Q(course_offering__course__level__ordering=level_obj.ordering)
     if course:
-        course_obj = Course.objects.filter(name=course).first()
-        query &= Q(course=course_obj)
-    quizzes = Quiz.objects.filter(query)
+        query &= Q(course_offering_id=course) if course.isdigit() else Q(pk__in=[])
+    quizzes = Quiz.objects.filter(query).select_related(
+        "course_offering__course",
+        "course_offering__academic_year_level__level",
+        "course_offering__academic_year_level__academic_year",
+        "quiz_type",
+    )
     
     logger.info(f"User : {user} filters users using {name} name and {year} level and {course} course")
 
@@ -1406,8 +2123,8 @@ def quiz_dashboard(request):
         "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Quiz.get_columns(),
-        "options" : [_("Choose Academic Year"), *list(Course.get_levels_name().values())],
-        "subjects" : [_("Choose Course"), *[value for value in Course.objects.values_list("name", flat=True)]],
+        "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
+        "subjects" : _content_offering_filter_options(),
         "filters" : ["course_filter.html"],
         "submission_view" : True,
     }
@@ -1417,31 +2134,47 @@ def quiz_dashboard(request):
 @capability_required(can_manage_content)
 def create_quiz(request):
     if request.method == "GET":
-        courses = [course.name for course in Course.objects.all()]
-        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
+        course_offerings = CourseOffering.objects.filter(
+            academic_year_level__academic_year__is_active=True
+        ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
 
         return render(request, "quiz_form.html", {
-            "courses" : courses,
             "course_offerings" : course_offerings,
+            "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
             "question_types" : Question.QUESTION_TYPES,
             "questions" : request.session.pop("questions", []),
-            **request.session.pop("quiz", {})
+            **request.session.pop("quiz", {}),
+            "content_status" : PublicationStatus.DRAFT,
+            "content_status_display" : PublicationStatus.DRAFT.label,
+            "publication_statuses" : PublicationStatus.choices,
         })
     elif request.method == "POST":
+        publication_status = _requested_publication_status(request)
+        if publication_status is None:
+            return HttpResponse(_("Invalid publication status."), status=400)
         questions, quiz = unpack_quiz_form(request.POST)
 
         try:
-            # Course
-            course = get_object_or_404(Course, name=quiz.get("course", ""))
             opening_date = get_datetime(quiz.get("opening_date", ""))
             closing_date = get_datetime(quiz.get("closing_date", ""))
             
             offering_id = request.POST.get("course_offering")
-            if offering_id:
-                course_offering = get_object_or_404(CourseOffering, pk=offering_id)
-            else:
-                course_offering = CourseOffering.objects.filter(course=course, academic_year__is_current=True).first()
-            quiz = Quiz(name=quiz.get("quiz_name", ""), course=course, course_offering=course_offering, total_grade=quiz.get("total_grade", 0), opening_date=opening_date, closing_date=closing_date)
+            course_offering = get_object_or_404(
+                CourseOffering,
+                pk=offering_id,
+                academic_year_level__academic_year__is_active=True,
+            )
+            quiz_type_id = request.POST.get("quiz_type")
+            quiz_type = get_object_or_404(QuizType, pk=quiz_type_id, code__in=QUIZ_TYPE_CODES)
+            quiz = Quiz(
+                name=quiz.get("quiz_name", ""),
+                quiz_type=quiz_type,
+                course_offering=course_offering,
+                status=publication_status,
+                total_grade=quiz.get("total_grade", 0),
+                opening_date=opening_date,
+                closing_date=closing_date,
+            )
             # Create Questions
             raise_exception = False
             exceptions_messages = []
@@ -1470,57 +2203,73 @@ def create_quiz(request):
                 quiz.save()
                 Question.objects.bulk_create(questions_obj)
 
-                logger.info(f"Quiz {quiz.name} is added in course {course.name} with {len(questions_obj)} questions")
+                logger.info(
+                    "Quiz %s is added in offering %s with %s questions",
+                    quiz.name,
+                    course_offering.pk,
+                    len(questions_obj),
+                )
                 success(request, _("Quiz is created successfully"), extra_tags="alert-success") # Translate
 
         except Http404:
             error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
-            logger.error(f"Course {questions.get('course', '')} is not found to create a quiz!")
+            logger.error("Offering %s is not found to create a quiz!", request.POST.get("course_offering"))
         
         except Exception as e:
             error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
 
             logger.error(f"Create Quiz has failed : {e}")
 
-
         return redirect(reverse("quiz-create"))
 
 @capability_required(can_manage_content)
 def update_quiz(request, quiz_id):
     if request.method == "GET":
-        courses = [course.name for course in Course.objects.all()]
-        course_offerings = CourseOffering.objects.filter(academic_year__is_current=True).select_related('course', 'academic_year')
         try:
             quiz = get_object_or_404(Quiz, pk=quiz_id)
+            course_offerings = CourseOffering.objects.filter(
+                Q(academic_year_level__academic_year__is_active=True) | Q(pk=quiz.course_offering_id)
+            ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
             return render(request, "quiz_form.html", {
-                "courses" : courses,
                 "course_offerings" : course_offerings,
                 "selected_offering_id" : quiz.course_offering_id,
+                "selected_quiz_type_id" : quiz.quiz_type_id,
+                "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
                 "question_types" : Question.QUESTION_TYPES,
                 "questions" : [question.serialize() for question in quiz.questions.all()],
-                **quiz.serialize()
+                **quiz.serialize(),
+                "content_status" : quiz.status,
+                "content_status_display" : quiz.get_status_display(),
+                "publication_statuses" : PublicationStatus.choices,
             })
         except Http404:
             logger.error(f"Quiz with id : {quiz_id} is not found!")
             return redirect(reverse("quiz-dashboard"))
 
     elif request.method == "POST":
+        publication_status = _requested_publication_status(request)
+        if publication_status is None:
+            return HttpResponse(_("Invalid publication status."), status=400)
         questions, quiz_data = unpack_quiz_form(request.POST)
         try:
-            # Course
-            course = get_object_or_404(Course, name=quiz_data['course'])
-
             # Update Quiz
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             if not quiz.can_edit:
-                return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                if publication_status == quiz.status:
+                    return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                quiz.status = publication_status
+                quiz.save(update_fields=["status"])
+                success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
+                return redirect(reverse("quiz-update", args=[quiz_id]))
             quiz.name = quiz_data['quiz_name']
             quiz.opening_date = get_datetime(quiz_data['opening_date'])
             quiz.closing_date = get_datetime(quiz_data['closing_date'])
             quiz.total_grade = quiz_data['total_grade']
-            quiz.course = course
+            quiz.status = publication_status
+            quiz_type_id = request.POST.get("quiz_type")
+            quiz.quiz_type = get_object_or_404(QuizType, pk=quiz_type_id, code__in=QUIZ_TYPE_CODES)
             offering_id = request.POST.get("course_offering")
-            quiz.course_offering = get_object_or_404(CourseOffering, pk=offering_id, course=course)
+            quiz.course_offering = get_object_or_404(CourseOffering, pk=offering_id)
 
             # Create Questions
             questions_obj = []
@@ -1550,12 +2299,18 @@ def update_quiz(request, quiz_id):
                 Question.objects.bulk_create(questions_obj)
                 quiz.save()
 
-            logger.info(f"Quiz {quiz.name} is updated successfully in course {course.name} with new {len(questions_obj)} questions and existing {len(questions_exists)} questions")
+            logger.info(
+                "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",
+                quiz.name,
+                offering_id,
+                len(questions_obj),
+                len(questions_exists),
+            )
             success(request, _("Quiz is updated successfully"), extra_tags="alert-success") # Translate
 
         except Http404:
             error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
-            logger.error(f"Course {quiz_data['course']} or Quiz with id {quiz_id} is not found ")
+            logger.error("Offering or Quiz with id %s was not found", quiz_id)
 
         except Exception as e:
             error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
@@ -1568,7 +2323,7 @@ class DeleteQuiz(QuizBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=401)
+            return HttpResponse(_("Unauthorized"), status=403)
         return super(QuizBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 
@@ -1576,7 +2331,6 @@ class DeleteQuiz(QuizBaseView, DeleteView):
 @capability_required(can_grade)
 def export_quiz_submissions_csv(request, quiz_id):
     return export_quiz_with_submissions_to_csv(quiz_id)
-
 
 @capability_required(can_grade)
 def export_quiz_summary_csv(request, quiz_id):
@@ -1586,7 +2340,6 @@ def export_quiz_summary_csv(request, quiz_id):
 def export_submission_csv(request, grade_id):
     return export_single_submission_to_csv(grade_id)
 
-
 @capability_required(can_view_reports)
 def export_yearly_transcript_csv(request):
     year = request.GET.get("year", now().year)
@@ -1595,7 +2348,6 @@ def export_yearly_transcript_csv(request):
     role = request.GET.get("role") or None
     return export_yearly_transcript_to_csv(year, name=name, course=course, role=role)
 
-
 @capability_required(can_view_reports)
 def yearly_transcript_dashboard(request):
     year = request.GET.get("year", now().year)
@@ -1603,18 +2355,40 @@ def yearly_transcript_dashboard(request):
     course = request.GET.get("course", "").strip()
     role = request.GET.get("role", "").strip()
 
-    transcript = build_yearly_transcript_rows(year, name=name or None, course=course or None, role=role or None)
+    from django.core.paginator import Paginator
+    transcript_query = yearly_transcript_queryset(year, name=name or None, course=course or None, role=role or None)
+    transcript_page = Paginator(transcript_query, 25).get_page(request.GET.get("page", 1))
+    transcript_rows = [
+        {
+            "user_id": grade.user_id,
+            "username": grade.user.username,
+            "first_name": grade.user.first_name,
+            "last_name": grade.user.last_name,
+            "course_name": grade.quiz.course_offering.course.name,
+            "quiz_name": grade.quiz.name,
+            "quiz_grade": grade.total_grade,
+            "quiz_total": grade.quiz.total_grade,
+            "course_accumulated_grade": grade.course_accumulated_grade,
+            "course_accumulated_total": grade.course_accumulated_total,
+            "overall_accumulated_grade": grade.overall_accumulated_grade,
+            "overall_accumulated_total": grade.overall_accumulated_total,
+            "submitted_at_display": grade.submitted_at.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        for grade in transcript_page
+    ]
+    student_count = transcript_query.values("user_id").distinct().count()
 
     context = {
         "title": _("Yearly Transcript"),
-        "year_value": transcript["year"],
+        "year_value": int(year) if str(year).isdigit() else now().year,
         "name_value": name,
         "course_value": course,
         "selected_role": role,
         "role_options": Role.ROLES,
-        "transcript_rows": transcript["rows"],
-        "student_count": len({row["user_id"] for row in transcript["rows"]}),
-        "result_count": len(transcript["rows"]),
+        "transcript_rows": transcript_rows,
+        "transcript_page_obj": transcript_page,
+        "student_count": student_count,
+        "result_count": transcript_page.paginator.count,
     }
 
     return render(request, "yearly_transcript_dashboard.html", context)
@@ -1735,10 +2509,13 @@ def submission_user(request, quiz_id, user_id):
         return HttpResponse(_("Not allowed method"), 400) # Translate
 
 @login_required(login_url=LOGIN_URL)
-def generate_audio_download(request, lesson_id):
+def generate_audio_download(request, offering_id, lesson_id):
     try:
-        # Fetch the lesson object
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
+        user = User.objects.get(pk=request.user.pk)
+        offering = get_accessible_offering_or_403(user, offering_id)
+        lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
+        if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
+            raise PermissionDenied(_("You do not have access to this lesson."))
 
         # Extract the m3u8 file URL from the lesson links
         m3u8_url = lesson.links
@@ -1746,7 +2523,7 @@ def generate_audio_download(request, lesson_id):
         # Fetch the m3u8 file content
         response = requests.get(m3u8_url)
         if response.status_code != 200:
-            return JsonResponse({"error": "Failed to fetch m3u8 file."}, status=500)
+            return JsonResponse({"error": _("Failed to fetch m3u8 file.")}, status=500)
 
         # Parse the m3u8 file to extract .ts file URLs
         ts_files = []
@@ -1760,7 +2537,7 @@ def generate_audio_download(request, lesson_id):
 
     except Exception as e:
         logger.error(f"Error generating audio download: {str(e)}")
-        return JsonResponse({"error": "An error occurred while processing the request."}, status=500)
+        return JsonResponse({"error": _("An error occurred while processing the request.")}, status=500)
 
 # Bulk Operations
 @capability_required(can_delete_content)
@@ -1770,7 +2547,7 @@ def bulk_delete_users(request):
         return HttpResponse(_("Method not allowed"), status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         ids = data.get('ids', [])
         
@@ -1792,7 +2569,7 @@ def bulk_delete_courses(request):
         return HttpResponse(_("Method not allowed"), status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         ids = data.get('ids', [])
         
@@ -1814,7 +2591,7 @@ def bulk_delete_lessons(request):
         return HttpResponse(_("Method not allowed"), status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         ids = data.get('ids', [])
         
@@ -1836,7 +2613,7 @@ def bulk_delete_quizzes(request):
         return HttpResponse(_("Method not allowed"), status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         ids = data.get('ids', [])
         
@@ -1851,7 +2628,6 @@ def bulk_delete_quizzes(request):
         logger.error(f"Bulk delete error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 # ============================================================================
 # R2 FILE MANAGEMENT API ENDPOINTS
 # ============================================================================
@@ -1865,7 +2641,7 @@ def api_delete_file(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         file_key = data.get('file_key')
         
@@ -1891,7 +2667,6 @@ def api_delete_file(request):
         logger.error(f"Error deleting file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_delete_content)
 def api_delete_m3u8_file(request):
     """
@@ -1901,7 +2676,7 @@ def api_delete_m3u8_file(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         file_key = data.get('file_key')
         
@@ -1928,7 +2703,6 @@ def api_delete_m3u8_file(request):
         logger.error(f"Error deleting m3u8 file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_delete_content)
 def api_delete_files_batch(request):
     """
@@ -1938,7 +2712,7 @@ def api_delete_files_batch(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         file_keys = data.get('file_keys', [])
         
@@ -1962,7 +2736,6 @@ def api_delete_files_batch(request):
         logger.error(f"Error in batch delete: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_manage_content)
 def api_rename_file(request):
     """
@@ -1972,7 +2745,7 @@ def api_rename_file(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         old_key = data.get('old_key')
         new_key = data.get('new_key')
@@ -2008,7 +2781,6 @@ def api_rename_file(request):
         logger.error(f"Error renaming file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_manage_content)
 def api_move_file(request):
     """
@@ -2018,7 +2790,7 @@ def api_move_file(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         file_key = data.get('file_key')
         destination_folder = data.get('destination_folder')
@@ -2039,7 +2811,6 @@ def api_move_file(request):
         logger.error(f"Error moving file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_manage_content)
 def api_create_folder(request):
     """
@@ -2049,7 +2820,7 @@ def api_create_folder(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         folder_path = data.get('folder_path')
         
@@ -2068,7 +2839,6 @@ def api_create_folder(request):
         logger.error(f"Error creating folder: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_delete_content)
 def api_delete_folder(request):
     """
@@ -2078,7 +2848,7 @@ def api_delete_folder(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
     
     try:
-        import json
+
         data = json.loads(request.body)
         folder_path = data.get('folder_path')
         recursive = data.get('recursive', False)
@@ -2106,7 +2876,6 @@ def api_delete_folder(request):
     except Exception as e:
         logger.error(f"Error deleting folder: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
 
 @capability_required(can_manage_content)
 def api_get_file_metadata(request):
@@ -2137,7 +2906,6 @@ def api_get_file_metadata(request):
         logger.error(f"Error getting file metadata: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_manage_content)
 def api_get_storage_stats(request):
     """
@@ -2166,7 +2934,6 @@ def api_get_storage_stats(request):
     except Exception as e:
         logger.error(f"Error getting storage stats: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
 
 @capability_required(can_manage_content)
 def api_search_files(request):
@@ -2201,9 +2968,7 @@ def api_search_files(request):
         logger.error(f"Error searching files: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
-@login_required(login_url=LOGIN_URL)
-def api_quiz_status(request, course_id):
+def api_quiz_status(request, offering_id):
     """
     API endpoint – returns quiz mode/status for every quiz in a course
     for the requesting user. Used by the course-detail sidebar to show
@@ -2211,15 +2976,15 @@ def api_quiz_status(request, course_id):
 
     Response: { "quizzes": [ { "id": int, "status": "exam"|"view"|"closed_unsolved" }, ... ] }
     """
-    try:
-        user = User.objects.get(username=request.user)
-        course = get_object_or_404(Course, pk=course_id)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": _("Authentication required")}, status=401)
 
-        if not user_can_access_course(user, course):
-            return JsonResponse({"error": "Unauthorized"}, status=401)
+    try:
+        user = User.objects.get(pk=request.user.pk)
+        offering = get_accessible_offering_or_403(user, offering_id)
 
         current_time = now()
-        quizzes = course.quizzes.all()
+        quizzes = offering.quizzes.all() if user_has_management_role(user) else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
         result = []
 
         for quiz in quizzes:
@@ -2232,7 +2997,6 @@ def api_quiz_status(request, course_id):
     except Exception as e:
         logger.error(f"api_quiz_status error: {e}")
         return JsonResponse({"error": str(e)}, status=500)
-
 
 @capability_required(can_manage_content)
 def api_list_files(request):
@@ -2276,7 +3040,6 @@ def api_list_files(request):
         logger.error(f"Error listing files: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-
 @capability_required(can_manage_content)
 def api_download_file(request):
     """
@@ -2297,7 +3060,6 @@ def api_download_file(request):
     except Exception as e:
         logger.error(f"Error generating download URL: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
 
 # ============================================================================
 # R2 MANAGEMENT DASHBOARD VIEW
@@ -2372,7 +3134,6 @@ def r2_management_dashboard(request):
     
     return render(request, 'r2_management.html', context)
 
-
 # ============================================================================
 # PHASE 3 — Student Applications
 # ============================================================================
@@ -2412,7 +3173,6 @@ def signup(request):
         form = SignupForm()
     return render(request, "signup.html", {"form": form})
 
-
 @capability_required(can_manage_applications)
 def applications_dashboard(request):
     from django.core.paginator import Paginator
@@ -2434,9 +3194,8 @@ def applications_dashboard(request):
     return render(request, "applications_dashboard.html", {
         "page_obj": page_obj,
         "current_status": status_filter,
-        "COURSE_LEVELS": Course.get_levels_name().items(),
+        "COURSE_LEVELS": Level.objects.order_by("ordering"),
     })
-
 
 @capability_required(can_manage_applications)
 def application_review(request, user_id):
@@ -2451,9 +3210,8 @@ def application_review(request, user_id):
     return render(request, "application_review.html", {
         "app_user": user,
         "doc_urls": doc_urls,
-        "COURSE_LEVELS": Course.get_levels_name().items(),
+        "COURSE_LEVELS": Level.objects.order_by("ordering"),
     })
-
 
 @capability_required(can_manage_applications)
 def application_decision(request, user_id, decision):
@@ -2461,112 +3219,58 @@ def application_decision(request, user_id, decision):
         return HttpResponse(_("Invalid decision"), status=400)
     if request.method != "POST":
         return HttpResponse(_("Method not allowed"), status=405)
-    level = request.POST.get("level", 1)
-    try:
-        level = int(level)
-    except (TypeError, ValueError):
-        level = 1
     user = get_object_or_404(User, pk=user_id)
 
-    if user.application_status == "active" and decision == "activate":
-        messages.info(request, _("%(name)s is already active.") % {"name": user.get_full_name() or user.username})
-        return redirect("applications-dashboard")
-
-    if user.application_status == "declined" and decision == "decline":
-        messages.info(request, _("%(name)s is already declined.") % {"name": user.get_full_name() or user.username})
-        return redirect("applications-dashboard")
-
-    if user.application_status != "pending":
-        return HttpResponse(
-            _("Cannot decide on a %(status)s application.") % {"status": user.application_status},
-            status=400,
-        )
-
-    with transaction.atomic():
+    try:
         if decision == "activate":
-            current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
-            if not current_year:
-                return HttpResponse(
-                    _("No current academic year exists for level %(level)d.") % {"level": level},
-                    status=400,
-                )
-            user.application_status = "active"
-            user.is_active = True
-            student_role = Role.objects.get(role="student")
-            user.role = student_role
-            user.decided_by = request.user
-            user.decided_at = now()
-            user.save()
-            Enrollment.objects.get_or_create(
-                student=user,
-                academic_year=current_year,
-                defaults={"enrolled_by": request.user, "level": level}
-            )
+            user, _enrollment = accept_application(user, request.user)
             send_application_activated(user)
             messages.success(request, _("%(name)s activated.") % {"name": user.get_full_name() or user.username})
         else:
-            user.application_status = "declined"
-            user.is_active = False
-            user.decided_by = request.user
-            user.decided_at = now()
-            user.save()
+            user = decline_application(user, request.user)
             send_application_declined(user)
             messages.success(request, _("%(name)s declined.") % {"name": user.get_full_name() or user.username})
+    except (ValidationError, PermissionDenied) as exc:
+        message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)
+        messages.error(request, message)
     return redirect("applications-dashboard")
-
 
 @capability_required(can_manage_applications)
 def bulk_application_decision(request):
     if request.method != "POST":
         return JsonResponse({"error": _("Method not allowed")}, status=405)
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": _("Invalid JSON")}, status=400)
     decision = data.get("decision")
     user_ids = data.get("user_ids", [])
     if data.get("select_all"):
         status = data.get("status", "pending")
-        user_ids = User.objects.filter(application_status=status).values_list("id", flat=True)
-    level = int(data.get("level", 1))
+        user_ids = list(User.objects.filter(application_status=status).values_list("id", flat=True)[:1000])
+    elif not isinstance(user_ids, list):
+        return JsonResponse({"error": _("user_ids must be a list.")}, status=400)
+    user_ids = user_ids[:1000]
     if decision not in ("activate", "decline"):
         return JsonResponse({"error": _("Invalid decision")}, status=400)
     results = {"success": [], "errors": []}
     for uid in user_ids:
         try:
             user = User.objects.get(pk=uid)
-            if user.application_status == "active" and decision == "activate":
-                results["success"].append(uid)
-                continue
-            if user.application_status == "declined" and decision == "decline":
-                results["success"].append(uid)
-                continue
-            if user.application_status != "pending":
-                results["errors"].append({"id": uid, "error": _("Cannot decide on a %(status)s application.") % {"status": user.application_status}})
-                continue
-            with transaction.atomic():
-                if decision == "activate":
-                    current_year = AcademicYear.objects.filter(is_current=True, level=level).first()
-                    if not current_year:
-                        results["errors"].append({"id": uid, "error": _("No current academic year for level %(level)d.") % {"level": level}})
-                        continue
-                    user.application_status = "active"
-                    user.is_active = True
-                    user.role = Role.objects.get(role="student")
-                    user.decided_by = request.user
-                    user.decided_at = now()
-                    user.save()
-                    Enrollment.objects.get_or_create(student=user, academic_year=current_year, defaults={"enrolled_by": request.user, "level": level})
-                    send_application_activated(user)
-                else:
-                    user.application_status = "declined"
-                    user.is_active = False
-                    user.decided_by = request.user
-                    user.decided_at = now()
-                    user.save()
-                    send_application_declined(user)
-                results["success"].append(uid)
-        except Exception as e:
-            results["errors"].append({"id": uid, "error": str(e)})
+            if decision == "activate":
+                user, _enrollment = accept_application(user, request.user)
+                send_application_activated(user)
+            else:
+                user = decline_application(user, request.user)
+                send_application_declined(user)
+            results["success"].append(uid)
+        except (ValidationError, PermissionDenied) as exc:
+            message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)
+            results["errors"].append({"id": uid, "error": message})
+        except Exception as exc:
+            logger.exception("Application decision failed for user %s", uid)
+            results["errors"].append({"id": uid, "error": str(exc)})
     return JsonResponse(results)
-
 
 @require_POST
 @capability_required(can_manage_content)
@@ -2577,13 +3281,11 @@ def duplicate_lesson(request, lesson_id):
     with transaction.atomic():
         lesson.pk = None
         lesson.course_offering = target_offering
-        lesson.course = target_offering.course
         lesson.status = PublicationStatus.DRAFT
         lesson.created_date = date.today()
         lesson.save()
     messages.success(request, _("Lesson duplicated."))
     return redirect("lesson-dashboard")
-
 
 @require_POST
 @capability_required(can_manage_content)
@@ -2595,7 +3297,6 @@ def duplicate_quiz(request, quiz_id):
         questions = list(quiz.questions.all())
         quiz.pk = None
         quiz.course_offering = target_offering
-        quiz.course = target_offering.course
         quiz.status = PublicationStatus.DRAFT
         quiz.save()
         for q in questions:
@@ -2605,149 +3306,234 @@ def duplicate_quiz(request, quiz_id):
     messages.success(request, _("Quiz duplicated."))
     return redirect("quiz-dashboard")
 
-
 @require_POST
-@capability_required(can_manage_content)
-def copy_course_offering(request, offering_id):
-    offering = get_object_or_404(CourseOffering, pk=offering_id)
-    target_year_id = request.POST.get("academic_year_id")
-    target_year = get_object_or_404(AcademicYear, pk=target_year_id) if target_year_id else offering.academic_year
-    with transaction.atomic():
-        new_offering = CourseOffering.objects.create(
-            course=offering.course,
-            academic_year=target_year,
-            instructor=offering.instructor,
-            status="draft",
-        )
-        for lesson in offering.lessons.all():
-            lesson.pk = None
-            lesson.course_offering = new_offering
-            lesson.status = PublicationStatus.DRAFT
-            lesson.save()
-        for quiz in offering.quizzes.all():
-            questions = list(quiz.questions.all())
-            quiz.pk = None
-            quiz.course_offering = new_offering
-            quiz.status = PublicationStatus.DRAFT
-            quiz.save()
-            for q in questions:
-                q.pk = None
-                q.quiz = quiz
-            Question.objects.bulk_create(questions)
-    messages.success(request, _("Course offering copied."))
-    return redirect("course-dashboard")
-
+@capability_required(can_manage_academic_setup)
+def copy_course_offerings(request):
+    form = OfferingCopyForm(request.POST)
+    if form.is_valid():
+        try:
+            copied = copy_offerings(
+                form.cleaned_data["source_year_level"],
+                form.cleaned_data["target_year_level"],
+                list(form.cleaned_data["offerings"].values_list("pk", flat=True)),
+                copy_lessons=form.cleaned_data["copy_lessons"],
+                copy_quizzes=form.cleaned_data["copy_quizzes"],
+                actor=request.user,
+            )
+            messages.success(request, _("Copied %(count)d offering(s) as drafts.") % {"count": len(copied)})
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, str(exc))
+    else:
+        for error in form.non_field_errors():
+            messages.error(request, error)
+        for field_errors in form.errors.values():
+            for error in field_errors:
+                messages.error(request, error)
+    target = request.POST.get("target_year_level")
+    return redirect(f"{reverse('academic-setup')}?scope={target}" if target else "academic-setup")
 
 @capability_required(can_manage_content)
 def levels_dashboard(request):
-    levels = (
-        AcademicYear.objects.values("level")
-        .annotate(
-            year_count=Count("id"),
-            offering_count=Count("course_offerings", distinct=True),
-        )
-        .order_by("level")
+    levels = Level.objects.order_by("ordering").annotate(
+        year_count=Count("year_links__academic_year", distinct=True),
+        offering_count=Count("year_links__course_offerings", distinct=True),
+        course_count=Count("courses", distinct=True),
+        enrollment_count=Count("year_links__enrollments", distinct=True),
     )
     level_list = []
     for entry in levels:
-        lvl = entry["level"]
-        ln = LevelName.objects.filter(level=lvl).first()
         level_list.append({
-            "level": lvl,
-            "name": Course.get_level_name(lvl),
-            "name_en": ln.name_en if ln else "",
-            "name_ar": ln.name_ar if ln else "",
-            "year_count": entry["year_count"],
-            "offering_count": entry["offering_count"],
-            "course_count": Course.objects.filter(level=lvl).count(),
-            "enrollment_count": Enrollment.objects.filter(level=lvl).count(),
+            "level": entry.ordering,
+            "name": entry.display_name,
+            "name_en": entry.name_en,
+            "name_ar": entry.name_ar,
+            "year_count": entry.year_count,
+            "offering_count": entry.offering_count,
+            "course_count": entry.course_count,
+            "enrollment_count": entry.enrollment_count,
         })
     return render(request, "levels.html", {
         "levels": level_list,
     })
 
-
 @require_POST
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def level_create(request):
     try:
-        level = int(request.POST.get("level", 0))
+        ordering = int(request.POST.get("level", 0))
     except (TypeError, ValueError):
-        level = 0
+        ordering = 0
     name_en = request.POST.get("name_en", "").strip()
     name_ar = request.POST.get("name_ar", "").strip()
-    if level < 1:
-        messages.error(request, _("Invalid level number."))
+    if ordering < 1:
+        messages.error(request, _("Invalid level ordering."))
         return redirect("levels-dashboard")
-    if LevelName.objects.filter(level=level).exists():
-        messages.error(request, _("Level %(level)d already exists.") % {"level": level})
+    if Level.objects.filter(ordering=ordering).exists():
+        messages.error(request, _("Level %(ordering)d already exists.") % {"ordering": ordering})
         return redirect("levels-dashboard")
-    LevelName.objects.create(level=level, name_en=name_en, name_ar=name_ar)
-    messages.success(request, _("Level %(level)d created.") % {"level": level})
+    Level.objects.create(ordering=ordering, name_en=name_en, name_ar=name_ar)
+    messages.success(request, _("Level %(ordering)d created.") % {"ordering": ordering})
     return redirect("levels-dashboard")
 
-
 @require_POST
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def level_edit(request, level):
-    name_en = request.POST.get("name_en", "").strip()
-    name_ar = request.POST.get("name_ar", "").strip()
-    entry, created = LevelName.objects.get_or_create(level=level)
-    entry.name_en = name_en
-    entry.name_ar = name_ar
+    try:
+        entry = Level.objects.get(ordering=level)
+    except Level.DoesNotExist:
+        messages.error(request, _("Level %(level)d not found.") % {"level": level})
+        return redirect("levels-dashboard")
+    entry.name_en = request.POST.get("name_en", "").strip()
+    entry.name_ar = request.POST.get("name_ar", "").strip()
     entry.save()
     messages.success(request, _("Level %(level)d updated.") % {"level": level})
     return redirect("levels-dashboard")
 
-
 @require_POST
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def level_delete(request, level):
-    years = AcademicYear.objects.filter(level=level)
-    if not years.exists():
+    try:
+        level_obj = Level.objects.get(ordering=level)
+    except Level.DoesNotExist:
         messages.error(request, _("Level not found."))
         return redirect("levels-dashboard")
-    has_offerings = CourseOffering.objects.filter(academic_year__level=level).exists()
-    has_enrollments = Enrollment.objects.filter(level=level).exists()
-    if has_offerings:
-        messages.error(request, _("Cannot delete level %(level)d: it has course offerings.") % {"level": level})
-    elif has_enrollments:
-        messages.error(request, _("Cannot delete level %(level)d: it has enrollments.") % {"level": level})
+    has_academic_years = level_obj.academic_years.exists()
+    has_courses = level_obj.courses.exists()
+    if has_academic_years:
+        messages.error(
+            request,
+            _("Cannot delete level %(level)d: it has academic years.") % {"level": level},
+        )
+    elif has_courses:
+        messages.error(
+            request,
+            _("Cannot delete level %(level)d: it has courses.") % {"level": level},
+        )
     else:
-        count = years.count()
-        years.delete()
-        Course.objects.filter(level=level).delete()
-        messages.success(request, _("Level %(level)d and all its data deleted.") % {"level": level})
+        level_obj.delete()
+        messages.success(request, _("Level %(level)d deleted.") % {"level": level})
     return redirect("levels-dashboard")
 
 @capability_required(can_manage_content)
 def academic_setup(request):
-    years = AcademicYear.objects.all().order_by("-starts_on", "level")
-    selected_year = request.GET.get("academic_year")
-    offerings = CourseOffering.objects.none()
+    from django.core.paginator import Paginator
+
+    search = request.GET.get("q", "").strip()
+    active_filter = request.GET.get("active", "all")
+    years = AcademicYear.objects.all().prefetch_related("levels").order_by("ordering")
+    if search:
+        years = years.filter(name__icontains=search)
+    if active_filter == "active":
+        years = years.filter(is_active=True)
+    elif active_filter == "inactive":
+        years = years.filter(is_active=False)
+    else:
+        active_filter = "all"
+    year_page_obj = Paginator(years, 10).get_page(request.GET.get("page", 1))
+
+    selected_scope_id = request.GET.get("scope")
+    selected_year_id = request.GET.get("academic_year")
+    selected_scope = None
+    if selected_scope_id:
+        selected_scope = get_object_or_404(
+            AcademicYearLevel.objects.select_related("academic_year", "level"),
+            pk=selected_scope_id,
+            **({"academic_year_id": selected_year_id} if selected_year_id else {}),
+        )
+    selected_year = selected_year_id
+    if selected_scope is None and selected_year:
+        selected_year = get_object_or_404(AcademicYear, pk=selected_year)
+    elif selected_scope is not None:
+        selected_year = selected_scope.academic_year
+
+    year_level_links = AcademicYearLevel.objects.none()
     if selected_year:
-        offerings = CourseOffering.objects.filter(academic_year_id=selected_year).select_related("course", "academic_year")
-        for o in offerings:
-            o.level_courses = Course.objects.filter(level=o.course.level)
+        year_level_links = AcademicYearLevel.objects.filter(academic_year=selected_year).select_related("level").order_by("level__ordering")
+
+    offering_search = request.GET.get("offering_q", "").strip()
+    offering_status = request.GET.get("offering_status", "all")
+    offerings = CourseOffering.objects.none()
+    if selected_scope:
+        offerings = CourseOffering.objects.filter(academic_year_level=selected_scope).select_related("course", "academic_year_level__academic_year", "academic_year_level__level")
+        if offering_search:
+            offerings = offerings.filter(Q(course__name__icontains=offering_search) | Q(instructor__icontains=offering_search))
+        if offering_status in dict(PublicationStatus.choices):
+            offerings = offerings.filter(status=offering_status)
+        else:
+            offering_status = "all"
+    offering_page_obj = Paginator(offerings.order_by("course__name"), 15).get_page(request.GET.get("offering_page", 1))
+    scope_courses = Course.objects.filter(level=selected_scope.level).order_by("name") if selected_scope else Course.objects.none()
     year_form = AcademicYearForm()
     offering_form = CourseOfferingForm()
+    copy_form = OfferingCopyForm(initial={
+        "target_year_level": selected_scope.pk
+        if selected_scope and selected_scope.academic_year.is_active
+        else None,
+    })
     return render(request, "academic_setup.html", {
-        "years": years,
-        "offerings": offerings,
-        "selected_year": int(selected_year) if selected_year else None,
+        "years": year_page_obj.object_list,
+        "year_page_obj": year_page_obj,
+        "year_level_links": year_level_links,
+        "selected_year": selected_year.pk if selected_year else None,
+        "selected_scope": selected_scope,
+        "selected_scope_id": selected_scope.pk if selected_scope else None,
+        "offerings": offering_page_obj.object_list,
+        "offering_page_obj": offering_page_obj,
+        "scope_courses": scope_courses,
+        "search": search,
+        "active_filter": active_filter,
+        "offering_search": offering_search,
+        "offering_status": offering_status,
         "year_form": year_form,
         "offering_form": offering_form,
-        "COURSE_LEVELS": Course.get_levels_name().items(),
+        "copy_form": copy_form,
+        "COURSE_LEVELS": Level.objects.order_by("ordering"),
         "meeting_weekday_choices": [(0, _("Monday")), (1, _("Tuesday")), (2, _("Wednesday")), (3, _("Thursday")), (4, _("Friday")), (5, _("Saturday")), (6, _("Sunday"))],
     })
 
 
-@capability_required(can_manage_content)
+@require_POST
+@capability_required(can_manage_academic_setup)
+def academic_year_level_weekdays(request, scope_id):
+    scope = get_object_or_404(AcademicYearLevel, pk=scope_id)
+    form = AcademicYearLevelWeekdayForm(request.POST, instance=scope)
+    if form.is_valid():
+        form.save()
+        messages.success(request, _("Meeting weekdays updated."))
+    else:
+        for error in form.errors.values():
+            for message in error:
+                messages.error(request, message)
+    return redirect(f"{reverse('academic-setup')}?scope={scope.pk}")
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def academic_year_level_delete(request, scope_id):
+    scope = get_object_or_404(AcademicYearLevel, pk=scope_id)
+    year_id = scope.academic_year_id
+    try:
+        scope.delete()
+        messages.success(request, _("Academic level removed from the year."))
+    except ProtectedError:
+        messages.error(request, _("Cannot remove a level referenced by academic records."))
+    return redirect(f"{reverse('academic-setup')}?academic_year={year_id}")
+
+
+@capability_required(can_manage_academic_setup)
+def academic_offerings_by_scope(request, scope_id):
+    scope = get_object_or_404(AcademicYearLevel, pk=scope_id)
+    offerings = CourseOffering.objects.filter(academic_year_level=scope).select_related("course").order_by("course__name")
+    return JsonResponse({
+        "offerings": [{"id": offering.pk, "name": offering.course.name} for offering in offerings]
+    })
+
+@capability_required(can_manage_academic_setup)
 def academic_year_create(request):
     if request.method == "POST":
         form = AcademicYearForm(request.POST)
         if form.is_valid():
-            form.save()
+            year = form.save()
             messages.success(request, _("Academic year created."))
         else:
             for err in form.errors.get("__all__", []):
@@ -2757,17 +3543,16 @@ def academic_year_create(request):
                     continue
                 label = form.fields[field].label if field in form.fields else field
                 for err in form.errors[field]:
-                    messages.error(request, f"{label}: {err}")
+                    messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
         return redirect("academic-setup")
 
-
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def academic_year_edit(request, year_id):
     year = get_object_or_404(AcademicYear, pk=year_id)
     if request.method == "POST":
         form = AcademicYearForm(request.POST, instance=year)
         if form.is_valid():
-            form.save()
+            year = form.save()
             messages.success(request, _("Academic year updated."))
         else:
             for err in form.errors.get("__all__", []):
@@ -2777,28 +3562,44 @@ def academic_year_edit(request, year_id):
                     continue
                 label = form.fields[field].label if field in form.fields else field
                 for err in form.errors[field]:
-                    messages.error(request, f"{label}: {err}")
+                    messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
         return redirect("academic-setup")
 
 
 @require_POST
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
+def academic_year_activate(request, year_id):
+    year = get_object_or_404(AcademicYear, pk=year_id)
+    try:
+        activate_academic_year(year, request.user)
+        messages.success(request, _("Academic year activated."))
+    except (ValidationError, PermissionDenied) as exc:
+        messages.error(request, str(exc))
+    return redirect("academic-setup")
+
+@require_POST
+@capability_required(can_manage_academic_setup)
 def academic_year_delete(request, year_id):
     year = get_object_or_404(AcademicYear, pk=year_id)
-    enrollments_count = Enrollment.objects.filter(academic_year=year).count()
-    if CourseOffering.objects.filter(academic_year=year).exists():
+    enrollments_count = Enrollment.objects.filter(academic_year_level__academic_year=year).count()
+    if year.is_active:
+        messages.error(request, _("Cannot delete the active academic year."))
+    elif CourseOffering.objects.filter(academic_year_level__academic_year=year).exists():
         messages.error(request, _("Cannot delete a year that has course offerings."))
     elif enrollments_count:
         messages.error(request, _("Cannot delete a year that has %(count)d enrollment(s).") % {"count": enrollments_count})
     else:
-        year.delete()
-        messages.success(request, _("Academic year deleted."))
+        try:
+            year.delete()
+            messages.success(request, _("Academic year deleted."))
+        except ProtectedError:
+            messages.error(request, _("Cannot delete an academic year referenced by historical records."))
     return redirect("academic-setup")
 
-
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def course_offering_create(request):
     if request.method == "POST":
+        scope_id = request.POST.get("academic_year_level")
         form = CourseOfferingForm(request.POST)
         if form.is_valid():
             form.save()
@@ -2811,12 +3612,10 @@ def course_offering_create(request):
                     continue
                 label = form.fields[field].label if field in form.fields else field
                 for err in form.errors[field]:
-                    messages.error(request, f"{label}: {err}")
-        year_id = request.POST.get("academic_year")
-        return redirect(f"{reverse('academic-setup')}?academic_year={year_id}" if year_id else "academic-setup")
+                    messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
+        return redirect(f"{reverse('academic-setup')}?scope={scope_id}" if scope_id else "academic-setup")
 
-
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def course_offering_edit(request, offering_id):
     offering = get_object_or_404(CourseOffering, pk=offering_id)
     if request.method == "POST":
@@ -2832,28 +3631,20 @@ def course_offering_edit(request, offering_id):
                     continue
                 label = form.fields[field].label if field in form.fields else field
                 for err in form.errors[field]:
-                    messages.error(request, f"{label}: {err}")
-        return redirect(f"{reverse('academic-setup')}?academic_year={offering.academic_year_id}")
-
+                    messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
+        return redirect(f"{reverse('academic-setup')}?scope={offering.academic_year_level_id}")
 
 @require_POST
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def course_offering_delete(request, offering_id):
     offering = get_object_or_404(CourseOffering, pk=offering_id)
-    year_id = offering.academic_year_id
+    year_id = offering.academic_year_level.academic_year_id
     try:
         offering.delete()
         messages.success(request, _("Course offering deleted."))
     except ProtectedError as e:
         messages.error(request, _("Cannot delete this course offering: it is referenced by other records (%s).") % str(e))
-    return redirect(f"{reverse('academic-setup')}?academic_year={year_id}")
-
-
-@capability_required(can_manage_content)
-def courses_by_level(request, level):
-    courses = Course.objects.filter(level=level).values("id", "name")
-    return JsonResponse(list(courses), safe=False)
-
+    return redirect(f"{reverse('academic-setup')}?scope={offering.academic_year_level_id}")
 
 @require_POST
 @capability_required(can_manage_content)
@@ -2862,22 +3653,20 @@ def duplicate_course(request, course_id):
     new_name = request.POST.get("new_name", "")
     if not new_name:
         return HttpResponse(_("New course name is required."), status=400)
-    target_year_id = request.POST.get("academic_year_id")
-    target_year = get_object_or_404(AcademicYear, pk=target_year_id) if target_year_id else None
+    target_scope_id = request.POST.get("academic_year_level_id")
+    target_scope = get_object_or_404(AcademicYearLevel, pk=target_scope_id) if target_scope_id else None
     with transaction.atomic():
         new_course = Course.objects.create(name=new_name, description=course.description, instructor=course.instructor, level=course.level)
-        if target_year:
-            new_offering = CourseOffering.objects.create(course=new_course, academic_year=target_year, status="draft")
-            for lesson in Lesson.objects.filter(course=course):
+        if target_scope:
+            new_offering = CourseOffering.objects.create(course=new_course, academic_year_level=target_scope, status="draft")
+            for lesson in Lesson.objects.filter(course_offering__course=course):
                 lesson.pk = None
-                lesson.course = new_course
                 lesson.course_offering = new_offering
                 lesson.status = PublicationStatus.DRAFT
                 lesson.save()
-            for quiz in Quiz.objects.filter(course=course):
+            for quiz in Quiz.objects.filter(course_offering__course=course):
                 questions = list(quiz.questions.all())
                 quiz.pk = None
-                quiz.course = new_course
                 quiz.course_offering = new_offering
                 quiz.status = PublicationStatus.DRAFT
                 quiz.save()
@@ -2888,29 +3677,28 @@ def duplicate_course(request, course_id):
     messages.success(request, _("Course duplicated."))
     return redirect("course-dashboard")
 
-
 # ============================================================================
 # PHASE 5 — Attendance Calendar, QR, and Scanning
 # ============================================================================
 
-
 @capability_required(can_manage_content)
 def calendar_management(request):
     import calendar as cal_mod
-    from datetime import date, datetime
+    from datetime import date
 
     years = AcademicYear.objects.all().order_by("-starts_on")
     selected_year_id = request.GET.get("academic_year")
-    year = None
+    if selected_year_id and not selected_year_id.isdigit():
+        selected_year_id = None
+    year = get_object_or_404(AcademicYear, pk=selected_year_id) if selected_year_id else None
     month_grid = None
     prev_month = None
     next_month = None
-    today = date.today()
+    today = timezone.localdate()
     cur_month = today.month
     cur_year = today.year
 
-    if selected_year_id:
-        year = get_object_or_404(AcademicYear, pk=selected_year_id)
+    if year:
         year_id = year.id
         year_start = year.starts_on
         year_end = year.ends_on
@@ -2969,7 +3757,9 @@ def calendar_management(request):
             for h in AcademicHoliday.objects.filter(academic_year=year, date__year=cur_year, date__month=cur_month)
         }
 
-        meeting_weekdays = set(year.meeting_weekdays or [])
+        meeting_weekdays = set()
+        for weekdays in year.level_links.values_list("meeting_weekdays", flat=True):
+            meeting_weekdays.update(weekdays or [])
 
         month_grid = []
         for week in month_days:
@@ -3000,7 +3790,7 @@ def calendar_management(request):
         d = date(2000, i, 1)
         months_list.append({
             "value": i,
-            "name": d.strftime("%B"),
+            "name": formats.date_format(d, "F"),
         })
 
     # Generate year options within the academic year range
@@ -3019,11 +3809,10 @@ def calendar_management(request):
         "cur_month": cur_month,
         "cur_year": cur_year,
         "today": today,
-        "month_name": date(cur_year, cur_month, 1).strftime("%B %Y") if month_grid else "",
+        "month_name": formats.date_format(date(cur_year, cur_month, 1), "F Y") if month_grid else "",
         "months": months_list,
         "year_options": year_options,
     })
-
 
 @require_POST
 @capability_required(can_manage_content)
@@ -3066,7 +3855,6 @@ def add_holiday(request):
     messages.success(request, _("Holiday added."))
     return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
 
-
 @require_POST
 @capability_required(can_manage_content)
 def delete_holiday(request, holiday_id):
@@ -3076,13 +3864,21 @@ def delete_holiday(request, holiday_id):
     messages.success(request, _("Holiday deleted."))
     return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
 
-
 @login_required
 def student_calendar(request):
-    enrollments = Enrollment.objects.filter(student=request.user, status="active").select_related("academic_year")
-    years = [e.academic_year for e in enrollments]
-    return render(request, "student_calendar.html", {"years": years})
-
+    enrollments = Enrollment.objects.filter(
+        student=request.user,
+        status__in=["active", "completed"],
+        enrollment_type="normal",
+    ).select_related("academic_year_level__academic_year", "academic_year_level__level")
+    scopes = []
+    seen = set()
+    for enrollment in enrollments:
+        scope = enrollment.academic_year_level
+        if scope.pk not in seen:
+            scopes.append(scope)
+            seen.add(scope.pk)
+    return render(request, "student_calendar.html", {"scopes": scopes})
 
 @login_required
 def download_qr(request):
@@ -3096,8 +3892,19 @@ def download_qr(request):
     buf = BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
-    return HttpResponse(buf, content_type="image/png")
-
+    response = HttpResponse(buf, content_type="image/png")
+    if request.GET.get("download") == "1":
+        display_name = re.sub(
+            r"[\x00-\x1f\x7f/\\]+",
+            " ",
+            request.user.get_full_name().strip() or request.user.username,
+        ).strip() or "Profile"
+        filename = f"{display_name} - {request.user.pk}.png"
+        response["Content-Disposition"] = (
+            f'attachment; filename="profile-qr-{request.user.pk}.png"; '
+            f"filename*=UTF-8''{quote(filename, safe='')}"
+        )
+    return response
 
 @require_POST
 @capability_required(can_correct_attendance)
@@ -3108,11 +3915,9 @@ def regenerate_qr(request, user_id):
     messages.success(request, _("QR token regenerated."))
     return redirect("application-review", user_id=user.id)
 
-
 @capability_required(can_scan_attendance)
 def scanner(request):
     return render(request, "scanner.html")
-
 
 @capability_required(can_scan_attendance)
 def student_lookup(request):
@@ -3146,7 +3951,6 @@ def student_lookup(request):
 
     return redirect("scan-preview", token=user.qr_token or user.id)
 
-
 @capability_required(can_scan_attendance)
 def scan_preview(request, token):
     if not token:
@@ -3158,21 +3962,32 @@ def scan_preview(request, token):
         except (ValueError, TypeError):
             raise Http404
     active_enrollment = Enrollment.objects.filter(
-        student=user, status="active", enrollment_type="normal"
-    ).select_related("academic_year").first()
-    academic_year = active_enrollment.academic_year if active_enrollment else None
+        student=user,
+        status=Enrollment.Status.ACTIVE,
+        enrollment_type=Enrollment.Type.NORMAL,
+        academic_year_level__academic_year__is_active=True,
+    ).select_related("academic_year_level__academic_year").first()
+    academic_year = active_enrollment.academic_year_level.academic_year if active_enrollment else None
     today = now().date()
-    already_recorded = list(AttendanceRecord.objects.filter(
-        student=user, attendance_date=today
-    ).values_list("action", flat=True))
+    offerings = list(active_year_offerings_for_student(user).order_by("course__name", "pk"))
+    offering_ids = [offering.pk for offering in offerings]
+    already_recorded_by_offering = defaultdict(list)
+    for offering_id, action in AttendanceRecord.objects.filter(
+        student=user,
+        course_offering_id__in=offering_ids,
+        attendance_date=today,
+    ).values_list("course_offering_id", "action"):
+        already_recorded_by_offering[str(offering_id)].append(action)
     return render(request, "scan_preview.html", {
         "student": user,
         "academic_year": academic_year,
         "today": today,
-        "already_recorded": already_recorded,
+        "offerings": offerings,
+        "selected_offering_id": int(request.GET["course_offering"]) if request.GET.get("course_offering", "").isdigit() else None,
+        "already_recorded_by_offering": dict(already_recorded_by_offering),
+        "already_recorded_json": json.dumps(already_recorded_by_offering),
         "token": token,
     })
-
 
 @require_POST
 @capability_required(can_scan_attendance)
@@ -3184,43 +3999,93 @@ def record_attendance(request, token, action):
     except (ValueError, TypeError):
         user = get_object_or_404(User, qr_token=token)
     if user.study_mode == "online":
-        return JsonResponse({"status": "noop", "action": action, "note": _("Online student — no attendance recorded.")})
-    active_enrollment = Enrollment.objects.filter(
-        student=user, status="active", enrollment_type="normal"
-    ).select_related("academic_year").first()
-    academic_year = active_enrollment.academic_year if active_enrollment else None
-    if not academic_year:
-        return JsonResponse({"error": _("No active enrollment.")}, status=400)
+        return JsonResponse({"error": _("Online students cannot record attendance.")}, status=400)
+    offering_id = request.POST.get("course_offering", "")
+    if not str(offering_id).isdigit():
+        return JsonResponse({"error": _("Select a course offering.")}, status=400)
+    offering = active_year_offerings_for_student(user).filter(pk=int(offering_id)).first()
+    if offering is None:
+        raise PermissionDenied(_("The student does not have access to this active course offering."))
+    academic_year_level = offering.academic_year_level
+    academic_year = academic_year_level.academic_year
     today = now().date()
-    if not is_expected_date(academic_year, today):
+    if not is_expected_date(academic_year_level, today):
         return JsonResponse({"error": _("Today is not an expected attendance day.")}, status=400)
-    rec, created = AttendanceRecord.objects.get_or_create(
-        student=user,
-        academic_year=academic_year,
-        attendance_date=today,
-        action=action,
-        defaults={"scanned_by": request.user},
-    )
+    with transaction.atomic():
+        rec, created = AttendanceRecord.objects.get_or_create(
+            student=user,
+            course_offering=offering,
+            attendance_date=today,
+            action=action,
+            defaults={"scanned_by": request.user},
+        )
     if created:
         return JsonResponse({"status": "recorded", "action": action})
     return JsonResponse({"status": "already_recorded", "action": action})
 
-
 @capability_required(can_scan_attendance)
 def attendance_management(request):
     year_id = request.GET.get("academic_year")
+    if year_id and not year_id.isdigit():
+        year_id = None
+    level_id = request.GET.get("level")
+    action = request.GET.get("action")
+    offering_id = request.GET.get("course_offering")
+    attendance_date = request.GET.get("date", "")
+    student_search = request.GET.get("student", "").strip()
     years = AcademicYear.objects.all()
+    levels = Level.objects.filter(
+        year_links__academic_year_id=year_id
+    ).order_by("ordering") if year_id else Level.objects.none()
+    course_offerings = CourseOffering.objects.filter(
+        academic_year_level__academic_year_id=year_id
+    ).select_related(
+        "course", "academic_year_level__academic_year", "academic_year_level__level"
+    ).order_by("course__name", "pk") if year_id else CourseOffering.objects.none()
     if year_id:
-        records = AttendanceRecord.objects.all().select_related("student", "academic_year", "scanned_by").filter(academic_year_id=year_id)
+        records = AttendanceRecord.objects.all().select_related(
+            "student", "course_offering__course", "course_offering__academic_year_level__academic_year",
+            "course_offering__academic_year_level__level", "scanned_by"
+        ).filter(course_offering__academic_year_level__academic_year_id=year_id)
+        if level_id and level_id.isdigit():
+            records = records.filter(course_offering__academic_year_level__level_id=int(level_id))
+        if offering_id and offering_id.isdigit():
+            records = records.filter(course_offering_id=int(offering_id))
+        if action in ("entrance", "exit"):
+            records = records.filter(action=action)
+        if attendance_date:
+            try:
+                from datetime import datetime
+                parsed_date = datetime.strptime(attendance_date, "%Y-%m-%d").date()
+                records = records.filter(attendance_date=parsed_date)
+            except (TypeError, ValueError):
+                records = records.none()
+        if student_search:
+            records = records.filter(
+                Q(student__username__icontains=student_search)
+                | Q(student__first_name__icontains=student_search)
+                | Q(student__last_name__icontains=student_search)
+                | Q(student__email__icontains=student_search)
+            )
+        records = records.order_by("-attendance_date", "-scanned_at")
     else:
         records = AttendanceRecord.objects.none()
+    from django.core.paginator import Paginator
+    page_obj = Paginator(records, 25).get_page(request.GET.get("page", 1))
     return render(request, "attendance_management.html", {
-        "records": records,
+        "records": page_obj,
+        "page_obj": page_obj,
         "years": years,
-        "selected_year": int(year_id) if year_id else None,
+        "levels": levels,
+        "course_offerings": course_offerings,
+        "selected_year": int(year_id) if year_id and year_id.isdigit() else None,
+        "selected_level": int(level_id) if level_id and level_id.isdigit() else None,
+        "selected_offering": int(offering_id) if offering_id and offering_id.isdigit() else None,
+        "selected_action": action if action in ("entrance", "exit") else "",
+        "selected_date": attendance_date,
+        "student_search": student_search,
         "has_filter": bool(year_id),
     })
-
 
 @capability_required(can_correct_attendance)
 def attendance_correction(request, record_id):
@@ -3230,7 +4095,8 @@ def attendance_correction(request, record_id):
         new_action = request.POST.get("action")
         if new_action and new_action not in ("entrance", "exit"):
             return HttpResponse(_("Invalid action."), status=400)
-        academic_year = record.academic_year
+        academic_year_level = record.course_offering.academic_year_level
+        academic_year = academic_year_level.academic_year
         if new_date:
             from datetime import datetime
             try:
@@ -3239,22 +4105,23 @@ def attendance_correction(request, record_id):
                 return HttpResponse(_("Invalid date format."), status=400)
             if new_date < academic_year.starts_on or new_date > academic_year.ends_on:
                 return HttpResponse(_("Date outside academic year bounds."), status=400)
-            if not is_expected_date(academic_year, new_date):
-                return HttpResponse(_("Date is not a scheduled day or is a holiday."), status=400)
-            if AttendanceRecord.objects.filter(
-                student=record.student, academic_year=academic_year,
-                attendance_date=new_date, action=new_action or record.action,
-            ).exclude(pk=record.pk).exists():
-                return HttpResponse(_("A record already exists for this student, date, and action."), status=400)
-        record.attendance_date = new_date or record.attendance_date
-        record.action = new_action or record.action
+        final_date = new_date or record.attendance_date
+        final_action = new_action or record.action
+        if not is_expected_date(academic_year_level, final_date):
+            return HttpResponse(_("Date is not a scheduled day or is a holiday."), status=400)
+        if AttendanceRecord.objects.filter(
+            student=record.student, course_offering=record.course_offering,
+            attendance_date=final_date, action=final_action,
+        ).exclude(pk=record.pk).exists():
+            return HttpResponse(_("A record already exists for this student, date, and action."), status=400)
+        record.attendance_date = final_date
+        record.action = final_action
         record.corrected_by = request.user
         record.corrected_at = now()
         record.save()
         messages.success(request, _("Attendance record corrected."))
         return redirect("attendance-management")
     return render(request, "attendance_correction.html", {"record": record})
-
 
 @require_POST
 @capability_required(can_correct_attendance)
@@ -3264,11 +4131,9 @@ def delete_attendance(request, record_id):
     messages.success(request, _("Attendance record deleted."))
     return redirect("attendance-management")
 
-
 # ============================================================================
 # PHASE 6 — Online Lecture Progress Tracking
 # ============================================================================
-
 
 def create_viewing_session(student, lesson, part_id):
     session_id = secrets.token_urlsafe(32)
@@ -3282,57 +4147,137 @@ def create_viewing_session(student, lesson, part_id):
     )
     return session
 
+def _sign_media_message(message):
+    return hmac.new(
+        settings.MEDIA_WORKER_HMAC_SECRET.encode(),
+        message.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
 
 def sign_session(session_id, expires_at):
     message = f"{session_id}:{int(expires_at.timestamp())}"
-    secret = settings.SECRET_KEY.encode()
-    signature = hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
+    signature = _sign_media_message(message)
     return f"{message}:{signature}"
 
 
-def sign_receipt(session_id, segment_key):
-    message = f"{session_id}:{segment_key}"
-    secret = settings.SECRET_KEY.encode()
-    return hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
+def sign_media_token(session_id, expires_at, segment_key):
+    expires_at_value = int(expires_at.timestamp())
+    message = f"{session_id}:{expires_at_value}:{segment_key}"
+    return f"{session_id}:{expires_at_value}:{_sign_media_message(message)}"
 
+
+def _valid_session_token(token, session):
+    if not token:
+        return False
+    parts = token.split(":")
+    if len(parts) != 3 or parts[0] != session.session_id:
+        return False
+    try:
+        expires_at = int(parts[1])
+    except (TypeError, ValueError):
+        return False
+    if expires_at != int(session.expires_at.timestamp()) or timezone.now().timestamp() >= expires_at:
+        return False
+    expected = _sign_media_message(f"{session.session_id}:{expires_at}")
+    return hmac.compare_digest(parts[2], expected)
 
 @login_required
-def start_viewing_session(request, lesson_id, part_id):
-    lesson = get_object_or_404(Lesson, pk=lesson_id)
-    # Verify the logged-in user may access this lesson
-    if not user_can_access_course(request.user, lesson.course_offering.course):
-        if not user_has_management_role(request.user):
-            return JsonResponse({"error": _("Access denied.")}, status=403)
-    # Validate part_id belongs to lesson
-    lesson_segments = get_lesson_segments(lesson.links)
-    valid_parts = [s["key"] for s in lesson_segments]
-    if part_id not in valid_parts:
-        return JsonResponse({"error": _("Invalid part ID.")}, status=400)
+def start_viewing_session(request, offering_id, lesson_id, file_index):
+    offering = get_accessible_offering_or_403(request.user, offering_id)
+    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
+    if not user_has_management_role(request.user) and lesson.status != PublicationStatus.PUBLISHED:
+        raise PermissionDenied(_("You do not have access to this lesson."))
+    links = json.loads(lesson.links)
+    if file_index < 0 or file_index >= len(links):
+        return JsonResponse({"error": _("Invalid media file.")}, status=400)
+    file_info = links[file_index]
+    if file_info.get("file_type") not in {"video", "audio"} or not file_info.get("id"):
+        return JsonResponse({"error": _("Invalid media file.")}, status=400)
 
-    session = create_viewing_session(request.user, lesson, part_id)
+    part_id = file_info.get("part_id", "")
+    session = ViewingSession.objects.filter(
+        student=request.user,
+        lesson=lesson,
+        part_id=part_id,
+        expires_at__gt=timezone.now(),
+    ).order_by("-expires_at").first()
+    if session is None:
+        session = create_viewing_session(request.user, lesson, part_id)
     token = sign_session(session.session_id, session.expires_at)
+    progress_percent = LectureProgress.objects.filter(
+        student=request.user,
+        lesson=lesson,
+        part_id=part_id,
+    ).values_list("percent", flat=True).first() or 0
     return JsonResponse({
         "session_id": session.session_id,
         "token": token,
         "expires_at": session.expires_at.isoformat(),
+        "manifest_url": reverse("lesson-manifest", args=[offering.pk, lesson.pk, file_index]),
+        "progress_percent": progress_percent,
     })
 
-
 @login_required
-def lesson_manifest(request, lesson_id, file_index):
-    lesson = get_object_or_404(Lesson, pk=lesson_id)
+def lesson_manifest(request, offering_id, lesson_id, file_index):
+    offering = get_accessible_offering_or_403(request.user, offering_id)
+    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
+    if not user_has_management_role(request.user) and lesson.status != PublicationStatus.PUBLISHED:
+        raise PermissionDenied(_("You do not have access to this lesson."))
     links = json.loads(lesson.links)
-    if file_index >= len(links):
+    if file_index < 0 or file_index >= len(links):
         return HttpResponse(status=404)
     file_info = links[file_index]
+    if file_info.get("file_type") not in {"video", "audio"} or not file_info.get("id"):
+        return HttpResponse(status=404)
     key = file_info["id"]
+    session_id = request.GET.get("session_id", "")
+    token = request.GET.get("token", "")
+    if not session_id or not token:
+        return JsonResponse({"error": _("Viewing session is required.")}, status=401)
+    session = get_object_or_404(
+        ViewingSession,
+        session_id=session_id,
+        student=request.user,
+        lesson=lesson,
+        part_id=file_info.get("part_id", ""),
+    )
+    if timezone.now() >= session.expires_at:
+        return JsonResponse({"error": _("Viewing session expired.")}, status=401)
+    if not _valid_session_token(token, session):
+        return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
     try:
         response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
         playlist = response["Body"].read().decode()
     except Exception:
         return HttpResponse(status=404)
-    return HttpResponse(playlist, content_type="application/vnd.apple.mpegurl")
 
+    playlist_lines = []
+    manifest_folder = posixpath.dirname(key).strip("/")
+    for line in playlist.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and stripped.lower().endswith(".ts"):
+            if stripped.startswith(("/", "http://", "https://")):
+                return HttpResponse(status=404)
+            segment_key = posixpath.normpath(posixpath.join(posixpath.dirname(key), stripped))
+            if segment_key in {".", ".."} or segment_key.startswith("../"):
+                return HttpResponse(status=404)
+            if manifest_folder and not segment_key.startswith(f"{manifest_folder}/"):
+                return HttpResponse(status=404)
+            if get_segment_number(segment_key) is None:
+                return HttpResponse(status=404)
+            signed_token = sign_media_token(session.session_id, session.expires_at, segment_key)
+            worker_base = settings.CLOUD_WORKER.rstrip("/")
+            playlist_lines.append(
+                f"{worker_base}/media/{quote(session.session_id, safe='')}/"
+                f"{quote(segment_key, safe='')}?token={quote(signed_token, safe='')}"
+            )
+        else:
+            playlist_lines.append(line)
+    return HttpResponse(
+        "\n".join(playlist_lines) + ("\n" if playlist.endswith("\n") else ""),
+        content_type="application/vnd.apple.mpegurl",
+    )
 
 @csrf_exempt
 @require_POST
@@ -3340,82 +4285,123 @@ def worker_receipt(request):
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        return JsonResponse({"error": _("Invalid request format.")}, status=400)
 
     session_id = data.get("session_id")
     segment_key = data.get("segment_key")
+    segment_number = data.get("segment_number")
     signature = data.get("signature")
 
-    if not all([session_id, segment_key, signature]):
-        return JsonResponse({"error": "Missing fields"}, status=400)
+    if (
+        not isinstance(session_id, str)
+        or not isinstance(segment_key, str)
+        or not isinstance(signature, str)
+        or not session_id
+        or not segment_key
+        or segment_number is None
+    ):
+        return JsonResponse({"error": _("Missing required fields.")}, status=400)
+    if request.headers.get("X-Worker-Secret") != settings.WORKER_RECEIPT_SECRET:
+        return JsonResponse({"error": _("Invalid worker credentials.")}, status=403)
+    if not validate_hls_object_key(segment_key)[0]:
+        return JsonResponse({"error": _("Invalid request format.")}, status=400)
+    if isinstance(segment_number, bool):
+        return JsonResponse({"error": _("Invalid segment number.")}, status=400)
+    try:
+        segment_number = int(segment_number)
+    except (TypeError, ValueError, OverflowError):
+        return JsonResponse({"error": _("Invalid segment number.")}, status=400)
 
     session = get_object_or_404(ViewingSession, session_id=session_id)
 
-    if timezone.now() > session.expires_at:
-        return JsonResponse({"error": "Session expired"}, status=410)
+    if timezone.now() >= session.expires_at:
+        return JsonResponse({"error": _("Session expired.")}, status=410)
 
-    expected = sign_receipt(session_id, segment_key)
+    if get_segment_number(segment_key) != segment_number:
+        return JsonResponse({"error": _("Invalid segment number.")}, status=400)
+    expected = _sign_media_message(
+        f"{session_id}:{int(session.expires_at.timestamp())}:{segment_key}"
+    )
     if not hmac.compare_digest(signature, expected):
-        return JsonResponse({"error": "Invalid signature"}, status=403)
+        return JsonResponse({"error": _("Invalid request signature.")}, status=403)
 
-    VerifiedSegmentRequest.objects.get_or_create(session=session, segment_key=segment_key)
-    return JsonResponse({"status": "recorded"})
-
+    _receipt, created = VerifiedSegmentRequest.objects.get_or_create(
+        session=session,
+        segment_number=segment_number,
+        defaults={
+            "segment_key": segment_key,
+            "signature": signature,
+            "expires_at": session.expires_at,
+        },
+    )
+    return JsonResponse({"status": "recorded" if created else "already_recorded"})
 
 @require_POST
 def progress_heartbeat(request):
     if not request.user.is_authenticated:
-        return JsonResponse({"error": "Authentication required"}, status=401)
+        return JsonResponse({"error": _("Authentication required")}, status=401)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        return JsonResponse({"error": _("Invalid request format.")}, status=400)
 
     session_id = data.get("session_id")
     ranges = data.get("ranges", [])
 
     if not session_id or not isinstance(ranges, list):
-        return JsonResponse({"error": "Missing session_id or ranges"}, status=400)
+        return JsonResponse({"error": _("Missing session identifier or time ranges.")}, status=400)
 
     # Validate ranges are numeric
     try:
         ranges = [[float(s), float(e)] for s, e in ranges]
     except (ValueError, TypeError):
-        return JsonResponse({"error": "Invalid range format"}, status=400)
+        return JsonResponse({"error": _("Invalid time range format.")}, status=400)
 
     session = get_object_or_404(ViewingSession, session_id=session_id)
 
     # Reject another user's session
     if session.student != request.user:
-        return JsonResponse({"error": "Session belongs to another user"}, status=403)
+        return JsonResponse({"error": _("Session belongs to another user.")}, status=403)
 
-    if timezone.now() > session.expires_at:
-        return JsonResponse({"error": "Session expired"}, status=403)
+    if timezone.now() >= session.expires_at:
+        return JsonResponse({"error": _("Session expired.")}, status=403)
+
+    if not user_can_write_offering_activity(request.user, session.lesson.course_offering):
+        return JsonResponse({"status": "ok", "note": _("Historical content is read-only")})
 
     session.last_heartbeat = timezone.now()
     session.save(update_fields=["last_heartbeat"])
 
     # Get verified segment requests for this session
-    verified = list(session.verified_requests.values_list("segment_key", flat=True))
+    verified = set(session.verified_requests.values_list("segment_number", flat=True))
     if not verified:
-        return JsonResponse({"status": "ok", "note": "No verified segments yet"})
+        return JsonResponse({"status": "ok", "note": _("No verified segments yet")})
 
     # Get segment time ranges from lesson and filter to verified ones
-    lesson_segments = get_lesson_segments(session.lesson.links)
+    lesson_segments = get_lesson_segments(
+        session.lesson,
+        CLOUD_CLIENT,
+        bucket_name,
+    ).get(session.part_id, [])
+    all_ranges = [
+        [float(sr.get("start", 0)), float(sr.get("end", 0))]
+        for sr in lesson_segments
+        if float(sr.get("end", 0)) > float(sr.get("start", 0))
+    ]
     verified_ranges = []
     for sr in lesson_segments:
-        if sr.get("key") in verified:
+        if sr.get("number") in verified:
             verified_ranges.append([float(sr.get("start", 0)), float(sr.get("end", 0))])
 
     if not verified_ranges:
-        return JsonResponse({"status": "ok", "note": "No verified segment ranges"})
+        return JsonResponse({"status": "ok", "note": _("No verified segment ranges")})
 
     from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
 
     intersected = intersect_verified(ranges, verified_ranges)
     merged = merge_ranges(intersected)
     unique_secs = unique_seconds(merged)
-    total_secs = sum(end - start for start, end in verified_ranges)
+    total_secs = sum(end - start for start, end in all_ranges)
     percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
 
     progress, created = LectureProgress.objects.update_or_create(
@@ -3449,71 +4435,107 @@ def progress_heartbeat(request):
         "completed": progress.completed_at is not None,
     })
 
-
 @capability_required(can_manage_content)
 def progress_dashboard(request):
-    academic_year_id = request.GET.get("academic_year")
+    academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
     offering_id = request.GET.get("course_offering")
     lesson_id = request.GET.get("lesson")
-    student_id = request.GET.get("student")
+    student_search = request.GET.get("student", "").strip()
 
-    academic_years = AcademicYear.objects.all().order_by("-starts_on")
+    scopes = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by(
+        "-academic_year__ordering", "level__ordering"
+    )
     offerings = CourseOffering.objects.none()
     lessons = Lesson.objects.none()
     students = User.objects.none()
     progress = LectureProgress.objects.none()
 
-    if academic_year_id:
-        offerings = CourseOffering.objects.filter(academic_year_id=academic_year_id).select_related("course")
-        progress = LectureProgress.objects.filter(lesson__course_offering__academic_year_id=academic_year_id)
-        students = User.objects.filter(enrollments__academic_year_id=academic_year_id, enrollments__status="active").distinct()
+    selected_scope = None
+    if academic_year_level_id and str(academic_year_level_id).isdigit():
+        selected_scope = get_object_or_404(
+            AcademicYearLevel,
+            pk=int(academic_year_level_id),
+            academic_year__is_active=True,
+        )
+        offerings = CourseOffering.objects.filter(
+            academic_year_level=selected_scope
+        ).select_related("course", "academic_year_level")
+        progress = LectureProgress.objects.filter(
+            lesson__course_offering__academic_year_level=selected_scope
+        )
 
     if offering_id:
         progress = progress.filter(lesson__course_offering_id=offering_id)
-        lessons = Lesson.objects.filter(course_offering_id=offering_id)
+        lessons = Lesson.objects.filter(course_offering_id=offering_id).order_by("name")
 
     if lesson_id:
         progress = progress.filter(lesson_id=lesson_id)
 
-    if student_id:
-        progress = progress.filter(student_id=student_id)
+    if student_search:
+        student_filter = (
+            Q(student__username__icontains=student_search)
+            | Q(student__first_name__icontains=student_search)
+            | Q(student__last_name__icontains=student_search)
+            | Q(student__email__icontains=student_search)
+        )
+        if student_search.isdigit():
+            student_filter |= Q(student_id=int(student_search))
+        progress = progress.filter(student_filter)
 
+    from django.core.paginator import Paginator
     progress = progress.select_related("student", "lesson").order_by("-lesson__name", "student__username")
+    page_obj = Paginator(progress, 25).get_page(request.GET.get("page", 1))
 
     return render(request, "progress_dashboard.html", {
-        "progress": progress,
-        "academic_years": academic_years,
+        "progress": page_obj,
+        "page_obj": page_obj,
+        "academic_years": scopes,
+        "scopes": scopes,
         "offerings": offerings,
         "lessons": lessons,
         "students": students,
-        "selected_year": int(academic_year_id) if academic_year_id else None,
+        "selected_year": selected_scope.pk if selected_scope else None,
         "selected_offering": int(offering_id) if offering_id else None,
         "selected_lesson": int(lesson_id) if lesson_id else None,
-        "selected_student": int(student_id) if student_id else None,
+        "selected_student": student_search,
     })
-
 
 @capability_required(can_view_reports)
 def report_dashboard(request):
-    academic_year_id = request.GET.get("academic_year")
-    student_id = request.GET.get("student") or None
+    academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
+    student_search = request.GET.get("student", "").strip()
     study_mode = request.GET.get("study_mode") or None
     course_offering_id = request.GET.get("course_offering") or None
 
-    levels = AcademicYear.objects.values_list("level", flat=True).distinct().order_by("level")
-    academic_years = AcademicYear.objects.all().order_by("-level", "-name")
+    levels = Level.objects.order_by("ordering")
+    academic_years = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by(
+        "-academic_year__ordering", "level__ordering"
+    )
     selected_year = None
     rows = []
+    page_obj = None
 
-    if academic_year_id:
-        selected_year = get_object_or_404(AcademicYear, pk=academic_year_id)
-        students = User.objects.filter(enrollments__academic_year=selected_year).distinct()
-        course_offerings = CourseOffering.objects.filter(academic_year=selected_year)
-        rows = build_report_data(
+    if academic_year_level_id:
+        selected_year = get_object_or_404(
+            AcademicYearLevel,
+            pk=academic_year_level_id,
+            academic_year__is_active=True,
+        )
+        course_offerings = CourseOffering.objects.filter(
+            academic_year_level=selected_year
+        ).select_related("academic_year_level__level", "course")
+        report_query = report_enrollments(
             selected_year,
-            student_id=int(student_id) if student_id else None,
+            student_search=student_search,
             study_mode=study_mode,
-            course_offering_id=int(course_offering_id) if course_offering_id else None,
+            course_offering_id=int(course_offering_id) if course_offering_id and str(course_offering_id).isdigit() else None,
+        )
+        from django.core.paginator import Paginator
+        page_obj = Paginator(report_query, 25).get_page(request.GET.get("page", 1))
+        rows = build_report_page_rows(
+            page_obj.object_list,
+            selected_year,
+            course_offering_id=int(course_offering_id) if course_offering_id and str(course_offering_id).isdigit() else None,
         )
 
     context = {
@@ -3522,91 +4544,83 @@ def report_dashboard(request):
         "academic_years": academic_years,
         "selected_year": selected_year,
         "selected_level": request.GET.get("level", ""),
-        "selected_student": student_id,
+        "selected_student": student_search,
         "selected_study_mode": study_mode or "",
         "selected_course_offering": course_offering_id or "",
-        "students": students if academic_year_id else [],
-        "course_offerings": course_offerings if academic_year_id else [],
+        "students": [],
+        "course_offerings": course_offerings if academic_year_level_id else [],
         "rows": rows,
-        "row_count": len(rows),
+        "row_count": page_obj.paginator.count if page_obj else 0,
+        "page_obj": page_obj,
     }
     return render(request, "report_dashboard.html", context)
 
-
 @capability_required(can_view_reports)
 def export_report_csv(request):
-    academic_year_id = request.GET.get("academic_year")
-    if not academic_year_id:
-        return HttpResponse("Missing academic_year", status=400)
-    year = get_object_or_404(AcademicYear, pk=academic_year_id)
+    academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
+    if not academic_year_level_id:
+        return HttpResponse(_("Academic year is required."), status=400)
+    scope = get_object_or_404(AcademicYearLevel, pk=academic_year_level_id)
 
-    rows = build_report_data(
-        year,
+    row_iterator = iter_report_data(
+        scope,
         student_id=request.GET.get("student") or None,
         study_mode=request.GET.get("study_mode") or None,
         course_offering_id=request.GET.get("course_offering") or None,
     )
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Student ID", "Username", "First Name", "Last Name", "Study Mode",
-                      "Level", "Academic Year",
-                      "Grade Earned", "Grade Available", "Grade %",
-                      "Expected", "Valid", "Invalid", "Absent",
-                      "Attendance %", "Absence %"])
-    for row in rows:
+    def csv_rows():
+        output = io.StringIO()
+        writer = csv.writer(output)
         writer.writerow([
-            row["student_id"],
-            _csv_safe_cell(row["username"]),
-            _csv_safe_cell(row["first_name"]),
-            _csv_safe_cell(row["last_name"]),
-            _csv_safe_cell(row["study_mode"]),
-            row["level"],
-            _csv_safe_cell(row["year_name"]),
-            row["grade_earned"],
-            row["grade_available"],
-            row["grade_percent"],
-            row["expected"],
-            row["valid"],
-            row["invalid"],
-            row["absent"],
-            row["attendance_rate"],
-            row["absence_rate"],
+            _("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Study Mode"),
+            _("Level"), _("Academic Year"), _("Grade Earned"), _("Grade Available"), _("Grade %"),
+            _("Expected"), _("Valid"), _("Invalid"), _("Absent"), _("Attendance %"), _("Absence %"),
         ])
+        yield output.getvalue()
+        for row in row_iterator:
+            output.seek(0)
+            output.truncate(0)
+            writer.writerow([
+                row["student_id"], _csv_safe_cell(row["username"]), _csv_safe_cell(row["first_name"]),
+                _csv_safe_cell(row["last_name"]),
+                _csv_safe_cell(_("Online") if row["study_mode"] == "online" else _("Offline") if row["study_mode"] == "offline" else row["study_mode"]),
+                row["level"],
+                _csv_safe_cell(row["year_name"]), row["grade_earned"], row["grade_available"],
+                row["grade_percent"], row["expected"], row["valid"], row["invalid"], row["absent"],
+                row["attendance_rate"], row["absence_rate"],
+            ])
+            yield output.getvalue()
 
-    output.seek(0)
-    safe_name = _safe_filename(year.name)
-    response = HttpResponse(output.read(), content_type="text/csv")
+    safe_name = _safe_filename(scope.academic_year.name)
+    response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
     return response
 
-
 @capability_required(can_view_reports)
 def export_report_xlsx(request):
-    academic_year_id = request.GET.get("academic_year")
-    if not academic_year_id:
-        return HttpResponse("Missing academic_year", status=400)
-    year = get_object_or_404(AcademicYear, pk=academic_year_id)
+    academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
+    if not academic_year_level_id:
+        return HttpResponse(_("Academic year is required."), status=400)
+    scope = get_object_or_404(AcademicYearLevel, pk=academic_year_level_id)
 
-    rows = build_report_data(
-        year,
-        student_id=request.GET.get("student") or None,
-        study_mode=request.GET.get("study_mode") or None,
-        course_offering_id=request.GET.get("course_offering") or None,
-    )
+    report_kwargs = {
+        "student_id": request.GET.get("student") or None,
+        "study_mode": request.GET.get("study_mode") or None,
+        "course_offering_id": request.GET.get("course_offering") or None,
+    }
 
     import openpyxl
     from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
 
-    wb = openpyxl.Workbook()
+    wb = openpyxl.Workbook(write_only=True)
 
-    ws1 = wb.active
-    ws1.title = "Grades Summary"
-    headers = ["Student ID", "Username", "First Name", "Last Name", "Course", "Quiz",
-               "Grade", "Total", "Percent"]
+    ws1 = wb.create_sheet(_("Grades Summary"))
+    headers = [_("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Course"), _("Quiz"),
+               _("Grade"), _("Total"), _("Percent")]
     ws1.append(headers)
-    for row in rows:
+    for row in iter_report_data(scope, **report_kwargs):
         for detail in row["grade_details"]:
             pct = round(detail["grade"] / detail["total"] * 100, 1) if detail["total"] else 0
             ws1.append([
@@ -3615,67 +4629,88 @@ def export_report_xlsx(request):
                 detail["grade"], detail["total"], pct,
             ])
 
-    ws1.freeze_panes = "A2"
-    ws1.auto_filter.ref = ws1.dimensions
-
-    ws2 = wb.create_sheet("Attendance Summary")
-    ws2.append(["Student ID", "Username", "First Name", "Last Name",
-                "Expected", "Valid", "Invalid", "Absent",
-                "Attendance %", "Absence %"])
-    for row in rows:
+    ws2 = wb.create_sheet(_("Attendance Summary"))
+    ws2.append([_("Student ID"), _("Username"), _("First Name"), _("Last Name"),
+                _("Expected"), _("Valid"), _("Invalid"), _("Absent"),
+                _("Attendance %"), _("Absence %")])
+    for row in iter_report_data(scope, **report_kwargs):
         ws2.append([
             row["student_id"], row["username"], row["first_name"], row["last_name"],
             row["expected"], row["valid"], row["invalid"], row["absent"],
             row["attendance_rate"], row["absence_rate"],
         ])
 
-    ws2.freeze_panes = "A2"
-    ws2.auto_filter.ref = ws2.dimensions
-
-    ws3 = wb.create_sheet("Attendance Daily")
-    ws3.append(["Student ID", "Username", "First Name", "Last Name",
-                "Date", "Day", "Entrance", "Exit", "Status"])
-    holidays = set(AcademicHoliday.objects.filter(academic_year=year).values_list("date", flat=True))
-    all_records = AttendanceRecord.objects.filter(academic_year=year).order_by("student_id", "attendance_date")
-    records_by_student = defaultdict(list)
-    for rec in all_records:
-        records_by_student[rec.student_id].append(rec)
-    for row in rows:
-        student_records = records_by_student.get(row["student_id"], [])
-        entrance_by_date = {}
-        exit_by_date = {}
-        for rec in student_records:
-            if rec.action == "entrance":
-                entrance_by_date[rec.attendance_date] = rec
-            else:
-                exit_by_date[rec.attendance_date] = rec
-        expected = get_expected_dates(year)
-        for d in expected:
-            has_entrance = d in entrance_by_date
-            has_exit = d in exit_by_date
-            if has_entrance and has_exit:
-                status = "Valid"
-            elif has_entrance or has_exit:
-                status = "Invalid"
-            else:
-                status = "Absent"
-            ws3.append([
-                row["student_id"], row["username"], row["first_name"], row["last_name"],
-                d.isoformat(), d.strftime("%A"),
-                d.isoformat() if has_entrance else "", d.isoformat() if has_exit else "",
-                status,
-            ])
-    ws3.freeze_panes = "A2"
-    ws3.auto_filter.ref = ws3.dimensions
+    ws3 = wb.create_sheet(_("Attendance Daily"))
+    ws3.append([_("Student ID"), _("Username"), _("First Name"), _("Last Name"),
+                _("Date"), _("Day"), _("Entrance"), _("Exit"), _("Status")])
+    expected = get_expected_dates(scope)
+    report_rows = iter_report_data(scope, **report_kwargs)
+    while True:
+        batch = list(islice(report_rows, 500))
+        if not batch:
+            break
+        student_ids = [row["student_id"] for row in batch]
+        records_by_student = defaultdict(list)
+        attendance_queryset = AttendanceRecord.objects.filter(
+            course_offering__academic_year_level=scope, student_id__in=student_ids
+        )
+        if report_kwargs["course_offering_id"]:
+            attendance_queryset = attendance_queryset.filter(course_offering_id=report_kwargs["course_offering_id"])
+        for rec in attendance_queryset.order_by("student_id", "attendance_date"):
+            records_by_student[rec.student_id].append(rec)
+        for row in batch:
+            entrance_by_date = {rec.attendance_date for rec in records_by_student[row["student_id"]] if rec.action == "entrance"}
+            exit_by_date = {rec.attendance_date for rec in records_by_student[row["student_id"]] if rec.action == "exit"}
+            for day in expected:
+                has_entrance = day in entrance_by_date
+                has_exit = day in exit_by_date
+                status = _("Valid") if has_entrance and has_exit else (_("Invalid") if has_entrance or has_exit else _("Absent"))
+                ws3.append([
+                    row["student_id"], row["username"], row["first_name"], row["last_name"],
+                    day.isoformat(), formats.date_format(day, "l"),
+                    day.isoformat() if has_entrance else "", day.isoformat() if has_exit else "", status,
+                ])
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    safe_name = _safe_filename(year.name)
+    safe_name = _safe_filename(scope.academic_year.name)
     response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
     return response
 
+
+@capability_required(can_view_reports)
+def export_evaluation_xlsx(request):
+    formula_id = request.GET.get("formula")
+    scope_id = request.GET.get("scope")
+    offering_id = request.GET.get("course_offering")
+    if formula_id and str(formula_id).isdigit():
+        formula = get_object_or_404(
+            PromotionFormula.objects.select_related("academic_year_level__academic_year", "academic_year_level__level"),
+            pk=int(formula_id),
+        )
+    else:
+        if not scope_id or not str(scope_id).isdigit():
+            return HttpResponse(_("Promotion formula is required."), status=400)
+        formula = PromotionFormula.objects.filter(
+            academic_year_level_id=int(scope_id),
+            course_offering_id=int(offering_id) if offering_id and str(offering_id).isdigit() else None,
+        ).select_related("academic_year_level__academic_year", "academic_year_level__level").first()
+        if formula is None:
+            return HttpResponse(_("Promotion formula is required."), status=404)
+    workbook = build_evaluation_workbook(formula)
+    response = HttpResponse(
+        workbook.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    safe_name = _safe_filename(
+        f"{formula.academic_year_level.academic_year.name}-{formula.academic_year_level.level.display_name}"
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="evaluation_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    )
+    return response
 
 def robots_txt(request):
     return HttpResponse(
@@ -3698,7 +4733,6 @@ def robots_txt(request):
         f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}\n",
         content_type="text/plain",
     )
-
 
 def sitemap_xml(request):
     urls = [

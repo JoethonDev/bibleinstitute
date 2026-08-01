@@ -26,6 +26,42 @@
             {% endfor %}
           </select>
         </div>
+        <div class="col-12 col-md-4 col-lg-3">
+          <label for="level" class="form-label">{% translate "Level" %}</label>
+          <select id="level" name="level" class="form-select">
+            <option value="">{% translate "All levels" %}</option>
+            {% for level in levels %}
+              <option value="{{ level.id }}" {% if selected_level == level.id %}selected{% endif %}>{{ level.display_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-lg-2">
+          <label for="date" class="form-label">{% translate "Date" %}</label>
+          <input id="date" name="date" type="date" value="{{ selected_date }}" class="form-control">
+        </div>
+        <div class="col-12 col-md-4 col-lg-2">
+          <label for="action" class="form-label">{% translate "Action" %}</label>
+          <select id="action" name="action" class="form-select">
+            <option value="">{% translate "All actions" %}</option>
+            <option value="entrance" {% if selected_action == "entrance" %}selected{% endif %}>{% translate "Entrance" %}</option>
+            <option value="exit" {% if selected_action == "exit" %}selected{% endif %}>{% translate "Exit" %}</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-5 col-lg-3">
+          <label for="course-offering" class="form-label">{% translate "Course" %}</label>
+          <select id="course-offering" name="course_offering" class="form-select">
+            <option value="">{% translate "All courses" %}</option>
+            {% for co in course_offerings %}
+              <option value="{{ co.id }}" {% if selected_offering == co.id %}selected{% endif %}>
+                {{ co.course.name }} — {{ co.academic_year_level.level.display_name }} — {{ co.academic_year_level.academic_year }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-5 col-lg-3">
+          <label for="student" class="form-label">{% translate "Student" %}</label>
+          <input id="student" name="student" type="search" value="{{ student_search }}" class="form-control" placeholder="{% translate 'Name, username, or email' %}">
+        </div>
         <div class="col-12 col-md-auto">
           <button type="submit" class="btn btn-primary w-100">{% translate "Filter" %}</button>
         </div>
@@ -37,6 +73,7 @@
           <thead>
             <tr>
               <th>{% translate "Student" %}</th>
+              <th>{% translate "Course" %}</th>
               <th>{% translate "Year" %}</th>
               <th>{% translate "Date" %}</th>
               <th>{% translate "Action" %}</th>
@@ -50,7 +87,8 @@
             {% for r in records %}
               <tr>
                 <td class="fw-semibold">{{ r.student.get_full_name|default:r.student.username }}</td>
-                <td>{{ r.academic_year }}</td>
+                <td>{{ r.course_offering.course.name|default:"—" }}</td>
+                <td>{{ r.course_offering.academic_year_level.academic_year }}</td>
                 <td>{{ r.attendance_date }}</td>
                 <td>{{ r.get_action_display }}</td>
                 <td>{{ r.scanned_by.get_full_name|default:r.scanned_by.username|default:"—" }}</td>
@@ -62,11 +100,52 @@
                 </td>
               </tr>
             {% empty %}
-              <tr><td colspan="8" class="text-center text-muted py-5">{% translate "No attendance records found." %}</td></tr>
+              <tr><td colspan="9" class="text-center text-muted py-5">{% translate "No attendance records found." %}</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+      {% if page_obj and page_obj.paginator.num_pages > 1 %}
+      <nav class="px-3 pb-3" aria-label="{% translate 'Attendance pagination' %}">
+        <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+          {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&level={{ selected_level }}&date={{ selected_date }}&action={{ selected_action }}&course_offering={{ selected_offering }}&student={{ student_search|urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+              <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+            </a>
+          </li>
+          {% else %}
+          <li class="page-item disabled" aria-disabled="true">
+            <span class="page-link rounded-pill">
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+              <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+            </span>
+          </li>
+          {% endif %}
+          {% for page_num in page_obj.paginator.page_range %}
+          <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
+            <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&level={{ selected_level }}&date={{ selected_date }}&action={{ selected_action }}&course_offering={{ selected_offering }}&student={{ student_search|urlencode }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
+          </li>
+          {% endfor %}
+          {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&level={{ selected_level }}&date={{ selected_date }}&action={{ selected_action }}&course_offering={{ selected_offering }}&student={{ student_search|urlencode }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+              <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+            </a>
+          </li>
+          {% else %}
+          <li class="page-item disabled" aria-disabled="true">
+            <span class="page-link rounded-pill">
+              <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+            </span>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
       {% else %}
       <div class="empty-state">
         <div class="empty-state-content text-center py-5">

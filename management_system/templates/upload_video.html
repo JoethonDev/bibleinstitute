@@ -8,6 +8,11 @@
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
             <span class="info">{% translate "Loading..." %}</span>
         </button>
+        <div class="text-center mb-3">
+            <a href="{% url 'lesson-create' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-plus-circle me-1"></i>{% translate "Create Lesson" %}
+            </a>
+        </div>
         <div class="form col-12 col-md-8 col-lg-6 m-auto overflow-y-scroll p-2">
             <div class="mb-3">
                 <label for="folder-name" class="form-label">{% translate "Folder" %}</label>
@@ -36,6 +41,39 @@
                 <small class="form-text text-muted">
                     {% translate "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 500MB per file." %}
                 </small>
+            </div>
+
+            <!-- Scheduled Lesson Section -->
+            <div id="scheduled-lesson-section" class="mb-3 p-3 border rounded">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="schedule-lesson-toggle">
+                    <label class="form-check-label" for="schedule-lesson-toggle">
+                        {% translate "Create a lesson draft from uploaded files" %}
+                    </label>
+                </div>
+                <div id="scheduled-lesson-fields" class="d-none">
+                    <div class="mb-2">
+                        <label for="lesson-name-input" class="form-label">{% translate "Lesson Name" %}</label>
+                        <input type="text" class="form-control" id="lesson-name-input"
+                               placeholder="{% translate 'Enter lesson name' %}">
+                    </div>
+                    <div class="mb-2">
+                        <label for="course-offering-select" class="form-label">{% translate "Course Offering" %}</label>
+                        <select class="form-select" id="course-offering-select">
+                            <option value="">{% translate "Select offering..." %}</option>
+                            {% for offering in course_offerings %}
+                            <option value="{{ offering.pk }}">
+                                {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="expected-files-preview" class="d-none mb-2">
+                        <h6>{% translate "Expected files after upload" %}</h6>
+                        <ul id="expected-files-list" class="list-group"></ul>
+                    </div>
+                    <div id="schedule-status" class="alert d-none mb-0" role="alert"></div>
+                </div>
             </div>
 
             <!-- Validation Errors Display -->
@@ -68,50 +106,43 @@
         (() => {
             // Translations for JavaScript messages
             const jsTranslations_upload = {
-                'en': {
-                    'loading': 'Loading...',
-                    'loaded': 'Loaded!',
-                    'process': 'Process',
-                    'upload': 'Upload',
-                    'videoProcessingFailed': 'Video processing failed for',
-                    'readingSegmentationFailed': 'Reading segmentation for {fileName} has failed',
-                    'videoSegmentationFailed': 'Video segmentation failed',
-                    'audioSegmentationFailed': 'Audio segmentation failed',
-                    'failedToGetPresignedUrl': 'Failed to get presigned URL',
-                    'uploadFailed': 'Upload failed',
-                    'playlistUploadFailed': 'Playlist upload failed:',
-                    'segmentUploadFailed': 'Segment {i} upload failed:',
-                    'uploadProcessFailed': 'Upload process failed:'
-                },
-                'ar': {
-                    'loading': 'جاري التحميل...',
-                    'loaded': 'تم التحميل!',
-                    'process': 'معالجة',
-                    'upload': 'رفع',
-                    'videoProcessingFailed': 'فشلت معالجة الفيديو لـ',
-                    'readingSegmentationFailed': 'فشل قراءة التجزئة لـ {fileName}',
-                    'videoSegmentationFailed': 'فشل تجزئة الفيديو',
-                    'audioSegmentationFailed': 'فشل تجزئة الصوت',
-                    'failedToGetPresignedUrl': 'فشل الحصول على رابط التحميل المسبق',
-                    'uploadFailed': 'فشل الرفع',
-                    'playlistUploadFailed': 'فشل رفع قائمة التشغيل:',
-                    'segmentUploadFailed': 'فشل رفع الجزء {i}:',
-                    'uploadProcessFailed': 'فشل عملية الرفع:',
-                    'invalidFileType': 'Invalid file type: {type}. Allowed types: MP4, MP3, PDF',
-                    'fileSizeExceeded': 'File size exceeds maximum: {size}MB. Maximum: 500MB',
-                    'noFilesSelected': 'No files selected',
-                    'invalidFiles': 'Some files are invalid and will not be uploaded',
-                    'selectedFiles': 'Selected Files',
-                    'invalidFileTypeAr': 'نوع الملف غير مسموح: {type}. الأنواع المسموحة: MP4، MP3، PDF',
-                    'fileSizeExceededAr': 'حجم الملف يتجاوز الحد الأقصى: {size}ميجابايت. الحد الأقصى: 500 ميجابايت',
-                    'noFilesSelectedAr': 'لم يتم اختيار أي ملفات',
-                    'invalidFilesAr': 'بعض الملفات غير صالحة ولن يتم رفعها'
-                }
+                'loading': '{% translate "Loading..."|escapejs %}',
+                'loaded': '{% translate "Loaded!"|escapejs %}',
+                'process': '{% translate "Process"|escapejs %}',
+                'upload': '{% translate "Upload"|escapejs %}',
+                'videoProcessingFailed': '{% translate "Video processing failed for"|escapejs %}',
+                'readingSegmentationFailed': '{% translate "Reading segmentation for {fileName} has failed"|escapejs %}',
+                'videoSegmentationFailed': '{% translate "Video segmentation failed"|escapejs %}',
+                'audioSegmentationFailed': '{% translate "Audio segmentation failed"|escapejs %}',
+                'failedToGetPresignedUrl': '{% translate "Failed to get presigned URL"|escapejs %}',
+                'uploadFailed': '{% translate "Upload failed"|escapejs %}',
+                'playlistUploadFailed': '{% translate "Playlist upload failed:"|escapejs %}',
+                'segmentUploadFailed': '{% translate "Segment {i} upload failed:"|escapejs %}',
+                'uploadProcessFailed': '{% translate "Upload process failed:"|escapejs %}',
+                'invalidFileType': '{% translate "Invalid file type: {type}. Allowed types: MP4, MP3, PDF"|escapejs %}',
+                'fileSizeExceeded': '{% translate "File size exceeds maximum: {size}MB. Maximum: 500MB"|escapejs %}',
+                'noFilesSelected': '{% translate "No files selected"|escapejs %}',
+                'invalidFiles': '{% translate "Some files are invalid and will not be uploaded"|escapejs %}',
+                'networkError': '{% translate "Network error during upload"|escapejs %}',
+                'scheduledLessonCreateFailed': '{% translate "Failed to create lesson draft"|escapejs %}',
+                'scheduledLessonFinalizeFailed': '{% translate "Failed to finalize lesson"|escapejs %}',
+                'scheduledLessonCreated': '{% translate "Lesson draft created"|escapejs %}',
+                'scheduledLessonPublished': '{% translate "Lesson published successfully"|escapejs %}',
+                'scheduleLessonNameRequired': '{% translate "Lesson name is required for scheduled upload"|escapejs %}',
+                'scheduleOfferingRequired': '{% translate "Course offering is required for scheduled upload"|escapejs %}',
+                'scheduleStatusCreating': '{% translate "Creating lesson draft..."|escapejs %}',
+                'scheduleStatusFinalizing': '{% translate "Finalizing lesson..."|escapejs %}',
+                'scheduleStatusDraft': '{% translate "Lesson draft created (ID: {id})"|escapejs %}',
+                'scheduleStatusPublished': '{% translate "Lesson published"|escapejs %}',
+                'scheduleStatusFailed': '{% translate "Lesson creation failed"|escapejs %}',
+                'expectedMediaVideoAudio': '{% translate "Video + Audio: {name}"|escapejs %}',
+                'expectedMediaAudio': '{% translate "Audio: {name}"|escapejs %}',
+                'expectedMediaBook': '{% translate "Book: {name}"|escapejs %}',
+                'expectedKey': '{% translate "Expected key:"|escapejs %}'
             };
 
             function getJsTranslation_upload(key, params = {}) {
-                const lang = document.documentElement.lang || 'en';
-                let message = jsTranslations_upload[lang][key] || jsTranslations_upload['en'][key];
+                let message = jsTranslations_upload[key] || key;
                 for (const param in params) {
                     message = message.replace(`{${param}}`, params[param]);
                 }
@@ -216,7 +247,7 @@
                 validFiles.forEach(result => {
                     const li = document.createElement('li');
                     li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                    
+
                     const fileInfo = document.createElement('div');
                     fileInfo.innerHTML = `
                         <strong>${result.file.name}</strong><br>
@@ -235,7 +266,30 @@
                 container.classList.remove('d-none');
             }
 
-            // Add validation to file input
+            // Add validation and scheduled preview to file input
+            function updateExpectedPreview() {
+                const isScheduled = document.getElementById('schedule-lesson-toggle').checked;
+                if (!isScheduled) {
+                    document.getElementById('expected-files-preview').classList.add('d-none');
+                    return;
+                }
+                const fileInput = document.getElementById('formFileMultiple');
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    document.getElementById('expected-files-preview').classList.add('d-none');
+                    return;
+                }
+                const validation = validateFiles(fileInput.files);
+                if (validation.validFiles.length === 0) {
+                    document.getElementById('expected-files-preview').classList.add('d-none');
+                    return;
+                }
+                // Reset part counter so preview IDs are deterministic per render
+                _partIdCounter = 0;
+                const folder = (document.getElementById('folder-name') || {}).value || '';
+                const descriptors = calculateExpectedMedia(validation.validFiles, folder);
+                renderExpectedPreview(descriptors);
+            }
+
             document.addEventListener('DOMContentLoaded', () => {
                 const fileInput = document.getElementById('formFileMultiple');
                 
@@ -243,7 +297,28 @@
                     const validation = validateFiles(e.target.files);
                     displayValidationErrors(validation.invalidFiles);
                     displaySelectedFiles(validation.validFiles);
+                    updateExpectedPreview();
                 });
+
+                // Schedule toggle shows/hides fields and updates preview
+                const scheduleToggle = document.getElementById('schedule-lesson-toggle');
+                const scheduleFields = document.getElementById('scheduled-lesson-fields');
+                scheduleToggle.addEventListener('change', () => {
+                    if (scheduleToggle.checked) {
+                        scheduleFields.classList.remove('d-none');
+                        updateExpectedPreview();
+                    } else {
+                        scheduleFields.classList.add('d-none');
+                        document.getElementById('expected-files-preview').classList.add('d-none');
+                        hideScheduleStatus();
+                    }
+                });
+
+                // Folder changes re-render expected-files preview
+                const folderInput = document.getElementById('folder-name');
+                if (folderInput) {
+                    folderInput.addEventListener('input', updateExpectedPreview);
+                }
             });
 
 
@@ -294,6 +369,9 @@
 
             window.__adminUploadQueue = window.__adminUploadQueue || { items: [], running: false };
 
+            // Global batch counter for unique batch IDs
+            window.__scheduledBatchCounter = window.__scheduledBatchCounter || 0;
+
             async function handleFiles(input) {
                 const files = input.files;
                 if (files.length === 0) {
@@ -316,7 +394,64 @@
                 }
 
                 const folder = folderName.value;
-                validation.validFiles.forEach(result => window.__adminUploadQueue.items.push({ ...result, folder }));
+                const isScheduled = document.getElementById('schedule-lesson-toggle').checked;
+
+                if (isScheduled) {
+                    const lessonName = document.getElementById('lesson-name-input').value.trim();
+                    const offeringSelect = document.getElementById('course-offering-select');
+                    const offeringId = parseInt(offeringSelect.value, 10);
+
+                    if (!lessonName) {
+                        showScheduleStatus(getJsTranslation_upload('scheduleLessonNameRequired'), 'warning');
+                        return;
+                    }
+                    if (!offeringId) {
+                        showScheduleStatus(getJsTranslation_upload('scheduleOfferingRequired'), 'warning');
+                        return;
+                    }
+
+                    // Calculate expected media from the current selection
+                    const expectedMedia = calculateExpectedMedia(validation.validFiles, folder);
+                    renderExpectedPreview(expectedMedia);
+
+                    // Create the lesson draft
+                    hideScheduleStatus();
+                    showScheduleStatus(getJsTranslation_upload('scheduleStatusCreating'), 'info');
+                    let lessonData;
+                    try {
+                        lessonData = await postScheduledLessonCreate({
+                            lesson_name: lessonName,
+                            course_offering: offeringId,
+                            expected_media: expectedMedia
+                        });
+                    } catch (err) {
+                        showScheduleStatus(err.message || getJsTranslation_upload('scheduledLessonCreateFailed'), 'danger');
+                        return;
+                    }
+
+                    const lessonId = lessonData.lesson_id;
+                    const batchId = ++window.__scheduledBatchCounter;
+                    showScheduleStatus(
+                        getJsTranslation_upload('scheduleStatusDraft', { id: lessonId }),
+                        'success'
+                    );
+
+                    // Push items with scheduled metadata
+                    validation.validFiles.forEach(result => {
+                        window.__adminUploadQueue.items.push({
+                            ...result,
+                            folder,
+                            scheduledLessonId: lessonId,
+                            scheduledBatchId: batchId
+                        });
+                    });
+                } else {
+                    // Ordinary upload — no scheduled lesson
+                    validation.validFiles.forEach(result => {
+                        window.__adminUploadQueue.items.push({ ...result, folder });
+                    });
+                }
+
                 input.value = '';
                 drainUploadQueue();
             }
@@ -326,7 +461,37 @@
                 if (queue.running) return;
                 queue.running = true;
                 try {
-                    while (queue.items.length) await processUploadItem(queue.items.shift());
+                    while (queue.items.length) {
+                        const item = queue.items.shift();
+                        let uploadResult;
+                        try {
+                            uploadResult = await processUploadItem(item);
+                        } catch (err) {
+                            console.error('Upload item failed:', err);
+                            uploadResult = { success: false, error: err.message };
+                        }
+                        // Finalize scheduled batch after all items of that batch complete
+                        if (item.scheduledLessonId) {
+                            const batchId = item.scheduledBatchId;
+                            const remaining = queue.items.some(i => i.scheduledBatchId === batchId);
+                            if (!remaining) {
+                                try {
+                                    showScheduleStatus(getJsTranslation_upload('scheduleStatusFinalizing'), 'info');
+                                    const finalizeData = await postScheduledLessonFinalize(item.scheduledLessonId);
+                                    if (finalizeData.status === 'published') {
+                                        showScheduleStatus(getJsTranslation_upload('scheduledLessonPublished'), 'success');
+                                    } else {
+                                        showScheduleStatus(
+                                            getJsTranslation_upload('scheduleStatusPublished') + ': ' + finalizeData.status,
+                                            'info'
+                                        );
+                                    }
+                                } catch (err) {
+                                    showScheduleStatus(err.message || getJsTranslation_upload('scheduledLessonFinalizeFailed'), 'danger');
+                                }
+                            }
+                        }
+                    }
                 } finally {
                     queue.running = false;
                 }
@@ -353,11 +518,13 @@
                             const videoSegments = await readSegments(videoName);
                             const audioSegments = await readSegments(audioName);
 
-                            console.log("Segmentation Complete:", videoSegments.length, "video segments created.");
-                            await uploadSegments(videoSegments, videoName, result.folder);
-                            await uploadSegments(audioSegments, audioName, result.folder);
+                            console.log("Segmentation Complete:", videoSegments.segments.length, "video segments created.");
+                            await uploadSegments(videoSegments, videoName, result.folder, 'Video Segments');
+                            await uploadSegments(audioSegments, audioName, result.folder, 'Audio Segments');
+                            return { success: true, type: 'video', fileName: fullFileName };
                         } catch (error) {
                             console.error(getJsTranslation_upload('videoProcessingFailed'), fileName, error);
+                            return { success: false, type: 'video', fileName: fullFileName, error: error.message };
                         } finally {
                             ffmpeg.FS("unlink", fullFileName);
                         }
@@ -374,16 +541,24 @@
                             // Read Segments
                             const audioSegments = await readSegments(audioName);
 
-                            console.log("Audio Segmentation Complete:", audioSegments.length, "segments created.");
-                            await uploadSegments(audioSegments, audioName, result.folder);
+                            console.log("Audio Segmentation Complete:", audioSegments.segments.length, "segments created.");
+                            await uploadSegments(audioSegments, audioName, result.folder, 'Audio Segments');
+                            return { success: true, type: 'audio', fileName: fullFileName };
                         } catch (error) {
                             console.error(getJsTranslation_upload('audioSegmentationFailed'), fileName, error);
+                            return { success: false, type: 'audio', fileName: fullFileName, error: error.message };
                         } finally {
                             ffmpeg.FS("unlink", fullFileName);
                         }
                     } else {
                         // Process non-media files (PDF)
-                        await uploadWholeFile(file, fileName, result.folder);
+                        try {
+                            await uploadWholeFile(file, fileName, result.folder);
+                            return { success: true, type: 'pdf', fileName: fullFileName };
+                        } catch (error) {
+                            console.error('PDF upload failed:', error);
+                            return { success: false, type: 'pdf', fileName: fullFileName, error: error.message };
+                        }
                     }
                 }
 
@@ -399,33 +574,46 @@
 
             async function readSegments(fileName) {
                     try {
-                        // Read generated files
-                        const files = [];
-                        // Add playlist file
-                        const playlistFile = ffmpeg.FS("readFile", `${fileName}.m3u8`)
+                        // Read playlist as text for URI rewriting
+                        const playlistData = ffmpeg.FS("readFile", `${fileName}.m3u8`);
                         ffmpeg.FS('unlink', `${fileName}.m3u8`);
+                        const playlistText = new TextDecoder().decode(playlistData);
 
-                        files.push(new Blob([playlistFile.buffer], { type: 'application/x-mpegURL' }));
-                        
+                        const segments = [];
                         for (let i = 0; i < 1000; i++) {
                             const index = String(i).padStart(3, '0');
                             const filename = `${fileName}_${index}.ts`;
                             
                             try {
                                 const data = ffmpeg.FS('readFile', filename);
-                                files.push(new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" }));
-                                // Clean up filesystem
+                                segments.push({
+                                    name: filename,
+                                    blob: new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" })
+                                });
                                 ffmpeg.FS('unlink', filename);
                             } catch (e) {
                                 break;
                             }
                         }
 
-                        return files;
+                        return { playlistText, segments };
                     } catch (error) {
                         console.error('FFmpeg error:', error);
                         throw new Error(getJsTranslation_upload('readingSegmentationFailed', { fileName: fileName }));
                     }
+            }
+
+            function rewritePlaylist(playlistText, segmentFolder) {
+                // Rewrite only media URI lines (non-comment, ending with .ts)
+                // to reference the canonical segment subfolder.
+                return playlistText.split('\n').map(line => {
+                    const trimmed = line.trim();
+                    if (trimmed && !trimmed.startsWith('#') && trimmed.endsWith('.ts')) {
+                        const basename = trimmed.split('/').pop();
+                        return `${segmentFolder}/${basename}`;
+                    }
+                    return line;
+                }).join('\n');
             }
             
             async function segmentVideo(fullFileName) {
@@ -446,10 +634,15 @@
                     // 4. Run FFmpeg command with await
                     await ffmpeg.run(
                         '-i', fullFileName,
-                        '-c', 'copy',          // Copy all streams without re-encoding
-                        '-map', '0',           // Include all streams from input
-                        '-f', 'hls',           // Use HLS format instead of generic segment
-                        '-hls_time', '10',     // Segment duration in seconds
+                        '-c:v', 'libx264',     // H.264 video encoding
+                        '-crf', '27',          // Quality/size tradeoff (higher=smaller)
+                        '-preset', 'medium',   // Default encoding speed/compression
+                        '-b:v', '900k',        // Cap video bitrate for lecture content
+                        '-pix_fmt', 'yuv420p', // Broad player compatibility
+                        '-map', '0:v:0',       // First video stream only (no audio)
+                        '-an',                 // No audio in video playlist
+                        '-f', 'hls',           // Use HLS format
+                        '-hls_time', '6',      // 6-second segments for shorter chunks
                         '-hls_list_size', '0', // Keep all segments in playlist
                         '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
                         `${fileName}.m3u8`        // Main playlist file
@@ -471,9 +664,9 @@
                         '-i', fullFileName,
                         '-vn',                    // no video
                         '-acodec', 'aac',
-                        '-b:a', '128k',
+                        '-b:a', '96k',           // Reduced audio bitrate
                         '-f', 'hls',
-                        '-hls_time', '30',
+                        '-hls_time', '8',        // 8-second segments
                         '-hls_list_size', '0',
                         '-hls_segment_filename', `${baseName}_%03d.ts`,
                         `${baseName}.m3u8`
@@ -506,9 +699,9 @@
                     await ffmpeg.run(
                         '-i', fullFileName,
                         '-acodec', 'aac',
-                        '-b:a', '128k',
+                        '-b:a', '96k',           // Reduced audio bitrate
                         '-f', 'hls',
-                        '-hls_time', '30',
+                        '-hls_time', '8',        // 8-second segments
                         '-hls_list_size', '0',
                         '-hls_segment_filename', `${baseName}_%03d.ts`,
                         `${baseName}.m3u8`
@@ -572,47 +765,41 @@
                 
             }
 
-            async function uploadSegments(files, fileName, folder) {
+            async function uploadSegments(sections, fileName, folder, segmentFolder) {
                 try {
-                    
-                    fileName = CSS.escape(fileName.split(".")[0])
+                    const baseName = fileName.split(".")[0];
+                    createProgressBar(baseName, "upload")
+                    let uploadBar = document.querySelector(`.upload-${CSS.escape(baseName)}`)
                     const uploadResults = [];
-                    createProgressBar(fileName, "upload")
-                    let uploadBar = document.querySelector(`.upload-${fileName}`)
-                    let filePath = createFilePath(fileName, folder)
 
-                    let playlist = files[0]
-                    let playlistPath = `${filePath}.m3u8`
-                    try {
+                    // Normalize folder prefix (preserve empty folder behavior)
+                    const f = (folder || '').replace(/\/+$/, '');
+                    const folderPrefix = f ? `${f}/` : '';
 
-                        await uploadR2(playlistPath, playlist)
+                    // Rewrite playlist with canonical segment subfolder references
+                    const rewrittenPlaylist = rewritePlaylist(sections.playlistText, segmentFolder);
+                    const playlistBlob = new Blob([rewrittenPlaylist], { type: 'application/x-mpegURL' });
 
-                    } catch (error) {
-                        console.error(getJsTranslation_upload('playlistUploadFailed'), error);
-                        uploadResults.push({
-                            status: 'failed',
-                            error: error.message
-                        });
-                    }
-                    
-                    // Remove m3u8 from files
-                    files.shift()
-                    for (const [i, file] of files.entries()) {
+                    // Upload playlist to selected-folder root
+                    const playlistPath = `${folderPrefix}${baseName}.m3u8`;
+                    await uploadR2(playlistPath, playlistBlob);
+
+                    // Upload each segment to <folder>/<segmentFolder>/<name>
+                    const segments = sections.segments;
+                    for (let i = 0; i < segments.length; i++) {
                         try {
-                            const index = String(i).padStart(3, '0');
-                            const segmentPath = `${filePath}_${index}.ts`
-                            await uploadR2(segmentPath, file)
+                            const segmentPath = `${folderPrefix}${segmentFolder}/${segments[i].name}`;
+                            await uploadR2(segmentPath, segments[i].blob);
                             uploadResults.push({
-                                index,
+                                index: segments[i].name,
                                 status: 'success'
                             });
-                            const percent = Math.round((uploadResults.length / files.length) * 100);
-                            updateProgressBar(uploadBar, percent)
-
+                            const percent = Math.round(((i + 1) / segments.length) * 100);
+                            updateProgressBar(uploadBar, percent);
                         } catch (error) {
                             console.error(getJsTranslation_upload('segmentUploadFailed', { i: i }), error);
                             uploadResults.push({
-                                index,
+                                index: segments[i].name,
                                 status: 'failed',
                                 error: error.message
                             });
@@ -629,7 +816,9 @@
 
             async function uploadWholeFile(file, fullFileName, folder) {
                 try {
-                    const [fileName, ext] = fullFileName.split(".")
+                    const extensionIndex = fullFileName.lastIndexOf(".");
+                    const fileName = extensionIndex >= 0 ? fullFileName.slice(0, extensionIndex) : fullFileName;
+                    const ext = extensionIndex >= 0 ? fullFileName.slice(extensionIndex + 1) : "";
                     const uploadResults = [];
                     createProgressBar(fileName, "upload")
                     let uploadBar = document.querySelector(`.upload-${CSS.escape(fileName)}`)
@@ -660,6 +849,143 @@
         
             function removeR2Files(){
                 document.querySelectorAll(".fa-file-alt").forEach(e => e.parentElement.parentElement.remove())
+            }
+
+            // --- Scheduled Lesson Helpers ---
+
+            let _partIdCounter = 0;
+            function generatePartId() {
+                return 'p' + Date.now() + '_' + (++_partIdCounter);
+            }
+
+            function normalizeFolderPrefix(folder) {
+                const f = (folder || '').replace(/\/+$/, '');
+                return f ? f + '/' : '';
+            }
+
+            function calculateExpectedMedia(validFiles, folder) {
+                const folderPrefix = normalizeFolderPrefix(folder);
+                const descriptors = [];
+                validFiles.forEach(result => {
+                    const partId = generatePartId();
+                    const fullFileName = result.file.name;
+                    const base = fullFileName.split('.')[0];
+                    if (result.type === 'video') {
+                        const videoName = base + '_video';
+                        descriptors.push({
+                            file_type: 'video',
+                            name: videoName,
+                            id: folderPrefix + videoName + '.m3u8',
+                            part_id: partId
+                        });
+                        const audioName = base + '_audio';
+                        descriptors.push({
+                            file_type: 'audio',
+                            name: audioName,
+                            id: folderPrefix + audioName + '.m3u8',
+                            part_id: partId
+                        });
+                    } else if (result.type === 'audio') {
+                        const audioName = 'audio_' + base;
+                        descriptors.push({
+                            file_type: 'audio',
+                            name: audioName,
+                            id: folderPrefix + audioName + '.m3u8',
+                            part_id: partId
+                        });
+                    } else if (result.type === 'document') {
+                        const normalizedFullName = result.file.name.split(' ').join('_');
+                        const extensionIndex = normalizedFullName.lastIndexOf('.');
+                        const normalizedBase = extensionIndex >= 0
+                            ? normalizedFullName.slice(0, extensionIndex)
+                            : normalizedFullName;
+                        descriptors.push({
+                            file_type: 'book',
+                            name: normalizedBase,
+                            id: folderPrefix + normalizedBase + '.pdf',
+                            part_id: partId
+                        });
+                    }
+                });
+                return descriptors;
+            }
+
+            function renderExpectedPreview(descriptors) {
+                const container = document.getElementById('expected-files-preview');
+                const list = document.getElementById('expected-files-list');
+                if (!descriptors || descriptors.length === 0) {
+                    container.classList.add('d-none');
+                    return;
+                }
+                list.innerHTML = '';
+                descriptors.forEach(d => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item py-1';
+                    let label;
+                    if (d.file_type === 'video') {
+                        label = getJsTranslation_upload('expectedMediaVideoAudio', { name: d.name });
+                    } else if (d.file_type === 'audio') {
+                        label = getJsTranslation_upload('expectedMediaAudio', { name: d.name });
+                    } else {
+                        label = getJsTranslation_upload('expectedMediaBook', { name: d.name });
+                    }
+                    const labelElement = document.createElement('strong');
+                    labelElement.textContent = label;
+                    const keyElement = document.createElement('small');
+                    keyElement.className = 'text-muted';
+                    keyElement.textContent = getJsTranslation_upload('expectedKey') + ' ' + d.id;
+                    li.appendChild(labelElement);
+                    li.appendChild(document.createElement('br'));
+                    li.appendChild(keyElement);
+                    list.appendChild(li);
+                });
+                container.classList.remove('d-none');
+            }
+
+            function showScheduleStatus(message, type) {
+                const el = document.getElementById('schedule-status');
+                el.textContent = message;
+                el.className = 'alert alert-' + type + ' mb-0';
+                el.classList.remove('d-none');
+            }
+
+            function hideScheduleStatus() {
+                const el = document.getElementById('schedule-status');
+                el.classList.add('d-none');
+            }
+
+            async function postScheduledLessonCreate(payload) {
+                const resp = await fetch('{% url "scheduled-lesson-create" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    throw new Error(errData.message || getJsTranslation_upload('scheduledLessonCreateFailed'));
+                }
+                return resp.json();
+            }
+
+            async function postScheduledLessonFinalize(lessonId) {
+                const template = '{{ scheduled_lesson_finalize_url_template|escapejs }}';
+                const url = template.replace('/0/', '/' + lessonId + '/');
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: '{}'
+                });
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    throw new Error(errData.message || getJsTranslation_upload('scheduledLessonFinalizeFailed'));
+                }
+                return resp.json();
             }
 
             function modifyFolderInput(folderLink){

@@ -11,10 +11,10 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.timezone import now
 from django.http import HttpResponse
-from django.db.models import Q, F
 from logging import getLogger
 from management_system.utils.decorators import check_role_permission
-from management_system.models import User, Enrollment, MANAGEMENT_ROLES, Course, Grade
+from management_system.models import User, MANAGEMENT_ROLES, Grade
+from management_system.academic_access import user_can_write_offering_activity
 
 logger = getLogger(__name__)
 
@@ -52,49 +52,11 @@ def is_quiz_in_user_window(quiz, user) -> bool:
     if user.role and user.role.role in MANAGEMENT_ROLES:
         return True
 
-    if quiz.course_offering_id and Enrollment.objects.filter(student=user, status="active").filter(
-        Q(enrollment_type="normal", academic_year_id=quiz.course_offering.academic_year_id)
-        | Q(course_offering_id=quiz.course_offering_id)
-    ).exists():
-        return True
-
-    return False
+    return bool(quiz.course_offering_id and user_can_write_offering_activity(user, quiz.course_offering))
 
 
 def user_has_management_role(user) -> bool:
     return bool(user.role and user.role.role in MANAGEMENT_ROLES)
-
-
-def user_can_access_course(user, course) -> bool:
-    if user_has_management_role(user):
-        return True
-
-    if not user.role:
-        return False
-
-    active_enrollments = Enrollment.objects.filter(
-        student=user,
-        status='active',
-    )
-
-    if not active_enrollments.exists():
-        return False
-
-    # Normal enrollment grants access to all courses in the AcademicYear.
-    if active_enrollments.filter(
-        enrollment_type="normal",
-        academic_year__course_offerings__course=course,
-    ).exists():
-        return True
-
-    # Targeted enrollment (repeat/remedial/manual) grants access only to its specific offering.
-    if active_enrollments.filter(
-        enrollment_type__in=["repeat", "remedial", "manual"],
-        course_offering__course=course,
-    ).exists():
-        return True
-
-    return False
 
 
 def get_student_quiz_status(quiz, user, current_time=None):
@@ -156,16 +118,19 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     try:
         user = User.objects.get(username=request.user)
     except User.DoesNotExist:
-        return HttpResponse(_("Unauthorized"), status=401)
+        return HttpResponse(_("Unauthorized"), status=403)
     
     if not check_role_permission(user, 'management'):
         logger.warning(f"User: {user} attempted to access {view} dashboard")
-        return HttpResponse(_("Unauthorized"), status=401)
+        return HttpResponse(_("Unauthorized"), status=403)
     
     # Paginate objects
     page_obj = paginate_obj(request, obj)
     
     # Prepare filters
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+    context["pagination_query"] = pagination_params.urlencode()
     filters = ["year_filter.html", "naming_filter.html"]
     if "filters" in context:
         context['filters'].extend(filters)

@@ -13,6 +13,10 @@
       <dl class="row mb-4">
         <dt class="col-sm-4 text-muted">{% translate "Student" %}</dt>
         <dd class="col-sm-8 fw-semibold">{{ record.student.get_full_name|default:record.student.username }}</dd>
+        <dt class="col-sm-4 text-muted">{% translate "Course" %}</dt>
+        <dd class="col-sm-8">{{ record.course_offering.course.name }}</dd>
+        <dt class="col-sm-4 text-muted">{% translate "Academic Year / Level" %}</dt>
+        <dd class="col-sm-8">{{ record.course_offering.academic_year_level.academic_year }} — {{ record.course_offering.academic_year_level.level.display_name }}</dd>
         <dt class="col-sm-4 text-muted">{% translate "Current Date" %}</dt>
         <dd class="col-sm-8">{{ record.attendance_date }}</dd>
         <dt class="col-sm-4 text-muted">{% translate "Current Action" %}</dt>

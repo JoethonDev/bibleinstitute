@@ -28,48 +28,44 @@
         <div class="card-body p-4">
           <form method="get" class="row g-3 align-items-end">
             <div class="col-12 col-md-2">
-              <label class="form-label fw-semibold">{% translate "Level" %}</label>
+              <label class="form-label fw-semibold" for="level-select">{% translate "Level" %}</label>
               <select name="level" class="form-select" id="level-select"
                 onchange="var ay=document.getElementById('academic-year-select');ay.value='';this.form.submit()">
                 <option value="">{% translate "All levels" %}</option>
                 {% for lvl in levels %}
-                  <option value="{{ lvl }}" {% if selected_level|add:0 == lvl %}selected{% endif %}>{% translate "Level" %} {{ lvl }}</option>
+                  <option value="{{ lvl.ordering }}" {% if selected_level|add:0 == lvl.ordering %}selected{% endif %}>{% translate "Level" %} {{ lvl.ordering }}</option>
                 {% endfor %}
               </select>
             </div>
             <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">{% translate "Academic Year" %}</label>
+              <label class="form-label fw-semibold" for="academic-year-select">{% translate "Academic Year" %}</label>
               <select name="academic_year" class="form-select" id="academic-year-select">
                 <option value="">{% translate "Select year" %}</option>
                 {% for ay in academic_years %}
-                  <option value="{{ ay.id }}" data-level="{{ ay.level }}"
+                    <option value="{{ ay.id }}" data-level="{{ ay.level.ordering }}"
                     {% if selected_year and ay.id == selected_year.id %}selected{% endif %}
-                    {% if selected_level and ay.level != selected_level|add:0 %}class="d-none"{% endif %}>
-                    {{ ay.name }} — {% translate "Level" %} {{ ay.level }}
+                    {% if selected_level and ay.level.ordering != selected_level|add:0 %}class="d-none"{% endif %}>
+                    {{ ay.academic_year.name }} — {{ ay.level.display_name }}
                   </option>
                 {% endfor %}
               </select>
             </div>
             <div class="col-12 col-md-2">
-              <label class="form-label fw-semibold">{% translate "Student" %}</label>
-              <select name="student" class="form-select">
-                <option value="">{% translate "All students" %}</option>
-                {% for s in students %}
-                  <option value="{{ s.id }}" {% if selected_student|add:0 == s.id %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
-                {% endfor %}
-              </select>
+              <label class="form-label fw-semibold" for="student-search">{% translate "Student" %}</label>
+              <input type="text" name="student" id="student-search" class="form-control"
+                value="{{ selected_student }}" placeholder="{% translate 'Search by name or username' %}">
             </div>
             <div class="col-12 col-md-2">
-              <label class="form-label fw-semibold">{% translate "Study Mode" %}</label>
-              <select name="study_mode" class="form-select">
+              <label class="form-label fw-semibold" for="study-mode-select">{% translate "Study Mode" %}</label>
+              <select name="study_mode" class="form-select" id="study-mode-select">
                 <option value="">{% translate "All modes" %}</option>
                 <option value="online" {% if selected_study_mode == 'online' %}selected{% endif %}>{% translate "Online" %}</option>
                 <option value="offline" {% if selected_study_mode == 'offline' %}selected{% endif %}>{% translate "Offline" %}</option>
               </select>
             </div>
             <div class="col-12 col-md-2">
-              <label class="form-label fw-semibold">{% translate "Course" %}</label>
-              <select name="course_offering" class="form-select">
+              <label class="form-label fw-semibold" for="course-select">{% translate "Course" %}</label>
+              <select name="course_offering" class="form-select" id="course-select">
                 <option value="">{% translate "All courses" %}</option>
                 {% for co in course_offerings %}
                   <option value="{{ co.id }}" {% if selected_course_offering|add:0 == co.id %}selected{% endif %}>{{ co.course.name }}</option>
@@ -93,21 +89,6 @@
               </div>
             </div>
           </div>
-          {% if rows %}
-            <div class="col-6 col-md-3">
-              <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                  <div class="text-muted small">{% translate "Avg Grade" %}</div>
-                  <div class="h3 mb-0">
-                    {% with total_percent=0 %}
-                      {% for row in rows %}{% with total_percent=total_percent|add:row.grade_percent %}{% endwith %}{% endfor %}
-                      {% if row_count > 0 %}{{ rows|slice:':1'|first }}%{% else %}0{% endif %}
-                    {% endwith %}
-                  </div>
-                </div>
-              </div>
-            </div>
-          {% endif %}
         </div>
 
         <div class="card shadow-sm border-0">
@@ -116,16 +97,16 @@
               <table class="table align-middle mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th>{% translate "Student" %}</th>
-                    <th>{% translate "Mode" %}</th>
-                    <th>{% translate "Grade" %}</th>
-                    <th>{% translate "Grade %" %}</th>
-                    <th>{% translate "Expected" %}</th>
-                    <th>{% translate "Valid" %}</th>
-                    <th>{% translate "Invalid" %}</th>
-                    <th>{% translate "Absent" %}</th>
-                    <th>{% translate "Attendance %" %}</th>
-                    <th>{% translate "Absence %" %}</th>
+                    <th scope="col">{% translate "Student" %}</th>
+                    <th scope="col">{% translate "Mode" %}</th>
+                    <th scope="col">{% translate "Grade" %}</th>
+                    <th scope="col">{% translate "Grade %" %}</th>
+                    <th scope="col">{% translate "Expected" %}</th>
+                    <th scope="col">{% translate "Valid" %}</th>
+                    <th scope="col">{% translate "Invalid" %}</th>
+                    <th scope="col">{% translate "Absent" %}</th>
+                    <th scope="col">{% translate "Attendance %" %}</th>
+                    <th scope="col">{% translate "Absence %" %}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,6 +132,51 @@
               </table>
             </div>
           </div>
+          {% if page_obj and page_obj.paginator.num_pages > 1 %}
+            <div class="card-footer bg-transparent border-top-0">
+              <nav aria-label="{% translate 'Report pagination' %}">
+                <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+                  {% if page_obj.has_previous %}
+                    <li class="page-item">
+                      <a class="page-link rounded-pill" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                      </a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled" aria-disabled="true">
+                      <span class="page-link rounded-pill">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                      </span>
+                    </li>
+                  {% endif %}
+
+                  {% for page_num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
+                      <a class="page-link rounded-pill" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
+                    </li>
+                  {% endfor %}
+
+                  {% if page_obj.has_next %}
+                    <li class="page-item">
+                      <a class="page-link rounded-pill" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                      </a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled" aria-disabled="true">
+                      <span class="page-link rounded-pill">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                      </span>
+                    </li>
+                  {% endif %}
+                </ul>
+              </nav>
+            </div>
+          {% endif %}
         </div>
       {% else %}
         <div class="card shadow-sm border-0">

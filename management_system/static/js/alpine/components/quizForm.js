@@ -11,61 +11,17 @@
  */
 function quizForm() {
     return {
-        // Translations
-        translations: {
-            en: {
-                questionType: 'Question Type:',
-                mcq: 'Multiple Choice',
-                written: 'Written',
-                complete: 'Fill in the Blank',
-                orderEvents: 'Order Events',
-                matchRelated: 'Match Related',
-                question: 'Question',
-                questionPlaceholder: 'Enter the question text here...?',
-                grade: 'Grade',
-                anotherChoice: 'Add another choice...',
-                correctAnswer: 'Correct Answer:',
-                delete: 'Delete',
-                answerOptions: 'Answer Options',
-                studentAnswer: 'Student will write their answer here...',
-                studentComplete: 'Student will complete this...',
-                answer: 'Answer',
-                addItem: 'Add item',
-                addPair: 'Add pair',
-                eventItem: 'Event item',
-                leftItem: 'Left item',
-                rightItem: 'Right item',
-                moveUp: 'Move up',
-                moveDown: 'Move down'
-            },
-            ar: {
-                questionType: 'نوع السؤال:',
-                mcq: 'اختيار من متعدد',
-                written: 'مقالي',
-                complete: 'إكمال الفراغ',
-                orderEvents: 'ترتيب الأحداث',
-                matchRelated: 'المطابقة',
-                question: 'السؤال',
-                questionPlaceholder: 'أدخل نص السؤال هنا...؟',
-                grade: 'الدرجة',
-                anotherChoice: 'أضف اختيار آخر...',
-                correctAnswer: 'الإجابة الصحيحة:',
-                delete: 'حذف',
-                answerOptions: 'خيارات الإجابة',
-                studentAnswer: 'سيكتب الطالب إجابته هنا...',
-                studentComplete: 'سيكمل الطالب هذا...',
-                answer: 'الإجابة',
-                addItem: 'إضافة عنصر',
-                addPair: 'إضافة زوج',
-                eventItem: 'عنصر الحدث',
-                leftItem: 'العنصر الأول',
-                rightItem: 'العنصر الثاني',
-                moveUp: 'للأعلى',
-                moveDown: 'للأسفل'
-            }
-        },
+        translations: {},
 
         init() {
+            const translationElement = this.$el.querySelector('#quiz-form-translations');
+            if (translationElement) {
+                try {
+                    this.translations = JSON.parse(translationElement.textContent);
+                } catch (error) {
+                    console.error('quizForm: invalid translation data', error);
+                }
+            }
             this.questionsContainer = this.$el.querySelector('.questions-container');
 
             if (!this.questionsContainer) {
@@ -94,8 +50,7 @@ function quizForm() {
          * Get translated string
          */
         t(key) {
-            const lang = document.documentElement.lang || 'en';
-            return this.translations[lang][key] || this.translations['en'][key];
+            return this.translations[key] || key;
         },
 
         /**

@@ -3,8 +3,8 @@ import io
 import json
 import re
 from collections import defaultdict
-from django.http import HttpResponse
-from django.db.models import Q
+from django.http import HttpResponse, StreamingHttpResponse
+from django.db.models import F, Q, Sum, Window
 from django.utils.translation import gettext as _
 from django.utils import timezone
 from ..models import User, Quiz, Submission, Question, Grade, Role
@@ -105,17 +105,15 @@ def _build_submission_map(submissions):
     return grouped
 
 
-def build_yearly_transcript_rows(year, name=None, course=None, role=None):
-    """
-    Build transcript rows and running totals for the yearly transcript dashboard/export.
-    """
+def yearly_transcript_queryset(year, name=None, course=None, role=None):
+    """Return a lazy transcript query with running totals calculated in SQL."""
     try:
         year = int(year)
     except (TypeError, ValueError):
         year = timezone.now().year
-
-    query = Grade.objects.select_related('user', 'quiz', 'quiz__course').filter(submitted_at__year=year)
-
+    query = Grade.objects.select_related("user", "quiz", "quiz__course_offering__course").filter(
+        submitted_at__year=year
+    )
     if name:
         query = query.filter(
             Q(user__first_name__icontains=name)
@@ -124,52 +122,46 @@ def build_yearly_transcript_rows(year, name=None, course=None, role=None):
         )
 
     if course:
-        query = query.filter(quiz__course__name__icontains=course)
+        query = query.filter(quiz__course_offering__course__name__icontains=course)
 
     if role:
         query = query.filter(user__role__role=role)
+    partition = [F("user_id"), F("quiz__course_offering__course_id")]
+    return query.annotate(
+        course_accumulated_grade=Window(Sum("total_grade"), partition_by=partition, order_by=["submitted_at", "pk"]),
+        course_accumulated_total=Window(Sum("quiz__total_grade"), partition_by=partition, order_by=["submitted_at", "pk"]),
+        overall_accumulated_grade=Window(Sum("total_grade"), partition_by=[F("user_id")], order_by=["submitted_at", "pk"]),
+        overall_accumulated_total=Window(Sum("quiz__total_grade"), partition_by=[F("user_id")], order_by=["submitted_at", "pk"]),
+    ).order_by("user__username", "quiz__course_offering__course__name", "quiz__name", "pk")
 
-    grades = list(query.order_by('user__username', 'quiz__course__name', 'quiz__name'))
 
-    course_totals = defaultdict(lambda: {'grade': 0, 'total': 0})
-    user_totals = defaultdict(lambda: {'grade': 0, 'total': 0})
-
-    for grade in grades:
-        course_key = (grade.user_id, grade.quiz.course_id if grade.quiz.course else None)
-        course_totals[course_key]['grade'] += grade.total_grade
-        course_totals[course_key]['total'] += grade.quiz.total_grade
-        user_totals[grade.user_id]['grade'] += grade.total_grade
-        user_totals[grade.user_id]['total'] += grade.quiz.total_grade
-
-    rows = []
-    for grade in grades:
-        course_key = (grade.user_id, grade.quiz.course_id if grade.quiz.course else None)
-        course_summary = course_totals[course_key]
-        overall_summary = user_totals[grade.user_id]
-        rows.append({
-            'user_id': grade.user_id,
-            'username': grade.user.username,
-            'first_name': grade.user.first_name,
-            'last_name': grade.user.last_name,
-            'course_name': grade.quiz.course.name if grade.quiz.course else '',
-            'quiz_name': grade.quiz.name,
-            'quiz_grade': grade.total_grade,
-            'quiz_total': grade.quiz.total_grade,
-            'course_accumulated_grade': course_summary['grade'],
-            'course_accumulated_total': course_summary['total'],
-            'overall_accumulated_grade': overall_summary['grade'],
-            'overall_accumulated_total': overall_summary['total'],
-            'submitted_at': grade.submitted_at,
-            'submitted_at_display': grade.submitted_at.strftime('%Y-%m-%d %H:%M:%S'),
-        })
-
+def _transcript_row(grade):
     return {
-        'year': year,
-        'rows': rows,
-        'grades': grades,
-        'course_totals': course_totals,
-        'user_totals': user_totals,
+        "user_id": grade.user_id,
+        "username": grade.user.username,
+        "first_name": grade.user.first_name,
+        "last_name": grade.user.last_name,
+        "course_name": grade.quiz.course_offering.course.name,
+        "quiz_name": grade.quiz.name,
+        "quiz_grade": grade.total_grade,
+        "quiz_total": grade.quiz.total_grade,
+        "course_accumulated_grade": grade.course_accumulated_grade,
+        "course_accumulated_total": grade.course_accumulated_total,
+        "overall_accumulated_grade": grade.overall_accumulated_grade,
+        "overall_accumulated_total": grade.overall_accumulated_total,
+        "submitted_at": grade.submitted_at,
+        "submitted_at_display": grade.submitted_at.strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+def build_yearly_transcript_rows(year, name=None, course=None, role=None):
+    """Build transcript rows for existing export callers."""
+    try:
+        normalized_year = int(year)
+    except (TypeError, ValueError):
+        normalized_year = timezone.now().year
+    grades = yearly_transcript_queryset(normalized_year, name, course, role)
+    return {"year": normalized_year, "rows": [_transcript_row(grade) for grade in grades]}
 
 
 def export_quiz_with_submissions_to_csv(quiz_id):
@@ -178,7 +170,7 @@ def export_quiz_with_submissions_to_csv(quiz_id):
     Returns HttpResponse with CSV data.
     """
     try:
-        quiz = Quiz.objects.select_related('course').get(id=quiz_id)
+        quiz = Quiz.objects.select_related('course_offering__course').get(id=quiz_id)
     except Quiz.DoesNotExist:
         # Return empty response if quiz doesn't exist
         response = HttpResponse('', content_type='text/csv')
@@ -192,7 +184,7 @@ def export_quiz_with_submissions_to_csv(quiz_id):
     # Write quiz header information
     writer.writerow([_('Quiz Export')])
     writer.writerow([_('Quiz Name'), quiz.name])
-    writer.writerow([_('Course'), quiz.course.name if quiz.course else ''])
+    writer.writerow([_('Course'), quiz.course_offering.course.name if quiz.course_offering_id else ''])
     writer.writerow([_('Opening Date'), quiz.opening_date.strftime('%Y-%m-%d %H:%M:%S') if quiz.opening_date else ''])
     writer.writerow([_('Closing Date'), quiz.closing_date.strftime('%Y-%m-%d %H:%M:%S') if quiz.closing_date else ''])
     writer.writerow([])  # Empty row separator
@@ -292,7 +284,7 @@ def export_quiz_summary_to_csv(quiz_id):
     Export a concise quiz report with user identity and grade columns.
     """
     try:
-        quiz = Quiz.objects.select_related('course').get(id=quiz_id)
+        quiz = Quiz.objects.select_related('course_offering__course').get(id=quiz_id)
     except Quiz.DoesNotExist:
         response = HttpResponse('', content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="quiz_not_found.csv"'
@@ -303,7 +295,7 @@ def export_quiz_summary_to_csv(quiz_id):
 
     writer.writerow([_('Quiz Summary Export')])
     writer.writerow([_('Quiz Name'), quiz.name])
-    writer.writerow([_('Course'), quiz.course.name if quiz.course else ''])
+    writer.writerow([_('Course'), quiz.course_offering.course.name if quiz.course_offering_id else ''])
     writer.writerow([])
 
     headers = [
@@ -340,53 +332,46 @@ def export_yearly_transcript_to_csv(year, name=None, course=None, role=None):
     """
     Export a transcript-style CSV grouped by student and course for a given year.
     """
-    output = io.StringIO()
-    writer = csv.writer(output)
+    try:
+        normalized_year = int(year)
+    except (TypeError, ValueError):
+        normalized_year = timezone.now().year
 
-    transcript = build_yearly_transcript_rows(year, name=name, course=course, role=role)
-    rows = transcript['rows']
+    def csv_rows():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([_('Yearly Transcript Export')])
+        writer.writerow([_('Academic Year'), normalized_year])
+        writer.writerow([])
+        yield output.getvalue()
 
-    writer.writerow([_('Yearly Transcript Export')])
-    writer.writerow([_('Academic Year'), transcript['year']])
-    writer.writerow([])
+        output.seek(0)
+        output.truncate(0)
+        headers = [
+            _('User ID'), _('Username'), _('First Name'), _('Last Name'),
+            _('Course Name'), _('Quiz Name'), _('Quiz Grade'), _('Quiz Total'),
+            _('Course Accumulated Grade'), _('Course Accumulated Total'),
+            _('Overall Accumulated Grade'), _('Overall Accumulated Total'), _('Submitted At'),
+        ]
+        writer.writerow(headers)
+        yield output.getvalue()
+        for grade in yearly_transcript_queryset(normalized_year, name, course, role).iterator(chunk_size=500):
+            row = _transcript_row(grade)
+            output.seek(0)
+            output.truncate(0)
+            writer.writerow([
+                _csv_safe_cell(row['user_id']), _csv_safe_cell(row['username']),
+                _csv_safe_cell(row['first_name']), _csv_safe_cell(row['last_name']),
+                _csv_safe_cell(row['course_name']), _csv_safe_cell(row['quiz_name']),
+                _csv_safe_cell(row['quiz_grade']), _csv_safe_cell(row['quiz_total']),
+                _csv_safe_cell(row['course_accumulated_grade']), _csv_safe_cell(row['course_accumulated_total']),
+                _csv_safe_cell(row['overall_accumulated_grade']), _csv_safe_cell(row['overall_accumulated_total']),
+                _csv_safe_cell(row['submitted_at_display']),
+            ])
+            yield output.getvalue()
 
-    headers = [
-        _('User ID'),
-        _('Username'),
-        _('First Name'),
-        _('Last Name'),
-        _('Course Name'),
-        _('Quiz Name'),
-        _('Quiz Grade'),
-        _('Quiz Total'),
-        _('Course Accumulated Grade'),
-        _('Course Accumulated Total'),
-        _('Overall Accumulated Grade'),
-        _('Overall Accumulated Total'),
-        _('Submitted At'),
-    ]
-    writer.writerow(headers)
-
-    for row in rows:
-        writer.writerow([
-            _csv_safe_cell(row['user_id']),
-            _csv_safe_cell(row['username']),
-            _csv_safe_cell(row['first_name']),
-            _csv_safe_cell(row['last_name']),
-            _csv_safe_cell(row['course_name']),
-            _csv_safe_cell(row['quiz_name']),
-            _csv_safe_cell(row['quiz_grade']),
-            _csv_safe_cell(row['quiz_total']),
-            _csv_safe_cell(row['course_accumulated_grade']),
-            _csv_safe_cell(row['course_accumulated_total']),
-            _csv_safe_cell(row['overall_accumulated_grade']),
-            _csv_safe_cell(row['overall_accumulated_total']),
-            _csv_safe_cell(row['submitted_at_display']),
-        ])
-
-    output.seek(0)
-    response = HttpResponse(output.read(), content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="transcript_{transcript["year"]}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    response = StreamingHttpResponse(csv_rows(), content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="transcript_{normalized_year}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
     return response
 
 
@@ -414,7 +399,7 @@ def export_single_submission_to_csv(grade_id):
     writer.writerow([_('Student'), grade.user.get_full_name()])
     writer.writerow([_('Username'), grade.user.username])
     writer.writerow([_('Quiz Name'), quiz.name])
-    writer.writerow([_('Course'), quiz.course.name if quiz.course else ''])
+    writer.writerow([_('Course'), quiz.course_offering.course.name if quiz.course_offering_id else ''])
     writer.writerow([_('Submission Date'), grade.submitted_at.strftime('%Y-%m-%d %H:%M:%S')])
     writer.writerow([_('Total Grade'), f"({grade.total_grade}/{quiz.total_grade}) Grade"])
     writer.writerow([])  # Empty row separator

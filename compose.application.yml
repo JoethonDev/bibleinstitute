@@ -1,0 +1,42 @@
+services:
+  # ── Django application ─────────────────────────────────────────
+  lms-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+        format: raw
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      POSTGRES_DB: ${POSTGRES_DB:-lms_database}
+      POSTGRES_USER: ${POSTGRES_USER:-lms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      SQLITE_SOURCE_PATH: /app/db.sqlite3
+    volumes:
+      - lms_static_data:/app/collectstatic
+    expose:
+      - 8000
+    # Do not publish host ports; Nginx is the external entry point.
+    # ports: []
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - lms_network
+
+volumes:
+  lms_static_data:
+    external: true
+
+networks:
+  lms_network:
+    external: true

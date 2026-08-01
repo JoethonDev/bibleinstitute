@@ -4,7 +4,7 @@
     class="btn btn-primary mobile-fab d-md-none position-fixed"
     @click="$store.ui.toggleMobileMenu()"
     x-data
-    aria-label="Toggle Menu"
+    aria-label="{% translate 'Toggle Menu' %}"
 >
     <i class="fas" :class="$store.ui.mobileMenuOpen ? 'fa-times' : 'fa-bars'"></i>
 </button>

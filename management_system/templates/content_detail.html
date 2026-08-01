@@ -1,0 +1,252 @@
+{% extends "admin_panel.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<nav aria-label="{% translate 'Content breadcrumb' %}">
+  <ol class="breadcrumb bg-transparent px-0 pt-2 mb-2 small">
+    <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}"><i class="fas fa-tachometer-alt me-1"></i>{% translate "Dashboard" %}</a></li>
+    {% if is_quiz %}
+    <li class="breadcrumb-item"><a href="{% url 'quiz-dashboard' %}">{% translate "Quizzes" %}</a></li>
+    {% else %}
+    <li class="breadcrumb-item"><a href="{% url 'lesson-dashboard' %}">{% translate "Lessons" %}</a></li>
+    {% endif %}
+    <li class="breadcrumb-item active" aria-current="page">{{ content.name|default:_("(untitled)") }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-3">
+
+  {% if back_url %}
+  <a href="{{ back_url }}" class="btn btn-sm btn-outline-secondary mb-3">
+    <i class="fas fa-arrow-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %} me-1"></i>
+    {% translate "Back" %}
+  </a>
+  {% endif %}
+
+  <!-- ── Main Header Card ── -->
+  <div class="card dashboard-card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <h5 class="mb-0 fw-bold">
+        {% if is_quiz %}
+        <i class="fas fa-question-circle text-warning me-2"></i>
+        {% else %}
+        <i class="fas fa-video text-info me-2"></i>
+        {% endif %}
+        {{ content.name|default:_("(untitled)") }}
+      </h5>
+      {% if edit_url %}
+      <a href="{{ edit_url }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-edit me-1"></i>{% translate "Edit" %}
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- ── Metadata Row ── -->
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Course" %}</div>
+          <div class="fw-semibold">{{ offering.course.name|default:"—" }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Level" %}</div>
+          <div class="fw-semibold">{{ offering.academic_year_level.level.display_name|default:"—" }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Academic Year" %}</div>
+          <div class="fw-semibold">{{ offering.academic_year_level.academic_year.name|default:"—" }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Status" %}</div>
+          <div>
+            {% if content.status == "published" %}
+            <span class="badge bg-success">{{ content.get_status_display }}</span>
+            {% elif content.status == "draft" %}
+            <span class="badge bg-warning text-dark">{{ content.get_status_display }}</span>
+            {% elif content.status == "archived" %}
+            <span class="badge bg-secondary">{{ content.get_status_display }}</span>
+            {% else %}
+            <span class="badge bg-light text-dark">{{ content.get_status_display|default:"—" }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if is_quiz %}
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Quiz Type" %}</div>
+          <div class="fw-semibold">{{ content.quiz_type|default:_("Unassigned") }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Total Grade" %}</div>
+          <div class="fw-semibold">{{ content.total_grade }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Opens" %}</div>
+          <div class="fw-semibold">{{ content.opening_date|date:"SHORT_DATETIME_FORMAT"|default:"—" }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Closes" %}</div>
+          <div class="fw-semibold">{{ content.closing_date|date:"SHORT_DATETIME_FORMAT"|default:"—" }}</div>
+        </div>
+        {% else %}
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Created" %}</div>
+          <div class="fw-semibold">{{ content.created_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Last Updated" %}</div>
+          <div class="fw-semibold">{{ content.updated_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</div>
+        </div>
+        {% endif %}
+
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Course Offering" %}</div>
+          <div class="fw-semibold">{{ offering.course.name|default:"—" }} ({{ offering.academic_year_level.level.display_name|default:"—" }})</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="stat-label">{% translate "Offering Status" %}</div>
+          <div>
+            {% if offering.status == "published" %}
+            <span class="badge bg-success">{{ offering.get_status_display }}</span>
+            {% elif offering.status == "draft" %}
+            <span class="badge bg-warning text-dark">{{ offering.get_status_display }}</span>
+            {% elif offering.status == "archived" %}
+            <span class="badge bg-secondary">{{ offering.get_status_display }}</span>
+            {% else %}
+            <span class="badge bg-light text-dark">{{ offering.get_status_display|default:"—" }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Content Section ── -->
+  {% if is_quiz %}
+    <!-- ════ QUIZ QUESTIONS ════ -->
+    <div class="card dashboard-card mb-4">
+      <div class="card-header">
+        <h6 class="mb-0 fw-bold"><i class="fas fa-list-ol me-2 text-warning"></i>{% translate "Questions" %}</h6>
+      </div>
+      {% if questions %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" class="text-center" style="width:48px;">#</th>
+              <th scope="col">{% translate "Title" %}</th>
+              <th scope="col">{% translate "Type" %}</th>
+              <th scope="col" class="text-center">{% translate "Grade" %}</th>
+              <th scope="col" class="text-center">{% translate "Auto Grade" %}</th>
+              <th scope="col">{% translate "Choices / Answer" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in questions %}
+            <tr>
+              <td class="text-center text-muted">{{ forloop.counter }}</td>
+              <td class="fw-semibold">{{ q.title|default:"—" }}</td>
+              <td>{{ q.get_question_type_display|default:q.question_type }}</td>
+              <td class="text-center">{{ q.grade }}</td>
+              <td class="text-center">
+                {% if q.auto_grade %}
+                <span class="badge bg-success"><i class="fas fa-check me-1"></i>{% translate "Auto" %}</span>
+                {% else %}
+                <span class="badge bg-warning text-dark"><i class="fas fa-pencil-alt me-1"></i>{% translate "Manual" %}</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted" style="max-width:300px;">
+                {% if q.question_type == "mcq" and q.choices %}
+                <button class="btn btn-sm btn-outline-info py-0 px-1" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#choices-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="choices-{{ forloop.counter }}">
+                  <i class="fas fa-eye me-1"></i>{% translate "View choices" %}
+                </button>
+                <div class="collapse mt-1" id="choices-{{ forloop.counter }}">
+                  <ul class="list-unstyled mb-0">
+                  {% for choice in q.get_choices_list %}
+                    <li><span class="badge bg-light text-dark me-1">{{ forloop.counter }}</span> {{ choice }}</li>
+                  {% empty %}
+                    <li class="text-muted">{% translate "(no choices)" %}</li>
+                  {% endfor %}
+                  </ul>
+                  {% if q.correct_answer %}
+                  <div class="mt-1 text-success small">
+                    <i class="fas fa-check-circle me-1"></i><strong>{% translate "Answer:" %}</strong> {{ q.correct_answer }}
+                  </div>
+                  {% endif %}
+                </div>
+                {% elif q.question_type in "order_events match_related" and q.config %}
+                <button class="btn btn-sm btn-outline-info py-0 px-1" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#config-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="config-{{ forloop.counter }}">
+                  <i class="fas fa-eye me-1"></i>{% translate "View config" %}
+                </button>
+                <div class="collapse mt-1 small" id="config-{{ forloop.counter }}">
+                  <pre class="mb-0" style="max-height:120px;overflow:auto;font-size:0.72rem;">{{ q.config|pprint|default:_("(empty)") }}</pre>
+                </div>
+                {% elif q.question_type == "written" or q.question_type == "complete" %}
+                  {% if q.correct_answer %}
+                  <span class="text-success"><i class="fas fa-check-circle me-1"></i>{% translate "Answer:" %} {{ q.correct_answer }}</span>
+                  {% else %}
+                  <span class="text-muted">{% translate "(open / manual grade)" %}</span>
+                  {% endif %}
+                {% else %}
+                <span class="text-muted">{% translate "(no preview)" %}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center py-4 text-muted">
+        <i class="fas fa-inbox me-2"></i>{% translate "No questions have been added to this quiz yet." %}
+      </div>
+      {% endif %}
+    </div>
+
+  {% else %}
+    <!-- ════ LESSON LINKS ════ -->
+    <div class="card dashboard-card mb-4">
+      <div class="card-header">
+        <h6 class="mb-0 fw-bold"><i class="fas fa-link me-2 text-info"></i>{% translate "Lesson Links" %}</h6>
+      </div>
+      {% if lesson_links %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" class="text-center" style="width:48px;">#</th>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "File Type" %}</th>
+              <th scope="col">{% translate "ID" %}</th>
+              <th scope="col">{% translate "Type" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in lesson_links %}
+            <tr>
+              <td class="text-center text-muted">{{ forloop.counter }}</td>
+              <td>{{ link.name|default:link.file_id|default:link.id|default:_("(unnamed)") }}</td>
+              <td><span class="badge bg-light text-dark">{{ link.file_type|default:link.type|default:_("—") }}</span></td>
+              <td class="small text-muted">{{ link.file_id|default:link.id|default:_("—") }}</td>
+              <td class="small text-muted">{{ link.type|default:_("—") }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center py-4 text-muted">
+        <i class="fas fa-link me-2"></i>{% translate "No file links have been added to this lesson yet." %}
+      </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

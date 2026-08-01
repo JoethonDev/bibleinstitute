@@ -33,7 +33,7 @@
            hx-target="#display-page"
            class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i>
-            <span>{% translate "Back to" %} {{ dynamic_view }}s</span>
+            <span>{% blocktranslate with view_name=dynamic_view %}Back to {{ view_name }}s{% endblocktranslate %}</span>
         </a>
         {% endwith %}
     </div>

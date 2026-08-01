@@ -98,13 +98,24 @@
             (() => {
                 // NOTE: All JavaScript logic has been preserved as requested.
                 const jsTranslations_quiz = {
-                    'en': { 'graded': 'Question graded', 'underReview': 'Question under review', 'input': 'input', 'textarea': 'textarea' },
-                    'ar': { 'graded': 'تم تصحيح السؤال', 'underReview': 'السؤال قيد المراجعة', 'input': 'حقل الإدخال', 'textarea': 'مربع النص' }
+                    'graded': '{% translate "Question graded"|escapejs %}',
+                    'underReview': '{% translate "Question under review"|escapejs %}',
+                    'input': '{% translate "input"|escapejs %}',
+                    'textarea': '{% translate "textarea"|escapejs %}',
+                    'day': '{% translate "day"|escapejs %}',
+                    'days': '{% translate "days"|escapejs %}',
+                    'hour': '{% translate "hour"|escapejs %}',
+                    'hours': '{% translate "hours"|escapejs %}',
+                    'minute': '{% translate "minute"|escapejs %}',
+                    'minutes': '{% translate "minutes"|escapejs %}',
+                    'second': '{% translate "second"|escapejs %}',
+                    'seconds': '{% translate "seconds"|escapejs %}',
+                    'listSeparator': '{% translate ", "|escapejs %}',
+                    'and': '{% translate " and "|escapejs %}'
                 };
 
                 function getJsTranslation_quiz(key) {
-                    const lang = document.documentElement.lang || 'en';
-                    return jsTranslations_quiz[lang][key] || jsTranslations_quiz['en'][key];
+                    return jsTranslations_quiz[key] || key;
                 }
 
                 let timerEl = document.querySelector("#timer span");
@@ -122,17 +133,17 @@
                     const seconds = remaining % 60;
 
                     const parts = [];
-                    if (days) parts.push(`${days} day${days === 1 ? '' : 's'}`);
-                    if (hours) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
-                    if (minutes) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
-                    if (!parts.length || seconds) parts.push(`${seconds} second${seconds === 1 ? '' : 's'}`);
+                    if (days) parts.push(`${days} ${getJsTranslation_quiz(days === 1 ? 'day' : 'days')}`);
+                    if (hours) parts.push(`${hours} ${getJsTranslation_quiz(hours === 1 ? 'hour' : 'hours')}`);
+                    if (minutes) parts.push(`${minutes} ${getJsTranslation_quiz(minutes === 1 ? 'minute' : 'minutes')}`);
+                    if (!parts.length || seconds) parts.push(`${seconds} ${getJsTranslation_quiz(seconds === 1 ? 'second' : 'seconds')}`);
 
                     if (parts.length === 1) {
                         return parts[0];
                     }
 
                     const lastPart = parts.pop();
-                    return `${parts.join(', ')} and ${lastPart}`;
+                    return `${parts.join(getJsTranslation_quiz('listSeparator'))}${getJsTranslation_quiz('and')}${lastPart}`;
                 }
 
                 function serializeStructuredAnswer(questionCard) {

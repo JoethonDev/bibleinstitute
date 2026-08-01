@@ -6,6 +6,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.20.3/video-js.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.20.3/video.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/videojs-seek-buttons@3.0.1/dist/videojs-seek-buttons.min.js"></script>
+    <script src="{% static 'js/alpine/components/progressTracker.js' %}?v=20260801-lesson-ui-3"></script>
 {% endblock %}
 
 {% block body %}
@@ -13,13 +14,14 @@
 {# Register quiz-status store globally so it works with HTMX #}
 <script>
     document.addEventListener('alpine:init', () => {
+        Alpine.data('progressTracker', progressTracker);
         Alpine.store('quizStatus', {
             statuses: {},
             loaded: false,
-            async load(courseId) {
+            async load(offeringId) {
                 if (this.loaded) return;
                 try {
-                    const url = "{% url 'api-quiz-status' 0 %}".replace('/0/', `/${courseId}/`);
+                    const url = "{% url 'api-quiz-status' 0 %}".replace('/0/', `/${offeringId}/`);
                     const res = await fetch(url);
                     if (!res.ok) return;
                     const data = await res.json();
@@ -36,11 +38,49 @@
     });
 </script>
 
-<div class="container-fluid p-lg-4 p-2" x-data x-init="$store.quizStatus.load({{ course_id }})">
+<div class="course-learning-shell container-fluid p-lg-4 p-2" x-data x-init="$store.quizStatus.load({{ offering_id }})">
+
+    {# --- Polished contextual course header --- #}
+    <div class="course-learning-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 p-3 p-lg-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="course-learning-header-icon d-flex align-items-center justify-content-center">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <div>
+                <h1 class="course-learning-title h4 fw-bold mb-1">{{ course.name }}</h1>
+                <div class="course-learning-meta d-flex flex-wrap align-items-center gap-2 small">
+                    <span class="course-learning-badge badge rounded-pill badge-soft">
+                        <i class="fas fa-layer-group me-1"></i>{{ offering.academic_year_level.level.display_name }}
+                    </span>
+                    <span class="course-learning-badge badge rounded-pill badge-soft">
+                        <i class="far fa-calendar-alt me-1"></i>{{ offering.academic_year_level.academic_year.name }}
+                    </span>
+                    {% if management_preview %}
+                        <span class="course-learning-badge badge rounded-pill badge-warning-soft">
+                            <i class="fas fa-eye me-1"></i>{% translate "Preview" %}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="course-learning-stats d-flex gap-2">
+            <div class="course-learning-stat d-flex align-items-center gap-1 px-3 py-2">
+                <i class="fas fa-play-circle"></i>
+                <span class="fw-semibold">{{ lessons|length }}</span>
+                <span class="small text-muted">{% translate "Lessons" %}</span>
+            </div>
+            <div class="course-learning-stat d-flex align-items-center gap-1 px-3 py-2">
+                <i class="fas fa-pen-to-square"></i>
+                <span class="fw-semibold">{{ quizzes|length }}</span>
+                <span class="small text-muted">{% translate "Quizzes" %}</span>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-4">
         <!-- ===== SIDEBAR ===== -->
         <div class="col-12 col-lg-4 col-xl-3">
-            <div class="user-card course-sidebar h-100">
+            <div class="user-card course-sidebar course-learning-sidebar h-100">
                 <!-- Header -->
                 <div class="p-3 d-flex align-items-center gap-2 course-sidebar-header">
                     <i class="fas fa-bars text-white opacity-75"></i>
@@ -49,16 +89,16 @@
 
                 <div class="p-2">
                     <!-- Lessons section -->
-                    <p class="px-2 pt-2 mb-1 text-muted fw-bold small text-uppercase section-kicker">
+                    <p class="px-2 pt-2 mb-1 text-muted fw-bold small text-uppercase section-kicker course-learning-sidebar__label">
                         <i class="fas fa-play-circle me-1"></i>{% translate "Lessons" %}
                         {% if lessons %}<span class="ms-1 badge rounded-pill badge-soft">{{ lessons|length }}</span>{% endif %}
                     </p>
-                    <div class="list-group list-group-flush mb-3" role="tablist">
+                    <div class="list-group list-group-flush mb-3 course-learning-sidebar__list" role="tablist">
                         {% for lesson in lessons %}
-                            <a class="list-group-item list-group-item-action pointer"
+                            <a class="list-group-item list-group-item-action pointer course-learning-sidebar__item"
                                hx-select="#content-loaded"
                                data-bs-toggle="list"
-                               hx-get="{% url 'lesson-details' course_id=lesson.course.id lesson_id=lesson.id %}"
+                               hx-get="{% url 'lesson-details' offering_id=offering_id lesson_id=lesson.id %}"
                                hx-trigger="click"
                                hx-target="#display-page"
                                hx-swap="innerHTML"
@@ -71,14 +111,14 @@
                     </div>
 
                     <!-- Quizzes section -->
-                    <p class="px-2 pt-1 mb-1 text-muted fw-bold small text-uppercase section-kicker">
+                    <p class="px-2 pt-1 mb-1 text-muted fw-bold small text-uppercase section-kicker course-learning-sidebar__label">
                         <i class="fas fa-pen-to-square me-1"></i>{% translate "Quizzes" %}
                         {% if quizzes %}<span class="ms-1 badge rounded-pill badge-soft">{{ quizzes|length }}</span>{% endif %}
                     </p>
-                    <div class="list-group list-group-flush" role="tablist" x-data>
+                    <div class="list-group list-group-flush course-learning-sidebar__list" role="tablist" x-data>
                         {% for quiz in quizzes %}
-                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-2"
-                               href="{% url 'quiz-details' quiz.course.id quiz.id %}">
+                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 course-learning-sidebar__item"
+                               href="{% url 'quiz-details' offering_id=offering_id quiz_id=quiz.id %}">
                                 <i class="fas fa-question-circle opacity-50 flex-shrink-0"></i>
                                 <span class="flex-grow-1 text-truncate">{{ quiz.name }}</span>
                                 <!-- Status badge (Alpine-driven) -->
@@ -101,7 +141,7 @@
 
         <!-- ===== MAIN CONTENT ===== -->
         <div class="col-12 col-lg-8 col-xl-9">
-            <div id="display-page" class="user-card content-panel">
+            <div id="display-page" class="user-card content-panel course-learning-panel">
                 {% block content %}
                 <div id="content-loaded" class="d-flex flex-column justify-content-center align-items-center h-100 text-muted p-4 content-empty">
                     <i class="fas fa-book-open fa-4x mb-3 opacity-25 text-accent"></i>
@@ -121,14 +161,13 @@
 <script>
     (() => {
         const jsTranslations_lesson = {
-            'en': { 'page': 'Page' },
-            'ar': { 'page': 'صفحة' }
+            'page': '{% translate "Page"|escapejs %}'
         };
 
         function disposeVideoJsPlayers(container) {
             const players = container.querySelectorAll('video.video-js');
             players.forEach(videoEl => {
-                const player = videojs.getPlayer(videoEl.id);
+                const player = videoEl.player;
                 if (player && typeof player.dispose === 'function') {
                     player.dispose();
                 }
@@ -136,12 +175,13 @@
         }
 
         function getJsTranslation_lesson(key) {
-            const lang = document.documentElement.lang || 'en';
-            return jsTranslations_lesson[lang][key] || jsTranslations_lesson['en'][key];
+            return jsTranslations_lesson[key] || key;
         }
 
         function initializeVideoJs(video) {
             if (video.player) return;
+            const source = video.querySelector('source');
+            if (!source || !source.src) return; // Guard: no signed source yet
             const player = videojs(video, {
                 controls: true,
                 fluid: true,
@@ -154,9 +194,10 @@
         function initializeHlsAudio(audio) {
             if (audio.hls) return;
             if (Hls.isSupported()) {
+                const source = audio.querySelector("source");
+                if (!source || !source.src) return; // Guard: no signed source yet
                 const hls = new Hls();
-                const source = audio.querySelector("source").src;
-                hls.loadSource(source);
+                hls.loadSource(source.src);
                 hls.attachMedia(audio);
                 audio.hls = hls;
             }
@@ -223,7 +264,7 @@
 
             } catch (error) {
                 console.error("Error loading PDF:", error);
-                if (pageInfo) pageInfo.textContent = "Error loading PDF.";
+                if (pageInfo) pageInfo.textContent = '{% translate "Error loading PDF."|escapejs %}';
             }
         }
 

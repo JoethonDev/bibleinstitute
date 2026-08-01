@@ -10,6 +10,11 @@
 <div class="container py-4">
   <h1 class="mb-4">{% translate "Attendance Scanner" %}</h1>
 
+  <div class="alert alert-info d-flex align-items-center gap-2 mb-4">
+    <i class="fas fa-info-circle" aria-hidden="true"></i>
+    <span>{% translate "Scan a QR code or look up a student, then select the course offering on the preview page before recording attendance." %}</span>
+  </div>
+
   {% if messages %}
     {% for msg in messages %}
       <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>

@@ -105,7 +105,7 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">{% translate "Name (Arabic)" %}</label>
-                                <input type="text" name="name_ar" class="form-control" value="{{ lvl.name_ar }}" placeholder="{% translate 'e.g. السنة الدراسية الثالثة' %}">
+                                <input type="text" name="name_ar" class="form-control" value="{{ lvl.name_ar }}" placeholder="{% translate 'e.g. Third Academic Year' %}">
                             </div>
                             <p class="text-muted small mb-0">{% translate "Leave blank to use the default translated name." %}</p>
                         </div>
@@ -157,37 +157,37 @@
         </div>
         {% endfor %}
     </div>
-</div>
 
-{# --- Create Level Modal --- #}
-<div class="modal fade" id="levelCreateModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content">
-            <form method="post" action="{% url 'level-create' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title">{% translate "New Level" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">{% translate "Level Number" %}</label>
-                        <input type="number" name="level" min="1" class="form-control" required placeholder="{% translate 'e.g. 3' %}">
+    {# --- Create Level Modal --- #}
+    <div class="modal fade" id="levelCreateModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <form method="post" action="{% url 'level-create' %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title">{% translate "New Level" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">{% translate "Name (English)" %} <small class="text-muted">{% translate "(optional)" %}</small></label>
-                        <input type="text" name="name_en" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Level Number" %}</label>
+                            <input type="number" name="level" min="1" class="form-control" required placeholder="{% translate 'e.g. 3' %}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Name (English)" %} <small class="text-muted">{% translate "(optional)" %}</small></label>
+                            <input type="text" name="name_en" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Name (Arabic)" %} <small class="text-muted">{% translate "(optional)" %}</small></label>
+                            <input type="text" name="name_ar" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">{% translate "Name (Arabic)" %} <small class="text-muted">{% translate "(optional)" %}</small></label>
-                        <input type="text" name="name_ar" class="form-control" placeholder="{% translate 'e.g. السنة الدراسية الثالثة' %}">
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 </div>

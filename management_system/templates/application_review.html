@@ -82,15 +82,6 @@
     <div class="d-flex gap-2 align-items-end">
         <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" class="application-decision-form">
             {% csrf_token %}
-            <div class="mb-2">
-                <label class="form-label small">{% translate "Academic Level" %}</label>
-                <select name="level" class="form-select form-select-sm" required>
-                    <option value="">{% translate "Select level..." %}</option>
-                    {% for key, label in COURSE_LEVELS %}
-                    <option value="{{ key }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
             <button type="submit" class="btn btn-success">
                 <i class="fas fa-check me-1"></i>{% translate "Activate" %}
             </button>

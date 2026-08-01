@@ -19,12 +19,14 @@ urlpatterns = [
     path('profile/<int:user_id>/', ProfileDetail.as_view(), name="check-profile"),
     path('profile/<int:user_id>/update/', ProfileUpdate.as_view(), name="update-profile"),
     path('courses/', view_courses, name="courses"),
-    path('courses/<int:course_id>/', view_course_details, name="course-details"),
-    path('courses/<int:course_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
-    path('courses/<int:course_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
-    path('api/courses/<int:course_id>/quiz-status/', api_quiz_status, name="api-quiz-status"),
-    path('lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
-    path('lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
+    path('design/student-ui/', student_ui_proposal, name="student-ui-proposal"),
+    path('design/admin-ui/', admin_ui_proposal, name="admin-ui-proposal"),
+    path('offerings/<int:offering_id>/', view_course_details, name="course-details"),
+    path('offerings/<int:offering_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
+    path('offerings/<int:offering_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
+    path('api/offerings/<int:offering_id>/quiz-status/', api_quiz_status, name="api-quiz-status"),
+    path('offerings/<int:offering_id>/lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
+    path('offerings/<int:offering_id>/lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
     
     # Admin Routes
     path('dashboard/', admin_panel, name="admin-panel"),
@@ -48,7 +50,7 @@ urlpatterns = [
     
     # Lesson Dashboard
     path('dashboard/lessons/', lesson_dashboard, name="lesson-dashboard"),
-    path('dashboard/lessons/<int:lesson_id>/', index, name="lesson-view"),
+    path('dashboard/lessons/<int:lesson_id>/', lesson_detail, name="lesson-view"),
     path('dashboard/lessons/create/', create_lesson, name="lesson-create"),
     path('dashboard/lessons/<int:lesson_id>/update/', update_lesson, name="lesson-update"),
     path('dashboard/lessons/<int:lesson_id>/delete/', DeleteLesson.as_view(), name="lesson-delete"),
@@ -57,7 +59,7 @@ urlpatterns = [
 
     # Quiz Dashboard
     path('dashboard/quizzez/', quiz_dashboard, name="quiz-dashboard"),
-    path('dashboard/quizzez/<int:quiz_id>/', index, name="quiz-view"),
+    path('dashboard/quizzez/<int:quiz_id>/', quiz_detail, name="quiz-view"),
     path('dashboard/quizzez/create/', create_quiz, name="quiz-create"),
     path('dashboard/quizzez/<int:quiz_id>/update/', update_quiz, name="quiz-update"),
     path('dashboard/quizzez/<int:quiz_id>/delete/', DeleteQuiz.as_view(), name="quiz-delete"),
@@ -75,6 +77,8 @@ urlpatterns = [
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),
     path('api/get-presigned-url/', upload_link, name="upload-link"),
+    path('api/scheduled-lessons/create/', scheduled_lesson_create, name="scheduled-lesson-create"),
+    path('api/scheduled-lessons/<int:lesson_id>/finalize/', scheduled_lesson_finalize, name="scheduled-lesson-finalize"),
     
     # R2 File Management
     path('dashboard/r2-management/', r2_management_dashboard, name="r2-management-dashboard"),
@@ -97,10 +101,9 @@ urlpatterns = [
     path('api/bulk-delete/lessons/', bulk_delete_lessons, name="bulk-delete-lessons"),
     path('api/bulk-delete/quizzes/', bulk_delete_quizzes, name="bulk-delete-quizzes"),
 
-    path('dashboard/course-offerings/<int:offering_id>/copy/', copy_course_offering, name="copy-course-offering"),
+    path('dashboard/academic/copy/', copy_course_offerings, name="copy-course-offerings"),
 
     # Academic Setup
-    path('courses-by-level/<int:level>/', courses_by_level, name="courses-by-level"),
     path('dashboard/levels/', levels_dashboard, name="levels-dashboard"),
     path('dashboard/levels/create/', level_create, name="level-create"),
     path('dashboard/levels/<int:level>/edit/', level_edit, name="level-edit"),
@@ -108,10 +111,19 @@ urlpatterns = [
     path('dashboard/academic/', academic_setup, name="academic-setup"),
     path('dashboard/academic/year/create/', academic_year_create, name="academic-year-create"),
     path('dashboard/academic/year/<int:year_id>/edit/', academic_year_edit, name="academic-year-edit"),
+    path('dashboard/academic/year/<int:year_id>/activate/', academic_year_activate, name="academic-year-activate"),
     path('dashboard/academic/year/<int:year_id>/delete/', academic_year_delete, name="academic-year-delete"),
+    path('dashboard/academic/year-level/<int:scope_id>/weekdays/', academic_year_level_weekdays, name="academic-year-level-weekdays"),
+    path('dashboard/academic/year-level/<int:scope_id>/delete/', academic_year_level_delete, name="academic-year-level-delete"),
+    path('dashboard/academic/year-level/<int:scope_id>/offerings/', academic_offerings_by_scope, name="academic-offerings-by-scope"),
     path('dashboard/academic/offering/create/', course_offering_create, name="course-offering-create"),
     path('dashboard/academic/offering/<int:offering_id>/edit/', course_offering_edit, name="course-offering-edit"),
     path('dashboard/academic/offering/<int:offering_id>/delete/', course_offering_delete, name="course-offering-delete"),
+    path('dashboard/academic/promotion-formula/', promotion_formula, name="promotion-formula"),
+    path('dashboard/academic/promotion-formula/result/<int:result_id>/override/', evaluation_result_override, name="evaluation-result-override"),
+    path('dashboard/academic/promotion-formula/result/<int:result_id>/promote/', promotion_result, name="promotion-result"),
+    path('dashboard/academic/promotion-formula/promote/', bulk_promotion_results, name="bulk-promotion-results"),
+    path('dashboard/academic/promotion-history/', promotion_history, name="promotion-history"),
 
     # Phase 3 — Student Applications
     path('signup/', signup, name="signup"),
@@ -136,8 +148,8 @@ urlpatterns = [
     path('dashboard/attendance/<int:record_id>/delete/', delete_attendance, name="attendance-delete"),
 
     # Phase 6 — Online Lecture Progress Tracking
-    path('api/lesson/<int:lesson_id>/start-session/<str:part_id>/', start_viewing_session, name="start-viewing-session"),
-    path('lesson/<int:lesson_id>/manifest/<int:file_index>/', lesson_manifest, name="lesson-manifest"),
+    path('api/offerings/<int:offering_id>/lesson/<int:lesson_id>/start-session/<int:file_index>/', start_viewing_session, name="start-viewing-session"),
+    path('offerings/<int:offering_id>/lesson/<int:lesson_id>/manifest/<int:file_index>/', lesson_manifest, name="lesson-manifest"),
     path('api/worker/receipt/', worker_receipt, name="worker-receipt"),
     path('api/progress/heartbeat/', progress_heartbeat, name="progress-heartbeat"),
     path('dashboard/progress/', progress_dashboard, name="progress-dashboard"),
@@ -146,6 +158,7 @@ urlpatterns = [
     path('dashboard/reports/', report_dashboard, name="report-dashboard"),
     path('dashboard/reports/export-csv/', export_report_csv, name="export-report-csv"),
     path('dashboard/reports/export-xlsx/', export_report_xlsx, name="export-report-xlsx"),
+    path('dashboard/academic/promotion-formula/export-xlsx/', export_evaluation_xlsx, name="export-evaluation-xlsx"),
 
     # Logout
     path('logout/', views.LogoutView.as_view(next_page='home'), name='logout'),

@@ -5,76 +5,100 @@
 {% block body %}
 <div class="container py-4 py-lg-5">
 
-    {% if not courses %}
+    {% if not sections %}
         <div class="text-center py-5 text-muted">
             <i class="fas fa-graduation-cap fa-3x mb-3 opacity-50"></i>
             <h4>{% translate "No courses available yet." %}</h4>
         </div>
     {% endif %}
 
-    {% for level in courses %}
-    <section class="mb-5">
-        <!-- Level heading -->
-        <div class="d-flex align-items-center gap-3 mb-4">
-            <h2 class="user-section-title mb-0">{{ level.level_name }}</h2>
-            <div class="flex-grow-1 section-rule"></div>
-            <span class="user-stat-badge">
-                <i class="fas fa-book-open"></i> {{ level.courses|length }} {% translate "courses" %}
-            </span>
-        </div>
-
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            {% for course in level.courses %}
-            <div class="col">
-                <div class="course-user-card">
-                    <a href="{% url 'course-details' course.id %}" class="text-decoration-none text-inherit d-block">
-                        <img src="{% static 'login-bg.jpg' %}" class="course-thumb" alt="{{ course.name }}">
-                    </a>
-                    <div class="card-body p-3">
-                        <h5 class="fw-bold mb-1">
-                            <a href="{% url 'course-details' course.id %}" class="text-decoration-none inherit-link">
-                                {{ course.name }}
-                            </a>
-                        </h5>
-                        {% if course.instructor %}
-                        <p class="text-muted small mb-2">
-                            <i class="fas fa-chalkboard-teacher me-1"></i>{{ course.instructor }}
-                        </p>
+    {% if sections %}
+    <div class="accordion" id="coursesSectionsAccordion">
+    {% for section in sections %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="course-section-heading-{{ forloop.counter }}">
+                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fw-semibold"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#course-section-collapse-{{ forloop.counter }}"
+                        aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                    <span class="d-flex align-items-center gap-2 flex-wrap w-100">
+                        <span>{{ section.academic_year.name }} — {{ section.level_name }}</span>
+                        {% if section.access_kind == 'current' %}
+                        <span class="badge bg-success">{% translate "Current" %}</span>
+                        {% elif section.access_kind == 'historical' %}
+                        <span class="badge bg-info">{% translate "Historical" %}</span>
+                        {% elif section.access_kind == 'exceptional' %}
+                        <span class="badge bg-warning text-dark">{% translate "Exceptional" %}</span>
+                        {% elif section.access_kind == 'management' %}
+                        <span class="badge bg-primary">{% translate "Management" %}</span>
                         {% endif %}
-                        {% if course.description %}
-                        <p class="text-secondary small mb-3 clamp-2">
-                            {{ course.description }}
-                        </p>
-                        {% endif %}
+                        <span class="user-stat-badge ms-auto flex-shrink-0">
+                            <i class="fas fa-book-open"></i> {{ section.offerings|length }} {% translate "courses" %}
+                        </span>
+                    </span>
+                </button>
+            </h2>
+            <div id="course-section-collapse-{{ forloop.counter }}"
+                 class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                 data-bs-parent="#coursesSectionsAccordion"
+                 aria-labelledby="course-section-heading-{{ forloop.counter }}">
+                <div class="accordion-body">
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                        {% for offering in section.offerings %}
+                        <div class="col">
+                            <div class="course-user-card">
+                                <a href="{% url 'course-details' offering.pk %}" class="text-decoration-none text-inherit d-block">
+                                    <img src="{% static 'login-bg.jpg' %}" class="course-thumb" alt="{{ offering.course.name }}">
+                                </a>
+                                <div class="card-body p-3">
+                                    <h5 class="fw-bold mb-1">
+                                        <a href="{% url 'course-details' offering.pk %}" class="text-decoration-none inherit-link">
+                                            {{ offering.course.name }}
+                                        </a>
+                                    </h5>
+                                    {% if offering.instructor %}
+                                    <p class="text-muted small mb-2">
+                                        <i class="fas fa-chalkboard-teacher me-1"></i>{{ offering.instructor }}
+                                    </p>
+                                    {% endif %}
+                                    {% if offering.course.description %}
+                                    <p class="text-secondary small mb-3 clamp-2">
+                                        {{ offering.course.description }}
+                                    </p>
+                                    {% endif %}
 
-                        <!-- Lesson / quiz counts -->
-                        <div class="d-flex gap-2 flex-wrap">
-                            <span class="grade-chip">
-                                <i class="fas fa-play-circle"></i>
-                                {{ course.lesson_count }} {% translate "Lessons" %}
-                            </span>
-                            <span class="grade-chip">
-                                <i class="fas fa-pen-to-square"></i>
-                                {{ course.quiz_count }} {% translate "Quizzes" %}
-                            </span>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <span class="grade-chip">
+                                            <i class="fas fa-play-circle"></i>
+                                            {{ offering.published_lesson_count }} {% translate "Lessons" %}
+                                        </span>
+                                        <span class="grade-chip">
+                                            <i class="fas fa-pen-to-square"></i>
+                                            {{ offering.published_quiz_count }} {% translate "Quizzes" %}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <a href="{% url 'course-details' offering.pk %}" class="btn btn-user-primary w-100">
+                                        {% translate "View Course" %}
+                                        <i class="fas fa-arrow-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} ms-2"></i>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-footer">
-                        <a href="{% url 'course-details' course.id %}" class="btn btn-user-primary w-100">
-                            {% translate "View Course" %}
-                            <i class="fas fa-arrow-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} ms-2"></i>
-                        </a>
+                        {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-info">{% translate "No courses available in this section yet." %}</div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
-            {% empty %}
-            <div class="col-12">
-                <div class="alert alert-info">{% translate "No courses available in this level yet." %}</div>
-            </div>
-            {% endfor %}
         </div>
-    </section>
     {% endfor %}
+    </div>
+    {% endif %}
 
 </div>
 {% endblock %}

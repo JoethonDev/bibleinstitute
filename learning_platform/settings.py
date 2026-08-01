@@ -15,9 +15,6 @@ import os
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
-import pymysql
-pymysql.install_as_MySQLdb()
-
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -36,7 +33,22 @@ if not SECRET_KEY:
 DEBUG = os.getenv('DJANGO_DEBUG', '').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
-CSRF_TRUSTED_ORIGINS = ["https://*.a2hosted.com", "http://*.a2hosted.com","https://*.ngrok-free.app", "http://127.0.0.1", "https://bibleinstitute.a2hosted.com", "http://bibleinstitute.a2hosted.com"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.a2hosted.com",
+    "http://*.a2hosted.com",
+    "https://*.ngrok-free.app",
+    "http://localhost:8080",
+    "http://localhost:8082",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8082",
+    "https://bibleinstitute.a2hosted.com",
+    "http://bibleinstitute.a2hosted.com",
+]
+CSRF_TRUSTED_ORIGINS.extend(
+    origin.strip().rstrip("/")
+    for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+)
 
 # Application definition
 
@@ -65,7 +77,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
     'management_system.middleware.SessionExpiryUpdate'
 ]
 
@@ -96,33 +107,18 @@ WSGI_APPLICATION = 'learning_platform.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME', 'your_local_db_name_for_testing'),
-        'USER': os.getenv('DB_USER', 'your_local_username'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'your_local_password'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '3306'),
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
-    }
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB', 'lms_database'),
+        'USER': os.getenv('POSTGRES_USER', 'lms_user'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'dev_password_change_me'),
+        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+        'PORT': os.getenv('POSTGRES_PORT', '5432'),
+    },
+    'sqlite_source': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.getenv('SQLITE_SOURCE_PATH', str(BASE_DIR / 'db.sqlite3')),
+    },
 }
-
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-# ponytail: switch to SQLite for local dev since PostgreSQL is down
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -182,6 +178,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Modifications
 CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "https://weathered-wave-c7f0.elprincedoca.workers.dev/")
+MEDIA_WORKER_HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET") or SECRET_KEY
+WORKER_RECEIPT_SECRET = os.environ.get("WORKER_RECEIPT_SECRET") or MEDIA_WORKER_HMAC_SECRET
 R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL") or os.environ.get("endpoint")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID") or os.environ.get("key_id")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY") or os.environ.get("access_key")

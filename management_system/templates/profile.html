@@ -9,7 +9,7 @@
 
         <!-- ===== LEFT: Profile card ===== -->
         <div class="col-lg-5">
-            <div class="user-card h-100">
+            <div class="user-card">
 
                 <!-- Header with avatar + name -->
                 <div class="p-4 d-flex align-items-center gap-3 border-bottom user-border">
@@ -20,15 +20,14 @@
                             {{ object.role.get_role_display }}
                         </span>
                     </div>
-                    {% if request.user.id == object.id %}
-                    <a href="{% url 'update-profile' object.id %}"
-                       class="btn btn-sm btn-accent-outline ms-auto flex-shrink-0">
-                        <i class="fas fa-pencil-alt me-1"></i>{% translate "Edit" %}
-                    </a>
+                    {% if request.user.id == object.id and profile_editable %}
+                    <span class="user-stat-badge profile-role mt-1 d-inline-flex ms-auto flex-shrink-0">
+                        <i class="fas fa-pencil-alt me-1"></i>{% translate "Editing" %}
+                    </span>
                     {% endif %}
                 </div>
 
-                <!-- Profile form (read-only) -->
+                <!-- Profile form -->
                 <div class="p-4">
                     <div id="profile">
                         {% if messages %}
@@ -36,7 +35,19 @@
                                 <div class="alert {{ message.tags }}">{{ message }}</div>
                             {% endfor %}
                         {% endif %}
+                        {% if profile_editable %}
+                        <form method="post" action="{% url 'view-profile' %}">
+                            {% csrf_token %}
+                            {{ form|crispy }}
+                            <div class="profile-form-actions">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-save me-1"></i>{% translate "Save Profile" %}
+                                </button>
+                            </div>
+                        </form>
+                        {% else %}
                         {{ form|crispy }}
+                        {% endif %}
                     </div>
                 </div>
 
@@ -50,6 +61,23 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if show_profile_qr %}
+            <div class="user-card mt-3">
+                <div class="p-3 text-center">
+                    <h6 class="fw-bold mb-2 small">{% translate "Profile QR Code" %}</h6>
+                    <a href="{% url 'download-qr' %}?download=1"
+                       class="profile-qr-link"
+                       download
+                       aria-label="{% translate 'Download QR Code' %}"
+                       title="{% translate 'Profile QR Code' %}">
+                        <img src="{% url 'download-qr' %}"
+                             alt="{% translate 'QR code for profile access' %}"
+                             class="profile-qr-img img-fluid">
+                    </a>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- ===== RIGHT: Courses + Recent Grades ===== -->
@@ -63,35 +91,38 @@
                 </div>
                 <div class="p-3">
                     {% if courses %}
-                    <div class="accordion accordion-flush" id="coursesAccordion">
+                    <div class="accordion" id="coursesAccordion">
                         {% for level in courses %}
                             <div class="accordion-item border-0">
                                 <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                                    <button class="accordion-button btn-accent-quiet {% if not forloop.first %}collapsed{% endif %} fw-semibold px-0"
+                                    <button class="accordion-button profile-group-header {% if not forloop.first %}collapsed{% endif %} fw-semibold"
                                             type="button"
                                             data-bs-toggle="collapse"
                                             data-bs-target="#collapse-{{ forloop.counter }}"
                                             aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
-                                        {{ level.level_name }}
+                                        <span class="profile-group-title">{{ level.section_name|default:level.level_name }}{% if not level.section_name and level.academic_year_name %} — {{ level.academic_year_name }}{% endif %}</span>
+                                        <span class="profile-group-count badge rounded-pill bg-soft ms-2">{{ level.offerings|length }}</span>
                                     </button>
                                 </h2>
                                 <div id="collapse-{{ forloop.counter }}"
                                      class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
                                      data-bs-parent="#coursesAccordion">
-                                    <ul class="list-unstyled mb-0 ps-1">
-                                        {% for course in level.courses %}
-                                            <li class="mb-1">
-                                                <a href="{% url 'course-details' course.id %}"
-                                                   class="d-flex align-items-center gap-2 py-2 px-3 rounded text-decoration-none inherit-link hover-soft">
-                                                    <i class="fas fa-book text-muted small"></i>
-                                                    <span class="flex-grow-1">{{ course.name }}</span>
-                                                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} text-muted small"></i>
-                                                </a>
-                                            </li>
-                                        {% empty %}
-                                            <li class="text-muted small px-3 py-2">{% translate "No courses in this level." %}</li>
-                                        {% endfor %}
-                                    </ul>
+                                    <div class="profile-group-body">
+                                        <ul class="list-unstyled mb-0">
+                                            {% for offering in level.offerings %}
+                                                <li>
+                                                    <a href="{% url 'course-details' offering.pk %}"
+                                                       class="profile-course-link">
+                                                        <i class="fas fa-book text-muted small"></i>
+                                                        <span class="flex-grow-1">{{ offering.course.name }}</span>
+                                                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} text-muted small"></i>
+                                                    </a>
+                                                </li>
+                                            {% empty %}
+                                                <li class="text-muted small px-3 py-2">{% translate "No courses in this level." %}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         {% endfor %}
@@ -115,7 +146,7 @@
                         <div class="flex-grow-1 min-w-0">
                             <p class="mb-0 fw-semibold text-truncate">{{ grade.quiz.name }}</p>
                             <span class="text-muted small">
-                                {% if grade.quiz.course %}{{ grade.quiz.course.name }} · {% endif %}
+                                                {% if grade.quiz.course_offering %}{{ grade.quiz.course_offering.course.name }} · {% endif %}
                                 {{ grade.submitted_at|date:"d/m/Y" }}
                             </span>
                         </div>

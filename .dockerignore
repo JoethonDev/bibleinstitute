@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.example
+
+# Python virtual environments
+.venv
+venv
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Database — never bake SQLite data into an image
+db.sqlite3
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Backup directories (outside repo but exclude if present)
+backup*/
+backups/
+
+# Logs
+*.log
+
+# Media / user uploads
+media/
+media/*
+
+# Static collection output
+collectstatic/
+
+# OS temp files
+.DS_Store
+Thumbs.db
