@@ -1,25 +1,20 @@
 {% load i18n %}
-<div class="card-body">
+<div class="ad-card-body">
 {% if not is_root %}
-<nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item">
-            <a href="#"
-               hx-get="{% url 'r2-management-dashboard' %}"
-               hx-target="#file-list-container"
-               hx-push-url="true"
-               class="text-decoration-none">
-                <i class="fas fa-home"></i> {% translate "Root" %}
-            </a>
-        </li>
-    </ol>
+<nav aria-label="breadcrumb" class="ad-drive-crumb mb-3">
+    <a href="#"
+       hx-get="{% url 'r2-management-dashboard' %}"
+       hx-target="#file-list-container"
+       hx-push-url="true">
+        <i class="fas fa-home"></i> {% translate "Root" %}
+    </a>
 </nav>
 {% endif %}
 
 {% if not is_root %}
 <div class="mb-3">
-    <button class="btn btn-outline-secondary"
-            hx-get="{% url 'r2-management-dashboard' %}?folder={{ parent_folder }}"
+    <button class="ad-btn ad-btn--ghost"
+            hx-get="{% if parent_folder %}{% url 'r2-management-dashboard' %}?folder={{ parent_folder }}{% else %}{% url 'r2-management-dashboard' %}{% endif %}"
             hx-target="#file-list-container"
             hx-push-url="true">
         <i class="fas fa-arrow-left me-2"></i>

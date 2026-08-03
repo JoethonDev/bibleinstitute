@@ -4,163 +4,157 @@
 {% load static %}
 
 {% block body %}
+<div class="sd-page">
 <div class="container py-4 py-lg-5">
-    <div class="row g-4">
+    <div class="sd-profile">
 
         <!-- ===== LEFT: Profile card ===== -->
-        <div class="col-lg-5">
-            <div class="user-card">
+        <div>
+            <div class="sd-id-card">
 
                 <!-- Header with avatar + name -->
-                <div class="p-4 d-flex align-items-center gap-3 border-bottom user-border">
-                    <div class="profile-avatar flex-shrink-0">{{ initials }}</div>
-                    <div class="min-w-0">
-                        <h5 class="mb-0 fw-bold text-truncate">{{ object.get_full_name|default:object.username }}</h5>
-                        <span class="user-stat-badge profile-role mt-1 d-inline-flex">
-                            {{ object.role.get_role_display }}
-                        </span>
-                    </div>
-                    {% if request.user.id == object.id and profile_editable %}
-                    <span class="user-stat-badge profile-role mt-1 d-inline-flex ms-auto flex-shrink-0">
-                        <i class="fas fa-pencil-alt me-1"></i>{% translate "Editing" %}
-                    </span>
-                    {% endif %}
-                </div>
+                <span class="sd-avatar">{{ initials }}</span>
+                <h3 class="sd-id-name">{{ object.get_full_name|default:object.username }}</h3>
+                <span class="sd-id-role">
+                    {{ object.role.get_role_display }}
+                </span>
+                {% if request.user.id == object.id and profile_editable %}
+                <span class="sd-id-role sd-id-role--editing">
+                    <i class="fas fa-pencil-alt"></i> {% translate "Editing" %}
+                </span>
+                {% endif %}
 
                 <!-- Profile form -->
-                <div class="p-4">
-                    <div id="profile">
-                        {% if messages %}
-                            {% for message in messages %}
-                                <div class="alert {{ message.tags }}">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
-                        {% if profile_editable %}
-                        <form method="post" action="{% url 'view-profile' %}">
-                            {% csrf_token %}
-                            {{ form|crispy }}
-                            <div class="profile-form-actions">
-                                <button type="submit" class="btn btn-primary w-100">
-                                    <i class="fas fa-save me-1"></i>{% translate "Save Profile" %}
-                                </button>
-                            </div>
-                        </form>
-                        {% else %}
+                <div id="profile" class="sd-profile-form">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert {{ message.tags }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    {% if profile_editable %}
+                    <form method="post" action="{% url 'view-profile' %}">
+                        {% csrf_token %}
                         {{ form|crispy }}
-                        {% endif %}
-                    </div>
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="sd-btn sd-btn--teal w-100">
+                                <i class="fas fa-save"></i>{% translate "Save Profile" %}
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    {{ form|crispy }}
+                    {% endif %}
                 </div>
 
                 <!-- Meta info -->
-                <div class="px-4 pb-4 d-flex flex-wrap gap-3 text-secondary small">
+                <ul class="sd-meta sd-profile-meta">
                     {% if object.joined_date %}
-                    <span><i class="fas fa-calendar-alt me-1"></i>{% translate "Joined" %}: {{ object.joined_date|date:"d/m/Y" }}</span>
+                    <li><b>{% translate "Joined" %}</b><span>{{ object.joined_date|date:"d/m/Y" }}</span></li>
                     {% endif %}
                     {% if object.last_login %}
-                    <span><i class="fas fa-clock me-1"></i>{% translate "Last login" %}: {{ object.last_login|date:"d/m/Y H:i" }}</span>
+                    <li><b>{% translate "Last login" %}</b><span>{{ object.last_login|date:"d/m/Y H:i" }}</span></li>
                     {% endif %}
-                </div>
+                </ul>
             </div>
 
             {% if show_profile_qr %}
-            <div class="user-card mt-3">
-                <div class="p-3 text-center">
-                    <h6 class="fw-bold mb-2 small">{% translate "Profile QR Code" %}</h6>
-                    <a href="{% url 'download-qr' %}?download=1"
-                       class="profile-qr-link"
-                       download
-                       aria-label="{% translate 'Download QR Code' %}"
-                       title="{% translate 'Profile QR Code' %}">
-                        <img src="{% url 'download-qr' %}"
-                             alt="{% translate 'QR code for profile access' %}"
-                             class="profile-qr-img img-fluid">
-                    </a>
-                </div>
+            <div class="sd-qr-block sd-profile-qr-block">
+                <h6 class="sd-chip sd-qr-title">
+                    <i class="fas fa-qrcode"></i> {% translate "Profile QR Code" %}
+                </h6>
+                <a href="{% url 'download-qr' %}?download=1"
+                   download
+                   aria-label="{% translate 'Download QR Code' %}"
+                   title="{% translate 'Profile QR Code' %}"
+                   class="sd-qr-link">
+                    <img src="{% url 'download-qr' %}"
+                         alt="{% translate 'QR code for profile access' %}"
+                         class="sd-qr-img">
+                </a>
+                <p class="sd-qr-hint sd-qr-hint--centered">
+                    <i class="fas fa-download"></i> {% translate "Click the QR image to download it" %}
+                </p>
             </div>
             {% endif %}
         </div>
 
         <!-- ===== RIGHT: Courses + Recent Grades ===== -->
-        <div class="col-lg-7 d-flex flex-column gap-4">
+        <div>
 
             <!-- Courses accordion -->
-            <div class="user-card">
-                <div class="p-3 border-bottom d-flex align-items-center gap-2 user-border">
-                    <i class="fas fa-book-open text-accent"></i>
-                    <h5 class="mb-0 fw-bold">{% translate "My Courses" %}</h5>
+            <div class="sd-panel-card">
+                <div class="sd-panel-head">
+                    <i class="fas fa-book-open"></i>
+                    {% translate "My Courses" %}
                 </div>
-                <div class="p-3">
+                <div>
                     {% if courses %}
                     <div class="accordion" id="coursesAccordion">
                         {% for level in courses %}
-                            <div class="accordion-item border-0">
+                            <div class="sd-acc">
                                 <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                                    <button class="accordion-button profile-group-header {% if not forloop.first %}collapsed{% endif %} fw-semibold"
+                                    <button class="accordion-button sd-acc-head {% if not forloop.first %}collapsed{% endif %}"
                                             type="button"
                                             data-bs-toggle="collapse"
                                             data-bs-target="#collapse-{{ forloop.counter }}"
                                             aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
-                                        <span class="profile-group-title">{{ level.section_name|default:level.level_name }}{% if not level.section_name and level.academic_year_name %} — {{ level.academic_year_name }}{% endif %}</span>
-                                        <span class="profile-group-count badge rounded-pill bg-soft ms-2">{{ level.offerings|length }}</span>
+                                        <span>{{ level.section_name|default:level.level_name }}{% if not level.section_name and level.academic_year_name %} — {{ level.academic_year_name }}{% endif %}</span>
+                                        <span class="sd-acc-count">{{ level.offerings|length }}</span>
+                                        <i class="fas fa-chevron-down sd-collapse-indicator"></i>
                                     </button>
                                 </h2>
                                 <div id="collapse-{{ forloop.counter }}"
                                      class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
                                      data-bs-parent="#coursesAccordion">
-                                    <div class="profile-group-body">
-                                        <ul class="list-unstyled mb-0">
-                                            {% for offering in level.offerings %}
-                                                <li>
-                                                    <a href="{% url 'course-details' offering.pk %}"
-                                                       class="profile-course-link">
-                                                        <i class="fas fa-book text-muted small"></i>
-                                                        <span class="flex-grow-1">{{ offering.course.name }}</span>
-                                                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %} text-muted small"></i>
-                                                    </a>
-                                                </li>
-                                            {% empty %}
-                                                <li class="text-muted small px-3 py-2">{% translate "No courses in this level." %}</li>
-                                            {% endfor %}
-                                        </ul>
+                                    <div class="sd-acc-body">
+                                        {% for offering in level.offerings %}
+                                            <a href="{% url 'course-details' offering.pk %}"
+                                               class="sd-mini-row text-decoration-none">
+                                                <i class="fas fa-book"></i>
+                                                <span>{{ offering.course.name }}</span>
+                                                <span class="sd-mini-end"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i></span>
+                                            </a>
+                                        {% empty %}
+                                            <span class="ps-muted-text sd-empty-course-note">{% translate "No courses in this level." %}</span>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-muted text-center py-3 mb-0">{% translate "You are not enrolled in any courses yet." %}</p>
+                    <div class="sd-screen">
+                        <p class="ps-muted-text sd-centered-note">{% translate "You are not enrolled in any courses yet." %}</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Recent Quiz Results -->
             {% if recent_grades %}
-            <div class="user-card">
-                <div class="p-3 border-bottom d-flex align-items-center gap-2 user-border">
-                    <i class="fas fa-star text-accent"></i>
-                    <h5 class="mb-0 fw-bold">{% translate "Recent Quiz Results" %}</h5>
+            <div class="sd-panel-card">
+                <div class="sd-panel-head">
+                    <i class="fas fa-award"></i>
+                    {% translate "Recent Quiz Results" %}
+                    <span class="sd-panel-sub">{% translate "Latest" %} {{ recent_grades|length }}</span>
                 </div>
-                <ul class="list-unstyled mb-0 p-3">
+                <div class="sd-acc-body sd-results-body">
                     {% for grade in recent_grades %}
-                    <li class="d-flex align-items-center gap-3 py-2 user-border {% if not forloop.last %}border-bottom{% endif %}">
-                        <div class="flex-grow-1 min-w-0">
-                            <p class="mb-0 fw-semibold text-truncate">{{ grade.quiz.name }}</p>
-                            <span class="text-muted small">
-                                                {% if grade.quiz.course_offering %}{{ grade.quiz.course_offering.course.name }} · {% endif %}
-                                {{ grade.submitted_at|date:"d/m/Y" }}
-                            </span>
-                        </div>
-                        <span class="grade-chip flex-shrink-0">
-                            <i class="fas fa-check-circle"></i>
-                            {{ grade.total_grade }} / {{ grade.quiz.total_grade }}
+                    <div class="sd-mini-row">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>
+                            <span class="fw-semibold">{{ grade.quiz.name }}</span>
+                            <br><span class="ps-muted-text sd-result-meta">{% if grade.quiz.course_offering %}{{ grade.quiz.course_offering.course.name }} · {% endif %}{{ grade.submitted_at|date:"d/m/Y" }}</span>
                         </span>
-                    </li>
+                        <span class="sd-score sd-score--good flex-shrink-0">{{ grade.total_grade }}/{{ grade.quiz.total_grade }}</span>
+                    </div>
                     {% endfor %}
-                </ul>
+                </div>
             </div>
             {% endif %}
 
         </div>
     </div>
+</div>
 </div>
 {% endblock %}

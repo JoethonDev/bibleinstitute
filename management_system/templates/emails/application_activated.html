@@ -1,10 +1,10 @@
 {% extends 'emails/base_email.html' %}{% load i18n %}
 {% block content %}
 <h2 style="color:#2F5D73;margin:0 0 15px;">{% translate "Application Approved" %}</h2>
-<p style="color:#555;line-height:1.6;">{% translate "Dear" %} <strong>{{ name }}</strong>,</p>
-<p style="color:#555;line-height:1.6;">{% translate "We are pleased to inform you that your application has been approved!" %}</p>
-<p style="color:#555;line-height:1.6;">{% translate "You can now log in to your account and start accessing courses and materials." %}</p>
+<p style="color:#4B5563;line-height:1.6;">{% translate "Dear" %} <strong>{{ name }}</strong>,</p>
+<p style="color:#4B5563;line-height:1.6;">{% translate "We are pleased to inform you that your application has been approved!" %}</p>
+<p style="color:#4B5563;line-height:1.6;">{% translate "You can now log in to your account and start accessing courses and materials." %}</p>
 <p style="text-align:center;margin:25px 0;"><a href="{{ login_url }}" style="background:#2F5D73;color:#fff;padding:12px 30px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">{% translate "Login to Your Account" %}</a></p>
-<p style="color:#555;line-height:1.6;">{% translate "Welcome to Bible Institute! May God bless your studies." %}</p>
-<p style="color:#555;line-height:1.6;"><strong>{% translate "Bible Institute Administration" %}</strong></p>
+<p style="color:#4B5563;line-height:1.6;">{% translate "Welcome to Bible Institute! May God bless your studies." %}</p>
+<p style="color:#4B5563;line-height:1.6;"><strong>{% translate "Bible Institute Administration" %}</strong></p>
 {% endblock %}

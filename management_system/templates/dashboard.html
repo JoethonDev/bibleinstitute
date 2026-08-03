@@ -3,101 +3,87 @@
 {% load i18n %}
 
 {% block body %}
-<div class="admin-dashboard" id="content" x-data="dashboardManager()">
-    <!-- Dashboard Header -->
-    <div class="dashboard-header">
-        <div class="dashboard-title">
-            <h2 class="h3 mb-0">
+<div class="ad-pane is-active" id="content" x-data="dashboardManager()">
+    <!-- Dashboard Toolbar -->
+    <div class="ad-toolbar">
+        <!-- Left: Title & Primary Actions -->
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+            <h2 class="h5 mb-0">
                 <i class="fas fa-{{ view|default:'folder' }} me-2"></i>
                 {% translate header %}
             </h2>
+
+            {% if not submission_user %}
+            <button class="ad-btn ad-btn--teal ad-btn--sm"
+                    hx-get="{{ url }}create"
+                    hx-push-url="true"
+                    hx-trigger="click"
+                    hx-target="#display-page"
+                    hx-select="#content">
+                <i class="fas fa-plus me-1"></i>
+                <span>{% translate "Create" %} {{ view|title }}</span>
+            </button>
+            {% endif %}
         </div>
-        
-        <!-- Header Actions (Mobile visible) -->
-        <div class="dashboard-header-actions d-lg-none">
-            <button class="btn btn-outline-primary" @click="showFilters = !showFilters" type="button">
-                <i class="fas fa-filter me-2"></i>
+
+        <!-- Right: Action buttons + Mobile filter toggle -->
+        <div class="d-flex align-items-center gap-2">
+            {% if view == 'user' %}
+            <button class="ad-btn ad-btn--outline-gold ad-btn--sm"
+                    hx-get="{% url 'user-bulk-create' %}"
+                    hx-push-url="true"
+                    hx-trigger="click"
+                    hx-target="#display-page"
+                    hx-select="#content">
+                <i class="fas fa-upload me-1"></i>
+                <span>{% translate "Bulk Import" %}</span>
+            </button>
+            <a href="{% url 'export-users-csv' %}" class="ad-btn ad-btn--teal ad-btn--sm">
+                <i class="fas fa-download me-1"></i>
+                <span>{% translate "Export CSV" %}</span>
+            </a>
+            {% elif view == 'submission' %}
+            <a href="{% url 'export-quiz-submissions-csv' quiz_id=parameters.0 %}" class="ad-btn ad-btn--teal ad-btn--sm">
+                <i class="fas fa-download me-1"></i>
+                <span>{% translate "Export Quiz Data" %}</span>
+            </a>
+            {% endif %}
+
+            <!-- Mobile Filter Toggle -->
+            <button @click="showFilters = !showFilters"
+                    class="ad-btn ad-btn--ghost ad-btn--sm d-lg-none position-relative">
+                <i class="fas fa-filter me-1"></i>
                 <span>{% translate "Filters" %}</span>
-                <span x-show="activeFiltersCount > 0" class="badge bg-primary ms-1" x-text="activeFiltersCount"></span>
+                <span class="badge bg-primary ms-1"
+                      x-show="activeFiltersCount > 0"
+                      x-text="activeFiltersCount"
+                      x-transition></span>
             </button>
         </div>
     </div>
 
     <!-- Main Card -->
-    <div class="card admin-card">
-        <div class="card-body">
-            <!-- Action Bar -->
-            <div class="action-bar">
-                <!-- Left Actions -->
-                <div class="action-bar-start">
-                    {% if not submission_user %}
-                    <button class="btn btn-primary"
-                            hx-get="{{ url }}create"
-                            hx-push-url="true"
-                            hx-trigger="click"
-                            hx-target="#display-page"
-                            hx-select="#content">
-                        <i class="fas fa-plus me-2"></i>
-                        <span>{% translate "Create" %} {{ view|title }}</span>
-                    </button>
-                    {% endif %}
-                    
-                    {% if view == 'user' %}
-                    <button class="btn btn-outline-primary"
-                            hx-get="{% url 'user-bulk-create' %}"
-                            hx-push-url="true"
-                            hx-trigger="click"
-                            hx-target="#display-page"
-                            hx-select="#content">
-                        <i class="fas fa-upload me-2"></i>
-                        <span>{% translate "Bulk Import" %}</span>
-                    </button>
-                    <a href="{% url 'export-users-csv' %}" class="btn btn-outline-success">
-                        <i class="fas fa-download me-2"></i>
-                        <span>{% translate "Export CSV" %}</span>
-                    </a>
-                    {% elif view == 'submission' %}
-                    <a href="{% url 'export-quiz-submissions-csv' quiz_id=parameters.0 %}" class="btn btn-outline-success">
-                        <i class="fas fa-download me-2"></i>
-                        <span>{% translate "Export Quiz Data" %}</span>
-                    </a>
-                    {% endif %}
-                </div>
+    <div class="ad-card">
+        <div class="ad-card-body">
+            <!-- Filter Bar -->
+            <div class="ad-filters"
+                 :class="{ 'show': showFilters }"
+                 x-show="showFilters || window.innerWidth >= 992"
+                 x-transition
+                 x-data="{ ...filterManager(), baseUrl: '{{ url }}' }">
+                {% for filter in filters %}
+                <div class="filter-item">{% include filter %}</div>
+                {% endfor %}
 
-                <!-- Right Actions - Filters -->
-                <div class="action-bar-end">
-                    <!-- Filter Toggle Button (Mobile) with active count badge -->
-                    <button @click="showFilters = !showFilters" 
-                            class="btn btn-outline-secondary filter-toggle-btn d-lg-none position-relative">
-                        <i class="fas fa-filter me-2"></i>
-                        <span>{% translate "Filters" %}</span>
-                        <span class="badge bg-primary position-absolute top-0 start-100 translate-middle rounded-pill"
-                              x-show="activeFiltersCount > 0"
-                              x-text="activeFiltersCount"
-                              x-transition></span>
-                    </button>
-
-                    <!-- Filters Container -->
-                    <div class="filters-container" 
-                         :class="{ 'show': showFilters }"
-                         x-show="showFilters || window.innerWidth >= 992"
-                         x-transition
-                         x-data="{ ...filterManager(), baseUrl: '{{ url }}' }">
-                        {% for filter in filters %}
-                        <div class="filter-item">{% include filter %}</div>
-                        {% endfor %}
-                        
-                        <!-- Clear Filters Button -->
-                        <button @click="clearFilters()" 
-                                class="btn btn-outline-danger btn-sm clear-filters-btn"
-                                x-show="activeFiltersCount > 0"
-                                x-transition
-                                type="button">
-                            <i class="fas fa-times-circle me-1"></i>
-                            <span>{% translate "Clear" %}</span>
-                        </button>
-                    </div>
-                </div>
+                <!-- Clear Filters -->
+                <button @click="clearFilters()"
+                        class="ad-btn ad-btn--danger ad-btn--sm"
+                        x-show="activeFiltersCount > 0"
+                        x-transition
+                        type="button">
+                    <i class="fas fa-times-circle me-1"></i>
+                    <span>{% translate "Clear" %}</span>
+                </button>
             </div>
 
             <!-- Table Loading Indicator -->
@@ -108,7 +94,7 @@
             </div>
 
             <!-- Table Section -->
-            <div id="table-container" 
+            <div id="table-container"
                  hx-indicator="#table-loading"
                  class="table-section">
                 {% include 'partials/table_and_pagination.html' %}

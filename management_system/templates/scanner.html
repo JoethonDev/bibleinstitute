@@ -7,8 +7,9 @@
 {% endblock %}
 
 {% block body %}
-<div class="container py-4">
-  <h1 class="mb-4">{% translate "Attendance Scanner" %}</h1>
+<div class="sd-page">
+<div class="container py-4 py-lg-5">
+  <h1 class="mb-4 sd-title">{% translate "Attendance Scanner" %}</h1>
 
   <div class="alert alert-info d-flex align-items-center gap-2 mb-4">
     <i class="fas fa-info-circle" aria-hidden="true"></i>
@@ -24,19 +25,19 @@
   <div class="row g-3">
     {# --- Camera Scanner --- #}
     <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">
+      <div class="sd-panel-card">
+        <div class="sd-panel-head">
           <h5 class="mb-0"><i class="fas fa-camera me-2"></i>{% translate "Scan Camera" %}</h5>
         </div>
-        <div class="card-body text-center">
-          <button id="start-camera" class="btn btn-primary mb-3">
+        <div class="p-3 p-lg-4 text-center">
+          <button id="start-camera" class="sd-btn sd-btn--teal mb-3">
             <i class="fas fa-camera me-1"></i>{% translate "Open Camera" %}
           </button>
-          <button id="stop-camera" class="btn btn-secondary mb-3 d-none">
+          <button id="stop-camera" class="sd-btn sd-btn--gold-outline mb-3 d-none">
             <i class="fas fa-stop me-1"></i>{% translate "Stop Camera" %}
           </button>
           <div id="camera-error" class="alert alert-danger d-none"></div>
-          <video id="scanner-video" playsinline class="scanner-video w-100 rounded border d-none" autoplay muted></video>
+          <video id="scanner-video" playsinline class="scanner-video sd-frame w-100 rounded border d-none" autoplay muted></video>
           <div id="scan-result" class="mt-2"></div>
         </div>
       </div>
@@ -44,18 +45,18 @@
 
     {# --- Find Student --- #}
     <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">
+      <div class="sd-panel-card">
+        <div class="sd-panel-head">
           <h5 class="mb-0"><i class="fas fa-search me-2"></i>{% translate "Find Student" %}</h5>
         </div>
-        <div class="card-body">
+        <div class="p-3 p-lg-4">
           <form id="student-lookup-form" method="post" action="{% url 'student-lookup' %}">
             {% csrf_token %}
             <div class="mb-3">
               <label for="query" class="form-label">{% translate "Username or ID" %}</label>
               <input type="text" name="query" id="query" class="form-control form-control-lg" placeholder="{% translate "Enter username or numeric ID" %}" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg w-100">
+            <button type="submit" class="sd-btn sd-btn--teal w-100">
               <i class="fas fa-search me-1"></i>{% translate "Look up" %}
             </button>
           </form>
@@ -64,6 +65,7 @@
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <script>

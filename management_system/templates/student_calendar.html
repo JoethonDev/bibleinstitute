@@ -6,32 +6,56 @@
 {% endblock %}
 
 {% block body %}
+<div class="sd-page sd-calendar-page">
 <div class="container py-4">
-  <h1 class="mb-4">{% translate "My Academic Calendar" %}</h1>
+  <h1 class="sd-calendar-title">{% translate "My Academic Calendar" %}</h1>
   {% for scope in scopes %}
-    <div class="card mb-4">
-      <div class="card-header">
+    <div class="sd-panel-card mb-4">
+      <div class="sd-panel-head">
+        <i class="fas fa-calendar-alt"></i>
         <strong>{{ scope.academic_year }} — {{ scope.level.display_name }}</strong>
-        <span class="badge bg-info ms-2">{{ scope.academic_year.starts_on }} – {{ scope.academic_year.ends_on }}</span>
+        <span class="sd-panel-sub">{{ scope.academic_year.starts_on }} – {{ scope.academic_year.ends_on }}</span>
       </div>
-      <div class="card-body">
-        {% with holidays=scope.academic_year.holidays.all %}
+      <div class="sd-screen">
+        {% with holidays=scope.calendar_holidays %}
           {% if holidays %}
-            <h6>{% translate "Holidays" %}</h6>
-            <ul class="list-group mb-3">
+            <h6 class="sd-chip sd-calendar-subtitle">
+              <i class="fas fa-star"></i> {% translate "Holidays" %}
+            </h6>
+            <ul class="sd-holiday-list">
               {% for h in holidays %}
-                <li class="list-group-item">{{ h.date }} – {{ h.name }}</li>
+                <li class="sd-holiday-item">
+                  <span class="sd-holiday-date">{{ h.date }}</span> – {{ h.name }}
+                </li>
               {% endfor %}
             </ul>
           {% endif %}
         {% endwith %}
-        <p class="text-muted">{% translate "Meeting days" %}:
-            {{ scope.meeting_weekdays|join:", " }}
-        </p>
+        <div class="sd-chip sd-meeting-summary">
+          <i class="fas fa-people-group"></i> {% translate "Meeting days" %}
+          <div class="ps-muted-text sd-calendar-locked-days">
+            {% translate "Locked meeting days" %}:
+            {% for weekday in scope.locked_meeting_weekdays %}{{ weekday }}{% if not forloop.last %}, {% endif %}{% endfor %}
+          </div>
+          {% if scope.calendar_meeting_rows %}
+          <ul class="sd-meeting-list sd-calendar-scheduled">
+             {% for meeting in scope.calendar_meeting_rows %}
+             <li class="sd-calendar-meeting">
+               <span class="sd-meeting-date sd-calendar-meeting-date">{{ meeting.meeting_date }}</span>
+               <strong class="sd-calendar-meeting-course">{{ meeting.course_name }}</strong>
+               <span class="ps-muted-text sd-calendar-meeting-level">{{ meeting.level_name }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="ps-muted-text mb-0">{% translate "No scheduled meetings." %}</p>
+          {% endif %}
+        </div>
       </div>
     </div>
   {% empty %}
-    <p>{% translate "No academic calendar available." %}</p>
+    <p class="ps-muted-text">{% translate "No academic calendar available." %}</p>
   {% endfor %}
+</div>
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% load i18n %}
 <!-- Mobile Menu Toggle Button -->
 <button 
-    class="btn btn-primary mobile-fab d-md-none position-fixed"
+    class="sd-btn sd-btn--teal mobile-fab d-md-none position-fixed"
     @click="$store.ui.toggleMobileMenu()"
     x-data
     aria-label="{% translate 'Toggle Menu' %}"
@@ -20,31 +20,31 @@
     x-transition:leave="transition ease-in duration-150"
     x-transition:leave-start="opacity-100 transform translate-y-0"
     x-transition:leave-end="opacity-0 transform translate-y-full"
-    class="mobile-menu-panel d-md-none position-fixed bottom-0 start-0 w-100 bg-white shadow-lg rounded-top-3"
+    class="sd-frame mobile-menu-panel d-md-none position-fixed bottom-0 start-0 w-100"
     x-cloak
 >
-    <div class="p-4">
+    <div class="sd-screen p-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">{% translate "Menu" %}</h5>
+            <h5 class="sd-serious mb-0">{% translate "Menu" %}</h5>
             <button 
-                class="btn btn-sm btn-outline-secondary rounded-circle mobile-menu-close"
+                class="sd-btn sd-btn--gold-outline rounded-circle mobile-menu-close"
                 @click="$store.ui.closeMobileMenu()"
             >
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <nav class="nav flex-column gap-2">
-            <a href="{% url 'home' %}" class="nav-link btn btn-outline-primary text-start" @click="$store.ui.closeMobileMenu()">
+            <a href="{% url 'home' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
                 <i class="fas fa-home me-2"></i>{% translate "Home" %}
             </a>
-            <a href="{% url 'courses' %}" class="nav-link btn btn-outline-primary text-start" @click="$store.ui.closeMobileMenu()">
+            <a href="{% url 'courses' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
                 <i class="fas fa-book me-2"></i>{% translate "Courses" %}
             </a>
-            <a href="{% url 'view-profile' %}" class="nav-link btn btn-outline-primary text-start" @click="$store.ui.closeMobileMenu()">
+            <a href="{% url 'view-profile' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
                 <i class="fas fa-user me-2"></i>{% translate "Profile" %}
             </a>
             {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
-            <a href="{% url 'user-dashboard' %}" class="nav-link btn btn-outline-primary text-start" @click="$store.ui.closeMobileMenu()">
+            <a href="{% url 'user-dashboard' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
                 <i class="fas fa-tachometer-alt me-2"></i>{% translate "Admin Dashboard" %}
             </a>
             {% endif %}

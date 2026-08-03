@@ -7,8 +7,8 @@ from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Avg, Count, F, Q, Sum
-from django.db import transaction
+from django.db.models import Avg, Count, F, Prefetch, Q, Sum
+from django.db import IntegrityError, transaction
 from django.contrib import messages
 from django.contrib.messages import success, error, info
 from django.conf import settings
@@ -38,6 +38,7 @@ import re
 import os
 import csv
 import requests
+from datetime import date
 
 # Internal Imports - Models
 from .models import *
@@ -3681,6 +3682,23 @@ def duplicate_course(request, course_id):
 # PHASE 5 — Attendance Calendar, QR, and Scanning
 # ============================================================================
 
+def _calendar_weekday_labels():
+    return [
+        _("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
+        _("Friday"), _("Saturday"), _("Sunday"),
+    ]
+
+
+def _calendar_meeting_row(meeting):
+    return {
+        "id": meeting.pk,
+        "meeting_date": meeting.meeting_date,
+        "weekday_name": formats.date_format(meeting.meeting_date, "l"),
+        "level_name": meeting.academic_year_level.level.display_name,
+        "course_name": meeting.course_offering.course.name,
+    }
+
+
 @capability_required(can_manage_content)
 def calendar_management(request):
     import calendar as cal_mod
@@ -3756,17 +3774,44 @@ def calendar_management(request):
             h.date: h
             for h in AcademicHoliday.objects.filter(academic_year=year, date__year=cur_year, date__month=cur_month)
         }
+        scope_links = list(year.level_links.select_related("level").order_by("level__ordering"))
+        locked_weekdays = {
+            weekday
+            for scope in scope_links
+            for weekday in (scope.meeting_weekdays or [])
+        }
 
-        meeting_weekdays = set()
-        for weekdays in year.level_links.values_list("meeting_weekdays", flat=True):
-            meeting_weekdays.update(weekdays or [])
+        meetings = list(
+            AcademicYearLevelMeeting.objects.filter(
+                academic_year_level__academic_year=year,
+                meeting_date__year=cur_year,
+                meeting_date__month=cur_month,
+            ).select_related(
+                "academic_year_level__level",
+                "course_offering__course",
+            ).order_by("meeting_date", "academic_year_level__level__ordering", "course_offering__course__name")
+        )
+        meetings_by_date = defaultdict(list)
+        for meeting in meetings:
+            meetings_by_date[meeting.meeting_date].append(_calendar_meeting_row(meeting))
+        meeting_offerings = list(CourseOffering.objects.filter(
+            academic_year_level__academic_year=year,
+        ).select_related(
+            "course",
+            "academic_year_level__level",
+        ).order_by("academic_year_level__level__ordering", "course__name", "pk"))
+        offerings_by_weekday = defaultdict(list)
+        for offering in meeting_offerings:
+            for weekday in offering.academic_year_level.meeting_weekdays or []:
+                offerings_by_weekday[weekday].append(offering)
 
         month_grid = []
         for week in month_days:
             week_data = []
             for d in week:
                 in_year = year_start <= d <= year_end
-                is_meeting = d.weekday() in meeting_weekdays
+                day_meetings = meetings_by_date.get(d, [])
+                is_meeting = d.weekday() in locked_weekdays
                 is_today = d == today
                 is_holiday = d in holidays
                 week_data.append({
@@ -3778,6 +3823,8 @@ def calendar_management(request):
                     "is_holiday": is_holiday,
                     "holiday_name": holidays[d].name if is_holiday else "",
                     "holiday_id": holidays[d].id if is_holiday else None,
+                    "meetings": day_meetings,
+                    "meeting_offerings": offerings_by_weekday.get(d.weekday(), []),
                     "disabled": not in_year,
                     "outside_month": d.month != cur_month,
                 })
@@ -3812,7 +3859,63 @@ def calendar_management(request):
         "month_name": formats.date_format(date(cur_year, cur_month, 1), "F Y") if month_grid else "",
         "months": months_list,
         "year_options": year_options,
+        "can_edit_meetings": can_manage_academic_setup(request.user),
     })
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def add_meeting(request):
+    year_id = request.POST.get("academic_year_id")
+    date_value = request.POST.get("date", "")
+    offering_id = request.POST.get("course_offering_id")
+    year = AcademicYear.objects.filter(pk=year_id).first() if year_id else None
+    if not year:
+        messages.error(request, _("Invalid academic year."))
+        return redirect("calendar-management")
+    try:
+        meeting_date = date.fromisoformat(date_value)
+    except (TypeError, ValueError):
+        messages.error(request, _("Invalid date format."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
+    if not year.starts_on <= meeting_date <= year.ends_on:
+        messages.error(request, _("Date is outside the academic year range."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
+    offering = CourseOffering.objects.filter(
+        pk=offering_id,
+        academic_year_level__academic_year=year,
+    ).select_related("academic_year_level").first()
+    if not offering:
+        messages.error(request, _("Invalid course offering."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
+    if meeting_date.weekday() not in (offering.academic_year_level.meeting_weekdays or []):
+        messages.error(request, _("The selected course does not meet on this weekday."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
+    try:
+        with transaction.atomic():
+            AcademicYearLevelMeeting.objects.create(
+                academic_year_level=offering.academic_year_level,
+                meeting_date=meeting_date,
+                course_offering=offering,
+            )
+    except IntegrityError:
+        messages.error(request, _("A meeting already exists for this level and date."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
+    messages.success(request, _("Meeting added."))
+    return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}&year={meeting_date.year}&month={meeting_date.month}")
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def delete_meeting(request, meeting_id):
+    meeting = get_object_or_404(
+        AcademicYearLevelMeeting.objects.select_related("academic_year_level__academic_year"),
+        pk=meeting_id,
+    )
+    year_id = meeting.academic_year_level.academic_year_id
+    meeting.delete()
+    messages.success(request, _("Meeting deleted."))
+    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}&year={meeting.meeting_date.year}&month={meeting.meeting_date.month}")
 
 @require_POST
 @capability_required(can_manage_content)
@@ -3871,13 +3974,38 @@ def student_calendar(request):
         status__in=["active", "completed"],
         enrollment_type="normal",
     ).select_related("academic_year_level__academic_year", "academic_year_level__level")
+    active_year = AcademicYear.objects.filter(is_active=True).first()
+    selected_enrollment = (
+        enrollments.filter(academic_year_level__academic_year=active_year)
+        .order_by("-enrolled_at")
+        .first()
+        if active_year else None
+    )
+    if selected_enrollment is None:
+        selected_enrollment = enrollments.order_by(
+            "-academic_year_level__academic_year__ordering", "-enrolled_at"
+        ).first()
+
     scopes = []
-    seen = set()
-    for enrollment in enrollments:
-        scope = enrollment.academic_year_level
-        if scope.pk not in seen:
-            scopes.append(scope)
-            seen.add(scope.pk)
+    if selected_enrollment:
+        scope = selected_enrollment.academic_year_level
+        weekday_labels = _calendar_weekday_labels()
+        scope.locked_meeting_weekdays = [
+            weekday_labels[weekday]
+            for weekday in sorted(scope.meeting_weekdays or [])
+            if 0 <= weekday < 7
+        ]
+        scope.calendar_meeting_rows = [
+            _calendar_meeting_row(meeting)
+            for meeting in AcademicYearLevelMeeting.objects.filter(
+                academic_year_level=scope,
+            ).select_related(
+                "academic_year_level__level",
+                "course_offering__course",
+            )
+        ]
+        scope.calendar_holidays = list(scope.academic_year.holidays.order_by("date"))
+        scopes.append(scope)
     return render(request, "student_calendar.html", {"scopes": scopes})
 
 @login_required

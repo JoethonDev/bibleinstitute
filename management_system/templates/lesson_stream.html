@@ -7,14 +7,14 @@
 {% block content %}
 <div id="content-loaded" class="p-2 p-md-3">
     {% for hls_url in links %}
-        <div class="card shadow-sm border-0 mb-4 lesson-media-card">
-            <div class="card-header bg-light lesson-media-header">
+        <div class="card shadow-sm border-0 mb-4 lesson-media-card sd-media-card">
+            <div class="card-header bg-light lesson-media-header sd-media-head">
                 <h6 class="mb-0 fw-bold">{{ hls_url.name }}</h6>
             </div>
             <div class="card-body p-2 p-sm-3">
                 {% if hls_url.type == 'video' %}
-                    <!-- Responsive video container -->
-                    <div class="lesson-video-wrapper" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+                    <!-- Responsive video container (Psalmodia) -->
+                    <div class="lesson-video-wrapper sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
                         <video playsinline controls class="video-js vjs-theme-city" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
                             <source type="application/x-mpegURL"/>
                             <p class="vjs-no-js">
@@ -22,25 +22,25 @@
                             <a href="https://videojs.com/html5-video-support/" target="_blank">{% translate "supports HTML5 video" %}</a>
                             </p>
                         </video>
-                        <div class="mt-2 d-flex align-items-center gap-2">
+                        <div class="mt-2 d-flex align-items-center gap-2 sd-track">
                             <span class="text-muted small">{% translate "Progress" %}:</span>
-                            <progress class="app-progress progress-thin flex-grow-1" :value="progressPercent" max="100" :aria-valuenow="progressPercent"></progress>
-                            <span class="progress-percent fw-semibold small" x-text="`${Math.round(progressPercent)}%`">0%</span>
+                            <progress class="app-progress progress-thin flex-grow-1 sd-track-bar" :value="progressPercent" max="100" :aria-valuenow="progressPercent"></progress>
+                            <span class="progress-percent fw-semibold small sd-track-pct" x-text="`${Math.round(progressPercent)}%`">0%</span>
                         </div>
                     </div>
                 {% elif hls_url.type == 'audio' %}
-                    <div x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+                    <div class="sd-audio-body" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
                     <audio controls class="w-100" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
                         <source type="application/x-mpegURL"/>
                     </audio>
-                    <div class="mt-2 d-flex align-items-center gap-2">
+                    <div class="mt-2 d-flex align-items-center gap-2 sd-track">
                         <span class="text-muted small">{% translate "Progress" %}:</span>
-                        <progress class="app-progress progress-thin flex-grow-1" :value="progressPercent" max="100" :aria-valuenow="progressPercent"></progress>
-                        <span class="progress-percent fw-semibold small" x-text="`${Math.round(progressPercent)}%`">0%</span>
+                        <progress class="app-progress progress-thin flex-grow-1 sd-track-bar" :value="progressPercent" max="100" :aria-valuenow="progressPercent"></progress>
+                        <span class="progress-percent fw-semibold small sd-track-pct" x-text="`${Math.round(progressPercent)}%`">0%</span>
                     </div>
-                    <!-- Audio Download Button -->
+                    <!-- Audio Download Button (Psalmodia) -->
                     <div class="mt-3">
-                        <button class="btn btn-primary audio-download-btn min-w-160 d-flex align-items-center justify-content-center"
+                        <button class="btn btn-primary audio-download-btn sd-btn--teal min-w-160 d-flex align-items-center justify-content-center"
                                 onclick="downloadAudio(this, '{{ hls_url.name }}')">
                             <i class="fas fa-download me-2"></i>{% translate "Download Audio" %}
                         </button>
@@ -59,7 +59,7 @@
                     </div>
                 {% else %}
                    <div class="d-flex justify-content-center">
-                       <div class="pdf-viewer" data-url="{{ hls_url.url }}">
+                       <div class="pdf-viewer sd-pdf-viewer" data-url="{{ hls_url.url }}">
                             <canvas class="pdf-canvas shadow-sm"></canvas>
                             <div class="controls d-flex justify-content-between align-items-center mt-3">
                                 <button class="prev btn btn-outline-secondary btn-sm"><i class="fas {% if request.LANGUAGE_CODE == 'en'  %}fa-arrow-left{% else %}fa-arrow-right{% endif %}"></i></button>
@@ -186,156 +186,6 @@
             return new Blob([concatenated], { type: 'audio/mpeg' });
         }
 
-    (() => {
-        // This IIFE runs every time this HTML fragment is swapped into the DOM.
-        
-        const jsTranslations_lesson = {
-            'page': '{% translate "Page"|escapejs %}'
-        };
-
-        function getJsTranslation_lesson(key) {
-            return jsTranslations_lesson[key] || key;
-        }
-
-        // --- INITIALIZATION FUNCTIONS ---
-        function initializeVideoJs(video) {
-            // Check if the element exists, hasn't been initialized, and has a real source
-            if (video && !video.player) {
-                const source = video.querySelector('source');
-                if (!source || !source.src) return; // Guard: no signed source yet
-                const player = videojs(video, {
-                    controls: true,
-                    fluid: true,
-                    playbackRates: [0.5, 1, 1.5, 2],
-                    controlBar: { volumePanel: true, playbackRateMenuButton: true, playToggle: true }
-                });
-                player.seekButtons({ forward: 10, back: 10 });
-            }
-        }
-
-        function initializeHlsAudio(audio) {
-            if (audio && !audio.hls) { // Simple check to prevent re-initialization
-                if (Hls.isSupported()) {
-                    const sourceElement = audio.querySelector("source");
-                    const source = sourceElement?.src;
-                    if (!source) return; // Guard: no signed source yet
-                    const hls = new Hls();
-                    hls.loadSource(source);
-                    hls.attachMedia(audio);
-                    hls.on(Hls.Events.ERROR, (_event, data) => {
-                        if (data?.response?.code === 401 || data?.response?.code === 403) {
-                            reloadExpiredMedia();
-                        }
-                    });
-                    audio.hls = hls; // Mark as initialized
-                }
-            }
-        }
-
-        function reloadExpiredMedia() {
-            const key = `media-session-reload:${window.location.pathname}`;
-            if (sessionStorage.getItem(key)) return;
-            sessionStorage.setItem(key, '1');
-            window.location.reload();
-        }
-
-        function attachMediaSource(element, url) {
-            const source = element?.querySelector('source');
-            if (!element || !source || !url) return;
-            source.src = url;
-            if (element.tagName.toLowerCase() === 'video') {
-                let player = element.player;
-                if (!player) {
-                    player = videojs(element, {
-                        controls: true,
-                        fluid: true,
-                        playbackRates: [0.5, 1, 1.5, 2],
-                        controlBar: { volumePanel: true, playbackRateMenuButton: true, playToggle: true }
-                    });
-                    player.seekButtons({ forward: 10, back: 10 });
-                }
-                player.src({ src: url, type: 'application/x-mpegURL' });
-                player.one('error', () => {
-                    const response = player.error()?.response;
-                    if (response?.code === 401 || response?.code === 403) reloadExpiredMedia();
-                });
-            } else {
-                element.load();
-                initializeHlsAudio(element);
-            }
-        }
-
-        document.addEventListener('media-session-ready', (event) => {
-            attachMediaSource(event.detail?.element, event.detail?.url);
-        });
-
-        async function initializePdfViewer(viewer) {
-            if (viewer && !viewer.pdfDoc) { // Prevent re-initialization
-                const url = viewer.dataset.url;
-                // ... (rest of PDF logic is fine, as it's self-contained)
-                const canvas = viewer.querySelector(".pdf-canvas");
-                const ctx = canvas.getContext("2d");
-                const pageInfo = viewer.querySelector(".page-info");
-                const prevBtn = viewer.querySelector(".prev");
-                const nextBtn = viewer.querySelector(".next");
-                let currentPage = 1;
-                viewer.pdfDoc = true; // Mark as initialized immediately
-
-                try {
-                    const response = await fetch(url);
-                    const result = await response.json();
-                    const loadingTask = pdfjsLib.getDocument(result.url);
-                    const pdfDoc = await loadingTask.promise;
-                    
-                    const renderPage = (num) => {
-                        pdfDoc.getPage(num).then(page => {
-                            canvas.height = 600; canvas.width = 400;
-                            const viewportDefault = page.getViewport({ scale: 1 });
-                            const scale = Math.min(canvas.width / viewportDefault.width, canvas.height / viewportDefault.height);
-                            const viewport = page.getViewport({ scale: scale });
-                            const tempCanvas = document.createElement('canvas');
-                            const tempCtx = tempCanvas.getContext('2d');
-                            tempCanvas.width = viewport.width; tempCanvas.height = viewport.height;
-                            const renderContext = { canvasContext: tempCtx, viewport: viewport };
-                            page.render(renderContext).promise.then(() => {
-                                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                const xOffset = (canvas.width - viewport.width) / 2;
-                                const yOffset = (canvas.height - viewport.height) / 2;
-                                ctx.drawImage(tempCanvas, xOffset, yOffset);
-                            });
-                            pageInfo.textContent = `${getJsTranslation_lesson('page')} ${num} / ${pdfDoc.numPages}`;
-                        });
-                    };
-
-                    renderPage(currentPage);
-                    prevBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderPage(currentPage); }});
-                    nextBtn.addEventListener("click", () => { if (currentPage < pdfDoc.numPages) { currentPage++; renderPage(currentPage); }});
-
-                } catch (error) {
-                    console.error("Error loading PDF:", error);
-                    pageInfo.textContent = '{% translate "Error loading PDF."|escapejs %}';
-                }
-            }
-        }
-
-        // 1. Dispose of any old players first.
-        // disposeExistingPlayers();
-        
-        // 2. Initialize all new components.
-        // A small timeout ensures the DOM is fully ready after the swap.
-        setTimeout(() => {
-            document.querySelectorAll('video.video-js').forEach(initializeVideoJs);
-            document.querySelectorAll('audio').forEach(initializeHlsAudio);
-            document.querySelectorAll('video, audio').forEach(media => {
-                media.addEventListener('error', reloadExpiredMedia);
-            });
-            document.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
-            document.querySelectorAll('video, audio').forEach(el => {
-                el.setAttribute('controlsList', 'nodownload');
-            });
-        }, 500);
-    })();
     </script>
 </div>
 {% endblock %}

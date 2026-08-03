@@ -5931,6 +5931,63 @@ msgstr "Years, scopes and offerings"
 msgid "files"
 msgstr "files"
 
+msgid "No meeting days configured."
+msgstr "No meeting days configured."
+
+#: .\management_system\views.py:3918
+#: .\management_system\views.py:3931
+#: .\management_system\views.py:3957
+msgid "Invalid course offering."
+msgstr "Invalid course offering."
+
+#: .\management_system\views.py:3969
+msgid "Meeting courses saved."
+msgstr "Meeting courses saved."
+
+#: .\management_system\models.py:253
+msgid "Meeting date must be inside the academic year."
+msgstr "Meeting date must be inside the academic year."
+
+#: .\management_system\views.py:3919
+msgid "Meeting added."
+msgstr "Meeting added."
+
+#: .\management_system\views.py:3931
+msgid "A meeting already exists for this level and date."
+msgstr "A meeting already exists for this level and date."
+
+#: .\management_system\views.py:3946
+msgid "Meeting deleted."
+msgstr "Meeting deleted."
+
+#: .\management_system\templates\calendar_management.html:222
+msgid "Add Meeting"
+msgstr "Add Meeting"
+
+#: .\management_system\templates\calendar_management.html:146
+msgid "Add meeting"
+msgstr "Add meeting"
+
+#: .\management_system\templates\calendar_management.html:138
+msgid "Delete meeting"
+msgstr "Delete meeting"
+
+#: .\management_system\templates\student_calendar.html:47
+msgid "No scheduled meetings."
+msgstr "No scheduled meetings."
+
+#: .\management_system\models.py:252
+msgid "Meeting date must use one of this level's locked meeting days."
+msgstr "Meeting date must use one of this level's locked meeting days."
+
+#: .\management_system\views.py:3883
+msgid "The selected course does not meet on this weekday."
+msgstr "The selected course does not meet on this weekday."
+
+#: .\management_system\templates\student_calendar.html:37
+msgid "Locked meeting days"
+msgstr "Locked meeting days"
+
 #~ msgid "Invalid part ID."
 #~ msgstr "Invalid part ID."
 

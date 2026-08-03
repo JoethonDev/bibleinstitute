@@ -5931,6 +5931,63 @@ msgstr "رمز QR"
 msgid "Upload files"
 msgstr "رفع الملفات"
 
+msgid "No meeting days configured."
+msgstr "لم يتم إعداد أيام اجتماعات."
+
+#: .\management_system\views.py:3918
+#: .\management_system\views.py:3931
+#: .\management_system\views.py:3957
+msgid "Invalid course offering."
+msgstr "المقرر الدراسي غير صالح."
+
+#: .\management_system\views.py:3969
+msgid "Meeting courses saved."
+msgstr "تم حفظ مقررات أيام الاجتماع."
+
+#: .\management_system\models.py:253
+msgid "Meeting date must be inside the academic year."
+msgstr "يجب أن يكون تاريخ الاجتماع داخل السنة الأكاديمية."
+
+#: .\management_system\views.py:3919
+msgid "Meeting added."
+msgstr "تمت إضافة الاجتماع."
+
+#: .\management_system\views.py:3931
+msgid "A meeting already exists for this level and date."
+msgstr "يوجد اجتماع بالفعل لهذا المستوى في هذا التاريخ."
+
+#: .\management_system\views.py:3946
+msgid "Meeting deleted."
+msgstr "تم حذف الاجتماع."
+
+#: .\management_system\templates\calendar_management.html:222
+msgid "Add Meeting"
+msgstr "إضافة اجتماع"
+
+#: .\management_system\templates\calendar_management.html:146
+msgid "Add meeting"
+msgstr "إضافة اجتماع"
+
+#: .\management_system\templates\calendar_management.html:138
+msgid "Delete meeting"
+msgstr "حذف الاجتماع"
+
+#: .\management_system\templates\student_calendar.html:47
+msgid "No scheduled meetings."
+msgstr "لا توجد اجتماعات مجدولة."
+
+#: .\management_system\models.py:252
+msgid "Meeting date must use one of this level's locked meeting days."
+msgstr "يجب أن يكون تاريخ الاجتماع في أحد أيام الاجتماع المحددة لهذا المستوى."
+
+#: .\management_system\views.py:3883
+msgid "The selected course does not meet on this weekday."
+msgstr "المقرر المختار لا ينعقد في هذا اليوم من الأسبوع."
+
+#: .\management_system\templates\student_calendar.html:37
+msgid "Locked meeting days"
+msgstr "أيام الاجتماع المحددة"
+
 #~ msgid "Invalid part ID."
 #~ msgstr "معرّف الجزء غير صالح."
 

@@ -18,7 +18,28 @@ services:
     networks:
       - lms_network
 
-  # ── Nginx ──────────────────────────────────────────────────────
+  # ── Redis (Celery broker & Django cache backend) ───────────────
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - lms_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - lms_network
+
+  # ── Nginx proxy (static serving + blue/green app routing) ──────
+  # The active application slot is controlled by the runtime bind-mounted
+  # nginx-active-upstream.conf file. The deployment script writes a safe
+  # Nginx `set $lms_app_upstream ...` directive there and reloads Nginx.
+  # LMS_RUNTIME_DIR defaults to ./runtime — the deploy/bootstrap script
+  # must create that directory and the state file before Nginx starts.
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -27,12 +48,21 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - lms_static_data:/usr/share/nginx/html/static:ro
+      # Bind-mount the runtime directory so Nginx can read the
+      # blue/green upstream state from a file outside the image.
+      # The deploy script writes ${LMS_RUNTIME_DIR}/nginx-active-upstream.conf.
+      - type: bind
+        source: ${LMS_RUNTIME_DIR:-./runtime}
+        target: /etc/nginx/runtime
+        read_only: true
     networks:
       - lms_network
 
 volumes:
   lms_postgres_data:
     name: lms_postgres_data
+  lms_redis_data:
+    name: lms_redis_data
   lms_static_data:
     name: lms_static_data
 

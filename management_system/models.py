@@ -218,6 +218,46 @@ class AcademicYearLevel(models.Model):
             raise ValidationError({"meeting_weekdays": _("Meeting weekdays must not repeat.")})
 
 
+class AcademicYearLevelMeeting(models.Model):
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel,
+        on_delete=models.CASCADE,
+        related_name="calendar_meetings",
+    )
+    meeting_date = models.DateField()
+    course_offering = models.ForeignKey(
+        "CourseOffering",
+        on_delete=models.PROTECT,
+        related_name="calendar_meetings",
+    )
+
+    class Meta:
+        ordering = ["meeting_date", "academic_year_level__level__ordering"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["academic_year_level", "meeting_date"],
+                name="academic_scope_meeting_date_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.academic_year_level} — {self.course_offering.course.name}"
+
+    def clean(self):
+        super().clean()
+        academic_year = self.academic_year_level.academic_year
+        if not academic_year.starts_on <= self.meeting_date <= academic_year.ends_on:
+            raise ValidationError({"meeting_date": _("Meeting date must be inside the academic year.")})
+        if self.meeting_date.weekday() not in (self.academic_year_level.meeting_weekdays or []):
+            raise ValidationError({"meeting_date": _("Meeting date must use one of this level's locked meeting days.")})
+        if self.course_offering.academic_year_level_id != self.academic_year_level_id:
+            raise ValidationError({"course_offering": _("Course offering must belong to the selected academic scope.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 class AcademicYear(models.Model):
     name = models.CharField(max_length=20, unique=True)
     levels = models.ManyToManyField(Level, through=AcademicYearLevel, related_name="academic_years")

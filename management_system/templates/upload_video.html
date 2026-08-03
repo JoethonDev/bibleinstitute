@@ -2,18 +2,18 @@
 {% load i18n %}
 
 {% block body %}
-    <div id="content" class="d-flex flex-column h-100">
+    <div id="content" class="ad-page d-flex flex-column">
 
-        <button class="btn btn-primary loading m-auto mb-3 w-50" type="button" disabled>
+        <button class="ad-btn ad-btn--teal loading m-auto mb-3 w-50 d-block text-center" type="button" disabled>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
             <span class="info">{% translate "Loading..." %}</span>
         </button>
         <div class="text-center mb-3">
-            <a href="{% url 'lesson-create' %}" class="btn btn-outline-primary btn-sm">
+            <a href="{% url 'lesson-create' %}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
                 <i class="fas fa-plus-circle me-1"></i>{% translate "Create Lesson" %}
             </a>
         </div>
-        <div class="form col-12 col-md-8 col-lg-6 m-auto overflow-y-scroll p-2">
+        <div class="ad-card col-12 col-md-8 col-lg-6 m-auto p-3">
             <div class="mb-3">
                 <label for="folder-name" class="form-label">{% translate "Folder" %}</label>
                 <input class="form-control" type="text" id="folder-name" name="folder" dir=ltr>
@@ -22,11 +22,11 @@
                 {% include 'drive_files.html' %}
             </div> -->
             <!-- Drive Files Card -->
-            <div class="card shadow-sm border-0 flex-grow-1">
-                <div class="card-header">
-                    <h6 class="mb-0">{% translate "Select Folder from Drive" %}</h6>
+            <div class="ad-card flex-grow-1">
+                <div class="ad-card-head">
+                    <i class="fas fa-folder-open"></i>{% translate "Select Folder from Drive" %}
                 </div>
-                <div id="drive-files" class="card-body overflow-auto min-h-300">
+                <div id="drive-files" class="ad-card-body overflow-auto min-h-300">
                     {% include 'drive_files.html' with folders_only=True %}
                 </div>
             </div>
@@ -44,42 +44,44 @@
             </div>
 
             <!-- Scheduled Lesson Section -->
-            <div id="scheduled-lesson-section" class="mb-3 p-3 border rounded">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="schedule-lesson-toggle">
-                    <label class="form-check-label" for="schedule-lesson-toggle">
-                        {% translate "Create a lesson draft from uploaded files" %}
-                    </label>
-                </div>
-                <div id="scheduled-lesson-fields" class="d-none">
-                    <div class="mb-2">
-                        <label for="lesson-name-input" class="form-label">{% translate "Lesson Name" %}</label>
-                        <input type="text" class="form-control" id="lesson-name-input"
-                               placeholder="{% translate 'Enter lesson name' %}">
+            <div id="scheduled-lesson-section" class="ad-card mb-3">
+                <div class="ad-card-body">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="schedule-lesson-toggle">
+                        <label class="form-check-label" for="schedule-lesson-toggle">
+                            {% translate "Create a lesson draft from uploaded files" %}
+                        </label>
                     </div>
-                    <div class="mb-2">
-                        <label for="course-offering-select" class="form-label">{% translate "Course Offering" %}</label>
-                        <select class="form-select" id="course-offering-select">
-                            <option value="">{% translate "Select offering..." %}</option>
-                            {% for offering in course_offerings %}
-                            <option value="{{ offering.pk }}">
-                                {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
+                    <div id="scheduled-lesson-fields" class="d-none">
+                        <div class="mb-2">
+                            <label for="lesson-name-input" class="form-label">{% translate "Lesson Name" %}</label>
+                            <input type="text" class="form-control" id="lesson-name-input"
+                                   placeholder="{% translate 'Enter lesson name' %}">
+                        </div>
+                        <div class="mb-2">
+                            <label for="course-offering-select" class="form-label">{% translate "Course Offering" %}</label>
+                            <select class="form-select" id="course-offering-select">
+                                <option value="">{% translate "Select offering..." %}</option>
+                                {% for offering in course_offerings %}
+                                <option value="{{ offering.pk }}">
+                                    {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="expected-files-preview" class="d-none mb-2">
+                            <h6>{% translate "Expected files after upload" %}</h6>
+                            <ul id="expected-files-list" class="list-group"></ul>
+                        </div>
+                        <div id="schedule-status" class="alert d-none mb-0" role="alert"></div>
                     </div>
-                    <div id="expected-files-preview" class="d-none mb-2">
-                        <h6>{% translate "Expected files after upload" %}</h6>
-                        <ul id="expected-files-list" class="list-group"></ul>
-                    </div>
-                    <div id="schedule-status" class="alert d-none mb-0" role="alert"></div>
                 </div>
             </div>
 
             <!-- Validation Errors Display -->
-            <div id="validation-errors" class="alert alert-danger d-none" role="alert">
-                <h6 class="alert-heading">{% translate "Invalid Files" %}</h6>
-                <ul id="validation-error-list" class="mb-0"></ul>
+            <div id="validation-errors" class="ad-alert ad-alert--danger d-none" role="alert">
+                <h6 class="mt-0 mb-1">{% translate "Invalid Files" %}</h6>
+                <ul id="validation-error-list" class="mb-0 ps-3"></ul>
             </div>
 
             <!-- Valid Files Display -->
@@ -93,7 +95,7 @@
                 
             </div>
     
-            <button class="btn btn-primary" id="upload-btn">{% translate "Upload Files" %}</button>
+            <button class="ad-btn ad-btn--teal" id="upload-btn">{% translate "Upload Files" %}</button>
     
         </div>
         

@@ -38,79 +38,84 @@
 
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-    
+
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
-    
+
     <!-- Bootstrap CSS -->
     {% if request.LANGUAGE_CODE == 'ar' %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb" crossorigin="anonymous">
     {% else %}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     {% endif %}
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
+
+    <!-- Font Awesome 6.7.2 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Legacy stylesheet remains available for unmigrated infrastructure. -->
     <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260801-lesson-ui-3">
-    <link rel="stylesheet" href="{% static 'css/public_site.css' %}">
-    
+    <!-- Psalmodia student layer wins over legacy selectors. -->
+    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v=20260802-ui-cascade-1">
+    <link rel="stylesheet" href="{% static 'css/app_student.css' %}?v=20260802-ui-cascade-1">
+    <!-- Public shell remains last so Home/About/Program keep their approved styling. -->
+    <link rel="stylesheet" href="{% static 'css/public_site.css' %}?v=20260802-public-preserved-1">
+
     {% block cdn %}{% endblock %}
     {% block style %}{% endblock %}
 </head>
 <body class="d-flex flex-column">
     <header>
-        <div class="institute-topbar">
-          <div class="container">
-            <span>{% translate "Bible Institute - Maadi - Cairo" %}</span>
-            <div><a href="mailto:info@bibleinstitute-eg.org">info@bibleinstitute-eg.org</a> · <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener">Facebook</a> · <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener">YouTube</a></div>
+        <div class="institute-topbar ps-site-topbar">
+          <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="ps-site-topbar-info"><i class="fas fa-map-marker-alt fa-fw me-1"></i>{% translate "Bible Institute - Maadi - Cairo" %}</span>
+            <div class="ps-site-topbar-links"><a href="mailto:info@bibleinstitute-eg.org"><i class="fas fa-envelope fa-fw"></i> info@bibleinstitute-eg.org</a> <span class="ps-site-sep">·</span> <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-fw"></i> Facebook</a> <span class="ps-site-sep">·</span> <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener"><i class="fab fa-youtube fa-fw"></i> YouTube</a></div>
           </div>
         </div>
-        <nav class="navbar app-navbar institute-navbar navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
+        <nav class="navbar app-navbar institute-navbar ps-site-nav navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
             <div class="container">
-              <a class="navbar-brand" href="{% url 'home' %}">
+              <a class="navbar-brand ps-site-brand" href="{% url 'home' %}">
                   <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
-                  <span class="institute-brand-copy"><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Maadi · Academic study with an ecclesial spirit" %}</small></span>
+                  <span class="institute-brand-copy ps-site-brand-text"><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Maadi · Academic study with an ecclesial spirit" %}</small></span>
               </a>
-              <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
+              <button class="navbar-toggler ps-site-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <i class="fas fa-bars"></i>
               </button>
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1">
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">{% translate "About Us" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#study-system">{% translate "Study System" %}</a></li>
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1 ps-site-nav-list">
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'about' %}">{% translate "About Us" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'program' %}#study-system">{% translate "Study System" %}</a></li>
               {% if not user.is_authenticated %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#curriculum">{% translate "Program" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'program' %}#curriculum">{% translate "Program" %}</a></li>
               {% endif %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'program' %}#admission">{% translate "Admissions" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'program' %}#admission">{% translate "Admissions" %}</a></li>
               {% if not user.is_authenticated %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#news">{% translate "News" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="#site-contact">{% translate "Contact" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'home' %}#news">{% translate "News" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="#site-contact">{% translate "Contact" %}</a></li>
               {% endif %}
               {% if user.is_authenticated %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
               {% if request.user.role.role == "student" %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
               {% endif %}
               {% if request.user.role.role == "student" or request.user.role.role == "admin" %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'download-qr' %}">{% translate "My QR" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'download-qr' %}">{% translate "My QR" %}</a></li>
               {% endif %}
               {% if request.user.role.role == "admin" or request.user.role.role == "staff" or request.user.role.role == "moderator" %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'scanner' %}">{% translate "Scanner" %}</a></li>
               {% endif %}
               {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
-                <li class="nav-item"><a class="nav-link" href="{% url 'user-dashboard' %}">{% translate "Dashboard" %}</a></li>
+                <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'user-dashboard' %}">{% translate "Dashboard" %}</a></li>
               {% endif %}
               {% endif %}
             </ul>
 
-            <div class="app-nav-actions">
-              <form action="{% url 'set_language' %}" method="post" id="language-form">
+            <div class="app-nav-actions ps-site-actions">
+              <form action="{% url 'set_language' %}" method="post" id="language-form" class="ps-inline-form">
                 {% csrf_token %}
                 <input name="next" type="hidden" value="{{ request.get_full_path }}">
-                <select name="language" class="form-select form-select-sm w-fit" onchange="document.getElementById('language-form').submit()">
+                <select name="language" class="form-select form-select-sm w-fit ps-site-lang-select" onchange="document.getElementById('language-form').submit()">
                     {% get_current_language as LANGUAGE_CODE %}
                     {% get_available_languages as LANGUAGES %}
                     {% for lang in LANGUAGES %}
@@ -121,17 +126,17 @@
                 </select>
               </form>
               {% if user.is_authenticated %}
-                <form method="post" action="{% url 'logout' %}" style="display:inline">{% csrf_token %}<button type="submit" class="btn btn-outline-primary btn-sm"><i class="fas fa-right-from-bracket"></i>{% translate "Logout" %}</button></form>
+                <form method="post" action="{% url 'logout' %}" class="ps-inline-form">{% csrf_token %}<button type="submit" class="sd-btn sd-btn--gold-outline btn-sm"><i class="fas fa-right-from-bracket"></i> {% translate "Logout" %}</button></form>
               {% else %}
-                <a class="btn btn-outline-primary btn-sm" href="{% url 'user_login' %}">{% translate "Login" %}</a>
-                <a class="btn btn-primary btn-sm" href="{% url 'signup' %}">{% translate "Sign Up" %}</a>
+                <a class="sd-btn sd-btn--gold-outline btn-sm" href="{% url 'user_login' %}">{% translate "Login" %}</a>
+                <a class="sd-btn sd-btn--teal btn-sm" href="{% url 'signup' %}">{% translate "Sign Up" %}</a>
               {% endif %}
             </div>
               </div>
             </div>
         </nav>
     </header>
-    
+
     {% block breadcrumb %}
     {% if breadcrumb_items %}
     <nav aria-label="{% translate 'Breadcrumb' %}" class="bg-light py-2">
@@ -150,14 +155,26 @@
     {% endif %}
     {% endblock %}
 
-    <!-- Toast Notifications -->
-    <div class="toast-container app-toast-stack position-fixed bottom-0 end-0 p-3" x-data>
+    <!-- Toast Notifications (Psalmodia) -->
+    <div class="ps-toast-stack" x-data>
         <template x-for="notification in $store.notifications.items" :key="notification.id">
-            <div class="toast show align-items-center text-white border-0 mb-2" :class="`bg-${notification.type}`" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="d-flex">
-                    <div class="toast-body" x-text="notification.message"></div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="$store.notifications.remove(notification.id)" aria-label="{% translate 'Close' %}"></button>
-                </div>
+            <div class="ps-toast" role="alert" aria-live="assertive" aria-atomic="true"
+                 x-show="true"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 transform translate-x-full"
+                 x-transition:enter-end="opacity-100 transform translate-x-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 transform translate-x-0"
+                 x-transition:leave-end="opacity-0 transform translate-x-full">
+                <i class="fas"
+                   :class="{
+                       'fa-check-circle': notification.type === 'success',
+                       'fa-exclamation-circle': notification.type === 'warning',
+                       'fa-times-circle': notification.type === 'danger',
+                       'fa-info-circle': notification.type === 'info'
+                   }"></i>
+                <span class="ps-toast-body" x-text="notification.message"></span>
+                <button type="button" class="ps-toast-close" @click="$store.notifications.remove(notification.id)" aria-label="{% translate 'Close' %}"><i class="fas fa-times"></i></button>
             </div>
         </template>
     </div>
@@ -167,38 +184,38 @@
     </main>
 
     {% block script %}{% endblock %}
-    
-    <footer id="site-contact" class="mt-auto institute-footer" role="contentinfo">
+
+    <footer id="site-contact" class="mt-auto institute-footer ps-site-footer" role="contentinfo">
       <div class="container py-5">
           <div class="row">
               <div class="col-lg-5 col-md-12 mb-4">
                   <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180" alt="{% translate 'Footer Logo' %}">
-                  <p>{% translate "A Coptic Orthodox ecclesiastical institute serving everyone who loves to study Scripture in Egypt and worldwide." %}</p>
+                  <p class="ps-site-footer-text">{% translate "A Coptic Orthodox ecclesiastical institute serving everyone who loves to study Scripture in Egypt and worldwide." %}</p>
               </div>
               <div class="col-lg-3 col-md-6 mb-4">
-                  <h2>{% translate "Quick Links" %}</h2>
-                  <p><a href="{% url 'about' %}">{% translate "About Us" %}</a></p>
-                  <p><a href="{% url 'program' %}#study-system">{% translate "Study System" %}</a></p>
+                  <h2 class="ps-site-footer-heading">{% translate "Quick Links" %}</h2>
+                  <p><a class="ps-site-footer-link" href="{% url 'about' %}">{% translate "About Us" %}</a></p>
+                  <p><a class="ps-site-footer-link" href="{% url 'program' %}#study-system">{% translate "Study System" %}</a></p>
                   {% if not user.is_authenticated %}
-                  <p><a href="{% url 'program' %}#curriculum">{% translate "Program" %}</a></p>
+                  <p><a class="ps-site-footer-link" href="{% url 'program' %}#curriculum">{% translate "Program" %}</a></p>
                   {% endif %}
-                  <p><a href="{% url 'signup' %}">{% translate "Sign Up" %}</a></p>
+                  <p><a class="ps-site-footer-link" href="{% url 'signup' %}">{% translate "Sign Up" %}</a></p>
               </div>
               <div class="col-lg-4 col-md-6 mb-4">
-                  <h5 class="text-uppercase">{% translate "Institute Headquarters" %}</h5>
-                  <p><i class="fas fa-map-marker-alt me-2"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</p>
-                  <p><i class="fas fa-envelope me-2"></i>info@bibleinstitute-eg.org</p>
-                  <p><i class="fas fa-globe me-2"></i>www.bibleinstitute-eg.org</p>
+                  <h5 class="text-uppercase ps-site-footer-heading">{% translate "Institute Headquarters" %}</h5>
+                  <p class="ps-site-footer-text"><i class="fas fa-map-marker-alt me-2"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</p>
+                  <p class="ps-site-footer-text"><i class="fas fa-envelope me-2"></i>info@bibleinstitute-eg.org</p>
+                  <p class="ps-site-footer-text"><i class="fas fa-globe me-2"></i>www.bibleinstitute-eg.org</p>
               </div>
           </div>
       </div>
-      <div class="footer-bottom institute-footer-bottom text-center p-3">
+      <div class="footer-bottom institute-footer-bottom ps-site-footer-bar text-center p-3">
         {% translate "All rights reserved to the Bible Institute in Maadi" %} &copy; {% now "Y" %}
       </div>
     </footer>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    
+
     <!-- Alpine.js Initialization -->
     <script>
         document.addEventListener('alpine:init', () => {

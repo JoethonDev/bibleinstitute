@@ -2,21 +2,19 @@
 {% load i18n %}
 
 {% block body %}
-<div class="container-fluid py-4" id="content">
+<div class="container-fluid py-3 ad-page" id="content">
   <div class="row">
     <div class="col-12">
-      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
-        <div>
-          <h2 class="h3 mb-1 text-primary fw-bold">{% translate "Combined Report" %}</h2>
-          <p class="text-muted mb-0">{% translate "Grades and attendance by level and academic year." %}</p>
-        </div>
+      <div class="ad-pane-head">
+        <h3 class="ad-pane-title mb-0">{% translate "Combined Report" %}</h3>
+        <p class="ad-pane-desc">{% translate "Grades and attendance by level and academic year." %}</p>
         <div class="d-flex gap-2">
           {% if selected_year %}
-            <a href="{% url 'export-report-csv' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="btn btn-success d-inline-flex align-items-center gap-2">
+            <a href="{% url 'export-report-csv' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="ad-btn ad-btn--ghost ad-btn--sm">
               <i class="fas fa-file-csv"></i>
               {% translate "Export CSV" %}
             </a>
-            <a href="{% url 'export-report-xlsx' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+            <a href="{% url 'export-report-xlsx' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="ad-btn ad-btn--teal ad-btn--sm">
               <i class="fas fa-file-excel"></i>
               {% translate "Export XLSX" %}
             </a>
@@ -24,8 +22,8 @@
         </div>
       </div>
 
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-4">
+      <div class="ad-card mb-4">
+        <div class="ad-card-body">
           <form method="get" class="row g-3 align-items-end">
             <div class="col-12 col-md-2">
               <label class="form-label fw-semibold" for="level-select">{% translate "Level" %}</label>
@@ -73,79 +71,73 @@
               </select>
             </div>
             <div class="col-12 col-md-1 d-grid">
-              <button type="submit" class="btn btn-outline-primary">{% translate "Filter" %}</button>
+              <button type="submit" class="ad-btn ad-btn--ghost">{% translate "Filter" %}</button>
             </div>
           </form>
         </div>
       </div>
 
       {% if selected_year %}
-        <div class="row g-3 mb-4">
-          <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-              <div class="card-body">
-                <div class="text-muted small">{% translate "Students" %}</div>
-                <div class="h3 mb-0">{{ row_count }}</div>
-              </div>
-            </div>
+        <div class="ad-stats mb-4">
+          <div class="ad-stat">
+            <div class="ad-stat-ic"><i class="fas fa-users"></i></div>
+            <div><b>{{ row_count }}</b><span>{% translate "Students" %}</span></div>
           </div>
         </div>
 
-        <div class="card shadow-sm border-0">
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table align-middle mb-0">
-                <thead class="table-light">
+        <div class="ad-card">
+          <div class="ad-table-wrap">
+            <table class="ad-table">
+              <thead>
+                <tr>
+                  <th scope="col">{% translate "Student" %}</th>
+                  <th scope="col">{% translate "Mode" %}</th>
+                  <th scope="col">{% translate "Grade" %}</th>
+                  <th scope="col">{% translate "Grade %" %}</th>
+                  <th scope="col">{% translate "Expected" %}</th>
+                  <th scope="col">{% translate "Valid" %}</th>
+                  <th scope="col">{% translate "Invalid" %}</th>
+                  <th scope="col">{% translate "Absent" %}</th>
+                  <th scope="col">{% translate "Attendance %" %}</th>
+                  <th scope="col">{% translate "Absence %" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
                   <tr>
-                    <th scope="col">{% translate "Student" %}</th>
-                    <th scope="col">{% translate "Mode" %}</th>
-                    <th scope="col">{% translate "Grade" %}</th>
-                    <th scope="col">{% translate "Grade %" %}</th>
-                    <th scope="col">{% translate "Expected" %}</th>
-                    <th scope="col">{% translate "Valid" %}</th>
-                    <th scope="col">{% translate "Invalid" %}</th>
-                    <th scope="col">{% translate "Absent" %}</th>
-                    <th scope="col">{% translate "Attendance %" %}</th>
-                    <th scope="col">{% translate "Absence %" %}</th>
+                    <td>{{ row.first_name }} {{ row.last_name }}<br><small class="ad-muted-text">{{ row.username }}</small></td>
+                    <td>{{ row.study_mode }}</td>
+                    <td>{{ row.grade_earned }}/{{ row.grade_available }}</td>
+                    <td>{{ row.grade_percent }}%</td>
+                    <td>{{ row.expected }}</td>
+                    <td>{{ row.valid }}</td>
+                    <td>{{ row.invalid }}</td>
+                    <td>{{ row.absent }}</td>
+                    <td>{{ row.attendance_rate }}%</td>
+                    <td>{{ row.absence_rate }}%</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {% for row in rows %}
-                    <tr>
-                      <td>{{ row.first_name }} {{ row.last_name }}<br><small class="text-muted">{{ row.username }}</small></td>
-                      <td>{{ row.study_mode }}</td>
-                      <td>{{ row.grade_earned }}/{{ row.grade_available }}</td>
-                      <td>{{ row.grade_percent }}%</td>
-                      <td>{{ row.expected }}</td>
-                      <td>{{ row.valid }}</td>
-                      <td>{{ row.invalid }}</td>
-                      <td>{{ row.absent }}</td>
-                      <td>{{ row.attendance_rate }}%</td>
-                      <td>{{ row.absence_rate }}%</td>
-                    </tr>
-                  {% empty %}
-                    <tr>
-                      <td colspan="10" class="text-center py-5 text-muted">{% translate "No data found for the selected filters." %}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+                {% empty %}
+                  <tr>
+                    <td colspan="10" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
           {% if page_obj and page_obj.paginator.num_pages > 1 %}
-            <div class="card-footer bg-transparent border-top-0">
+            <div class="ad-page-wrapper">
               <nav aria-label="{% translate 'Report pagination' %}">
-                <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+                <ul class="ad-page-nav">
                   {% if page_obj.has_previous %}
-                    <li class="page-item">
-                      <a class="page-link rounded-pill" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+                    <li>
+                      <a class="ad-page-link" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                         <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                       </a>
                     </li>
                   {% else %}
-                    <li class="page-item disabled" aria-disabled="true">
-                      <span class="page-link rounded-pill">
+                    <li>
+                      <span class="ad-page-link is-disabled" aria-disabled="true">
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                         <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                       </span>
@@ -153,21 +145,21 @@
                   {% endif %}
 
                   {% for page_num in page_obj.paginator.page_range %}
-                    <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
-                      <a class="page-link rounded-pill" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
+                    <li>
+                      <a class="ad-page-link {% if page_num == page_obj.number %}is-active{% endif %}" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
                     </li>
                   {% endfor %}
 
                   {% if page_obj.has_next %}
-                    <li class="page-item">
-                      <a class="page-link rounded-pill" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+                    <li>
+                      <a class="ad-page-link" href="?academic_year={{ selected_year.id }}&level={{ selected_level }}&student={{ selected_student|urlencode }}&study_mode={{ selected_study_mode }}&course_offering={{ selected_course_offering }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                       </a>
                     </li>
                   {% else %}
-                    <li class="page-item disabled" aria-disabled="true">
-                      <span class="page-link rounded-pill">
+                    <li>
+                      <span class="ad-page-link is-disabled" aria-disabled="true">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                       </span>
@@ -175,13 +167,17 @@
                   {% endif %}
                 </ul>
               </nav>
+              <div class="ad-page-info">
+                {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}
+              </div>
             </div>
           {% endif %}
         </div>
       {% else %}
-        <div class="card shadow-sm border-0">
-          <div class="card-body text-center py-5 text-muted">
-            {% translate "Select an academic year above to view the report." %}
+        <div class="ad-card">
+          <div class="ad-empty">
+            <i class="fas fa-filter"></i>
+            <p>{% translate "Select an academic year above to view the report." %}</p>
           </div>
         </div>
       {% endif %}

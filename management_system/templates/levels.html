@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3" id="content">
+<div class="container-fluid py-3 ad-page" id="content">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
@@ -13,7 +13,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4><i class="fas fa-layer-group me-2"></i>{% translate "Academic Levels" %}</h4>
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
+        <button class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
             <i class="fas fa-plus me-1"></i>{% translate "New Level" %}
         </button>
     </div>
@@ -27,15 +27,15 @@
     <div class="row g-3">
         {% for lvl in levels %}
         <div class="col-lg-4 col-md-6">
-            <div class="card dashboard-card h-100">
-                <div class="card-body d-flex flex-column">
+            <div class="ad-card h-100">
+                <div class="ad-card-body d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <div>
-                            <h5 class="mb-1" style="font-weight:700;">{{ lvl.name }}</h5>
-                            <span class="badge bg-primary badge-role">{% translate "Level" %} {{ lvl.level }}</span>
+                            <h5 class="mb-1 ad-level-name">{{ lvl.name }}</h5>
+                            <span class="ad-pill ad-pill--teal">{% translate "Level" %} {{ lvl.level }}</span>
                         </div>
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                            <button class="ad-btn ad-btn--ghost ad-btn--sm" type="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
@@ -65,24 +65,24 @@
                             </ul>
                         </div>
                     </div>
-                    <div class="stat-grid mb-0">
-                        <div class="stat-grid-item">
-                            <div class="stat-value text-primary">{{ lvl.year_count }}</div>
-                            <div class="stat-label">{% translate "Years" %}</div>
+                    <div class="ad-stat-grid mb-0">
+                        <div class="ad-stat-grid-item">
+                            <div class="ad-stat-value ad-stat-value--teal">{{ lvl.year_count }}</div>
+                            <div class="ad-stat-label">{% translate "Years" %}</div>
                         </div>
-                        <div class="stat-grid-item">
-                            <div class="stat-value text-success">{{ lvl.course_count }}</div>
-                            <div class="stat-label">{% translate "Courses" %}</div>
+                        <div class="ad-stat-grid-item">
+                            <div class="ad-stat-value ad-stat-value--success">{{ lvl.course_count }}</div>
+                            <div class="ad-stat-label">{% translate "Courses" %}</div>
                         </div>
-                        <div class="stat-grid-item">
-                            <div class="stat-value text-info">{{ lvl.offering_count }}</div>
-                            <div class="stat-label">{% translate "Offerings" %}</div>
+                        <div class="ad-stat-grid-item">
+                            <div class="ad-stat-value ad-stat-value--gold">{{ lvl.offering_count }}</div>
+                            <div class="ad-stat-label">{% translate "Offerings" %}</div>
                         </div>
                     </div>
-                    <hr class="dashboard-divider">
-                    <div class="kv-row mt-auto">
-                        <span class="kv-label">{% translate "Enrollments" %}</span>
-                        <span class="kv-value">{{ lvl.enrollment_count }}</span>
+                    <hr class="ad-divider">
+                    <div class="ad-kv-row mt-auto">
+                        <span class="ad-kv-label">{% translate "Enrollments" %}</span>
+                        <span class="ad-kv-value">{{ lvl.enrollment_count }}</span>
                     </div>
                 </div>
             </div>
@@ -110,8 +110,8 @@
                             <p class="text-muted small mb-0">{% translate "Leave blank to use the default translated name." %}</p>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                            <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+                            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
                         </div>
                     </form>
                 </div>
@@ -133,8 +133,8 @@
                             <p class="text-danger small mb-0">{% translate "This will remove all academic years and courses in this level." %}</p>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                            <button type="submit" class="btn btn-danger">{% translate "Delete" %}</button>
+                            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                            <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">{% translate "Delete" %}</button>
                         </div>
                     </form>
                 </div>
@@ -142,13 +142,13 @@
         </div>
         {% empty %}
         <div class="col-12">
-            <div class="card dashboard-card">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-layer-group fa-3x mb-3 text-muted"></i>
+            <div class="ad-card">
+                <div class="ad-empty">
+                    <i class="fas fa-layer-group"></i>
                     <p class="mb-1">{% translate "No academic levels found." %}</p>
-                    <small class="text-muted">{% translate "Create an academic year to define your first level." %}</small>
+                    <small class="ps-muted-text">{% translate "Create an academic year to define your first level." %}</small>
                     <div class="mt-3">
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
+                        <button class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
                             <i class="fas fa-plus me-1"></i>{% translate "Create Level" %}
                         </button>
                     </div>
@@ -183,8 +183,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Create" %}</button>
                     </div>
                 </form>
             </div>

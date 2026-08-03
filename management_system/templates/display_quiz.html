@@ -4,31 +4,30 @@
 {% load i18n %}
 
 {% block body %}
-<div id="{{ id }}" class="container-fluid py-4">
+<div id="{{ id }}" class="sd-page">
+<div class="container py-4">
     <!-- Back Navigation -->
     <div class="row justify-content-center">
         <div class="mb-4 col-12 col-lg-10 col-xl-8">
-            <a {% if is_student %} href="{{ back_url }}" {% else %} hx-get="{{ back_url }}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" {% endif %} class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit">
+            <a {% if is_student %} href="{{ back_url }}" {% else %} hx-get="{{ back_url }}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" {% endif %} class="sd-btn sd-btn--gold-outline">
                 <i class="fas fa-arrow-left"></i>
                 {% translate "Back" %}
             </a>
         </div>
         <div class="col-12 col-lg-10 col-xl-8">
-            <div class="card shadow-sm border-0 position-relative">
+            <div class="sd-frame position-relative">
                 {% if mode == "exam" %}
-                    <div id="timer" class="badge bg-danger fs-5 position-absolute top-0 end-0 m-3 p-2 shadow-sm">
-                        <i class="bi bi-clock-history me-2"></i>
+                    <div id="timer" class="sd-timer position-absolute top-0 end-0 m-3 shadow-sm">
+                        <i class="fas fa-hourglass-half me-2"></i>
                         <span>--:--:--</span>
                     </div>
                 {% endif %}
 
                 <!-- Card header colour changes by quiz mode -->
-                <div class="card-header py-3
-                    {% if mode == 'view' %}bg-success{% elif mode == 'closed_unsolved' %}bg-secondary{% else %}bg-primary{% endif %}
-                    text-white">
-                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                <div class="sd-quiz-head {% if mode == 'view' %}sd-quiz-head--success{% elif mode == 'closed_unsolved' %}sd-quiz-head--closed{% endif %}">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center w-100">
                         <div>
-                            <h4 class="mb-1 d-flex align-items-center gap-2">
+                            <h4 class="sd-quiz-title d-flex align-items-center gap-2">
                                 {% if mode == "exam" %}
                                     <i class="fas fa-pen-to-square"></i>
                                 {% elif mode == "view" %}
@@ -38,18 +37,18 @@
                                 {% endif %}
                                 {% translate "Exam" %}: {{ quiz_name }}
                             </h4>
-                            <p class="mb-0 opacity-75">{% translate "Student" %}: {{ username }}</p>
+                            <p class="sd-quiz-meta mb-0">{% translate "Student" %}: {{ username }}</p>
                         </div>
                         {% if total_grade %}
                         <div class="mt-2 mt-md-0 text-md-end">
-                            <h5 class="mb-0">{% translate "Final Grade" %}</h5>
-                            <span class="fs-4 fw-bold">{{ total_grade }}</span>
+                            <h5 class="mb-0 sd-quiz-grade-label">{% translate "Final Grade" %}</h5>
+                            <span class="fw-bold sd-quiz-grade-value">{{ total_grade }}</span>
                         </div>
                         {% endif %}
                     </div>
                 </div>
 
-                <div class="card-body p-4">
+                <div class="sd-screen">
                     {% if messages %}
                         {% for message in messages %}
                             <div class="alert {{ message.tags }}">{{ message }}</div>
@@ -58,11 +57,11 @@
 
                     <!-- Closed / not taken banner -->
                     {% if mode == "closed_unsolved" %}
-                    <div class="alert d-flex align-items-center gap-3 mb-4 quiz-closed-banner">
-                        <i class="fas fa-lock fa-lg quiz-closed-banner__icon"></i>
+                    <div class="alert sd-quiz-closed-alert d-flex align-items-center gap-3 mb-4">
+                        <i class="fas fa-lock fa-lg sd-quiz-closed-icon"></i>
                         <div>
                             <strong>{% translate "Quiz Closed" %}</strong>
-                            <div class="text-muted small">
+                            <div class="ps-muted-text small">
                                 {% blocktranslate with date=quiz_closing_date_str %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktranslate %}
                             </div>
                         </div>
@@ -76,10 +75,10 @@
 
                         <!-- Show submit only for exam mode (student) or correction mode (management) -->
                         {% if mode == "exam" or not is_student %}
-                        <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg">
+                        <div class="sd-quiz-foot d-grid mt-4">
+                            <button type="submit" class="sd-btn sd-btn--gold btn-lg">
                                 {% if is_student %}
-                                    <i class="fas fa-circle-check me-2"></i> {% translate "Submit Exam" %}
+                                    <i class="fas fa-paper-plane me-2"></i> {% translate "Submit Exam" %}
                                 {% else %}
                                     <i class="fas fa-floppy-disk me-2"></i> {% translate "Submit Correction" %}
                                 {% endif %}

@@ -4,7 +4,7 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3" id="content">
+<div class="container-fluid py-3 ad-page" id="content">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
@@ -15,7 +15,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4>{% translate "Academic Setup" %}</h4>
         <div class="d-flex gap-2">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#yearModal">
+            <button class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#yearModal">
                 <i class="fas fa-plus me-1"></i>{% translate "New Academic Year" %}
             </button>
         </div>
@@ -28,7 +28,9 @@
     {% endif %}
 
     {# --- Academic Years Section --- #}
-    <h5>{% translate "Academic Years" %}</h5>
+    <div class="ad-pane-head">
+        <h5 class="ad-pane-title">{% translate "Academic Years" %}</h5>
+    </div>
     <form method="get" class="row g-2 mb-3 align-items-end" action="?{% if selected_scope_id %}scope={{ selected_scope_id }}{% elif selected_year %}academic_year={{ selected_year }}{% endif %}">
         <div class="col-auto">
             <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
@@ -44,119 +46,128 @@
         </div>
     </form>
 
-    <div class="table-responsive mb-4">
-        <table class="table table-hover admin-table">
-            <thead>
-                <tr>
-                    <th>{% translate "Name" %}</th>
-                    <th>{% translate "Levels" %}</th>
-                    <th>{% translate "Start" %}</th>
-                    <th>{% translate "End" %}</th>
-                    <th>{% translate "Status" %}</th>
-                    <th>{% translate "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for y in year_page_obj.object_list %}
-                <tr{% if selected_year == y.pk %} class="table-active"{% endif %}>
-                    <td>{{ y.name }}</td>
-                    <td>{{ y.level_display }}</td>
-                    <td>{{ y.starts_on }}</td>
-                    <td>{{ y.ends_on }}</td>
-                    <td>
-                        {% if y.is_active %}
-                        <span class="badge bg-success">{% translate "Active" %}</span>
-                        {% else %}
-                        <span class="badge bg-secondary">{% translate "Historical" %}</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if not y.is_active %}
-                        <form method="post" action="{% url 'academic-year-activate' y.id %}" style="display:inline" onsubmit="return confirm('{% translate "Activate this academic year?" %}')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-success" title="{% translate "Activate" %}"><i class="fas fa-check me-1"></i>{% translate "Activate" %}</button>
-                        </form>
-                        {% endif %}
-                        <a href="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" class="btn btn-sm btn-outline-info" title="{% translate "View levels and offerings" %}">
-                            <i class="fas fa-layer-group"></i>
-                        </a>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}" title="{% translate "Edit" %}">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <form method="post" action="{% url 'academic-year-delete' y.id %}" style="display:inline" onsubmit="return confirm('{% translate "Delete this year?" %}')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="text-center text-muted">{% translate "No academic years yet." %}</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="ad-card mb-4">
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th>{% translate "Name" %}</th>
+                        <th>{% translate "Levels" %}</th>
+                        <th>{% translate "Start" %}</th>
+                        <th>{% translate "End" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for y in year_page_obj.object_list %}
+                    <tr{% if selected_year == y.pk %} class="table-active"{% endif %}>
+                        <td>{{ y.name }}</td>
+                        <td>{{ y.level_display }}</td>
+                        <td>{{ y.starts_on }}</td>
+                        <td>{{ y.ends_on }}</td>
+                        <td>
+                            {% if y.is_active %}
+                            <span class="ad-pill ad-pill--success">{% translate "Active" %}</span>
+                            {% else %}
+                            <span class="ad-pill ad-pill--muted">{% translate "Historical" %}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="ad-actions">
+                            {% if not y.is_active %}
+                            <form method="post" action="{% url 'academic-year-activate' y.id %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Activate this academic year?" %}')">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-action-btn" title="{% translate "Activate" %}"><i class="fas fa-check"></i></button>
+                            </form>
+                            {% endif %}
+                            <a href="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" class="ad-action-btn" title="{% translate "View levels and offerings" %}">
+                                <i class="fas fa-layer-group"></i>
+                            </a>
+                            <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}" title="{% translate "Edit" %}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form method="post" action="{% url 'academic-year-delete' y.id %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Delete this year?" %}')">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-action-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
+                            </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="ad-empty">{% translate "No academic years yet." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     {# --- Year pagination --- #}
     {% if year_page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="{% translate "Year pagination" %}">
-        <ul class="pagination pagination-sm justify-content-center flex-wrap gap-1 mb-0">
-            {% if year_page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link rounded-pill" href="?page={{ year_page_obj.previous_page_number }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}" aria-label="{% translate "Previous page" %}">
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                    <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled" aria-disabled="true">
-                <span class="page-link rounded-pill">
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                    <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                </span>
-            </li>
-            {% endif %}
-            {% for p in year_page_obj.paginator.page_range %}
-            <li class="page-item{% if p == year_page_obj.number %} active{% endif %}">
-                <a class="page-link rounded-pill" href="?page={{ p }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}"{% if p == year_page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
-            </li>
-            {% endfor %}
-            {% if year_page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link rounded-pill" href="?page={{ year_page_obj.next_page_number }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}" aria-label="{% translate "Next page" %}">
-                    <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled" aria-disabled="true">
-                <span class="page-link rounded-pill">
-                    <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </span>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
+    <div class="ad-page-wrapper mb-4">
+        <nav aria-label="{% translate "Year pagination" %}">
+            <ul class="ad-page-nav">
+                {% if year_page_obj.has_previous %}
+                <li>
+                    <a class="ad-page-link" href="?page={{ year_page_obj.previous_page_number }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}" aria-label="{% translate "Previous page" %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </span>
+                </li>
+                {% endif %}
+                {% for p in year_page_obj.paginator.page_range %}
+                <li>
+                    <a class="ad-page-link {% if p == year_page_obj.number %}is-active{% endif %}" href="?page={{ p }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}"{% if p == year_page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
+                </li>
+                {% endfor %}
+                {% if year_page_obj.has_next %}
+                <li>
+                    <a class="ad-page-link" href="?page={{ year_page_obj.next_page_number }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}" aria-label="{% translate "Next page" %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="ad-page-info">
+            {% blocktranslate with start=year_page_obj.start_index end=year_page_obj.end_index total=year_page_obj.paginator.count %}Page {{ year_page_obj.number }} of {{ year_page_obj.paginator.num_pages }} ({{ start }}–{{ end }} of {{ total }}){% endblocktranslate %}
+        </div>
+    </div>
     {% endif %}
 
     {# --- Year-Level Links Section --- #}
     {% if year_level_links %}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{% translate "Year Levels" %} — {{ year_level_links.0.academic_year.name }}</h5>
+    <div class="ad-card mb-4">
+        <div class="ad-card-head d-flex justify-content-between align-items-center">
+            <span>{% translate "Year Levels" %} — {{ year_level_links.0.academic_year.name }}</span>
         </div>
-        <div class="card-body">
+        <div class="ad-card-body">
             {% for ayl in year_level_links %}
             <div class="border rounded p-3 mb-3{% if selected_scope_id == ayl.pk %} border-primary{% endif %}">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">{{ ayl.level.display_name }}</h6>
                     <div class="d-flex gap-2">
-                        <a href="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" class="btn btn-sm btn-outline-info">
+                        <a href="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" class="ad-btn ad-btn--ghost ad-btn--sm">
                             <i class="fas fa-book me-1"></i>{% translate "Offerings" %}
                         </a>
-                        <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" style="display:inline" onsubmit="return confirm('{% translate "Delete this level from the academic year?" %}')">
+                        <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Delete this level from the academic year?" %}')">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            <button type="submit" class="ad-action-btn is-danger"><i class="fas fa-trash"></i></button>
                         </form>
                     </div>
                 </div>
@@ -175,7 +186,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <button type="submit" class="btn btn-sm btn-outline-primary">{% translate "Save Weekdays" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">{% translate "Save Weekdays" %}</button>
                     </div>
                 </form>
             </div>
@@ -186,108 +197,111 @@
 
     {# --- Course Offerings Section --- #}
     {% if selected_scope %}
-    <h5>{% translate "Course Offerings" %} — {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h5>
-    <form method="get" class="row g-2 mb-3 align-items-end">
-        <input type="hidden" name="scope" value="{{ selected_scope_id }}">
-        <div class="col-auto">
+    <div class="ad-pane-head">
+        <h5 class="ad-pane-title">{% translate "Course Offerings" %} — {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h5>
+    </div>
+    <div class="ad-filters mb-3">
+        <form method="get" class="d-flex align-items-end gap-2 flex-wrap">
+            <input type="hidden" name="scope" value="{{ selected_scope_id }}">
             <label for="offering-search" class="visually-hidden">{% translate "Search offerings" %}</label>
             <input type="search" id="offering-search" name="offering_q" class="form-control form-control-sm" placeholder="{% translate "Search offerings…" %}" value="{{ offering_search }}">
-        </div>
-        <div class="col-auto">
-            <label for="offering-status" class="visually-hidden">{% translate "Filter by status" %}</label>
-            <select name="offering_status" id="offering-status" class="form-select form-select-sm" onchange="this.form.submit()">
+            <select name="offering_status" id="offering-status" class="form-select form-select-sm ad-width-auto" onchange="this.form.submit()">
                 <option value="all" {% if offering_status == "all" %}selected{% endif %}>{% translate "All" %}</option>
                 <option value="draft" {% if offering_status == "draft" %}selected{% endif %}>{% translate "Draft" %}</option>
                 <option value="published" {% if offering_status == "published" %}selected{% endif %}>{% translate "Published" %}</option>
                 <option value="archived" {% if offering_status == "archived" %}selected{% endif %}>{% translate "Archived" %}</option>
             </select>
-        </div>
-        <div class="col-auto">
-            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#offeringModal">
-                <i class="fas fa-plus me-1"></i>{% translate "New Offering" %}
-            </button>
-        </div>
-        <div class="col-auto">
-            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#copyModal">
-                <i class="fas fa-copy me-1"></i>{% translate "Copy Offerings" %}
-            </button>
-        </div>
-    </form>
+        <button type="button" class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#offeringModal">
+            <i class="fas fa-plus me-1"></i>{% translate "New Offering" %}
+        </button>
+        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-toggle="modal" data-bs-target="#copyModal">
+            <i class="fas fa-copy me-1"></i>{% translate "Copy Offerings" %}
+        </button>
+    </div>
 
-    <div class="table-responsive mb-4">
-        <table class="table table-hover admin-table">
-            <thead>
-                <tr>
-                    <th>{% translate "Course" %}</th>
-                    <th>{% translate "Instructor" %}</th>
-                    <th>{% translate "Status" %}</th>
-                    <th>{% translate "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for o in offering_page_obj.object_list %}
-                <tr>
-                    <td>{{ o.course.name }}</td>
-                    <td>{{ o.instructor|default:"—" }}</td>
-                    <td>{{ o.get_status_display }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}" title="{% translate "Edit" %}">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <form method="post" action="{% url 'course-offering-delete' o.id %}" style="display:inline" onsubmit="return confirm('{% translate "Delete this offering?" %}')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="4" class="text-center text-muted">{% translate "No offerings for this scope." %}</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="ad-card mb-4">
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th>{% translate "Course" %}</th>
+                        <th>{% translate "Instructor" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in offering_page_obj.object_list %}
+                    <tr>
+                        <td>{{ o.course.name }}</td>
+                        <td>{{ o.instructor|default:"—" }}</td>
+                        <td><span class="ad-pill ad-pill--muted">{{ o.get_status_display }}</span></td>
+                        <td>
+                            <div class="ad-actions">
+                            <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}" title="{% translate "Edit" %}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form method="post" action="{% url 'course-offering-delete' o.id %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Delete this offering?" %}')">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-action-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
+                            </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="ad-empty">{% translate "No offerings for this scope." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     {# --- Offering pagination --- #}
     {% if offering_page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="{% translate "Offering pagination" %}">
-        <ul class="pagination pagination-sm justify-content-center flex-wrap gap-1 mb-0">
-            {% if offering_page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link rounded-pill" href="?scope={{ selected_scope_id }}&offering_page={{ offering_page_obj.previous_page_number }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}" aria-label="{% translate "Previous page" %}">
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                    <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled" aria-disabled="true">
-                <span class="page-link rounded-pill">
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                    <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                </span>
-            </li>
-            {% endif %}
-            {% for p in offering_page_obj.paginator.page_range %}
-            <li class="page-item{% if p == offering_page_obj.number %} active{% endif %}">
-                <a class="page-link rounded-pill" href="?scope={{ selected_scope_id }}&offering_page={{ p }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}"{% if p == offering_page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
-            </li>
-            {% endfor %}
-            {% if offering_page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link rounded-pill" href="?scope={{ selected_scope_id }}&offering_page={{ offering_page_obj.next_page_number }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}" aria-label="{% translate "Next page" %}">
-                    <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled" aria-disabled="true">
-                <span class="page-link rounded-pill">
-                    <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </span>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
+    <div class="ad-page-wrapper mb-4">
+        <nav aria-label="{% translate "Offering pagination" %}">
+            <ul class="ad-page-nav">
+                {% if offering_page_obj.has_previous %}
+                <li>
+                    <a class="ad-page-link" href="?scope={{ selected_scope_id }}&offering_page={{ offering_page_obj.previous_page_number }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}" aria-label="{% translate "Previous page" %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </span>
+                </li>
+                {% endif %}
+                {% for p in offering_page_obj.paginator.page_range %}
+                <li>
+                    <a class="ad-page-link {% if p == offering_page_obj.number %}is-active{% endif %}" href="?scope={{ selected_scope_id }}&offering_page={{ p }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}"{% if p == offering_page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
+                </li>
+                {% endfor %}
+                {% if offering_page_obj.has_next %}
+                <li>
+                    <a class="ad-page-link" href="?scope={{ selected_scope_id }}&offering_page={{ offering_page_obj.next_page_number }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}" aria-label="{% translate "Next page" %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="ad-page-info">
+            {% blocktranslate with start=offering_page_obj.start_index end=offering_page_obj.end_index total=offering_page_obj.paginator.count %}Page {{ offering_page_obj.number }} of {{ offering_page_obj.paginator.num_pages }} ({{ start }}–{{ end }} of {{ total }}){% endblocktranslate %}
+        </div>
+    </div>
     {% endif %}
 
     {# --- Create Offering Modal --- #}
@@ -322,8 +336,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Create" %}</button>
                     </div>
                 </form>
             </div>
@@ -361,8 +375,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
                     </div>
                 </form>
             </div>
@@ -402,8 +416,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
                     </div>
                 </form>
             </div>
@@ -429,8 +443,8 @@
                         {% endfor %}
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Create" %}</button>
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Create" %}</button>
                     </div>
                 </form>
             </div>
@@ -476,8 +490,8 @@
                         {% endif %}
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Copy" %}</button>
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Copy" %}</button>
                     </div>
                 </form>
             </div>

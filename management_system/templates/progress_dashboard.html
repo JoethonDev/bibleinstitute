@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3" id="content">
+<div class="container-fluid py-3 ad-page" id="content">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
@@ -11,7 +11,9 @@
         </ol>
     </nav>
 
-    <h4 class="mb-3">{% translate "Lecture Progress" %}</h4>
+    <div class="ad-pane-head">
+        <h4 class="ad-pane-title mb-0">{% translate "Lecture Progress" %}</h4>
+    </div>
 
     <form method="get" class="row g-2 mb-3">
         <div class="col-auto">
@@ -44,69 +46,68 @@
         </div>
     </form>
 
-    <div class="card admin-card">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover admin-table mb-0">
-                    <thead>
-                        <tr>
-                            <th scope="col">{% translate "Student" %}</th>
-                            <th scope="col">{% translate "Lesson" %}</th>
-                            <th scope="col">{% translate "Part" %}</th>
-                            <th scope="col">{% translate "Progress" %}</th>
-                            <th scope="col">{% translate "Completed" context "progress" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in progress %}
-                        <tr>
-                            <td>{{ p.student.get_full_name|default:p.student.username }}</td>
-                            <td>{{ p.lesson.name }}</td>
-                            <td><code>{{ p.part_id }}</code></td>
-                            <td>
-                                <div class="progress" style="height:20px;max-width:200px">
-                                    <div class="progress-bar" role="progressbar" style="width:{{ p.percent }}%" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">{{ p.percent }}%</div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if p.completed_at %}
-                                <span class="badge bg-success">{% translate "Yes" %}</span>
-                                {% else %}
-                                <span class="badge bg-secondary">{% translate "No" %}</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                {% if selected_year %}
-                                <i class="fas fa-inbox fs-1 mb-2"></i>
-                                <p>{% translate "No progress records for this selection." %}</p>
-                                {% else %}
-                                <i class="fas fa-filter fs-1 mb-2"></i>
-                                <p>{% translate "Select an academic year to load progress data." %}</p>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <div class="ad-card">
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th scope="col">{% translate "Student" %}</th>
+                        <th scope="col">{% translate "Lesson" %}</th>
+                        <th scope="col">{% translate "Part" %}</th>
+                        <th scope="col">{% translate "Progress" %}</th>
+                        <th scope="col">{% translate "Completed" context "progress" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in progress %}
+                    <tr>
+                        <td>{{ p.student.get_full_name|default:p.student.username }}</td>
+                        <td>{{ p.lesson.name }}</td>
+                        <td><code>{{ p.part_id }}</code></td>
+                        <td>
+                            <div class="ad-meter ad-meter--progress" role="progressbar" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">
+                                <span style="width:{{ p.percent }}%"></span>
+                            </div>
+                            <small class="ps-muted-text">{{ p.percent }}%</small>
+                        </td>
+                        <td>
+                            {% if p.completed_at %}
+                            <span class="ad-pill ad-pill--success">{% translate "Yes" %}</span>
+                            {% else %}
+                            <span class="ad-pill ad-pill--muted">{% translate "No" %}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="ad-empty">
+                            {% if selected_year %}
+                            <i class="fas fa-inbox"></i>
+                            <p>{% translate "No progress records for this selection." %}</p>
+                            {% else %}
+                            <i class="fas fa-filter"></i>
+                            <p>{% translate "Select an academic year to load progress data." %}</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% if page_obj and page_obj.paginator.num_pages > 1 %}
-        <div class="card-footer bg-transparent">
+        <div class="ad-page-wrapper">
             <nav aria-label="{% translate 'Progress pagination' %}">
-                <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+                <ul class="ad-page-nav">
                     {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+                    <li>
+                        <a class="ad-page-link" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
                             <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                             <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                         </a>
                     </li>
                     {% else %}
-                    <li class="page-item disabled" aria-disabled="true">
-                        <span class="page-link rounded-pill">
+                    <li>
+                        <span class="ad-page-link is-disabled" aria-disabled="true">
                             <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                             <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                         </span>
@@ -114,21 +115,21 @@
                     {% endif %}
 
                     {% for page_num in page_obj.paginator.page_range %}
-                    <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
-                        <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
+                    <li>
+                        <a class="ad-page-link {% if page_num == page_obj.number %}is-active{% endif %}" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_num }}"{% if page_num == page_obj.number %} aria-current="page"{% endif %}>{{ page_num }}</a>
                     </li>
                     {% endfor %}
 
                     {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link rounded-pill" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+                    <li>
+                        <a class="ad-page-link" href="?academic_year={{ selected_year }}&course_offering={{ selected_offering }}&lesson={{ selected_lesson }}&student={{ selected_student|urlencode }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
                             <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                             <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                         </a>
                     </li>
                     {% else %}
-                    <li class="page-item disabled" aria-disabled="true">
-                        <span class="page-link rounded-pill">
+                    <li>
+                        <span class="ad-page-link is-disabled" aria-disabled="true">
                             <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                             <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                         </span>
@@ -136,6 +137,9 @@
                     {% endif %}
                 </ul>
             </nav>
+            <div class="ad-page-info">
+                {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}
+            </div>
         </div>
         {% endif %}
     </div>

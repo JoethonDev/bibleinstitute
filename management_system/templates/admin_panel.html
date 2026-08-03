@@ -19,243 +19,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     {% endif %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    <!-- Style -->
+    <!-- Legacy stylesheets (migration fallback — loaded first so new system wins cascade) -->
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260802-ui-cascade-1">
+    <!-- Psalmodia Design System (loads after legacy for cascade precedence) -->
+    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v=20260802-ui-cascade-1">
+    <link rel="stylesheet" href="{% static 'css/app_admin.css' %}?v=20260802-ui-cascade-1">
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260801-lesson-ui-3">
-    
-    <style>
-        :root {
-            --card-radius: 14px;
-            --card-shadow: 0 2px 12px rgba(0,0,0,0.06);
-            --card-shadow-hover: 0 8px 30px rgba(0,0,0,0.10);
-            --section-border: 2px solid;
-        }
-
-        /* ===== Global Card ===== */
-        .dashboard-card {
-            border: none;
-            border-radius: var(--card-radius);
-            box-shadow: var(--card-shadow);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-            overflow: hidden;
-        }
-        .dashboard-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--card-shadow-hover);
-        }
-        .dashboard-card .card-body { padding: 1.35rem 1.25rem; }
-        .dashboard-card .card-header {
-            background: transparent;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            padding: 0.9rem 1.25rem;
-        }
-
-        /* ===== Metric Cards (top row) ===== */
-        .metric-card {
-            border: none;
-            border-radius: var(--card-radius);
-            box-shadow: var(--card-shadow);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .metric-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            opacity: 0.04;
-            background: linear-gradient(135deg, var(--bs-primary, #0d6efd) 0%, transparent 60%);
-            transition: opacity 0.3s ease;
-        }
-        .metric-card:hover::before { opacity: 0.08; }
-        .metric-card:hover { transform: translateY(-3px); box-shadow: var(--card-shadow-hover); }
-        .metric-card .card-body { padding: 1.25rem 0.75rem; }
-        .metric-card .metric-icon {
-            font-size: 1.6rem;
-            display: block;
-            margin-bottom: 0.4rem;
-            opacity: 0.85;
-        }
-        .metric-card h4 {
-            font-size: 1.6rem;
-            font-weight: 750;
-            letter-spacing: -0.02em;
-            margin-bottom: 0.15rem;
-            line-height: 1.2;
-        }
-        .metric-card p {
-            font-size: 0.78rem;
-            font-weight: 500;
-            opacity: 0.65;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            margin-bottom: 0;
-        }
-
-        /* ===== Section Title ===== */
-        .section-title {
-            font-size: 0.88rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-bottom: 1rem;
-            padding-bottom: 0.6rem;
-            border-bottom: var(--section-border) var(--bs-primary, #0d6efd);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .section-title i { font-size: 0.9rem; }
-
-        /* ===== Stat Labels / Values ===== */
-        .stat-label {
-            font-size: 0.72rem;
-            font-weight: 500;
-            opacity: 0.6;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        .stat-value {
-            font-size: 1.3rem;
-            font-weight: 700;
-            line-height: 1.3;
-        }
-
-        /* ===== Bar Charts ===== */
-        .bar-chart {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            margin-bottom: 0.45rem;
-        }
-        .bar-chart .bar-label {
-            min-width: 72px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--bs-body-color, #212529);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .bar-chart .bar-track {
-            flex: 1;
-            height: 20px;
-            background: var(--bs-light, #f1f3f5);
-            border-radius: 5px;
-            overflow: hidden;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
-        }
-        .bar-chart .bar-fill {
-            height: 100%;
-            border-radius: 5px;
-            transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-            display: flex;
-            align-items: center;
-            padding-left: 7px;
-            font-size: 0.7rem;
-            color: #fff;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            min-width: 22px;
-        }
-        .bar-chart .bar-fill.bg-primary { background: linear-gradient(135deg, #0d6efd, #0a58ca); }
-        .bar-chart .bar-fill.bg-success { background: linear-gradient(135deg, #198754, #146c43); }
-        .bar-chart .bar-fill.bg-info { background: linear-gradient(135deg, #0dcaf0, #0aa2c0); }
-        .bar-chart .bar-fill.bg-warning { background: linear-gradient(135deg, #ffc107, #d39e00); }
-        .bar-chart .bar-fill.bg-danger { background: linear-gradient(135deg, #dc3545, #b02a37); }
-        .bar-chart .bar-fill.bg-secondary { background: linear-gradient(135deg, #6c757d, #565e64); }
-        .bar-chart .bar-fill.bg-dark { background: linear-gradient(135deg, #212529, #1a1e21); }
-
-        /* ===== Progress Bar ===== */
-        .progress-thin { height: 8px; border-radius: 4px; background: var(--bs-light, #f1f3f5); }
-
-        /* ===== Badge ===== */
-        .badge-role {
-            font-size: 0.68rem;
-            font-weight: 600;
-            padding: 0.2em 0.7em;
-            border-radius: 4px;
-            letter-spacing: 0.02em;
-        }
-
-        /* ===== Activity List ===== */
-        .activity-list-item {
-            padding: 0.7rem 1.25rem;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            transition: background 0.15s ease;
-        }
-        .activity-list-item:last-child { border-bottom: none; }
-        .activity-list-item:hover { background: rgba(0,0,0,0.02); }
-        .activity-list-item .activity-name { font-size: 0.88rem; font-weight: 600; }
-        .activity-list-item .activity-meta { font-size: 0.76rem; opacity: 0.6; }
-        .activity-list-item .activity-date { font-size: 0.72rem; opacity: 0.5; white-space: nowrap; }
-
-        /* ===== Divider ===== */
-        .dashboard-divider {
-            border: none;
-            border-top: 1px solid rgba(0,0,0,0.06);
-            margin: 0.75rem 0;
-            opacity: 1;
-        }
-
-        /* ===== Page Header ===== */
-        .page-header {
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.8rem;
-            border-bottom: 2px solid rgba(0,0,0,0.05);
-        }
-        .page-header h4 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-        }
-        .page-header .page-date {
-            font-size: 0.78rem;
-            opacity: 0.55;
-            font-weight: 500;
-        }
-
-        /* ===== Stat Grid for 3-column layouts ===== */
-        .stat-grid {
-            display: flex;
-            justify-content: space-around;
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-        .stat-grid-item { flex: 1; padding: 0.25rem 0; position: relative; }
-        .stat-grid-item + .stat-grid-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 15%;
-            height: 70%;
-            width: 1px;
-            background: rgba(0,0,0,0.07);
-        }
-
-        /* ===== Key-Value Row ===== */
-        .kv-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.3rem 0;
-            font-size: 0.82rem;
-        }
-        .kv-row .kv-label { opacity: 0.65; font-weight: 500; }
-        .kv-row .kv-value { font-weight: 650; }
-
-        /* ===== Responsive Fine-tune ===== */
-        @media (max-width: 576px) {
-            .dashboard-card .card-body { padding: 1rem; }
-            .metric-card .card-body { padding: 1rem 0.5rem; }
-            .metric-card h4 { font-size: 1.35rem; }
-            .bar-chart .bar-label { min-width: 56px; font-size: 0.72rem; }
-            .page-header h4 { font-size: 1.1rem; }
-        }
-    </style>
     
     {% block style %}
     {% endblock %}
@@ -266,479 +38,447 @@
     {% include 'partials/components/toast_container.html' %}
     
     <!-- Main Admin Layout -->
-    <div class="admin-layout">
+    <div class="admin-layout ad-shell"
+         x-data
+         :class="{ 'is-sidebar-collapsed': $store.ui.sidebarCollapsed }">
         <!-- Sidebar Component -->
         {% include 'partials/components/admin_sidebar.html' %}
         
         <!-- Main Content Area -->
-        <main id="display-page" class="admin-main-content">
+        <main id="display-page" class="admin-main-content ad-panes">
             {% block breadcrumbs %}{% include 'partials/admin_breadcrumbs.html' %}{% endblock %}
             {% block body %}
-            <div class="container-fluid px-3">
+            <div class="container-fluid px-3 ad-dashboard-page">
 
                 <!-- ===== PAGE HEADER ===== -->
-                <div class="page-header d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0"><i class="fas fa-tachometer-alt me-2 text-primary"></i>{% translate "Dashboard" %}</h4>
-                    <span class="page-date"><i class="far fa-calendar-alt me-1"></i>{{ today|date:"l, F j, Y" }}</span>
+                <div class="ad-page-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-tachometer-alt me-2 ad-page-header-icon"></i>{% translate "Dashboard" %}</h4>
+                    <span class="ad-page-date"><i class="far fa-calendar-alt me-1"></i>{{ today|date:"l, F j, Y" }}</span>
                 </div>
 
                 <!-- ===== SUMMARY METRIC CARDS ===== -->
-                <div class="row g-3 mb-4">
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card metric-card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-users metric-icon text-primary"></i>
-                                <h4>{{ admin_metrics.users|default:0 }}</h4>
-                                <p>{% translate "Total Users" %}</p>
-                            </div>
+                <div class="ad-stats mb-4">
+                    <div class="ad-stat">
+                        <i class="fas fa-users ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.users|default:0 }}</b>
+                            <span>{% translate "Total Users" %}</span>
                         </div>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card metric-card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-book-open metric-icon text-success"></i>
-                                <h4>{{ admin_metrics.courses|default:0 }}</h4>
-                                <p>{% translate "Total Courses" %}</p>
-                            </div>
+                    <div class="ad-stat ad-stat--green">
+                        <i class="fas fa-book-open ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.courses|default:0 }}</b>
+                            <span>{% translate "Total Courses" %}</span>
                         </div>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card metric-card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-play-circle metric-icon text-info"></i>
-                                <h4>{{ admin_metrics.lessons|default:0 }}</h4>
-                                <p>{% translate "Total Lessons" %}</p>
-                            </div>
+                    <div class="ad-stat">
+                        <i class="fas fa-play-circle ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.lessons|default:0 }}</b>
+                            <span>{% translate "Total Lessons" %}</span>
                         </div>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card metric-card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-question-circle metric-icon text-warning"></i>
-                                <h4>{{ admin_metrics.quizzes|default:0 }}</h4>
-                                <p>{% translate "Total Quizzes" %}</p>
-                            </div>
+                    <div class="ad-stat ad-stat--gold">
+                        <i class="fas fa-question-circle ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.quizzes|default:0 }}</b>
+                            <span>{% translate "Total Quizzes" %}</span>
                         </div>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card metric-card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-graduation-cap metric-icon text-danger"></i>
-                                <h4>{{ admin_metrics.academic_years|default:0 }}</h4>
-                                <p>{% translate "Academic Years" %}</p>
-                            </div>
+                    <div class="ad-stat ad-stat--red">
+                        <i class="fas fa-graduation-cap ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.academic_years|default:0 }}</b>
+                            <span>{% translate "Academic Years" %}</span>
                         </div>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card metric-card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-layer-group metric-icon text-secondary"></i>
-                                <h4>{{ admin_metrics.offerings|default:0 }}</h4>
-                                <p>{% translate "Offerings" %}</p>
-                            </div>
+                    <div class="ad-stat ad-stat--gold">
+                        <i class="fas fa-layer-group ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.offerings|default:0 }}</b>
+                            <span>{% translate "Offerings" %}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- ===== ROW 1: USER ANALYTICS ===== -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-primary);"><i class="fas fa-user-tag text-primary"></i>{% translate "Users by Role" %}</h6>
-                                {% for item in users_by_role %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{{ item.role__role|default:_("Unknown")|title }}</span>
-                                    <div class="bar-track">
-                                        {% widthratio item.count admin_metrics.users 100 as pct %}
-                                        <div class="bar-fill bg-primary" style="width:{{ pct }}%">{{ item.count }}</div>
-                                    </div>
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-user-tag"></i>{% translate "Users by Role" %}</h6>
+                            {% for item in users_by_role %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.role__role|default:_("Unknown")|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
                             </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-success);"><i class="fas fa-clipboard-check text-success"></i>{% translate "Application Status" %}</h6>
-                                {% for item in users_by_app_status %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{{ item.application_status|default:_("Unknown")|title }}</span>
-                                    <div class="bar-track">
-                                        {% widthratio item.count admin_metrics.users 100 as pct %}
-                                        <div class="bar-fill {% if item.application_status == 'active' %}bg-success{% elif item.application_status == 'pending' %}bg-warning{% elif item.application_status == 'declined' %}bg-danger{% else %}bg-secondary{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
-                                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-clipboard-check"></i>{% translate "Application Status" %}</h6>
+                            {% for item in users_by_app_status %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.application_status|default:_("Unknown")|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill {% if item.application_status == 'active' %}ad-bar-fill--green{% elif item.application_status == 'pending' %}ad-bar-fill--warning{% elif item.application_status == 'declined' %}ad-bar-fill--danger{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
                             </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-info);"><i class="fas fa-laptop-house text-info"></i>{% translate "Study Mode" %}</h6>
-                                {% for item in users_by_study_mode %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{{ item.study_mode|default:_("Not Set")|title }}</span>
-                                    <div class="bar-track">
-                                        {% widthratio item.count admin_metrics.users 100 as pct %}
-                                        <div class="bar-fill bg-info" style="width:{{ pct }}%">{{ item.count }}</div>
-                                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-laptop-house"></i>{% translate "Study Mode" %}</h6>
+                            {% for item in users_by_study_mode %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.study_mode|default:_("Not Set")|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
                             </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-success);"><i class="fas fa-user-plus text-success"></i>{% translate "New Users" %}</h6>
-                                <div class="stat-grid">
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-success">{{ new_users_week }}</div>
-                                        <div class="stat-label">{% translate "This Week" %}</div>
-                                    </div>
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-primary">{{ new_users_month }}</div>
-                                        <div class="stat-label">{% translate "This Month" %}</div>
-                                    </div>
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value" style="color:var(--bs-body-color);">{{ admin_metrics.users }}</div>
-                                        <div class="stat-label">{% translate "Total" %}</div>
-                                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-user-plus"></i>{% translate "New Users" %}</h6>
+                            <div class="ad-stat-grid">
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--success">{{ new_users_week }}</div>
+                                    <div class="ad-stat-label">{% translate "This Week" %}</div>
                                 </div>
-                                <hr class="dashboard-divider">
-                                <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "Top Cities" %}</h6>
-                                {% for city in top_cities|slice:":5" %}
-                                <div class="bar-chart">
-                                    <span class="bar-label" style="min-width:56px;font-size:0.75rem;">{{ city.city }}</span>
-                                    <div class="bar-track" style="height:16px;">
-                                        {% widthratio city.count admin_metrics.users 100 as pct %}
-                                        <div class="bar-fill bg-secondary" style="width:{{ pct }}%;font-size:0.62rem;">{{ city.count }}</div>
-                                    </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ new_users_month }}</div>
+                                    <div class="ad-stat-label">{% translate "This Month" %}</div>
                                 </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value">{{ admin_metrics.users }}</div>
+                                    <div class="ad-stat-label">{% translate "Total" %}</div>
+                                </div>
                             </div>
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Top Cities" %}</h6>
+                            {% for city in top_cities|slice:":5" %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label ad-bar-label--sm">{{ city.city }}</span>
+                                <div class="ad-bar-track ad-bar-track--sm">
+                                    {% widthratio city.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--slate ad-bar-fill--sm" style="width:{{ pct }}%">{{ city.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
 
                 <!-- ===== ROW 2: COURSE, LESSON, QUIZ & ACADEMIC YEAR ===== -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-primary);"><i class="fas fa-layer-group text-primary"></i>{% translate "Courses by Level" %}</h6>
-                                {% for item in courses_by_level %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{% translate "Level" %} {{ item.level }}</span>
-                                    <div class="bar-track">
-                                        {% widthratio item.count admin_metrics.courses 100 as pct %}
-                                        <div class="bar-fill bg-primary" style="width:{{ pct }}%">{{ item.count }}</div>
-                                    </div>
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-layer-group"></i>{% translate "Courses by Level" %}</h6>
+                            {% for item in courses_by_level %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{% translate "Level" %} {{ item.level }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.courses 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
-                                <hr class="dashboard-divider">
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Avg Lessons / Course" %}</span>
-                                    <span class="kv-value">{{ avg_lessons_per_course }}</span>
-                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Avg Lessons / Course" %}</span>
+                                <span class="ad-kv-value">{{ avg_lessons_per_course }}</span>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-info);"><i class="fas fa-video text-info"></i>{% translate "Lessons" %}</h6>
-                                {% for item in lessons_by_status %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{{ item.status|title }}</span>
-                                    <div class="bar-track">
-                                        {% widthratio item.count admin_metrics.lessons 100 as pct %}
-                                        <div class="bar-fill {% if item.status == 'published' %}bg-success{% elif item.status == 'draft' %}bg-warning{% else %}bg-secondary{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
-                                    </div>
-                                </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
-                                <hr class="dashboard-divider">
-                                <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "Offerings by Status" %}</h6>
-                                {% for item in offerings_by_status %}
-                                <div class="kv-row">
-                                    <span class="kv-label">{{ item.status|title }}</span>
-                                    <span class="kv-value">{{ item.count }}</span>
-                                </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-warning);"><i class="fas fa-question-circle text-warning"></i>{% translate "Quizzes" %}</h6>
-                                {% for item in quizzes_by_status %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{{ item.status|title }}</span>
-                                    <div class="bar-track">
-                                        {% widthratio item.count admin_metrics.quizzes 100 as pct %}
-                                        <div class="bar-fill {% if item.status == 'published' %}bg-success{% elif item.status == 'draft' %}bg-warning{% else %}bg-secondary{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
-                                    </div>
-                                </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
-                                <hr class="dashboard-divider">
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Total Submissions" %}</span>
-                                    <span class="kv-value">{{ total_submissions }}</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Avg Grade" %}</span>
-                                    <span class="kv-value">{{ avg_grade }}</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Submissions / Quiz" %}</span>
-                                    {% if admin_metrics.quizzes %}
-                                    <span class="kv-value">{% widthratio total_submissions admin_metrics.quizzes 1 %}</span>
-                                    {% else %}
-                                    <span class="kv-value">0</span>
-                                    {% endif %}
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-video"></i>{% translate "Lessons" %}</h6>
+                            {% for item in lessons_by_status %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.status|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.lessons 100 as pct %}
+                                    <div class="ad-bar-fill {% if item.status == 'published' %}ad-bar-fill--green{% elif item.status == 'draft' %}ad-bar-fill--warning{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Offerings by Status" %}</h6>
+                            {% for item in offerings_by_status %}
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{{ item.status|title }}</span>
+                                <span class="ad-kv-value">{{ item.count }}</span>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-danger);"><i class="fas fa-calendar-alt text-danger"></i>{% translate "Current Academic Year" %}</h6>
-                                {% for year in current_academic_years %}
-                                <div class="mb-3">
-                                    <div class="stat-value">{{ year.name }}</div>
-                                    <div class="stat-label" style="font-size:0.76rem;text-transform:none;letter-spacing:0;">{{ year.starts_on|date:"Y-m-d" }} &rarr; {{ year.ends_on|date:"Y-m-d" }}</div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-question-circle"></i>{% translate "Quizzes" %}</h6>
+                            {% for item in quizzes_by_status %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.status|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.quizzes 100 as pct %}
+                                    <div class="ad-bar-fill {% if item.status == 'published' %}ad-bar-fill--green{% elif item.status == 'draft' %}ad-bar-fill--warning{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
-                                {% if year.level_links.all %}
-                                <div>
-                                    <span class="stat-label" style="display:inline-block;margin-bottom:0.3rem;">{% translate "Meeting Days" %}</span>
-                                    <div>
-                                        {% for link in year.level_links.all %}
-                                        <span class="fw-semibold me-1" style="font-size:0.76rem;">{{ link.level.display_name }}:</span>
-                                        {% for wd in link.meeting_weekdays %}
-                                        <span class="badge bg-light text-dark me-1 px-2 py-1" style="font-weight:500;">
-                                            {% if wd == 0 %}{% translate "Mon" %}{% elif wd == 1 %}{% translate "Tue" %}{% elif wd == 2 %}{% translate "Wed" %}{% elif wd == 3 %}{% translate "Thu" %}{% elif wd == 4 %}{% translate "Fri" %}{% elif wd == 5 %}{% translate "Sat" %}{% elif wd == 6 %}{% translate "Sun" %}{% endif %}
-                                        </span>
-                                        {% endfor %}
-                                        {% if not forloop.last %}<br>{% endif %}
-                                        {% endfor %}
-                                    </div>
-                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Total Submissions" %}</span>
+                                <span class="ad-kv-value">{{ total_submissions }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Avg Grade" %}</span>
+                                <span class="ad-kv-value">{{ avg_grade }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Submissions / Quiz" %}</span>
+                                {% if admin_metrics.quizzes %}
+                                <span class="ad-kv-value">{% widthratio total_submissions admin_metrics.quizzes 1 %}</span>
+                                {% else %}
+                                <span class="ad-kv-value">0</span>
                                 {% endif %}
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No current academic year set" %}</p>
-                                {% endfor %}
-                                <hr class="dashboard-divider">
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Total Academic Years" %}</span>
-                                    <span class="kv-value">{{ admin_metrics.academic_years }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-calendar-alt"></i>{% translate "Current Academic Year" %}</h6>
+                            {% for year in current_academic_years %}
+                            <div class="mb-3">
+                                <div class="ad-stat-value">{{ year.name }}</div>
+                                <div class="ad-stat-label ad-meeting-label ad-meeting-label--plain">{{ year.starts_on|date:"Y-m-d" }} &rarr; {{ year.ends_on|date:"Y-m-d" }}</div>
+                            </div>
+                            {% if year.level_links.all %}
+                            <div>
+                                <span class="ad-stat-label ad-heading-inline">{% translate "Meeting Days" %}</span>
+                                <div>
+                                    {% for link in year.level_links.all %}
+                                    <span class="fw-semibold me-1 ad-meeting-label">{{ link.level.display_name }}:</span>
+                                    {% for wd in link.meeting_weekdays %}
+                                    <span class="ad-pill ad-pill--muted me-1">
+                                        {% if wd == 0 %}{% translate "Mon" %}{% elif wd == 1 %}{% translate "Tue" %}{% elif wd == 2 %}{% translate "Wed" %}{% elif wd == 3 %}{% translate "Thu" %}{% elif wd == 4 %}{% translate "Fri" %}{% elif wd == 5 %}{% translate "Sat" %}{% elif wd == 6 %}{% translate "Sun" %}{% endif %}
+                                    </span>
+                                    {% endfor %}
+                                    {% if not forloop.last %}<br>{% endif %}
+                                    {% endfor %}
                                 </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Total Offerings" %}</span>
-                                    <span class="kv-value">{{ admin_metrics.offerings }}</span>
-                                </div>
+                            </div>
+                            {% endif %}
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No current academic year set" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Total Academic Years" %}</span>
+                                <span class="ad-kv-value">{{ admin_metrics.academic_years }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Total Offerings" %}</span>
+                                <span class="ad-kv-value">{{ admin_metrics.offerings }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- ===== ROW 3: ENROLLMENTS, PROGRESS & ATTENDANCE ===== -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-4 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-primary);"><i class="fas fa-user-graduate text-primary"></i>{% translate "Enrollments" %} <span class="badge bg-primary ms-2 badge-role">{{ enrollments_total }}</span></h6>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "By Status" %}</h6>
-                                        {% for item in enrollments_by_status %}
-                                        <div class="kv-row" style="padding:0.2rem 0;">
-                                            <span class="kv-label">{{ item.status|title }}</span>
-                                            <span class="kv-value">{{ item.count }}</span>
-                                        </div>
-                                        {% empty %}
-                                        <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                        {% endfor %}
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-user-graduate"></i>{% translate "Enrollments" %} <span class="ad-pill ad-pill--teal ms-2">{{ enrollments_total }}</span></h6>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <h6 class="ad-card-subheading mb-2">{% translate "By Status" %}</h6>
+                                    {% for item in enrollments_by_status %}
+                                    <div class="ad-kv-row ad-kv-row--compact">
+                                        <span class="ad-kv-label">{{ item.status|title }}</span>
+                                        <span class="ad-kv-value">{{ item.count }}</span>
                                     </div>
-                                    <div class="col-6">
-                                        <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "By Type" %}</h6>
-                                        {% for item in enrollments_by_type %}
-                                        <div class="kv-row" style="padding:0.2rem 0;">
-                                            <span class="kv-label">{{ item.enrollment_type|title }}</span>
-                                            <span class="kv-value">{{ item.count }}</span>
-                                        </div>
-                                        {% empty %}
-                                        <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                        {% endfor %}
-                                    </div>
+                                    {% empty %}
+                                    <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                                    {% endfor %}
                                 </div>
-                                {% if enrollments_by_level %}
-                                <hr class="dashboard-divider">
-                                <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "By Level" %}</h6>
-                                {% for item in enrollments_by_level %}
-                                <div class="bar-chart">
-                                    <span class="bar-label">{% translate "Level" %} {{ item.level|default:"N/A" }}</span>
-                                    <div class="bar-track" style="height:16px;">
-                                        {% widthratio item.count enrollments_total 100 as pct %}
-                                        <div class="bar-fill bg-primary" style="width:{{ pct }}%;font-size:0.62rem;">{{ item.count }}</div>
+                                <div class="col-6">
+                                    <h6 class="ad-card-subheading mb-2">{% translate "By Type" %}</h6>
+                                    {% for item in enrollments_by_type %}
+                                    <div class="ad-kv-row ad-kv-row--compact">
+                                        <span class="ad-kv-label">{{ item.enrollment_type|title }}</span>
+                                        <span class="ad-kv-value">{{ item.count }}</span>
                                     </div>
+                                    {% empty %}
+                                    <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
-                                {% endif %}
                             </div>
+                            {% if enrollments_by_level %}
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "By Level" %}</h6>
+                            {% for item in enrollments_by_level %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{% translate "Level" %} {{ item.level|default:"N/A" }}</span>
+                                <div class="ad-bar-track ad-bar-track--sm">
+                                    {% widthratio item.count enrollments_total 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal ad-bar-fill--sm" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-success);"><i class="fas fa-chart-line text-success"></i>{% translate "Lecture Progress" %}</h6>
-                                <div class="stat-grid">
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-info">{{ progress_total }}</div>
-                                        <div class="stat-label">{% translate "Records" %}</div>
-                                    </div>
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-success">{{ students_with_progress }}</div>
-                                        <div class="stat-label">{% translate "Students" %}</div>
-                                    </div>
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-primary">{{ completed_lectures }}</div>
-                                        <div class="stat-label">{% translate "Completed" %}</div>
-                                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-chart-line"></i>{% translate "Lecture Progress" %}</h6>
+                            <div class="ad-stat-grid">
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ progress_total }}</div>
+                                    <div class="ad-stat-label">{% translate "Records" %}</div>
                                 </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Avg Completion" %}</span>
-                                    <span class="kv-value">{{ avg_completion }}%</span>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--success">{{ students_with_progress }}</div>
+                                    <div class="ad-stat-label">{% translate "Students" %}</div>
                                 </div>
-                                <div class="progress progress-thin mb-3">
-                                    <div class="progress-bar bg-success" role="progressbar" style="width:{{ avg_completion }}%"></div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ completed_lectures }}</div>
+                                    <div class="ad-stat-label">{% translate "Completed" %}</div>
                                 </div>
-                                <hr class="dashboard-divider">
-                                <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "Enrollments by Year" %}</h6>
-                                {% for item in enrollments_by_year|slice:":5" %}
-                                <div class="kv-row" style="padding:0.2rem 0;">
-                                    <span class="kv-label">{{ item.academic_year_level__academic_year__name }} — {% translate "Level" %} {{ item.academic_year_level__level__ordering }}</span>
-                                    <span class="kv-value">{{ item.count }}</span>
-                                </div>
-                                {% empty %}
-                                <p class="text-muted small mb-0">{% translate "No data" %}</p>
-                                {% endfor %}
                             </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Avg Completion" %}</span>
+                                <span class="ad-kv-value">{{ avg_completion }}%</span>
+                            </div>
+                            <div class="ad-meter ad-meter--thin mb-3">
+                                <span style="width:{{ avg_completion }}%"></span>
+                            </div>
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Enrollments by Year" %}</h6>
+                            {% for item in enrollments_by_year|slice:":5" %}
+                            <div class="ad-kv-row ad-kv-row--compact">
+                                <span class="ad-kv-label">{{ item.academic_year_level__academic_year__name }} — {% translate "Level" %} {{ item.academic_year_level__level__ordering }}</span>
+                                <span class="ad-kv-value">{{ item.count }}</span>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="card dashboard-card h-100">
-                            <div class="card-body">
-                                <h6 class="section-title" style="border-bottom-color:var(--bs-warning);"><i class="fas fa-clipboard-list text-warning"></i>{% translate "Attendance" %}</h6>
-                                <div class="stat-grid">
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-warning">{{ today_attendance }}</div>
-                                        <div class="stat-label">{% translate "Today Records" %}</div>
-                                    </div>
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value text-primary">{{ today_students }}</div>
-                                        <div class="stat-label">{% translate "Today Students" %}</div>
-                                    </div>
-                                    <div class="stat-grid-item">
-                                        <div class="stat-value" style="color:var(--bs-body-color);">{{ attendance_total }}</div>
-                                        <div class="stat-label">{% translate "Total Records" %}</div>
-                                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-clipboard-list"></i>{% translate "Attendance" %}</h6>
+                            <div class="ad-stat-grid">
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--warning">{{ today_attendance }}</div>
+                                    <div class="ad-stat-label">{% translate "Today Records" %}</div>
                                 </div>
-                                <hr class="dashboard-divider">
-                                <h6 class="small fw-bold mb-2" style="font-size:0.78rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.04em;">{% translate "Stats Summary" %}</h6>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Students w/ Progress" %}</span>
-                                    <span class="kv-value">{{ students_with_progress }}</span>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ today_students }}</div>
+                                    <div class="ad-stat-label">{% translate "Today Students" %}</div>
                                 </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Completed Lectures" %}</span>
-                                    <span class="kv-value">{{ completed_lectures }}</span>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value">{{ attendance_total }}</div>
+                                    <div class="ad-stat-label">{% translate "Total Records" %}</div>
                                 </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">{% translate "Progress Records" %}</span>
-                                    <span class="kv-value">{{ progress_total }}</span>
-                                </div>
+                            </div>
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Stats Summary" %}</h6>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Students w/ Progress" %}</span>
+                                <span class="ad-kv-value">{{ students_with_progress }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Completed Lectures" %}</span>
+                                <span class="ad-kv-value">{{ completed_lectures }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Progress Records" %}</span>
+                                <span class="ad-kv-value">{{ progress_total }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- ===== ROW 4: RECENT ACTIVITY ===== -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="card dashboard-card">
-                            <div class="card-header">
-                                <h6 class="mb-0" style="font-size:0.85rem;font-weight:700;"><i class="fas fa-user-plus me-2 text-success"></i>{% translate "Recent Enrollments" %}</h6>
-                            </div>
-                            <div class="card-body p-0">
-                                {% for enrollment in recent_enrollments %}
-                                <div class="activity-list-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="activity-name">{{ enrollment.student.get_full_name|default:enrollment.student.username }}</div>
-                                            <div class="activity-meta">
-                                                {{ enrollment.academic_year_level.academic_year.name }} &middot;
-                                                {% if enrollment.course_offering %}
-                                                {{ enrollment.course_offering.course.name }}
-                                                {% else %}
-                                                {% translate "Full Year" %}
-                                                {% endif %}
-                                                &middot; <span class="badge bg-{% if enrollment.enrollment_type == 'normal' %}primary{% elif enrollment.enrollment_type == 'repeat' %}warning{% elif enrollment.enrollment_type == 'remedial' %}danger{% else %}secondary{% endif %} badge-role">{{ enrollment.enrollment_type|title }}</span>
-                                            </div>
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-head">
+                            <i class="fas fa-user-plus"></i>
+                            {% translate "Recent Enrollments" %}
+                        </div>
+                        <div class="ad-card-body p-0">
+                            {% for enrollment in recent_enrollments %}
+                            <div class="ad-activity">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="ad-activity-name">{{ enrollment.student.get_full_name|default:enrollment.student.username }}</div>
+                                        <div class="ad-activity-meta">
+                                            {{ enrollment.academic_year_level.academic_year.name }} &middot;
+                                            {% if enrollment.course_offering %}
+                                            {{ enrollment.course_offering.course.name }}
+                                            {% else %}
+                                            {% translate "Full Year" %}
+                                            {% endif %}
+                                            &middot; <span class="ad-pill ad-pill--{% if enrollment.enrollment_type == 'normal' %}teal{% elif enrollment.enrollment_type == 'repeat' %}warning{% elif enrollment.enrollment_type == 'remedial' %}danger{% else %}muted{% endif %}">{{ enrollment.enrollment_type|title }}</span>
                                         </div>
-                                        <span class="activity-date">{{ enrollment.enrolled_at|date:"M j, Y" }}</span>
                                     </div>
+                                    <span class="ad-activity-date">{{ enrollment.enrolled_at|date:"M j, Y" }}</span>
                                 </div>
-                                {% empty %}
-                                <div class="text-center py-4 text-muted" style="font-size:0.85rem;">
-                                    <i class="fas fa-inbox me-1"></i>{% translate "No recent enrollments" %}
-                                </div>
-                                {% endfor %}
                             </div>
+                            {% empty %}
+                            <div class="ad-empty">
+                                <i class="fas fa-inbox"></i>
+                                {% translate "No recent enrollments" %}
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="card dashboard-card">
-                            <div class="card-header">
-                                <h6 class="mb-0" style="font-size:0.85rem;font-weight:700;"><i class="fas fa-file-alt me-2 text-info"></i>{% translate "Recent Quiz Submissions" %}</h6>
-                            </div>
-                            <div class="card-body p-0">
-                                {% for submission in recent_submissions %}
-                                <div class="activity-list-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="activity-name">{{ submission.user.get_full_name|default:submission.user.username }}</div>
-                                            <div class="activity-meta">{{ submission.quiz.name }} &middot; {% translate "Grade" %}: {{ submission.total_grade }}/{{ submission.quiz.total_grade }}</div>
-                                        </div>
-                                        <span class="activity-date">{{ submission.submitted_at|date:"M j, Y H:i" }}</span>
+                    <div class="ad-card">
+                        <div class="ad-card-head">
+                            <i class="fas fa-file-alt"></i>
+                            {% translate "Recent Quiz Submissions" %}
+                        </div>
+                        <div class="ad-card-body p-0">
+                            {% for submission in recent_submissions %}
+                            <div class="ad-activity">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="ad-activity-name">{{ submission.user.get_full_name|default:submission.user.username }}</div>
+                                        <div class="ad-activity-meta">{{ submission.quiz.name }} &middot; {% translate "Grade" %}: {{ submission.total_grade }}/{{ submission.quiz.total_grade }}</div>
                                     </div>
+                                    <span class="ad-activity-date">{{ submission.submitted_at|date:"M j, Y H:i" }}</span>
                                 </div>
-                                {% empty %}
-                                <div class="text-center py-4 text-muted" style="font-size:0.85rem;">
-                                    <i class="fas fa-inbox me-1"></i>{% translate "No recent submissions" %}
-                                </div>
-                                {% endfor %}
                             </div>
+                            {% empty %}
+                            <div class="ad-empty">
+                                <i class="fas fa-inbox"></i>
+                                {% translate "No recent submissions" %}
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -821,28 +561,27 @@
     
     <!-- Global Components -->
     {% include 'partials/components/loading_overlay.html' %}
-    {% include 'partials/components/toast_container.html' %}
 
     <!-- Global Confirmation Modal (used by hx-confirm and bulk actions) -->
     <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">
-                        <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-triangle ad-icon--danger"></i>
                         {% translate "Confirm Action" %}
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
                     <p class="mb-0" id="globalConfirmMessage"></p>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                <div class="modal-footer">
+                    <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">
                         <i class="fas fa-times me-1"></i>
                         {% translate "Cancel" %}
                     </button>
-                    <button type="button" class="btn btn-danger" id="globalConfirmButton" data-bs-dismiss="modal">
+                    <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" id="globalConfirmButton" data-bs-dismiss="modal">
                         <i class="fas fa-check me-1"></i>
                         {% translate "Confirm" %}
                     </button>

@@ -11,15 +11,15 @@
 {% endblock %}
 
 {% block body %}
-<section class="login-page">
+<section class="login-page sd-page">
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-11 col-sm-8 col-md-6 col-lg-5 col-xl-4">
             <div class="d-flex justify-content-start mb-3 language-switcher">
-                <form action="{% url 'set_language' %}" method="post" id="language-form" class="w-auto">
+                <form action="{% url 'set_language' %}" method="post" id="login-language-form" class="w-auto ps-inline-form">
                     {% csrf_token %}
                     <input name="next" type="hidden" value="{{ request.get_full_path }}">
-                    <select name="language" class="form-select form-select-sm" onchange="document.getElementById('language-form').submit()">
+                    <select name="language" class="form-select form-select-sm ps-site-lang-select" onchange="document.getElementById('login-language-form').submit()">
                         {% get_current_language as LANGUAGE_CODE %}
                         {% get_available_languages as LANGUAGES %}
                         {% for lang in LANGUAGES %}
@@ -28,18 +28,18 @@
                     </select>
                 </form>
             </div>
-            <div class="card login-card">
-                <div class="card-body p-4 p-sm-5">
+            <div class="sd-frame login-card">
+                <div class="sd-screen p-4 p-sm-5">
                     <div class="text-center mb-4">
                         <a href="{% url 'home' %}"><img src="{% static 'login-logo.png' %}" alt="Logo" class="login-logo"></a>
-                        <h5 class="card-title mt-3">{% translate "Welcome Back" %}</h5>
-                        <p class="text-muted">{% translate "Sign in to continue" %}</p>
+                        <h5 class="sd-serious mt-3">{% translate "Welcome Back" %}</h5>
+                        <p class="ps-muted-text">{% translate "Sign in to continue" %}</p>
                     </div>
                     <form method="post">
                         {% csrf_token %}
                         {{ form|crispy }}
                         <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg">
+                            <button type="submit" class="sd-btn sd-btn--teal btn-lg w-100">
                                 <i class="fas fa-sign-in-alt me-2"></i>{% translate "Login" %}
                             </button>
                         </div>

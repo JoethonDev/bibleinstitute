@@ -12,6 +12,7 @@ SITE_DOMAIN = os.getenv('DJANGO_SITE_DOMAIN', 'http://localhost:8000')
 
 
 def _send_html_email(subject, template_name, context, recipient_email):
+    context = {**context, "site_domain": SITE_DOMAIN.rstrip("/")}
     html_message = render_to_string(template_name, context)
     send_mail(
         subject=subject,

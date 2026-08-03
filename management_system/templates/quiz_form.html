@@ -3,7 +3,7 @@
 {% load i18n %}
 
 {% block body %}
-<div id="content" class="admin-form-page"
+<div id="content" class="admin-form-page ad-page"
      x-data="{
          ...autoSave('quiz-form-{{ request.resolver_match.kwargs.quiz_id|default:'new' }}'),
          ...quizForm()
@@ -39,7 +39,7 @@
     
     <!-- Auto-save Indicator -->
     <div class="auto-save-indicator" x-show="lastSaved" x-transition.opacity>
-        <div class="alert alert-success mb-0 d-flex align-items-center gap-2 shadow-lg">
+        <div class="ad-alert ad-alert--success">
             <i class="fas fa-check-circle"></i>
             <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
         </div>
@@ -47,7 +47,7 @@
 
     <!-- Saving Indicator -->
     <div class="auto-save-indicator" x-show="isSaving" x-transition.opacity>
-        <div class="alert alert-info mb-0 d-flex align-items-center gap-2 shadow-lg">
+        <div class="ad-alert ad-alert--info">
             <div class="spinner-border spinner-border-sm" role="status">
                 <span class="visually-hidden">{% translate "Saving..." %}</span>
             </div>
@@ -61,189 +61,183 @@
            hx-select="#content" 
            hx-push-url="true" 
            hx-target="#display-page" 
-           class="btn btn-outline-secondary">
+           class="ad-btn ad-btn--ghost">
             <i class="fas fa-arrow-left me-2"></i>
             {% translate "Back to quizzes" %}
         </a>
     </div>
 
     <!-- Form Container -->
-    <div class="form-container">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-gradient py-3">
-                <h4 class="mb-0">
-                    <i class="fa fa-pencil-square me-2"></i>
-                    {% if quiz_name %}
-                        {% translate "Edit Quiz" %}
-                    {% else %}
-                        {% translate "Create Quiz" %}
-                    {% endif %}
-                </h4>
-            </div>
-            <div class="card-body p-4">
-                {% include 'messages.html' %}
+    <div class="ad-card">
+        <div class="ad-card-head">
+            <i class="fa fa-pencil-square me-2"></i>
+            {% if quiz_name %}
+                {% translate "Edit Quiz" %}
+            {% else %}
+                {% translate "Create Quiz" %}
+            {% endif %}
+        </div>
+        <div class="ad-card-body">
+            {% include 'messages.html' %}
+
+            <form action="" method="post"
+                  class="admin-form"
+                  x-data="formValidation()"
+                  @submit="handleSubmit($event)"
+                  novalidate>
+                {% csrf_token %}
                 
-                <form action="" method="post" 
-                      class="admin-form"
-                      x-data="formValidation()"
-                      @submit="handleSubmit($event)"
-                      novalidate>
-                    {% csrf_token %}
+                <!-- Quiz Details -->
+                <div class="form-fields">
+                    <h5 class="ad-card-subheading border-bottom pb-2 mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        {% translate "Quiz Details" %}
+                    </h5>
                     
-                    <!-- Quiz Details -->
-                    <div class="form-fields">
-                        <h5 class="border-bottom pb-2 mb-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            {% translate "Quiz Details" %}
-                        </h5>
-                        
-                        <div class="form-row">
-                            <!-- Quiz Name -->
-                            <div class="form-group" @focusout="validateField($event)">
-                                <label for="quiz_name" class="form-label">
-                                    {% translate "Exam Title" %}
-                                    <span class="required-indicator">*</span>
-                                </label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="quiz_name" 
-                                       name="quiz_name" 
-                                       required 
-                                       value="{{ quiz_name }}"
-                                       placeholder="{% translate 'Enter exam title' %}">
-                                <div class="invalid-feedback">
-                                    {% translate "Please enter an exam title" %}
-                                </div>
+                    <div class="form-row">
+                        <!-- Quiz Name -->
+                        <div class="form-group" @focusout="validateField($event)">
+                            <label for="quiz_name" class="form-label">
+                                {% translate "Exam Title" %}
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="quiz_name"
+                                   name="quiz_name"
+                                   required
+                                   value="{{ quiz_name }}"
+                                   placeholder="{% translate 'Enter exam title' %}">
+                            <div class="invalid-feedback">
+                                {% translate "Please enter an exam title" %}
                             </div>
+                        </div>
 
-                            <!-- Course Offering (determines course and level) -->
-                            <div class="form-group">
-                                <label for="course_offering" class="form-label">
-                                    {% translate "Course Offering" %}
-                                    <span class="required-indicator">*</span>
-                                </label>
-                                <select class="form-select" id="course_offering" name="course_offering" required>
-                                    <option value="">{% translate "Select Course Offering" %}</option>
-                                    {% for offering in course_offerings %}
-                                    <option value="{{ offering.pk }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
-                                        {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
+                        <!-- Course Offering (determines course and level) -->
+                        <div class="form-group">
+                            <label for="course_offering" class="form-label">
+                                {% translate "Course Offering" %}
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <select class="form-select" id="course_offering" name="course_offering" required>
+                                <option value="">{% translate "Select Course Offering" %}</option>
+                                {% for offering in course_offerings %}
+                                <option value="{{ offering.pk }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
+                                    {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">{% translate "The offering determines the course, level, and academic year." %}</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="quiz_type" class="form-label">
+                                {% translate "Quiz Type" %}
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <select class="form-select" id="quiz_type" name="quiz_type" required>
+                                <option value="">{% translate "Select quiz type" %}</option>
+                                {% for quiz_type in quiz_types %}
+                                    <option value="{{ quiz_type.pk }}" {% if quiz_type.pk == selected_quiz_type_id %}selected{% endif %}>
+                                        {{ quiz_type.name_en }}{% if quiz_type.name_ar %} — {{ quiz_type.name_ar }}{% endif %}
                                     </option>
-                                    {% endfor %}
-                                </select>
-                                <div class="form-text">{% translate "The offering determines the course, level, and academic year." %}</div>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                        <!-- Publication Status -->
+                        <div class="form-group mt-3">
+                            <label for="quiz-status" class="form-label">{% translate "Status" %}</label>
+                            <select class="form-select" id="quiz-status" name="status" required>
+                                {% for status_value, status_label in publication_statuses %}
+                                <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                     <div class="form-row">
+                        <!-- Opening Date -->
+                        <div class="form-group" @focusout="validateField($event)">
+                            <label for="opening_date" class="form-label">
+                                {% translate "Exam Opening Date" %}
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="datetime-local"
+                                   class="form-control"
+                                   id="opening_date"
+                                   name="opening_date"
+                                   required
+                                   value="{{ opening_date }}">
+                            <div class="invalid-feedback">
+                                {% translate "Please select an opening date" %}
                             </div>
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="quiz_type" class="form-label">
-                                    {% translate "Quiz Type" %}
-                                    <span class="required-indicator">*</span>
-                                </label>
-                                <select class="form-select" id="quiz_type" name="quiz_type" required>
-                                    <option value="">{% translate "Select quiz type" %}</option>
-                                    {% for quiz_type in quiz_types %}
-                                        <option value="{{ quiz_type.pk }}" {% if quiz_type.pk == selected_quiz_type_id %}selected{% endif %}>
-                                            {{ quiz_type.name_en }}{% if quiz_type.name_ar %} — {{ quiz_type.name_ar }}{% endif %}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-
-                            <!-- Publication Status -->
-                            <div class="form-group mt-3">
-                                <label for="quiz-status" class="form-label">{% translate "Status" %}</label>
-                                <select class="form-select" id="quiz-status" name="status" required>
-                                    {% for status_value, status_label in publication_statuses %}
-                                    <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                         <div class="form-row">
-                            <!-- Opening Date -->
-                            <div class="form-group" @focusout="validateField($event)">
-                                <label for="opening_date" class="form-label">
-                                    {% translate "Exam Opening Date" %}
-                                    <span class="required-indicator">*</span>
-                                </label>
-                                <input type="datetime-local" 
-                                       class="form-control" 
-                                       id="opening_date" 
-                                       name="opening_date" 
-                                       required 
-                                       value="{{ opening_date }}">
-                                <div class="invalid-feedback">
-                                    {% translate "Please select an opening date" %}
-                                </div>
-                            </div>
-
-                            <!-- Closing Date -->
-                            <div class="form-group" @focusout="validateField($event)">
-                                <label for="closing_date" class="form-label">
-                                    {% translate "Exam Closing Date" %}
-                                    <span class="required-indicator">*</span>
-                                </label>
-                                <input type="datetime-local" 
-                                       class="form-control" 
-                                       id="closing_date" 
-                                       name="closing_date" 
-                                       required 
-                                       value="{{ closing_date }}">
-                                <div class="invalid-feedback">
-                                    {% translate "Please select a closing date" %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Questions Section -->
-                        <div class="border-top pt-4 mt-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="mb-0 fw-bold text-primary">
-                                    <i class="fas fa-question-circle me-2"></i>
-                                    {% translate "Questions" %}
-                                </h5>
-                            </div>
-                            
-                            {% with is_student=False mode="edit" %}
-                            {% include 'questions_rendering.html' %}
-                            {% endwith %}
-
-                            <div class="d-flex justify-content-end mt-3">
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        data-action="add-question">
-                                    <i class="fa fa-plus-circle me-2"></i>
-                                    {% translate "Add Question" %}
-                                </button>
+                        <!-- Closing Date -->
+                        <div class="form-group" @focusout="validateField($event)">
+                            <label for="closing_date" class="form-label">
+                                {% translate "Exam Closing Date" %}
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="datetime-local"
+                                   class="form-control"
+                                   id="closing_date"
+                                   name="closing_date"
+                                   required
+                                   value="{{ closing_date }}">
+                            <div class="invalid-feedback">
+                                {% translate "Please select a closing date" %}
                             </div>
                         </div>
                     </div>
 
-                    <!-- Form Actions -->
-                    <div class="form-actions">
-                        <button type="submit" 
-                                class="btn btn-primary btn-lg"
-                                :disabled="submitting">
-                            <span x-show="!submitting">
-                                <i class="fa fa-check-circle me-2"></i>
-                                {% translate "Submit" %}
-                            </span>
-                            <span x-show="submitting" :class="{ 'd-flex align-items-center justify-content-center': submitting }">
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                {% translate "Submitting..." %}
-                            </span>
-                        </button>
-                        <button type="reset" 
-                                class="btn btn-outline-secondary btn-lg"
-                                @click="$event.target.closest('form').dispatchEvent(new Event('reset'))">
-                            <i class="fas fa-undo me-2"></i>
-                            {% translate "Reset" %}
-                        </button>
+                    <!-- Questions Section -->
+                    <div class="border-top pt-4 mt-4">
+                        <h5 class="ad-section-title">
+                            <i class="fas fa-question-circle me-2"></i>
+                            {% translate "Questions" %}
+                        </h5>
+
+                        {% with is_student=False mode="edit" %}
+                        {% include 'questions_rendering.html' %}
+                        {% endwith %}
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="button"
+                                    class="ad-btn ad-btn--ghost ad-btn--sm"
+                                    data-action="add-question">
+                                <i class="fa fa-plus-circle me-2"></i>
+                                {% translate "Add Question" %}
+                            </button>
+                        </div>
                     </div>
-                </form>
-            </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="submit"
+                            class="ad-btn ad-btn--teal"
+                            :disabled="submitting">
+                        <span x-show="!submitting">
+                            <i class="fa fa-check-circle me-2"></i>
+                            {% translate "Submit" %}
+                        </span>
+                        <span x-show="submitting" :class="{ 'd-flex align-items-center justify-content-center': submitting }">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            {% translate "Submitting..." %}
+                        </span>
+                    </button>
+                    <button type="reset"
+                            class="ad-btn ad-btn--ghost"
+                            @click="$event.target.closest('form').dispatchEvent(new Event('reset'))">
+                        <i class="fas fa-undo me-2"></i>
+                        {% translate "Reset" %}
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

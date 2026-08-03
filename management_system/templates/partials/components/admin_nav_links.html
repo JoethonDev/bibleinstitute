@@ -2,9 +2,9 @@
 {% with role=request.user.role.role %}
 {% with is_staff='admin staff' is_admin='admin' %}
 <!-- Admin Navigation Links -->
-<ul class="nav flex-column">
+<ul class="nav flex-column ad-rail-groups">
     <li class="nav-item">
-        <a class="nav-link text-white" href="{% url 'admin-panel' %}">
+        <a class="ad-tab" href="{% url 'admin-panel' %}">
             <i class="fas fa-home"></i>
             <span>{% translate "Home" %}</span>
         </a>
@@ -12,7 +12,7 @@
     
     {% if role in is_admin %}
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'applications-dashboard' %}"
                hx-get="{% url 'applications-dashboard' %}"
                hx-trigger="click"
@@ -27,7 +27,7 @@
     {% endif %}
     {% if role in is_staff %}
         <li class="nav-item">
-            <a class="nav-link text-white" 
+            <a class="ad-tab"
                href="{% url 'user-dashboard' %}"
                hx-get="{% url 'user-dashboard' %}"
                hx-trigger="click"
@@ -41,7 +41,7 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'course-dashboard' %}"
                hx-get="{% url 'course-dashboard' %}"
                hx-trigger="click"
@@ -55,7 +55,7 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'lesson-dashboard' %}"
                hx-get="{% url 'lesson-dashboard' %}"
                hx-trigger="click"
@@ -69,7 +69,7 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'quiz-dashboard' %}"
                hx-get="{% url 'quiz-dashboard' %}"
                hx-trigger="click"
@@ -83,7 +83,7 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'upload-files' %}"
                hx-get="{% url 'upload-files' %}"
                hx-trigger="click"
@@ -98,7 +98,7 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'r2-management-dashboard' %}"
                hx-get="{% url 'r2-management-dashboard' %}"
                hx-trigger="click"
@@ -112,7 +112,7 @@
         </li>
 
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'levels-dashboard' %}"
                hx-get="{% url 'levels-dashboard' %}"
                hx-trigger="click"
@@ -126,7 +126,7 @@
         </li>
 
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'academic-setup' %}"
                hx-get="{% url 'academic-setup' %}"
                hx-trigger="click"
@@ -140,14 +140,14 @@
         </li>
 
         <li class="nav-item">
-            <a class="nav-link text-white" href="{% url 'calendar-management' %}">
+            <a class="ad-tab" href="{% url 'calendar-management' %}">
                 <i class="fas fa-calendar-days"></i>
                 <span>{% translate "Calendar" %}</span>
             </a>
         </li>
 
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'attendance-management' %}"
                hx-get="{% url 'attendance-management' %}"
                hx-trigger="click"
@@ -162,7 +162,7 @@
 
         {% if request.user.role.role == "admin" %}
         <li class="nav-item">
-            <a class="nav-link text-white" href="{% url 'promotion-formula' %}">
+            <a class="ad-tab" href="{% url 'promotion-formula' %}">
                 <i class="fas fa-calculator"></i>
                 <span>{% translate "Promotion Formula" %}</span>
             </a>
@@ -170,14 +170,14 @@
         {% endif %}
 
         <li class="nav-item">
-            <a class="nav-link text-white" href="{% url 'scanner' %}">
+            <a class="ad-tab" href="{% url 'scanner' %}">
                 <i class="fas fa-qrcode"></i>
                 <span>{% translate "Scanner" %}</span>
             </a>
         </li>
 
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'progress-dashboard' %}"
                hx-get="{% url 'progress-dashboard' %}"
                hx-trigger="click"
@@ -191,7 +191,7 @@
         </li>
 
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'report-dashboard' %}"
                hx-get="{% url 'report-dashboard' %}"
                hx-trigger="click"
@@ -205,7 +205,7 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link text-white"
+            <a class="ad-tab"
                href="{% url 'yearly-transcript-dashboard' %}"
                hx-get="{% url 'yearly-transcript-dashboard' %}"
                hx-trigger="click"

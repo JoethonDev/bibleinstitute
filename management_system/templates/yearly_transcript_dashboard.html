@@ -2,22 +2,20 @@
 {% load i18n %}
 
 {% block body %}
-<div class="container-fluid py-4" id="content">
+<div class="container-fluid py-3 ad-page" id="content">
   <div class="row">
     <div class="col-12">
-      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
-        <div>
-          <h2 class="h3 mb-1 text-primary fw-bold">{% translate "Yearly Transcript" %}</h2>
-          <p class="text-muted mb-0">{% translate "Trace student quiz grades across the selected year." %}</p>
-        </div>
-        <a href="{% url 'export-yearly-transcript-csv' %}?year={{ year_value }}&name={{ name_value|urlencode }}&course={{ course_value|urlencode }}&role={{ selected_role|urlencode }}" class="btn btn-success d-inline-flex align-items-center gap-2">
+      <div class="ad-pane-head">
+        <h3 class="ad-pane-title mb-0">{% translate "Yearly Transcript" %}</h3>
+        <p class="ad-pane-desc">{% translate "Trace student quiz grades across the selected year." %}</p>
+        <a href="{% url 'export-yearly-transcript-csv' %}?year={{ year_value }}&name={{ name_value|urlencode }}&course={{ course_value|urlencode }}&role={{ selected_role|urlencode }}" class="ad-btn ad-btn--ghost ad-btn--sm">
           <i class="fas fa-file-csv"></i>
           {% translate "Export Transcript CSV" %}
         </a>
       </div>
 
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-4">
+      <div class="ad-card mb-4">
+        <div class="ad-card-body">
           <form method="get" class="row g-3 align-items-end">
             <div class="col-12 col-md-3">
               <label class="form-label fw-semibold">{% translate "Year" %}</label>
@@ -41,152 +39,147 @@
               </select>
             </div>
             <div class="col-12 col-md-1 d-grid">
-              <button type="submit" class="btn btn-outline-primary">{% translate "Filter" %}</button>
+              <button type="submit" class="ad-btn ad-btn--ghost">{% translate "Filter" %}</button>
             </div>
           </form>
         </div>
       </div>
 
-      <div class="row g-3 mb-4">
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="text-muted small">{% translate "Rows" %}</div>
-              <div class="h3 mb-0">{{ result_count }}</div>
-            </div>
-          </div>
+      <div class="ad-stats mb-4">
+        <div class="ad-stat">
+          <div class="ad-stat-ic"><i class="fas fa-table"></i></div>
+          <div><b>{{ result_count }}</b><span>{% translate "Rows" %}</span></div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="text-muted small">{% translate "Students" %}</div>
-              <div class="h3 mb-0">{{ student_count }}</div>
-            </div>
-          </div>
+        <div class="ad-stat">
+          <div class="ad-stat-ic"><i class="fas fa-users"></i></div>
+          <div><b>{{ student_count }}</b><span>{% translate "Students" %}</span></div>
         </div>
       </div>
 
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-              <table class="table align-middle mb-0">
-              <thead class="table-light">
+      <div class="ad-card">
+        <div class="ad-table-wrap">
+          <table class="ad-table ad-table--dense">
+            <thead>
+              <tr>
+                <th scope="col">{% translate "User ID" %}</th>
+                <th scope="col">{% translate "Username" %}</th>
+                <th scope="col">{% translate "First Name" %}</th>
+                <th scope="col">{% translate "Last Name" %}</th>
+                <th scope="col">{% translate "Course" %}</th>
+                <th scope="col">{% translate "Quiz" %}</th>
+                <th scope="col">{% translate "Quiz Grade" %}</th>
+                <th scope="col">{% translate "Quiz Total" %}</th>
+                <th scope="col">{% translate "Course Grade" %}</th>
+                <th scope="col">{% translate "Course Total" %}</th>
+                <th scope="col">{% translate "Overall Grade" %}</th>
+                <th scope="col">{% translate "Overall Total" %}</th>
+                <th scope="col">{% translate "Submitted At" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in transcript_rows %}
                 <tr>
-                  <th scope="col">{% translate "User ID" %}</th>
-                  <th scope="col">{% translate "Username" %}</th>
-                  <th scope="col">{% translate "First Name" %}</th>
-                  <th scope="col">{% translate "Last Name" %}</th>
-                  <th scope="col">{% translate "Course" %}</th>
-                  <th scope="col">{% translate "Quiz" %}</th>
-                  <th scope="col">{% translate "Quiz Grade" %}</th>
-                  <th scope="col">{% translate "Quiz Total" %}</th>
-                  <th scope="col">{% translate "Course Grade" %}</th>
-                  <th scope="col">{% translate "Course Total" %}</th>
-                  <th scope="col">{% translate "Overall Grade" %}</th>
-                  <th scope="col">{% translate "Overall Total" %}</th>
-                  <th scope="col">{% translate "Submitted At" %}</th>
+                  <td>{{ row.user_id }}</td>
+                  <td>{{ row.username }}</td>
+                  <td>{{ row.first_name }}</td>
+                  <td>{{ row.last_name }}</td>
+                  <td>{{ row.course_name }}</td>
+                  <td>{{ row.quiz_name }}</td>
+                  <td>{{ row.quiz_grade }}</td>
+                  <td>{{ row.quiz_total }}</td>
+                  <td>{{ row.course_accumulated_grade }}</td>
+                  <td>{{ row.course_accumulated_total }}</td>
+                  <td>{{ row.overall_accumulated_grade }}</td>
+                  <td>{{ row.overall_accumulated_total }}</td>
+                  <td>{{ row.submitted_at_display }}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {% for row in transcript_rows %}
-                  <tr>
-                    <td>{{ row.user_id }}</td>
-                    <td>{{ row.username }}</td>
-                    <td>{{ row.first_name }}</td>
-                    <td>{{ row.last_name }}</td>
-                    <td>{{ row.course_name }}</td>
-                    <td>{{ row.quiz_name }}</td>
-                    <td>{{ row.quiz_grade }}</td>
-                    <td>{{ row.quiz_total }}</td>
-                    <td>{{ row.course_accumulated_grade }}</td>
-                    <td>{{ row.course_accumulated_total }}</td>
-                    <td>{{ row.overall_accumulated_grade }}</td>
-                    <td>{{ row.overall_accumulated_total }}</td>
-                    <td>{{ row.submitted_at_display }}</td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td colspan="13" class="text-center py-5 text-muted">{% translate "No transcript rows found for the selected filters." %}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+              {% empty %}
+                <tr>
+                  <td colspan="13" class="ad-empty">{% translate "No transcript rows found for the selected filters." %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {% if transcript_page_obj.paginator.num_pages > 1 %}
-      <nav aria-label="{% translate 'Transcript pagination' %}" class="mt-4">
-        <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
-          {% if transcript_page_obj.has_previous %}
-            <li class="page-item">
-              <a class="page-link rounded-pill" href="?page=1&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'First page' %}">
-                <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
-              </a>
-            </li>
-            <li class="page-item">
-              <a class="page-link rounded-pill" href="?page={{ transcript_page_obj.previous_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Previous page' %}">
-                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-              </a>
-            </li>
-          {% else %}
-            <li class="page-item disabled" aria-disabled="true">
-              <span class="page-link rounded-pill">
-                <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
-              </span>
-            </li>
-            <li class="page-item disabled" aria-disabled="true">
-              <span class="page-link rounded-pill">
-                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-              </span>
-            </li>
-          {% endif %}
-
-          {% for page_num in transcript_page_obj.paginator.page_range %}
-            {% if page_num == transcript_page_obj.number %}
-              <li class="page-item active" aria-current="page">
-                <span class="page-link rounded-pill">{{ page_num }}</span>
+      <div class="ad-page-wrapper mt-3">
+        <nav aria-label="{% translate 'Transcript pagination' %}">
+          <ul class="ad-page-nav">
+            {% if transcript_page_obj.has_previous %}
+              <li>
+                <a class="ad-page-link" href="?page=1&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'First page' %}">
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
+                </a>
+              </li>
+              <li>
+                <a class="ad-page-link" href="?page={{ transcript_page_obj.previous_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Previous page' %}">
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                </a>
               </li>
             {% else %}
-              <li class="page-item">
-                <a class="page-link rounded-pill" href="?page={{ page_num }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}">{{ page_num }}</a>
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
+                </span>
+              </li>
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                </span>
               </li>
             {% endif %}
-          {% endfor %}
 
-          {% if transcript_page_obj.has_next %}
-            <li class="page-item">
-              <a class="page-link rounded-pill" href="?page={{ transcript_page_obj.next_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Next page' %}">
-                <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-              </a>
-            </li>
-            <li class="page-item">
-              <a class="page-link rounded-pill" href="?page={{ transcript_page_obj.paginator.num_pages }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Last page' %}">
-                <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
-                <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-              </a>
-            </li>
-          {% else %}
-            <li class="page-item disabled" aria-disabled="true">
-              <span class="page-link rounded-pill">
-                <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-              </span>
-            </li>
-            <li class="page-item disabled" aria-disabled="true">
-              <span class="page-link rounded-pill">
-                <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
-                <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-              </span>
-            </li>
-          {% endif %}
-        </ul>
-      </nav>
+            {% for page_num in transcript_page_obj.paginator.page_range %}
+              {% if page_num == transcript_page_obj.number %}
+                <li aria-current="page">
+                  <span class="ad-page-link is-active">{{ page_num }}</span>
+                </li>
+              {% else %}
+                <li>
+                  <a class="ad-page-link" href="?page={{ page_num }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}">{{ page_num }}</a>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if transcript_page_obj.has_next %}
+              <li>
+                <a class="ad-page-link" href="?page={{ transcript_page_obj.next_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Next page' %}">
+                  <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </a>
+              </li>
+              <li>
+                <a class="ad-page-link" href="?page={{ transcript_page_obj.paginator.num_pages }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Last page' %}">
+                  <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </a>
+              </li>
+            {% else %}
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </span>
+              </li>
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+        <div class="ad-page-info">
+          {% blocktranslate with start=transcript_page_obj.start_index end=transcript_page_obj.end_index total=transcript_page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}
+        </div>
+      </div>
       {% endif %}
     </div>
   </div>

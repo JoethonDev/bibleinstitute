@@ -19,8 +19,8 @@ urlpatterns = [
     path('profile/<int:user_id>/', ProfileDetail.as_view(), name="check-profile"),
     path('profile/<int:user_id>/update/', ProfileUpdate.as_view(), name="update-profile"),
     path('courses/', view_courses, name="courses"),
-    path('design/student-ui/', student_ui_proposal, name="student-ui-proposal"),
-    path('design/admin-ui/', admin_ui_proposal, name="admin-ui-proposal"),
+    # path('design/student-ui/', student_ui_proposal, name="student-ui-proposal"),
+    # path('design/admin-ui/', admin_ui_proposal, name="admin-ui-proposal"),
     path('offerings/<int:offering_id>/', view_course_details, name="course-details"),
     path('offerings/<int:offering_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
@@ -55,6 +55,7 @@ urlpatterns = [
     path('dashboard/lessons/<int:lesson_id>/update/', update_lesson, name="lesson-update"),
     path('dashboard/lessons/<int:lesson_id>/delete/', DeleteLesson.as_view(), name="lesson-delete"),
     path('dashboard/lessons/<int:lesson_id>/duplicate/', duplicate_lesson, name="lesson-duplicate"),
+    path('dashboard/folder/', navigate_folder, name="navigate-folder-root"),
     path('dashboard/folder/<path:folder_id>/', navigate_folder, name="navigate-folder"),
 
     # Quiz Dashboard
@@ -134,6 +135,8 @@ urlpatterns = [
 
     # Phase 5 — Attendance Calendar, QR, and Scanning
     path('dashboard/calendar/', calendar_management, name="calendar-management"),
+    path('dashboard/calendar/meeting/add/', add_meeting, name="add-meeting"),
+    path('dashboard/calendar/meeting/<int:meeting_id>/delete/', delete_meeting, name="delete-meeting"),
     path('dashboard/calendar/holiday/add/', add_holiday, name="add-holiday"),
     path('dashboard/calendar/holiday/<int:holiday_id>/delete/', delete_holiday, name="delete-holiday"),
     path('my-calendar/', student_calendar, name="student-calendar"),

@@ -5,45 +5,48 @@
 {% block body %}
 
 <!-- ========== HERO CAROUSEL ========== -->
-<div class="carousel slide mb-0" id="homeCarousel" data-bs-ride="carousel" data-bs-interval="5000">
-    <div class="carousel-inner">
-        <div class="carousel-item active">
-            <img src="{% static 'bible-slider1.jpg' %}" class="d-block w-100 carousel-media" alt="">
+<div class="sd-carousel-wrap">
+    <div class="carousel slide mb-0" id="homeCarousel" data-bs-ride="carousel" data-bs-interval="5000">
+        <div class="carousel-inner">
+            <div class="carousel-item active">
+                <img src="{% static 'bible-slider1.jpg' %}" class="d-block w-100 carousel-media" alt="">
+            </div>
+            <div class="carousel-item">
+                <img src="{% static 'bible-slider2.jpg' %}" class="d-block w-100 carousel-media" alt="">
+            </div>
+            <div class="carousel-item">
+                <img src="{% static 'bible-slider3.jpg' %}" class="d-block w-100 carousel-media" alt="">
+            </div>
         </div>
-        <div class="carousel-item">
-            <img src="{% static 'bible-slider2.jpg' %}" class="d-block w-100 carousel-media" alt="">
-        </div>
-        <div class="carousel-item">
-            <img src="{% static 'bible-slider3.jpg' %}" class="d-block w-100 carousel-media" alt="">
-        </div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#homeCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">{% translate "Previous" %}</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#homeCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">{% translate "Next" %}</span>
+        </button>
     </div>
-    <button class="carousel-control-prev" type="button" data-bs-target="#homeCarousel" data-bs-slide="prev">
-        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-        <span class="visually-hidden">{% translate "Previous" %}</span>
-    </button>
-    <button class="carousel-control-next" type="button" data-bs-target="#homeCarousel" data-bs-slide="next">
-        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-        <span class="visually-hidden">{% translate "Next" %}</span>
-    </button>
 </div>
 
+<div class="sd-page">
 <div class="container py-4 py-lg-5">
 
-    <!-- ========== WELCOME HERO STRIP ========== -->
-    <div class="welcome-hero mb-5 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+    <!-- ========== WELCOME STRIP ========== -->
+    <div class="sd-welcome">
         <div>
-            <p class="welcome-role mb-1">
+            <p class="sd-welcome-role">
                 <i class="fas fa-circle-user me-2"></i>{{ role_display }}
             </p>
-            <div class="welcome-name">{% blocktranslate with name=full_name %}Welcome back, {{ name }}{% endblocktranslate %}</div>
+            <div class="sd-welcome-name">{% blocktranslate with name=full_name %}Welcome back, {{ name }}{% endblocktranslate %}</div>
         </div>
-        <div class="d-flex gap-3 flex-wrap">
-            <div class="user-stat-badge">
+        <div class="sd-welcome-stats">
+            <div class="sd-stat-badge">
                 <i class="fas fa-book-open"></i>
                 <span>{{ course_count }} {% translate "Courses" %}</span>
             </div>
             {% if open_quiz_count %}
-            <div class="user-stat-badge badge-warning-soft">
+            <div class="sd-stat-badge sd-stat-badge--warning">
                 <i class="fas fa-pen-to-square"></i>
                 <span>{{ open_quiz_count }} {% translate "Open Quizzes" %}</span>
             </div>
@@ -52,41 +55,33 @@
     </div>
 
     <!-- ========== QUICK LINKS ========== -->
-    <div class="row g-3 mb-5">
-        <div class="col-6 col-md-3">
-            <a href="{% url 'courses' %}" class="quick-link-card h-100">
-                <span class="ql-icon"><i class="fas fa-graduation-cap"></i></span>
-                <span class="ql-label">{% translate "My Courses" %}</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{% url 'view-profile' %}" class="quick-link-card h-100">
-                <span class="ql-icon"><i class="fas fa-user-circle"></i></span>
-                <span class="ql-label">{% translate "My Profile" %}</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{% url 'courses' %}" class="quick-link-card h-100">
-                <span class="ql-icon"><i class="fas fa-pen-to-square"></i></span>
-                <span class="ql-label">{% translate "My Quizzes" %}</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="#about" class="quick-link-card h-100">
-                <span class="ql-icon"><i class="fas fa-church"></i></span>
-                <span class="ql-label">{% translate "About" %}</span>
-            </a>
-        </div>
+    <div class="sd-quick-grid">
+        <a href="{% url 'courses' %}" class="sd-quick-link">
+            <i class="fas fa-graduation-cap"></i>
+            <span class="sd-quick-label">{% translate "My Courses" %}</span>
+        </a>
+        <a href="{% url 'view-profile' %}" class="sd-quick-link">
+            <i class="fas fa-user-circle"></i>
+            <span class="sd-quick-label">{% translate "My Profile" %}</span>
+        </a>
+        <a href="{% url 'courses' %}" class="sd-quick-link">
+            <i class="fas fa-pen-to-square"></i>
+            <span class="sd-quick-label">{% translate "My Quizzes" %}</span>
+        </a>
+        <a href="#about" class="sd-quick-link">
+            <i class="fas fa-church"></i>
+            <span class="sd-quick-label">{% translate "About" %}</span>
+        </a>
     </div>
 
     <!-- ========== ABOUT SECTION ========== -->
     <div id="about">
-        <h2 class="user-section-title text-center mb-2">{% translate "Bible Institute" %}</h2>
-        <div class="user-divider"></div>
+        <h2 class="sd-landing-title">{% translate "Bible Institute" %}</h2>
+        <div class="sd-landing-divider"></div>
 
         <div class="row g-4 justify-content-center mb-5">
             <div class="col-12 col-md-6 col-lg-5">
-                <p class="fs-5 lh-lg text-secondary">
+                <p class="fs-5 lh-lg ps-muted-text">
                     {% translate "It is an Orthodox church institute affiliated with the Coptic Orthodox Church, located at the Church of the Great Martyr Mar Girgis - Kotsika, Maadi Coptic Orthodox Diocese." %}
                 </p>
             </div>
@@ -98,11 +93,11 @@
         <!-- Supreme Head -->
         <div class="row g-4 justify-content-center mb-5 align-items-center">
             <div class="col-12 col-md-6 col-lg-5">
-                <div class="user-card p-4">
-                    <h4 class="user-section-title mb-3">
+                <div class="sd-panel-card p-4">
+                    <h4 class="sd-section-title mb-3">
                         {% translate "Supreme Head of the Institute" %}
                     </h4>
-                    <p class="lh-lg text-secondary mb-0">
+                    <p class="lh-lg ps-muted-text mb-0">
                         {% translate "His Holiness Pope Tawadros II, Pope of Alexandria and Patriarch of the See of St. Mark, and the Supreme Head of the Theological Institutes and Colleges." %}
                     </p>
                 </div>
@@ -115,9 +110,9 @@
         <!-- General Supervisor -->
         <div class="row g-4 justify-content-center mb-5 align-items-center">
             <div class="col-12 col-lg-8">
-                <div class="user-card p-4 text-center">
-                    <h4 class="user-section-title mb-3">{% translate "General Supervisor of the Institute" %}</h4>
-                    <p class="lh-lg text-secondary mb-4">
+                <div class="sd-panel-card p-4 text-center">
+                    <h4 class="sd-section-title mb-3">{% translate "General Supervisor of the Institute" %}</h4>
+                    <p class="lh-lg ps-muted-text mb-4">
                         {% translate "His Eminence Anba Daniel, Metropolitan of Maadi and its Dependencies, and Secretary of the Holy Synod." %}
                     </p>
                     <div class="ratio ratio-16x9 video-embed">
@@ -132,5 +127,6 @@
         </div>
     </div>
 
+</div>
 </div>
 {% endblock %}

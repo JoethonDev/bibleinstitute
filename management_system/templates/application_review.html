@@ -4,28 +4,31 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3" id="content">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'applications-dashboard' %}">{% translate "Applications" %}</a></li>
-            <li class="breadcrumb-item active">{{ app_user.get_full_name|default:app_user.username }}</li>
-        </ol>
-    </nav>
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4>{% translate "Application Review" %}</h4>
-        <span class="badge fs-6 {% if app_user.application_status == 'active' %}bg-success{% elif app_user.application_status == 'declined' %}bg-danger{% else %}bg-warning{% endif %}">
-            {{ app_user.get_application_status_display }}
-        </span>
+<div class="container-fluid py-3 ad-page" id="content">
+    <div class="ad-detail-head">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'applications-dashboard' %}">{% translate "Applications" %}</a></li>
+                <li class="breadcrumb-item active">{{ app_user.get_full_name|default:app_user.username }}</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center ad-detail-content">
+            <h4 class="ad-detail-title mb-0">{% translate "Application Review" %}</h4>
+            <div class="ad-detail-badges">
+                <span class="ad-detail-badge {% if app_user.application_status == 'active' %}ad-pill--success{% elif app_user.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">
+                    {{ app_user.get_application_status_display }}
+                </span>
+            </div>
+        </div>
     </div>
 
     <div class="row">
         <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header"><strong>{% translate "Personal Information" %}</strong></div>
-                <div class="card-body">
-                    <table class="table table-sm">
+            <div class="ad-card mb-3">
+                <div class="ad-card-head"><strong>{% translate "Personal Information" %}</strong></div>
+                <div class="ad-card-body">
+                    <table class="ad-table">
                         <tr><th>{% translate "Username" %}</th><td>{{ app_user.username }}</td></tr>
                         <tr><th>{% translate "Full Name" %}</th><td>{{ app_user.get_full_name|default:"—" }}</td></tr>
                         <tr><th>{% translate "Email" %}</th><td>{{ app_user.email|default:"—" }}</td></tr>
@@ -36,10 +39,10 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header"><strong>{% translate "Church Information" %}</strong></div>
-                <div class="card-body">
-                    <table class="table table-sm">
+            <div class="ad-card mb-3">
+                <div class="ad-card-head"><strong>{% translate "Church Information" %}</strong></div>
+                <div class="ad-card-body">
+                    <table class="ad-table">
                         <tr><th>{% translate "Priest Name" %}</th><td>{{ app_user.priest_name|default:"—" }}</td></tr>
                         <tr><th>{% translate "Priest Phone" %}</th><td>{{ app_user.priest_phone|default:"—" }}</td></tr>
                         <tr><th>{% translate "Church" %}</th><td>{{ app_user.church|default:"—" }}</td></tr>
@@ -51,10 +54,10 @@
 
     <div class="row">
         <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header"><strong>{% translate "Identity" %}</strong></div>
-                <div class="card-body">
-                    <table class="table table-sm">
+            <div class="ad-card mb-3">
+                <div class="ad-card-head"><strong>{% translate "Identity" %}</strong></div>
+                <div class="ad-card-body">
+                    <table class="ad-table">
                         <tr><th>{% translate "Identity Type" %}</th><td>{{ app_user.get_identity_type_display|default:"—" }}</td></tr>
                         <tr><th>{% translate "Identity Number" %}</th><td>{{ app_user.identity_number|default:"—" }}</td></tr>
                         <tr><th>{% translate "Identity Front" %}</th><td>{% if app_user.identity_front_key %}<code>{{ app_user.identity_front_key }}</code>{% else %}—{% endif %}</td></tr>
@@ -64,10 +67,10 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header"><strong>{% translate "Documents" %}</strong></div>
-                <div class="card-body">
-                    <table class="table table-sm">
+            <div class="ad-card mb-3">
+                <div class="ad-card-head"><strong>{% translate "Documents" %}</strong></div>
+                <div class="ad-card-body">
+                    <table class="ad-table">
                         <tr><th>{% translate "ID Front" %}</th><td>{% if doc_urls.identity_front %}<a href="{{ doc_urls.identity_front }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                         <tr><th>{% translate "ID Back" %}</th><td>{% if doc_urls.identity_back %}<a href="{{ doc_urls.identity_back }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                         <tr><th>{% translate "Payment" %}</th><td>{% if doc_urls.payment %}<a href="{{ doc_urls.payment }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
@@ -80,22 +83,25 @@
 
     {% if app_user.application_status == "pending" %}
     <div class="d-flex gap-2 align-items-end">
-        <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" class="application-decision-form">
+        <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" class="application-decision-form ps-inline-form">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success">
+            <button type="submit" class="ad-btn ad-btn--teal">
                 <i class="fas fa-check me-1"></i>{% translate "Activate" %}
             </button>
         </form>
-        <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" class="application-decision-form">
+        <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" class="application-decision-form ps-inline-form">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger">
+            <button type="submit" class="ad-btn ad-btn--danger">
                 <i class="fas fa-times me-1"></i>{% translate "Decline" %}
             </button>
         </form>
     </div>
     {% elif app_user.decided_by %}
-    <div class="alert alert-secondary mt-3">
-        <small>{% translate "Decided by" %}: {{ app_user.decided_by.get_full_name|default:app_user.decided_by.username }} — {{ app_user.decided_at|date:"Y-m-d H:i" }}</small>
+    <div class="ad-alert ad-alert--info mt-3">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <small>{% translate "Decided by" %}: {{ app_user.decided_by.get_full_name|default:app_user.decided_by.username }} — {{ app_user.decided_at|date:"Y-m-d H:i" }}</small>
+        </div>
     </div>
     {% endif %}
 </div>

@@ -4,167 +4,114 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="admin-dashboard" id="content" x-data="r2Manager()" x-init="is_root = {% if is_root %}true{% else %}false{% endif %}">
-    <!-- Dashboard Header -->
-    <div class="dashboard-header">
-        <div class="dashboard-title">
-            <h2 class="h3 mb-0">
-                <i class="fas fa-cloud me-2"></i>
-                {% translate "R2 Storage Management" %}
-            </h2>
-        </div>
+<div class="ad-page" id="content" x-data="r2Manager()" x-init="is_root = {% if is_root %}true{% else %}false{% endif %}">
+    <!-- Pane Header -->
+    <div class="ad-pane-head">
+        <h2 class="ad-pane-title"><i class="fas fa-cloud me-2"></i>{% translate "R2 Storage Management" %}</h2>
+        <p class="ad-pane-desc">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
     </div>
-    <p class="text-muted mb-4">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
 
     <!-- Storage Statistics -->
-    <div class="row mb-4" id="storage-stats-container">
-        <div class="col-md-3">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-muted mb-1">{% translate "Total Files" %}</h6>
-                            <h3 class="mb-0" id="stat-total-files">
-                                {% if storage_stats.loading %}
-                                <span class="spinner-border spinner-border-sm"></span>
-                                {% else %}{{ storage_stats.total_files }}{% endif %}
-                                <span id="stat-total-files-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
-                            </h3>
-                        </div>
-                        <div class="text-primary">
-                            <i class="fas fa-file fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
+    <div class="ad-stats" id="storage-stats-container">
+        <div class="ad-stat ad-stat--file">
+            <div class="ad-stat-ic"><i class="fas fa-file"></i></div>
+            <div>
+                <b id="stat-total-files">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% else %}{{ storage_stats.total_files }}{% endif %}
+                    <span id="stat-total-files-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "Total Files" %}</span>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-muted mb-1">{% translate "Total Storage" %}</h6>
-                            <h3 class="mb-0" id="stat-total-storage">
-                                {% if storage_stats.loading %}
-                                <span class="spinner-border spinner-border-sm"></span>
-                                {% else %}{{ total_size_formatted }}{% endif %}
-                                <span id="stat-total-storage-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
-                            </h3>
-                        </div>
-                        <div class="text-success">
-                            <i class="fas fa-hdd fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
+        <div class="ad-stat ad-stat--storage">
+            <div class="ad-stat-ic"><i class="fas fa-hdd"></i></div>
+            <div>
+                <b id="stat-total-storage">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% else %}{{ total_size_formatted }}{% endif %}
+                    <span id="stat-total-storage-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "Total Storage" %}</span>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-muted mb-1">{% translate "Video Files" %}</h6>
-                            <h3 class="mb-0" id="stat-video-files">
-                                {% if storage_stats.loading %}
-                                <span class="spinner-border spinner-border-sm"></span>
-                                {% elif storage_stats.by_extension.mp4 %}{{ storage_stats.by_extension.mp4.count }}{% else %}0{% endif %}
-                                <span id="stat-video-files-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
-                            </h3>
-                        </div>
-                        <div class="text-danger">
-                            <i class="fas fa-video fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
+        <div class="ad-stat ad-stat--video">
+            <div class="ad-stat-ic"><i class="fas fa-video"></i></div>
+            <div>
+                <b id="stat-video-files">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% elif storage_stats.by_extension.mp4 %}{{ storage_stats.by_extension.mp4.count }}{% else %}0{% endif %}
+                    <span id="stat-video-files-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "Video Files" %}</span>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-muted mb-1">{% translate "PDF Files" %}</h6>
-                            <h3 class="mb-0" id="stat-pdf-files">
-                                {% if storage_stats.loading %}
-                                <span class="spinner-border spinner-border-sm"></span>
-                                {% elif storage_stats.by_extension.pdf %}{{ storage_stats.by_extension.pdf.count }}{% else %}0{% endif %}
-                                <span id="stat-pdf-files-approx" class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:0.5em;{% if not storage_stats.approximate %}display:none{% endif %}">~</span>
-                            </h3>
-                        </div>
-                        <div class="text-warning">
-                            <i class="fas fa-file-pdf fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
+        <div class="ad-stat ad-stat--pdf">
+            <div class="ad-stat-ic"><i class="fas fa-file-pdf"></i></div>
+            <div>
+                <b id="stat-pdf-files">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% elif storage_stats.by_extension.pdf %}{{ storage_stats.by_extension.pdf.count }}{% else %}0{% endif %}
+                    <span id="stat-pdf-files-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "PDF Files" %}</span>
             </div>
         </div>
     </div>
 
     <!-- File Management Toolbar -->
-    <div class="card admin-card mb-4">
-        <div class="card-body">
-            <div class="action-bar">
-                <!-- Left Actions -->
-                <div class="action-bar-start">
-                    <button class="btn btn-primary" @click="showCreateFolderModal()">
-                        <i class="fas fa-folder-plus me-1"></i>
-                        {% translate "New Folder" %}
-                    </button>
-                    <button class="btn btn-success" onclick="window.location.href='{% url 'upload-files' %}'">
-                        <i class="fas fa-upload me-1"></i>
-                        {% translate "Upload Files" %}
-                    </button>
-                    <button class="btn btn-outline-secondary" @click="refreshStats()">
-                        <i class="fas fa-chart-bar me-1"></i>
-                        {% translate "Statistics" %}
-                    </button>
-                    <button class="btn btn-danger" 
-                            x-show="selectedFiles.length > 0" 
-                            @click="deleteSelectedFiles()">
-                        <i class="fas fa-trash me-1"></i>
-                        {% translate "Delete Selected" %} (<span x-text="selectedFiles.length"></span>)
-                    </button>
-                </div>
+    <div class="ad-card mb-4">
+        <div class="ad-drive-toolbar">
+            <button class="ad-btn ad-btn--teal" @click="showCreateFolderModal()">
+                <i class="fas fa-folder-plus"></i>
+                {% translate "New Folder" %}
+            </button>
+            <button class="ad-btn ad-btn--gold" onclick="window.location.href='{% url 'upload-files' %}'">
+                <i class="fas fa-upload"></i>
+                {% translate "Upload Files" %}
+            </button>
+            <button class="ad-btn ad-btn--ghost" @click="refreshStats()">
+                <i class="fas fa-chart-bar"></i>
+                {% translate "Statistics" %}
+            </button>
+            <button class="ad-btn ad-btn--danger"
+                    x-show="selectedFiles.length > 0"
+                    @click="deleteSelectedFiles()">
+                <i class="fas fa-trash"></i>
+                {% translate "Delete Selected" %} (<span x-text="selectedFiles.length"></span>)
+            </button>
 
-                <!-- Right Actions - Filters -->
-                <div class="action-bar-end">
-                    <div class="filters-container">
-                        <!-- Filter Selector -->
-                        <div class="filter-item">
-                            <select class="form-select" 
-                                    x-model="currentFilter" 
-                                    @change="applyFilter()">
-                                {% for preset in filter_presets %}
-                                <option value="{{ preset }}" {% if preset == current_filter %}selected{% endif %}>
-                                    {{ preset|title }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
+            <div class="ms-auto ad-filters">
+                <select class="form-select ad-width-auto"
+                        x-model="currentFilter"
+                        @change="applyFilter()">
+                    {% for preset in filter_presets %}
+                    <option value="{{ preset }}" {% if preset == current_filter %}selected{% endif %}>
+                        {{ preset|title }}
+                    </option>
+                    {% endfor %}
+                </select>
 
-                        <!-- Search -->
-                        <div class="filter-item">
-                            <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       x-model="searchQuery" 
-                                       @keyup.debounce.500ms="searchFiles()"
-                                       placeholder="{% translate 'Search files...' %}">
-                                <button class="btn btn-outline-secondary" 
-                                        type="button" 
-                                        @click="searchFiles()">
-                                    <i class="fas fa-search"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div class="ad-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text"
+                           x-model="searchQuery"
+                           @keyup.debounce.500ms="searchFiles()"
+                           placeholder="{% translate 'Search files...' %}">
+                    <button class="ad-btn ad-btn--sm" type="button" @click="searchFiles()">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- File List (browse partial — breadcrumb, back, grid) -->
-    <div class="card admin-card" id="file-list-container">
+    <div class="ad-card" id="file-list-container">
         {% include 'partials/r2_browse.html' %}
     </div>
 
@@ -186,10 +133,10 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">
                         {% translate "Cancel" %}
                     </button>
-                    <button type="button" class="btn btn-primary" @click="createFolder()">
+                    <button type="button" class="ad-btn ad-btn--teal" @click="createFolder()">
                         {% translate "Create" %}
                     </button>
                 </div>
@@ -216,10 +163,10 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">
                         {% translate "Cancel" %}
                     </button>
-                    <button type="button" class="btn btn-primary" @click="renameFile()">
+                    <button type="button" class="ad-btn ad-btn--teal" @click="renameFile()">
                         {% translate "Rename" %}
                     </button>
                 </div>
@@ -241,8 +188,8 @@
                     </p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="button" class="btn btn-danger" id="confirm-delete-btn">{% translate "Delete" %}</button>
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="button" class="ad-btn ad-btn--danger" id="confirm-delete-btn">{% translate "Delete" %}</button>
                 </div>
             </div>
         </div>
@@ -263,7 +210,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Close" %}</button>
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">{% translate "Close" %}</button>
                 </div>
             </div>
         </div>

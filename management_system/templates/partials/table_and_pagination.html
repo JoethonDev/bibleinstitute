@@ -14,23 +14,23 @@
         viewKey: '{{ view|default:'default'|escapejs }}',
          bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}',
         pageSize: {{ page_obj.paginator.per_page|default:15 }}
-     }" class="table-wrapper">
+     }" class="ad-table-shell">
     
         <!-- Bulk Actions & Column Controls -->
-    <div class="table-controls">
+    <div class="ad-toolbar">
         <!-- Bulk Actions (shown when items selected) -->
         <div class="bulk-actions" x-show="selected.length > 0" x-transition x-cloak>
             <span class="bulk-count">
                 <i class="fas fa-check-circle me-1"></i>
                 <span x-text="selectionLabel"></span>
             </span>
-            <button class="btn btn-sm btn-danger" 
+            <button class="ad-btn ad-btn--danger ad-btn--sm"
                     @click="deleteSelected()"
                     :disabled="selected.length === 0">
                 <i class="fas fa-trash me-1"></i>
                 <span>{% translate "Delete Selected" %}</span>
             </button>
-            <button class="btn btn-sm btn-outline-secondary" 
+            <button class="ad-btn ad-btn--ghost ad-btn--sm"
                     @click="selected = []; selectAll = false">
                 <i class="fas fa-times me-1"></i>
                 <span>{% translate "Clear" %}</span>
@@ -40,9 +40,9 @@
         <!-- Column Visibility Toggle -->
         <div class="column-controls">
             <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
-                        type="button" 
-                        data-bs-toggle="dropdown" 
+                <button class="btn ad-btn ad-btn--ghost ad-btn--sm dropdown-toggle"
+                        type="button"
+                        data-bs-toggle="dropdown"
                         aria-expanded="false">
                     <i class="fas fa-columns me-1"></i>
                     <span>{% translate "Columns" %}</span>
@@ -72,8 +72,8 @@
     </div>
 
     <!-- Responsive Table -->
-    <div class="table-responsive">
-        <table class="table table-hover admin-table">
+    <div class="ad-table-wrap">
+        <table class="ad-table">
             <thead>
                 <tr>
                     <th class="column-checkbox">
@@ -122,8 +122,8 @@
                     <!-- View Submissions Column (for quizzes) -->
                     {% if submission_view %}
                     <td class="column-actions">
-                        <div class="action-buttons">
-                            <button class="btn btn-sm btn-primary"
+                        <div class="ad-actions">
+                            <button class="ad-btn ad-btn--teal ad-btn--sm"
                                     hx-get="{{ values.url }}view-submission/"
                                     hx-swap="innerHTML"
                                     hx-target="#display-page"
@@ -140,8 +140,8 @@
                     <!-- Action Buttons -->
                     <td class="column-actions">
                         {% if submission_user %}
-                        <div class="action-buttons">
-                            <button class="btn btn-sm btn-primary"
+                        <div class="ad-actions">
+                            <button class="ad-btn ad-btn--teal ad-btn--sm"
                                     hx-get="{{ values.url }}"
                                     hx-swap="innerHTML"
                                     hx-target="#display-page"
@@ -152,14 +152,14 @@
                                 <span>{% translate "View" %}</span>
                             </button>
                             <a href="{% url 'export-submission-csv' grade_id=values.submission_id %}"
-                               class="btn btn-sm btn-outline-success">
+                               class="ad-btn ad-btn--outline-gold ad-btn--sm">
                                 <i class="fas fa-download me-1"></i>
                                 <span>{% translate "Export" %}</span>
                             </a>
                         </div>
                         {% else %}
-                        <div class="action-buttons">
-                            <button class="btn btn-sm btn-outline-secondary"
+                        <div class="ad-actions">
+                            <button class="ad-btn ad-btn--ghost ad-btn--sm"
                                     hx-get="{{ values.url }}update/"
                                     hx-swap="innerHTML"
                                     hx-target="#display-page"
@@ -170,7 +170,7 @@
                                 <span>{% translate "Edit" %}</span>
                             </button>
                             
-                            <button class="btn btn-sm btn-outline-danger"
+                            <button class="ad-btn ad-btn--danger ad-btn--sm"
                                     hx-delete="{{ values.url }}delete/"
                                     hx-swap="delete"
                                     hx-target="closest tr"
@@ -186,12 +186,10 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if submission_view %}{{ columns|length|add:3 }}{% else %}{{ columns|length|add:2 }}{% endif %}" class="empty-state">
-                        <div class="empty-state-content">
-                            <i class="fas fa-inbox fa-3x mb-3"></i>
-                            <h5>{% translate "No Data Available" %}</h5>
-                            <p class="text-muted">{% translate "No records found matching your criteria." %}</p>
-                        </div>
+                    <td colspan="{% if submission_view %}{{ columns|length|add:3 }}{% else %}{{ columns|length|add:2 }}{% endif %}" class="ad-empty">
+                        <i class="fas fa-inbox"></i>
+                        <h5>{% translate "No Data Available" %}</h5>
+                        <p>{% translate "No records found matching your criteria." %}</p>
                     </td>
                 </tr>
                 {% endfor %}
@@ -201,9 +199,9 @@
 
     <!-- Pagination -->
     {% if page_obj.has_other_pages %}
-    <div class="table-pagination">
+    <div class="ad-page-wrapper">
         <nav aria-label="{% translate 'Page navigation' %}">
-            <ul class="pagination mb-0 gap-1"
+            <ul class="ad-page-nav"
                 hx-target="#table-container"
                 hx-indicator="#table-loading"
                 hx-push-url="true"
@@ -211,8 +209,8 @@
 
                 <!-- Previous Button -->
                 {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link rounded-pill"
+                <li>
+                    <a class="ad-page-link"
                        href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
                        hx-get="{{ url }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
                        aria-label="{% translate 'Previous' %}"
@@ -222,8 +220,8 @@
                     </a>
                 </li>
                 {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link rounded-pill"
+                <li>
+                    <span class="ad-page-link is-disabled"
                           aria-disabled="true"
                           title="{% translate 'No previous page' %}">
                         <i class="fas fa-chevron-left" aria-hidden="true"></i>
@@ -235,36 +233,36 @@
                 <!-- Page Numbers -->
                 {% for i in page_obj.paginator.page_range %}
                     {% if page_obj.number == i %}
-                    <li class="page-item active" aria-current="page">
-                        <span class="page-link rounded-pill">{{ i }}</span>
+                    <li aria-current="page">
+                        <span class="ad-page-link is-active">{{ i }}</span>
                     </li>
                     {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
-                    <li class="page-item">
-                        <a class="page-link rounded-pill"
+                    <li>
+                        <a class="ad-page-link"
                            href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ i }}"
                            hx-get="{{ url }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ i }}">{{ i }}</a>
                     </li>
                     {% elif forloop.counter == 1 or forloop.revcounter == 1 %}
-                    <li class="page-item">
-                        <a class="page-link rounded-pill"
+                    <li>
+                        <a class="ad-page-link"
                            href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ i }}"
                            hx-get="{{ url }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ i }}">{{ i }}</a>
                     </li>
                     {% elif forloop.counter == 2 and page_obj.number > 4 %}
-                    <li class="page-item disabled">
-                        <span class="page-link rounded-pill" aria-disabled="true">&hellip;</span>
+                    <li>
+                        <span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span>
                     </li>
                     {% elif forloop.revcounter == 2 and page_obj.number < page_obj.paginator.num_pages|add:'-3' %}
-                    <li class="page-item disabled">
-                        <span class="page-link rounded-pill" aria-disabled="true">&hellip;</span>
+                    <li>
+                        <span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span>
                     </li>
                     {% endif %}
                 {% endfor %}
 
                 <!-- Next Button -->
                 {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link rounded-pill"
+                <li>
+                    <a class="ad-page-link"
                        href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}"
                        hx-get="{{ url }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}"
                        aria-label="{% translate 'Next' %}"
@@ -274,8 +272,8 @@
                     </a>
                 </li>
                 {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link rounded-pill"
+                <li>
+                    <span class="ad-page-link is-disabled"
                           aria-disabled="true"
                           title="{% translate 'No next page' %}">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
@@ -287,7 +285,7 @@
         </nav>
 
         <!-- Page Info -->
-        <div class="page-info">
+        <div class="ad-page-info">
             {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
                 Showing {{ start }} to {{ end }} of {{ total }} entries
             {% endblocktranslate %}

@@ -1,0 +1,481 @@
+/* ================================================================================
+   PSALMODIA — Design System Tokens & Shared Primitives
+   Source of truth for the Bible Institute LMS visual identity.
+   Ink #17303A · Teal #2F5D73 · Gold #B4853A · Parchment #F7F3EA
+   Loaded sitewide before realm stylesheets (app_student.css / app_admin.css).
+   ================================================================================ */
+
+/* ---------------- 1. Light role tokens ---------------- */
+:root {
+    /* ── Literal colour tokens (one canonical hex map) ── */
+    --ps-ink:           #17303A;
+    --ps-ink-deep:      #10262E;
+    --ps-ink-black:     #0B1D23;
+    --ps-on-ink:        #FFFFFF;
+
+    --ps-teal:          #2F5D73;
+    --ps-teal-deep:     #24495B;
+    --ps-teal-soft:     #DCEAF3;
+
+    --ps-gold:          #B4853A;
+    --ps-gold-deep:     #8F6627;
+    --ps-gold-soft:     #F4EAD6;
+
+    --ps-cream:         #F7F3EA;
+    --ps-paper:         #FFFDF8;
+    --ps-mist:          #EEF3F4;
+
+    --ps-line:          #E5DCC8;
+    --ps-line-cool:     #D6E2EA;
+
+    --ps-muted:         #6A7A83;
+    --ps-slate:         #46586B;
+
+    --ps-success:       #2F7A5B;
+    --ps-success-deep:  #23694E;
+    --ps-success-soft:  #E2F0E9;
+    --ps-danger:        #B54747;
+    --ps-danger-soft:   #F6E4E4;
+    --ps-warning:       #A36A1B;
+    --ps-warning-soft:  #F8EFDD;
+
+    /* ── Spacing & shape ── */
+    --ps-radius:        1rem;
+    --ps-radius-lg:     1.5rem;
+
+    /* ── Shadows (ink-channel alpha) ── */
+    --ps-shadow:        0 2px 10px rgba(23, 48, 58, .05);
+    --ps-shadow-md:     0 14px 34px rgba(23, 48, 58, .10);
+    --ps-shadow-xl:     0 26px 60px rgba(23, 48, 58, .16);
+
+    /* ── Motion ── */
+    --ps-motion:        .22s cubic-bezier(.22, .61, .36, 1);
+
+    /* ── Display font stack (system serifs — no webfonts) ── */
+    --ps-display:       Georgia, "Times New Roman", "Sakkal Majalla", "Traditional Arabic", serif;
+
+    /* ── Semantic role tokens (consumed by components) ── */
+    --ps-surface:       var(--ps-paper);          /* card/sheet surface */
+    --ps-text:          var(--ps-ink);             /* body text */
+    /* `--ps-line` and `--ps-muted` are already role tokens and literal map keys. */
+    --ps-accent:        var(--ps-gold);            /* primary accent */
+    --ps-accent-strong: var(--ps-gold-deep);       /* strong/hover accent */
+    --ps-page-bg:       var(--ps-cream);           /* page background */
+
+    /* ── Status tokens (aliases for readability) ── */
+    --ps-status-good:       var(--ps-success);
+    --ps-status-good-soft:  var(--ps-success-soft);
+    --ps-status-bad:        var(--ps-danger);
+    --ps-status-bad-soft:   var(--ps-danger-soft);
+    --ps-status-caution:    var(--ps-warning);
+    --ps-status-caution-soft: var(--ps-warning-soft);
+}
+
+
+/* ---------------- 2. Dark-theme placeholder (future) ---------------- */
+/*
+[data-ps-theme="dark"] {
+    --ps-ink:           …;
+    --ps-teal:          …;
+    --ps-gold:          …;
+    --ps-cream:         …;
+    ...
+
+    Only re-map literal tokens above; component CSS (consumer role tokens)
+    stays untouched.
+}
+*/
+
+
+/* ---------------- 3. Conservative global resets ---------------- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+
+/* ---------------- 4. Alpine / HTMX utilities ---------------- */
+[x-cloak] { display: none !important; }
+
+
+/* ---------------- 5. Focus-visible (accessibility) ---------------- */
+:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
+
+/* ---------------- 6. Themed global scrollbar (D10) ---------------- */
+html {
+    scrollbar-color: var(--ps-gold) rgba(247, 243, 234, .6);
+    scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar {
+    width: 11px;
+}
+
+html::-webkit-scrollbar-track {
+    background: var(--ps-cream);
+}
+
+html::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--ps-gold), var(--ps-gold-deep));
+    border: 2px solid var(--ps-cream);
+}
+
+
+/* ---------------- 7. Bootstrap modal skin (D3) ---------------- */
+.modal-content {
+    border: 1px solid var(--ps-line);
+    border-radius: var(--ps-radius);
+    background: var(--ps-paper);
+    box-shadow: 0 30px 70px rgba(11, 29, 35, .35);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .9rem 1.15rem;
+    background: linear-gradient(120deg, var(--ps-ink-deep), var(--ps-ink));
+    color: #fff;
+    font-family: var(--ps-display);
+    font-weight: 700;
+    border-bottom: 0;
+    border-radius: calc(var(--ps-radius) - 1px) calc(var(--ps-radius) - 1px) 0 0;
+}
+
+.modal-header .btn-close {
+    margin-inline-start: auto;
+    width: 1.9rem;
+    height: 1.9rem;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    font-size: .85rem;
+    opacity: 1;
+    transition: background-color var(--ps-motion);
+}
+
+.modal-header .btn-close:hover {
+    background: rgba(255, 255, 255, .25);
+    opacity: 1;
+}
+
+.modal-header .btn-close::before {
+    content: "\2715"; /* ✕ */
+    font-size: .85rem;
+}
+
+.modal-body {
+    padding: 1.1rem 1.2rem;
+    color: var(--ps-ink);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    padding: .8rem 1.2rem;
+    border-top: 1px dashed var(--ps-line);
+    background: var(--ps-cream);
+    border-radius: 0 0 calc(var(--ps-radius) - 1px) calc(var(--ps-radius) - 1px);
+}
+
+
+/* ---------------- 8. Shared utilities ---------------- */
+
+/* Inline form (display:inline POST forms) */
+.ps-inline-form {
+    display: inline;
+}
+
+/* Muted text utility */
+.ps-muted-text {
+    color: var(--ps-muted);
+}
+
+
+/* ---------------- 8a. Shared icon alignment across realm controls ---------------- */
+
+/* Ensure icons in realm buttons, actions, and tabs render consistently */
+.sd-btn i,
+.sd-btn svg,
+.ad-btn i,
+.ad-btn svg,
+.ad-action-btn i,
+.ad-action-btn svg,
+.ad-tab i,
+.ad-tab svg,
+.ad-stat-ic i,
+.ad-stat-ic svg,
+.ad-drive-ic i,
+.ad-drive-ic svg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+
+/* ---------------- 8b. Disabled Bootstrap form control contrast (realm-agnostic) ---------------- */
+
+.form-control:disabled,
+.form-select:disabled {
+    background: var(--ps-mist) !important;
+    color: var(--ps-slate) !important;
+    border-color: var(--ps-line) !important;
+    opacity: .75;
+    cursor: not-allowed;
+}
+
+.form-check-input:disabled {
+    opacity: .65;
+    cursor: not-allowed;
+}
+
+.form-check-input:disabled + .form-check-label {
+    color: var(--ps-muted);
+    cursor: not-allowed;
+}
+
+
+/* ---------------- 8c. Site shell / public realm (.ps-site-*) ---------------- */
+
+/* Top bar */
+.ps-site-topbar {
+    background: var(--ps-ink);
+    color: rgba(255, 255, 255, .72);
+    font-size: .82rem;
+    padding: .32rem 0;
+}
+.ps-site-topbar a {
+    color: rgba(255, 255, 255, .82);
+    text-decoration: none;
+    transition: color var(--ps-motion);
+}
+.ps-site-topbar a:hover { color: #fff; }
+.ps-site-topbar-info i { color: var(--ps-gold); }
+.ps-site-topbar-links { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.ps-site-sep { opacity: .3; }
+
+/* Navbar */
+.ps-site-nav {
+    background: linear-gradient(180deg, #fff, var(--ps-paper));
+    border-bottom: 1px solid var(--ps-line);
+    box-shadow: 0 2px 12px rgba(23, 48, 58, .05);
+}
+.ps-site-brand-text strong { font-family: var(--ps-display); color: var(--ps-ink); font-size: 1.1rem; }
+.ps-site-brand-text small { display: block; font-size: .72rem; color: var(--ps-muted); }
+.ps-site-toggler {
+    border: 1px solid var(--ps-line);
+    color: var(--ps-teal);
+    background: transparent;
+}
+.ps-site-nav-link {
+    color: var(--ps-ink) !important;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: .35rem .85rem !important;
+    transition: background-color var(--ps-motion), color var(--ps-motion);
+}
+.ps-site-nav-link:hover,
+.ps-site-nav-link:focus-visible {
+    background: var(--ps-gold-soft) !important;
+    color: var(--ps-gold-deep) !important;
+}
+.ps-site-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.ps-site-lang-select {
+    border-color: var(--ps-line-cool);
+    border-radius: var(--ps-radius);
+    font-size: .8rem;
+}
+
+/* Footer */
+.ps-site-footer {
+    background: var(--ps-ink);
+    color: rgba(255, 255, 255, .72);
+}
+.ps-site-footer-heading {
+    font-family: var(--ps-display);
+    color: #fff;
+    font-size: 1rem;
+    margin-bottom: .8rem;
+}
+.ps-site-footer-link {
+    color: var(--ps-gold-soft);
+    text-decoration: none;
+    transition: color var(--ps-motion);
+}
+.ps-site-footer-link:hover { color: var(--ps-gold); }
+.ps-site-footer-text { font-size: .88rem; margin-bottom: .3rem; }
+.ps-site-footer-text i { color: var(--ps-gold); width: 1.2rem; }
+.ps-site-footer-bar {
+    background: var(--ps-ink-black);
+    font-size: .82rem;
+    color: rgba(255, 255, 255, .55);
+}
+
+
+/* ---------------- 8c. Loading overlay (.ps-loading-overlay) ---------------- */
+.ps-loading-overlay {
+    background: rgba(23, 48, 58, .7);
+    backdrop-filter: blur(6px);
+    z-index: 1090;
+}
+.ps-loading-spinner {
+    width: 3rem;
+    height: 3rem;
+    color: var(--ps-gold) !important;
+}
+
+
+/* ---------------- 9. Shared toast stack (D4) ---------------- */
+.ps-toast-stack {
+    position: fixed;
+    z-index: 1080;
+    inset-block-start: 5.5rem;
+    inset-inline-end: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    max-width: 22rem;
+}
+
+.ps-toast {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .7rem .95rem;
+    border-radius: var(--ps-radius);
+    background: linear-gradient(120deg, var(--ps-ink-deep), var(--ps-ink));
+    color: #fff;
+    box-shadow: 0 14px 34px rgba(11, 29, 35, .35);
+    border: 1px solid rgba(180, 133, 58, .35);
+    font-size: .86rem;
+    animation: psToastIn .3s ease;
+}
+
+.ps-toast i { color: var(--ps-gold); flex-shrink: 0; }
+
+.ps-toast-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.ps-toast-close {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color var(--ps-motion);
+}
+.ps-toast-close:hover { background: rgba(255, 255, 255, .25); }
+.ps-toast-close i { font-size: .7rem; color: inherit; }
+
+@keyframes psToastIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ps-toast { animation: none; }
+}
+
+
+/* ---------------- 10. Print rules (D11) ---------------- */
+@media print {
+    /* Hide navigation, rails, actions, and filters */
+    nav,
+    .ad-rail,
+    .sd-nav-wrap,
+    .ad-actions,
+    .ad-action-btn,
+    .ad-filters,
+    .ad-filter-pill,
+    .ad-toolbar,
+    .ad-search,
+    .ad-quick-grid,
+    .ad-quick-link,
+    .sd-cal-nav,
+    .sd-page-nav,
+    .ad-page-nav,
+    .ps-toast-stack,
+    .modal-backdrop,
+    .ad-modal-backdrop,
+    .btn,
+    .ad-btn,
+    .sd-btn,
+    .ps-inline-form,
+    form[style*="display:inline"],
+    [data-bs-toggle="modal"],
+    [hx-get],
+    [hx-post],
+    [hx-delete],
+    [hx-put] {
+        display: none !important;
+    }
+
+    /* Retain content areas, tables, cards */
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .container,
+    .ad-pane.is-active,
+    .sd-screen,
+    .sd-frame,
+    .ad-card,
+    .ad-table,
+    .ad-table-wrap,
+    .sd-course-grid,
+    .sd-cal-grid,
+    .sd-group,
+    .sd-learn-panel {
+        display: block !important;
+        visibility: visible !important;
+        background: #fff !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        border-color: #ccc !important;
+    }
+
+    .ad-table th,
+    .ad-table td,
+    .sd-day,
+    .sd-course-card,
+    .sd-panel-card,
+    .sd-id-card,
+    .sd-q-card {
+        border-color: #ccc !important;
+        background: #fff !important;
+        color: #000 !important;
+        box-shadow: none !important;
+    }
+
+    a { color: #000 !important; text-decoration: underline; }
+
+    /* Page margins */
+    @page {
+        margin: 1.5cm;
+    }
+}
