@@ -221,7 +221,15 @@ fi
 info "Saved prior state for rollback."
 
 # ---------------------------------------------------------------------------
-# Step 1 — Run migrations and collectstatic in the target slot
+# Step 1 — Build the target slot and celery images first
+# ---------------------------------------------------------------------------
+info "Building lms-app-${TARGET_SLOT} and celery images…"
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" build \
+    "lms-app-${TARGET_SLOT}" celery \
+    || die "Image build failed — aborting."
+
+# ---------------------------------------------------------------------------
+# Step 2 — Run migrations and collectstatic from the newly built image
 # ---------------------------------------------------------------------------
 info "Running forward migrations (target: lms-app-${TARGET_SLOT})…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-deps \
@@ -236,15 +244,15 @@ docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-de
     || die "collectstatic failed — aborting."
 
 # ---------------------------------------------------------------------------
-# Step 2 — Build and start the target slot + celery
+# Step 3 — Start the target slot + celery from the already-built image
 # ---------------------------------------------------------------------------
-info "Building and starting lms-app-${TARGET_SLOT} and celery…"
-docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" up -d --build --force-recreate \
+info "Starting lms-app-${TARGET_SLOT} and celery…"
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" up -d --force-recreate --no-build \
     "lms-app-${TARGET_SLOT}" celery \
     || die "Failed to start target slot and celery."
 
 # ---------------------------------------------------------------------------
-# Step 3 — Wait for target healthcheck
+# Step 4 — Wait for target healthcheck
 # ---------------------------------------------------------------------------
 info "Waiting for lms-app-${TARGET_SLOT} healthcheck…"
 TARGET_CID=$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps -q "lms-app-${TARGET_SLOT}" 2>/dev/null || true)
@@ -282,7 +290,7 @@ CELERY_STATE="$(docker inspect --format='{{.State.Status}}' "$CELERY_CID" 2>/dev
 info "Celery container is running."
 
 # ---------------------------------------------------------------------------
-# Step 4 — Atomic upstream switch
+# Step 5 — Atomic upstream switch
 # ---------------------------------------------------------------------------
 info "Writing new upstream file (pointing to lms-app-${TARGET_SLOT})…"
 cat > "$TMP_UPSTREAM_FILE" <<-NGINX
@@ -299,7 +307,7 @@ mv "$TMP_UPSTREAM_FILE" "$UPSTREAM_FILE"
 info "Upstream file updated atomically."
 
 # ---------------------------------------------------------------------------
-# Step 5 — Nginx reload
+# Step 6 — Nginx reload
 # ---------------------------------------------------------------------------
 info "Validating Nginx configuration inside the container…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
@@ -329,7 +337,7 @@ docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx 
 info "Nginx reloaded successfully."
 
 # ---------------------------------------------------------------------------
-# Step 6 — HTTP smoke check through Nginx
+# Step 7 — HTTP smoke check through Nginx
 # ---------------------------------------------------------------------------
 info "Running HTTP smoke check against ${HEALTHCHECK_URL}…"
 SMOKE_OK=false
@@ -367,14 +375,14 @@ if ! $SMOKE_OK; then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 7 — Mark active slot
+# Step 8 — Mark active slot
 # ---------------------------------------------------------------------------
 printf '%s' "$TARGET_SLOT" > "$TMP_SLOT_FILE"
 mv "$TMP_SLOT_FILE" "$ACTIVE_SLOT_FILE"
 info "Active slot updated to '$TARGET_SLOT'."
 
 # ---------------------------------------------------------------------------
-# Step 8 — Optionally stop old web slot
+# Step 9 — Optionally stop old web slot
 # ---------------------------------------------------------------------------
 if [[ "${STOP_OLD_SLOT,,}" == "true" && "$INITIAL_DEPLOY" == "false" ]]; then
     info "Stopping old web slot lms-app-${ACTIVE_SLOT}…"
