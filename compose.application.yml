@@ -16,7 +16,6 @@ x-app-base: &app-base
     DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
     POSTGRES_DB: ${POSTGRES_DB:-lms_database}
     POSTGRES_USER: ${POSTGRES_USER:-lms_user}
-    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
     POSTGRES_HOST: postgres
     POSTGRES_PORT: 5432
     SQLITE_SOURCE_PATH: /app/db.sqlite3

@@ -3,10 +3,13 @@ services:
   postgres:
     image: postgres:18
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+        format: raw
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lms_database}
       POSTGRES_USER: ${POSTGRES_USER:-lms_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
     volumes:
       - lms_postgres_data:/var/lib/postgresql
     healthcheck:
