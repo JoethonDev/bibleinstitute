@@ -80,8 +80,10 @@ volumes:
   lms_redis_data:
     name: lms_redis_data
   lms_static_data:
+    external: true
     name: lms_static_data
 
 networks:
   lms_network:
+    external: true
     name: lms_network
