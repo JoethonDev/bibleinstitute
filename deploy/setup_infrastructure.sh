@@ -77,7 +77,11 @@ for svc in postgres redis; do
         fi
         sleep 2
     done
-    $ok || die "$svc not healthy within 60s — check 'docker compose logs $svc'"
+    if ! $ok; then
+        docker compose --env-file .env -f "$INFRA_COMPOSE" ps "$svc" || true
+        docker compose --env-file .env -f "$INFRA_COMPOSE" logs --tail=100 "$svc" || true
+        die "$svc not healthy within 60s — see the logs above"
+    fi
 done
 info "PostgreSQL and Redis are healthy."
 
