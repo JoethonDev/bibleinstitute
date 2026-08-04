@@ -20,6 +20,8 @@ docs/**
 **/.env.*
 .env
 .env.*
+!.env.example
+.compose.env
 *.log
 *.pot
 *.pyc
