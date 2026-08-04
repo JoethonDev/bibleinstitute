@@ -9,6 +9,8 @@ INFRA_COMPOSE="compose.infrastructure.yml"
 NETWORK_NAME="lms_network"
 VOLUME_NAME="lms_static_data"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.compose.env}"
+HEALTH_ATTEMPTS=90
+HEALTH_INTERVAL=2
 
 # Tiny .env key reader — never sources the file.
 env_val() {
@@ -70,19 +72,26 @@ info "Starting PostgreSQL and Redis…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" up -d postgres redis \
     || die "Failed to start PostgreSQL or Redis"
 
-info "Waiting for health (up to 60s)…"
+info "Waiting for health (up to $((HEALTH_ATTEMPTS * HEALTH_INTERVAL))s)…"
 for svc in postgres redis; do
     ok=false
-    for i in $(seq 1 30); do
-        if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps --status healthy --format '{{.Service}}' 2>/dev/null | grep -qFx "$svc"; then
+    for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
+        cid="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps -q "$svc" 2>/dev/null || true)"
+        state=""
+        health=""
+        if [[ -n "$cid" ]]; then
+            state="$(docker inspect --format='{{.State.Status}}' "$cid" 2>/dev/null || true)"
+            health="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+        fi
+        if [[ "$state" == "running" && "$health" == "healthy" ]]; then
             ok=true; break
         fi
-        sleep 2
+        sleep "$HEALTH_INTERVAL"
     done
     if ! $ok; then
         docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps "$svc" || true
         docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" logs --tail=100 "$svc" || true
-        die "$svc not healthy within 60s — see the logs above"
+        die "$svc not healthy within $((HEALTH_ATTEMPTS * HEALTH_INTERVAL))s — see the logs above"
     fi
 done
 info "PostgreSQL and Redis are healthy."
