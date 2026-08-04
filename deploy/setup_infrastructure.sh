@@ -8,6 +8,7 @@ set -Eeuo pipefail
 INFRA_COMPOSE="compose.infrastructure.yml"
 NETWORK_NAME="lms_network"
 VOLUME_NAME="lms_static_data"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.compose.env}"
 
 # Tiny .env key reader — never sources the file.
 env_val() {
@@ -37,12 +38,13 @@ fi
 # ── Preflight ─────────────────────────────────────────────────────────────
 [[ -f "$INFRA_COMPOSE" ]] || die "Run from repo root (missing $INFRA_COMPOSE)"
 [[ -f ".env"          ]] || die "Missing .env — run 'bash deploy/setup_env.sh' first"
+[[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE — run 'bash deploy/setup_env.sh' to generate the safe Compose interpolation file"
 
 command -v docker >/dev/null 2>&1 || die "Docker is not installed"
 docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required"
 
 info "Validating Compose config…"
-docker compose --env-file .env -f "$INFRA_COMPOSE" config >/dev/null \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" config >/dev/null \
     || die "Compose config is invalid for $INFRA_COMPOSE"
 
 # ── External resources (create only when absent — never remove) ─────────
@@ -65,21 +67,21 @@ fi
 
 # ── Start PostgreSQL + Redis ────────────────────────────────────────────
 info "Starting PostgreSQL and Redis…"
-docker compose --env-file .env -f "$INFRA_COMPOSE" up -d postgres redis \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" up -d postgres redis \
     || die "Failed to start PostgreSQL or Redis"
 
 info "Waiting for health (up to 60s)…"
 for svc in postgres redis; do
     ok=false
     for i in $(seq 1 30); do
-        if docker compose --env-file .env -f "$INFRA_COMPOSE" ps --status healthy --format '{{.Service}}' 2>/dev/null | grep -qFx "$svc"; then
+        if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps --status healthy --format '{{.Service}}' 2>/dev/null | grep -qFx "$svc"; then
             ok=true; break
         fi
         sleep 2
     done
     if ! $ok; then
-        docker compose --env-file .env -f "$INFRA_COMPOSE" ps "$svc" || true
-        docker compose --env-file .env -f "$INFRA_COMPOSE" logs --tail=100 "$svc" || true
+        docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps "$svc" || true
+        docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" logs --tail=100 "$svc" || true
         die "$svc not healthy within 60s — see the logs above"
     fi
 done
@@ -108,9 +110,9 @@ if [[ -r "$CERT_FILE" && -r "$KEY_FILE" ]]; then
     fi
 
     info "Starting Nginx…"
-    docker compose --env-file .env -f "$INFRA_COMPOSE" up -d nginx || die "Failed to start Nginx"
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" up -d nginx || die "Failed to start Nginx"
     info "Validating Nginx config…"
-    docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -t || die "Nginx config test FAILED"
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t || die "Nginx config test FAILED"
     info "Nginx is running."
 else
     info "TLS certificates NOT found at $TLS_DIR — Nginx intentionally not started."
@@ -130,4 +132,4 @@ info "Next steps:"
 echo "  1. Provision TLS certificates  (skip if already done)"
 echo "  2. Run forward migrations and deploy the application"
 echo ""
-echo "  To restart later: docker compose --env-file .env -f $INFRA_COMPOSE up -d postgres redis"
+echo "  To restart later: docker compose --env-file $COMPOSE_ENV_FILE -f $INFRA_COMPOSE up -d postgres redis"

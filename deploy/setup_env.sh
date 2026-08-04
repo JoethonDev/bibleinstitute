@@ -6,7 +6,8 @@
 set -Eeuo pipefail
 
 TMP=".env.$$.tmp"
-trap 'rm -f "$TMP"' EXIT
+COMPOSE_TMP=".compose.env.$$.tmp"
+trap 'rm -f "$TMP" "$COMPOSE_TMP"' EXIT
 
 die() { echo "[FATAL] $*" >&2; exit 1; }
 info() { echo "[INFO] $*"; }
@@ -46,6 +47,45 @@ write_value() {
     local k="$1" v="$2"
     awk -v k="$k" -v v="$v" 'BEGIN{f=0} index($0,k"=")==1{print k"="v;f=1;next} {print} END{if(!f)print k"="v}' \
         "$TMP" > "${TMP}.w" && mv "${TMP}.w" "$TMP"
+}
+
+value_from_tmp() {
+    local key="$1" default="$2" value
+    value="$(awk -v k="$key" 'index($0, k"=")==1{sub(/^[^=]+=/, "", $0); print; exit}' "$TMP")"
+    printf '%s' "${value:-$default}"
+}
+
+write_compose_env() {
+    # Compose parses its interpolation env file before it processes service
+    # env_file entries.  Keep this file limited to non-secret settings so a
+    # literal '$' in .env cannot be mistaken for a Compose variable.  The
+    # services still receive the complete .env through their raw env_file.
+    : > "$COMPOSE_TMP"
+    local key default value
+    while IFS='|' read -r key default; do
+        value="$(value_from_tmp "$key" "$default")"
+        printf '%s=%s\n' "$key" "$value" >> "$COMPOSE_TMP"
+    done <<'SETTINGS'
+POSTGRES_DB|lms_database
+POSTGRES_USER|lms_user
+POSTGRES_HOST|postgres
+POSTGRES_PORT|5432
+DJANGO_DEBUG|False
+DJANGO_ALLOWED_HOSTS|*
+NGINX_HTTP_PORT|80
+NGINX_HTTPS_PORT|443
+NGINX_TLS_CERT_DIR|./certs
+LMS_RUNTIME_DIR|./runtime
+REDIS_URL|redis://redis:6379/0
+CELERY_BROKER_URL|redis://redis:6379/0
+CELERY_RESULT_BACKEND|redis://redis:6379/0
+CELERY_CONCURRENCY|2
+WEB_CONCURRENCY|2
+WEB_THREADS|8
+GUNICORN_TIMEOUT|1800
+SETTINGS
+    chmod 600 "$COMPOSE_TMP"
+    mv "$COMPOSE_TMP" .compose.env
 }
 
 gen_secret() {
@@ -142,9 +182,10 @@ write_value DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE 10485760
 
 # ── Atomic write ───────────────────────────────────────────────────────
 chmod 600 "$TMP"
+write_compose_env
 mv "$TMP" .env
 
-info ".env written with mode 600"
+info ".env and .compose.env written with mode 600"
 echo ""
 echo "  Next steps:"
 echo "    1. Provision TLS certificates at: $tls_dir"

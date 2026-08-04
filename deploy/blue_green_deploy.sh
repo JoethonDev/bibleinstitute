@@ -61,6 +61,7 @@ TMP_SLOT_FILE="${ACTIVE_SLOT_FILE}.tmp"
 
 INFRA_COMPOSE="compose.infrastructure.yml"
 APP_COMPOSE="compose.application.yml"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.compose.env}"
 
 HEALTHCHECK_URL="${DEPLOY_HEALTHCHECK_URL:-$(read_env_setting DEPLOY_HEALTHCHECK_URL)}"
 HTTPS_PORT="${NGINX_HTTPS_PORT:-$(read_env_setting NGINX_HTTPS_PORT)}"
@@ -91,6 +92,7 @@ trap cleanup EXIT
 [[ -f "$INFRA_COMPOSE" ]] || die "Run this script from the repository root."
 [[ -f "$APP_COMPOSE" ]] || die "Missing $APP_COMPOSE."
 [[ -f ".env" ]] || die "Missing .env — deployment requires it for Compose."
+[[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE — run 'bash deploy/setup_env.sh' first."
 
 # Required commands
 for cmd in docker curl git flock; do
@@ -134,7 +136,7 @@ else
     ACTIVE_SLOT=$(tr -d '[:space:]' < "$ACTIVE_SLOT_FILE")
     case "$ACTIVE_SLOT" in
         blue|green)
-            ACTIVE_RUNNING=$(docker compose --env-file .env -f "$APP_COMPOSE" ps --status running --format '{{.Service}}' 2>/dev/null | grep -Fx "lms-app-${ACTIVE_SLOT}" || true)
+            ACTIVE_RUNNING=$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps --status running --format '{{.Service}}' 2>/dev/null | grep -Fx "lms-app-${ACTIVE_SLOT}" || true)
             if [[ -z "$ACTIVE_RUNNING" ]]; then
                 INITIAL_DEPLOY=true
                 TARGET_SLOT="$ACTIVE_SLOT"
@@ -190,7 +192,7 @@ fi
 # ---------------------------------------------------------------------------
 info "Verifying infrastructure containers…"
 for svc in postgres redis nginx; do
-    CID="$(docker compose --env-file .env -f "$INFRA_COMPOSE" ps -q "$svc" 2>/dev/null || true)"
+    CID="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps -q "$svc" 2>/dev/null || true)"
     [[ -n "$CID" ]] || die "Infrastructure service '$svc' has no container. Start it first via deploy/setup_infrastructure.sh."
     STATE="$(docker inspect --format='{{.State.Status}}' "$CID" 2>/dev/null || true)"
     [[ "$STATE" == "running" ]] || die "Infrastructure service '$svc' is not running (state: ${STATE:-unknown})."
@@ -202,10 +204,10 @@ done
 info "All infrastructure services are running and healthy (Nginx running, Postgres/Redis healthy)."
 
 # Also verify the target app slot is NOT currently running (it should be inactive)
-TARGET_RUNNING=$(docker compose --env-file .env -f "$APP_COMPOSE" ps --status running --format '{{.Service}}' 2>/dev/null | grep -Fx "lms-app-${TARGET_SLOT}" || true)
+TARGET_RUNNING=$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps --status running --format '{{.Service}}' 2>/dev/null | grep -Fx "lms-app-${TARGET_SLOT}" || true)
 if [[ -n "$TARGET_RUNNING" ]]; then
     warn "Target slot lms-app-${TARGET_SLOT} is already running — stopping it first."
-    docker compose --env-file .env -f "$APP_COMPOSE" stop "lms-app-${TARGET_SLOT}" \
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" stop "lms-app-${TARGET_SLOT}" \
         || die "Failed to stop already-running target slot."
 fi
 
@@ -222,13 +224,13 @@ info "Saved prior state for rollback."
 # Step 1 — Run migrations and collectstatic in the target slot
 # ---------------------------------------------------------------------------
 info "Running forward migrations (target: lms-app-${TARGET_SLOT})…"
-docker compose --env-file .env -f "$APP_COMPOSE" run --rm --no-deps \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-deps \
     "lms-app-${TARGET_SLOT}" \
     python manage.py migrate --noinput \
     || die "Migration failed — aborting. No upstream change was made."
 
 info "Running collectstatic…"
-docker compose --env-file .env -f "$APP_COMPOSE" run --rm --no-deps \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-deps \
     "lms-app-${TARGET_SLOT}" \
     python manage.py collectstatic --noinput \
     || die "collectstatic failed — aborting."
@@ -237,7 +239,7 @@ docker compose --env-file .env -f "$APP_COMPOSE" run --rm --no-deps \
 # Step 2 — Build and start the target slot + celery
 # ---------------------------------------------------------------------------
 info "Building and starting lms-app-${TARGET_SLOT} and celery…"
-docker compose --env-file .env -f "$APP_COMPOSE" up -d --build --force-recreate \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" up -d --build --force-recreate \
     "lms-app-${TARGET_SLOT}" celery \
     || die "Failed to start target slot and celery."
 
@@ -245,7 +247,7 @@ docker compose --env-file .env -f "$APP_COMPOSE" up -d --build --force-recreate 
 # Step 3 — Wait for target healthcheck
 # ---------------------------------------------------------------------------
 info "Waiting for lms-app-${TARGET_SLOT} healthcheck…"
-TARGET_CID=$(docker compose --env-file .env -f "$APP_COMPOSE" ps -q "lms-app-${TARGET_SLOT}" 2>/dev/null || true)
+TARGET_CID=$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps -q "lms-app-${TARGET_SLOT}" 2>/dev/null || true)
 if [[ -z "$TARGET_CID" ]]; then
     die "Could not find container ID for lms-app-${TARGET_SLOT}."
 fi
@@ -273,7 +275,7 @@ info "Target slot healthcheck passed."
 
 # Celery has no HTTP health endpoint. Confirm its selected container is running
 # after the image replacement; task-level monitoring remains operational work.
-CELERY_CID="$(docker compose --env-file .env -f "$APP_COMPOSE" ps -q celery 2>/dev/null || true)"
+CELERY_CID="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps -q celery 2>/dev/null || true)"
 [[ -n "$CELERY_CID" ]] || die "Could not find the Celery container after startup."
 CELERY_STATE="$(docker inspect --format='{{.State.Status}}' "$CELERY_CID" 2>/dev/null || true)"
 [[ "$CELERY_STATE" == "running" ]] || die "Celery is not running after startup (state: ${CELERY_STATE:-unknown})."
@@ -300,27 +302,27 @@ info "Upstream file updated atomically."
 # Step 5 — Nginx reload
 # ---------------------------------------------------------------------------
 info "Validating Nginx configuration inside the container…"
-docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
     || {
         warn "Nginx config test FAILED after upstream switch — restoring prior state."
         $INITIAL_DEPLOY && die "CRITICAL: First deployment has no prior upstream; manual intervention required."
         cp "$PRIOR_UPSTREAM_FILE" "$UPSTREAM_FILE"
-        docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
+        docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
             || die "CRITICAL: Rollback upstream also failed Nginx config test — manual intervention required."
-        docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
+        docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
             || die "CRITICAL: Rollback reload also failed — manual Nginx reload required."
         die "Deploy aborted — Nginx config test failed after upstream switch. Prior state restored."
     }
 
 info "Reloading Nginx…"
-docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
     || {
         warn "Nginx reload FAILED — restoring prior upstream."
         $INITIAL_DEPLOY && die "CRITICAL: First deployment has no prior upstream; manual intervention required."
         cp "$PRIOR_UPSTREAM_FILE" "$UPSTREAM_FILE"
-        docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
+        docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
             || die "CRITICAL: Rollback upstream also failed Nginx config test."
-        docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
+        docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
             || die "CRITICAL: Rollback reload also failed."
         die "Deploy aborted — Nginx reload failed. Prior state restored."
     }
@@ -353,12 +355,12 @@ if ! $SMOKE_OK; then
         die "Deploy aborted — first-deployment smoke failed; target remains available for manual diagnosis."
     fi
     cp "$PRIOR_UPSTREAM_FILE" "$UPSTREAM_FILE"
-    docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t \
         || die "CRITICAL: Rollback upstream Nginx config test failed."
-    docker compose --env-file .env -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload \
         || die "CRITICAL: Rollback Nginx reload failed."
     # Stop the failed new slot to avoid confusion
-    docker compose --env-file .env -f "$APP_COMPOSE" stop "lms-app-${TARGET_SLOT}" \
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" stop "lms-app-${TARGET_SLOT}" \
         || warn "Could not stop failed new slot — manual stop may be required."
     info "Upstream restored to lms-app-${ACTIVE_SLOT}. New slot stopped."
     die "Deploy aborted — smoke check failed after upstream switch."
@@ -376,7 +378,7 @@ info "Active slot updated to '$TARGET_SLOT'."
 # ---------------------------------------------------------------------------
 if [[ "${STOP_OLD_SLOT,,}" == "true" && "$INITIAL_DEPLOY" == "false" ]]; then
     info "Stopping old web slot lms-app-${ACTIVE_SLOT}…"
-    docker compose --env-file .env -f "$APP_COMPOSE" stop "lms-app-${ACTIVE_SLOT}" \
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" stop "lms-app-${ACTIVE_SLOT}" \
         || warn "Could not stop old web slot — manual stop may be required."
     info "Old web slot stopped."
 else
