@@ -5,14 +5,11 @@ from __future__ import annotations
 import io
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING
+import openpyxl
 
 from django.utils.translation import gettext as _
 
 from .models import CourseOffering, EvaluationResult, PromotionFormula, PromotionRule, QuizType
-
-if TYPE_CHECKING:
-    from .models import PromotionFormula
 
 
 _FORMULA_CELL = re.compile(r"^[\s]*[=+\-@]")
@@ -108,8 +105,6 @@ def _status_display(result, field):
 
 def build_evaluation_workbook(formula: PromotionFormula) -> io.BytesIO:
     """Build a write-only workbook without materializing the result population."""
-    import openpyxl
-
     workbook = openpyxl.Workbook(write_only=True)
     quiz_types = {
         item.pk: item.name_en or item.code

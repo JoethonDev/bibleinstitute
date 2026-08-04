@@ -11,6 +11,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from .academic_formula import save_promotion_formula
 from .models import (
     AcademicYearLevel,
     AttendanceRecord,
@@ -528,8 +529,6 @@ def save_formula_and_results(
     evaluation_ends_on, failed_courses_repeat_threshold, rules, actor,
 ):
     """Replace one formula and recalculate effective course/aggregate results."""
-    from .academic_formula import save_promotion_formula
-
     formula = save_promotion_formula(
         scope=scope,
         course_offering=course_offering,

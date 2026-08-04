@@ -39,7 +39,7 @@
                     accept="video/mp4,audio/mp3,audio/mpeg,application/pdf,.mp4,.mp3,.pdf"
                     multiple>
                 <small class="form-text text-muted">
-                    {% translate "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 500MB per file." %}
+                    {% translate "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 2GB per file." %}
                 </small>
             </div>
 
@@ -122,7 +122,7 @@
                 'segmentUploadFailed': '{% translate "Segment {i} upload failed:"|escapejs %}',
                 'uploadProcessFailed': '{% translate "Upload process failed:"|escapejs %}',
                 'invalidFileType': '{% translate "Invalid file type: {type}. Allowed types: MP4, MP3, PDF"|escapejs %}',
-                'fileSizeExceeded': '{% translate "File size exceeds maximum: {size}MB. Maximum: 500MB"|escapejs %}',
+                'fileSizeExceeded': '{% translate "File size exceeds maximum: {size}MB. Maximum: 2048MB"|escapejs %}',
                 'noFilesSelected': '{% translate "No files selected"|escapejs %}',
                 'invalidFiles': '{% translate "Some files are invalid and will not be uploaded"|escapejs %}',
                 'networkError': '{% translate "Network error during upload"|escapejs %}',
@@ -160,7 +160,7 @@
             };
 
             const ALLOWED_EXTENSIONS = ['.mp4', '.mp3', '.pdf'];
-            const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+            const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 
             // File Validation Functions
             function getFileExtension(filename) {
@@ -717,7 +717,7 @@
                 }
             }
 
-            async function requestUploadUrl(fileName) {
+            async function requestUploadUrl(fileName, size) {
                 // 1. Get presigned URL from your Django backend
                 const presignedResponse = await fetch('{% url "upload-link" %}', {
                     method: 'POST',
@@ -726,7 +726,8 @@
                         'X-CSRFToken': getCSRFToken(),
                     },
                     body: JSON.stringify({
-                        filename: fileName
+                        filename: fileName,
+                        size: size
                     })
                 });
 
@@ -738,7 +739,7 @@
             }
 
             async function uploadR2(filePath, file){
-                const presignedResponse = await requestUploadUrl(filePath)
+                const presignedResponse = await requestUploadUrl(filePath, file.size)
 
                 // console.log(await presignedResponse.json())
                 const { url, headers: presignedHeaders } = await presignedResponse.json();

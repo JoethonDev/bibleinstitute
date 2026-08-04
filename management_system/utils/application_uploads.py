@@ -1,4 +1,5 @@
 import os
+import uuid
 from logging import getLogger
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -33,7 +34,6 @@ def validate_application_file(file_obj):
 def _safe_key(prefix, file_obj):
     ext = os.path.splitext(file_obj.name)[1].lower()
     # Use a safe generated name instead of the original filename
-    import uuid
     safe_name = f"{uuid.uuid4().hex}{ext}"
     return f"{prefix}/{safe_name}"
 

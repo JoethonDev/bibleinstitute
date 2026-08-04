@@ -22,6 +22,6 @@ COPY . .
 
 EXPOSE 8000
 
-# Use Django development server for local launch.
-# Production WSGI server (e.g. Gunicorn) requires separate approval.
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Production WSGI entry point. The application Compose services provide the
+# production worker/thread/timeout options for both blue/green slots.
+CMD ["gunicorn", "learning_platform.wsgi:application", "--bind", "0.0.0.0:8000"]

@@ -16,7 +16,7 @@ ALLOWED_MIME_TYPES = {
     'audio/mpeg',
     'application/pdf'
 }
-MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB in bytes
+MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB in bytes
 
 
 class FileValidator:

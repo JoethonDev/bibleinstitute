@@ -3894,8 +3894,8 @@ msgid "Select Folder from Drive"
 msgstr "اختر مجلدًا من الدرايف"
 
 #: .\management_system\templates\upload_video.html:42
-msgid "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 500MB per file."
-msgstr "أنواع الملفات المسموح بها: MP4 (فيديو)، MP3 (صوت)، PDF (مستند). الحد الأقصى للحجم: 500 ميجابايت للملف."
+msgid "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 2GB per file."
+msgstr "أنواع الملفات المسموح بها: MP4 (فيديو)، MP3 (صوت)، PDF (مستند). الحد الأقصى للحجم: 2 جيجابايت للملف."
 
 #: .\management_system\templates\upload_video.html:51
 msgid "Create a lesson draft from uploaded files"
@@ -3974,8 +3974,8 @@ msgstr "نوع الملف غير صالح: {type}. الأنواع المسموح
 
 #: .\management_system\templates\upload_video.html:123
 #, python-brace-format
-msgid "File size exceeds maximum: {size}MB. Maximum: 500MB"
-msgstr "حجم الملف يتجاوز الحد الأقصى: {size} ميجابايت. الحد الأقصى: 500 ميجابايت"
+msgid "File size exceeds maximum: {size}MB. Maximum: 2048MB"
+msgstr "حجم الملف يتجاوز الحد الأقصى: {size} ميجابايت. الحد الأقصى: 2048 ميجابايت"
 
 #: .\management_system\templates\upload_video.html:124
 msgid "No files selected"

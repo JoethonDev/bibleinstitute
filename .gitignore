@@ -9,6 +9,10 @@ __pycache__/*
 db.sqlite3
 collectstatic/
 collectstatic/**
+runtime/
+runtime/**
+certs/
+certs/**
 docs/**
 !docs/LMS_PHASE_0_8_HARD_REVIEW_AND_EXECUTION_PROMPTS.md
 !docs/ADMIN_UX_AND_ACADEMIC_WORKFLOW_HANDOFF.md
@@ -34,3 +38,5 @@ docs/**
 tmp/
 migration-dry-run.json
 opencode.json
+**/theme_showcase/
+**/test_*.py

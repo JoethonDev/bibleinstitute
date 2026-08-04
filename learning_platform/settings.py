@@ -32,6 +32,17 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', '').lower() in ('true', '1', 'yes')
 
+# Nginx terminates TLS and forwards the original protocol. Secure cookie
+# defaults turn on automatically for production while remaining convenient for
+# local HTTP development.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = os.getenv(
+    "DJANGO_SESSION_COOKIE_SECURE", "False" if DEBUG else "True"
+).lower() in ("true", "1", "yes")
+CSRF_COOKIE_SECURE = os.getenv(
+    "DJANGO_CSRF_COOKIE_SECURE", "False" if DEBUG else "True"
+).lower() in ("true", "1", "yes")
+
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
 CSRF_TRUSTED_ORIGINS = [
     "https://*.a2hosted.com",
@@ -119,6 +130,26 @@ DATABASES = {
         'NAME': os.getenv('SQLITE_SOURCE_PATH', str(BASE_DIR / 'db.sqlite3')),
     },
 }
+
+# Celery (Redis broker / result backend — defaults to the redis service on lms_network)
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or os.getenv(
+    "REDIS_URL", "redis://redis:6379/0"
+)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
+    "REDIS_URL", "redis://redis:6379/0"
+)
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TIMEZONE = "Africa/Cairo"
+
+# Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
+# Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by
+# Django's temporary-file upload handler rather than held in process memory.
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", str(2 * 1024 ** 3))
+)
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv("DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 ** 2))
+)
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -209,6 +240,7 @@ EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.con
 EMAIL_HOST = os.getenv('DJANGO_EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('DJANGO_EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('DJANGO_EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_TIMEOUT = int(os.getenv('DJANGO_EMAIL_TIMEOUT', '20'))
 EMAIL_HOST_USER = os.getenv('DJANGO_EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('DJANGO_EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'noreply@bibleinstitute.edu')

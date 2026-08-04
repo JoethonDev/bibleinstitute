@@ -52,7 +52,7 @@ from .utils.reports import build_report_data, build_report_page_rows, iter_repor
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
-from .utils.file_validator import validate_upload_filename, validate_hls_object_key, FileValidator
+from .utils.file_validator import validate_upload_filename, validate_hls_object_key, FileValidator, MAX_FILE_SIZE
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_has_management_role
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
@@ -81,6 +81,17 @@ from .evaluation_export import build_evaluation_workbook
 from .academic_access import accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .scheduled_lessons import create_scheduled_lesson, finalize_scheduled_lesson
+from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
+
+# Standard Library (moved from function-local)
+import calendar as py_calendar
+from datetime import datetime
+from io import BytesIO
+import openpyxl
+import qrcode
+
+# Django
+from django.core.paginator import Paginator
 
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
@@ -435,8 +446,6 @@ def admin_ui_proposal(request):
         AcademicHoliday.objects.filter(academic_year__is_active=True)
         .order_by("date")[:6]
     )
-
-    import calendar as py_calendar
 
     meeting_weekday_numbers = sorted({
         weekday
@@ -1753,19 +1762,29 @@ def upload_link(request):
     filename = body.get("filename", "")
     if not isinstance(filename, str):
         return JsonResponse({"message": _("Invalid file name.")}, status=400)
-    
+
+    size = body.get("size")
+    # Validate size: must be present, non-negative integer, not boolean
+    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+        return JsonResponse({"message": _("Invalid file size.")}, status=400)
+    max_size_mb = MAX_FILE_SIZE // (1024 * 1024)
+    if size > MAX_FILE_SIZE:
+        return JsonResponse({
+            "message": _("File size exceeds maximum allowed size of %(max_size)sMB") % {'max_size': max_size_mb}
+        }, status=400)
+
     # Generated HLS objects use a separate, exact folder contract. Ordinary
     # uploads retain the existing MP4/MP3/PDF validation.
     if filename.lower().endswith((".m3u8", ".ts")):
         is_valid, errors = validate_hls_object_key(filename)
     else:
-        is_valid, errors = validate_upload_filename(filename)
+        is_valid, errors = validate_upload_filename(filename, size)
     if not is_valid:
         return JsonResponse({
             "message": _("Invalid file"),
             "errors": errors
         }, status=400)
-    
+
     presigned_url = CLOUD_CLIENT.generate_presigned_url(
         'put_object',
         Params={
@@ -1924,7 +1943,6 @@ def promotion_formula(request):
                 status=PublicationStatus.PUBLISHED,
             ).select_related("course").first()
     if preview_formula:
-        from django.core.paginator import Paginator
         plan = build_evaluation_plan(
             preview_formula,
             getattr(preview_formula, "_preview_rules", None),
@@ -1942,7 +1960,6 @@ def promotion_formula(request):
         preview_page_obj = Paginator(enrollments, 25).get_page(request.GET.get("page", 1))
         preview_rows = [evaluate_enrollment(enrollment, plan) for enrollment in preview_page_obj] if plan else []
         preview_grading_errors = plan.grading_errors if plan else ()
-        from django.core.paginator import Paginator
         saved_results = EvaluationResult.objects.filter(
             formula=formula,
             course_offering__isnull=formula.course_offering_id is None,
@@ -2063,8 +2080,6 @@ def bulk_promotion_results(request):
 
 @capability_required(can_view_reports)
 def promotion_history(request):
-    from django.core.paginator import Paginator
-
     history = PromotionHistory.objects.select_related(
         "student",
         "source_year_level__academic_year",
@@ -2356,7 +2371,6 @@ def yearly_transcript_dashboard(request):
     course = request.GET.get("course", "").strip()
     role = request.GET.get("role", "").strip()
 
-    from django.core.paginator import Paginator
     transcript_query = yearly_transcript_queryset(year, name=name or None, course=course or None, role=role or None)
     transcript_page = Paginator(transcript_query, 25).get_page(request.GET.get("page", 1))
     transcript_rows = [
@@ -3176,7 +3190,6 @@ def signup(request):
 
 @capability_required(can_manage_applications)
 def applications_dashboard(request):
-    from django.core.paginator import Paginator
     status_filter = request.GET.get("status", "all")
     if status_filter == "all":
         users = User.objects.filter(
@@ -3417,8 +3430,6 @@ def level_delete(request, level):
 
 @capability_required(can_manage_content)
 def academic_setup(request):
-    from django.core.paginator import Paginator
-
     search = request.GET.get("q", "").strip()
     active_filter = request.GET.get("active", "all")
     years = AcademicYear.objects.all().prefetch_related("levels").order_by("ordering")
@@ -3701,9 +3712,6 @@ def _calendar_meeting_row(meeting):
 
 @capability_required(can_manage_content)
 def calendar_management(request):
-    import calendar as cal_mod
-    from datetime import date
-
     years = AcademicYear.objects.all().order_by("-starts_on")
     selected_year_id = request.GET.get("academic_year")
     if selected_year_id and not selected_year_id.isdigit():
@@ -3767,7 +3775,7 @@ def calendar_management(request):
             nm = current_cell + 1
             next_month = f"year={((nm - 1) // 12)}&month={((nm - 1) % 12) + 1}"
 
-        cal = cal_mod.Calendar()
+        cal = py_calendar.Calendar()
         month_days = cal.monthdatescalendar(cur_year, cur_month)
 
         holidays = {
@@ -3920,8 +3928,6 @@ def delete_meeting(request, meeting_id):
 @require_POST
 @capability_required(can_manage_content)
 def add_holiday(request):
-    from datetime import datetime as dt
-
     year_id = request.POST.get("academic_year_id")
     date_val = request.POST.get("date")
     name = request.POST.get("name", "").strip()
@@ -3941,7 +3947,7 @@ def add_holiday(request):
         return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
 
     try:
-        holiday_date = dt.strptime(date_val, "%Y-%m-%d").date()
+        holiday_date = datetime.strptime(date_val, "%Y-%m-%d").date()
     except (ValueError, TypeError):
         messages.error(request, _("Invalid date format."))
         return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
@@ -4014,8 +4020,6 @@ def download_qr(request):
         request.user.qr_token = secrets.token_urlsafe(32)
         request.user.save(update_fields=["qr_token"])
     qr_data = request.build_absolute_uri(reverse("scan-preview", args=[request.user.qr_token]))
-    import qrcode
-    from io import BytesIO
     img = qrcode.make(qr_data)
     buf = BytesIO()
     img.save(buf, format="PNG")
@@ -4183,7 +4187,6 @@ def attendance_management(request):
             records = records.filter(action=action)
         if attendance_date:
             try:
-                from datetime import datetime
                 parsed_date = datetime.strptime(attendance_date, "%Y-%m-%d").date()
                 records = records.filter(attendance_date=parsed_date)
             except (TypeError, ValueError):
@@ -4198,7 +4201,6 @@ def attendance_management(request):
         records = records.order_by("-attendance_date", "-scanned_at")
     else:
         records = AttendanceRecord.objects.none()
-    from django.core.paginator import Paginator
     page_obj = Paginator(records, 25).get_page(request.GET.get("page", 1))
     return render(request, "attendance_management.html", {
         "records": page_obj,
@@ -4226,7 +4228,6 @@ def attendance_correction(request, record_id):
         academic_year_level = record.course_offering.academic_year_level
         academic_year = academic_year_level.academic_year
         if new_date:
-            from datetime import datetime
             try:
                 new_date = datetime.strptime(new_date, "%Y-%m-%d").date()
             except (ValueError, TypeError):
@@ -4524,8 +4525,6 @@ def progress_heartbeat(request):
     if not verified_ranges:
         return JsonResponse({"status": "ok", "note": _("No verified segment ranges")})
 
-    from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
-
     intersected = intersect_verified(ranges, verified_ranges)
     merged = merge_ranges(intersected)
     unique_secs = unique_seconds(merged)
@@ -4610,7 +4609,6 @@ def progress_dashboard(request):
             student_filter |= Q(student_id=int(student_search))
         progress = progress.filter(student_filter)
 
-    from django.core.paginator import Paginator
     progress = progress.select_related("student", "lesson").order_by("-lesson__name", "student__username")
     page_obj = Paginator(progress, 25).get_page(request.GET.get("page", 1))
 
@@ -4658,7 +4656,6 @@ def report_dashboard(request):
             study_mode=study_mode,
             course_offering_id=int(course_offering_id) if course_offering_id and str(course_offering_id).isdigit() else None,
         )
-        from django.core.paginator import Paginator
         page_obj = Paginator(report_query, 25).get_page(request.GET.get("page", 1))
         rows = build_report_page_rows(
             page_obj.object_list,
@@ -4737,10 +4734,6 @@ def export_report_xlsx(request):
         "study_mode": request.GET.get("study_mode") or None,
         "course_offering_id": request.GET.get("course_offering") or None,
     }
-
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
 
     wb = openpyxl.Workbook(write_only=True)
 

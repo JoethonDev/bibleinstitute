@@ -14,3 +14,6 @@ requests==2.32.3
 PyYAML==6.0.2
 urllib3==2.3.0
 asgiref==3.8.1
+celery==5.4.0
+redis==5.2.1
+gunicorn==23.0.0

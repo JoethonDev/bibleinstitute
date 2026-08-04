@@ -3894,8 +3894,8 @@ msgid "Select Folder from Drive"
 msgstr "Select Folder from Drive"
 
 #: .\management_system\templates\upload_video.html:42
-msgid "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 500MB per file."
-msgstr "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 500MB per file."
+msgid "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 2GB per file."
+msgstr "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 2GB per file."
 
 #: .\management_system\templates\upload_video.html:51
 msgid "Create a lesson draft from uploaded files"
@@ -3974,8 +3974,8 @@ msgstr "Invalid file type: {type}. Allowed types: MP4, MP3, PDF"
 
 #: .\management_system\templates\upload_video.html:123
 #, python-brace-format
-msgid "File size exceeds maximum: {size}MB. Maximum: 500MB"
-msgstr "File size exceeds maximum: {size}MB. Maximum: 500MB"
+msgid "File size exceeds maximum: {size}MB. Maximum: 2048MB"
+msgstr "File size exceeds maximum: {size}MB. Maximum: 2048MB"
 
 #: .\management_system\templates\upload_video.html:124
 msgid "No files selected"
