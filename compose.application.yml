@@ -50,7 +50,7 @@ services:
     expose:
       - 8000
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      test: ["CMD", "python", "-c", "import os, urllib.parse, urllib.request; configured=os.environ.get('DJANGO_SITE_DOMAIN', ''); host=urllib.parse.urlparse(configured).netloc or os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')[0].strip() or 'localhost'; request=urllib.request.Request('http://127.0.0.1:8000/', headers={'Host': host}); urllib.request.urlopen(request, timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -77,7 +77,7 @@ services:
     expose:
       - 8000
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      test: ["CMD", "python", "-c", "import os, urllib.parse, urllib.request; configured=os.environ.get('DJANGO_SITE_DOMAIN', ''); host=urllib.parse.urlparse(configured).netloc or os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')[0].strip() or 'localhost'; request=urllib.request.Request('http://127.0.0.1:8000/', headers={'Host': host}); urllib.request.urlopen(request, timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
