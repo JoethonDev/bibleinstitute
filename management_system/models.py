@@ -1,14 +1,18 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.urls import reverse_lazy
 from django.db.models import Sum, Prefetch, Q, prefetch_related_objects
+from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, timedelta
 import json
-from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
+from django.utils.translation import gettext_lazy as _
+from django.utils import translation
+from django.db.models import Max
 
 # Constants
-MANAGEMENT_ROLES = ["admin", "teacher"]
+MANAGEMENT_ROLES = ["admin", "staff"]
 
 # Helper Function
 def assign_academic_date():
@@ -18,17 +22,27 @@ def assign_academic_date():
     return today.replace(month=8)
 
 
+def default_meeting_weekdays():
+    return [6, 1]  # Sunday and Tuesday using datetime.date.weekday().
+
+
+class PublicationStatus(models.TextChoices):
+    DRAFT = "draft", _("Draft")
+    PUBLISHED = "published", _("Published")
+    ARCHIVED = "archived", _("Archived")
+
+
 # Create your models here.
 class Role(models.Model):
     ROLES = [
         ("admin", _("Admin")),
-        ("teacher", _("Teacher")),
-        ("junior", _("First Year")),
-        ("senior", _("Second Year"))
+        ("staff", _("Staff")),
+        ("moderator", _("Moderator")),
+        ("student", _("Student")),
     ]
     # Fields
     role = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=ROLES, 
         unique=True
     )
@@ -38,7 +52,7 @@ class Role(models.Model):
     
     @staticmethod
     def get_default():
-        return Role.objects.get_or_create(role='junior')[0]
+        return Role.objects.get_or_create(role='student')[0]
     
     @staticmethod
     def get_by_readable_value(readable_value):
@@ -54,8 +68,45 @@ class Role(models.Model):
         return [str(_(role.get_role_display())) for role in Role.objects.all()] # Translate display values
 
 class User(AbstractUser):
-    role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, default=Role.get_default().id)
-    joined_date = models.DateField(null=False, default=assign_academic_date())
+    role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
+    joined_date = models.DateField(null=False, default=assign_academic_date)
+
+    phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    priest_name = models.CharField(max_length=255, null=True, blank=True)
+    priest_phone = models.CharField(max_length=20, null=True, blank=True)
+    church = models.CharField(max_length=255, null=True, blank=True)
+    city = models.CharField(max_length=255, null=True, blank=True)
+
+    STUDY_MODES = [("online", _("Online")), ("offline", _("Offline"))]
+    study_mode = models.CharField(max_length=10, choices=STUDY_MODES, null=True, blank=True)
+    study_mode_override = models.BooleanField(default=False)
+
+    IDENTITY_TYPES = [("national_id", _("National ID")), ("passport", _("Passport"))]
+    identity_type = models.CharField(max_length=20, choices=IDENTITY_TYPES, null=True, blank=True)
+    identity_number = models.CharField(max_length=50, null=True, blank=True, unique=True)
+
+    identity_front_key = models.CharField(max_length=500, null=True, blank=True)
+    identity_back_key = models.CharField(max_length=500, null=True, blank=True)
+    payment_key = models.CharField(max_length=500, null=True, blank=True)
+    profile_image_key = models.CharField(max_length=500, null=True, blank=True)
+
+    APPLICATION_STATUSES = [("pending", _("Pending")), ("active", _("Active")), ("declined", _("Declined"))]
+    application_status = models.CharField(max_length=10, choices=APPLICATION_STATUSES, default="active")
+
+    decided_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_notes = models.TextField(null=True, blank=True)
+
+    qr_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.role_id:
+            try:
+                default_role = Role.objects.get(role='student')
+                self.role = default_role
+            except Role.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
     
     def serialize_pagination(self):
         return {
@@ -67,110 +118,718 @@ class User(AbstractUser):
     def get_columns():
         return [_("Username"), _("Name"), _("Role"), _("Joined Date"), _("Last Login")]
 
+
+class OfflineCity(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+class Level(models.Model):
+    ordering = models.PositiveIntegerField(unique=True)
+    name_en = models.CharField(max_length=255, blank=True, default="")
+    name_ar = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ordering"]
+        verbose_name = _("Level")
+        verbose_name_plural = _("Levels")
+
+    def __str__(self):
+        lang = translation.get_language()
+        name = self.name_ar if lang == "ar" else self.name_en
+        if name:
+            return name
+        return _("Level %(ordering)d") % {"ordering": self.ordering}
+
+    def clean(self):
+        super().clean()
+        if self.ordering is not None and self.ordering < 1:
+            raise ValidationError({"ordering": _("Ordering must be 1 or greater.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def display_name(self):
+        return self.name_en or self.name_ar or str(self.ordering)
+
+
 class Course(models.Model):
-    MAXIMUM_LEVEL = 2
-
-    LEVELS = {
-        "junior" : 1,
-        "senior" : MAXIMUM_LEVEL,
-        "management" : MAXIMUM_LEVEL
-    }
-
-
-    LEVELS_NAME = {
-        1 : _("First Academic Year"),
-        2 : _("Second Academic Year"),
-    }
-
-    name = models.CharField(max_length=255, null=False, unique=True)
+    name = models.CharField(max_length=255, null=False)
     description = models.TextField(null=True)
     instructor = models.CharField(max_length=255, null=True)
-    level = models.PositiveIntegerField(null=False)
+    level = models.ForeignKey(Level, on_delete=models.PROTECT, related_name="courses")
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "level"],
+                name="course_unique_name_level",
+            ),
+        ]
 
     def __str__(self):
-        return f"Course : {self.name} in level : {self.level}"
-    
+        return f"Course : {self.name} in level : {self.level.ordering}"
+
+    # ── Instance methods ───────────────────────────────────────────
     def serialize_pagination(self):
         return {
-            "rows" : [self.name, self.description, str(_(self.LEVELS_NAME[self.level])), self.instructor],
+            "rows" : [self.name, self.description, self.level.display_name, self.instructor],
             "url" : reverse_lazy("course-view", args=[self.pk,])
         }
-    
+
     @staticmethod
     def get_columns():
             return [_("Name"), _("Description"), _("Level"), _("Instructor")]
 
     def get_name_year(self):
-        return f"{self.name} - {self.LEVELS_NAME[self.level]}"
+        return f"{self.name} - {self.level.display_name}"
 
-    def can_access(self, role: str):
-        print(self.level)
-        return self.level <= self.LEVELS[role] 
-
-    def retrieve_courses_for_level(self, level: int):
-        packed_levels = []
-        # Get All levels
-        levels = [number for number in range(1, level+1)]
-        # Query Optimization for making a single hit to database
-        courses = self.objects.filter(level__in=levels)
-        # Collect and Sort Course based on level
-        packed_courses = {}
-        for course in courses:
-            current_level = course.level
-            if current_level in packed_courses:
-                packed_courses[current_level].append(course)
-            else:
-                packed_courses[current_level] = [course]
-
-        # Format Course to return
-        for current_level, courses_list in packed_courses.items():
-            packed_levels.insert(0, {
-                "level_name" : str(_(self.LEVELS_NAME[current_level])), # Translate level name here
-                "courses" : courses_list,
-            })
-            
-        return packed_levels
-
-    @staticmethod
-    def fetch_courses_by_role(role: str):
-        if role in MANAGEMENT_ROLES:
-            role = "management"
-               
-        current_level = Course.LEVELS.get(role, 0)
-        return Course.retrieve_courses_for_level(Course, current_level)
-    
     def fetch_quizzes(self, user):
-        # Select all quizzes where user took quiz (id) or closing_date < now()
-        # Get all quizzes
-        return self.quizzes.filter(Q(closing_date__gte=now()) | Q(grade__user=user)).distinct('id')
+        return Quiz.objects.filter(course_offering__course=self)
+
+
+class AcademicYearLevel(models.Model):
+    academic_year = models.ForeignKey("AcademicYear", on_delete=models.CASCADE, related_name="level_links")
+    level = models.ForeignKey(Level, on_delete=models.PROTECT, related_name="year_links")
+    meeting_weekdays = models.JSONField(default=default_meeting_weekdays)
+
+    class Meta:
+        unique_together = [("academic_year", "level")]
+        ordering = ["academic_year__ordering", "level__ordering"]
+        verbose_name = _("Academic Year Level")
+        verbose_name_plural = _("Academic Year Levels")
+
+    def __str__(self):
+        return f"{self.academic_year.name} → {self.level.display_name}"
+
+    def clean(self):
+        super().clean()
+        if not isinstance(self.meeting_weekdays, list):
+            raise ValidationError({"meeting_weekdays": _("Meeting weekdays must be a list.")})
+        if any(not isinstance(day, int) or isinstance(day, bool) or day < 0 or day > 6 for day in self.meeting_weekdays):
+            raise ValidationError({"meeting_weekdays": _("Meeting weekdays must be unique values from 0 through 6.")})
+        if len(self.meeting_weekdays) != len(set(self.meeting_weekdays)):
+            raise ValidationError({"meeting_weekdays": _("Meeting weekdays must not repeat.")})
+
+
+class AcademicYearLevelMeeting(models.Model):
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel,
+        on_delete=models.CASCADE,
+        related_name="calendar_meetings",
+    )
+    meeting_date = models.DateField()
+    course_offering = models.ForeignKey(
+        "CourseOffering",
+        on_delete=models.PROTECT,
+        related_name="calendar_meetings",
+    )
+
+    class Meta:
+        ordering = ["meeting_date", "academic_year_level__level__ordering"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["academic_year_level", "meeting_date"],
+                name="academic_scope_meeting_date_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.academic_year_level} — {self.course_offering.course.name}"
+
+    def clean(self):
+        super().clean()
+        academic_year = self.academic_year_level.academic_year
+        if not academic_year.starts_on <= self.meeting_date <= academic_year.ends_on:
+            raise ValidationError({"meeting_date": _("Meeting date must be inside the academic year.")})
+        if self.meeting_date.weekday() not in (self.academic_year_level.meeting_weekdays or []):
+            raise ValidationError({"meeting_date": _("Meeting date must use one of this level's locked meeting days.")})
+        if self.course_offering.academic_year_level_id != self.academic_year_level_id:
+            raise ValidationError({"course_offering": _("Course offering must belong to the selected academic scope.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class AcademicYear(models.Model):
+    name = models.CharField(max_length=20, unique=True)
+    levels = models.ManyToManyField(Level, through=AcademicYearLevel, related_name="academic_years")
+    starts_on = models.DateField()
+    ends_on = models.DateField()
+    is_active = models.BooleanField(default=False)
+    ordering = models.PositiveIntegerField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ordering"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(ends_on__gt=models.F("starts_on")),
+                name="academic_year_ends_after_starts",
+            ),
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=models.Q(is_active=True),
+                name="academic_year_one_active",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name}"
+
+    def level_display(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {}).get("levels")
+        levels = sorted(prefetched, key=lambda level: level.ordering) if prefetched is not None else self.levels.order_by("ordering")
+        return " / ".join(lvl.display_name for lvl in levels) if levels else ""
+
+    def clean(self):
+        super().clean()
+        if self.starts_on and self.ends_on and self.ends_on <= self.starts_on:
+            raise ValidationError({"ends_on": _("End date must be after start date.")})
+
+        if self.is_active:
+            current_years = AcademicYear.objects.filter(is_active=True)
+            if self.pk:
+                current_years = current_years.exclude(pk=self.pk)
+            if current_years.exists():
+                raise ValidationError({"is_active": _("Only one academic year can be active at a time.")})
+
+
+class CourseOffering(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.PROTECT, related_name="offerings")
+    academic_year_level = models.ForeignKey(AcademicYearLevel, on_delete=models.PROTECT, related_name="course_offerings")
+    instructor = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=PublicationStatus.choices,
+        default=PublicationStatus.DRAFT,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-academic_year_level__academic_year__starts_on", "course__name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "academic_year_level"],
+                name="course_offering_unique_course_year_level",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.course.name} @ {self.academic_year_level}"
+
+    def clean(self):
+        super().clean()
+        if self.course_id and self.academic_year_level_id:
+            if self.course.level_id != self.academic_year_level.level_id:
+                raise ValidationError({"course": _("Course level must match the academic-year level.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class Enrollment(models.Model):
+    class Type(models.TextChoices):
+        NORMAL = "normal", _("Normal")
+        REPEAT = "repeat", _("Repeat")
+        REMEDIAL = "remedial", _("Remedial")
+        MANUAL = "manual", _("Manual")
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", _("Active")
+        INACTIVE = "inactive", _("Inactive")
+        COMPLETED = "completed", _("Completed")
+        WITHDRAWN = "withdrawn", _("Withdrawn")
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="enrollments")
+    academic_year_level = models.ForeignKey(AcademicYearLevel, on_delete=models.PROTECT, related_name="enrollments")
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="enrollments",
+    )
+    enrollment_type = models.CharField(max_length=20, choices=Type.choices, default=Type.NORMAL)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    enrolled_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_enrollments",
+    )
+
+    class Meta:
+        ordering = ["-enrolled_at"]
+        indexes = [
+            models.Index(
+                fields=["academic_year_level", "enrollment_type", "course_offering"],
+                name="enrollment_scope_type_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(enrollment_type="normal", course_offering__isnull=True)
+                    | models.Q(
+                        enrollment_type__in=["repeat", "remedial", "manual"],
+                        course_offering__isnull=False,
+                    )
+                ),
+                name="enrollment_target_matches_type",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "academic_year_level"],
+                condition=models.Q(course_offering__isnull=True),
+                name="enrollment_unique_full_year",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "course_offering"],
+                condition=models.Q(course_offering__isnull=False),
+                name="enrollment_unique_course_offering",
+            ),
+        ]
+
+    def __str__(self):
+        target = self.course_offering or self.academic_year_level
+        return f"{self.student.username} -> {target} ({self.enrollment_type})"
+
+    def clean(self):
+        super().clean()
+        if self.course_offering_id and self.academic_year_level_id:
+            if self.course_offering.academic_year_level_id != self.academic_year_level_id:
+                raise ValidationError(_("Course offering must belong to the enrollment scope."))
+        if self.course_offering_id:
+            if self.enrollment_type == self.Type.NORMAL:
+                raise ValidationError({"enrollment_type": _("Normal enrollment grants the full academic year.")})
+        elif self.enrollment_type != self.Type.NORMAL:
+            raise ValidationError({"course_offering": _("This enrollment type requires a course offering.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+QUIZ_TYPE_CODES = frozenset({"weekly", "final"})
+
+
+class QuizType(models.Model):
+    code = models.SlugField(unique=True)
+    name_en = models.CharField(max_length=255)
+    name_ar = models.CharField(max_length=255)
+
+    def clean(self):
+        super().clean()
+        if self.code not in QUIZ_TYPE_CODES:
+            raise ValidationError({"code": _("Quiz type must be weekly or final.")})
+
+    def __str__(self):
+        return self.name_en or self.code
+
+
+class PromotionFormula(models.Model):
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel,
+        on_delete=models.PROTECT,
+        related_name="promotion_formulas",
+    )
+    course_offering = models.ForeignKey(
+        "CourseOffering",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="promotion_formulas",
+    )
+    overall_pass_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    evaluation_starts_on = models.DateField()
+    evaluation_ends_on = models.DateField()
+    failed_courses_repeat_threshold = models.PositiveIntegerField(default=3)
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="created_promotion_formulas"
+    )
+    updated_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="updated_promotion_formulas"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["academic_year_level"],
+                condition=models.Q(course_offering__isnull=True),
+                name="promotion_formula_one_all_courses",
+            ),
+            models.UniqueConstraint(
+                fields=["academic_year_level", "course_offering"],
+                condition=models.Q(course_offering__isnull=False),
+                name="promotion_formula_unique_offering",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["academic_year_level", "course_offering"], name="promo_formula_scope_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        if not 0 <= self.overall_pass_percent <= 100:
+            raise ValidationError({"overall_pass_percent": _("Percentage must be between 0 and 100.")})
+        if self.failed_courses_repeat_threshold < 1:
+            raise ValidationError({"failed_courses_repeat_threshold": _("The repeat threshold must be at least 1.")})
+        if self.course_offering_id and self.academic_year_level_id:
+            if self.course_offering.academic_year_level_id != self.academic_year_level_id:
+                raise ValidationError({"course_offering": _("Course offering must belong to the selected academic scope.")})
+        if self.academic_year_level_id and self.evaluation_starts_on and self.evaluation_ends_on:
+            year = self.academic_year_level.academic_year
+            if self.evaluation_ends_on < self.evaluation_starts_on:
+                raise ValidationError({"evaluation_ends_on": _("Evaluation end date must not be before the start date.")})
+            if not year.starts_on <= self.evaluation_starts_on <= year.ends_on:
+                raise ValidationError({"evaluation_starts_on": _("Evaluation start date must be inside the academic year.")})
+            if not year.starts_on <= self.evaluation_ends_on <= year.ends_on:
+                raise ValidationError({"evaluation_ends_on": _("Evaluation end date must be inside the academic year.")})
+            if self.evaluation_ends_on > min(timezone.localdate(), year.ends_on):
+                raise ValidationError({"evaluation_ends_on": _("Evaluation end date cannot be in the future.")})
+
+    @property
+    def applies_to_all_courses(self):
+        return self.course_offering_id is None
+
+
+class PromotionRule(models.Model):
+    class Metric(models.TextChoices):
+        QUIZ = "quiz", _("Quiz")
+        ATTENDANCE = "attendance", _("Attendance")
+
+    formula = models.ForeignKey(PromotionFormula, on_delete=models.CASCADE, related_name="rules")
+    metric = models.CharField(max_length=20, choices=Metric.choices)
+    quiz_type = models.ForeignKey(
+        QuizType,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="promotion_rules",
+    )
+    weight_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    minimum_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    ordering = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["ordering"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["formula", "ordering"],
+                name="promotion_rule_unique_ordering",
+            ),
+            models.UniqueConstraint(
+                fields=["formula"],
+                condition=models.Q(metric="attendance"),
+                name="promotion_formula_one_attendance_rule",
+            ),
+            models.UniqueConstraint(
+                fields=["formula", "quiz_type"],
+                condition=models.Q(metric="quiz", quiz_type__isnull=False),
+                name="promotion_formula_unique_quiz_type_rule",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        for field in ("weight_percent", "minimum_percent"):
+            value = getattr(self, field)
+            if not 0 <= value <= 100:
+                raise ValidationError({field: _("Percentage must be between 0 and 100.")})
+        if self.metric == self.Metric.ATTENDANCE and self.quiz_type_id:
+            raise ValidationError({"quiz_type": _("Attendance rules cannot select a quiz type.")})
+
+
+class EvaluationResult(models.Model):
+    class Status(models.TextChoices):
+        PASS = "pass", _("Pass")
+        FAIL = "fail", _("Fail")
+        UNEVALUABLE = "unevaluable", _("Unevaluable")
+
+    formula = models.ForeignKey(PromotionFormula, on_delete=models.PROTECT, related_name="results")
+    enrollment = models.ForeignKey(
+        Enrollment,
+        on_delete=models.PROTECT,
+        related_name="evaluation_results",
+    )
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="evaluation_results",
+    )
+    computed_score = models.DecimalField(max_digits=6, decimal_places=2)
+    computed_status = models.CharField(max_length=12, choices=Status.choices)
+    final_status = models.CharField(max_length=12, choices=Status.choices)
+    metric_snapshot = models.JSONField(default=dict)
+    override_note = models.TextField(blank=True, default="")
+    overridden_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, null=True, blank=True, related_name="evaluation_overrides"
+    )
+    overridden_at = models.DateTimeField(null=True, blank=True)
+    calculated_at = models.DateTimeField(auto_now=True)
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["formula", "course_offering", "final_status"],
+                name="eval_result_formula_status_idx",
+            ),
+            models.Index(
+                fields=["enrollment", "course_offering"],
+                name="eval_result_enrollment_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["formula", "enrollment", "course_offering"],
+                condition=models.Q(course_offering__isnull=False),
+                name="evaluation_result_unique_course",
+            ),
+            models.UniqueConstraint(
+                fields=["formula", "enrollment"],
+                condition=models.Q(course_offering__isnull=True),
+                name="evaluation_result_unique_aggregate",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.course_offering_id:
+            if self.course_offering.academic_year_level_id != self.formula.academic_year_level_id:
+                raise ValidationError(_("Evaluation offering must belong to the formula scope."))
+            if self.formula.course_offering_id and self.course_offering_id != self.formula.course_offering_id:
+                raise ValidationError(_("Evaluation offering does not match the formula offering."))
+        elif self.formula.course_offering_id:
+            raise ValidationError(_("A course-specific formula requires a course result."))
+        if self.computed_status not in self.Status.values or self.final_status not in self.Status.values:
+            raise ValidationError(_("Invalid evaluation result status."))
+
+
+class PromotionHistory(models.Model):
+    evaluation_result = models.OneToOneField(
+        EvaluationResult, on_delete=models.PROTECT, related_name="promotion_history"
+    )
+    source_enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.PROTECT, related_name="source_promotion_history"
+    )
+    destination_enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.PROTECT, null=True, blank=True, related_name="destination_promotion_history"
+    )
+    student = models.ForeignKey(User, on_delete=models.PROTECT, related_name="promotion_history")
+    source_year_level = models.ForeignKey(
+        AcademicYearLevel, on_delete=models.PROTECT, related_name="source_promotion_history"
+    )
+    destination_year_level = models.ForeignKey(
+        AcademicYearLevel, on_delete=models.PROTECT, null=True, blank=True, related_name="destination_promotion_history"
+    )
+    outcome = models.CharField(max_length=32)
+    score = models.DecimalField(max_digits=6, decimal_places=2)
+    computed_status = models.CharField(max_length=10)
+    final_status = models.CharField(max_length=10)
+    override_note = models.TextField(blank=True, default="")
+    override_actor = models.ForeignKey(
+        User, on_delete=models.PROTECT, null=True, blank=True, related_name="promotion_override_history"
+    )
+    exceptional_offering_ids = models.JSONField(default=list)
+    formula_snapshot = models.JSONField(default=dict)
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name="recorded_promotions")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class MigrationReviewItem(models.Model):
+    class Severity(models.TextChoices):
+        INFO = "info", _("Info")
+        WARNING = "warning", _("Warning")
+        ERROR = "error", _("Error")
+
+    item_type = models.CharField(max_length=50)
+    object_id = models.PositiveBigIntegerField(null=True, blank=True)
+    message = models.TextField()
+    severity = models.CharField(max_length=20, choices=Severity.choices, default=Severity.INFO)
+    resolved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.severity}] {self.item_type}"
+
+
+class AcademicHoliday(models.Model):
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name="holidays")
+    date = models.DateField()
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        unique_together = [("academic_year", "date")]
+
+    def __str__(self):
+        return f"{self.name} - {self.date}"
+
+
+class AttendanceRecord(models.Model):
+    class Action(models.TextChoices):
+        ENTRANCE = "entrance", _("Entrance")
+        EXIT = "exit", _("Exit")
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="attendance_records")
+    course_offering = models.ForeignKey(CourseOffering, on_delete=models.PROTECT, related_name="attendance_records")
+    attendance_date = models.DateField()
+    action = models.CharField(max_length=10, choices=Action.choices)
+    scanned_at = models.DateTimeField(auto_now_add=True)
+    scanned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="scanned_records")
+    corrected_at = models.DateTimeField(null=True, blank=True)
+    corrected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="corrected_records")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "course_offering", "attendance_date", "action"],
+                name="attendance_unique_student_offering_date_action",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["course_offering", "attendance_date"],
+                name="attendance_offering_date_idx",
+            ),
+            models.Index(
+                fields=["student", "course_offering", "attendance_date"],
+                name="attendance_student_off_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.student.username} {self.action} on {self.attendance_date}"
+
+    def clean(self):
+        super().clean()
+        if self.course_offering_id and self.attendance_date:
+            year = self.course_offering.academic_year_level.academic_year
+            if not year.starts_on <= self.attendance_date <= year.ends_on:
+                raise ValidationError({"attendance_date": _("Attendance date must be inside the academic year.")})
+
+
+class ViewingSession(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="viewing_sessions")
+    lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="viewing_sessions")
+    part_id = models.CharField(max_length=100)
+    session_id = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    last_heartbeat = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["session_id"])]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.lesson.name} part {self.part_id}"
+
+
+class VerifiedSegmentRequest(models.Model):
+    session = models.ForeignKey(ViewingSession, on_delete=models.CASCADE, related_name="verified_requests")
+    segment_number = models.PositiveIntegerField()
+    segment_key = models.CharField(max_length=500)
+    signature = models.CharField(max_length=128, blank=True, default='')
+    expires_at = models.DateTimeField(null=True, blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "segment_number"],
+                name="unique_verified_segment_number_per_session",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.session.session_id} - {self.segment_key}"
+
+
+class LectureProgress(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lecture_progress")
+    lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="lecture_progress")
+    part_id = models.CharField(max_length=100)
+    merged_ranges = models.JSONField(default=list)
+    unique_seconds = models.PositiveIntegerField(default=0)
+    percent = models.PositiveSmallIntegerField(default=0)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [("student", "lesson", "part_id")]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.lesson.name} part {self.part_id}: {self.percent}%"
+
 
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")
     links = models.TextField() # Null must be false
-    created_date = models.DateField(null=False, default=date.today())
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        related_name="lessons",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=PublicationStatus.choices,
+        default=PublicationStatus.DRAFT,
+    )
+    created_date = models.DateField(null=False, default=date.today)
     updated_date = models.DateField(null=False, auto_now=True)
 
 
     def __str__(self):
-        return f"{self.name} for course : {self.course.name}"
+        return f"{self.name} for course : {self.course_offering.course.name}"
+
+    def clean(self):
+        super().clean()
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def serialize_pagination(self):
+        offering = self.course_offering
         return {
-            "rows" : [self.name, self.course.get_name_year(), _("Updated on %(date)s") % {'date': self.updated_date.strftime('%d/%m/%Y')}],
+            "rows" : [
+                self.name,
+                offering.course.name,
+                offering.academic_year_level.level.display_name,
+                offering.academic_year_level.academic_year.name,
+                _("Updated on %(date)s") % {'date': self.updated_date.strftime('%d/%m/%Y')},
+            ],
             "url" : reverse_lazy("lesson-view", args=[self.pk,])
         }
     
     @staticmethod
     def get_columns():
-        return [_("Name"), _("Course"), _("Last Updated")]
+        return [_("Name"), _("Course"), _("Level"), _("Academic Year"), _("Last Updated")]
 
     def can_access(self, user_join_date: date):
-        end_range = user_join_date.replace(year=user_join_date.year + self.course.level)
+        try:
+            end_range = user_join_date.replace(year=user_join_date.year + self.course_offering.course.level.ordering)
+        except ValueError:
+            end_range = user_join_date.replace(year=user_join_date.year + self.course_offering.course.level.ordering, day=28)
         return user_join_date <= self.created_date <= end_range
+
+    @property
+    def can_edit(self):
+        return self.status == PublicationStatus.DRAFT
 
     def has_segment(self, segment: str):
         links = json.loads(self.links)
@@ -199,59 +858,259 @@ class Lesson(models.Model):
     
 class Quiz(models.Model):
     name = models.CharField(max_length=64)
-    course = models.ForeignKey(Course, on_delete=models.SET_NULL, related_name="quizzes", null=True)
+    quiz_type = models.ForeignKey(
+        QuizType,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="quizzes",
+    )
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        related_name="quizzes",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=PublicationStatus.choices,
+        default=PublicationStatus.DRAFT,
+    )
     total_grade = models.PositiveSmallIntegerField(default=50)
-    opening_date = models.DateTimeField(default=now())
-    closing_date = models.DateTimeField(default=now())
+    opening_date = models.DateTimeField(default=now)
+    closing_date = models.DateTimeField(default=now)
     created_date = models.DateField(auto_now=True)
 
     def __str__(self):
         return f"Quiz {self.name}"
 
+    def clean(self):
+        super().clean()
+        if self.quiz_type_id and self.quiz_type and self.quiz_type.code not in QUIZ_TYPE_CODES:
+            raise ValidationError({"quiz_type": _("Quiz type must be weekly or final.")})
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def can_edit(self):
+        return self.status == PublicationStatus.DRAFT
+
     def serialize(self):
         return {
             "quiz_name" : self.name,
-            "selected_course" : self.course.name,
+            "selected_offering_id": self.course_offering_id,
+            "selected_quiz_type_id": self.quiz_type_id,
             "opening_date" : self.opening_date.strftime("%Y-%m-%dT%H:%M:%S"),
             "closing_date" : self.closing_date.strftime("%Y-%m-%dT%H:%M:%S"),
         }
 
     def serialize_pagination(self):
-        if self.course:
-            return {
-                "rows" : [self.name, self.course.get_name_year(), self.total_grade, self.opening_date.strftime("%H:%M:%S, %d/%m/%Y"), self.closing_date.strftime("%H:%M:%S, %d/%m/%Y")],
-                "url" : reverse_lazy("quiz-view", args=[self.pk,])
-            }
+        offering = self.course_offering
+        return {
+            "rows" : [
+                self.name,
+                offering.course.name,
+                offering.academic_year_level.level.display_name,
+                offering.academic_year_level.academic_year.name,
+                self.quiz_type.name_en if self.quiz_type else _("Unassigned"),
+                self.total_grade,
+                self.opening_date.strftime("%H:%M:%S, %d/%m/%Y"),
+                self.closing_date.strftime("%H:%M:%S, %d/%m/%Y"),
+            ],
+            "url" : reverse_lazy("quiz-view", args=[self.pk,])
+        }
 
     @staticmethod
     def get_columns():
-        return [_("Name"), _("Course"), _("Grades"), _("Opening Date"), _("Closing Date"), _("Submissions")]
+        return [
+            _("Name"), _("Course"), _("Level"), _("Academic Year"), _("Quiz Type"),
+            _("Grades"), _("Opening Date"), _("Closing Date"), _("Submissions"),
+        ]
 
 class Question(models.Model):
     QUESTION_TYPES = [
         ("mcq", _("Multiple Choice")),
         ("written", _("Written")),
-        ("complete", _("Complete"))
+        ("complete", _("Complete")),
+        ("order_events", _("Order Events")),
+        ("match_related", _("Match Related"))
     ]
+
+    STRUCTURED_QUESTION_TYPES = {"order_events", "match_related"}
 
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
     title = models.CharField(max_length=255)
     correct_answer = models.CharField(max_length=255, null=True)
     question_type = models.CharField(max_length=512, choices=QUESTION_TYPES)
     choices = models.TextField(null=True)
+    config = models.JSONField(default=dict, blank=True)
     grade = models.PositiveSmallIntegerField(default=1)
     auto_grade = models.BooleanField(default=True)
 
+    def get_config(self):
+        return self.config if isinstance(self.config, dict) else {}
+
+    def get_choices_list(self):
+        config = self.get_config()
+
+        if self.question_type == "mcq":
+            try:
+                return json.loads(self.choices) if self.choices else []
+            except (TypeError, json.JSONDecodeError):
+                return []
+
+        if self.question_type == "order_events":
+            return config.get("items", [])
+
+        if self.question_type == "match_related":
+            return [pair.get("left", "") for pair in config.get("pairs", []) if isinstance(pair, dict)]
+
+        return []
+
+    def get_correct_answer_payload(self):
+        config = self.get_config()
+
+        if self.question_type == "order_events":
+            return config.get("items", [])
+
+        if self.question_type == "match_related":
+            pairs = config.get("pairs", [])
+            return {
+                str(pair.get("left", "")).strip(): str(pair.get("right", "")).strip()
+                for pair in pairs
+                if isinstance(pair, dict) and pair.get("left") is not None and pair.get("right") is not None
+            }
+
+        return self.correct_answer or ""
+
+    @staticmethod
+    def _normalize_order_events_answer(answer):
+        if answer in (None, "", "-"):
+            return []
+
+        if isinstance(answer, str):
+            try:
+                answer = json.loads(answer)
+            except (TypeError, json.JSONDecodeError):
+                return [segment.strip() for segment in answer.split("|") if segment.strip()]
+
+        if isinstance(answer, dict):
+            answer = answer.get("order") or answer.get("items") or answer.get("answer") or []
+
+        if isinstance(answer, list):
+            return [str(item).strip() for item in answer if str(item).strip()]
+
+        return [str(answer).strip()]
+
+    @staticmethod
+    def _normalize_match_related_answer(answer):
+        if answer in (None, "", "-"):
+            return {}
+
+        if isinstance(answer, str):
+            try:
+                answer = json.loads(answer)
+            except (TypeError, json.JSONDecodeError):
+                return {}
+
+        if isinstance(answer, dict):
+            return {str(key).strip(): str(value).strip() for key, value in answer.items() if str(key).strip()}
+
+        if isinstance(answer, list):
+            normalized = {}
+            for pair in answer:
+                if isinstance(pair, dict) and pair.get("left") is not None and pair.get("right") is not None:
+                    normalized[str(pair["left"]).strip()] = str(pair["right"]).strip()
+                elif isinstance(pair, (list, tuple)) and len(pair) >= 2:
+                    normalized[str(pair[0]).strip()] = str(pair[1]).strip()
+            return normalized
+
+        return {}
+
+    def get_submitted_answer_payload(self, submitted_answer):
+        if self.question_type == "order_events":
+            return self._normalize_order_events_answer(submitted_answer)
+
+        if self.question_type == "match_related":
+            return self._normalize_match_related_answer(submitted_answer)
+
+        return submitted_answer
+
+    def get_auto_grade(self, submitted_answer):
+        if not self.auto_grade:
+            return 0
+
+        if self.question_type in {"mcq", "complete"}:
+            return self.grade if self.is_answer_correct(submitted_answer) else 0
+
+        if self.question_type == "order_events":
+            correct_answer = self.get_correct_answer_payload()
+            submitted_items = self._normalize_order_events_answer(submitted_answer)
+
+            if not correct_answer:
+                return 0
+
+            matched_items = sum(
+                1
+                for index, expected_item in enumerate(correct_answer)
+                if index < len(submitted_items) and submitted_items[index] == expected_item
+            )
+            return max(0, min(self.grade, int(((matched_items / len(correct_answer)) * self.grade) + 0.5)))
+
+        if self.question_type == "match_related":
+            correct_answer = self.get_correct_answer_payload()
+            submitted_pairs = self._normalize_match_related_answer(submitted_answer)
+
+            if not correct_answer:
+                return 0
+
+            matched_pairs = sum(
+                1 for left_item, right_item in correct_answer.items()
+                if submitted_pairs.get(left_item) == right_item
+            )
+            return max(0, min(self.grade, int(((matched_pairs / len(correct_answer)) * self.grade) + 0.5)))
+
+        return self.grade if self.is_answer_correct(submitted_answer) else 0
+
+    def is_answer_correct(self, submitted_answer):
+        if not self.auto_grade:
+            return False
+
+        if self.question_type in {"mcq", "complete"}:
+            return str(submitted_answer).strip() == str(self.correct_answer or "").strip()
+
+        if self.question_type == "order_events":
+            return self._normalize_order_events_answer(submitted_answer) == self.get_correct_answer_payload()
+
+        if self.question_type == "match_related":
+            return self._normalize_match_related_answer(submitted_answer) == self.get_correct_answer_payload()
+
+        return False
+
     def serialize(self):
+        config = self.get_config()
+        answer_payload = self.get_correct_answer_payload()
         return {
             "id" : self.pk,
             "name" : self.title,
             "type" : self.question_type,
             "grade" : self.grade,
-            "choices" : json.loads(self.choices) if self.choices else [],
+            "choices" : self.get_choices_list(),
+            "config" : config,
+            "config_json" : json.dumps(config, ensure_ascii=False),
+            "answer_payload" : answer_payload,
+            "answer_payload_json" : json.dumps(answer_payload, ensure_ascii=False) if isinstance(answer_payload, (dict, list)) else (answer_payload or ""),
             "auto_grade" : self.auto_grade,
             "correct_answer" : self.correct_answer,
         }
+
+    def serialize_student(self):
+        base = self.serialize()
+        base.pop("correct_answer", None)
+        base.pop("answer_payload", None)
+        base.pop("answer_payload_json", None)
+        base.pop("config_json", None)
+        return base
 
     @staticmethod
     def get_types():
@@ -274,13 +1133,16 @@ class Submission(models.Model):
 
         else:
             self.is_graded = self.question.auto_grade
-            if self.is_graded and self.submitted_answer == self.question.correct_answer:
-                self.grade = question_grade           
+            if self.is_graded:
+                self.grade = self.question.get_auto_grade(self.submitted_answer)
         return
 
     def serialize(self):
+        submitted_answer_payload = self.question.get_submitted_answer_payload(self.submitted_answer)
         return {
             "submitted_answer" : self.submitted_answer,
+            "submitted_answer_payload" : submitted_answer_payload,
+            "submitted_answer_payload_json" : json.dumps(submitted_answer_payload, ensure_ascii=False) if isinstance(submitted_answer_payload, (dict, list)) else (submitted_answer_payload or ""),
             "current_grade" : self.grade,
             "is_graded" : self.is_graded,
             **self.question.serialize()
@@ -317,4 +1179,6 @@ class Grade(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.quiz.name} ({self.total_grade})"
-        
+
+
+

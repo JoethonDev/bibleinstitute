@@ -1,0 +1,69 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block body %}
+<div id="content" class="container-fluid py-3 ad-page">
+  <div class="ad-detail-head">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'attendance-management' %}">{% translate "Attendance" %}</a></li>
+        <li class="breadcrumb-item active">{% translate "Correct Attendance Record" %}</li>
+      </ol>
+    </nav>
+    <div class="ad-detail-content">
+      <h4 class="ad-detail-title mb-0">{% translate "Correct Attendance Record" %}</h4>
+    </div>
+  </div>
+
+  <div class="ad-card">
+    <div class="ad-card-body">
+      <div class="ad-meta-grid mb-4">
+        <div class="ad-meta-item">
+          <b>{% translate "Student" %}</b>
+          <span>{{ record.student.get_full_name|default:record.student.username }}</span>
+        </div>
+        <div class="ad-meta-item">
+          <b>{% translate "Course" %}</b>
+          <span>{{ record.course_offering.course.name }}</span>
+        </div>
+        <div class="ad-meta-item">
+          <b>{% translate "Academic Year / Level" %}</b>
+          <span>{{ record.course_offering.academic_year_level.academic_year }} — {{ record.course_offering.academic_year_level.level.display_name }}</span>
+        </div>
+        <div class="ad-meta-item">
+          <b>{% translate "Current Date" %}</b>
+          <span>{{ record.attendance_date }}</span>
+        </div>
+        <div class="ad-meta-item">
+          <b>{% translate "Current Action" %}</b>
+          <span>{{ record.get_action_display }}</span>
+        </div>
+        <div class="ad-meta-item">
+          <b>{% translate "Scanned at" %}</b>
+          <span>{{ record.scanned_at }}</span>
+        </div>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label for="attendance_date" class="form-label">{% translate "New Date" %}</label>
+          <input type="date" name="attendance_date" id="attendance_date" class="form-control" value="{{ record.attendance_date|date:'Y-m-d' }}">
+        </div>
+        <div class="mb-4">
+          <label for="action" class="form-label">{% translate "New Action" %}</label>
+          <select name="action" id="action" class="form-select">
+            <option value="">{% translate "— Keep current —" %}</option>
+            <option value="entrance">{% translate "Entrance" %}</option>
+            <option value="exit">{% translate "Exit" %}</option>
+          </select>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="submit" class="ad-btn ad-btn--teal">{% translate "Save Correction" %}</button>
+          <a href="{% url 'attendance-management' %}" class="ad-btn ad-btn--ghost">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

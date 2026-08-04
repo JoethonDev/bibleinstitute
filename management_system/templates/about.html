@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block body %}
+<div class="public-site">
+<section class="public-inner-hero"><div class="container"><p class="public-kicker">{{ copy.hero_kicker }}</p><h1>{{ copy.hero_title }}</h1><p>{{ copy.hero_text }}</p></div></section>
+<section class="public-section container public-story"><div><p class="public-kicker">{{ copy.story_kicker }}</p><h2>{{ copy.story_title }}</h2></div><div><p>{{ copy.story_text_1 }}</p><p>{{ copy.story_text_2 }}</p></div></section>
+<section class="public-timeline"><div class="container">{% for year, text in copy.timeline %}<div><strong>{{ year }}</strong><span></span><p>{{ text }}</p></div>{% endfor %}</div></section>
+<section class="public-section container"><div class="public-heading"><p class="public-kicker">{{ copy.purpose_kicker }}</p><h2>{{ copy.purpose_title }}</h2></div><div class="public-purpose-grid">{% for item in copy.purpose %}<article><span>0{{ forloop.counter }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p></article>{% endfor %}</div></section>
+<section class="public-values"><div class="container"><div><p class="public-kicker">{{ copy.values_kicker }}</p><h2>{{ copy.values_title }}</h2></div><div>{% for title, text in copy.values %}<article><span>✦</span><div><h3>{{ title }}</h3><p>{{ text }}</p></div></article>{% endfor %}</div></div></section>
+<section class="public-section container"><div class="public-intro"><p class="public-kicker">{{ copy.leadership_kicker }}</p><h2>{{ copy.leadership_title }}</h2></div><div class="public-leader-grid">{% for leader in copy.leaders %}<article><div>✝</div><span>{{ leader.role }}</span><h3>{{ leader.name }}</h3><p>{{ leader.detail }}</p></article>{% endfor %}</div></section>
+<section class="public-campus"><div></div><div><p class="public-kicker">{{ copy.place_kicker }}</p><h2>{{ copy.place_title }}</h2><p>{{ copy.place_text }}</p><a href="#site-contact">{{ copy.contact_us }} ←</a></div></section>
+</div>
+{% endblock %}

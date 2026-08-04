@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block head_meta %}
+<title>{% translate "Application Submitted" %} | {% translate "Bible Institute Coptic" %}</title>
+{% endblock %}
+
+{% block style %}
+{% endblock %}
+
+{% block body %}
+<section class="sd-page">
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-11 col-sm-8 col-md-6 col-lg-5">
+
+            <div class="sd-frame">
+                <div class="sd-screen text-center p-4 p-sm-5">
+                    <i class="fas fa-check-circle sd-success-icon"></i>
+                    <h3 class="sd-section-title mb-3">{% translate "Application Submitted" %}</h3>
+                    <p class="ps-muted-text mb-4">{% translate "Your application has been received. You will be notified once it is reviewed." %}</p>
+                    <a href="{% url 'user_login' %}" class="sd-btn sd-btn--teal">
+                        <i class="fas fa-sign-in-alt me-2"></i>{% translate "Go to Login" %}
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</section>
+{% endblock %}

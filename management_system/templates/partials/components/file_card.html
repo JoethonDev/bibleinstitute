@@ -1,0 +1,131 @@
+{% load i18n %}
+{#
+    Reusable File/Folder Card Component
+
+    Parameters:
+    - item: Dictionary with file/folder info (id, name, type, size, last_modified)
+    - mode: 'simple' or 'advanced' (default: simple)
+    - selectable: Boolean - show checkbox (default: false)
+    - show_actions: Boolean - show action menu (default: false)
+    - show_size: Boolean - show file size (default: false)
+    - show_icons: Boolean - show file type icons (default: true)
+
+    Example Usage:
+    {% include 'partials/components/file_card.html' with item=file_obj mode='advanced' selectable=True show_actions=True %}
+#}
+
+{% if not mode %}{% with mode='simple' %}{% endwith %}{% endif %}
+
+<div class="ad-drive-item{% if item.type == 'folder' %} is-folder{% endif %} position-relative"
+     {% if mode == 'advanced' %}x-data="{ showActions: false }"{% endif %}>
+
+    <div class="ad-drive-body">
+
+        {# Checkbox for selection (advanced mode only) #}
+        {% if selectable and item.type == 'file' %}
+        <div class="position-absolute top-0 start-0 p-2">
+            <input type="checkbox"
+                   class="form-check-input"
+                   @click="toggleFileSelection('{{ item.id }}')"
+                   :checked="selectedFiles.includes('{{ item.id }}')">
+        </div>
+        {% endif %}
+
+        {# Action Menu (if enabled) #}
+        {% if show_actions %}
+        <div class="ad-actions position-absolute top-0 end-0 p-2"
+             {% if mode == 'advanced' %}@mouseenter="showActions = true" @mouseleave="showActions = false"{% endif %}>
+            {% include 'partials/components/file_actions_menu.html' with item=item %}
+        </div>
+        {% endif %}
+
+        {# Icon and Name #}
+        {% if item.type == 'folder' and item.id %}
+            {# Folder Icon #}
+            <div class="ad-drive-ic ad-drive-folder w-100 is-clickable"
+                 role="button"
+                 tabindex="0"
+                 {% if mode == 'simple' %}
+                     hx-get="{% url 'navigate-folder' item.id %}"
+                     hx-trigger="click"
+                     hx-swap="innerHTML"
+                     hx-target="#drive-files"
+                 {% else %}
+                     onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ item.id }}'"
+                 {% endif %}>
+                <i class="fas fa-folder fa-3x"></i>
+            </div>
+
+            <div class="ad-drive-name {% if mode == 'advanced' %}ad-drive-name-sm{% else %}ad-drive-name-md{% endif %} mt-2 w-100"
+                 title="{{ item.name }}">
+                {{ item.name }}
+            </div>
+
+        {% else %}
+            {# File Icon #}
+            <div class="ad-drive-ic ad-drive-file w-100" data-id="{{ item.id }}">
+                {% if show_icons %}
+                    {% if '_video' in item.name or item.name|slice:'-5:' == '.m3u8' or item.name|slice:'-4:' == '.mp4' %}
+                        <i class="fas fa-file-video fa-3x"></i>
+                    {% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %}
+                        <i class="fas fa-file-audio fa-3x"></i>
+                    {% elif item.name|slice:'-4:' == '.pdf' %}
+                        <i class="fas fa-file-pdf fa-3x"></i>
+                    {% else %}
+                        <i class="fas fa-file-alt fa-3x"></i>
+                    {% endif %}
+                {% else %}
+                    <i class="fas fa-file-alt fa-3x"></i>
+                {% endif %}
+            </div>
+
+            {# File Name with Badge #}
+            <div class="ad-drive-name {% if mode == 'advanced' %}ad-drive-name-sm{% else %}ad-drive-name-md{% endif %} mt-2 w-100"
+                 title="{{ item.name }}">
+                {% if mode == 'advanced' %}
+                    {% if '_video' in item.name or item.name|slice:'-4:' == '.mp4' %}
+                        {% if item.name|slice:'-5:' == '.m3u8' %}
+                            {{ item.name|slice:':-5' }}
+                        {% elif item.name|slice:'-4:' == '.mp4' %}
+                            {{ item.name|slice:':-4' }}
+                        {% else %}
+                            {{ item.name }}
+                        {% endif %}
+                        <span class="ad-pill ad-pill--video">{% translate "Video" %}</span>
+                    {% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %}
+                        {% if item.name|slice:'-4:' == '.mp3' %}
+                            {{ item.name|slice:':-4' }}
+                        {% else %}
+                            {{ item.name }}
+                        {% endif %}
+                        <span class="ad-pill ad-pill--audio">{% translate "Audio" %}</span>
+                    {% elif item.name|slice:'-4:' == '.pdf' %}
+                        {{ item.name|slice:':-4' }}
+                        <span class="ad-pill ad-pill--warning">{% translate "PDF" %}</span>
+                    {% else %}
+                        {{ item.name }}
+                        <span class="ad-pill ad-pill--muted">{% translate "Document" %}</span>
+                    {% endif %}
+                {% else %}
+                    {{ item.name }}
+                {% endif %}
+            </div>
+
+            {# File Size (if enabled) #}
+            {% if show_size and item.size %}
+            <div class="text-muted file-meta ad-drive-meta">
+                {% if item.size < 1024 %}
+                    {{ item.size }} B
+                {% elif item.size < 1048576 %}
+                    {{ item.size|floatformat:2|add:"0"|slice:":-2" }} KB
+                {% elif item.size < 1073741824 %}
+                    {% widthratio item.size 1048576 1 %} MB
+                {% else %}
+                    {% widthratio item.size 1073741824 1 %} GB
+                {% endif %}
+            </div>
+            {% endif %}
+        {% endif %}
+
+    </div>
+</div>

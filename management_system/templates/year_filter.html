@@ -1,14 +1,22 @@
 {% load i18n %}
-<select class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
-    {% for option in options %}
-        {% if forloop.first %}
-            <option value="">{{ option }}</option>
-        {% else %}
-            {% if filtering == option %}
-                <option value="{{ option }}" selected>{{ option }}</option>
-            {% else %}
-                <option value="{{ option }}">{{ option }}</option>
-            {% endif %}
-        {% endif %}
-    {% endfor %}
-</select>
+<div class="ad-filters">
+  <div class="position-relative d-flex align-items-center">
+    <select class="form-select filters-fields pe-4" aria-label="{% translate 'Year Filter' %}" name="filtering" hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}" hx-include=".filters-fields" hx-trigger="change" hx-target="#table-container" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#year-spinner">
+      {% for option in options %}
+          {% if forloop.first %}
+              <option value="">{{ option }}</option>
+          {% else %}
+              {% if filtering == option %}
+                  <option value="{{ option }}" selected>{{ option }}</option>
+              {% else %}
+                  <option value="{{ option }}">{{ option }}</option>
+              {% endif %}
+          {% endif %}
+      {% endfor %}
+    </select>
+    <span id="year-spinner" class="htmx-indicator position-absolute end-0 me-4">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+          </div>
+    </span>
+  </div>
+</div>

@@ -1,0 +1,109 @@
+# ── Application services: blue/green Django web slots + Celery worker ──
+# Infrastructure services (postgres, redis, nginx) live in
+# compose.infrastructure.yml on the same external lms_network.
+
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+      format: raw
+  environment:
+    DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+    POSTGRES_DB: ${POSTGRES_DB:-lms_database}
+    POSTGRES_USER: ${POSTGRES_USER:-lms_user}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    SQLITE_SOURCE_PATH: /app/db.sqlite3
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+    CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+    WEB_THREADS: ${WEB_THREADS:-8}
+    GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
+  volumes:
+    - lms_static_data:/app/collectstatic
+  networks:
+    - lms_network
+
+services:
+  # ── Blue web slot ──────────────────────────────────────────────
+  lms-app-blue:
+    <<: *app-base
+    command:
+      - gunicorn
+      - learning_platform.wsgi:application
+      - --bind
+      - 0.0.0.0:8000
+      - --worker-class
+      - gthread
+      - --workers
+      - ${WEB_CONCURRENCY:-2}
+      - --threads
+      - ${WEB_THREADS:-8}
+      - --timeout
+      - ${GUNICORN_TIMEOUT:-1800}
+    expose:
+      - 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cpus: 1.0
+    mem_limit: 1G
+
+  # ── Green web slot ─────────────────────────────────────────────
+  lms-app-green:
+    <<: *app-base
+    command:
+      - gunicorn
+      - learning_platform.wsgi:application
+      - --bind
+      - 0.0.0.0:8000
+      - --worker-class
+      - gthread
+      - --workers
+      - ${WEB_CONCURRENCY:-2}
+      - --threads
+      - ${WEB_THREADS:-8}
+      - --timeout
+      - ${GUNICORN_TIMEOUT:-1800}
+    expose:
+      - 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cpus: 1.0
+    mem_limit: 1G
+
+  # ── Celery worker ──────────────────────────────────────────────
+  celery:
+    <<: *app-base
+    command:
+      - celery
+      - -A
+      - learning_platform
+      - worker
+      - --loglevel=INFO
+      - --concurrency
+      - ${CELERY_CONCURRENCY:-2}
+    cpus: 0.5
+    mem_limit: 1G
+
+volumes:
+  lms_static_data:
+    external: true
+
+networks:
+  lms_network:
+    external: true

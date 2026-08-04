@@ -1,85 +1,160 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 {% load i18n %}
+{% load static %}
 
 {% block body %}
-<div class="container py-5">
-    <div class="row g-4">
-        <!-- Profile Section -->
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-user-circle me-2"></i>{% translate "My Profile" %}
-                    </h5>
-                    {% if request.user.id == object.id %}
-                    <button class="btn btn-light btn-sm" 
-                            hx-get="{% url 'update-profile' object.id %}" 
-                            hx-trigger="click" 
-                            hx-target="#profile"
-                            hx-select="#profile"
-                            hx-swap="innerHTML">
-                        <i class="fas fa-pencil-alt me-1"></i>{% translate "Edit" %}
-                    </button>
+<div class="sd-page">
+<div class="container py-4 py-lg-5">
+    <div class="sd-profile">
+
+        <!-- ===== LEFT: Profile card ===== -->
+        <div>
+            <div class="sd-id-card">
+
+                <!-- Header with avatar + name -->
+                <span class="sd-avatar">{{ initials }}</span>
+                <h3 class="sd-id-name">{{ object.get_full_name|default:object.username }}</h3>
+                <span class="sd-id-role">
+                    {{ object.role.get_role_display }}
+                </span>
+                {% if request.user.id == object.id and profile_editable %}
+                <span class="sd-id-role sd-id-role--editing">
+                    <i class="fas fa-pencil-alt"></i> {% translate "Editing" %}
+                </span>
+                {% endif %}
+
+                <!-- Profile form -->
+                <div id="profile" class="sd-profile-form">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert {{ message.tags }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    {% if profile_editable %}
+                    <form method="post" action="{% url 'view-profile' %}">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="sd-btn sd-btn--teal w-100">
+                                <i class="fas fa-save"></i>{% translate "Save Profile" %}
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    {{ form|crispy }}
                     {% endif %}
                 </div>
-                <div class="card-body p-4">
 
-                    <div id="profile">
-                        {% if messages %}
-                            {% for message in messages %}   
-                                <div class="alert {{ message.tags }}">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
-                        {{ form|crispy }}
-                    </div>
-                </div>
+                <!-- Meta info -->
+                <ul class="sd-meta sd-profile-meta">
+                    {% if object.joined_date %}
+                    <li><b>{% translate "Joined" %}</b><span>{{ object.joined_date|date:"d/m/Y" }}</span></li>
+                    {% endif %}
+                    {% if object.last_login %}
+                    <li><b>{% translate "Last login" %}</b><span>{{ object.last_login|date:"d/m/Y H:i" }}</span></li>
+                    {% endif %}
+                </ul>
             </div>
+
+            {% if show_profile_qr %}
+            <div class="sd-qr-block sd-profile-qr-block">
+                <h6 class="sd-chip sd-qr-title">
+                    <i class="fas fa-qrcode"></i> {% translate "Profile QR Code" %}
+                </h6>
+                <a href="{% url 'download-qr' %}?download=1"
+                   download
+                   aria-label="{% translate 'Download QR Code' %}"
+                   title="{% translate 'Profile QR Code' %}"
+                   class="sd-qr-link">
+                    <img src="{% url 'download-qr' %}"
+                         alt="{% translate 'QR code for profile access' %}"
+                         class="sd-qr-img">
+                </a>
+                <p class="sd-qr-hint sd-qr-hint--centered">
+                    <i class="fas fa-download"></i> {% translate "Click the QR image to download it" %}
+                </p>
+            </div>
+            {% endif %}
         </div>
 
-        <!-- Courses Section -->
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-book-open me-2"></i>{% translate "My Courses" %}
-                    </h5>
+        <!-- ===== RIGHT: Courses + Recent Grades ===== -->
+        <div>
+
+            <!-- Courses accordion -->
+            <div class="sd-panel-card">
+                <div class="sd-panel-head">
+                    <i class="fas fa-book-open"></i>
+                    {% translate "My Courses" %}
                 </div>
-                <div class="card-body p-3">
-                    <div class="accordion accordion-flush" id="coursesAccordion">
+                <div>
+                    {% if courses %}
+                    <div class="accordion" id="coursesAccordion">
                         {% for level in courses %}
-                            <div class="accordion-item">
+                            <div class="sd-acc">
                                 <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ forloop.counter }}">
-                                        {{ level.level_name }}
+                                    <button class="accordion-button sd-acc-head {% if not forloop.first %}collapsed{% endif %}"
+                                            type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#collapse-{{ forloop.counter }}"
+                                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                                        <span>{{ level.section_name|default:level.level_name }}{% if not level.section_name and level.academic_year_name %} — {{ level.academic_year_name }}{% endif %}</span>
+                                        <span class="sd-acc-count">{{ level.offerings|length }}</span>
+                                        <i class="fas fa-chevron-down sd-collapse-indicator"></i>
                                     </button>
                                 </h2>
-                                <div id="collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading-{{ forloop.counter }}" data-bs-parent="#coursesAccordion">
-                                    <div class="accordion-body p-0">
-                                        <ul class="list-group list-group-flush">
-                                            {% for course in level.courses %}
-                                                <li class="list-group-item">
-                                                    <a href="{% url 'course-details' course.id %}" class="text-decoration-none d-flex justify-content-between align-items-center">
-                                                        {{ course.name }}
-                                                        <i class="fas fa-chevron-right text-muted small"></i>
-                                                    </a>
-                                                </li>
-                                            {% empty %}
-                                                <li class="list-group-item text-muted">{% translate "No courses in this level." %}</li>
-                                            {% endfor %}
-                                        </ul>
+                                <div id="collapse-{{ forloop.counter }}"
+                                     class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                                     data-bs-parent="#coursesAccordion">
+                                    <div class="sd-acc-body">
+                                        {% for offering in level.offerings %}
+                                            <a href="{% url 'course-details' offering.pk %}"
+                                               class="sd-mini-row text-decoration-none">
+                                                <i class="fas fa-book"></i>
+                                                <span>{{ offering.course.name }}</span>
+                                                <span class="sd-mini-end"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i></span>
+                                            </a>
+                                        {% empty %}
+                                            <span class="ps-muted-text sd-empty-course-note">{% translate "No courses in this level." %}</span>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
-                        {% empty %}
-                            <div class="p-3 text-center text-muted">
-                                {% translate "You are not enrolled in any courses yet." %}
-                            </div>
                         {% endfor %}
                     </div>
+                    {% else %}
+                    <div class="sd-screen">
+                        <p class="ps-muted-text sd-centered-note">{% translate "You are not enrolled in any courses yet." %}</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
+
+            <!-- Recent Quiz Results -->
+            {% if recent_grades %}
+            <div class="sd-panel-card">
+                <div class="sd-panel-head">
+                    <i class="fas fa-award"></i>
+                    {% translate "Recent Quiz Results" %}
+                    <span class="sd-panel-sub">{% translate "Latest" %} {{ recent_grades|length }}</span>
+                </div>
+                <div class="sd-acc-body sd-results-body">
+                    {% for grade in recent_grades %}
+                    <div class="sd-mini-row">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>
+                            <span class="fw-semibold">{{ grade.quiz.name }}</span>
+                            <br><span class="ps-muted-text sd-result-meta">{% if grade.quiz.course_offering %}{{ grade.quiz.course_offering.course.name }} · {% endif %}{{ grade.submitted_at|date:"d/m/Y" }}</span>
+                        </span>
+                        <span class="sd-score sd-score--good flex-shrink-0">{{ grade.total_grade }}/{{ grade.quiz.total_grade }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
         </div>
     </div>
+</div>
 </div>
 {% endblock %}

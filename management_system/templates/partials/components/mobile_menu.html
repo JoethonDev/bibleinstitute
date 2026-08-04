@@ -1,0 +1,53 @@
+{% load i18n %}
+<!-- Mobile Menu Toggle Button -->
+<button 
+    class="sd-btn sd-btn--teal mobile-fab d-md-none position-fixed"
+    @click="$store.ui.toggleMobileMenu()"
+    x-data
+    aria-label="{% translate 'Toggle Menu' %}"
+>
+    <i class="fas" :class="$store.ui.mobileMenuOpen ? 'fa-times' : 'fa-bars'"></i>
+</button>
+
+<!-- Mobile Menu Overlay -->
+<div 
+    x-data
+    x-show="$store.ui.mobileMenuOpen"
+    @click.away="$store.ui.closeMobileMenu()"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 transform translate-y-full"
+    x-transition:enter-end="opacity-100 transform translate-y-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 transform translate-y-0"
+    x-transition:leave-end="opacity-0 transform translate-y-full"
+    class="sd-frame mobile-menu-panel d-md-none position-fixed bottom-0 start-0 w-100"
+    x-cloak
+>
+    <div class="sd-screen p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="sd-serious mb-0">{% translate "Menu" %}</h5>
+            <button 
+                class="sd-btn sd-btn--gold-outline rounded-circle mobile-menu-close"
+                @click="$store.ui.closeMobileMenu()"
+            >
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="nav flex-column gap-2">
+            <a href="{% url 'home' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
+                <i class="fas fa-home me-2"></i>{% translate "Home" %}
+            </a>
+            <a href="{% url 'courses' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
+                <i class="fas fa-book me-2"></i>{% translate "Courses" %}
+            </a>
+            <a href="{% url 'view-profile' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
+                <i class="fas fa-user me-2"></i>{% translate "Profile" %}
+            </a>
+            {% if request.user.role.role == "admin" or request.user.role.role == "staff" %}
+            <a href="{% url 'user-dashboard' %}" class="nav-link sd-btn sd-btn--gold-outline text-start" @click="$store.ui.closeMobileMenu()">
+                <i class="fas fa-tachometer-alt me-2"></i>{% translate "Admin Dashboard" %}
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</div>

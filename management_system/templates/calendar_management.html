@@ -1,0 +1,289 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block body %}
+<div class="container-fluid py-3 ad-page ad-calendar-page" id="content">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+      <li class="breadcrumb-item active">{% translate "Calendar" %}</li>
+    </ol>
+  </nav>
+
+  <div class="ad-pane-head">
+    <h4 class="ad-pane-title">{% translate "Calendar Management" %}</h4>
+  </div>
+
+  <div id="calendar-content">
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {# Academic year selector — level selection is not required for the calendar entry page #}
+  <div class="row g-2 mb-3 align-items-end ad-calendar-year-picker">
+    <div class="col-auto">
+      <label for="year-select" class="form-label fw-semibold mb-1">{% translate "Academic Year" %}</label>
+      <select id="year-select" name="academic_year" class="form-select"
+              hx-get="{% url 'calendar-management' %}"
+              hx-target="#calendar-content"
+              hx-select="#calendar-content"
+              hx-swap="outerHTML"
+              hx-push-url="true">
+        <option value="">{% translate "Select academic year..." %}</option>
+        {% for y in years %}
+              <option value="{{ y.id }}" {% if year_id == y.id %}selected{% endif %}>{{ y.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  {% if month_grid %}
+  {# Month/year picker with navigation — level selector is not required #}
+  <div class="ad-card mb-3 ad-calendar-toolbar">
+    <div class="ad-card-body py-2 px-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <form id="month-year-form" method="get" action="{% url 'calendar-management' %}"
+              hx-get="{% url 'calendar-management' %}"
+              hx-target="#calendar-content"
+              hx-select="#calendar-content"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              class="d-flex align-items-center gap-2">
+          <input type="hidden" name="academic_year" value="{{ year_id }}">
+          <label for="nav-year-select" class="form-label mb-0 visually-hidden">{% translate "Year" %}</label>
+          <select id="nav-year-select" name="year" class="form-select form-select-sm ad-width-auto"
+                  aria-label="{% translate 'Select year' %}"
+                  onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
+            {% for y in year_options %}
+            <option value="{{ y }}" {% if y == cur_year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+          <label for="nav-month-select" class="form-label mb-0 visually-hidden">{% translate "Month" %}</label>
+          <select id="nav-month-select" name="month" class="form-select form-select-sm ad-width-auto"
+                  aria-label="{% translate 'Select month' %}"
+                  onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
+            {% for m in months %}
+            <option value="{{ m.value }}" {% if m.value == cur_month %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        <h5 class="mb-0 fw-semibold ad-calendar-month-title">{{ month_name }}</h5>
+        <div class="d-flex gap-1 ad-calendar-nav" role="group" aria-label="{% translate 'Month navigation' %}">
+             {% if prev_month %}
+          <a href="?academic_year={{ year_id }}&{{ prev_month }}"
+             class="ad-btn ad-btn--ghost ad-btn--sm"
+             hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ prev_month }}"
+             hx-target="#calendar-content"
+             hx-select="#calendar-content"
+             hx-swap="outerHTML"
+             hx-push-url="true"
+             aria-label="{% translate 'Previous month' %}">
+            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i>
+          </a>
+          {% endif %}
+          {% if next_month %}
+          <a href="?academic_year={{ year_id }}&{{ next_month }}"
+             class="ad-btn ad-btn--ghost ad-btn--sm"
+             hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ next_month }}"
+             hx-target="#calendar-content"
+             hx-select="#calendar-content"
+             hx-swap="outerHTML"
+             hx-push-url="true"
+             aria-label="{% translate 'Next month' %}">
+            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Calendar grid #}
+  <div class="ad-calmg-grid">
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Mon" %}</div>
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Tue" %}</div>
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Wed" %}</div>
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Thu" %}</div>
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Fri" %}</div>
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Sat" %}</div>
+    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Sun" %}</div>
+    {% for week in month_grid %}
+      {% for day in week %}
+      <div class="ad-calmg-cell
+        {% if day.outside_month %} is-out{% endif %}
+        {% if day.is_holiday %} is-holiday{% endif %}
+        {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
+        {% if day.is_today %} is-today{% endif %}
+      ">
+        {% if day.in_year and not day.outside_month %}
+        <div class="ad-calendar-cell-content">
+        <div class="ad-calendar-day-number">{{ day.day }}</div>
+         {% if day.is_holiday %}
+            <div class="ad-calendar-holiday">
+              <small>{{ day.holiday_name }}</small>
+            <form method="post" action="{% url 'delete-holiday' day.holiday_id %}" class="ps-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="btn-close btn-sm holiday-delete" aria-label="{% translate 'Delete' %}"></button>
+            </form>
+           </div>
+          {% endif %}
+          {% for meeting in day.meetings %}
+          <div class="ad-calendar-meeting" title="{{ meeting.course_name }}">
+            <strong class="ad-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="ad-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
+            {% if can_edit_meetings %}
+            <form method="post" action="{% url 'delete-meeting' meeting.id %}" class="ps-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="btn-close btn-sm" aria-label="{% translate 'Delete meeting' %}"></button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% if can_edit_meetings and day.meeting_offerings %}
+            <template id="meeting-offerings-{{ day.date }}">
+              <option value="">{% translate "Select offering..." %}</option>
+              {% for offering in day.meeting_offerings %}
+              <option value="{{ offering.pk }}">{{ offering.academic_year_level.level.display_name }} — {{ offering.course.name }}</option>
+              {% endfor %}
+            </template>
+            <div class="d-flex gap-1 mt-1 ad-calendar-add-actions">
+              <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
+                      data-date="{{ day.date }}" data-year="{{ year_id }}"
+                      data-offerings-template="meeting-offerings-{{ day.date }}"
+                      aria-label="{% translate 'Add meeting' %}">
+                <i class="fas fa-church"></i>
+              </button>
+              {% if not day.is_holiday %}
+              <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#addHolidayModal"
+                      data-date="{{ day.date }}" data-year="{{ year_id }}"
+                      aria-label="{% translate 'Add holiday' %}">
+                <i class="fas fa-plus"></i>
+              </button>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="ps-muted-text ad-calendar-day-number">{{ day.day }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  {# Legend #}
+  <div class="d-flex gap-3 mt-2 small ad-card-body ad-calendar-legend">
+    <span><span class="ad-pill is-meeting ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Meeting day" %}</span>
+    <span><span class="ad-pill is-holiday ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Holiday" %}</span>
+    <span><span class="ad-pill is-today ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Today" %}</span>
+    <span><span class="ad-pill ad-pill--muted ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Out of year" %}</span>
+  </div>
+
+  {% elif year_id %}
+  <div class="ad-alert ad-alert--info">{% translate "No calendar data for this year." %}</div>
+  {% else %}
+  {# No academic year selected — prompt the user #}
+  <div class="ad-empty py-5">
+    <i class="fas fa-calendar-alt fa-3x mb-3"></i>
+    <p class="fs-5">{% translate "Select an academic year above to view the calendar." %}</p>
+  </div>
+  {% endif %}
+
+  {# Add Holiday Modal #}
+  <div class="modal fade" id="addHolidayModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <form method="post" action="{% url 'add-holiday' %}">
+          {% csrf_token %}
+          <input type="hidden" name="academic_year_id" id="modal-year-id">
+          <input type="hidden" name="date" id="modal-date">
+          <div class="modal-header">
+            <h6 class="modal-title">{% translate "Add Holiday" %}</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">{% translate "Date" %}</label>
+              <p class="form-control-plaintext" id="modal-date-display"></p>
+            </div>
+            <div class="mb-3">
+              <label for="holiday-name" class="form-label">{% translate "Holiday Name" %}</label>
+              <input type="text" name="name" id="holiday-name" class="form-control" required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# Add Meeting Modal #}
+  <div class="modal fade" id="addMeetingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <form method="post" action="{% url 'add-meeting' %}">
+          {% csrf_token %}
+          <input type="hidden" name="academic_year_id" id="meeting-modal-year-id">
+          <input type="hidden" name="date" id="meeting-modal-date">
+          <div class="modal-header">
+            <h6 class="modal-title">{% translate "Add Meeting" %}</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">{% translate "Date" %}</label>
+              <p class="form-control-plaintext" id="meeting-modal-date-display"></p>
+            </div>
+            <div class="mb-3">
+              <label for="meeting-course-offering" class="form-label">{% translate "Course Offering" %}</label>
+              <select name="course_offering_id" id="meeting-course-offering" class="form-select" required>
+                <option value="">{% translate "Select offering..." %}</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    document.addEventListener('show.bs.modal', function(event) {
+      if (event.target.id === 'addHolidayModal') {
+        var button = event.relatedTarget;
+        if (!button) return;
+        var date = button.getAttribute('data-date');
+        var yearId = button.getAttribute('data-year');
+        document.getElementById('modal-date').value = date;
+        document.getElementById('modal-year-id').value = yearId;
+        document.getElementById('modal-date-display').textContent = date;
+        document.getElementById('holiday-name').value = '';
+      }
+      if (event.target.id === 'addMeetingModal') {
+        var button = event.relatedTarget;
+        if (!button) return;
+        var date = button.getAttribute('data-date');
+        var yearId = button.getAttribute('data-year');
+        document.getElementById('meeting-modal-date').value = date;
+        document.getElementById('meeting-modal-year-id').value = yearId;
+        document.getElementById('meeting-modal-date-display').textContent = date;
+        var offeringsTemplate = document.getElementById(button.getAttribute('data-offerings-template'));
+        var offeringSelect = document.getElementById('meeting-course-offering');
+        offeringSelect.innerHTML = offeringsTemplate ? offeringsTemplate.innerHTML : '<option value="">{% translate "Select offering..." %}</option>';
+        offeringSelect.selectedIndex = 0;
+      }
+    });
+  })();
+  </script>
+  </div>
+</div>
+{% endblock %}

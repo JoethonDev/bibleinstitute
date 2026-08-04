@@ -1,52 +1,97 @@
-{% extends 'admin_panel.html' %} {% load crispy_forms_tags %} {% load i18n %} 
+{% extends 'admin_panel.html' %}
+{% load crispy_forms_tags %}
+{% load i18n %}
 
 {% block body %}
-<div id="content" class="container-fluid py-4">
- 
-  <!-- Form Container -->
-  <div class="row justify-content-center">
-    <!-- Back Navigation -->
-    <div class="mb-4 col-12 col-md-8 col-lg-7">
-      {% with dynamic_view=view_name %}
-      <a
-        hx-get="{% url dynamic_view|add:'-dashboard' %}"
-        hx-select="#content"
-        hx-push-url="true"
-        hx-trigger="click"
-        hx-target="#display-page"
-        class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit"
-      >
-        <i class="fa-solid fa-arrow-left"></i>
-        {% translate "Back to" %} {{ dynamic_view }}s
-      </a>
-      {% endwith %}
-    </div>
-    <div class="col-12 col-md-8 col-lg-6  ">
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-primary text-white py-3">
-          <h4 class="mb-0 d-flex align-items-center gap-2">
-            <i class="bi bi-pencil-square"></i>
-            Form Entry
-          </h4>
-        </div>
-        <div class="card-body p-4">
-          <form action="" method="post" class="needs-validation" novalidate>
-            {% include 'messages.html' %} {% csrf_token %}
-            <div class="form-content mb-4">{{ form|crispy }}</div>
+<div id="content" class="ad-pane is-active"
+     x-data="autoSave('{{ view_name }}-form-{{ object_id }}')"
+     @input.debounce.2000ms="saveDraft()">
 
-            <div class="d-grid">
-              <button
-                type="submit"
-                class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2"
-              >
-                <i class="bi bi-check-circle"></i>
-                {% translate 'Submit' %}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+    <!-- Auto-save Indicator: Draft Saved -->
+    <div class="ad-alert ad-alert--success"
+         x-show="lastSaved"
+         x-transition.opacity>
+        <i class="fas fa-check-circle"></i>
+        <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
     </div>
-  </div>
+
+    <!-- Auto-save Indicator: Saving -->
+    <div class="ad-alert ad-alert--info"
+         x-show="isSaving"
+         x-transition.opacity>
+        <i class="fas fa-spinner fa-pulse"></i>
+        <span>{% translate "Saving draft..." %}</span>
+    </div>
+
+    <!-- Back Navigation -->
+    <div class="ad-toolbar">
+        {% with dynamic_view=view_name %}
+        <a hx-get="{% url dynamic_view|add:'-dashboard' %}"
+           hx-select="#content"
+           hx-push-url="true"
+           hx-trigger="click"
+           hx-target="#display-page"
+           class="ad-btn ad-btn--ghost ad-btn--sm">
+            <i class="fas fa-arrow-left me-2"></i>
+            <span>
+                {% blocktranslate with view_name=dynamic_view %}Back to {{ view_name }}s{% endblocktranslate %}
+            </span>
+        </a>
+        {% endwith %}
+    </div>
+
+    <!-- Form Card -->
+    <div class="ad-card">
+        <div class="ad-card-head">
+            <i class="fas fa-edit"></i>
+            <span>{{ header|default:"Form Entry" }}</span>
+        </div>
+
+        <div class="ad-card-body">
+            <!-- Form with validation -->
+            <div x-data="formValidation()">
+                <form action=""
+                      method="post"
+                      class="admin-form"
+                      @submit="handleSubmit($event)"
+                      novalidate>
+
+                    {% include 'messages.html' %}
+                    {% csrf_token %}
+
+                    <!-- Form Fields -->
+                    <div class="form-fields"
+                         @focusout="validateField($event.target)">
+                        {{ form|crispy }}
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <button type="submit"
+                                class="ad-btn ad-btn--teal"
+                                :disabled="submitting"
+                                :class="{ 'is-disabled': submitting }">
+                            <span x-show="!submitting">
+                                <i class="fas fa-check me-2"></i>
+                                {% translate "Submit" %}
+                            </span>
+                            <span x-show="submitting" x-cloak>
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                {% translate "Submitting..." %}
+                            </span>
+                        </button>
+
+                        <button type="button"
+                                class="ad-btn ad-btn--ghost"
+                                @click="$el.closest('form').reset(); $dispatch('form-reset')"
+                                :disabled="submitting">
+                            <i class="fas fa-redo me-2"></i>
+                            {% translate "Reset" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

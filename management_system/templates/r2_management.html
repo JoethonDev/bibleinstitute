@@ -1,0 +1,219 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block body %}
+<div class="ad-page" id="content" x-data="r2Manager()" x-init="is_root = {% if is_root %}true{% else %}false{% endif %}">
+    <!-- Pane Header -->
+    <div class="ad-pane-head">
+        <h2 class="ad-pane-title"><i class="fas fa-cloud me-2"></i>{% translate "R2 Storage Management" %}</h2>
+        <p class="ad-pane-desc">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
+    </div>
+
+    <!-- Storage Statistics -->
+    <div class="ad-stats" id="storage-stats-container">
+        <div class="ad-stat ad-stat--file">
+            <div class="ad-stat-ic"><i class="fas fa-file"></i></div>
+            <div>
+                <b id="stat-total-files">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% else %}{{ storage_stats.total_files }}{% endif %}
+                    <span id="stat-total-files-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "Total Files" %}</span>
+            </div>
+        </div>
+        <div class="ad-stat ad-stat--storage">
+            <div class="ad-stat-ic"><i class="fas fa-hdd"></i></div>
+            <div>
+                <b id="stat-total-storage">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% else %}{{ total_size_formatted }}{% endif %}
+                    <span id="stat-total-storage-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "Total Storage" %}</span>
+            </div>
+        </div>
+        <div class="ad-stat ad-stat--video">
+            <div class="ad-stat-ic"><i class="fas fa-video"></i></div>
+            <div>
+                <b id="stat-video-files">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% elif storage_stats.by_extension.mp4 %}{{ storage_stats.by_extension.mp4.count }}{% else %}0{% endif %}
+                    <span id="stat-video-files-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "Video Files" %}</span>
+            </div>
+        </div>
+        <div class="ad-stat ad-stat--pdf">
+            <div class="ad-stat-ic"><i class="fas fa-file-pdf"></i></div>
+            <div>
+                <b id="stat-pdf-files">
+                    {% if storage_stats.loading %}
+                    <span class="spinner-border spinner-border-sm"></span>
+                    {% elif storage_stats.by_extension.pdf %}{{ storage_stats.by_extension.pdf.count }}{% else %}0{% endif %}
+                    <span id="stat-pdf-files-approx" class="ad-stat-approx badge bg-warning-subtle text-warning-emphasis ms-1"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</span>
+                </b>
+                <span>{% translate "PDF Files" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Management Toolbar -->
+    <div class="ad-card mb-4">
+        <div class="ad-drive-toolbar">
+            <button class="ad-btn ad-btn--teal" @click="showCreateFolderModal()">
+                <i class="fas fa-folder-plus"></i>
+                {% translate "New Folder" %}
+            </button>
+            <button class="ad-btn ad-btn--gold" onclick="window.location.href='{% url 'upload-files' %}'">
+                <i class="fas fa-upload"></i>
+                {% translate "Upload Files" %}
+            </button>
+            <button class="ad-btn ad-btn--ghost" @click="refreshStats()">
+                <i class="fas fa-chart-bar"></i>
+                {% translate "Statistics" %}
+            </button>
+            <button class="ad-btn ad-btn--danger"
+                    x-show="selectedFiles.length > 0"
+                    @click="deleteSelectedFiles()">
+                <i class="fas fa-trash"></i>
+                {% translate "Delete Selected" %} (<span x-text="selectedFiles.length"></span>)
+            </button>
+
+            <div class="ms-auto ad-filters">
+                <select class="form-select ad-width-auto"
+                        x-model="currentFilter"
+                        @change="applyFilter()">
+                    {% for preset in filter_presets %}
+                    <option value="{{ preset }}" {% if preset == current_filter %}selected{% endif %}>
+                        {{ preset|title }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <div class="ad-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text"
+                           x-model="searchQuery"
+                           @keyup.debounce.500ms="searchFiles()"
+                           placeholder="{% translate 'Search files...' %}">
+                    <button class="ad-btn ad-btn--sm" type="button" @click="searchFiles()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File List (browse partial — breadcrumb, back, grid) -->
+    <div class="ad-card" id="file-list-container">
+        {% include 'partials/r2_browse.html' %}
+    </div>
+
+    <div class="modal fade" id="createFolderModal" tabindex="-1" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title">{% translate "Create New Folder" %}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="create-folder-error" class="alert alert-danger d-none"></div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Folder Name" %}</label>
+                        <input type="text" class="form-control"
+                               x-model="newFolderName"
+                               @keyup.enter="createFolder()"
+                               placeholder="{% translate 'Enter folder name' %}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">
+                        {% translate "Cancel" %}
+                    </button>
+                    <button type="button" class="ad-btn ad-btn--teal" @click="createFolder()">
+                        {% translate "Create" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="renameFileModal" tabindex="-1" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title" x-text="renameIsFolder ? '{% translate "Rename Folder" %}' : '{% translate "Rename File" %}'"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="rename-file-error" class="alert alert-danger d-none"></div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "Current Name" %}</label>
+                        <input type="text" class="form-control" x-model="renameFileOldName" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{% translate "New Name" %}</label>
+                        <input type="text" class="form-control" x-model="renameFileNewName" @keyup.enter="renameFile()">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">
+                        {% translate "Cancel" %}
+                    </button>
+                    <button type="button" class="ad-btn ad-btn--teal" @click="renameFile()">
+                        {% translate "Rename" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">{% translate "Confirm Delete" %}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="delete-confirm-message"></p>
+                    <p id="delete-hls-warning" class="text-danger fw-bold d-none">
+                        {% translate "This will also delete all related .ts segment files in the same directory." %}
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="button" class="ad-btn ad-btn--danger" id="confirm-delete-btn">{% translate "Delete" %}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="infoModal" tabindex="-1" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title">{% translate "File Information" %}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="info-modal-body">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">{% translate "Loading..." %}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">{% translate "Close" %}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

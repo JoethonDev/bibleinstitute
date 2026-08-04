@@ -1,202 +1,230 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block body %}
-<div id="content" class="container-fluid py-4">
+     {% block body %}
+<div id="content" class="admin-form-page lesson-editor ad-page"
+     data-lesson-close="{% translate 'Close' %}"
+     data-lesson-video="{% translate 'Video' %}"
+     data-lesson-audio-recording="{% translate 'Audio Recording' %}"
+     data-lesson-book="{% translate 'Book' %}"
+     data-lesson-move-up="{% translate 'Move up' %}"
+     data-lesson-move-down="{% translate 'Move down' %}"
+     x-data="{
+         ...autoSave('lesson-form-{{ request.resolver_match.kwargs.lesson_id|default:'new' }}'),
+         ...lessonForm()
+     }" 
+     @input.debounce.2000ms="saveDraft()">
+    
+    <!-- Auto-save Indicator -->
+    <div class="auto-save-indicator" x-show="lastSaved" x-transition.opacity>
+         <div class="ad-alert ad-alert--success mb-0 d-flex align-items-center gap-2">
+            <i class="fas fa-check-circle"></i>
+            <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
+        </div>
+    </div>
+
+    <!-- Saving Indicator -->
+    <div class="auto-save-indicator" x-show="isSaving" x-transition.opacity>
+         <div class="ad-alert ad-alert--info mb-0 d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">{% translate "Saving..." %}</span>
+            </div>
+            <span>{% translate "Saving draft..." %}</span>
+        </div>
+    </div>
+    
     <!-- Back Navigation -->
-    <div class="mb-4">
-        <a hx-get="{% url 'lesson-dashboard' %}" hx-select="#content" hx-push-url="true" hx-trigger="click" hx-target="#display-page" class="btn btn-outline-secondary d-flex align-items-center gap-2 w-fit">
-            <i class="fas fa-arrow-left"></i>
+    <div class="form-back-nav">
+        <a hx-get="{% url 'lesson-dashboard' %}" 
+           hx-select="#content" 
+           hx-push-url="true" 
+           hx-target="#display-page" 
+            class="ad-btn ad-btn--ghost">
+            <i class="fas fa-arrow-left me-2"></i>
             {% translate "Back to lessons" %}
         </a>
     </div>
 
-    <form action="" method="post" class="row g-4">
-        {% csrf_token %}
-        <!-- Left Column: Form Inputs & Drive Files -->
-        <div class="col-lg-7 d-flex flex-column gap-4">
-            <!-- Lesson Details Card -->
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0 fw-bold">{% translate "Lesson Details" %}</h5>
-                </div>
-                <div class="card-body p-4">
-                    {% include 'messages.html' %}
-                    <div class="mb-3">
-                        <label for="lesson_name" class="form-label fw-semibold">{% translate "Lesson Name" %}</label>
-                        <input type="text" class="form-control" id="lesson_name" name="lesson_name" required value="{{ lesson_name }}">
-                    </div>
-                    <div>
-                        <label for="course_select" class="form-label fw-semibold">{% translate "Course" %}</label>
-                        <select class="form-select" id="course_select" required name="course">
-                            <option selected disabled>{% translate "Select a Course" %}</option>
-                            {% for course in courses %}
-                                <option value="{{ course }}" {% if course == selected_course %}selected{% endif %}>{{ course }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
+    <!-- Form Container -->
+    <div class="form-container">
+        <div class="ad-card">
+            <div class="ad-card-head">
+                <h4 class="mb-0">
+                    <i class="fas fa-book-open me-2"></i>
+                    {% if lesson_name %}
+                        {% translate "Edit Lesson" %}
+                    {% else %}
+                        {% translate "Create New Lesson" %}
+                    {% endif %}
+                </h4>
             </div>
+            <div class="ad-card-body">
+                {% include 'messages.html' %}
+                
+                <form action="" method="post" 
+                      class="admin-form"
+                      x-data="formValidation()"
+                      @submit="handleSubmit($event)"
+                      novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- Form Layout: Responsive Grid -->
+                     <div class="lesson-editor__grid">
+                         <!-- Lesson Details Section -->
+                         <div class="lesson-editor__details">
+                             <h5 class="border-bottom pb-2 mb-3">
+                                 <i class="fas fa-info-circle me-2"></i>
+                                 {% translate "Lesson Details" %}
+                             </h5>
 
-            <!-- Drive Files Card -->
-            <div class="card shadow-sm border-0 flex-grow-1">
-                <div class="card-header">
-                    <h6 class="mb-0">{% translate "Select Files from Drive" %}</h6>
-                </div>
-                <div id="drive-files" class="card-body overflow-auto" style="min-height: 300px;">
-                    {% include 'drive_files.html' %}
-                </div>
-            </div>
-        </div>
+                             <!-- Lesson Name -->
+                             <div class="form-group" @focusout="validateField($event)">
+                                 <label for="lesson_name" class="form-label">
+                                     {% translate "Lesson Name" %}
+                                     <span class="required-indicator">*</span>
+                                 </label>
+                                 <input type="text"
+                                        class="form-control"
+                                        id="lesson_name"
+                                        name="lesson_name"
+                                        required
+                                        value="{{ lesson_name }}"
+                                        placeholder="{% translate 'Enter lesson name' %}">
+                                 <div class="invalid-feedback">
+                                     {% translate "Please enter a lesson name" %}
+                                 </div>
+                             </div>
 
-        <!-- Right Column: Selected Lectures -->
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0">
-                <div class="card-header">
-                    <h5 class="mb-0">{% translate "Selected Lectures" %}</h5>
-                </div>
-                <div id="lectures-display" class="card-body p-3">
-                    <div id="videos-input" class="d-flex flex-column column-gap-2">
-                       {% for video in videos %}
-                        <div class="card video-container mb-3">
-                            <input type="text" name="videos" hidden value="{{ video.id }}">
-                            <input type="text" name="videos_name" hidden value="{{ video.name }}">
-                            <div class="card-body p-3">
-                                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close"></button>
-                                <p class="fw-bold mb-2 text-primary">{{ video.name }}</p>
-                                <select name="files_type" class="form-select form-select-sm">
-                                    <option value="video" {% if video.file_type == "video" %}selected{% endif %}>{% translate "Video" %}</option>
-                                    <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>{% translate "Audio Recording" %}</option>
-                                    <option value="book" {% if video.file_type == "book" %}selected{% endif %}>{% translate "Book" %}</option>
+                             <!-- Course Offering (determines course and level) -->
+                             <div class="form-group">
+                                 <label for="course_offering" class="form-label">
+                                     {% translate "Course Offering" %}
+                                     <span class="required-indicator">*</span>
+                                 </label>
+                                 <select class="form-select" id="course_offering" name="course_offering" required>
+                                     <option value="">{% translate "Select Course Offering" %}</option>
+                                     {% for offering in course_offerings %}
+                                     <option value="{{ offering.pk }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
+                                         {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
+                                     </option>
+                                     {% endfor %}
+                                 </select>
+                                <div class="form-text">{% translate "The offering determines the course, level, and academic year." %}</div>
+                            </div>
+
+                            <!-- Publication Status -->
+                            <div class="form-group mt-3">
+                                <label for="lesson-status" class="form-label">{% translate "Status" %}</label>
+                                <select class="form-select" id="lesson-status" name="status" required>
+                                    {% for status_value, status_label in publication_statuses %}
+                                    <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
-                            <div class="card-footer bg-light p-1 text-end">
-                                <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-up"><i class="fas fa-arrow-up"></i></button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-down"><i class="fas fa-arrow-down"></i></button>
-                            </div>
                         </div>
-                       {% endfor %}
+
+                         <!-- Drive Files Section -->
+                         <div class="lesson-editor__drive">
+                          <div class="ad-card">
+                                  <div class="ad-card-head">
+                                      <h6 class="mb-0">
+                                          <i class="fas fa-cloud me-2"></i>
+                                          {% translate "Select Files from Drive" %}
+                                      </h6>
+                                  </div>
+                                  <div id="drive-files" class="ad-card-body">
+                                     {% include 'drive_files.html' %}
+                                 </div>
+                             </div>
+                         </div>
+
+                         <!-- Selected Lectures Sidebar -->
+                         <div class="lesson-editor__sidebar">
+                          <div class="ad-card">
+                                  <div class="ad-card-head">
+                                      <h6 class="mb-0">
+                                          <i class="fas fa-list me-2"></i>
+                                          {% translate "Selected Lectures" %}
+                                      </h6>
+                                  </div>
+                                  <div id="lectures-display" class="ad-card-body p-3">
+                                     <div id="videos-input" class="d-flex flex-column">
+                                         {% for video in videos %}
+                                         <div class="card video-container mb-3">
+                                             <input type="hidden" name="videos" value="{{ video.id }}">
+                                             <input type="hidden" name="videos_name" value="{{ video.name }}">
+                                             <div class="card-body p-3">
+                                                 <button type="button"
+                                                         class="btn-close position-absolute top-0 end-0 m-2"
+                                                         @click="removeFile($event)"
+                                                         aria-label="Close"></button>
+                                                 <p class="fw-bold mb-2 text-primary">{{ video.name }}</p>
+                                                 <select name="files_type" class="form-select form-select-sm">
+                                                     <option value="video" {% if video.file_type == "video" %}selected{% endif %}>
+                                                         {% translate "Video" %}
+                                                     </option>
+                                                     <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>
+                                                         {% translate "Audio Recording" %}
+                                                     </option>
+                                                     <option value="book" {% if video.file_type == "book" %}selected{% endif %}>
+                                                         {% translate "Book" %}
+                                                     </option>
+                                                 </select>
+                                             </div>
+                                             <div class="card-footer bg-light p-1 text-end">
+                                                 <button type="button"
+                                                         class="btn btn-sm btn-outline-secondary border-0"
+                                                         @click="moveUp($event)"
+                                                         title="{% translate 'Move up' %}">
+                                                     <i class="fas fa-arrow-up"></i>
+                                                 </button>
+                                                 <button type="button"
+                                                         class="btn btn-sm btn-outline-secondary border-0"
+                                                         @click="moveDown($event)"
+                                                         title="{% translate 'Move down' %}">
+                                                     <i class="fas fa-arrow-down"></i>
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         {% endfor %}
+                                        
+                                         <!-- Empty State -->
+                                         <div x-show="!$el.parentElement.querySelector('.video-container')"
+                                              class="text-center text-muted py-5">
+                                             <i class="fas fa-folder-open fa-3x mb-3"></i>
+                                             <p>{% translate "No lectures selected yet" %}</p>
+                                             <small>{% translate "Click on files from the left to add them" %}</small>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+
+                     <!-- Form Actions -->
+                     <div class="lesson-editor__actions">
+                         <button type="submit"
+                                 class="ad-btn ad-btn--teal btn-lg"
+                                :disabled="submitting">
+                            <span x-show="!submitting">
+                                <i class="fas fa-save me-2"></i>
+                                {% translate "Submit" %}
+                            </span>
+                            <span x-show="submitting" :class="{ 'd-flex align-items-center justify-content-center': submitting }">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                {% translate "Submitting..." %}
+                            </span>
+                        </button>
+                          <button type="reset"
+                                 class="ad-btn ad-btn--ghost btn-lg"
+                                @click="$event.target.closest('form').dispatchEvent(new Event('reset'))">
+                            <i class="fas fa-undo me-2"></i>
+                            {% translate "Reset" %}
+                        </button>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
-        
-        <!-- Submit Button -->
-        <div class="col-12">
-            <div class="d-grid">
-                <input type="submit" class="btn btn-primary btn-lg" value="{% translate "Submit" %}">
-            </div>
-        </div>
-    </form>
-
-    <script>
-        (() => {
-            const videosCONTAINER = document.querySelector("#videos-input");
-
-            const jsTranslations_lesson_form = {
-                'en': { 'video': 'Video', 'audioRecording': 'Audio Recording', 'book': 'Book' },
-                'ar': { 'video': 'فيديو', 'audioRecording': 'تسجيل صوتي', 'book': 'كتاب' }
-            };
-
-            function getJsTranslation_lesson_form(key) {
-                const lang = document.documentElement.lang || 'en';
-                return jsTranslations_lesson_form[lang][key] || jsTranslations_lesson_form['en'][key];
-            }
-
-            function create_video(element) {
-                const name = element.closest('.card-body').querySelector('.card-title').textContent.trim();
-                const id = element.dataset.id;
-
-                const videoCard = document.createElement("div");
-                videoCard.className = "card video-container mb-3";
-                
-                let fileType = "book";
-                if (name.toLowerCase().includes("audio")) fileType = "audio";
-                if (name.toLowerCase().includes("video")) fileType = "video";
-
-                videoCard.innerHTML = `
-                    <input type="text" name="videos" hidden value="${id}">
-                    <input type="text" name="videos_name" hidden value="${name}">
-                    <div class="card-body p-3">
-                        <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close"></button>
-                        <p class="fw-bold mb-2 text-primary">${name}</p>
-                        <select name="files_type" class="form-select form-select-sm">
-                            <option value="video" ${fileType === 'video' ? 'selected' : ''}>${getJsTranslation_lesson_form('video')}</option>
-                            <option value="audio" ${fileType === 'audio' ? 'selected' : ''}>${getJsTranslation_lesson_form('audioRecording')}</option>
-                            <option value="book" ${fileType === 'book' ? 'selected' : ''}>${getJsTranslation_lesson_form('book')}</option>
-                        </select>
-                    </div>
-                    <div class="card-footer bg-light p-1 text-end">
-                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-up"><i class="fas fa-arrow-up"></i></button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 video-order-down"><i class="fas fa-arrow-down"></i></button>
-                    </div>
-                `;
-                
-                videosCONTAINER.appendChild(videoCard);
-                addEventListenersToCard(videoCard);
-            }
-
-            function moveUp(event) {
-                const videoContainer = event.target.closest('.video-container');
-                const prevSibling = videoContainer.previousElementSibling;
-                if (prevSibling) {
-                    videosCONTAINER.insertBefore(videoContainer, prevSibling);
-                }
-            }
-
-            function moveDown(event) {
-                const videoContainer = event.target.closest('.video-container');
-                const nextSibling = videoContainer.nextElementSibling;
-                if (nextSibling) {
-                    videosCONTAINER.insertBefore(nextSibling, videoContainer);
-                }
-            }
-
-            function deleteCard(event) {
-                event.target.closest('.video-container').remove();
-            }
-            
-            function hideSegments(files) {
-                files.forEach(file => {
-                    if (file.dataset.id && file.dataset.id.endsWith(".ts")) {
-                        file.closest('.col').remove();
-                    }
-                });
-            }
-
-            function renameM3u8() {
-                document.querySelectorAll("#drive-files .file-icon").forEach(videoIcon => {
-                    const cardBody = videoIcon.closest('.card-body');
-                    const nameSection = cardBody.querySelector(".card-title");
-                    if (nameSection.innerText.endsWith('.m3u8')) {
-                        nameSection.innerText = nameSection.innerText.replace('.m3u8', '');
-                    }
-                });
-            }
-
-            function addEventListenersToCard(card) {
-                card.querySelector('.btn-close').addEventListener('click', deleteCard);
-                card.querySelector('.video-order-up').addEventListener('click', moveUp);
-                card.querySelector('.video-order-down').addEventListener('click', moveDown);
-            }
-
-            function initializePage() {
-                const files = document.querySelectorAll("#drive-files .file-icon");
-                hideSegments(files);
-                renameM3u8();
-
-                document.querySelectorAll("#drive-files .file-icon").forEach(element => {
-                    element.addEventListener('click', () => create_video(element));
-                });
-                
-                document.querySelectorAll("#videos-input .video-container").forEach(addEventListenersToCard);
-            }
-
-            document.addEventListener("htmx:afterSwap", () => {
-                initializePage();
-            })
-            
-        })();
-    </script>
+    </div>
 </div>
 {% endblock %}

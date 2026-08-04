@@ -1,0 +1,11 @@
+{% load i18n %}
+<nav class="ad-breadcrumb container-fluid pt-3" aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item">
+            <a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">
+            {{ request.resolver_match.url_name|capfirst }}
+        </li>
+    </ol>
+</nav>

@@ -1,0 +1,194 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block body %}
+<div class="container-fluid py-3 ad-page" id="content">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active">{% translate "Academic Levels" %}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-layer-group me-2"></i>{% translate "Academic Levels" %}</h4>
+        <button class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
+            <i class="fas fa-plus me-1"></i>{% translate "New Level" %}
+        </button>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row g-3">
+        {% for lvl in levels %}
+        <div class="col-lg-4 col-md-6">
+            <div class="ad-card h-100">
+                <div class="ad-card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="mb-1 ad-level-name">{{ lvl.name }}</h5>
+                            <span class="ad-pill ad-pill--teal">{% translate "Level" %} {{ lvl.level }}</span>
+                        </div>
+                        <div class="dropdown">
+                            <button class="ad-btn ad-btn--ghost ad-btn--sm" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal" data-bs-target="#editLevelModal{{ lvl.level }}">
+                                        <i class="fas fa-edit me-2"></i>{% translate "Edit Name" %}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'academic-setup' %}">
+                                        <i class="fas fa-cog me-2"></i>{% translate "Manage Years" %}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'course-dashboard' %}?year={{ lvl.name }}">
+                                        <i class="fas fa-book-open me-2"></i>{% translate "View Courses" %}
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#"
+                                       data-bs-toggle="modal" data-bs-target="#deleteLevelModal{{ lvl.level }}">
+                                        <i class="fas fa-trash me-2"></i>{% translate "Delete Level" %}
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="ad-stat-grid mb-0">
+                        <div class="ad-stat-grid-item">
+                            <div class="ad-stat-value ad-stat-value--teal">{{ lvl.year_count }}</div>
+                            <div class="ad-stat-label">{% translate "Years" %}</div>
+                        </div>
+                        <div class="ad-stat-grid-item">
+                            <div class="ad-stat-value ad-stat-value--success">{{ lvl.course_count }}</div>
+                            <div class="ad-stat-label">{% translate "Courses" %}</div>
+                        </div>
+                        <div class="ad-stat-grid-item">
+                            <div class="ad-stat-value ad-stat-value--gold">{{ lvl.offering_count }}</div>
+                            <div class="ad-stat-label">{% translate "Offerings" %}</div>
+                        </div>
+                    </div>
+                    <hr class="ad-divider">
+                    <div class="ad-kv-row mt-auto">
+                        <span class="ad-kv-label">{% translate "Enrollments" %}</span>
+                        <span class="ad-kv-value">{{ lvl.enrollment_count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# --- Edit Name Modal --- #}
+        <div class="modal fade" id="editLevelModal{{ lvl.level }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="{% url 'level-edit' lvl.level %}">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h6 class="modal-title">{% translate "Edit Level Name" %} — {{ lvl.name }}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">{% translate "Name (English)" %}</label>
+                                <input type="text" name="name_en" class="form-control" value="{{ lvl.name_en }}" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{% translate "Name (Arabic)" %}</label>
+                                <input type="text" name="name_ar" class="form-control" value="{{ lvl.name_ar }}" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                            </div>
+                            <p class="text-muted small mb-0">{% translate "Leave blank to use the default translated name." %}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {# --- Delete Confirmation Modal --- #}
+        <div class="modal fade" id="deleteLevelModal{{ lvl.level }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <form method="post" action="{% url 'level-delete' lvl.level %}">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h6 class="modal-title">{% translate "Delete Level" %}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>{% translate "Are you sure you want to delete" %} <strong>{{ lvl.name }}</strong>?</p>
+                            <p class="text-danger small mb-0">{% translate "This will remove all academic years and courses in this level." %}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                            <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">{% translate "Delete" %}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="ad-card">
+                <div class="ad-empty">
+                    <i class="fas fa-layer-group"></i>
+                    <p class="mb-1">{% translate "No academic levels found." %}</p>
+                    <small class="ps-muted-text">{% translate "Create an academic year to define your first level." %}</small>
+                    <div class="mt-3">
+                        <button class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
+                            <i class="fas fa-plus me-1"></i>{% translate "Create Level" %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# --- Create Level Modal --- #}
+    <div class="modal fade" id="levelCreateModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <form method="post" action="{% url 'level-create' %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title">{% translate "New Level" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Level Number" %}</label>
+                            <input type="number" name="level" min="1" class="form-control" required placeholder="{% translate 'e.g. 3' %}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Name (English)" %} <small class="text-muted">{% translate "(optional)" %}</small></label>
+                            <input type="text" name="name_en" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Name (Arabic)" %} <small class="text-muted">{% translate "(optional)" %}</small></label>
+                            <input type="text" name="name_ar" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Create" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -8,275 +8,628 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
-    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
-    <meta http-equiv="Cross-Origin-Resource-Policy" content="same-origin">
-    <title>{% translate "Bible Institute Coptic" %}</title>
-    <script src="https://unpkg.com/htmx.org@2.0.4" xintegrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <title>{% translate "Bible Institute - Admin" %}</title>
+
+    <!-- HTMX Configuration -->
+    <meta name="htmx-config" content='{"timeout":10000,"defaultSwapStyle":"innerHTML","defaultSwapDelay":100,"includeIndicatorStyles":false}'>
     <!-- CDN -->
     {% if request.LANGUAGE_CODE == 'ar' %}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" xintegrity="sha384-gXt9imSW0VcJVHezoNQsP+TNrjYXoGcrqBZJpry9zJt8PCQjobwmhMGaDHTASo9N" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb" crossorigin="anonymous">
     {% else %}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-    <!-- Style -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <!-- Legacy stylesheets (migration fallback — loaded first so new system wins cascade) -->
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260802-ui-cascade-1">
+    <!-- Psalmodia Design System (loads after legacy for cascade precedence) -->
+    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v=20260802-ui-cascade-1">
+    <link rel="stylesheet" href="{% static 'css/app_admin.css' %}?v=20260802-ui-cascade-1">
 
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    
     {% block style %}
     {% endblock %}
-    <link rel="stylesheet" href="{% static 'css/admin.css' %}"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" xintegrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
-
-    <script>
-        // Translations for JavaScript messages
-        const jsTranslations = {
-            'en': {
-                'itemDeletedSuccess': 'Item is deleted successfully!',
-                'adminPanel': 'Admin Panel',
-                'users': 'Users',
-                'courses': 'Courses',
-                'lessons': 'Lessons',
-                'uploadFiles': 'Upload Files',
-                'quizzes': 'Quizzes',
-                'menu': 'Menu'
-            },
-            'ar': {
-                'itemDeletedSuccess': 'تم حذف العنصر بنجاح!',
-                'adminPanel': 'لوحة التحكم',
-                'users': 'المستخدمون',
-                'courses': 'الدورات',
-                'lessons': 'الدروس',
-                'uploadFiles': 'رفع الملفات',
-                'quizzes': 'الاختبارات',
-                'menu': 'القائمة'
-            }
-        };
-
-        function getJsTranslation(key) {
-            const lang = document.documentElement.lang || 'en';
-            return jsTranslations[lang][key] || jsTranslations['en'][key];
-        }
-
-        function removePopUp(alert) {
-          setTimeout(() => {
-            alert.classList.add("hide")
-          }, 500)
-          setTimeout(() => {
-            alert.remove()
-          }, 6000)
-        }
-
-        function displaySuccessAlert(e, msg = getJsTranslation('itemDeletedSuccess')) { // Use translated message
-          let divAlert = document.createElement("div")
-          divAlert.className = "alert alert-success pop-up"
-          divAlert.innerText = msg
-          divAlert.style.width = "300px"
-          document.querySelector("#display-page").append(divAlert)
-          removePopUp(divAlert)
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Update static elements that might not be covered by Django's template tags
-            document.querySelector('.offcanvas-title .fs-4').textContent = getJsTranslation('adminPanel');
-            document.querySelector('.offcanvas-header button.btn-close').setAttribute('aria-label', getJsTranslation('Close')); // Assuming 'Close' is needed
-            document.querySelector('.display-page button.btn-primary').textContent = getJsTranslation('menu');
-
-            // Update navigation links
-            const navLinks = document.querySelectorAll(".nav-link");
-            navLinks.forEach(link => {
-                const linkText = link.textContent.trim();
-                if (linkText === "Users") {
-                    link.textContent = getJsTranslation('users');
-                } else if (linkText === "Courses") {
-                    link.textContent = getJsTranslation('courses');
-                } else if (linkText === "Lessons") {
-                    link.textContent = getJsTranslation('lessons');
-                } else if (linkText === "Upload Files") {
-                    link.textContent = getJsTranslation('uploadFiles');
-                } else if (linkText === "Quizzes") {
-                    link.textContent = getJsTranslation('quizzes');
-                }
-            });
-        });
-    </script>
-
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'class="bg-light">
-    <div class="container-fluid p-0">
-        <div class="row g-0">
-            <!-- Sidebar Offcanvas -->
-            <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasDarkLabel">
-                <div class="offcanvas-header">
-                    <h5 class="offcanvas-title text-white d-flex align-items-center" id="offcanvasDarkLabel">
-                        <a href="{% url 'user-dashboard' %}" class="d-flex align-items-center text-white text-decoration-none">
-                            <i class="fas fa-graduation-cap me-2 fs-4"></i>
-                            <span class="fs-4">{% translate "Admin Panel" %}</span>
-                        </a>
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="{% translate "Close" %}"></button>
-                </div>
-                <div class="offcanvas-body">
-                    <div class="border-bottom border-light mb-3 opacity-25"></div>
-                    <nav>
-                        <ul class="nav nav-pills flex-column mb-auto">
-                            <li class="nav-item">
-                                <a class="nav-link text-white" href="{% url 'home' %}">
-                                    <i class="fas fa-home me-2"></i>
-                                    {% translate "Home" %}
-                                </a>
-                            </li>
-                            {% if request.user.role.role == "admin" %}
-                                <li class="nav-item">
-                                    <a class="nav-link text-white" aria-current="page" 
-                                        hx-get="{% url 'user-dashboard' %}"
-                                        hx-trigger="click"
-                                        hx-target="#display-page"
-                                        hx-swap="innerHTML"
-                                        hx-push-url="true"
-                                        hx-select="#content">
-                                        <i class="fa-light fa-user-pen me-2"></i>
-                                        {% translate "Users" %}
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link text-white"
-                                        hx-get="{% url 'course-dashboard' %}"
-                                        hx-trigger="click"
-                                        hx-target="#display-page"
-                                        hx-swap="innerHTML"
-                                        hx-push-url="true"
-                                        hx-select="#content">
-                                        <i class="fa-light fa-book-open me-2"></i>
-                                        {% translate "Courses" %}
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link text-white"
-                                        hx-get="{% url 'lesson-dashboard' %}"
-                                        hx-trigger="click"
-                                        hx-target="#display-page"
-                                        hx-swap="innerHTML"
-                                        hx-push-url="true"
-                                        hx-select="#content">
-                                        <i class="fa-light fa-file-video me-2"></i>
-                                        {% translate "Lessons" %}
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link text-white"
-                                        hx-get="{% url 'upload-files' %}"
-                                        hx-trigger="click"
-                                        hx-target="#display-page"
-                                        hx-swap="innerHTML"
-                                        hx-push-url="true"
-                                        hx-select="#content"
-                                        hx-refresh="true">
-                                        <i class="fa-light fa-cloud-upload me-2"></i>
-                                        {% translate "Upload Files" %}
-                                    </a>
-                                </li>
-                            {% endif %}
-                            <li class="nav-item">
-                                <a class="nav-link text-white"
-                                    hx-get="{% url 'quiz-dashboard' %}"
-                                    hx-trigger="click"
-                                    hx-target="#display-page"
-                                    hx-swap="innerHTML"
-                                    hx-push-url="true"
-                                    hx-select="#content">
-                                    <i class="fa-light fa-list-check me-2"></i>
-                                    {% translate "Quizzes" %}
-                                </a>
-                            </li>
-                        </ul>
-                    </nav>
-                    <div class="border-top border-light mt-3 opacity-25"></div>
-                </div>
-            </div>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    
+    <!-- Toast Notifications -->
+    {% include 'partials/components/toast_container.html' %}
+    
+    <!-- Main Admin Layout -->
+    <div class="admin-layout ad-shell"
+         x-data
+         :class="{ 'is-sidebar-collapsed': $store.ui.sidebarCollapsed }">
+        <!-- Sidebar Component -->
+        {% include 'partials/components/admin_sidebar.html' %}
+        
+        <!-- Main Content Area -->
+        <main id="display-page" class="admin-main-content ad-panes">
+            {% block breadcrumbs %}{% include 'partials/admin_breadcrumbs.html' %}{% endblock %}
+            {% block body %}
+            <div class="container-fluid px-3 ad-dashboard-page">
 
-            <!-- Main Content -->
-            <div class="col">
-                <div class="display-page">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <button class="btn btn-primary menu-toggle d-flex align-items-center" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasExample" aria-controls="offcanvasExample">
-                            <i class="fas fa-bars me-2"></i>
-                            {% translate "Menu" %}
-                        </button>
-                        <div class="d-flex align-items-center">
-                            <small class="text-muted">
-                                <i class="fas fa-user-circle me-1"></i>
-                                {{ request.user.get_full_name|default:request.user.username }}
-                            </small>
+                <!-- ===== PAGE HEADER ===== -->
+                <div class="ad-page-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-tachometer-alt me-2 ad-page-header-icon"></i>{% translate "Dashboard" %}</h4>
+                    <span class="ad-page-date"><i class="far fa-calendar-alt me-1"></i>{{ today|date:"l, F j, Y" }}</span>
+                </div>
+
+                <!-- ===== SUMMARY METRIC CARDS ===== -->
+                <div class="ad-stats mb-4">
+                    <div class="ad-stat">
+                        <i class="fas fa-users ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.users|default:0 }}</b>
+                            <span>{% translate "Total Users" %}</span>
                         </div>
                     </div>
-                    <div id="display-page">
-                        {% block body %}
-                        <div class="row">
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title mb-0">
-                                            <i class="fas fa-tachometer-alt me-2"></i>
-                                            {% translate "Dashboard" %}
-                                        </h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-12 col-md-6 col-lg-3 mb-4">
-                                                <div class="card bg-primary text-white">
-                                                    <div class="card-body text-center">
-                                                        <i class="fas fa-users fs-1 mb-3"></i>
-                                                        <h4>0</h4>
-                                                        <p class="mb-0">{% translate "Total Users" %}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-6 col-lg-3 mb-4">
-                                                <div class="card bg-success text-white">
-                                                    <div class="card-body text-center">
-                                                        <i class="fas fa-book-open fs-1 mb-3"></i>
-                                                        <h4>0</h4>
-                                                        <p class="mb-0">{% translate "Total Courses" %}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-6 col-lg-3 mb-4">
-                                                <div class="card bg-info text-white">
-                                                    <div class="card-body text-center">
-                                                        <i class="fas fa-play-circle fs-1 mb-3"></i>
-                                                        <h4>0</h4>
-                                                        <p class="mb-0">{% translate "Total Lessons" %}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-6 col-lg-3 mb-4">
-                                                <div class="card bg-warning text-white">
-                                                    <div class="card-body text-center">
-                                                        <i class="fas fa-question-circle fs-1 mb-3"></i>
-                                                        <h4>0</h4>
-                                                        <p class="mb-0">{% translate "Total Quizzes" %}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                    <div class="ad-stat ad-stat--green">
+                        <i class="fas fa-book-open ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.courses|default:0 }}</b>
+                            <span>{% translate "Total Courses" %}</span>
+                        </div>
+                    </div>
+                    <div class="ad-stat">
+                        <i class="fas fa-play-circle ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.lessons|default:0 }}</b>
+                            <span>{% translate "Total Lessons" %}</span>
+                        </div>
+                    </div>
+                    <div class="ad-stat ad-stat--gold">
+                        <i class="fas fa-question-circle ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.quizzes|default:0 }}</b>
+                            <span>{% translate "Total Quizzes" %}</span>
+                        </div>
+                    </div>
+                    <div class="ad-stat ad-stat--red">
+                        <i class="fas fa-graduation-cap ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.academic_years|default:0 }}</b>
+                            <span>{% translate "Academic Years" %}</span>
+                        </div>
+                    </div>
+                    <div class="ad-stat ad-stat--gold">
+                        <i class="fas fa-layer-group ad-stat-ic"></i>
+                        <div>
+                            <b>{{ admin_metrics.offerings|default:0 }}</b>
+                            <span>{% translate "Offerings" %}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== ROW 1: USER ANALYTICS ===== -->
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-user-tag"></i>{% translate "Users by Role" %}</h6>
+                            {% for item in users_by_role %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.role__role|default:_("Unknown")|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
                         </div>
-                        {% endblock %}
                     </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-clipboard-check"></i>{% translate "Application Status" %}</h6>
+                            {% for item in users_by_app_status %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.application_status|default:_("Unknown")|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill {% if item.application_status == 'active' %}ad-bar-fill--green{% elif item.application_status == 'pending' %}ad-bar-fill--warning{% elif item.application_status == 'declined' %}ad-bar-fill--danger{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-laptop-house"></i>{% translate "Study Mode" %}</h6>
+                            {% for item in users_by_study_mode %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.study_mode|default:_("Not Set")|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-user-plus"></i>{% translate "New Users" %}</h6>
+                            <div class="ad-stat-grid">
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--success">{{ new_users_week }}</div>
+                                    <div class="ad-stat-label">{% translate "This Week" %}</div>
+                                </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ new_users_month }}</div>
+                                    <div class="ad-stat-label">{% translate "This Month" %}</div>
+                                </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value">{{ admin_metrics.users }}</div>
+                                    <div class="ad-stat-label">{% translate "Total" %}</div>
+                                </div>
+                            </div>
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Top Cities" %}</h6>
+                            {% for city in top_cities|slice:":5" %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label ad-bar-label--sm">{{ city.city }}</span>
+                                <div class="ad-bar-track ad-bar-track--sm">
+                                    {% widthratio city.count admin_metrics.users 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--slate ad-bar-fill--sm" style="width:{{ pct }}%">{{ city.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== ROW 2: COURSE, LESSON, QUIZ & ACADEMIC YEAR ===== -->
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-layer-group"></i>{% translate "Courses by Level" %}</h6>
+                            {% for item in courses_by_level %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{% translate "Level" %} {{ item.level }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.courses 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Avg Lessons / Course" %}</span>
+                                <span class="ad-kv-value">{{ avg_lessons_per_course }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-video"></i>{% translate "Lessons" %}</h6>
+                            {% for item in lessons_by_status %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.status|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.lessons 100 as pct %}
+                                    <div class="ad-bar-fill {% if item.status == 'published' %}ad-bar-fill--green{% elif item.status == 'draft' %}ad-bar-fill--warning{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Offerings by Status" %}</h6>
+                            {% for item in offerings_by_status %}
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{{ item.status|title }}</span>
+                                <span class="ad-kv-value">{{ item.count }}</span>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-question-circle"></i>{% translate "Quizzes" %}</h6>
+                            {% for item in quizzes_by_status %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{{ item.status|title }}</span>
+                                <div class="ad-bar-track">
+                                    {% widthratio item.count admin_metrics.quizzes 100 as pct %}
+                                    <div class="ad-bar-fill {% if item.status == 'published' %}ad-bar-fill--green{% elif item.status == 'draft' %}ad-bar-fill--warning{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Total Submissions" %}</span>
+                                <span class="ad-kv-value">{{ total_submissions }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Avg Grade" %}</span>
+                                <span class="ad-kv-value">{{ avg_grade }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Submissions / Quiz" %}</span>
+                                {% if admin_metrics.quizzes %}
+                                <span class="ad-kv-value">{% widthratio total_submissions admin_metrics.quizzes 1 %}</span>
+                                {% else %}
+                                <span class="ad-kv-value">0</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-calendar-alt"></i>{% translate "Current Academic Year" %}</h6>
+                            {% for year in current_academic_years %}
+                            <div class="mb-3">
+                                <div class="ad-stat-value">{{ year.name }}</div>
+                                <div class="ad-stat-label ad-meeting-label ad-meeting-label--plain">{{ year.starts_on|date:"Y-m-d" }} &rarr; {{ year.ends_on|date:"Y-m-d" }}</div>
+                            </div>
+                            {% if year.level_links.all %}
+                            <div>
+                                <span class="ad-stat-label ad-heading-inline">{% translate "Meeting Days" %}</span>
+                                <div>
+                                    {% for link in year.level_links.all %}
+                                    <span class="fw-semibold me-1 ad-meeting-label">{{ link.level.display_name }}:</span>
+                                    {% for wd in link.meeting_weekdays %}
+                                    <span class="ad-pill ad-pill--muted me-1">
+                                        {% if wd == 0 %}{% translate "Mon" %}{% elif wd == 1 %}{% translate "Tue" %}{% elif wd == 2 %}{% translate "Wed" %}{% elif wd == 3 %}{% translate "Thu" %}{% elif wd == 4 %}{% translate "Fri" %}{% elif wd == 5 %}{% translate "Sat" %}{% elif wd == 6 %}{% translate "Sun" %}{% endif %}
+                                    </span>
+                                    {% endfor %}
+                                    {% if not forloop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No current academic year set" %}</p>
+                            {% endfor %}
+                            <hr class="ad-divider">
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Total Academic Years" %}</span>
+                                <span class="ad-kv-value">{{ admin_metrics.academic_years }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Total Offerings" %}</span>
+                                <span class="ad-kv-value">{{ admin_metrics.offerings }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== ROW 3: ENROLLMENTS, PROGRESS & ATTENDANCE ===== -->
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-user-graduate"></i>{% translate "Enrollments" %} <span class="ad-pill ad-pill--teal ms-2">{{ enrollments_total }}</span></h6>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <h6 class="ad-card-subheading mb-2">{% translate "By Status" %}</h6>
+                                    {% for item in enrollments_by_status %}
+                                    <div class="ad-kv-row ad-kv-row--compact">
+                                        <span class="ad-kv-label">{{ item.status|title }}</span>
+                                        <span class="ad-kv-value">{{ item.count }}</span>
+                                    </div>
+                                    {% empty %}
+                                    <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-6">
+                                    <h6 class="ad-card-subheading mb-2">{% translate "By Type" %}</h6>
+                                    {% for item in enrollments_by_type %}
+                                    <div class="ad-kv-row ad-kv-row--compact">
+                                        <span class="ad-kv-label">{{ item.enrollment_type|title }}</span>
+                                        <span class="ad-kv-value">{{ item.count }}</span>
+                                    </div>
+                                    {% empty %}
+                                    <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% if enrollments_by_level %}
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "By Level" %}</h6>
+                            {% for item in enrollments_by_level %}
+                            <div class="ad-bar">
+                                <span class="ad-bar-label">{% translate "Level" %} {{ item.level|default:"N/A" }}</span>
+                                <div class="ad-bar-track ad-bar-track--sm">
+                                    {% widthratio item.count enrollments_total 100 as pct %}
+                                    <div class="ad-bar-fill ad-bar-fill--teal ad-bar-fill--sm" style="width:{{ pct }}%">{{ item.count }}</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-chart-line"></i>{% translate "Lecture Progress" %}</h6>
+                            <div class="ad-stat-grid">
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ progress_total }}</div>
+                                    <div class="ad-stat-label">{% translate "Records" %}</div>
+                                </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--success">{{ students_with_progress }}</div>
+                                    <div class="ad-stat-label">{% translate "Students" %}</div>
+                                </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ completed_lectures }}</div>
+                                    <div class="ad-stat-label">{% translate "Completed" %}</div>
+                                </div>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Avg Completion" %}</span>
+                                <span class="ad-kv-value">{{ avg_completion }}%</span>
+                            </div>
+                            <div class="ad-meter ad-meter--thin mb-3">
+                                <span style="width:{{ avg_completion }}%"></span>
+                            </div>
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Enrollments by Year" %}</h6>
+                            {% for item in enrollments_by_year|slice:":5" %}
+                            <div class="ad-kv-row ad-kv-row--compact">
+                                <span class="ad-kv-label">{{ item.academic_year_level__academic_year__name }} — {% translate "Level" %} {{ item.academic_year_level__level__ordering }}</span>
+                                <span class="ad-kv-value">{{ item.count }}</span>
+                            </div>
+                            {% empty %}
+                            <p class="ad-empty-state mb-0">{% translate "No data" %}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-body">
+                            <h6 class="ad-section-title"><i class="fas fa-clipboard-list"></i>{% translate "Attendance" %}</h6>
+                            <div class="ad-stat-grid">
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--warning">{{ today_attendance }}</div>
+                                    <div class="ad-stat-label">{% translate "Today Records" %}</div>
+                                </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value ad-stat-value--teal">{{ today_students }}</div>
+                                    <div class="ad-stat-label">{% translate "Today Students" %}</div>
+                                </div>
+                                <div class="ad-stat-grid-item">
+                                    <div class="ad-stat-value">{{ attendance_total }}</div>
+                                    <div class="ad-stat-label">{% translate "Total Records" %}</div>
+                                </div>
+                            </div>
+                            <hr class="ad-divider">
+                            <h6 class="ad-card-subheading mb-2">{% translate "Stats Summary" %}</h6>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Students w/ Progress" %}</span>
+                                <span class="ad-kv-value">{{ students_with_progress }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Completed Lectures" %}</span>
+                                <span class="ad-kv-value">{{ completed_lectures }}</span>
+                            </div>
+                            <div class="ad-kv-row">
+                                <span class="ad-kv-label">{% translate "Progress Records" %}</span>
+                                <span class="ad-kv-value">{{ progress_total }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== ROW 4: RECENT ACTIVITY ===== -->
+                <div class="ad-grid-2 mb-4">
+                    <div class="ad-card">
+                        <div class="ad-card-head">
+                            <i class="fas fa-user-plus"></i>
+                            {% translate "Recent Enrollments" %}
+                        </div>
+                        <div class="ad-card-body p-0">
+                            {% for enrollment in recent_enrollments %}
+                            <div class="ad-activity">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="ad-activity-name">{{ enrollment.student.get_full_name|default:enrollment.student.username }}</div>
+                                        <div class="ad-activity-meta">
+                                            {{ enrollment.academic_year_level.academic_year.name }} &middot;
+                                            {% if enrollment.course_offering %}
+                                            {{ enrollment.course_offering.course.name }}
+                                            {% else %}
+                                            {% translate "Full Year" %}
+                                            {% endif %}
+                                            &middot; <span class="ad-pill ad-pill--{% if enrollment.enrollment_type == 'normal' %}teal{% elif enrollment.enrollment_type == 'repeat' %}warning{% elif enrollment.enrollment_type == 'remedial' %}danger{% else %}muted{% endif %}">{{ enrollment.enrollment_type|title }}</span>
+                                        </div>
+                                    </div>
+                                    <span class="ad-activity-date">{{ enrollment.enrolled_at|date:"M j, Y" }}</span>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="ad-empty">
+                                <i class="fas fa-inbox"></i>
+                                {% translate "No recent enrollments" %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ad-card">
+                        <div class="ad-card-head">
+                            <i class="fas fa-file-alt"></i>
+                            {% translate "Recent Quiz Submissions" %}
+                        </div>
+                        <div class="ad-card-body p-0">
+                            {% for submission in recent_submissions %}
+                            <div class="ad-activity">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="ad-activity-name">{{ submission.user.get_full_name|default:submission.user.username }}</div>
+                                        <div class="ad-activity-meta">{{ submission.quiz.name }} &middot; {% translate "Grade" %}: {{ submission.total_grade }}/{{ submission.quiz.total_grade }}</div>
+                                    </div>
+                                    <span class="ad-activity-date">{{ submission.submitted_at|date:"M j, Y H:i" }}</span>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="ad-empty">
+                                <i class="fas fa-inbox"></i>
+                                {% translate "No recent submissions" %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            {% endblock %}
+        </main>
+    </div>
+        </div>
+    </div>
+    <!-- Bootstrap JS is loaded in <head> — no defer duplicate needed -->
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous" defer></script>
+    
+    <!-- Alpine.js Setup: All scripts use defer to load in order after DOM parsing -->
+    <!-- 1. Persist Plugin -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.13.3/dist/cdn.min.js"></script>
+    
+    <!-- 2. Store Definitions (will register alpine:init listeners) -->
+    <script defer src="{% static 'js/alpine/stores/ui.js' %}"></script>
+    <script defer src="{% static 'js/alpine/stores/notifications.js' %}"></script>
+    
+    <!-- 3. Alpine.js Component Scripts (MUST load before Alpine Core) -->
+    <script defer src="{% static 'js/alpine/components/autoSave.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/bulkActions.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/columnManager.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/lessonForm.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/quizForm.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/r2Manager.js' %}"></script>
+    <!-- Dashboard / table components — extracted so they are globally available
+         BEFORE Alpine.initTree() runs after any HTMX swap -->
+    <script defer src="{% static 'js/alpine/components/dashboardManager.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/filterManager.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/tableManager.js' %}"></script>
+    <script defer src="{% static 'js/alpine/components/progressTracker.js' %}?v=20260801-lesson-ui-3"></script>
+    
+    <!-- 4. Alpine.js Global Component Registration (MUST be before Alpine Core) -->
+    <script defer>
+        document.addEventListener('alpine:init', () => {
+            // Register components globally so they're available after HTMX swaps
+            Alpine.data('r2Manager', r2Manager);
+            Alpine.data('lessonForm', lessonForm);
+            Alpine.data('autoSave', autoSave);
+            Alpine.data('columnManager', columnManager);
+            Alpine.data('bulkActions', bulkActions);
+            Alpine.data('quizForm', quizForm);
+            Alpine.data('formValidation', formValidation);
+            Alpine.data('dashboardManager', dashboardManager);
+            Alpine.data('filterManager', filterManager);
+            Alpine.data('tableManager', tableManager);
+            Alpine.data('progressTracker', progressTracker);
+        });
+
+        // NOTE: We do NOT manually call Alpine.initTree() after HTMX swaps.
+        // Alpine 3's built-in MutationObserver detects new x-data nodes automatically.
+        // All component factory functions are now loaded in static files (above), so
+        // they are defined before any swap happens — no timing race condition.
+    </script>
+    
+    <!-- 5. Alpine.js Core (will fire alpine:init event AFTER components are defined) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    
+    <!-- Extra Scripts Block for Child Templates -->
+    {% block extra_scripts %}{% endblock %}
+    
+    <!-- Offcanvas Auto-Close Script -->
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const offcanvasLinks = document.querySelectorAll(".offcanvas .nav-link");
+        const closeButton = document.querySelector(".offcanvas .btn-close");
+        
+        offcanvasLinks.forEach(link => {
+          link.addEventListener("click", () => {
+            if (closeButton) closeButton.click();
+          });
+        });
+      });
+    </script>
+    
+    <!-- Global Components -->
+    {% include 'partials/components/loading_overlay.html' %}
+
+    <!-- Global Confirmation Modal (used by hx-confirm and bulk actions) -->
+    <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-triangle ad-icon--danger"></i>
+                        {% translate "Confirm Action" %}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="globalConfirmMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        {% translate "Cancel" %}
+                    </button>
+                    <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" id="globalConfirmButton" data-bs-dismiss="modal">
+                        <i class="fas fa-check me-1"></i>
+                        {% translate "Confirm" %}
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Safe modal helpers — catch Bootstrap backdrop edge cases -->
     <script>
-      offcanvasURLS = document.querySelectorAll(".nav-link")
-      offcanvasURLS.forEach(element => {
-        element.addEventListener("click", () => {
-          document.querySelector(".btn-close").click()
-        })
-      });
+        document.addEventListener('htmx:confirm', function (e) {
+            if (!e.detail.question) return;
+            e.preventDefault();
+
+            const modal = document.getElementById('globalConfirmModal');
+            const message = document.getElementById('globalConfirmMessage');
+            const confirmBtn = document.getElementById('globalConfirmButton');
+            if (!modal) return;
+
+            message.textContent = e.detail.question;
+
+            const newBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+
+            newBtn.addEventListener('click', function () {
+                const inst = bootstrap.Modal.getInstance(modal);
+                if (inst) inst.hide();
+                e.detail.issueRequest(true);
+            });
+
+            try { bootstrap.Modal.getOrCreateInstance(modal).show(); } catch (_) {}
+        });
+
+        // Patch Bootstrap Modal to suppress backdrop edge-case errors
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            var OrigModal = bootstrap.Modal;
+            var origGetOrCreate = OrigModal.getOrCreateInstance;
+            OrigModal.getOrCreateInstance = function (el, config) {
+                try { return origGetOrCreate.call(this, el, config); } catch (_) { return null; }
+            };
+            // Also patch getInstance to never throw
+            var origGetInstance = OrigModal.getInstance;
+            if (origGetInstance) {
+                OrigModal.getInstance = function (el) {
+                    try { return origGetInstance.call(this, el); } catch (_) { return null; }
+                };
+            }
+        }
     </script>
 </body>
 </html>

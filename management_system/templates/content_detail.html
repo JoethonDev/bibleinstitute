@@ -1,0 +1,248 @@
+{% extends "admin_panel.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<nav aria-label="{% translate 'Content breadcrumb' %}">
+  <ol class="breadcrumb bg-transparent px-0 pt-2 mb-2 small">
+    <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}"><i class="fas fa-tachometer-alt me-1"></i>{% translate "Dashboard" %}</a></li>
+    {% if is_quiz %}
+    <li class="breadcrumb-item"><a href="{% url 'quiz-dashboard' %}">{% translate "Quizzes" %}</a></li>
+    {% else %}
+    <li class="breadcrumb-item"><a href="{% url 'lesson-dashboard' %}">{% translate "Lessons" %}</a></li>
+    {% endif %}
+    <li class="breadcrumb-item active" aria-current="page">{{ content.name|default:_("(untitled)") }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-3 ad-page">
+
+  {% if back_url %}
+  <a href="{{ back_url }}" class="ad-btn ad-btn--ghost ad-btn--sm mb-3">
+    <i class="fas fa-arrow-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %} me-1"></i>
+    {% translate "Back" %}
+  </a>
+  {% endif %}
+
+  <!-- ── Detail Head ── -->
+  <div class="ad-detail-head mb-4">
+    <div class="ad-detail-ic">
+      {% if is_quiz %}<i class="fas fa-question-circle"></i>{% else %}<i class="fas fa-video"></i>{% endif %}
+    </div>
+    <div>
+      <h4 class="ad-detail-title mb-0">{{ content.name|default:_("(untitled)") }}</h4>
+      <p class="ad-detail-sub mb-0">{% if is_quiz %}{% translate "Quiz" %}{% else %}{% translate "Lesson" %}{% endif %}</p>
+    </div>
+    <div class="ad-detail-badges">
+      {% if content.status == "published" %}
+      <span class="ad-detail-badge ad-pill--success">{{ content.get_status_display }}</span>
+      {% elif content.status == "draft" %}
+      <span class="ad-detail-badge ad-pill--warning">{{ content.get_status_display }}</span>
+      {% elif content.status == "archived" %}
+      <span class="ad-detail-badge ad-pill--muted">{{ content.get_status_display }}</span>
+      {% else %}
+      <span class="ad-detail-badge">{{ content.get_status_display|default:"—" }}</span>
+      {% endif %}
+      {% if edit_url %}
+      <a href="{{ edit_url }}" class="ad-detail-badge ad-detail-badge--action">
+        <i class="fas fa-edit me-1"></i>{% translate "Edit" %}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Metadata Grid ── -->
+  <div class="ad-meta-grid mb-4">
+    <div class="ad-meta-item">
+      <b>{% translate "Course" %}</b>
+      <span>{{ offering.course.name|default:"—" }}</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Level" %}</b>
+      <span>{{ offering.academic_year_level.level.display_name|default:"—" }}</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Academic Year" %}</b>
+      <span>{{ offering.academic_year_level.academic_year.name|default:"—" }}</span>
+    </div>
+
+    {% if is_quiz %}
+    <div class="ad-meta-item">
+      <b>{% translate "Quiz Type" %}</b>
+      <span>{{ content.quiz_type|default:_("Unassigned") }}</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Total Grade" %}</b>
+      <span>{{ content.total_grade }}</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Opens" %}</b>
+      <span>{{ content.opening_date|date:"SHORT_DATETIME_FORMAT"|default:"—" }}</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Closes" %}</b>
+      <span>{{ content.closing_date|date:"SHORT_DATETIME_FORMAT"|default:"—" }}</span>
+    </div>
+    {% else %}
+    <div class="ad-meta-item">
+      <b>{% translate "Created" %}</b>
+      <span>{{ content.created_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Last Updated" %}</b>
+      <span>{{ content.updated_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</span>
+    </div>
+    {% endif %}
+
+    <div class="ad-meta-item">
+      <b>{% translate "Course Offering" %}</b>
+      <span>{{ offering.course.name|default:"—" }} ({{ offering.academic_year_level.level.display_name|default:"—" }})</span>
+    </div>
+    <div class="ad-meta-item">
+      <b>{% translate "Offering Status" %}</b>
+      <span>
+        {% if offering.status == "published" %}
+        <span class="ad-pill ad-pill--success">{{ offering.get_status_display }}</span>
+        {% elif offering.status == "draft" %}
+        <span class="ad-pill ad-pill--warning">{{ offering.get_status_display }}</span>
+        {% elif offering.status == "archived" %}
+        <span class="ad-pill ad-pill--muted">{{ offering.get_status_display }}</span>
+        {% else %}
+        <span class="ad-pill ad-pill--muted">{{ offering.get_status_display|default:"—" }}</span>
+        {% endif %}
+      </span>
+    </div>
+  </div>
+
+  <!-- ── Content Section ── -->
+  {% if is_quiz %}
+    <!-- ════ QUIZ QUESTIONS ════ -->
+    <div class="ad-card mb-4">
+      <div class="ad-card-head">
+        <i class="fas fa-list-ol"></i>
+        <span>{% translate "Questions" %}</span>
+      </div>
+      {% if questions %}
+      <div class="ad-table-wrap">
+        <table class="ad-table">
+          <thead>
+            <tr>
+              <th scope="col" class="text-center ad-col-number">#</th>
+              <th scope="col">{% translate "Title" %}</th>
+              <th scope="col">{% translate "Type" %}</th>
+              <th scope="col" class="text-center">{% translate "Grade" %}</th>
+              <th scope="col" class="text-center">{% translate "Auto Grade" %}</th>
+              <th scope="col">{% translate "Choices / Answer" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in questions %}
+            <tr>
+              <td class="text-center ps-muted-text">{{ forloop.counter }}</td>
+              <td class="fw-semibold">{{ q.title|default:"—" }}</td>
+              <td>{{ q.get_question_type_display|default:q.question_type }}</td>
+              <td class="text-center">{{ q.grade }}</td>
+              <td class="text-center">
+                {% if q.auto_grade %}
+                <span class="ad-pill ad-pill--success"><i class="fas fa-check me-1"></i>{% translate "Auto" %}</span>
+                {% else %}
+                <span class="ad-pill ad-pill--warning"><i class="fas fa-pencil-alt me-1"></i>{% translate "Manual" %}</span>
+                {% endif %}
+              </td>
+              <td class="ad-answer-cell">
+                {% if q.question_type == "mcq" and q.choices %}
+                <button class="ad-btn ad-btn--ghost ad-btn--sm" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#choices-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="choices-{{ forloop.counter }}">
+                  <i class="fas fa-eye me-1"></i>{% translate "View choices" %}<i class="fas fa-chevron-down ad-collapse-indicator ms-1"></i>
+                </button>
+                <div class="collapse mt-1" id="choices-{{ forloop.counter }}">
+                  <ul class="list-unstyled mb-0">
+                  {% for choice in q.get_choices_list %}
+                    <li><span class="ad-pill ad-pill--muted me-1">{{ forloop.counter }}</span> {{ choice }}</li>
+                  {% empty %}
+                    <li class="ps-muted-text">{% translate "(no choices)" %}</li>
+                  {% endfor %}
+                  </ul>
+                  {% if q.correct_answer %}
+                  <div class="mt-1 text-success small">
+                    <i class="fas fa-check-circle me-1"></i><strong>{% translate "Answer:" %}</strong> {{ q.correct_answer }}
+                  </div>
+                  {% endif %}
+                </div>
+                {% elif q.question_type in "order_events match_related" and q.config %}
+                <button class="ad-btn ad-btn--ghost ad-btn--sm" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#config-{{ forloop.counter }}"
+                        aria-expanded="false" aria-controls="config-{{ forloop.counter }}">
+                  <i class="fas fa-eye me-1"></i>{% translate "View config" %}<i class="fas fa-chevron-down ad-collapse-indicator ms-1"></i>
+                </button>
+                <div class="collapse mt-1 small" id="config-{{ forloop.counter }}">
+                  <pre class="mb-0 ad-pre-config">{{ q.config|pprint|default:_("(empty)") }}</pre>
+                </div>
+                {% elif q.question_type == "written" or q.question_type == "complete" %}
+                  {% if q.correct_answer %}
+                  <span class="text-success"><i class="fas fa-check-circle me-1"></i>{% translate "Answer:" %} {{ q.correct_answer }}</span>
+                  {% else %}
+                  <span class="ps-muted-text">{% translate "(open / manual grade)" %}</span>
+                  {% endif %}
+                {% else %}
+                <span class="ps-muted-text">{% translate "(no preview)" %}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="ad-empty">
+        <i class="fas fa-inbox"></i>
+        <p>{% translate "No questions have been added to this quiz yet." %}</p>
+      </div>
+      {% endif %}
+    </div>
+
+  {% else %}
+    <!-- ════ LESSON LINKS ════ -->
+    <div class="ad-card mb-4">
+      <div class="ad-card-head">
+        <i class="fas fa-link"></i>
+        <span>{% translate "Lesson Links" %}</span>
+      </div>
+      {% if lesson_links %}
+      <div class="ad-table-wrap">
+        <table class="ad-table">
+          <thead>
+            <tr>
+              <th scope="col" class="text-center ad-col-number">#</th>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "File Type" %}</th>
+              <th scope="col">{% translate "ID" %}</th>
+              <th scope="col">{% translate "Type" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in lesson_links %}
+            <tr>
+              <td class="text-center ps-muted-text">{{ forloop.counter }}</td>
+              <td>{{ link.name|default:link.file_id|default:link.id|default:_("(unnamed)") }}</td>
+              <td><span class="ad-pill ad-pill--muted">{{ link.file_type|default:link.type|default:_("—") }}</span></td>
+              <td class="small ps-muted-text">{{ link.file_id|default:link.id|default:_("—") }}</td>
+              <td class="small ps-muted-text">{{ link.type|default:_("—") }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="ad-empty">
+        <i class="fas fa-link"></i>
+        <p>{% translate "No file links have been added to this lesson yet." %}</p>
+      </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

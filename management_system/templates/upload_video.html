@@ -2,13 +2,18 @@
 {% load i18n %}
 
 {% block body %}
-    <div id="content" class="d-flex flex-column h-100">
+    <div id="content" class="ad-page d-flex flex-column">
 
-        <button class="btn btn-primary loading m-auto mb-3 w-50" type="button" disabled>
+        <button class="ad-btn ad-btn--teal loading m-auto mb-3 w-50 d-block text-center" type="button" disabled>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
             <span class="info">{% translate "Loading..." %}</span>
         </button>
-        <div class="form col-12 col-md-8 col-lg-6 m-auto overflow-y-scroll p-2">
+        <div class="text-center mb-3">
+            <a href="{% url 'lesson-create' %}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                <i class="fas fa-plus-circle me-1"></i>{% translate "Create Lesson" %}
+            </a>
+        </div>
+        <div class="ad-card col-12 col-md-8 col-lg-6 m-auto p-3">
             <div class="mb-3">
                 <label for="folder-name" class="form-label">{% translate "Folder" %}</label>
                 <input class="form-control" type="text" id="folder-name" name="folder" dir=ltr>
@@ -17,17 +22,72 @@
                 {% include 'drive_files.html' %}
             </div> -->
             <!-- Drive Files Card -->
-            <div class="card shadow-sm border-0 flex-grow-1">
-                <div class="card-header">
-                    <h6 class="mb-0">{% translate "Select Files from Drive" %}</h6>
+            <div class="ad-card flex-grow-1">
+                <div class="ad-card-head">
+                    <i class="fas fa-folder-open"></i>{% translate "Select Folder from Drive" %}
                 </div>
-                <div id="drive-files" class="card-body overflow-auto" style="min-height: 300px;">
-                    {% include 'drive_files.html' %}
+                <div id="drive-files" class="ad-card-body overflow-auto min-h-300">
+                    {% include 'drive_files.html' with folders_only=True %}
                 </div>
             </div>
             <div class="mb-3">
                 <label for="formFileMultiple" class="form-label">{% translate "Upload Files" %}</label>
-                <input class="form-control" type="file" id="formFileMultiple" multiple>
+                <input 
+                    class="form-control" 
+                    type="file" 
+                    id="formFileMultiple" 
+                    accept="video/mp4,audio/mp3,audio/mpeg,application/pdf,.mp4,.mp3,.pdf"
+                    multiple>
+                <small class="form-text text-muted">
+                    {% translate "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 2GB per file." %}
+                </small>
+            </div>
+
+            <!-- Scheduled Lesson Section -->
+            <div id="scheduled-lesson-section" class="ad-card mb-3">
+                <div class="ad-card-body">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="schedule-lesson-toggle">
+                        <label class="form-check-label" for="schedule-lesson-toggle">
+                            {% translate "Create a lesson draft from uploaded files" %}
+                        </label>
+                    </div>
+                    <div id="scheduled-lesson-fields" class="d-none">
+                        <div class="mb-2">
+                            <label for="lesson-name-input" class="form-label">{% translate "Lesson Name" %}</label>
+                            <input type="text" class="form-control" id="lesson-name-input"
+                                   placeholder="{% translate 'Enter lesson name' %}">
+                        </div>
+                        <div class="mb-2">
+                            <label for="course-offering-select" class="form-label">{% translate "Course Offering" %}</label>
+                            <select class="form-select" id="course-offering-select">
+                                <option value="">{% translate "Select offering..." %}</option>
+                                {% for offering in course_offerings %}
+                                <option value="{{ offering.pk }}">
+                                    {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="expected-files-preview" class="d-none mb-2">
+                            <h6>{% translate "Expected files after upload" %}</h6>
+                            <ul id="expected-files-list" class="list-group"></ul>
+                        </div>
+                        <div id="schedule-status" class="alert d-none mb-0" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation Errors Display -->
+            <div id="validation-errors" class="ad-alert ad-alert--danger d-none" role="alert">
+                <h6 class="mt-0 mb-1">{% translate "Invalid Files" %}</h6>
+                <ul id="validation-error-list" class="mb-0 ps-3"></ul>
+            </div>
+
+            <!-- Valid Files Display -->
+            <div id="file-list" class="mb-3 d-none">
+                <h6>{% translate "Selected Files" %}</h6>
+                <ul id="file-list-items" class="list-group"></ul>
             </div>
     
             <!-- Progress Bars -->
@@ -35,58 +95,236 @@
                 
             </div>
     
-            <button class="btn btn-primary" id="upload-btn">{% translate "Upload Files" %}</button>
+            <button class="ad-btn ad-btn--teal" id="upload-btn">{% translate "Upload Files" %}</button>
     
         </div>
         
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" xintegrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.0/ffmpeg.min.js" integrity="sha512-tn8AWHJncCEEwBaiPJIqRYPujHs4MqlW+cisEO5PcM8Y6H/WtOaOAuRRzESgMm146midwwY24PkJvz9WIyn9lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         
         <script>
+        // IIFE: wraps all constants and functions in a local scope so that HTMX
+        // re-navigation (which re-executes inline scripts) does not hit
+        // "Identifier already declared" errors from top-level const declarations.
+        (() => {
             // Translations for JavaScript messages
             const jsTranslations_upload = {
-                'en': {
-                    'loading': 'Loading...',
-                    'loaded': 'Loaded!',
-                    'process': 'Process',
-                    'upload': 'Upload',
-                    'videoProcessingFailed': 'Video processing failed for',
-                    'readingSegmentationFailed': 'Reading segmentation for {fileName} has failed',
-                    'videoSegmentationFailed': 'Video segmentation failed',
-                    'audioSegmentationFailed': 'Audio segmentation failed',
-                    'failedToGetPresignedUrl': 'Failed to get presigned URL',
-                    'uploadFailed': 'Upload failed',
-                    'playlistUploadFailed': 'Playlist upload failed:',
-                    'segmentUploadFailed': 'Segment {i} upload failed:',
-                    'uploadProcessFailed': 'Upload process failed:'
-                },
-                'ar': {
-                    'loading': 'جاري التحميل...',
-                    'loaded': 'تم التحميل!',
-                    'process': 'معالجة',
-                    'upload': 'رفع',
-                    'videoProcessingFailed': 'فشلت معالجة الفيديو لـ',
-                    'readingSegmentationFailed': 'فشل قراءة التجزئة لـ {fileName}',
-                    'videoSegmentationFailed': 'فشل تجزئة الفيديو',
-                    'audioSegmentationFailed': 'فشل تجزئة الصوت',
-                    'failedToGetPresignedUrl': 'فشل الحصول على رابط التحميل المسبق',
-                    'uploadFailed': 'فشل الرفع',
-                    'playlistUploadFailed': 'فشل رفع قائمة التشغيل:',
-                    'segmentUploadFailed': 'فشل رفع الجزء {i}:',
-                    'uploadProcessFailed': 'فشل عملية الرفع:'
-                }
+                'loading': '{% translate "Loading..."|escapejs %}',
+                'loaded': '{% translate "Loaded!"|escapejs %}',
+                'process': '{% translate "Process"|escapejs %}',
+                'upload': '{% translate "Upload"|escapejs %}',
+                'videoProcessingFailed': '{% translate "Video processing failed for"|escapejs %}',
+                'readingSegmentationFailed': '{% translate "Reading segmentation for {fileName} has failed"|escapejs %}',
+                'videoSegmentationFailed': '{% translate "Video segmentation failed"|escapejs %}',
+                'audioSegmentationFailed': '{% translate "Audio segmentation failed"|escapejs %}',
+                'failedToGetPresignedUrl': '{% translate "Failed to get presigned URL"|escapejs %}',
+                'uploadFailed': '{% translate "Upload failed"|escapejs %}',
+                'playlistUploadFailed': '{% translate "Playlist upload failed:"|escapejs %}',
+                'segmentUploadFailed': '{% translate "Segment {i} upload failed:"|escapejs %}',
+                'uploadProcessFailed': '{% translate "Upload process failed:"|escapejs %}',
+                'invalidFileType': '{% translate "Invalid file type: {type}. Allowed types: MP4, MP3, PDF"|escapejs %}',
+                'fileSizeExceeded': '{% translate "File size exceeds maximum: {size}MB. Maximum: 2048MB"|escapejs %}',
+                'noFilesSelected': '{% translate "No files selected"|escapejs %}',
+                'invalidFiles': '{% translate "Some files are invalid and will not be uploaded"|escapejs %}',
+                'networkError': '{% translate "Network error during upload"|escapejs %}',
+                'scheduledLessonCreateFailed': '{% translate "Failed to create lesson draft"|escapejs %}',
+                'scheduledLessonFinalizeFailed': '{% translate "Failed to finalize lesson"|escapejs %}',
+                'scheduledLessonCreated': '{% translate "Lesson draft created"|escapejs %}',
+                'scheduledLessonPublished': '{% translate "Lesson published successfully"|escapejs %}',
+                'scheduleLessonNameRequired': '{% translate "Lesson name is required for scheduled upload"|escapejs %}',
+                'scheduleOfferingRequired': '{% translate "Course offering is required for scheduled upload"|escapejs %}',
+                'scheduleStatusCreating': '{% translate "Creating lesson draft..."|escapejs %}',
+                'scheduleStatusFinalizing': '{% translate "Finalizing lesson..."|escapejs %}',
+                'scheduleStatusDraft': '{% translate "Lesson draft created (ID: {id})"|escapejs %}',
+                'scheduleStatusPublished': '{% translate "Lesson published"|escapejs %}',
+                'scheduleStatusFailed': '{% translate "Lesson creation failed"|escapejs %}',
+                'expectedMediaVideoAudio': '{% translate "Video + Audio: {name}"|escapejs %}',
+                'expectedMediaAudio': '{% translate "Audio: {name}"|escapejs %}',
+                'expectedMediaBook': '{% translate "Book: {name}"|escapejs %}',
+                'expectedKey': '{% translate "Expected key:"|escapejs %}'
             };
 
             function getJsTranslation_upload(key, params = {}) {
-                const lang = document.documentElement.lang || 'en';
-                let message = jsTranslations_upload[lang][key] || jsTranslations_upload['en'][key];
+                let message = jsTranslations_upload[key] || key;
                 for (const param in params) {
                     message = message.replace(`{${param}}`, params[param]);
                 }
                 return message;
             }
 
+            // File Validation Constants
+            const ALLOWED_TYPES = {
+                'video/mp4': { ext: '.mp4', label: 'MP4 Video', category: 'video' },
+                'audio/mp3': { ext: '.mp3', label: 'MP3 Audio', category: 'audio' },
+                'audio/mpeg': { ext: '.mp3', label: 'MP3 Audio', category: 'audio' },
+                'application/pdf': { ext: '.pdf', label: 'PDF Document', category: 'document' }
+            };
 
-            ffmpeg = null
+            const ALLOWED_EXTENSIONS = ['.mp4', '.mp3', '.pdf'];
+            const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+
+            // File Validation Functions
+            function getFileExtension(filename) {
+                return filename.slice(filename.lastIndexOf('.')).toLowerCase();
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            }
+
+            function validateFile(file) {
+                const errors = [];
+                const ext = getFileExtension(file.name);
+                
+                // Check extension
+                if (!ALLOWED_EXTENSIONS.includes(ext)) {
+                    errors.push(getJsTranslation_upload('invalidFileType', { type: ext }));
+                }
+                
+                // Check MIME type
+                if (!ALLOWED_TYPES[file.type]) {
+                    errors.push(getJsTranslation_upload('invalidFileType', { type: file.type }));
+                }
+                
+                // Check file size
+                if (file.size > MAX_FILE_SIZE) {
+                    const sizeMB = Math.round(file.size / (1024 * 1024));
+                    errors.push(getJsTranslation_upload('fileSizeExceeded', { size: sizeMB }));
+                }
+                
+                return {
+                    file: file,
+                    isValid: errors.length === 0,
+                    errors: errors,
+                    type: ALLOWED_TYPES[file.type]?.category || 'unknown'
+                };
+            }
+
+            function validateFiles(fileList) {
+                const results = [];
+                
+                for (let i = 0; i < fileList.length; i++) {
+                    results.push(validateFile(fileList[i]));
+                }
+                
+                return {
+                    validFiles: results.filter(r => r.isValid),
+                    invalidFiles: results.filter(r => !r.isValid),
+                    allValid: results.every(r => r.isValid)
+                };
+            }
+
+            function displayValidationErrors(invalidFiles) {
+                const container = document.getElementById('validation-errors');
+                const list = document.getElementById('validation-error-list');
+                
+                if (invalidFiles.length === 0) {
+                    container.classList.add('d-none');
+                    return;
+                }
+                
+                list.innerHTML = '';
+                invalidFiles.forEach(result => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${result.file.name}</strong>: ${result.errors.join(', ')}`;
+                    list.appendChild(li);
+                });
+                
+                container.classList.remove('d-none');
+            }
+
+            function displaySelectedFiles(validFiles) {
+                const container = document.getElementById('file-list');
+                const list = document.getElementById('file-list-items');
+                
+                if (validFiles.length === 0) {
+                    container.classList.add('d-none');
+                    return;
+                }
+                
+                list.innerHTML = '';
+                validFiles.forEach(result => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+                    const fileInfo = document.createElement('div');
+                    fileInfo.innerHTML = `
+                        <strong>${result.file.name}</strong><br>
+                        <small class="text-muted">${ALLOWED_TYPES[result.file.type]?.label || 'Unknown'} - ${formatFileSize(result.file.size)}</small>
+                    `;
+                    
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-success';
+                    badge.textContent = 'Valid';
+                    
+                    li.appendChild(fileInfo);
+                    li.appendChild(badge);
+                    list.appendChild(li);
+                });
+                
+                container.classList.remove('d-none');
+            }
+
+            // Add validation and scheduled preview to file input
+            function updateExpectedPreview() {
+                const isScheduled = document.getElementById('schedule-lesson-toggle').checked;
+                if (!isScheduled) {
+                    document.getElementById('expected-files-preview').classList.add('d-none');
+                    return;
+                }
+                const fileInput = document.getElementById('formFileMultiple');
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    document.getElementById('expected-files-preview').classList.add('d-none');
+                    return;
+                }
+                const validation = validateFiles(fileInput.files);
+                if (validation.validFiles.length === 0) {
+                    document.getElementById('expected-files-preview').classList.add('d-none');
+                    return;
+                }
+                // Reset part counter so preview IDs are deterministic per render
+                _partIdCounter = 0;
+                const folder = (document.getElementById('folder-name') || {}).value || '';
+                const descriptors = calculateExpectedMedia(validation.validFiles, folder);
+                renderExpectedPreview(descriptors);
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const fileInput = document.getElementById('formFileMultiple');
+                
+                fileInput.addEventListener('change', (e) => {
+                    const validation = validateFiles(e.target.files);
+                    displayValidationErrors(validation.invalidFiles);
+                    displaySelectedFiles(validation.validFiles);
+                    updateExpectedPreview();
+                });
+
+                // Schedule toggle shows/hides fields and updates preview
+                const scheduleToggle = document.getElementById('schedule-lesson-toggle');
+                const scheduleFields = document.getElementById('scheduled-lesson-fields');
+                scheduleToggle.addEventListener('change', () => {
+                    if (scheduleToggle.checked) {
+                        scheduleFields.classList.remove('d-none');
+                        updateExpectedPreview();
+                    } else {
+                        scheduleFields.classList.add('d-none');
+                        document.getElementById('expected-files-preview').classList.add('d-none');
+                        hideScheduleStatus();
+                    }
+                });
+
+                // Folder changes re-render expected-files preview
+                const folderInput = document.getElementById('folder-name');
+                if (folderInput) {
+                    folderInput.addEventListener('input', updateExpectedPreview);
+                }
+            });
+
+
+            if (typeof ffmpeg === 'undefined') ffmpeg = null
             uploadBtn = document.getElementById("upload-btn")
             uploadBtn.addEventListener("click", async (e) => {
                 await handleFiles(document.getElementById('formFileMultiple'))
@@ -100,9 +338,9 @@
                 return csrf['X-CSRFToken']
             }
 
-            function createFilePath(fileName) {
+            function createFilePath(fileName, folder = folderName.value) {
                 fileName = fileName.split(".")[0]
-                let value = folderName.value
+                let value = folder
                 let folderValue = (value.endsWith("/")) ? value : `${value}/`
                 return `${folderValue}${fileName}`
             }
@@ -131,23 +369,147 @@
                 progressBar.style.width = currentProgress
             }
 
+            window.__adminUploadQueue = window.__adminUploadQueue || { items: [], running: false };
+
+            // Global batch counter for unique batch IDs
+            window.__scheduledBatchCounter = window.__scheduledBatchCounter || 0;
+
             async function handleFiles(input) {
                 const files = input.files;
-                if (files.length === 0) return;
+                if (files.length === 0) {
+                    alert(getJsTranslation_upload('noFilesSelected'));
+                    return;
+                }
 
-                // document.getElementById('progress-container').style.display = 'block';
+                // Validate files before processing
+                const validation = validateFiles(files);
+                
+                // Display errors if any
+                if (validation.invalidFiles.length > 0) {
+                    displayValidationErrors(validation.invalidFiles);
+                    alert(getJsTranslation_upload('invalidFiles'));
+                }
+                
+                // If no valid files, stop
+                if (validation.validFiles.length === 0) {
+                    return;
+                }
 
-                for (const file of files) {
-                    console.log("Processing file:", file.name);
-                    const fileName = file.name.split(" ").join("_")
-                    const isVideo = file.type.startsWith("video/");
-                    const fullFileName = file.name
+                const folder = folderName.value;
+                const isScheduled = document.getElementById('schedule-lesson-toggle').checked;
 
-                    
-                    if (isVideo) {
+                if (isScheduled) {
+                    const lessonName = document.getElementById('lesson-name-input').value.trim();
+                    const offeringSelect = document.getElementById('course-offering-select');
+                    const offeringId = parseInt(offeringSelect.value, 10);
+
+                    if (!lessonName) {
+                        showScheduleStatus(getJsTranslation_upload('scheduleLessonNameRequired'), 'warning');
+                        return;
+                    }
+                    if (!offeringId) {
+                        showScheduleStatus(getJsTranslation_upload('scheduleOfferingRequired'), 'warning');
+                        return;
+                    }
+
+                    // Calculate expected media from the current selection
+                    const expectedMedia = calculateExpectedMedia(validation.validFiles, folder);
+                    renderExpectedPreview(expectedMedia);
+
+                    // Create the lesson draft
+                    hideScheduleStatus();
+                    showScheduleStatus(getJsTranslation_upload('scheduleStatusCreating'), 'info');
+                    let lessonData;
+                    try {
+                        lessonData = await postScheduledLessonCreate({
+                            lesson_name: lessonName,
+                            course_offering: offeringId,
+                            expected_media: expectedMedia
+                        });
+                    } catch (err) {
+                        showScheduleStatus(err.message || getJsTranslation_upload('scheduledLessonCreateFailed'), 'danger');
+                        return;
+                    }
+
+                    const lessonId = lessonData.lesson_id;
+                    const batchId = ++window.__scheduledBatchCounter;
+                    showScheduleStatus(
+                        getJsTranslation_upload('scheduleStatusDraft', { id: lessonId }),
+                        'success'
+                    );
+
+                    // Push items with scheduled metadata
+                    validation.validFiles.forEach(result => {
+                        window.__adminUploadQueue.items.push({
+                            ...result,
+                            folder,
+                            scheduledLessonId: lessonId,
+                            scheduledBatchId: batchId
+                        });
+                    });
+                } else {
+                    // Ordinary upload — no scheduled lesson
+                    validation.validFiles.forEach(result => {
+                        window.__adminUploadQueue.items.push({ ...result, folder });
+                    });
+                }
+
+                input.value = '';
+                drainUploadQueue();
+            }
+
+            async function drainUploadQueue() {
+                const queue = window.__adminUploadQueue;
+                if (queue.running) return;
+                queue.running = true;
+                try {
+                    while (queue.items.length) {
+                        const item = queue.items.shift();
+                        let uploadResult;
                         try {
-                            const fileData = await readFile(file)
-                            // 2. Write file to FFmpeg FS
+                            uploadResult = await processUploadItem(item);
+                        } catch (err) {
+                            console.error('Upload item failed:', err);
+                            uploadResult = { success: false, error: err.message };
+                        }
+                        // Finalize scheduled batch after all items of that batch complete
+                        if (item.scheduledLessonId) {
+                            const batchId = item.scheduledBatchId;
+                            const remaining = queue.items.some(i => i.scheduledBatchId === batchId);
+                            if (!remaining) {
+                                try {
+                                    showScheduleStatus(getJsTranslation_upload('scheduleStatusFinalizing'), 'info');
+                                    const finalizeData = await postScheduledLessonFinalize(item.scheduledLessonId);
+                                    if (finalizeData.status === 'published') {
+                                        showScheduleStatus(getJsTranslation_upload('scheduledLessonPublished'), 'success');
+                                    } else {
+                                        showScheduleStatus(
+                                            getJsTranslation_upload('scheduleStatusPublished') + ': ' + finalizeData.status,
+                                            'info'
+                                        );
+                                    }
+                                } catch (err) {
+                                    showScheduleStatus(err.message || getJsTranslation_upload('scheduledLessonFinalizeFailed'), 'danger');
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    queue.running = false;
+                }
+            }
+
+            async function processUploadItem(result) {
+                    const file = result.file;
+                    const fileName = file.name.split(" ").join("_");
+                    const fullFileName = file.name;
+                    const fileCategory = result.type;
+
+                    if (fileCategory === 'video') {
+                        // Handle MP4 video files
+                        try {
+                            const fileData = await readFile(file);
+                            // Write file to FFmpeg FS
                             ffmpeg.FS('writeFile', fullFileName, fileData);
 
                             // Segment video and audio
@@ -155,24 +517,52 @@
                             const audioName = await segmentAudio(fullFileName);
 
                             // Read Segments
-                            const videoSegments = await readSegments(videoName)
-                            const audioSegments = await readSegments(audioName)
+                            const videoSegments = await readSegments(videoName);
+                            const audioSegments = await readSegments(audioName);
 
-                            console.log("Segmentation Complete:", videoSegments.length, "segments created.");
-                            await uploadSegments(videoSegments, videoName);
-                            console.log("Segmentation Complete:", audioSegments.length, "segments created.");
-                            await uploadSegments(audioSegments, audioName);
+                            console.log("Segmentation Complete:", videoSegments.segments.length, "video segments created.");
+                            await uploadSegments(videoSegments, videoName, result.folder, 'Video Segments');
+                            await uploadSegments(audioSegments, audioName, result.folder, 'Audio Segments');
+                            return { success: true, type: 'video', fileName: fullFileName };
                         } catch (error) {
                             console.error(getJsTranslation_upload('videoProcessingFailed'), fileName, error);
+                            return { success: false, type: 'video', fileName: fullFileName, error: error.message };
                         } finally {
-                            ffmpeg.FS("unlink", fullFileName)
+                            ffmpeg.FS("unlink", fullFileName);
+                        }
+                    } else if (fileCategory === 'audio') {
+                        // Handle MP3 audio files (no video version, only audio segmentation)
+                        try {
+                            const fileData = await readFile(file);
+                            // Write file to FFmpeg FS
+                            ffmpeg.FS('writeFile', fullFileName, fileData);
+
+                            // Segment audio only (no video version)
+                            const audioName = await segmentAudioOnly(fullFileName);
+
+                            // Read Segments
+                            const audioSegments = await readSegments(audioName);
+
+                            console.log("Audio Segmentation Complete:", audioSegments.segments.length, "segments created.");
+                            await uploadSegments(audioSegments, audioName, result.folder, 'Audio Segments');
+                            return { success: true, type: 'audio', fileName: fullFileName };
+                        } catch (error) {
+                            console.error(getJsTranslation_upload('audioSegmentationFailed'), fileName, error);
+                            return { success: false, type: 'audio', fileName: fullFileName, error: error.message };
+                        } finally {
+                            ffmpeg.FS("unlink", fullFileName);
                         }
                     } else {
-                        // Process non-video files (PDF, images, etc.)
-                        await uploadWholeFile(file, fileName);
+                        // Process non-media files (PDF)
+                        try {
+                            await uploadWholeFile(file, fileName, result.folder);
+                            return { success: true, type: 'pdf', fileName: fullFileName };
+                        } catch (error) {
+                            console.error('PDF upload failed:', error);
+                            return { success: false, type: 'pdf', fileName: fullFileName, error: error.message };
+                        }
                     }
                 }
-            }
 
             async function readFile(file) {
                 const fileData = await new Promise((resolve, reject) => {
@@ -186,33 +576,46 @@
 
             async function readSegments(fileName) {
                     try {
-                        // Read generated files
-                        const files = [];
-                        // Add playlist file
-                        const playlistFile = ffmpeg.FS("readFile", `${fileName}.m3u8`)
+                        // Read playlist as text for URI rewriting
+                        const playlistData = ffmpeg.FS("readFile", `${fileName}.m3u8`);
                         ffmpeg.FS('unlink', `${fileName}.m3u8`);
+                        const playlistText = new TextDecoder().decode(playlistData);
 
-                        files.push(new Blob([playlistFile.buffer], { type: 'application/x-mpegURL' }));
-                        
+                        const segments = [];
                         for (let i = 0; i < 1000; i++) {
                             const index = String(i).padStart(3, '0');
                             const filename = `${fileName}_${index}.ts`;
                             
                             try {
                                 const data = ffmpeg.FS('readFile', filename);
-                                files.push(new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" }));
-                                // Clean up filesystem
+                                segments.push({
+                                    name: filename,
+                                    blob: new Blob([data.buffer], { type: "video/vnd.dlna.mpeg-tts" })
+                                });
                                 ffmpeg.FS('unlink', filename);
                             } catch (e) {
                                 break;
                             }
                         }
 
-                        return files;
+                        return { playlistText, segments };
                     } catch (error) {
                         console.error('FFmpeg error:', error);
                         throw new Error(getJsTranslation_upload('readingSegmentationFailed', { fileName: fileName }));
                     }
+            }
+
+            function rewritePlaylist(playlistText, segmentFolder) {
+                // Rewrite only media URI lines (non-comment, ending with .ts)
+                // to reference the canonical segment subfolder.
+                return playlistText.split('\n').map(line => {
+                    const trimmed = line.trim();
+                    if (trimmed && !trimmed.startsWith('#') && trimmed.endsWith('.ts')) {
+                        const basename = trimmed.split('/').pop();
+                        return `${segmentFolder}/${basename}`;
+                    }
+                    return line;
+                }).join('\n');
             }
             
             async function segmentVideo(fullFileName) {
@@ -233,10 +636,15 @@
                     // 4. Run FFmpeg command with await
                     await ffmpeg.run(
                         '-i', fullFileName,
-                        '-c', 'copy',          // Copy all streams without re-encoding
-                        '-map', '0',           // Include all streams from input
-                        '-f', 'hls',           // Use HLS format instead of generic segment
-                        '-hls_time', '10',     // Segment duration in seconds
+                        '-c:v', 'libx264',     // H.264 video encoding
+                        '-crf', '27',          // Quality/size tradeoff (higher=smaller)
+                        '-preset', 'medium',   // Default encoding speed/compression
+                        '-b:v', '900k',        // Cap video bitrate for lecture content
+                        '-pix_fmt', 'yuv420p', // Broad player compatibility
+                        '-map', '0:v:0',       // First video stream only (no audio)
+                        '-an',                 // No audio in video playlist
+                        '-f', 'hls',           // Use HLS format
+                        '-hls_time', '6',      // 6-second segments for shorter chunks
                         '-hls_list_size', '0', // Keep all segments in playlist
                         '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
                         `${fileName}.m3u8`        // Main playlist file
@@ -258,15 +666,15 @@
                         '-i', fullFileName,
                         '-vn',                    // no video
                         '-acodec', 'aac',
-                        '-b:a', '128k',
+                        '-b:a', '96k',           // Reduced audio bitrate
                         '-f', 'hls',
-                        '-hls_time', '30',
+                        '-hls_time', '8',        // 8-second segments
                         '-hls_list_size', '0',
                         '-hls_segment_filename', `${baseName}_%03d.ts`,
                         `${baseName}.m3u8`
                     );
 
-                    return baseName
+                    return baseName;
 
                 } catch (error) {
                     console.error(getJsTranslation_upload('audioSegmentationFailed'), error);
@@ -274,7 +682,42 @@
                 }
             }
 
-            async function requestUploadUrl(fileName) {
+            async function segmentAudioOnly(fullFileName) {
+                try {
+                    // For MP3 files, use "audio" prefix directly
+                    const baseName = `audio_${fullFileName.split(".")[0]}`;
+
+                    // Create progress bar
+                    createProgressBar(baseName, "process");
+
+                    let progressBar = document.querySelector(`.process-${CSS.escape(baseName)}`);
+                    
+                    // Set progress handler
+                    ffmpeg.setProgress(({ ratio }) => {
+                        updateProgressBar(progressBar, Math.round(ratio * 100));
+                    });
+
+                    // Process audio file and segment it
+                    await ffmpeg.run(
+                        '-i', fullFileName,
+                        '-acodec', 'aac',
+                        '-b:a', '96k',           // Reduced audio bitrate
+                        '-f', 'hls',
+                        '-hls_time', '8',        // 8-second segments
+                        '-hls_list_size', '0',
+                        '-hls_segment_filename', `${baseName}_%03d.ts`,
+                        `${baseName}.m3u8`
+                    );
+
+                    return baseName;
+
+                } catch (error) {
+                    console.error(getJsTranslation_upload('audioSegmentationFailed'), error);
+                    throw error;
+                }
+            }
+
+            async function requestUploadUrl(fileName, size) {
                 // 1. Get presigned URL from your Django backend
                 const presignedResponse = await fetch('{% url "upload-link" %}', {
                     method: 'POST',
@@ -283,7 +726,8 @@
                         'X-CSRFToken': getCSRFToken(),
                     },
                     body: JSON.stringify({
-                        filename: fileName
+                        filename: fileName,
+                        size: size
                     })
                 });
 
@@ -295,7 +739,7 @@
             }
 
             async function uploadR2(filePath, file){
-                const presignedResponse = await requestUploadUrl(filePath)
+                const presignedResponse = await requestUploadUrl(filePath, file.size)
 
                 // console.log(await presignedResponse.json())
                 const { url, headers: presignedHeaders } = await presignedResponse.json();
@@ -324,47 +768,41 @@
                 
             }
 
-            async function uploadSegments(files, fileName) {
+            async function uploadSegments(sections, fileName, folder, segmentFolder) {
                 try {
-                    
-                    fileName = CSS.escape(fileName.split(".")[0])
+                    const baseName = fileName.split(".")[0];
+                    createProgressBar(baseName, "upload")
+                    let uploadBar = document.querySelector(`.upload-${CSS.escape(baseName)}`)
                     const uploadResults = [];
-                    createProgressBar(fileName, "upload")
-                    let uploadBar = document.querySelector(`.upload-${fileName}`)
-                    let filePath = createFilePath(fileName)
 
-                    let playlist = files[0]
-                    let playlistPath = `${filePath}.m3u8`
-                    try {
+                    // Normalize folder prefix (preserve empty folder behavior)
+                    const f = (folder || '').replace(/\/+$/, '');
+                    const folderPrefix = f ? `${f}/` : '';
 
-                        await uploadR2(playlistPath, playlist)
+                    // Rewrite playlist with canonical segment subfolder references
+                    const rewrittenPlaylist = rewritePlaylist(sections.playlistText, segmentFolder);
+                    const playlistBlob = new Blob([rewrittenPlaylist], { type: 'application/x-mpegURL' });
 
-                    } catch (error) {
-                        console.error(getJsTranslation_upload('playlistUploadFailed'), error);
-                        uploadResults.push({
-                            status: 'failed',
-                            error: error.message
-                        });
-                    }
-                    
-                    // Remove m3u8 from files
-                    files.shift()
-                    for (const [i, file] of files.entries()) {
+                    // Upload playlist to selected-folder root
+                    const playlistPath = `${folderPrefix}${baseName}.m3u8`;
+                    await uploadR2(playlistPath, playlistBlob);
+
+                    // Upload each segment to <folder>/<segmentFolder>/<name>
+                    const segments = sections.segments;
+                    for (let i = 0; i < segments.length; i++) {
                         try {
-                            const index = String(i).padStart(3, '0');
-                            const segmentPath = `${filePath}_${index}.ts`
-                            await uploadR2(segmentPath, file)
+                            const segmentPath = `${folderPrefix}${segmentFolder}/${segments[i].name}`;
+                            await uploadR2(segmentPath, segments[i].blob);
                             uploadResults.push({
-                                index,
+                                index: segments[i].name,
                                 status: 'success'
                             });
-                            const percent = Math.round((uploadResults.length / files.length) * 100);
-                            updateProgressBar(uploadBar, percent)
-
+                            const percent = Math.round(((i + 1) / segments.length) * 100);
+                            updateProgressBar(uploadBar, percent);
                         } catch (error) {
                             console.error(getJsTranslation_upload('segmentUploadFailed', { i: i }), error);
                             uploadResults.push({
-                                index,
+                                index: segments[i].name,
                                 status: 'failed',
                                 error: error.message
                             });
@@ -379,13 +817,15 @@
                 }
             }
 
-            async function uploadWholeFile(file, fullFileName) {
+            async function uploadWholeFile(file, fullFileName, folder) {
                 try {
-                    const [fileName, ext] = fullFileName.split(".")
+                    const extensionIndex = fullFileName.lastIndexOf(".");
+                    const fileName = extensionIndex >= 0 ? fullFileName.slice(0, extensionIndex) : fullFileName;
+                    const ext = extensionIndex >= 0 ? fullFileName.slice(extensionIndex + 1) : "";
                     const uploadResults = [];
                     createProgressBar(fileName, "upload")
                     let uploadBar = document.querySelector(`.upload-${CSS.escape(fileName)}`)
-                    let filePath = createFilePath(fileName)
+                    let filePath = createFilePath(fileName, folder)
 
                     let playlistPath = `${filePath}.${ext}`
                     try {
@@ -412,6 +852,143 @@
         
             function removeR2Files(){
                 document.querySelectorAll(".fa-file-alt").forEach(e => e.parentElement.parentElement.remove())
+            }
+
+            // --- Scheduled Lesson Helpers ---
+
+            let _partIdCounter = 0;
+            function generatePartId() {
+                return 'p' + Date.now() + '_' + (++_partIdCounter);
+            }
+
+            function normalizeFolderPrefix(folder) {
+                const f = (folder || '').replace(/\/+$/, '');
+                return f ? f + '/' : '';
+            }
+
+            function calculateExpectedMedia(validFiles, folder) {
+                const folderPrefix = normalizeFolderPrefix(folder);
+                const descriptors = [];
+                validFiles.forEach(result => {
+                    const partId = generatePartId();
+                    const fullFileName = result.file.name;
+                    const base = fullFileName.split('.')[0];
+                    if (result.type === 'video') {
+                        const videoName = base + '_video';
+                        descriptors.push({
+                            file_type: 'video',
+                            name: videoName,
+                            id: folderPrefix + videoName + '.m3u8',
+                            part_id: partId
+                        });
+                        const audioName = base + '_audio';
+                        descriptors.push({
+                            file_type: 'audio',
+                            name: audioName,
+                            id: folderPrefix + audioName + '.m3u8',
+                            part_id: partId
+                        });
+                    } else if (result.type === 'audio') {
+                        const audioName = 'audio_' + base;
+                        descriptors.push({
+                            file_type: 'audio',
+                            name: audioName,
+                            id: folderPrefix + audioName + '.m3u8',
+                            part_id: partId
+                        });
+                    } else if (result.type === 'document') {
+                        const normalizedFullName = result.file.name.split(' ').join('_');
+                        const extensionIndex = normalizedFullName.lastIndexOf('.');
+                        const normalizedBase = extensionIndex >= 0
+                            ? normalizedFullName.slice(0, extensionIndex)
+                            : normalizedFullName;
+                        descriptors.push({
+                            file_type: 'book',
+                            name: normalizedBase,
+                            id: folderPrefix + normalizedBase + '.pdf',
+                            part_id: partId
+                        });
+                    }
+                });
+                return descriptors;
+            }
+
+            function renderExpectedPreview(descriptors) {
+                const container = document.getElementById('expected-files-preview');
+                const list = document.getElementById('expected-files-list');
+                if (!descriptors || descriptors.length === 0) {
+                    container.classList.add('d-none');
+                    return;
+                }
+                list.innerHTML = '';
+                descriptors.forEach(d => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item py-1';
+                    let label;
+                    if (d.file_type === 'video') {
+                        label = getJsTranslation_upload('expectedMediaVideoAudio', { name: d.name });
+                    } else if (d.file_type === 'audio') {
+                        label = getJsTranslation_upload('expectedMediaAudio', { name: d.name });
+                    } else {
+                        label = getJsTranslation_upload('expectedMediaBook', { name: d.name });
+                    }
+                    const labelElement = document.createElement('strong');
+                    labelElement.textContent = label;
+                    const keyElement = document.createElement('small');
+                    keyElement.className = 'text-muted';
+                    keyElement.textContent = getJsTranslation_upload('expectedKey') + ' ' + d.id;
+                    li.appendChild(labelElement);
+                    li.appendChild(document.createElement('br'));
+                    li.appendChild(keyElement);
+                    list.appendChild(li);
+                });
+                container.classList.remove('d-none');
+            }
+
+            function showScheduleStatus(message, type) {
+                const el = document.getElementById('schedule-status');
+                el.textContent = message;
+                el.className = 'alert alert-' + type + ' mb-0';
+                el.classList.remove('d-none');
+            }
+
+            function hideScheduleStatus() {
+                const el = document.getElementById('schedule-status');
+                el.classList.add('d-none');
+            }
+
+            async function postScheduledLessonCreate(payload) {
+                const resp = await fetch('{% url "scheduled-lesson-create" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    throw new Error(errData.message || getJsTranslation_upload('scheduledLessonCreateFailed'));
+                }
+                return resp.json();
+            }
+
+            async function postScheduledLessonFinalize(lessonId) {
+                const template = '{{ scheduled_lesson_finalize_url_template|escapejs }}';
+                const url = template.replace('/0/', '/' + lessonId + '/');
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: '{}'
+                });
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    throw new Error(errData.message || getJsTranslation_upload('scheduledLessonFinalizeFailed'));
+                }
+                return resp.json();
             }
 
             function modifyFolderInput(folderLink){
@@ -464,10 +1041,12 @@
                     ffmpeg = createFFmpeg({ log: true})
                     await ffmpeg.load()
                     button = document.querySelector(".loading")
-                    button.classList.remove("btn-primary")
-                    button.classList.add("btn-success")
-                    button.querySelector(".spinner-border").remove()
-                    button.querySelector(".info").innerText = getJsTranslation_upload('loaded');
+                    if (button) {
+                        button.classList.remove("btn-primary")
+                        button.classList.add("btn-success")
+                        button.querySelector(".spinner-border")?.remove()
+                        button.querySelector(".info").innerText = getJsTranslation_upload('loaded');
+                    }
                     }
                 , 500)
                 removeR2Files()
@@ -479,6 +1058,7 @@
                 })
             })
 
+        })(); // end IIFE
         </script>
     </div>
 {% endblock %}

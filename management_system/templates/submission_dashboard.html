@@ -3,68 +3,79 @@
 {% load i18n %}
 
 {% block body %}
-<div class="container-fluid py-4" id="content">
-  <div class="row">
-    <div class="col-12">
-      <!-- Header Section -->
-      <div class="d-flex align-items-center justify-content-between mb-4">
-        <h2 class="h3 mb-0 text-primary fw-bold">{% translate "Submissions" %}</h2>
-        <div class="d-flex gap-2">
-          <a href="{% url 'export-quiz-submissions-csv' quiz_id=quiz_id %}" class="btn btn-success d-flex align-items-center gap-2">
-            <i class="fas fa-file-csv"></i>
-            {% translate "Export Quiz & Submissions" %}
-          </a>
+<div class="ad-pane is-active" id="content">
+    <!-- Header with export actions -->
+    <div class="ad-toolbar">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+            <h2 class="h5 mb-0">
+                <i class="fas fa-file-alt me-2"></i>
+                {% translate "Submissions" %}
+            </h2>
         </div>
-      </div>
-
-      <!-- Main Content Card -->
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <!-- Filters Section -->
-          <div class="d-flex flex-column flex-lg-row justify-content-end align-items-lg-center gap-2 mb-4">
-            <div class="filters d-flex flex-wrap gap-2" hx-include=".filters-fields">
-              {% if submission %}
-              <div class="filter-item">
-                <input class="form-control filters-fields" type="number" placeholder="{% translate "Minimum Grade" %}" name="min-grade" value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Minimum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
-              </div>
-              <div class="filter-item">
-                <input class="form-control filters-fields" type="number" placeholder="{% translate "Maximum Grade" %}" name="max-grade" value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Maximum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
-              </div>
-              {% endif %}
-
-              <div class="filter-item">
-                <select class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
-                  {% for option in options %}
-                    {% if forloop.first %}
-                      <option value="">{% translate "All" %} {{ view_name }}</option>
-                    {% else %}
-                      {% if filtering == option %}
-                        <option value="{{ option }}" selected>{{ option }}</option>
-                      {% else %}
-                        <option value="{{ option }}">{{ option }}</option>
-                      {% endif %}
-                    {% endif %}
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="filter-item">
-                <input class="form-control me-2 filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
-              </div>
-            </div>
-          </div>
-
-          <!-- Table Section -->
-          <div class="table-container">
-            {% include 'table_rendering.html' %}
-          </div>
-
-          <!-- Pagination Section -->
-          <div class="mt-4">
-            {% include 'pagination.html' %}
-          </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'export-quiz-summary-csv' quiz_id=quiz_id %}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                <i class="fas fa-table me-1"></i>
+                {% translate "Quiz Summary" %}
+            </a>
+            <a href="{% url 'export-quiz-submissions-csv' quiz_id=quiz_id %}" class="ad-btn ad-btn--teal ad-btn--sm">
+                <i class="fas fa-file-csv me-1"></i>
+                {% translate "Export Quiz & Submissions" %}
+            </a>
+            <a href="{% url 'yearly-transcript-dashboard' %}" class="ad-btn ad-btn--ghost ad-btn--sm">
+                <i class="fas fa-graduation-cap me-1"></i>
+                {% translate "Yearly Transcript" %}
+            </a>
         </div>
-      </div>
     </div>
-  </div>
+
+    <!-- Main Card -->
+    <div class="ad-card">
+        <div class="ad-card-body">
+            <!-- Filter Bar -->
+            <div class="ad-filters mb-3" hx-include=".filters-fields">
+                {% if submission %}
+                <div class="filter-item">
+                    <input class="form-control filters-fields" type="number" placeholder="{% translate "Minimum Grade" %}" name="min-grade" value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Minimum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+                </div>
+                <div class="filter-item">
+                    <input class="form-control filters-fields" type="number" placeholder="{% translate "Maximum Grade" %}" name="max-grade" value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Maximum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+                </div>
+                {% endif %}
+
+                <div class="filter-item">
+                    <select class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+                        {% for option in options %}
+                            {% if forloop.first %}
+                                <option value="">{% translate "All" %} {{ view_name }}</option>
+                            {% else %}
+                                {% if filtering == option %}
+                                    <option value="{{ option }}" selected>{{ option }}</option>
+                                {% else %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <input class="form-control me-2 filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+                </div>
+            </div>
+
+            <!-- Table Loading Indicator -->
+            <div class="htmx-indicator table-loading" id="table-loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">{% translate "Loading..." %}</span>
+                </div>
+            </div>
+
+            <!-- Table Section -->
+            <div id="table-container"
+                 hx-indicator="#table-loading"
+                 class="table-section">
+                {% include 'partials/table_and_pagination.html' %}
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

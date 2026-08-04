@@ -3,14 +3,23 @@
 {% load i18n %}
 
 {% block body %}
-<div id="content" class="container-fluid mw-50">
-    <div id="profile" class="mb-5">
-        <form action="" method="post">
-            {% csrf_token %}
-            {{ form|crispy }}
-            <button class="btn btn-secondary" hx-post="{% url 'update-profile' object.id %}" hx-swap="innerHTML" hx-target="#profile" hx-select="#profile" hx-trigger="click">{% translate "Update Profile" %}</button>
-        </form>
+<div id="content" class="sd-page">
+<div class="container py-4 sd-narrow-container">
+    <div id="profile" class="sd-panel-card">
+        <div class="sd-panel-head">
+            <i class="fas fa-user-pen"></i>
+            {% translate "Update Profile" %}
+        </div>
+        <div class="sd-screen">
+            <form action="" method="post">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <div class="d-grid mt-3">
+                    <button class="sd-btn sd-btn--teal" hx-post="{% url 'update-profile' object.id %}" hx-swap="innerHTML" hx-target="#profile" hx-select="#profile" hx-trigger="click">{% translate "Update Profile" %}</button>
+                </div>
+            </form>
+        </div>
     </div>
-
+</div>
 </div>
 {% endblock %}

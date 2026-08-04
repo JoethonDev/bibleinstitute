@@ -1,0 +1,30 @@
+{% extends 'base.html' %}{% load static %}
+{% block body %}
+<div class="public-site">
+<section class="public-home-hero">
+  <div class="public-hero-shade"></div>
+  <div class="container public-hero-inner"><div><p class="public-kicker">{{ copy.hero_kicker }}</p><h1>{{ copy.hero_title }}</h1><p>{{ copy.hero_text }}</p><div class="public-actions"><a class="public-btn public-btn-gold" href="{% url 'signup' %}">{{ copy.apply_now }}</a><a class="public-btn public-btn-line" href="{% url 'program' %}">{{ copy.discover }}</a><a class="public-btn public-btn-text" href="#message">▶ {{ copy.watch_message }}</a></div></div></div>
+  <div class="container public-stats">{% for value, label in copy.stats %}<div><strong>{{ value }}</strong><span>{{ label }}</span></div>{% endfor %}</div>
+</section>
+
+<section class="public-section container"><div class="public-intro"><p class="public-kicker">{{ copy.identity_kicker }}</p><h2>{{ copy.identity_title }}</h2><p>{{ copy.identity_text }}</p></div><div class="public-pillar-grid">{% for item in copy.pillars %}<article><span>{{ item.number }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p></article>{% endfor %}</div></section>
+
+<section id="news" class="public-news"><div class="container public-news-card"><div class="public-date"><small>{{ copy.news_kicker }}</small><strong>20</strong><span>09 · 2026</span></div><div><span class="public-status">{{ copy.news_badge }}</span><h2>{{ copy.news_title }}</h2><p>{{ copy.news_text }}</p><a href="{% url 'program' %}#study-system">{{ copy.news_link }} ←</a></div></div></section>
+
+<section class="public-section container"><div class="public-heading"><p class="public-kicker">{{ copy.path_kicker }}</p><h2>{{ copy.path_title }}</h2></div><div class="public-path-grid">{% for item in copy.paths %}<article><div class="public-path-image public-path-image-{{ forloop.counter }}"></div><div><span>{{ item.label }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p><a href="{% url 'program' %}#study-system">{{ item.action }} ←</a></div></article>{% endfor %}</div></section>
+
+<section class="public-quote"><div class="container"><span aria-hidden="true">✣</span><blockquote><p>“{{ copy.quote }}”</p><cite>{{ copy.quote_label }}</cite></blockquote></div></section>
+
+<section class="public-section container public-curriculum-preview"><div class="public-book-art"><span>66</span></div><div><p class="public-kicker">{{ copy.curriculum_kicker }}</p><h2>{{ copy.curriculum_title }}</h2><p>{{ copy.curriculum_text }}</p><a class="public-btn public-btn-dark" href="{% url 'program' %}#curriculum">{{ copy.curriculum_action }}</a></div></section>
+
+<section id="message" class="public-section public-video"><div class="container public-video-grid"><div><p class="public-kicker">{{ copy.video_kicker }}</p><h2>{{ copy.video_title }}</h2><p>{{ copy.video_text }}</p></div><div class="public-video-frame">
+  <iframe src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g?si=Gn7QU4eywL3HVRcD"
+                                title="YouTube video player"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen></iframe>
+</div></div></section>
+
+<section class="public-cta"><div class="container"><div><h2>{{ copy.cta_title }}</h2><p>{{ copy.cta_text }}</p></div><a class="public-btn public-btn-cream" href="{% url 'signup' %}">{{ copy.apply_now }}</a></div></section>
+</div>
+{% endblock %}

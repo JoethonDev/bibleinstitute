@@ -1,0 +1,187 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block body %}
+<div class="container-fluid py-3 ad-page" id="content">
+  <div class="row">
+    <div class="col-12">
+      <div class="ad-pane-head">
+        <h3 class="ad-pane-title mb-0">{% translate "Yearly Transcript" %}</h3>
+        <p class="ad-pane-desc">{% translate "Trace student quiz grades across the selected year." %}</p>
+        <a href="{% url 'export-yearly-transcript-csv' %}?year={{ year_value }}&name={{ name_value|urlencode }}&course={{ course_value|urlencode }}&role={{ selected_role|urlencode }}" class="ad-btn ad-btn--ghost ad-btn--sm">
+          <i class="fas fa-file-csv"></i>
+          {% translate "Export Transcript CSV" %}
+        </a>
+      </div>
+
+      <div class="ad-card mb-4">
+        <div class="ad-card-body">
+          <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold">{% translate "Year" %}</label>
+              <input type="number" name="year" class="form-control" value="{{ year_value }}" placeholder="{% translate 'Year' %}">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold">{% translate "Student name" %}</label>
+              <input type="search" name="name" class="form-control" value="{{ name_value }}" placeholder="{% translate 'Search by first, last, or username' %}">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold">{% translate "Course" %}</label>
+              <input type="search" name="course" class="form-control" value="{{ course_value }}" placeholder="{% translate 'Course name' %}">
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label fw-semibold">{% translate "Role" %}</label>
+              <select name="role" class="form-select">
+                <option value="">{% translate "All roles" %}</option>
+                {% for role_code, role_label in role_options %}
+                  <option value="{{ role_code }}" {% if selected_role == role_code %}selected{% endif %}>{{ role_label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-1 d-grid">
+              <button type="submit" class="ad-btn ad-btn--ghost">{% translate "Filter" %}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="ad-stats mb-4">
+        <div class="ad-stat">
+          <div class="ad-stat-ic"><i class="fas fa-table"></i></div>
+          <div><b>{{ result_count }}</b><span>{% translate "Rows" %}</span></div>
+        </div>
+        <div class="ad-stat">
+          <div class="ad-stat-ic"><i class="fas fa-users"></i></div>
+          <div><b>{{ student_count }}</b><span>{% translate "Students" %}</span></div>
+        </div>
+      </div>
+
+      <div class="ad-card">
+        <div class="ad-table-wrap">
+          <table class="ad-table ad-table--dense">
+            <thead>
+              <tr>
+                <th scope="col">{% translate "User ID" %}</th>
+                <th scope="col">{% translate "Username" %}</th>
+                <th scope="col">{% translate "First Name" %}</th>
+                <th scope="col">{% translate "Last Name" %}</th>
+                <th scope="col">{% translate "Course" %}</th>
+                <th scope="col">{% translate "Quiz" %}</th>
+                <th scope="col">{% translate "Quiz Grade" %}</th>
+                <th scope="col">{% translate "Quiz Total" %}</th>
+                <th scope="col">{% translate "Course Grade" %}</th>
+                <th scope="col">{% translate "Course Total" %}</th>
+                <th scope="col">{% translate "Overall Grade" %}</th>
+                <th scope="col">{% translate "Overall Total" %}</th>
+                <th scope="col">{% translate "Submitted At" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in transcript_rows %}
+                <tr>
+                  <td>{{ row.user_id }}</td>
+                  <td>{{ row.username }}</td>
+                  <td>{{ row.first_name }}</td>
+                  <td>{{ row.last_name }}</td>
+                  <td>{{ row.course_name }}</td>
+                  <td>{{ row.quiz_name }}</td>
+                  <td>{{ row.quiz_grade }}</td>
+                  <td>{{ row.quiz_total }}</td>
+                  <td>{{ row.course_accumulated_grade }}</td>
+                  <td>{{ row.course_accumulated_total }}</td>
+                  <td>{{ row.overall_accumulated_grade }}</td>
+                  <td>{{ row.overall_accumulated_total }}</td>
+                  <td>{{ row.submitted_at_display }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="13" class="ad-empty">{% translate "No transcript rows found for the selected filters." %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% if transcript_page_obj.paginator.num_pages > 1 %}
+      <div class="ad-page-wrapper mt-3">
+        <nav aria-label="{% translate 'Transcript pagination' %}">
+          <ul class="ad-page-nav">
+            {% if transcript_page_obj.has_previous %}
+              <li>
+                <a class="ad-page-link" href="?page=1&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'First page' %}">
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
+                </a>
+              </li>
+              <li>
+                <a class="ad-page-link" href="?page={{ transcript_page_obj.previous_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Previous page' %}">
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                </a>
+              </li>
+            {% else %}
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
+                </span>
+              </li>
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                  <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                </span>
+              </li>
+            {% endif %}
+
+            {% for page_num in transcript_page_obj.paginator.page_range %}
+              {% if page_num == transcript_page_obj.number %}
+                <li aria-current="page">
+                  <span class="ad-page-link is-active">{{ page_num }}</span>
+                </li>
+              {% else %}
+                <li>
+                  <a class="ad-page-link" href="?page={{ page_num }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}">{{ page_num }}</a>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if transcript_page_obj.has_next %}
+              <li>
+                <a class="ad-page-link" href="?page={{ transcript_page_obj.next_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Next page' %}">
+                  <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </a>
+              </li>
+              <li>
+                <a class="ad-page-link" href="?page={{ transcript_page_obj.paginator.num_pages }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Last page' %}">
+                  <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </a>
+              </li>
+            {% else %}
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </span>
+              </li>
+              <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true">
+                  <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
+                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+        <div class="ad-page-info">
+          {% blocktranslate with start=transcript_page_obj.start_index end=transcript_page_obj.end_index total=transcript_page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

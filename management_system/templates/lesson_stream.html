@@ -2,57 +2,53 @@
 {% load i18n %}
 
 {% block style %}
-<style>
-    /* Ensures the PDF canvas is responsive and maintains its aspect ratio */
-    .pdf-viewer canvas {
-        border: 1px solid #dee2e6;
-        border-radius: 0.5rem;
-    }
-    /* Ensures the video player is responsive */
-    .video-js.vjs-fluid,
-    .video-js.vjs-16-9 {
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
 <div id="content-loaded" class="p-2 p-md-3">
     {% for hls_url in links %}
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-light">
+        <div class="card shadow-sm border-0 mb-4 lesson-media-card sd-media-card">
+            <div class="card-header bg-light lesson-media-header sd-media-head">
                 <h6 class="mb-0 fw-bold">{{ hls_url.name }}</h6>
             </div>
             <div class="card-body p-2 p-sm-3">
                 {% if hls_url.type == 'video' %}
-                    <!-- Responsive video container -->
-                    <div>
-                        <video playsinline controls class="video-js vjs-theme-city" preload="auto" controlsList="nodownload">
-                            <source src="{{ hls_url.url }}" type="application/x-mpegURL"/>
+                    <!-- Responsive video container (Psalmodia) -->
+                    <div class="lesson-video-wrapper sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+                        <video playsinline controls class="video-js vjs-theme-city" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
+                            <source type="application/x-mpegURL"/>
                             <p class="vjs-no-js">
                             {% translate "To view this video please enable JavaScript, and consider upgrading to a web browser that" %}
                             <a href="https://videojs.com/html5-video-support/" target="_blank">{% translate "supports HTML5 video" %}</a>
                             </p>
                         </video>
+                        <div class="mt-2 d-flex align-items-center gap-2 sd-track">
+                            <span class="text-muted small">{% translate "Progress" %}:</span>
+                            <progress class="app-progress progress-thin flex-grow-1 sd-track-bar" :value="progressPercent" max="100" :aria-valuenow="progressPercent"></progress>
+                            <span class="progress-percent fw-semibold small sd-track-pct" x-text="`${Math.round(progressPercent)}%`">0%</span>
+                        </div>
                     </div>
                 {% elif hls_url.type == 'audio' %}
-                    <audio controls class="w-100" preload="auto" controlsList="nodownload">
-                        <source src="{{ hls_url.url }}"/>
+                    <div class="sd-audio-body" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+                    <audio controls class="w-100" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
+                        <source type="application/x-mpegURL"/>
                     </audio>
-                    <!-- Audio Download Button -->
+                    <div class="mt-2 d-flex align-items-center gap-2 sd-track">
+                        <span class="text-muted small">{% translate "Progress" %}:</span>
+                        <progress class="app-progress progress-thin flex-grow-1 sd-track-bar" :value="progressPercent" max="100" :aria-valuenow="progressPercent"></progress>
+                        <span class="progress-percent fw-semibold small sd-track-pct" x-text="`${Math.round(progressPercent)}%`">0%</span>
+                    </div>
+                    <!-- Audio Download Button (Psalmodia) -->
                     <div class="mt-3">
-                        <button class="btn btn-primary audio-download-btn d-flex align-items-center justify-content-center" 
-                                onclick="downloadAudio('{{ hls_url.url }}', '{{ hls_url.name }}')" 
-                                style="min-width: 160px;">
+                        <button class="btn btn-primary audio-download-btn sd-btn--teal min-w-160 d-flex align-items-center justify-content-center"
+                                onclick="downloadAudio(this, '{{ hls_url.name }}')">
                             <i class="fas fa-download me-2"></i>{% translate "Download Audio" %}
                         </button>
-                        <div class="download-progress mt-3" id="progress-{{ forloop.counter }}" style="display: none;">
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                        <div class="download-progress hidden-initially mt-3" id="progress-{{ forloop.counter }}">
+                            <div class="progress progress-download">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success progress-zero"
                                      id="progress-bar-{{ forloop.counter }}" 
-                                     role="progressbar" 
-                                     style="width: 0%;" 
+                                     role="progressbar"
                                      aria-valuenow="0" 
                                      aria-valuemin="0" 
                                      aria-valuemax="100">
@@ -60,10 +56,10 @@
                                 </div>
                             </div>
                         </div>
-                    </div> 
+                    </div>
                 {% else %}
                    <div class="d-flex justify-content-center">
-                       <div class="pdf-viewer" data-url="{{ hls_url.url }}">
+                       <div class="pdf-viewer sd-pdf-viewer" data-url="{{ hls_url.url }}">
                             <canvas class="pdf-canvas shadow-sm"></canvas>
                             <div class="controls d-flex justify-content-between align-items-center mt-3">
                                 <button class="prev btn btn-outline-secondary btn-sm"><i class="fas {% if request.LANGUAGE_CODE == 'en'  %}fa-arrow-left{% else %}fa-arrow-right{% endif %}"></i></button>
@@ -80,8 +76,8 @@
     <script>
     // --- MAIN EXECUTION ---
     // Move downloadAudio to global scope and declare as async
-    async function downloadAudio(m3u8Url, fileName) {
-        const button = event.target.closest('.audio-download-btn');
+    async function downloadAudio(button, fileName) {
+        const m3u8Url = button.closest('.card-body').querySelector('audio source').src;
         const progressContainer = button.parentElement.querySelector('.download-progress');
         const progressBar = progressContainer.querySelector('.progress-bar');
         try {
@@ -89,12 +85,12 @@
             button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>{% translate "Processing..." %}';
             progressContainer.style.display = 'block';
             const progressText = progressBar.querySelector('span');
-            progressText.textContent = 'Fetching playlist...';
+            progressText.textContent = '{% translate "Fetching playlist..."|escapejs %}';
             const response = await fetch(m3u8Url);
             const m3u8Text = await response.text();
             const tsUrls = parseM3U8(m3u8Text, m3u8Url);
             if (tsUrls.length === 0) {
-                throw new Error('No audio segments found in playlist');
+                throw new Error('{% translate "No audio segments found in playlist"|escapejs %}');
             }
             const audioBlob = await downloadAndConcatenateTS(tsUrls, (downloadedFiles, totalFiles) => {
                 const progressPercentage = Math.round((downloadedFiles / totalFiles) * 100);
@@ -102,7 +98,7 @@
                 progressBar.setAttribute('aria-valuenow', progressPercentage);
                 progressText.textContent = `${progressPercentage}%`;
             });
-            progressText.textContent = 'Processing...';
+            progressText.textContent = '{% translate "Processing..."|escapejs %}';
             let baseFileName = m3u8Url.split('/').filter(part => part.trim() !== '').slice(1).join('_');
             if (baseFileName.endsWith('.m3u8')) {
                 baseFileName = baseFileName.slice(0, -5);
@@ -190,119 +186,6 @@
             return new Blob([concatenated], { type: 'audio/mpeg' });
         }
 
-    (() => {
-        // This IIFE runs every time this HTML fragment is swapped into the DOM.
-        
-        const jsTranslations_lesson = {
-            'en': { 'page': 'Page' },
-            'ar': { 'page': 'صفحة' }
-        };
-
-        function getJsTranslation_lesson(key) {
-            const lang = document.documentElement.lang || 'en';
-            return jsTranslations_lesson[lang][key] || jsTranslations_lesson['en'][key];
-        }
-
-        // --- INITIALIZATION FUNCTIONS ---
-        function initializeVideoJs(video) {
-            // Check if the element exists and hasn't been initialized
-            if (video) {
-                const player = videojs(video, {
-                    controls: true,
-                    fluid: true,
-                    playbackRates: [0.5, 1, 1.5, 2],
-                    controlBar: { volumePanel: true, playbackRateMenuButton: true, playToggle: true }
-                });
-                player.seekButtons({ forward: 10, back: 10 });
-            }
-        }
-
-        function initializeHlsAudio(audio) {
-            if (audio && !audio.hls) { // Simple check to prevent re-initialization
-                if (Hls.isSupported()) {
-                    const hls = new Hls();
-                    const source = audio.querySelector("source").src;
-                    hls.loadSource(source);
-                    hls.attachMedia(audio);
-                    audio.hls = hls; // Mark as initialized
-                }
-            }
-        }
-
-        async function initializePdfViewer(viewer) {
-            if (viewer && !viewer.pdfDoc) { // Prevent re-initialization
-                const url = viewer.dataset.url;
-                // ... (rest of PDF logic is fine, as it's self-contained)
-                const canvas = viewer.querySelector(".pdf-canvas");
-                const ctx = canvas.getContext("2d");
-                const pageInfo = viewer.querySelector(".page-info");
-                const prevBtn = viewer.querySelector(".prev");
-                const nextBtn = viewer.querySelector(".next");
-                let currentPage = 1;
-                viewer.pdfDoc = true; // Mark as initialized immediately
-
-                try {
-                    const response = await fetch(url);
-                    const result = await response.json();
-                    const loadingTask = pdfjsLib.getDocument(result.url);
-                    const pdfDoc = await loadingTask.promise;
-                    
-                    const renderPage = (num) => {
-                        pdfDoc.getPage(num).then(page => {
-                            canvas.height = 600; canvas.width = 400;
-                            const viewportDefault = page.getViewport({ scale: 1 });
-                            const scale = Math.min(canvas.width / viewportDefault.width, canvas.height / viewportDefault.height);
-                            const viewport = page.getViewport({ scale: scale });
-                            const tempCanvas = document.createElement('canvas');
-                            const tempCtx = tempCanvas.getContext('2d');
-                            tempCanvas.width = viewport.width; tempCanvas.height = viewport.height;
-                            const renderContext = { canvasContext: tempCtx, viewport: viewport };
-                            page.render(renderContext).promise.then(() => {
-                                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                const xOffset = (canvas.width - viewport.width) / 2;
-                                const yOffset = (canvas.height - viewport.height) / 2;
-                                ctx.drawImage(tempCanvas, xOffset, yOffset);
-                            });
-                            pageInfo.textContent = `${getJsTranslation_lesson('page')} ${num} / ${pdfDoc.numPages}`;
-                        });
-                    };
-
-                    renderPage(currentPage);
-                    prevBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderPage(currentPage); }});
-                    nextBtn.addEventListener("click", () => { if (currentPage < pdfDoc.numPages) { currentPage++; renderPage(currentPage); }});
-
-                } catch (error) {
-                    console.error("Error loading PDF:", error);
-                    pageInfo.textContent = "Error loading PDF.";
-                }
-            }
-        }
-
-        // 1. Dispose of any old players first.
-        // disposeExistingPlayers();
-        
-        // 2. Initialize all new components.
-        // A small timeout ensures the DOM is fully ready after the swap.
-        setTimeout(() => {
-            document.querySelectorAll('video.video-js').forEach(initializeVideoJs);
-            document.querySelectorAll('audio').forEach(initializeHlsAudio);
-            document.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
-            document.querySelectorAll('video, audio').forEach(el => {
-                el.setAttribute('controlsList', 'nodownload');
-                el.addEventListener('contextmenu', e => e.preventDefault());
-            });
-        }, 500);
-
-        // Security measures
-        document.addEventListener("keydown", e => {
-            if ((e.ctrlKey && ["s", "p", "u"].includes(e.key.toLowerCase())) || e.key === "PrintScreen") {
-                e.preventDefault();
-            }
-        });
-        document.addEventListener("selectstart", e => e.preventDefault());
-        document.addEventListener('contextmenu', e => e.preventDefault());
-    })();
     </script>
 </div>
 {% endblock %}

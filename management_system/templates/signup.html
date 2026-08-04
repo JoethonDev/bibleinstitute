@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block head_meta %}
+<title>{% translate "Sign Up" %} | {% translate "Bible Institute Coptic" %}</title>
+{% endblock %}
+
+{% block style %}
+{% endblock %}
+
+{% block body %}
+<section class="sd-page">
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-8 col-xl-7">
+
+            <div class="sd-frame">
+                <div class="sd-screen p-4 p-sm-5">
+
+                    <div class="text-center mb-4">
+                        <h1 class="sd-section-title">{% translate "Student Application" %}</h1>
+                        <p class="ps-muted-text">{% translate "Fill in your details to apply" %}</p>
+                    </div>
+
+                    <!-- ========== TERMS MODAL ========== -->
+                    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true" data-bs-backdrop="false">
+                        <div class="modal-dialog modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="termsModalLabel">{% translate "Terms and Conditions" %}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>{% translate "By submitting this application, you agree to the following terms:" %}</p>
+                                    <ul>
+                                        <li>{% translate "All information provided must be accurate and complete." %}</li>
+                                        <li>{% translate "You commit to attending scheduled classes and completing required coursework." %}</li>
+                                        <li>{% translate "The institute reserves the right to modify schedules, curriculum, and policies as needed." %}</li>
+                                        <li>{% translate "Your personal data will be used solely for institute administrative purposes." %}</li>
+                                        <li>{% translate "You agree to abide by the institute's code of conduct and academic integrity policies." %}</li>
+                                    </ul>
+                                    <p class="mb-0">{% translate "By checking the 'I agree' box and submitting, you confirm acceptance of these terms." %}</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Close" %}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SIGNUP FORM ========== -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <div class="mb-3">
+                            <small>
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">
+                                    {% translate "View Terms and Conditions" %}
+                                </a>
+                            </small>
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="sd-btn sd-btn--gold btn-lg">
+                                <i class="fas fa-paper-plane me-2"></i>{% translate "Submit Application" %}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-3">
+                        <a href="{% url 'user_login' %}">{% translate "Already have an account? Log in" %}</a>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</section>
+{% endblock %}
