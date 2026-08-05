@@ -109,6 +109,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.i18n',
                 'management_system.context_processors.static_asset_version',
+                'management_system.context_processors.localized_alternate_urls',
             ],
         },
     },

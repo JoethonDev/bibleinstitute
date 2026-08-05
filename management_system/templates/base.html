@@ -13,8 +13,8 @@
     <meta name="keywords" content="{% translate 'Bible institute, Coptic, theological education, online learning, Egypt' %}">
     <link rel="canonical" href="{% if request.get_full_path %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% else %}{{ request.build_absolute_uri }}{% endif %}">
     <link rel="alternate" hreflang="x-default" href="{{ request.scheme }}://{{ request.get_host }}/">
-    <link rel="alternate" hreflang="en" href="{{ request.scheme }}://{{ request.get_host }}{% translate_url 'en' %}">
-    <link rel="alternate" hreflang="ar" href="{{ request.scheme }}://{{ request.get_host }}{% translate_url 'ar' %}">
+    <link rel="alternate" hreflang="en" href="{{ request.scheme }}://{{ request.get_host }}{{ localized_url_en }}">
+    <link rel="alternate" hreflang="ar" href="{{ request.scheme }}://{{ request.get_host }}{{ localized_url_ar }}">
     <meta name="robots" content="{% if user.is_authenticated %}noindex, nofollow{% else %}index, follow{% endif %}">
     <meta property="og:title" content="{% translate 'Bible Institute Coptic' %}">
     <meta property="og:description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
