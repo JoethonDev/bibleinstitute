@@ -20,11 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Ensure the shared collectstatic volume replaces files from an older image.
-# collectstatic compares mtimes and must not leave an older CSS bundle in
-# place when the persistent volume outlives the application image.
-RUN find management_system/static static -type f -exec touch {} +
-
 EXPOSE 8000
 
 # Production WSGI entry point. The application Compose services provide the
