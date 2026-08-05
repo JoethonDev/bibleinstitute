@@ -20,10 +20,10 @@
     {% endif %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <!-- Legacy stylesheets (migration fallback — loaded first so new system wins cascade) -->
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260804-admin-assets-1">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ static_asset_version }}">
     <!-- Psalmodia Design System (loads after legacy for cascade precedence) -->
-    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v=20260804-admin-assets-1">
-    <link rel="stylesheet" href="{% static 'css/app_admin.css' %}?v=20260804-admin-assets-1">
+    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v={{ static_asset_version }}">
+    <link rel="stylesheet" href="{% static 'css/app_admin.css' %}?v={{ static_asset_version }}">
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -514,7 +514,7 @@
     <script defer src="{% static 'js/alpine/components/dashboardManager.js' %}"></script>
     <script defer src="{% static 'js/alpine/components/filterManager.js' %}"></script>
     <script defer src="{% static 'js/alpine/components/tableManager.js' %}"></script>
-    <script defer src="{% static 'js/alpine/components/progressTracker.js' %}?v=20260801-lesson-ui-3"></script>
+    <script defer src="{% static 'js/alpine/components/progressTracker.js' %}?v={{ static_asset_version }}"></script>
     
     <!-- 4. Alpine.js Global Component Registration (MUST be before Alpine Core) -->
     <script defer>

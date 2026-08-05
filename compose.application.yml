@@ -25,6 +25,7 @@ x-app-base: &app-base
     WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
     WEB_THREADS: ${WEB_THREADS:-8}
     GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
+    STATIC_ASSET_VERSION: ${STATIC_ASSET_VERSION:-dev}
   volumes:
     - lms_static_data:/app/collectstatic
   networks:

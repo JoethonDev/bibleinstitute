@@ -110,6 +110,14 @@ if [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null | grep -v "^${R
 fi
 info "Working tree is clean."
 
+# Give every deployment a unique static URL key. Nginx does not maintain a
+# proxy cache for /static/, but browsers and the CDN cache immutable asset
+# URLs. The shell environment overrides the interpolation env file for all
+# target build/run/start commands below.
+STATIC_ASSET_VERSION="$(git rev-parse --short=12 HEAD)-$(date -u +%Y%m%d%H%M%S)"
+export STATIC_ASSET_VERSION
+info "Static asset release: $STATIC_ASSET_VERSION"
+
 # ---------------------------------------------------------------------------
 # Lock
 # ---------------------------------------------------------------------------

@@ -31,6 +31,7 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', '').lower() in ('true', '1', 'yes')
+STATIC_ASSET_VERSION = os.getenv('STATIC_ASSET_VERSION', 'dev')
 
 # Nginx terminates TLS and forwards the original protocol. Secure cookie
 # defaults turn on automatically for production while remaining convenient for
@@ -105,6 +106,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.i18n',
+                'management_system.context_processors.static_asset_version',
             ],
         },
     },

@@ -53,12 +53,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <!-- Legacy stylesheet remains available for unmigrated infrastructure. -->
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260801-lesson-ui-3">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ static_asset_version }}">
     <!-- Psalmodia student layer wins over legacy selectors. -->
-    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v=20260802-ui-cascade-1">
-    <link rel="stylesheet" href="{% static 'css/app_student.css' %}?v=20260802-ui-cascade-1">
+    <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v={{ static_asset_version }}">
+    <link rel="stylesheet" href="{% static 'css/app_student.css' %}?v={{ static_asset_version }}">
     <!-- Public shell remains last so Home/About/Program keep their approved styling. -->
-    <link rel="stylesheet" href="{% static 'css/public_site.css' %}?v=20260802-public-preserved-1">
+    <link rel="stylesheet" href="{% static 'css/public_site.css' %}?v={{ static_asset_version }}">
 
     {% block cdn %}{% endblock %}
     {% block style %}{% endblock %}
