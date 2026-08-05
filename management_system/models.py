@@ -28,10 +28,6 @@ def default_meeting_weekdays():
     return [6, 1]  # Sunday and Tuesday using datetime.date.weekday().
 
 
-def default_user_time_zone():
-    return settings.TIME_ZONE
-
-
 class PublicationStatus(models.TextChoices):
     DRAFT = "draft", _("Draft")
     PUBLISHED = "published", _("Published")
@@ -76,7 +72,7 @@ class Role(models.Model):
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
     joined_date = models.DateField(null=False, default=assign_academic_date)
-    time_zone = models.CharField(max_length=64, default=default_user_time_zone)
+    time_zone = models.CharField(max_length=64, default=settings.TIME_ZONE)
 
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
     priest_name = models.CharField(max_length=255, null=True, blank=True)

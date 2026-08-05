@@ -201,9 +201,7 @@ LOCALE_PATHS = [
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-   BASE_DIR / 'static'
-]
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').is_dir() else []
 STATIC_ROOT = BASE_DIR / "collectstatic/"
 
 # Default primary key field type
