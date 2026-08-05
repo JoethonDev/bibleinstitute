@@ -44,7 +44,7 @@ from datetime import date
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, yearly_transcript_queryset, _csv_safe_cell, _safe_filename
@@ -54,12 +54,14 @@ from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
 from .utils.file_validator import validate_upload_filename, validate_hls_object_key, FileValidator, MAX_FILE_SIZE
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, user_has_management_role
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
 from .utils.r2_references import rewrite_lesson_r2_references
-from .utils.attendance import is_expected_date, get_expected_dates
+from .utils.attendance import is_expected_date, get_expected_dates, get_student_attendance_context, assign_unassigned_attendance
+from .utils.timezones import ensure_aware, format_user_datetime
+from .utils.quiz_access import grant_quiz_openings, quiz_window
 from .public_content import get_institute_copy
 from .academic_enrollment import (
     activate_academic_year,
@@ -872,7 +874,8 @@ def take_exam(request, offering_id, quiz_id):
 
         submission_datetime = now()
         # Quiz can be submitted from opening time through the 30-minute closing buffer
-        can_submit = quiz.opening_date <= submission_datetime <= quiz.closing_date + timedelta(minutes=30)
+        can_submit = is_quiz_open(quiz, submission_datetime, user)
+        _, effective_closing_date = quiz_window(quiz, user)
 
         # Check if user has previously taken this quiz
         quiz_mode, grade = get_student_quiz_status(quiz, user, submission_datetime)
@@ -923,10 +926,10 @@ def take_exam(request, offering_id, quiz_id):
                 "extended_view": "base.html",
                 "id": "container",
                 "total_grade": total_grade,
-                "closing_date": quiz.closing_date.timestamp(),
+                "closing_date": ensure_aware(effective_closing_date).timestamp(),
                 "exam_taken": True if grade else False,
                 "back_url": reverse("course-details", args=[offering_id]),
-                "quiz_closing_date_str": quiz.closing_date.strftime("%d/%m/%Y %H:%M"),
+                "quiz_closing_date_str": format_user_datetime(effective_closing_date, user, "%d/%m/%Y %H:%M"),
             })
         
         elif request.method == "POST":
@@ -1311,6 +1314,7 @@ class CreateUser(UserBaseView, CreateView):
         if user.role and user.role.role != "admin":
             form.fields.pop("role", None)
             form.fields.pop("password", None)
+            form.fields.pop("time_zone", None)
         return form
 
 class UpdateUser(UserBaseView, UpdateView):
@@ -1323,6 +1327,7 @@ class UpdateUser(UserBaseView, UpdateView):
         if user.role and user.role.role != "admin":
             form.fields.pop("role", None)
             form.fields.pop("password", None)
+            form.fields.pop("time_zone", None)
         return form
 
     def form_valid(self, form):
@@ -1466,9 +1471,19 @@ def quiz_detail(request, quiz_id):
             "course_offering__academic_year_level__level",
             "course_offering__academic_year_level__academic_year",
             "quiz_type",
-        ).prefetch_related("questions"),
+        ).prefetch_related(
+            "questions",
+            Prefetch(
+                "student_openings",
+                queryset=QuizStudentOpening.objects.select_related("student", "granted_by").order_by(
+                    "student__last_name", "student__first_name", "student__username"
+                ),
+                to_attr="exceptional_openings",
+            ),
+        ),
         pk=quiz_id,
     )
+    exception_form = QuizExceptionalOpeningForm(quiz=quiz) if can_manage_academic_setup(request.user) else None
     return render(request, "content_detail.html", {
         "content": quiz,
         "content_kind": "quiz",
@@ -1478,7 +1493,33 @@ def quiz_detail(request, quiz_id):
         "questions": quiz.questions.all(),
         "back_url": reverse("quiz-dashboard"),
         "edit_url": reverse("quiz-update", args=[quiz.pk]),
+        "exception_form": exception_form,
+        "exceptional_openings": getattr(quiz, "exceptional_openings", []),
     })
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def quiz_exceptional_opening(request, quiz_id):
+    quiz = get_object_or_404(Quiz.objects.select_related("course_offering__academic_year_level"), pk=quiz_id)
+    form = QuizExceptionalOpeningForm(request.POST, quiz=quiz)
+    if not form.is_valid():
+        messages.error(request, _("Please correct the exceptional opening form."))
+        return redirect("quiz-view", quiz_id=quiz.pk)
+    try:
+        with transaction.atomic():
+            count = grant_quiz_openings(
+                quiz,
+                form.cleaned_data["students"],
+                form.cleaned_data["opening_date"],
+                form.cleaned_data["closing_date"],
+                request.user,
+            )
+    except ValidationError as exc:
+        messages.error(request, "; ".join(str(message) for message in exc.messages))
+    else:
+        messages.success(request, _("Exceptional opening saved for %(count)s student(s).") % {"count": count})
+    return redirect("quiz-view", quiz_id=quiz.pk)
 
 
 # Lesson Dashboard
@@ -3154,6 +3195,7 @@ def r2_management_dashboard(request):
 # ============================================================================
 
 def signup(request):
+    copy = get_institute_copy(translation.get_language(), "courses")["copy"]
     if request.method == "POST":
         form = SignupForm(request.POST, request.FILES)
         if form.is_valid():
@@ -3165,17 +3207,30 @@ def signup(request):
                         is_offline = OfflineCity.objects.filter(name__iexact=user.city, is_active=True).exists()
                         user.study_mode = "offline" if is_offline else "online"
                     file_type_map = {"identity_front": "identity_front_key", "identity_back": "identity_back_key", "payment": "payment_key", "profile": "profile_image_key"}
+                    required_upload_types = {"identity_front", "payment", "profile"}
+                    if user.identity_type == "national_id":
+                        required_upload_types.add("identity_back")
                     for upload_type, model_field in file_type_map.items():
                         if upload_type in request.FILES:
                             key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, request.FILES[upload_type], upload_type)
                             if key:
                                 setattr(user, model_field, key)
                                 uploaded_keys.append(key)
+                    if any(not getattr(user, file_type_map[upload_type], None) for upload_type in required_upload_types):
+                        raise ValidationError(_("All required application documents must be uploaded."))
                     if uploaded_keys:
                         user.save(update_fields=[v for v in file_type_map.values() if getattr(user, v, None)] + ["study_mode"])
                     elif user.study_mode:
                         user.save(update_fields=["study_mode"])
                     send_application_received(user)
+            except ValidationError as exc:
+                for key in uploaded_keys:
+                    try:
+                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+                    except Exception:
+                        pass
+                form.add_error(None, "; ".join(str(message) for message in exc.messages))
+                return render(request, "signup.html", {"form": form, "copy": copy})
             except Exception:
                 for key in uploaded_keys:
                     try:
@@ -3186,7 +3241,7 @@ def signup(request):
             return render(request, "signup_success.html")
     else:
         form = SignupForm()
-    return render(request, "signup.html", {"form": form})
+    return render(request, "signup.html", {"form": form, "copy": copy})
 
 @capability_required(can_manage_applications)
 def applications_dashboard(request):
@@ -3901,15 +3956,16 @@ def add_meeting(request):
         return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
     try:
         with transaction.atomic():
-            AcademicYearLevelMeeting.objects.create(
+            meeting = AcademicYearLevelMeeting.objects.create(
                 academic_year_level=offering.academic_year_level,
                 meeting_date=meeting_date,
                 course_offering=offering,
             )
+            assigned_count = assign_unassigned_attendance(meeting)
     except IntegrityError:
         messages.error(request, _("A meeting already exists for this level and date."))
         return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
-    messages.success(request, _("Meeting added."))
+    messages.success(request, _("Meeting added. %(count)s pending attendance record(s) assigned.") % {"count": assigned_count})
     return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}&year={meeting_date.year}&month={meeting_date.month}")
 
 
@@ -4093,31 +4149,21 @@ def scan_preview(request, token):
             user = get_object_or_404(User, pk=int(token))
         except (ValueError, TypeError):
             raise Http404
-    active_enrollment = Enrollment.objects.filter(
+    today = timezone.localdate()
+    academic_year_level, scheduled_offering = get_student_attendance_context(user, today)
+    academic_year = academic_year_level.academic_year if academic_year_level else None
+    already_recorded_actions = list(AttendanceRecord.objects.filter(
         student=user,
-        status=Enrollment.Status.ACTIVE,
-        enrollment_type=Enrollment.Type.NORMAL,
-        academic_year_level__academic_year__is_active=True,
-    ).select_related("academic_year_level__academic_year").first()
-    academic_year = active_enrollment.academic_year_level.academic_year if active_enrollment else None
-    today = now().date()
-    offerings = list(active_year_offerings_for_student(user).order_by("course__name", "pk"))
-    offering_ids = [offering.pk for offering in offerings]
-    already_recorded_by_offering = defaultdict(list)
-    for offering_id, action in AttendanceRecord.objects.filter(
-        student=user,
-        course_offering_id__in=offering_ids,
         attendance_date=today,
-    ).values_list("course_offering_id", "action"):
-        already_recorded_by_offering[str(offering_id)].append(action)
+    ).values_list("action", flat=True))
+    can_record = bool(academic_year_level and is_expected_date(academic_year_level, today) and user.study_mode != "online")
     return render(request, "scan_preview.html", {
         "student": user,
         "academic_year": academic_year,
+        "scheduled_offering": scheduled_offering,
         "today": today,
-        "offerings": offerings,
-        "selected_offering_id": int(request.GET["course_offering"]) if request.GET.get("course_offering", "").isdigit() else None,
-        "already_recorded_by_offering": dict(already_recorded_by_offering),
-        "already_recorded_json": json.dumps(already_recorded_by_offering),
+        "already_recorded_actions": already_recorded_actions,
+        "can_record": can_record,
         "token": token,
     })
 
@@ -4132,15 +4178,10 @@ def record_attendance(request, token, action):
         user = get_object_or_404(User, qr_token=token)
     if user.study_mode == "online":
         return JsonResponse({"error": _("Online students cannot record attendance.")}, status=400)
-    offering_id = request.POST.get("course_offering", "")
-    if not str(offering_id).isdigit():
-        return JsonResponse({"error": _("Select a course offering.")}, status=400)
-    offering = active_year_offerings_for_student(user).filter(pk=int(offering_id)).first()
-    if offering is None:
-        raise PermissionDenied(_("The student does not have access to this active course offering."))
-    academic_year_level = offering.academic_year_level
-    academic_year = academic_year_level.academic_year
-    today = now().date()
+    today = timezone.localdate()
+    academic_year_level, offering = get_student_attendance_context(user, today)
+    if academic_year_level is None:
+        return JsonResponse({"error": _("The student has no active academic-year enrollment.")}, status=400)
     if not is_expected_date(academic_year_level, today):
         return JsonResponse({"error": _("Today is not an expected attendance day.")}, status=400)
     with transaction.atomic():
@@ -4178,9 +4219,23 @@ def attendance_management(request):
         records = AttendanceRecord.objects.all().select_related(
             "student", "course_offering__course", "course_offering__academic_year_level__academic_year",
             "course_offering__academic_year_level__level", "scanned_by"
-        ).filter(course_offering__academic_year_level__academic_year_id=year_id)
+        ).filter(
+            Q(course_offering__academic_year_level__academic_year_id=year_id)
+            | Q(
+                student__enrollments__academic_year_level__academic_year_id=year_id,
+                student__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+                student__enrollments__enrollment_type=Enrollment.Type.NORMAL,
+            )
+        ).distinct()
         if level_id and level_id.isdigit():
-            records = records.filter(course_offering__academic_year_level__level_id=int(level_id))
+            records = records.filter(
+                Q(course_offering__academic_year_level__level_id=int(level_id))
+                | Q(
+                    student__enrollments__academic_year_level__level_id=int(level_id),
+                    student__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+                    student__enrollments__enrollment_type=Enrollment.Type.NORMAL,
+                )
+            ).distinct()
         if offering_id and offering_id.isdigit():
             records = records.filter(course_offering_id=int(offering_id))
         if action in ("entrance", "exit"):
@@ -4220,6 +4275,9 @@ def attendance_management(request):
 @capability_required(can_correct_attendance)
 def attendance_correction(request, record_id):
     record = get_object_or_404(AttendanceRecord, pk=record_id)
+    if not record.course_offering_id:
+        messages.error(request, _("Assign a calendar course before correcting this record."))
+        return redirect("attendance-management")
     if request.method == "POST":
         new_date = request.POST.get("attendance_date")
         new_action = request.POST.get("action")

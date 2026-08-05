@@ -82,7 +82,7 @@ function tableManager() {
         async confirmDelete() {
             if (!this.bulkDeleteUrl || this.selected.length === 0) return;
 
-            // Extract numeric IDs from URL paths like /en/dashboard/users/5/
+            // Extract numeric IDs from localized user-detail URLs.
             const ids = this.selected.map(url => {
                 const parts = url.replace(/\/$/, '').split('/');
                 return parseInt(parts[parts.length - 1], 10);

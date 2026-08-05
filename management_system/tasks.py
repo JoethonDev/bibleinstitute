@@ -23,7 +23,11 @@ SITE_DOMAIN = os.getenv("DJANGO_SITE_DOMAIN", "http://localhost:8000")
 
 def _send_html_email(subject: str, template_name: str, context: dict, recipient_email: str) -> None:
     """Low-level render-and-send helper used only by tasks. Does not catch exceptions."""
-    ctx = {**context, "site_domain": SITE_DOMAIN.rstrip("/")}
+    ctx = {
+        **context,
+        "site_domain": SITE_DOMAIN.rstrip("/"),
+        "static_asset_version": settings.STATIC_ASSET_VERSION,
+    }
     html_message = render_to_string(template_name, ctx)
     send_mail(
         subject=subject,

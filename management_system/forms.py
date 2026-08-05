@@ -7,6 +7,10 @@ from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel,
 from .utils.validators import normalize_phone, validate_identity_by_type
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
+from django.conf import settings
+from .utils.timezones import user_time_zone_choices
+from .utils.timezones import parse_application_datetime
+from .utils.quiz_access import eligible_quiz_students
 
 
 class UserLoginForm(AuthenticationForm):
@@ -38,6 +42,8 @@ class UserCreationForm(forms.ModelForm):
         self.fields['role'].label = _("Role") # Localized
         self.fields['joined_date'].label = _("Joined Date") # Localized
         self.fields['password'].label = _("Password") # Localized
+        self.fields['time_zone'].label = _("Time zone")
+        self.fields['time_zone'].choices = user_time_zone_choices()
 
     username = UsernameField(widget=forms.TextInput(
         attrs={ 
@@ -78,7 +84,7 @@ class UserCreationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "username", "password", "joined_date", "role"]
+        fields = ["first_name", "last_name", "username", "password", "joined_date", "role", "time_zone"]
         exclude = []
 
     def save(self, commit=True):
@@ -97,23 +103,14 @@ class UserUpdateForm(UserCreationForm):
             'id': 'password',
         }), required=False)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_password = self.instance.password
+
     def save(self, commit=True):
         password = self.cleaned_data.get("password")
         if not password:
-            print("No password provided, skipping password update.")
-
-            # Temporarily add 'password' to _meta.exclude for this save so Django's
-            # ModelForm doesn't write an empty raw string to the password field.
-            # Restore the original list afterwards to avoid permanent class mutation.
-            original_exclude = list(self._meta.exclude or [])
-            self._meta.exclude = original_exclude + ['password']
-            self.cleaned_data.pop('password', None)
-            print(f"Cleaned data: {self.cleaned_data}")
-            print(f"Meta exclude: {self._meta.exclude}")
-            try:
-                return super(UserUpdateForm, self).save(commit)
-            finally:
-                self._meta.exclude = original_exclude
+            self.instance.password = self._original_password
         return super(UserUpdateForm, self).save(commit)
     
 
@@ -123,6 +120,7 @@ class ProfileUpdateForm(UserUpdateForm):
     def __init__(self, *args, **kwargs):
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
         self.fields.pop("role", None)
+        self.fields.pop("time_zone", None)
         for fname in self.readonly_fields:
             if fname in self.fields:
                 self.fields[fname].disabled = True
@@ -391,17 +389,59 @@ class CSVUploadForm(forms.Form):
     csv_file = forms.FileField(label=_("CSV File"), help_text=_("Upload a .csv file with user data."))
 
 
+class QuizExceptionalOpeningForm(forms.Form):
+    students = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        label=_("Students"),
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
+    )
+    opening_date = forms.CharField(
+        label=_("Exceptional opening date"),
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+    )
+    closing_date = forms.CharField(
+        label=_("Exceptional closing date"),
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+    )
+
+    def __init__(self, *args, quiz, **kwargs):
+        self.quiz = quiz
+        super().__init__(*args, **kwargs)
+        self.fields["students"].queryset = eligible_quiz_students(quiz)
+
+    def _parse_datetime(self, value):
+        try:
+            return parse_application_datetime(value)
+        except (TypeError, ValueError):
+            raise forms.ValidationError(_("Enter a valid date and time."))
+
+    def clean_opening_date(self):
+        return self._parse_datetime(self.cleaned_data["opening_date"])
+
+    def clean_closing_date(self):
+        return self._parse_datetime(self.cleaned_data["closing_date"])
+
+    def clean(self):
+        cleaned = super().clean()
+        opening_date = cleaned.get("opening_date")
+        closing_date = cleaned.get("closing_date")
+        if opening_date and closing_date and closing_date <= opening_date:
+            self.add_error("closing_date", _("Closing date must be after opening date."))
+        return cleaned
+
+
 class SignupForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}))
     agree_terms = forms.BooleanField(required=True, label=_("I agree to the Terms and Conditions"))
-    identity_front = forms.FileField(required=False, label=_("National ID / Passport (Front)"))
+    identity_front = forms.FileField(required=True, label=_("National ID / Passport (Front)"))
     identity_back = forms.FileField(required=False, label=_("National ID / Passport (Back)"))
-    payment = forms.FileField(required=False, label=_("Payment Receipt"))
-    profile = forms.FileField(required=False, label=_("Profile Photo"))
+    payment = forms.FileField(required=True, label=_("Payment Receipt"))
+    profile = forms.FileField(required=True, label=_("Profile Photo"))
+    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
 
     class Meta:
         model = User
-        fields = ["username", "password", "first_name", "last_name", "email", "phone", "priest_name", "priest_phone", "church", "city", "identity_type", "identity_number"]
+        fields = ["username", "password", "first_name", "last_name", "email", "phone", "priest_name", "priest_phone", "church", "city", "identity_type", "identity_number", "time_zone"]
         widgets = {
             'username': forms.TextInput(attrs={'placeholder': _('Username'), 'id': 'username'}),
             'first_name': forms.TextInput(attrs={'placeholder': _('First Name'), 'id': 'first_name'}),
@@ -416,6 +456,8 @@ class SignupForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['time_zone'].choices = user_time_zone_choices()
+        self.fields['time_zone'].initial = settings.TIME_ZONE
         self.fields['email'].required = False
         self.fields['last_name'].required = False
         self.fields['first_name'].label = _("Name")
@@ -462,6 +504,10 @@ class SignupForm(forms.ModelForm):
         cleaned_data = super().clean()
         if not cleaned_data.get("agree_terms"):
             raise forms.ValidationError(_("You must agree to the Terms and Conditions."))
+        if cleaned_data.get("identity_type") == "national_id" and not cleaned_data.get("identity_back"):
+            self.add_error("identity_back", _("The back of the National ID is required."))
+        if cleaned_data.get("identity_type") == "passport" and cleaned_data.get("identity_back"):
+            self.add_error("identity_back", _("A passport requires only the front document."))
         return cleaned_data
 
     def save(self, commit=True):

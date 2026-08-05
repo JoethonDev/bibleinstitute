@@ -6027,8 +6027,65 @@ msgstr "Locked meeting days"
 #~ msgid "Page navigation example"
 #~ msgstr "Page navigation example"
 
+msgid "Time zone"
+msgstr "Time zone"
+
+msgid "The back of the National ID is required."
+msgstr "The back of the National ID is required."
+
+msgid "A passport requires only the front document."
+msgstr "A passport requires only the front document."
+
+msgid "All required application documents must be uploaded."
+msgstr "All required application documents must be uploaded."
+
 #~ msgid "HLS segment key must have a folder prefix and a \"Video Segments\" or \"Audio Segments\" media folder."
 #~ msgstr "HLS segment key must have a folder prefix and a \"Video Segments\" or \"Audio Segments\" media folder."
 
 #~ msgid "HLS segment key must have a non-empty folder prefix before the \"Video Segments\" or \"Audio Segments\" folder."
 #~ msgstr "HLS segment key must have a non-empty folder prefix before the \"Video Segments\" or \"Audio Segments\" folder."
+
+msgid "Closing date must be after opening date."
+msgstr "Closing date must be after opening date."
+
+msgid "Every selected student must be actively enrolled in this quiz's course scope."
+msgstr "Every selected student must be actively enrolled in this quiz's course scope."
+
+msgid "Enter a valid date and time."
+msgstr "Enter a valid date and time."
+
+msgid "Exceptional quiz opening"
+msgstr "Exceptional quiz opening"
+
+msgid "Select enrolled students and a local opening window. This does not change the normal quiz window."
+msgstr "Select enrolled students and a local opening window. This does not change the normal quiz window."
+
+msgid "Save exceptional opening"
+msgstr "Save exceptional opening"
+
+msgid "Exceptional opening saved for %(count)s student(s)."
+msgstr "Exceptional opening saved for %(count)s student(s)."
+
+msgid "Assign a calendar course before correcting this record."
+msgstr "Assign a calendar course before correcting this record."
+
+msgid "Meeting added. %(count)s pending attendance record(s) assigned."
+msgstr "Meeting added. %(count)s pending attendance record(s) assigned."
+
+msgid "The student has no active academic-year enrollment."
+msgstr "The student has no active academic-year enrollment."
+
+msgid "This course was taken from today's calendar."
+msgstr "This course was taken from today's calendar."
+
+msgid "No course is registered in today's calendar. The scan will be saved pending course assignment."
+msgstr "No course is registered in today's calendar. The scan will be saved pending course assignment."
+
+msgid "No attendance course is available for this student today."
+msgstr "No attendance course is available for this student today."
+
+msgid "Scan a QR code or look up a student. The course is taken automatically from today's calendar."
+msgstr "Scan a QR code or look up a student. The course is taken automatically from today's calendar."
+
+msgid "Today's records:"
+msgstr "Today's records:"

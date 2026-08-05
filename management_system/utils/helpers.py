@@ -15,6 +15,8 @@ from logging import getLogger
 from management_system.utils.decorators import check_role_permission
 from management_system.models import User, MANAGEMENT_ROLES, Grade
 from management_system.academic_access import user_can_write_offering_activity
+from .timezones import ensure_aware, parse_application_datetime
+from .quiz_access import quiz_window
 
 logger = getLogger(__name__)
 
@@ -29,7 +31,7 @@ def get_datetime(datetime_string):
     Returns:
         datetime object
     """
-    return datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M")
+    return parse_application_datetime(datetime_string)
 
 
 def parse_json_value(value, default=None):
@@ -68,12 +70,18 @@ def get_student_quiz_status(quiz, user, current_time=None):
         return "view", grade
 
     current_time = current_time or now()
-    quiz_open = quiz.opening_date <= current_time <= quiz.closing_date + timedelta(minutes=30)
+    quiz_open = is_quiz_open(quiz, current_time, user)
 
     if quiz_open and is_quiz_in_user_window(quiz, user):
         return "exam", None
 
     return "closed_unsolved", None
+
+
+def is_quiz_open(quiz, current_time=None, user=None) -> bool:
+    opening_date, closing_date = quiz_window(quiz, user)
+    current_time = ensure_aware(current_time or now())
+    return ensure_aware(opening_date) <= current_time <= ensure_aware(closing_date) + timedelta(minutes=30)
 
 
 def paginate_obj(request, obj, page_size=15):

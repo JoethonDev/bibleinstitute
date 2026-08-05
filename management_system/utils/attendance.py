@@ -1,14 +1,47 @@
 from datetime import datetime, timedelta
 import zoneinfo
+from django.conf import settings
+from django.db.models import Exists, OuterRef
 
-from ..models import AcademicHoliday, AttendanceRecord, Lesson, PublicationStatus
+from ..models import AcademicHoliday, AcademicYearLevelMeeting, AttendanceRecord, Enrollment, Lesson, PublicationStatus
 
-CAIRO_TZ = "Africa/Cairo"
 
+def get_student_attendance_context(student, check_date):
+    enrollment = Enrollment.objects.filter(
+        student=student,
+        status=Enrollment.Status.ACTIVE,
+        enrollment_type=Enrollment.Type.NORMAL,
+        academic_year_level__academic_year__is_active=True,
+        academic_year_level__academic_year__starts_on__lte=check_date,
+        academic_year_level__academic_year__ends_on__gte=check_date,
+    ).select_related("academic_year_level").order_by(
+        "-academic_year_level__academic_year__ordering", "-enrolled_at"
+    ).first()
+    if not enrollment:
+        return None, None
+    meeting = AcademicYearLevelMeeting.objects.filter(
+        academic_year_level_id=enrollment.academic_year_level_id,
+        meeting_date=check_date,
+    ).select_related("course_offering").first()
+    return enrollment.academic_year_level, meeting.course_offering if meeting else None
+
+
+def assign_unassigned_attendance(meeting) -> int:
+    existing = AttendanceRecord.objects.filter(
+        student_id=OuterRef("student_id"),
+        course_offering_id=meeting.course_offering_id,
+        attendance_date=OuterRef("attendance_date"),
+        action=OuterRef("action"),
+    )
+    return AttendanceRecord.objects.filter(
+        course_offering__isnull=True,
+        attendance_date=meeting.meeting_date,
+        student__enrollments__academic_year_level_id=meeting.academic_year_level_id,
+    ).filter(~Exists(existing)).update(course_offering_id=meeting.course_offering_id)
 
 def get_expected_dates(academic_year_level, through_date=None):
-    cairo = zoneinfo.ZoneInfo(CAIRO_TZ)
-    today = datetime.now(cairo).date()
+    application_tz = zoneinfo.ZoneInfo(settings.TIME_ZONE)
+    today = datetime.now(application_tz).date()
     year = academic_year_level.academic_year
 
     effective_end = min(year.ends_on, through_date or today)

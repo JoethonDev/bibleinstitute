@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
@@ -26,6 +26,7 @@ from .models import (
     Submission,
     Quiz,
 )
+from .utils.timezones import application_timezone
 
 
 @dataclass(frozen=True)
@@ -67,11 +68,13 @@ def evaluation_offerings(formula: PromotionFormula):
 
 
 def _quiz_scope(rule: PromotionRule, offering: CourseOffering, starts_on: date, ends_on: date) -> Q:
+    local_start = timezone.make_aware(datetime.combine(starts_on, time.min), application_timezone())
+    local_end = timezone.make_aware(datetime.combine(ends_on + timedelta(days=1), time.min), application_timezone())
     query = Q(
         course_offering=offering,
         status=PublicationStatus.PUBLISHED,
-        closing_date__date__gte=starts_on,
-        closing_date__date__lte=ends_on,
+        closing_date__gte=local_start,
+        closing_date__lt=local_end,
     )
     if rule.quiz_type_id:
         query &= Q(quiz_type_id=rule.quiz_type_id)

@@ -6027,8 +6027,65 @@ msgstr "أيام الاجتماع المحددة"
 #~ msgid "Page navigation example"
 #~ msgstr "مثال على التنقل بين الصفحات"
 
+msgid "Time zone"
+msgstr "المنطقة الزمنية"
+
+msgid "The back of the National ID is required."
+msgstr "صورة ظهر البطاقة الشخصية مطلوبة."
+
+msgid "A passport requires only the front document."
+msgstr "جواز السفر يحتاج إلى صورة الوجه فقط."
+
+msgid "All required application documents must be uploaded."
+msgstr "يجب رفع جميع المستندات المطلوبة."
+
 #~ msgid "HLS segment key must have a folder prefix and a \"Video Segments\" or \"Audio Segments\" media folder."
 #~ msgstr "يجب أن يحتوي مفتاح مقطع HLS على بادئة مجلد ومجلد وسائط \"Video Segments\" أو \"Audio Segments\"."
 
 #~ msgid "HLS segment key must have a non-empty folder prefix before the \"Video Segments\" or \"Audio Segments\" folder."
 #~ msgstr "يجب أن يحتوي مفتاح مقطع HLS على بادئة مجلد غير فارغة قبل مجلد \"Video Segments\" أو \"Audio Segments\"."
+
+msgid "Closing date must be after opening date."
+msgstr "يجب أن يكون تاريخ الإغلاق بعد تاريخ الفتح."
+
+msgid "Every selected student must be actively enrolled in this quiz's course scope."
+msgstr "يجب أن يكون كل طالب مختار مقيدًا حاليًا في نطاق مادة هذا الاختبار."
+
+msgid "Enter a valid date and time."
+msgstr "أدخل تاريخًا ووقتًا صحيحين."
+
+msgid "Exceptional quiz opening"
+msgstr "فتح استثنائي للاختبار"
+
+msgid "Select enrolled students and a local opening window. This does not change the normal quiz window."
+msgstr "اختر الطلاب المقيدين وحدد فترة فتح محلية. لا يغير ذلك فترة الاختبار الأساسية."
+
+msgid "Save exceptional opening"
+msgstr "حفظ الفتح الاستثنائي"
+
+msgid "Exceptional opening saved for %(count)s student(s)."
+msgstr "تم حفظ الفتح الاستثنائي لعدد %(count)s من الطلاب."
+
+msgid "Assign a calendar course before correcting this record."
+msgstr "عيّن مادة من التقويم قبل تصحيح هذا السجل."
+
+msgid "Meeting added. %(count)s pending attendance record(s) assigned."
+msgstr "تمت إضافة المحاضرة وإسناد %(count)s من سجلات الحضور المعلقة."
+
+msgid "The student has no active academic-year enrollment."
+msgstr "لا يوجد للطالب قيد نشط في سنة دراسية."
+
+msgid "This course was taken from today's calendar."
+msgstr "تم أخذ هذه المادة تلقائيًا من تقويم اليوم."
+
+msgid "No course is registered in today's calendar. The scan will be saved pending course assignment."
+msgstr "لا توجد مادة مسجلة في تقويم اليوم. سيتم حفظ المسح لحين إسناد المادة."
+
+msgid "No attendance course is available for this student today."
+msgstr "لا توجد مادة حضور متاحة لهذا الطالب اليوم."
+
+msgid "Scan a QR code or look up a student. The course is taken automatically from today's calendar."
+msgstr "امسح رمز QR أو ابحث عن طالب. يتم أخذ المادة تلقائيًا من تقويم اليوم."
+
+msgid "Today's records:"
+msgstr "سجلات اليوم:"

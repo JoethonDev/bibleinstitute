@@ -117,6 +117,62 @@
 
   <!-- ── Content Section ── -->
   {% if is_quiz %}
+    {% if exception_form %}
+    <div class="ad-card mb-4">
+      <div class="ad-card-head">
+        <i class="fas fa-unlock"></i>
+        <span>{% translate "Exceptional quiz opening" %}</span>
+      </div>
+      <div class="ad-card-body">
+        <p class="ps-muted-text">{% translate "Select enrolled students and a local opening window. This does not change the normal quiz window." %}</p>
+        <form method="post" action="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="{{ exception_form.students.id_for_label }}" class="form-label">{{ exception_form.students.label }}</label>
+            {{ exception_form.students }}
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="{{ exception_form.opening_date.id_for_label }}" class="form-label">{{ exception_form.opening_date.label }}</label>
+              {{ exception_form.opening_date }}
+            </div>
+            <div class="col-md-6">
+              <label for="{{ exception_form.closing_date.id_for_label }}" class="form-label">{{ exception_form.closing_date.label }}</label>
+              {{ exception_form.closing_date }}
+            </div>
+          </div>
+          <button type="submit" class="ad-btn ad-btn--teal mt-3">
+            <i class="fas fa-unlock me-1"></i>{% translate "Save exceptional opening" %}
+          </button>
+        </form>
+
+        {% if exceptional_openings %}
+        <div class="ad-table-wrap mt-4">
+          <table class="ad-table">
+            <thead>
+              <tr>
+                <th>{% translate "Student" %}</th>
+                <th>{% translate "Opens" %}</th>
+                <th>{% translate "Closes" %}</th>
+                <th>{% translate "Granted by" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for opening in exceptional_openings %}
+              <tr>
+                <td>{{ opening.student.get_full_name|default:opening.student.username }}</td>
+                <td>{{ opening.opening_date|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td>{{ opening.closing_date|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td>{{ opening.granted_by.get_full_name|default:opening.granted_by.username }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
     <!-- ════ QUIZ QUESTIONS ════ -->
     <div class="ad-card mb-4">
       <div class="ad-card-head">

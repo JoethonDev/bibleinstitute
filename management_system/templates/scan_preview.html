@@ -27,40 +27,19 @@
     </div>
   </div>
 
-  {# --- Course offering selector --- #}
+  {# --- Calendar course --- #}
   <div class="sd-panel-card mb-4">
     <div class="sd-panel-head">
       <h5 class="mb-0"><i class="fas fa-book me-2"></i>{% translate "Course" %}</h5>
     </div>
     <div class="p-3 p-lg-4">
-      <div class="mb-3">
-        <label for="course-offering-select" class="form-label fw-semibold">{% translate "Course" %}</label>
-        <select id="course-offering-select" class="form-select form-select-lg" required>
-          <option value="">{% translate "Select a course..." %}</option>
-          {% for offering in offerings %}
-            <option value="{{ offering.id }}" {% if selected_offering_id == offering.id %}selected{% endif %}>
-              {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      {% if already_recorded_by_offering %}
-        <div class="mt-2">
-          <p class="sd-section-note mb-1">{% translate "Today's records per course:" %}</p>
-          <div class="d-flex flex-wrap gap-1">
-            {% for off_id, actions in already_recorded_by_offering.items %}
-              <span class="sd-chip">
-                {% for offering in offerings %}
-                  {% if offering.id == off_id %}{{ offering.course.name }}:{% endif %}
-                {% endfor %}
-                {% for action in actions %}
-                  <span class="sd-pill sd-pill--done">{{ action }}</span>
-                {% endfor %}
-              </span>
-            {% endfor %}
-          </div>
-        </div>
+      {% if scheduled_offering %}
+        <p class="mb-0"><strong>{{ scheduled_offering.course.name }}</strong> — {{ scheduled_offering.academic_year_level.level.display_name }}</p>
+        <p class="sd-section-note mb-0">{% translate "This course was taken from today's calendar." %}</p>
+      {% elif can_record %}
+        <p class="mb-0">{% translate "No course is registered in today's calendar. The scan will be saved pending course assignment." %}</p>
+      {% else %}
+        <p class="mb-0">{% translate "No attendance course is available for this student today." %}</p>
       {% endif %}
     </div>
   </div>
@@ -69,15 +48,13 @@
   <div class="d-flex gap-2">
     <form id="entrance-form" method="post" action="{% url 'record-attendance' token=token action='entrance' %}">
       {% csrf_token %}
-      <input type="hidden" name="course_offering" id="entrance-offering" value="">
-      <button id="entrance-btn" type="submit" class="sd-btn sd-btn--teal btn-success" disabled>
+      <button id="entrance-btn" type="submit" class="sd-btn sd-btn--teal btn-success" {% if not can_record or "entrance" in already_recorded_actions %}disabled{% endif %}>
         <i class="fas fa-door-open me-1"></i>{% translate "Record Entrance" %}
       </button>
     </form>
     <form id="exit-form" method="post" action="{% url 'record-attendance' token=token action='exit' %}">
       {% csrf_token %}
-      <input type="hidden" name="course_offering" id="exit-offering" value="">
-      <button id="exit-btn" type="submit" class="sd-btn sd-btn--gold btn-warning" disabled>
+      <button id="exit-btn" type="submit" class="sd-btn sd-btn--gold btn-warning" {% if not can_record or "exit" in already_recorded_actions %}disabled{% endif %}>
         <i class="fas fa-door-closed me-1"></i>{% translate "Record Exit" %}
       </button>
     </form>
@@ -95,30 +72,8 @@
 
 <script>
 (function() {
-  var selectEl = document.getElementById('course-offering-select');
-  var entranceOffering = document.getElementById('entrance-offering');
-  var exitOffering = document.getElementById('exit-offering');
   var entranceBtn = document.getElementById('entrance-btn');
   var exitBtn = document.getElementById('exit-btn');
-  var alreadyByOffering = {{ already_recorded_json|default:"{}"|safe }};
-
-  function updateButtons() {
-    var val = selectEl.value;
-    entranceOffering.value = val;
-    exitOffering.value = val;
-    if (!val) {
-      entranceBtn.disabled = true;
-      exitBtn.disabled = true;
-      return;
-    }
-    var actions = alreadyByOffering[val] || [];
-    entranceBtn.disabled = actions.indexOf('entrance') !== -1;
-    exitBtn.disabled = actions.indexOf('exit') !== -1;
-  }
-
-  selectEl.addEventListener('change', updateButtons);
-  updateButtons();
-
   document.querySelectorAll('form[id$="-form"]').forEach(function(form) {
     form.addEventListener('submit', function(e) {
       e.preventDefault();

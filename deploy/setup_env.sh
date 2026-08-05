@@ -119,7 +119,7 @@ fi
 domain="${raw#https://}"; domain="${domain#http://}"; domain="${domain%%/*}"
 [[ -n "$domain" ]] || die "Domain cannot be empty"
 [[ "$domain" != *[[:space:]]* ]] || die "Domain cannot contain spaces"
-write_value DJANGO_ALLOWED_HOSTS "$domain"
+write_value DJANGO_ALLOWED_HOSTS "$domain,*.$domain"
 write_value DJANGO_CSRF_TRUSTED_ORIGINS "https://$domain"
 write_value DJANGO_SITE_DOMAIN "https://$domain"
 write_value DEPLOY_HEALTHCHECK_URL "https://${domain}/"

@@ -10,6 +10,8 @@ import json
 from django.utils.translation import gettext_lazy as _
 from django.utils import translation
 from django.db.models import Max
+from django.conf import settings
+from .utils.timezones import format_application_datetime
 
 # Constants
 MANAGEMENT_ROLES = ["admin", "staff"]
@@ -24,6 +26,10 @@ def assign_academic_date():
 
 def default_meeting_weekdays():
     return [6, 1]  # Sunday and Tuesday using datetime.date.weekday().
+
+
+def default_user_time_zone():
+    return settings.TIME_ZONE
 
 
 class PublicationStatus(models.TextChoices):
@@ -70,6 +76,7 @@ class Role(models.Model):
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
     joined_date = models.DateField(null=False, default=assign_academic_date)
+    time_zone = models.CharField(max_length=64, default=default_user_time_zone)
 
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
     priest_name = models.CharField(max_length=255, null=True, blank=True)
@@ -689,7 +696,13 @@ class AttendanceRecord(models.Model):
         EXIT = "exit", _("Exit")
 
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="attendance_records")
-    course_offering = models.ForeignKey(CourseOffering, on_delete=models.PROTECT, related_name="attendance_records")
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="attendance_records",
+    )
     attendance_date = models.DateField()
     action = models.CharField(max_length=10, choices=Action.choices)
     scanned_at = models.DateTimeField(auto_now_add=True)
@@ -702,6 +715,11 @@ class AttendanceRecord(models.Model):
             models.UniqueConstraint(
                 fields=["student", "course_offering", "attendance_date", "action"],
                 name="attendance_unique_student_offering_date_action",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "attendance_date", "action"],
+                condition=models.Q(course_offering__isnull=True),
+                name="attendance_unique_student_unassigned_date_action",
             ),
         ]
         indexes = [
@@ -900,8 +918,8 @@ class Quiz(models.Model):
             "quiz_name" : self.name,
             "selected_offering_id": self.course_offering_id,
             "selected_quiz_type_id": self.quiz_type_id,
-            "opening_date" : self.opening_date.strftime("%Y-%m-%dT%H:%M:%S"),
-            "closing_date" : self.closing_date.strftime("%Y-%m-%dT%H:%M:%S"),
+            "opening_date" : format_application_datetime(self.opening_date, "%Y-%m-%dT%H:%M:%S"),
+            "closing_date" : format_application_datetime(self.closing_date, "%Y-%m-%dT%H:%M:%S"),
         }
 
     def serialize_pagination(self):
@@ -914,8 +932,8 @@ class Quiz(models.Model):
                 offering.academic_year_level.academic_year.name,
                 self.quiz_type.name_en if self.quiz_type else _("Unassigned"),
                 self.total_grade,
-                self.opening_date.strftime("%H:%M:%S, %d/%m/%Y"),
-                self.closing_date.strftime("%H:%M:%S, %d/%m/%Y"),
+                format_application_datetime(self.opening_date, "%H:%M:%S, %d/%m/%Y"),
+                format_application_datetime(self.closing_date, "%H:%M:%S, %d/%m/%Y"),
             ],
             "url" : reverse_lazy("quiz-view", args=[self.pk,])
         }
@@ -926,6 +944,36 @@ class Quiz(models.Model):
             _("Name"), _("Course"), _("Level"), _("Academic Year"), _("Quiz Type"),
             _("Grades"), _("Opening Date"), _("Closing Date"), _("Submissions"),
         ]
+
+class QuizStudentOpening(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="student_openings")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="quiz_openings")
+    opening_date = models.DateTimeField()
+    closing_date = models.DateTimeField()
+    granted_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="granted_quiz_openings",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["quiz", "student"],
+                name="quiz_student_opening_unique",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.opening_date and self.closing_date and self.closing_date <= self.opening_date:
+            raise ValidationError({"closing_date": _("Closing date must be after opening date.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
 
 class Question(models.Model):
     QUESTION_TYPES = [

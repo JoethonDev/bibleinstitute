@@ -4,7 +4,16 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="ad-page" id="content" x-data="r2Manager()" x-init="is_root = {% if is_root %}true{% else %}false{% endif %}">
+<div class="ad-page" id="content" x-data="r2Manager()"
+     data-r2-download-url="{% url 'api-download-file' %}"
+     data-r2-rename-url="{% url 'api-rename-file' %}"
+     data-r2-delete-url="{% url 'api-delete-file' %}"
+     data-r2-delete-m3u8-url="{% url 'api-delete-m3u8-file' %}"
+     data-r2-delete-folder-url="{% url 'api-delete-folder' %}"
+     data-r2-metadata-url="{% url 'api-get-file-metadata' %}"
+     data-r2-create-folder-url="{% url 'api-create-folder' %}"
+     data-r2-stats-url="{% url 'api-storage-stats' %}"
+     x-init="is_root = {% if is_root %}true{% else %}false{% endif %}">
     <!-- Pane Header -->
     <div class="ad-pane-head">
         <h2 class="ad-pane-title"><i class="fas fa-cloud me-2"></i>{% translate "R2 Storage Management" %}</h2>

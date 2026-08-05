@@ -33,13 +33,9 @@
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <p>{% translate "By submitting this application, you agree to the following terms:" %}</p>
+                                    <p>{{ copy.terms_intro }}</p>
                                     <ul>
-                                        <li>{% translate "All information provided must be accurate and complete." %}</li>
-                                        <li>{% translate "You commit to attending scheduled classes and completing required coursework." %}</li>
-                                        <li>{% translate "The institute reserves the right to modify schedules, curriculum, and policies as needed." %}</li>
-                                        <li>{% translate "Your personal data will be used solely for institute administrative purposes." %}</li>
-                                        <li>{% translate "You agree to abide by the institute's code of conduct and academic integrity policies." %}</li>
+                                        {% for term in copy.terms %}<li><strong>{{ term.title }}:</strong> {{ term.text }}</li>{% endfor %}
                                     </ul>
                                     <p class="mb-0">{% translate "By checking the 'I agree' box and submitting, you confirm acceptance of these terms." %}</p>
                                 </div>
@@ -53,6 +49,10 @@
                     <!-- ========== SIGNUP FORM ========== -->
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
+                        <div class="alert alert-light border mb-4">
+                            <h2 class="h6">{{ copy.payment_title }}</h2>
+                            <ul class="mb-0">{% for method in copy.payment_methods %}<li><strong>{{ method.title }}:</strong> {{ method.text }}</li>{% endfor %}</ul>
+                        </div>
                         {{ form|crispy }}
                         <div class="mb-3">
                             <small>
@@ -79,4 +79,39 @@
     </div>
 </div>
 </section>
+{% endblock %}
+
+{% block script %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const identityType = document.getElementById('id_identity_type');
+    const identityBack = document.getElementById('id_identity_back');
+    const identityBackField = identityBack && (identityBack.closest('[id^="div_id_"]') || identityBack.closest('.mb-3') || identityBack.parentElement);
+    if (identityType && identityBack) {
+        const updateIdentityDocuments = function () {
+            const nationalId = identityType.value === 'national_id';
+            identityBack.required = nationalId;
+            if (identityBackField) identityBackField.hidden = !nationalId;
+            if (!nationalId) identityBack.value = '';
+        };
+        identityType.addEventListener('change', updateIdentityDocuments);
+        updateIdentityDocuments();
+    }
+
+    const checkbox = document.getElementById('id_agree_terms');
+    const modalElement = document.getElementById('termsModal');
+    if (!checkbox || !modalElement || !window.bootstrap) return;
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    checkbox.addEventListener('click', function (event) {
+        if (checkbox.checked) {
+            event.preventDefault();
+            modal.show();
+        }
+    });
+    modalElement.addEventListener('hidden.bs.modal', function () {
+        checkbox.checked = true;
+    });
+});
+</script>
 {% endblock %}

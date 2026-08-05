@@ -22,8 +22,19 @@ function r2Manager() {
         renameIsFolder: false,
         statsLoaded: false,
         is_root: true, // Will be set by x-init in template
+        routes: {},
         
         init() {
+            this.routes = {
+                download: this.$el.dataset.r2DownloadUrl,
+                rename: this.$el.dataset.r2RenameUrl,
+                delete: this.$el.dataset.r2DeleteUrl,
+                deleteM3u8: this.$el.dataset.r2DeleteM3u8Url,
+                deleteFolder: this.$el.dataset.r2DeleteFolderUrl,
+                metadata: this.$el.dataset.r2MetadataUrl,
+                createFolder: this.$el.dataset.r2CreateFolderUrl,
+                stats: this.$el.dataset.r2StatsUrl,
+            };
             const params = new URLSearchParams(window.location.search);
             this.currentFilter = params.get('filter') || 'media';
             this.searchQuery = params.get('search') || '';
@@ -72,7 +83,9 @@ function r2Manager() {
          * Download file via presigned URL
          */
         downloadFile(fileKey, fileName) {
-            window.open(`/api/r2/files/download/?file_key=${encodeURIComponent(fileKey)}`, '_blank');
+            const url = new URL(this.routes.download, window.location.origin);
+            url.searchParams.set('file_key', fileKey);
+            window.open(url.toString(), '_blank');
         },
         
         /**
@@ -129,7 +142,7 @@ function r2Manager() {
 
             const body = JSON.stringify({ old_key: oldKey, new_key: newKey, is_folder: this.renameIsFolder });
 
-            fetch('/api/r2/files/rename/', {
+            fetch(this.routes.rename, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -171,7 +184,7 @@ function r2Manager() {
             
             newConfirmBtn.addEventListener('click', () => {
                 confirmModal.hide();
-                const endpoint = isM3u8 ? '/api/r2/files/delete-m3u8/' : '/api/r2/files/delete/';
+                const endpoint = isM3u8 ? this.routes.deleteM3u8 : this.routes.delete;
                 fetch(endpoint, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
@@ -212,7 +225,7 @@ function r2Manager() {
             
             newConfirmBtn.addEventListener('click', () => {
                 confirmModal.hide();
-                fetch('/api/r2/folder/delete/', {
+                fetch(this.routes.deleteFolder, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
                     body: JSON.stringify({ folder_path: folderId, recursive: true })
@@ -253,7 +266,7 @@ function r2Manager() {
                 confirmModal.hide();
                 const filesToDelete = [...this.selectedFiles];
                 Promise.all(filesToDelete.map(fileKey =>
-                    fetch('/api/r2/files/delete/', {
+                    fetch(this.routes.delete, {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
                         body: JSON.stringify({ file_key: fileKey })
@@ -298,7 +311,9 @@ function r2Manager() {
             
             infoModal.show();
             
-            fetch(`/api/r2/files/metadata/?file_key=${encodeURIComponent(fileKey)}`)
+            const metadataUrl = new URL(this.routes.metadata, window.location.origin);
+            metadataUrl.searchParams.set('file_key', fileKey);
+            fetch(metadataUrl.toString())
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -344,7 +359,7 @@ function r2Manager() {
             const currentFolder = new URLSearchParams(window.location.search).get('folder') || '';
             const folderPath = currentFolder ? `${currentFolder}/${this.newFolderName}` : this.newFolderName;
             
-            fetch('/api/r2/folder/create/', {
+            fetch(this.routes.createFolder, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -374,7 +389,7 @@ function r2Manager() {
          * Load storage statistics
          */
         loadStorageStats() {
-            fetch('/api/r2/stats/')
+            fetch(this.routes.stats)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {

@@ -62,6 +62,8 @@ CSRF_TRUSTED_ORIGINS.extend(
     if origin.strip()
 )
 
+TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -141,7 +143,7 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
     "REDIS_URL", "redis://redis:6379/0"
 )
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TIMEZONE = "Africa/Cairo"
+CELERY_TIMEZONE = TIME_ZONE
 
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
 # Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by
@@ -186,7 +188,6 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
-TIME_ZONE = 'Africa/Cairo'
 
 # Define where Django should look for translation files
 LOCALE_PATHS = [

@@ -8,6 +8,7 @@ from django.db.models import F, Q, Sum, Window
 from django.utils.translation import gettext as _
 from django.utils import timezone
 from ..models import User, Quiz, Submission, Question, Grade, Role
+from .timezones import format_application_datetime
 
 
 def export_users_to_csv():
@@ -185,8 +186,8 @@ def export_quiz_with_submissions_to_csv(quiz_id):
     writer.writerow([_('Quiz Export')])
     writer.writerow([_('Quiz Name'), quiz.name])
     writer.writerow([_('Course'), quiz.course_offering.course.name if quiz.course_offering_id else ''])
-    writer.writerow([_('Opening Date'), quiz.opening_date.strftime('%Y-%m-%d %H:%M:%S') if quiz.opening_date else ''])
-    writer.writerow([_('Closing Date'), quiz.closing_date.strftime('%Y-%m-%d %H:%M:%S') if quiz.closing_date else ''])
+    writer.writerow([_('Opening Date'), format_application_datetime(quiz.opening_date, '%Y-%m-%d %H:%M:%S') if quiz.opening_date else ''])
+    writer.writerow([_('Closing Date'), format_application_datetime(quiz.closing_date, '%Y-%m-%d %H:%M:%S') if quiz.closing_date else ''])
     writer.writerow([])  # Empty row separator
     
     # Write quiz questions section
