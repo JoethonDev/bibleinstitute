@@ -1538,6 +1538,35 @@ main:has(.sd-page) {
 }
 
 /* ---------------- Live student template helpers ---------------- */
+.sd-page,
+.sd-page > .container,
+.sd-frame,
+.sd-screen,
+.sd-course-grid,
+.sd-course-card,
+.sd-learn-head,
+.sd-learn-side,
+.sd-learn-panel,
+.sd-media-card,
+.sd-q-card,
+.sd-opt,
+.sd-order-row,
+.sd-match-row,
+.sd-profile,
+.sd-panel-card { min-width: 0; }
+
+.sd-page img,
+.sd-page video,
+.sd-page iframe,
+.sd-page canvas { max-width: 100%; }
+
+.sd-learn-title,
+.sd-learn-sub,
+.sd-course-name,
+.sd-course-desc,
+.sd-q-text,
+.sd-match-row .sd-match-key { overflow-wrap: anywhere; }
+
 .sd-empty-icon { color: var(--ps-muted); opacity: .5; }
 .sd-inherit-link { color: inherit; }
 .sd-chip--small { font-size: .82rem; }

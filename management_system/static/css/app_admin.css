@@ -1316,8 +1316,15 @@
 
 /* ---------------- Responsive ---------------- */
 @media (max-width: 991.98px) {
-    .ad-shell { grid-template-columns: 1fr; }
-    .ad-shell.is-sidebar-collapsed { grid-template-columns: 1fr; }
+    .admin-layout.ad-shell { grid-template-columns: 1fr; }
+    .admin-layout.ad-shell.is-sidebar-collapsed { grid-template-columns: 1fr; }
+    .admin-main-content.ad-panes { overflow-x: clip; }
+    .ad-page-header,
+    .ad-toolbar { flex-wrap: wrap; }
+    .ad-page-header > *,
+    .ad-toolbar > * { min-width: 0; }
+    .ad-toolbar > :last-child { flex-wrap: wrap; }
+    .ad-search { flex: 1 1 16rem; max-width: none; }
     .ad-rail,
     .admin-sidebar.ad-rail,
     .ad-shell.is-sidebar-collapsed .ad-rail,
@@ -1363,7 +1370,16 @@
 }
 
 @media (max-width: 575.98px) {
-    .ad-stats { grid-template-columns: 1fr 1fr; }
+    .admin-main-content.ad-panes { padding: .75rem .7rem 1.5rem; }
+    .ad-stats { grid-template-columns: 1fr; }
+    .ad-card-body { padding: .8rem; }
+    .ad-page-header { align-items: flex-start !important; gap: .4rem; }
+    .ad-page-header > * { flex: 1 1 100%; }
+    .ad-page-date { text-align: start; }
+    .ad-toolbar { align-items: stretch; padding: .65rem 0; }
+    .ad-toolbar > * { flex: 1 1 100%; }
+    .ad-toolbar > :last-child { width: 100%; }
+    .ad-toolbar .ad-btn { flex: 1 1 auto; }
     .ad-calmg-cell { min-height: 2.5rem; padding: .25rem .35rem; font-size: .72rem; border-radius: .5rem; }
     .ad-calmg-grid { gap: .22rem; }
     /* Calendar compact mode */
@@ -1409,6 +1425,41 @@
         min-width: 10rem;
     }
 }
+
+/* The desktop rail is dark; the same navigation is reused inside the mobile
+   offcanvas and must keep its dark surface and light text there too. */
+.offcanvas#mobileAdminMenu {
+    background: linear-gradient(180deg, var(--ps-ink-deep), var(--ps-ink-black));
+    color: #fff;
+}
+
+.offcanvas#mobileAdminMenu .offcanvas-header {
+    border-bottom: 1px solid rgba(244, 234, 214, .18);
+}
+
+.offcanvas#mobileAdminMenu .offcanvas-title,
+.offcanvas#mobileAdminMenu .ad-tab { color: #fff; }
+.offcanvas#mobileAdminMenu .ad-tab i { color: var(--ps-gold-soft); }
+
+.offcanvas#mobileAdminMenu .ad-tab:hover,
+.offcanvas#mobileAdminMenu .ad-tab:focus-visible {
+    background: rgba(244, 234, 214, .12);
+    color: #fff;
+}
+
+.offcanvas#mobileAdminMenu .btn-close {
+    filter: invert(1) grayscale(1) brightness(2);
+    opacity: 1;
+}
+
+.offcanvas#mobileAdminMenu hr { border-color: rgba(244, 234, 214, .22); }
+
+.offcanvas#mobileAdminMenu .ad-card-body {
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(244, 234, 214, .18);
+}
+
+.offcanvas#mobileAdminMenu .ps-muted-text { color: #fff !important; }
 
 @media (prefers-reduced-motion: reduce) {
     .ad-pane.is-active { animation: none; }

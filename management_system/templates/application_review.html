@@ -28,6 +28,7 @@
             <div class="ad-card mb-3">
                 <div class="ad-card-head"><strong>{% translate "Personal Information" %}</strong></div>
                 <div class="ad-card-body">
+                    <div class="ad-table-wrap">
                     <table class="ad-table">
                         <tr><th>{% translate "Username" %}</th><td>{{ app_user.username }}</td></tr>
                         <tr><th>{% translate "Full Name" %}</th><td>{{ app_user.get_full_name|default:"—" }}</td></tr>
@@ -35,6 +36,7 @@
                         <tr><th>{% translate "Phone" %}</th><td>{{ app_user.phone|default:"—" }}</td></tr>
                         <tr><th>{% translate "City" %}</th><td>{{ app_user.city|default:"—" }}</td></tr>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -42,11 +44,13 @@
             <div class="ad-card mb-3">
                 <div class="ad-card-head"><strong>{% translate "Church Information" %}</strong></div>
                 <div class="ad-card-body">
+                    <div class="ad-table-wrap">
                     <table class="ad-table">
                         <tr><th>{% translate "Priest Name" %}</th><td>{{ app_user.priest_name|default:"—" }}</td></tr>
                         <tr><th>{% translate "Priest Phone" %}</th><td>{{ app_user.priest_phone|default:"—" }}</td></tr>
                         <tr><th>{% translate "Church" %}</th><td>{{ app_user.church|default:"—" }}</td></tr>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -57,12 +61,14 @@
             <div class="ad-card mb-3">
                 <div class="ad-card-head"><strong>{% translate "Identity" %}</strong></div>
                 <div class="ad-card-body">
+                    <div class="ad-table-wrap">
                     <table class="ad-table">
                         <tr><th>{% translate "Identity Type" %}</th><td>{{ app_user.get_identity_type_display|default:"—" }}</td></tr>
                         <tr><th>{% translate "Identity Number" %}</th><td>{{ app_user.identity_number|default:"—" }}</td></tr>
                         <tr><th>{% translate "Identity Front" %}</th><td>{% if app_user.identity_front_key %}<code>{{ app_user.identity_front_key }}</code>{% else %}—{% endif %}</td></tr>
                         <tr><th>{% translate "Identity Back" %}</th><td>{% if app_user.identity_back_key %}<code>{{ app_user.identity_back_key }}</code>{% else %}—{% endif %}</td></tr>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -70,12 +76,14 @@
             <div class="ad-card mb-3">
                 <div class="ad-card-head"><strong>{% translate "Documents" %}</strong></div>
                 <div class="ad-card-body">
+                    <div class="ad-table-wrap">
                     <table class="ad-table">
                         <tr><th>{% translate "ID Front" %}</th><td>{% if doc_urls.identity_front %}<a href="{{ doc_urls.identity_front }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                         <tr><th>{% translate "ID Back" %}</th><td>{% if doc_urls.identity_back %}<a href="{{ doc_urls.identity_back }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                         <tr><th>{% translate "Payment" %}</th><td>{% if doc_urls.payment %}<a href="{{ doc_urls.payment }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                         <tr><th>{% translate "Profile" %}</th><td>{% if doc_urls.profile %}<a href="{{ doc_urls.profile }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
