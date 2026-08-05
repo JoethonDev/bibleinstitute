@@ -82,7 +82,9 @@ document.addEventListener('DOMContentLoaded', function() {
       mediaStream.getTracks().forEach(t => t.stop());
       mediaStream = null;
     }
-    video.style.display = 'none';
+    video.pause();
+    video.srcObject = null;
+    video.classList.add('d-none');
     startBtn.classList.remove('d-none');
     stopBtn.classList.add('d-none');
   }
@@ -91,9 +93,12 @@ document.addEventListener('DOMContentLoaded', function() {
     cameraError.classList.add('d-none');
     scanResult.innerHTML = '';
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('camera-unavailable');
+      }
+      mediaStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}}, audio: false});
       video.srcObject = mediaStream;
-      video.style.display = 'block';
+      video.classList.remove('d-none');
       startBtn.classList.add('d-none');
       stopBtn.classList.remove('d-none');
       await video.play();

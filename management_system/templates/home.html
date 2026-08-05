@@ -15,7 +15,7 @@
 
 <section class="public-quote"><div class="container"><span aria-hidden="true">✣</span><blockquote><p>“{{ copy.quote }}”</p><cite>{{ copy.quote_label }}</cite></blockquote></div></section>
 
-<section class="public-section container public-curriculum-preview"><div class="public-book-art"><img src="{% static 'statement.jpg' %}" alt="{{ copy.curriculum_image_alt }}" class="public-statement-img"></div><div><p class="public-kicker">{{ copy.curriculum_kicker }}</p><h2>{{ copy.curriculum_title }}</h2><p>{{ copy.curriculum_text }}</p><a class="public-btn public-btn-dark" href="{% url 'program' %}#curriculum">{{ copy.curriculum_action }}</a></div></section>
+<section class="public-section container public-curriculum-preview"><div class="public-book-art"><img src="{% static 'statement.jpg' %}?v={{ static_asset_version }}" alt="{{ copy.curriculum_image_alt }}" class="public-statement-img"></div><div><p class="public-kicker">{{ copy.curriculum_kicker }}</p><h2>{{ copy.curriculum_title }}</h2><p>{{ copy.curriculum_text }}</p><a class="public-btn public-btn-dark" href="{% url 'program' %}#curriculum">{{ copy.curriculum_action }}</a></div></section>
 
 <section id="message" class="public-section public-video"><div class="container public-video-grid"><div><p class="public-kicker">{{ copy.video_kicker }}</p><h2>{{ copy.video_title }}</h2><p>{{ copy.video_text }}</p></div><div class="public-video-frame">
   <iframe src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g?si=Gn7QU4eywL3HVRcD"

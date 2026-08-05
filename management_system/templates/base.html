@@ -20,7 +20,7 @@
     <meta property="og:description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.build_absolute_uri }}">
-    <meta property="og:image" content="{% static 'login-logo.png' %}">
+    <meta property="og:image" content="{% static 'login-logo.png' %}?v={{ static_asset_version }}">
     {% endblock head_meta %}
 
     {% block structured_data %}
@@ -30,7 +30,7 @@
         "@type": "Organization",
         "name": "Bible Institute Coptic",
         "url": "https://bibleinstitute-eg.org",
-        "logo": "{% static 'login-logo.png' %}",
+        "logo": "{% static 'login-logo.png' %}?v={{ static_asset_version }}",
         "sameAs": []
     }
     </script>
@@ -74,7 +74,7 @@
         <nav class="navbar app-navbar institute-navbar ps-site-nav navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
             <div class="container">
               <a class="navbar-brand ps-site-brand" href="{% url 'home' %}">
-                  <img src="{% static 'login-logo.png' %}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
+                  <img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
                   <span class="institute-brand-copy ps-site-brand-text"><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Maadi · Academic study with an ecclesial spirit" %}</small></span>
               </a>
               <button class="navbar-toggler ps-site-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
@@ -189,7 +189,7 @@
       <div class="container py-5">
           <div class="row">
               <div class="col-lg-5 col-md-12 mb-4">
-                  <img src="{% static 'footer-logo.png' %}" class="mb-3 img-fluid" width="180" alt="{% translate 'Footer Logo' %}">
+                  <img src="{% static 'footer-logo.png' %}?v={{ static_asset_version }}" class="mb-3 img-fluid" width="180" alt="{% translate 'Footer Logo' %}">
                   <p class="ps-site-footer-text">{% translate "A Coptic Orthodox ecclesiastical institute serving everyone who loves to study Scripture in Egypt and worldwide." %}</p>
               </div>
               <div class="col-lg-3 col-md-6 mb-4">

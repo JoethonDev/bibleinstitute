@@ -9,13 +9,13 @@
     <div class="carousel slide mb-0" id="homeCarousel" data-bs-ride="carousel" data-bs-interval="5000">
         <div class="carousel-inner">
             <div class="carousel-item active">
-                <img src="{% static 'bible-slider1.png' %}" class="d-block w-100 carousel-media" alt="">
+                <img src="{% static 'bible-slider1.png' %}?v={{ static_asset_version }}" class="d-block w-100 carousel-media" alt="">
             </div>
             <div class="carousel-item">
-                <img src="{% static 'bible-slider2.png' %}" class="d-block w-100 carousel-media" alt="">
+                <img src="{% static 'bible-slider2.png' %}?v={{ static_asset_version }}" class="d-block w-100 carousel-media" alt="">
             </div>
             <div class="carousel-item">
-                <img src="{% static 'bible-slider3.png' %}" class="d-block w-100 carousel-media" alt="">
+                <img src="{% static 'bible-slider3.png' %}?v={{ static_asset_version }}" class="d-block w-100 carousel-media" alt="">
             </div>
         </div>
         <button class="carousel-control-prev" type="button" data-bs-target="#homeCarousel" data-bs-slide="prev">
@@ -86,7 +86,7 @@
                 </p>
             </div>
             <div class="col-12 col-md-6 col-lg-5 d-flex align-items-center justify-content-center">
-                <img src="{% static 'login-logo.png' %}" alt="{% translate 'Bible Institute Logo' %}" class="img-fluid brand-mark">
+                <img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Bible Institute Logo' %}" class="img-fluid brand-mark">
             </div>
         </div>
 
@@ -103,7 +103,7 @@
                 </div>
             </div>
             <div class="col-12 col-md-6 col-lg-5 d-flex align-items-center justify-content-center">
-                <img src="{% static 'statement.jpg' %}" alt="" class="img-fluid rounded shadow-sm statement-media">
+                <img src="{% static 'statement.jpg' %}?v={{ static_asset_version }}" alt="" class="img-fluid rounded shadow-sm statement-media">
             </div>
         </div>
 
