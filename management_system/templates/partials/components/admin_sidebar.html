@@ -1,7 +1,7 @@
 {% load i18n %}
 
 <!-- Desktop & Tablet Sidebar -->
-<aside id="admin-sidebar" class="admin-sidebar ad-rail d-none d-lg-flex flex-column"
+<aside id="admin-sidebar" class="admin-sidebar ad-rail"
        :class="{ 'sidebar-collapsed': $store.ui.sidebarCollapsed }">
     
     <!-- Sidebar Header -->
@@ -32,7 +32,7 @@
 </aside>
 
 <!-- Mobile Offcanvas Menu -->
-<div class="offcanvas offcanvas-start d-lg-none" 
+<div class="offcanvas offcanvas-start"
      tabindex="-1" 
      id="mobileAdminMenu"
      aria-labelledby="mobileAdminMenuLabel">
@@ -64,7 +64,7 @@
 </div>
 
 <!-- Mobile Menu Toggle Button -->
-<button class="ad-btn ad-btn--teal mobile-menu-toggle d-lg-none"
+<button class="ad-btn ad-btn--teal mobile-menu-toggle"
         type="button"
         data-bs-toggle="offcanvas"
         data-bs-target="#mobileAdminMenu"

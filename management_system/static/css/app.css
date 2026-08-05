@@ -956,7 +956,7 @@ body,
 /* ================================
    11. RESPONSIVE DESIGN
    ================================ */
-@media (max-width: 991px) {
+@media (max-width: 991.98px) {
     .admin-sidebar {
         transform: translateX(-100%);
     }
@@ -986,7 +986,7 @@ body,
     }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
     .admin-main-content {
         padding: var(--admin-spacing-sm);
     }
@@ -1028,7 +1028,7 @@ body,
     left: var(--admin-spacing-lg);
 }
 
-@media (max-width: 991px) {
+@media (max-width: 991.98px) {
     [dir="rtl"] .admin-sidebar {
         transform: translateX(100%);
     }
@@ -1152,14 +1152,13 @@ textarea:focus {
 
 /* Prevent transform issues with modals */
 #content,
-.display-page,
-.col {
+.display-page {
     position: static !important;
     transform: none !important;
 }
 
 /* R2 Toolbar Responsive */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     .card-body .row {
         gap: var(--admin-spacing-sm);
     }
@@ -1380,7 +1379,7 @@ textarea:focus {
 }
 
 /* Responsive Tables */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     .table-responsive {
         font-size: 0.875rem;
     }

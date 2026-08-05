@@ -1279,6 +1279,8 @@
 
 /* Neutralize legacy fixed sidebar — use Psalmodia full-height sticky rail geometry */
 .admin-sidebar.ad-rail {
+    display: flex;
+    flex-direction: column;
     position: sticky;
     top: 0;
     height: 100vh;
@@ -1289,6 +1291,8 @@
     background: linear-gradient(180deg, var(--ps-ink-deep), var(--ps-ink-black));
     overflow-y: auto;
 }
+
+.mobile-menu-toggle { display: none !important; }
 
 /* Remove legacy margin-left on main content — use Psalmodia grid auto-flow */
 .admin-main-content.ad-panes {
@@ -1318,9 +1322,9 @@
 @media (max-width: 991.98px) {
     .admin-layout.ad-shell,
     .admin-layout.ad-shell.is-sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
-    /* The rail is hidden by Bootstrap at this breakpoint; make the remaining
-       pane span the grid explicitly so RTL auto-placement cannot leave it in
-       the desktop 16.5rem track. */
+    /* The desktop rail is hidden at this breakpoint; make the remaining pane
+       span the grid explicitly so RTL auto-placement cannot leave it in the
+       desktop 16.5rem track. */
     .admin-layout.ad-shell > .admin-main-content.ad-panes {
         grid-column: 1 / -1;
         width: 100%;
@@ -1338,12 +1342,7 @@
     .ad-shell.is-sidebar-collapsed .ad-rail,
     .ad-shell.is-sidebar-collapsed .admin-sidebar.ad-rail {
         position: static;
-        display: flex;
-        flex-wrap: nowrap;
-        gap: .35rem;
-        max-height: none;
-        overflow-x: auto;
-        padding: .6rem;
+        display: none !important;
     }
     .ad-rail-brand, .ad-rail-group,
     .ad-shell.is-sidebar-collapsed .ad-rail-brand,
@@ -1356,6 +1355,7 @@
     }
     .ad-shell.is-sidebar-collapsed .ad-tab span { display: inline; }
     .ad-tab .ad-tab-count { display: none; }
+    .mobile-menu-toggle { display: flex !important; }
     .ad-grid-2 { grid-template-columns: 1fr; }
     /* Calendar responsive */
     .ad-card.ad-calendar-toolbar .ad-card-body > div {
@@ -1437,6 +1437,7 @@
 /* The desktop rail is dark; the same navigation is reused inside the mobile
    offcanvas and must keep its dark surface and light text there too. */
 .offcanvas#mobileAdminMenu {
+    display: none !important;
     background: linear-gradient(180deg, var(--ps-ink-deep), var(--ps-ink-black));
     color: #fff;
 }
@@ -1468,6 +1469,10 @@
 }
 
 .offcanvas#mobileAdminMenu .ps-muted-text { color: #fff !important; }
+
+@media (max-width: 991.98px) {
+    .offcanvas#mobileAdminMenu { display: flex !important; }
+}
 
 @media (prefers-reduced-motion: reduce) {
     .ad-pane.is-active { animation: none; }
@@ -1716,7 +1721,7 @@
 .ad-table--dense td { padding: .4rem .6rem; font-size: .82rem; white-space: nowrap; }
 
 /* ── Responsive fine-tune for dashboard ── */
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
     .ad-bar-label { min-width: 56px; font-size: 0.72rem; }
     .ad-page-header h4 { font-size: 1.1rem; }
 }
