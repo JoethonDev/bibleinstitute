@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from urllib.parse import urlsplit
 import os
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
@@ -48,6 +49,17 @@ def _env_csv(name, default=''):
     return [value.strip() for value in os.getenv(name, default).split(',') if value.strip()]
 
 
+def _is_plain_domain(host):
+    return (
+        host
+        and host != '*'
+        and not host.startswith(('.', '*'))
+        and '.' in host
+        and not host.replace('.', '').isdigit()
+        and ':' not in host
+    )
+
+
 ALLOWED_HOSTS = []
 for configured_host in _env_csv('DJANGO_ALLOWED_HOSTS', '*'):
     configured_host = configured_host.strip()
@@ -55,7 +67,26 @@ for configured_host in _env_csv('DJANGO_ALLOWED_HOSTS', '*'):
         configured_host = f'.{configured_host[2:]}'
     if configured_host:
         ALLOWED_HOSTS.append(configured_host)
-CSRF_TRUSTED_ORIGINS = [origin.rstrip('/') for origin in _env_csv('DJANGO_CSRF_TRUSTED_ORIGINS')]
+        if _is_plain_domain(configured_host):
+            ALLOWED_HOSTS.append(f'.{configured_host}')
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
+
+CSRF_TRUSTED_ORIGINS = []
+for configured_origin in _env_csv('DJANGO_CSRF_TRUSTED_ORIGINS'):
+    configured_origin = configured_origin.rstrip('/')
+    if not configured_origin:
+        continue
+    CSRF_TRUSTED_ORIGINS.append(configured_origin)
+    origin_parts = urlsplit(configured_origin)
+    origin_host = origin_parts.hostname or ''
+    if (
+        origin_parts.scheme in ('http', 'https')
+        and not origin_parts.port
+        and not origin_parts.username
+        and _is_plain_domain(origin_host)
+    ):
+        CSRF_TRUSTED_ORIGINS.append(f'{origin_parts.scheme}://*.{origin_host}')
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
 
