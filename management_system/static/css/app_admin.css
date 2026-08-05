@@ -1316,9 +1316,17 @@
 
 /* ---------------- Responsive ---------------- */
 @media (max-width: 991.98px) {
-    .admin-layout.ad-shell { grid-template-columns: 1fr; }
-    .admin-layout.ad-shell.is-sidebar-collapsed { grid-template-columns: 1fr; }
-    .admin-main-content.ad-panes { overflow-x: clip; }
+    .admin-layout.ad-shell,
+    .admin-layout.ad-shell.is-sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+    /* The rail is hidden by Bootstrap at this breakpoint; make the remaining
+       pane span the grid explicitly so RTL auto-placement cannot leave it in
+       the desktop 16.5rem track. */
+    .admin-layout.ad-shell > .admin-main-content.ad-panes {
+        grid-column: 1 / -1;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: clip;
+    }
     .ad-page-header,
     .ad-toolbar { flex-wrap: wrap; }
     .ad-page-header > *,
