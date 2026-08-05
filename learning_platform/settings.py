@@ -44,23 +44,18 @@ CSRF_COOKIE_SECURE = os.getenv(
     "DJANGO_CSRF_COOKIE_SECURE", "False" if DEBUG else "True"
 ).lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
-CSRF_TRUSTED_ORIGINS = [
-    "https://*.a2hosted.com",
-    "http://*.a2hosted.com",
-    "https://*.ngrok-free.app",
-    "http://localhost:8080",
-    "http://localhost:8082",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.1:8082",
-    "https://bibleinstitute.a2hosted.com",
-    "http://bibleinstitute.a2hosted.com",
-]
-CSRF_TRUSTED_ORIGINS.extend(
-    origin.strip().rstrip("/")
-    for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
-    if origin.strip()
-)
+def _env_csv(name, default=''):
+    return [value.strip() for value in os.getenv(name, default).split(',') if value.strip()]
+
+
+ALLOWED_HOSTS = []
+for configured_host in _env_csv('DJANGO_ALLOWED_HOSTS', '*'):
+    configured_host = configured_host.strip()
+    if configured_host.startswith('*.'):
+        configured_host = f'.{configured_host[2:]}'
+    if configured_host:
+        ALLOWED_HOSTS.append(configured_host)
+CSRF_TRUSTED_ORIGINS = [origin.rstrip('/') for origin in _env_csv('DJANGO_CSRF_TRUSTED_ORIGINS')]
 
 TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
 
