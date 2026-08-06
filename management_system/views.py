@@ -38,13 +38,14 @@ import re
 import os
 import csv
 import requests
+import mimetypes
 from datetime import date
 
 # Internal Imports - Models
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, yearly_transcript_queryset, _csv_safe_cell, _safe_filename
@@ -3402,18 +3403,138 @@ def applications_dashboard(request):
 @capability_required(can_manage_applications)
 def application_review(request, user_id):
     user = get_object_or_404(User, pk=user_id)
-    doc_fields = {"identity_front_key": "identity_front", "identity_back_key": "identity_back", "payment_key": "payment", "profile_image_key": "profile"}
-    doc_urls = {}
-    for field, label in doc_fields.items():
+    document_fields = {
+        "identity_front": ("identity_front_key", _("Identity Front")),
+        "identity_back": ("identity_back_key", _("Identity Back")),
+        "payment": ("payment_key", _("Payment")),
+        "profile": ("profile_image_key", _("Profile")),
+    }
+    if request.method == "POST":
+        form = ApplicationAdminForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            uploaded_keys = []
+            old_keys = []
+            original_status = user.application_status
+            desired_status = form.cleaned_data["application_status"]
+            try:
+                with transaction.atomic():
+                    if desired_status != original_status:
+                        form.instance.application_status = original_status
+                        form.instance.is_active = user.is_active
+                    user = form.save()
+                    file_fields = {
+                        "identity_front": "identity_front_key",
+                        "identity_back": "identity_back_key",
+                        "payment": "payment_key",
+                        "profile": "profile_image_key",
+                    }
+                    for upload_type, model_field in file_fields.items():
+                        previous_key = getattr(user, model_field, None)
+                        if form.cleaned_data.get(f"clear_{upload_type}"):
+                            if previous_key:
+                                old_keys.append(previous_key)
+                            setattr(user, model_field, None)
+                        uploaded_file = form.cleaned_data.get(upload_type)
+                        if uploaded_file:
+                            new_key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, uploaded_file, upload_type)
+                            if not new_key:
+                                raise ValidationError(_("The %(document)s could not be uploaded.") % {"document": upload_type})
+                            if previous_key and previous_key != new_key:
+                                old_keys.append(previous_key)
+                            setattr(user, model_field, new_key)
+                            uploaded_keys.append(new_key)
+                    user.save()
+
+                    if desired_status != original_status:
+                        user.application_status = "pending"
+                        user.is_active = False
+                        user.save(update_fields=["application_status", "is_active"])
+                        if desired_status == "active":
+                            user, _enrollment = accept_application(user, request.user)
+                        elif desired_status == "declined":
+                            user = decline_application(user, request.user)
+                        else:
+                            user.decided_by = None
+                            user.decided_at = None
+                            user.save(update_fields=["decided_by", "decided_at"])
+                for old_key in set(old_keys):
+                    try:
+                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=old_key)
+                    except Exception:
+                        logger.exception("Could not delete replaced application file %s", old_key)
+                if desired_status != original_status:
+                    if desired_status == "active":
+                        send_application_activated(user)
+                    elif desired_status == "declined":
+                        send_application_declined(user)
+                messages.success(request, _("Application and student data updated."))
+                return redirect("application-review", user_id=user.pk)
+            except (ValidationError, PermissionDenied) as exc:
+                for key in uploaded_keys:
+                    try:
+                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+                    except Exception:
+                        logger.exception("Could not clean up application file %s", key)
+                form.add_error(None, str(exc))
+            except Exception:
+                for key in uploaded_keys:
+                    try:
+                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+                    except Exception:
+                        logger.exception("Could not clean up application file %s", key)
+                raise
+    else:
+        form = ApplicationAdminForm(instance=user)
+
+    documents = []
+    for document_type, (field, label) in document_fields.items():
         key = getattr(user, field, None)
         if key:
-            url = generate_unique_url(CLOUD_CLIENT, bucket_name, key, expires_in=300)
-            doc_urls[label] = url
+            content_type = mimetypes.guess_type(key)[0] or ""
+            documents.append({
+                "type": document_type,
+                "label": label,
+                "url": reverse("application-document", args=[user.pk, document_type]),
+                "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
+                "is_image": content_type.startswith("image/"),
+            })
     return render(request, "application_review.html", {
         "app_user": user,
-        "doc_urls": doc_urls,
+        "edit_form": form,
+        "documents": documents,
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
     })
+
+
+@capability_required(can_manage_applications)
+def application_document(request, user_id, document_type):
+    document_fields = {
+        "identity_front": "identity_front_key",
+        "identity_back": "identity_back_key",
+        "payment": "payment_key",
+        "profile": "profile_image_key",
+    }
+    model_field = document_fields.get(document_type)
+    if not model_field:
+        raise Http404
+    user = get_object_or_404(User, pk=user_id)
+    key = getattr(user, model_field, None)
+    if not key:
+        raise Http404
+    try:
+        storage_response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
+        response = FileResponse(
+            storage_response["Body"],
+            content_type=storage_response.get("ContentType") or mimetypes.guess_type(key)[0] or "application/octet-stream",
+            as_attachment=request.GET.get("download") == "1",
+            filename=os.path.basename(key),
+        )
+        if storage_response.get("ContentLength") is not None:
+            response["Content-Length"] = str(storage_response["ContentLength"])
+        return response
+    except Exception as exc:
+        logger.warning("Application document unavailable for user=%s type=%s: %s", user_id, document_type, exc)
+        raise Http404 from exc
 
 @capability_required(can_manage_applications)
 def application_decision(request, user_id, decision):

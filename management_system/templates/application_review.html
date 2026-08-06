@@ -1,6 +1,7 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 {% load static %}
+{% load crispy_forms_tags %}
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
@@ -23,6 +24,22 @@
         </div>
     </div>
 
+    <div class="ad-card mb-3">
+        <div class="ad-card-head"><strong>{% translate "Edit student and application" %}</strong></div>
+        <div class="ad-card-body">
+            <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}">
+                {% csrf_token %}
+                {{ edit_form|crispy }}
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="ad-btn ad-btn--teal">
+                        <i class="fas fa-save me-1"></i>{% translate "Save changes" %}
+                    </button>
+                    <a href="{% url 'applications-dashboard' %}" class="ad-btn ad-btn--ghost">{% translate "Cancel" %}</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-md-6">
             <div class="ad-card mb-3">
@@ -34,7 +51,9 @@
                         <tr><th>{% translate "Full Name" %}</th><td>{{ app_user.get_full_name|default:"—" }}</td></tr>
                         <tr><th>{% translate "Email" %}</th><td>{{ app_user.email|default:"—" }}</td></tr>
                         <tr><th>{% translate "Phone" %}</th><td>{{ app_user.phone|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Country" %}</th><td>{{ app_user.country|default:"—" }}</td></tr>
                         <tr><th>{% translate "City" %}</th><td>{{ app_user.city|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Educational qualification / occupation" %}</th><td>{{ app_user.education_or_job|default:"—" }}</td></tr>
                     </table>
                     </div>
                 </div>
@@ -46,9 +65,10 @@
                 <div class="ad-card-body">
                     <div class="ad-table-wrap">
                     <table class="ad-table">
-                        <tr><th>{% translate "Priest Name" %}</th><td>{{ app_user.priest_name|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Priest Phone" %}</th><td>{{ app_user.priest_phone|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Confessor Name" %}</th><td>{{ app_user.priest_name|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Confessor Phone" %}</th><td>{{ app_user.priest_phone|default:"—" }}</td></tr>
                         <tr><th>{% translate "Church" %}</th><td>{{ app_user.church|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Service (if any)" %}</th><td>{{ app_user.service|default:"—" }}</td></tr>
                     </table>
                     </div>
                 </div>
@@ -78,10 +98,18 @@
                 <div class="ad-card-body">
                     <div class="ad-table-wrap">
                     <table class="ad-table">
-                        <tr><th>{% translate "ID Front" %}</th><td>{% if doc_urls.identity_front %}<a href="{{ doc_urls.identity_front }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
-                        <tr><th>{% translate "ID Back" %}</th><td>{% if doc_urls.identity_back %}<a href="{{ doc_urls.identity_back }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
-                        <tr><th>{% translate "Payment" %}</th><td>{% if doc_urls.payment %}<a href="{{ doc_urls.payment }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
-                        <tr><th>{% translate "Profile" %}</th><td>{% if doc_urls.profile %}<a href="{{ doc_urls.profile }}" target="_blank">{% translate "View" %}</a>{% else %}—{% endif %}</td></tr>
+                        {% for document in documents %}
+                        <tr>
+                            <th>{{ document.label }}</th>
+                            <td>
+                                {% if document.is_image %}<img src="{{ document.url }}" alt="{{ document.label }}" style="max-width: 180px; max-height: 120px; object-fit: contain;" class="d-block mb-2 rounded border">{% endif %}
+                                <a href="{{ document.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
+                                <a href="{{ document.download_url }}" class="ms-2">{% translate "Download" %}</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="2">{% translate "No documents uploaded." %}</td></tr>
+                        {% endfor %}
                     </table>
                     </div>
                 </div>
@@ -112,5 +140,6 @@
         </div>
     </div>
     {% endif %}
+    <script src="{% static 'js/country_select.js' %}"></script>
 </div>
 {% endblock %}

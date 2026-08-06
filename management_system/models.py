@@ -79,6 +79,9 @@ class User(AbstractUser):
     priest_phone = models.CharField(max_length=20, null=True, blank=True)
     church = models.CharField(max_length=255, null=True, blank=True)
     city = models.CharField(max_length=255, null=True, blank=True)
+    country = models.CharField(max_length=100, null=True, blank=True)
+    education_or_job = models.CharField(max_length=255, null=True, blank=True)
+    service = models.CharField(max_length=255, null=True, blank=True)
 
     STUDY_MODES = [("online", _("Online")), ("offline", _("Offline"))]
     study_mode = models.CharField(max_length=10, choices=STUDY_MODES, null=True, blank=True)

@@ -6104,3 +6104,66 @@ msgstr "الاختبارات الأسبوعية"
 
 msgid "Final quizzes"
 msgstr "الاختبارات النهائية"
+
+msgid "Confessor Name"
+msgstr "اسم أب الاعتراف"
+
+msgid "Confessor Phone"
+msgstr "هاتف أب الاعتراف"
+
+msgid "Country"
+msgstr "الدولة"
+
+msgid "Educational qualification / occupation"
+msgstr "المؤهل الدراسي / الوظيفة"
+
+msgid "Service (if any)"
+msgstr "الخدمة إن وجدت"
+
+msgid "Enter your full name."
+msgstr "أدخل اسمك الكامل."
+
+msgid "Search countries"
+msgstr "ابحث عن دولة"
+
+msgid "Password (leave blank to keep current)"
+msgstr "كلمة المرور (اتركها فارغة للإبقاء على الحالية)"
+
+msgid "Replace identity front"
+msgstr "استبدال صورة وجه إثبات الهوية"
+
+msgid "Replace identity back"
+msgstr "استبدال صورة ظهر إثبات الهوية"
+
+msgid "Replace payment receipt"
+msgstr "استبدال إيصال الدفع"
+
+msgid "Replace profile photo"
+msgstr "استبدال الصورة الشخصية"
+
+msgid "Remove identity front"
+msgstr "إزالة صورة وجه إثبات الهوية"
+
+msgid "Remove identity back"
+msgstr "إزالة صورة ظهر إثبات الهوية"
+
+msgid "Remove payment receipt"
+msgstr "إزالة إيصال الدفع"
+
+msgid "Remove profile photo"
+msgstr "إزالة الصورة الشخصية"
+
+msgid "The %(document)s could not be uploaded."
+msgstr "تعذر رفع %(document)s."
+
+msgid "Application and student data updated."
+msgstr "تم تحديث بيانات الطالب وطلب التقديم."
+
+msgid "Edit student and application"
+msgstr "تعديل بيانات الطالب وطلب التقديم"
+
+msgid "Save changes"
+msgstr "حفظ التغييرات"
+
+msgid "No documents uploaded."
+msgstr "لم يتم رفع مستندات."

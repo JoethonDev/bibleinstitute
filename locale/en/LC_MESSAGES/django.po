@@ -6104,3 +6104,66 @@ msgstr "Weekly quizzes"
 
 msgid "Final quizzes"
 msgstr "Final quizzes"
+
+msgid "Confessor Name"
+msgstr "Confessor Name"
+
+msgid "Confessor Phone"
+msgstr "Confessor Phone"
+
+msgid "Country"
+msgstr "Country"
+
+msgid "Educational qualification / occupation"
+msgstr "Educational qualification / occupation"
+
+msgid "Service (if any)"
+msgstr "Service (if any)"
+
+msgid "Enter your full name."
+msgstr "Enter your full name."
+
+msgid "Search countries"
+msgstr "Search countries"
+
+msgid "Password (leave blank to keep current)"
+msgstr "Password (leave blank to keep current)"
+
+msgid "Replace identity front"
+msgstr "Replace identity front"
+
+msgid "Replace identity back"
+msgstr "Replace identity back"
+
+msgid "Replace payment receipt"
+msgstr "Replace payment receipt"
+
+msgid "Replace profile photo"
+msgstr "Replace profile photo"
+
+msgid "Remove identity front"
+msgstr "Remove identity front"
+
+msgid "Remove identity back"
+msgstr "Remove identity back"
+
+msgid "Remove payment receipt"
+msgstr "Remove payment receipt"
+
+msgid "Remove profile photo"
+msgstr "Remove profile photo"
+
+msgid "The %(document)s could not be uploaded."
+msgstr "The %(document)s could not be uploaded."
+
+msgid "Application and student data updated."
+msgstr "Application and student data updated."
+
+msgid "Edit student and application"
+msgstr "Edit student and application"
+
+msgid "Save changes"
+msgstr "Save changes"
+
+msgid "No documents uploaded."
+msgstr "No documents uploaded."

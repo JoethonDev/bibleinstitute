@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
 from django.conf import settings
 from .utils.timezones import user_time_zone_choices
+from .utils.countries import country_choices
 from .utils.timezones import parse_application_datetime
 from .utils.quiz_access import eligible_quiz_students
 
@@ -430,28 +431,125 @@ class QuizExceptionalOpeningForm(forms.Form):
         return cleaned
 
 
+class ApplicationAdminForm(forms.ModelForm):
+    password = forms.CharField(
+        required=False,
+        label=_("Password (leave blank to keep current)"),
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
+    identity_front = forms.FileField(required=False, label=_("Replace identity front"))
+    identity_back = forms.FileField(required=False, label=_("Replace identity back"))
+    payment = forms.FileField(required=False, label=_("Replace payment receipt"))
+    profile = forms.FileField(required=False, label=_("Replace profile photo"))
+    clear_identity_front = forms.BooleanField(required=False, label=_("Remove identity front"))
+    clear_identity_back = forms.BooleanField(required=False, label=_("Remove identity back"))
+    clear_payment = forms.BooleanField(required=False, label=_("Remove payment receipt"))
+    clear_profile = forms.BooleanField(required=False, label=_("Remove profile photo"))
+    country = forms.ChoiceField(label=_("Country"), choices=country_choices(), required=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "first_name", "last_name", "username", "email", "password", "joined_date", "phone", "country", "city",
+            "education_or_job", "priest_name", "priest_phone", "church", "service", "identity_type",
+            "identity_number", "time_zone", "study_mode", "study_mode_override", "role", "is_active",
+            "application_status", "decision_notes",
+            "identity_front", "identity_back", "payment", "profile",
+            "clear_identity_front", "clear_identity_back", "clear_payment", "clear_profile",
+        ]
+        widgets = {
+            "first_name": forms.TextInput(attrs={"placeholder": _("First Name")}),
+            "last_name": forms.TextInput(attrs={"placeholder": _("Last Name")}),
+            "username": forms.TextInput(attrs={"placeholder": _("Username")}),
+            "email": forms.EmailInput(attrs={"placeholder": _("Email")}),
+            "phone": forms.TextInput(attrs={"placeholder": _("Phone")}),
+            "city": forms.TextInput(attrs={"placeholder": _("City")}),
+            "education_or_job": forms.TextInput(attrs={"placeholder": _("Educational qualification / occupation")}),
+            "priest_name": forms.TextInput(attrs={"placeholder": _("Confessor Name")}),
+            "priest_phone": forms.TextInput(attrs={"placeholder": _("Confessor Phone")}),
+            "church": forms.TextInput(attrs={"placeholder": _("Church")}),
+            "service": forms.TextInput(attrs={"placeholder": _("Service (if any)")}),
+            "identity_number": forms.TextInput(attrs={"placeholder": _("Identity Number")}),
+            "decision_notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["time_zone"].choices = user_time_zone_choices()
+        self.fields["time_zone"].initial = getattr(self.instance, "time_zone", None) or settings.TIME_ZONE
+        current_country = getattr(self.instance, "country", None)
+        if current_country and current_country not in dict(country_choices()):
+            self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
+        self.fields["country"].widget.attrs.update({
+            "id": "id_country",
+            "data-country-select": "true",
+            "data-search-placeholder": _("Search countries"),
+            "aria-label": _("Search countries"),
+        })
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        if not phone:
+            return phone
+        phone = normalize_phone(phone)
+        if User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError(_("This phone number is already in use."))
+        return phone
+
+    def clean_identity_number(self):
+        identity_number = self.cleaned_data.get("identity_number")
+        identity_type = self.cleaned_data.get("identity_type")
+        if identity_type and identity_number:
+            try:
+                validate_identity_by_type(identity_type, identity_number)
+            except ValidationError as exc:
+                raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
+        return identity_number
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get("password")
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user
+
+
 class SignupForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}))
+    full_name = forms.CharField(
+        label=_("Full Name"),
+        max_length=255,
+        widget=forms.TextInput(attrs={'placeholder': _('Full Name'), 'id': 'full_name'}),
+    )
     agree_terms = forms.BooleanField(required=True, label=_("I agree to the Terms and Conditions"))
     identity_front = forms.FileField(required=True, label=_("National ID / Passport (Front)"))
     identity_back = forms.FileField(required=False, label=_("National ID / Passport (Back)"))
     payment = forms.FileField(required=True, label=_("Payment Receipt"))
     profile = forms.FileField(required=True, label=_("Profile Photo"))
     time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
+    country = forms.ChoiceField(
+        label=_("Country"),
+        choices=country_choices(),
+        required=True,
+        widget=forms.Select(attrs={"id": "id_country", "data-country-select": "true"}),
+    )
 
     class Meta:
         model = User
-        fields = ["username", "password", "first_name", "last_name", "email", "phone", "priest_name", "priest_phone", "church", "city", "identity_type", "identity_number", "time_zone"]
+        fields = ["username", "password", "email", "phone", "priest_name", "priest_phone", "church", "city", "country", "education_or_job", "service", "identity_type", "identity_number", "time_zone"]
         widgets = {
             'username': forms.TextInput(attrs={'placeholder': _('Username'), 'id': 'username'}),
-            'first_name': forms.TextInput(attrs={'placeholder': _('First Name'), 'id': 'first_name'}),
-            'last_name': forms.TextInput(attrs={'placeholder': _('Last Name'), 'id': 'last_name'}),
             'email': forms.EmailInput(attrs={'placeholder': _('Email'), 'id': 'email'}),
             'phone': forms.TextInput(attrs={'placeholder': _('Phone'), 'id': 'phone'}),
-            'priest_name': forms.TextInput(attrs={'placeholder': _('Priest Name'), 'id': 'priest_name'}),
-            'priest_phone': forms.TextInput(attrs={'placeholder': _('Priest Phone'), 'id': 'priest_phone'}),
+            'priest_name': forms.TextInput(attrs={'placeholder': _('Confessor Name'), 'id': 'priest_name'}),
+            'priest_phone': forms.TextInput(attrs={'placeholder': _('Confessor Phone'), 'id': 'priest_phone'}),
             'church': forms.TextInput(attrs={'placeholder': _('Church'), 'id': 'church'}),
             'city': forms.TextInput(attrs={'placeholder': _('City'), 'id': 'city'}),
+            'education_or_job': forms.TextInput(attrs={'placeholder': _('Educational qualification / occupation'), 'id': 'education_or_job'}),
+            'service': forms.TextInput(attrs={'placeholder': _('Service (if any)'), 'id': 'service'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -459,24 +557,45 @@ class SignupForm(forms.ModelForm):
         self.fields['time_zone'].choices = user_time_zone_choices()
         self.fields['time_zone'].initial = settings.TIME_ZONE
         self.fields['email'].required = False
-        self.fields['last_name'].required = False
-        self.fields['first_name'].label = _("Name")
-        self.fields['last_name'].label = _("Last Name")
+        self.fields['full_name'].required = True
         self.fields['email'].label = _("Email")
         self.fields['phone'].label = _("Phone")
         self.fields['phone'].required = True
-        self.fields['priest_name'].label = _("Priest Name")
+        self.fields['priest_name'].label = _("Confessor Name")
         self.fields['priest_name'].required = True
-        self.fields['priest_phone'].label = _("Priest Phone")
+        self.fields['priest_phone'].label = _("Confessor Phone")
         self.fields['priest_phone'].required = True
         self.fields['church'].label = _("Church")
         self.fields['church'].required = True
         self.fields['city'].label = _("City")
         self.fields['city'].required = True
+        self.fields['country'].label = _("Country")
+        self.fields['country'].required = True
+        self.fields['country'].initial = getattr(self.instance, "country", None) or "EG"
+        self.fields['country'].widget.attrs.update({
+            "data-search-placeholder": _("Search countries"),
+            "aria-label": _("Search countries"),
+        })
+        self.fields['education_or_job'].label = _("Educational qualification / occupation")
+        self.fields['education_or_job'].required = True
+        self.fields['service'].label = _("Service (if any)")
+        self.fields['service'].required = False
         self.fields['identity_type'].label = _("Identity Type")
         self.fields['identity_type'].required = True
         self.fields['identity_number'].label = _("Identity Number")
         self.fields['identity_number'].required = True
+        self.order_fields([
+            "full_name", "username", "password", "email", "phone", "country", "city",
+            "education_or_job", "priest_name", "priest_phone", "church", "service",
+            "identity_type", "identity_number", "time_zone", "identity_front", "identity_back",
+            "payment", "profile", "agree_terms",
+        ])
+
+    def clean_full_name(self):
+        full_name = " ".join((self.cleaned_data.get("full_name") or "").split())
+        if len(full_name.split()) < 2:
+            raise forms.ValidationError(_("Enter your full name."))
+        return full_name
 
     def clean_phone(self):
         phone = self.cleaned_data.get("phone")
@@ -512,6 +631,9 @@ class SignupForm(forms.ModelForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
+        name_parts = self.cleaned_data["full_name"].split()
+        user.first_name = name_parts[0]
+        user.last_name = " ".join(name_parts[1:])
         user.set_password(self.cleaned_data["password"])
         user.application_status = "pending"
         user.is_active = False
