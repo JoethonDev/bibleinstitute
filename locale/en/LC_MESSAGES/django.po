@@ -6089,3 +6089,18 @@ msgstr "Scan a QR code or look up a student. The course is taken automatically f
 
 msgid "Today's records:"
 msgstr "Today's records:"
+
+msgid "Watch time"
+msgstr "Watch time"
+
+msgid "Watch time progress"
+msgstr "Watch time progress"
+
+msgid "media parts completed"
+msgstr "media parts completed"
+
+msgid "Weekly quizzes"
+msgstr "Weekly quizzes"
+
+msgid "Final quizzes"
+msgstr "Final quizzes"

@@ -32,21 +32,24 @@
     <div class="ad-card">
         <div class="ad-card-body">
             <!-- Filter Bar -->
-            <div class="ad-filters mb-3" hx-include=".filters-fields">
-                {% if submission %}
-                <div class="filter-item">
-                    <input class="form-control filters-fields" type="number" placeholder="{% translate "Minimum Grade" %}" name="min-grade" value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Minimum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+            <div class="submission-filters mb-3" hx-include=".filters-fields">
+                {% if submission_user %}
+                <div class="submission-filter-field">
+                    <label for="submission-min-grade">{% translate "Minimum Grade" %}</label>
+                    <input id="submission-min-grade" class="form-control filters-fields" type="number" min="0" max="{{ quiz.total_grade }}" placeholder="{% translate "Minimum Grade" %}" name="min-grade" value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Minimum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
                 </div>
-                <div class="filter-item">
-                    <input class="form-control filters-fields" type="number" placeholder="{% translate "Maximum Grade" %}" name="max-grade" value="{{ min_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Maximum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+                <div class="submission-filter-field">
+                    <label for="submission-max-grade">{% translate "Maximum Grade" %}</label>
+                    <input id="submission-max-grade" class="form-control filters-fields" type="number" min="0" max="{{ quiz.total_grade }}" placeholder="{% translate "Maximum Grade" %}" name="max-grade" value="{{ max_grade }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Maximum Grade" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
                 </div>
                 {% endif %}
 
-                <div class="filter-item">
-                    <select class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
+                <div class="submission-filter-field">
+                    <label for="submission-year">{% translate "Academic Year" %}</label>
+                    <select id="submission-year" class="form-select filters-fields" aria-label="{% translate "Year Filter" %}" name="filtering" hx-select="#content" hx-get="{{ url }}" hx-trigger="change" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML">
                         {% for option in options %}
                             {% if forloop.first %}
-                                <option value="">{% translate "All" %} {{ view_name }}</option>
+                                <option value="">{{ option }}</option>
                             {% else %}
                                 {% if filtering == option %}
                                     <option value="{{ option }}" selected>{{ option }}</option>
@@ -57,8 +60,14 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="filter-item">
-                    <input class="form-control me-2 filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+                <div class="submission-filter-field submission-filter-field--search">
+                    <label for="submission-search">{% translate "Student" %}</label>
+                    <input id="submission-search" class="form-control filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-select="#content" hx-push-url="true" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="keyup delay:500ms, change delay:500ms" hx-target="#display-page" hx-swap="innerHTML">
+                </div>
+                <div class="submission-filter-actions">
+                    <a href="{{ url }}" hx-get="{{ url }}" hx-select="#content" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML" class="ad-btn ad-btn--danger ad-btn--sm">
+                        <i class="fas fa-times-circle me-1"></i>{% translate "Clear" %}
+                    </a>
                 </div>
             </div>
 

@@ -636,6 +636,136 @@ class ProfileDetail(LoginProtection, DetailView):
                 "academic_year_level__level__ordering",
                 "course__name",
             )
+        offerings = list(offerings)
+        offering_ids = [offering.pk for offering in offerings]
+        course_progress = {
+            offering_id: {
+                "watch_time_minutes": 0,
+                "watch_time_seconds": 0,
+                "watch_percent": 0,
+                "watched_parts": 0,
+                "watchable_parts": 0,
+                "attendance_scanned": 0,
+                "attendance_total": 0,
+                "weekly_taken": 0,
+                "weekly_total": 0,
+                "weekly_grades": [],
+                "final_taken": 0,
+                "final_total": 0,
+                "final_grades": [],
+            }
+            for offering_id in offering_ids
+        }
+
+        if offering_ids:
+            media_parts = {}
+            if user.study_mode == "online":
+                lesson_rows = Lesson.objects.filter(
+                    course_offering_id__in=offering_ids,
+                    **({} if user_has_management_role(user) else {"status": PublicationStatus.PUBLISHED}),
+                ).values("id", "course_offering_id", "links")
+                for lesson in lesson_rows:
+                    try:
+                        links = json.loads(lesson["links"] or "[]")
+                    except (TypeError, json.JSONDecodeError):
+                        links = []
+                    for link in links if isinstance(links, list) else []:
+                        if not isinstance(link, dict):
+                            continue
+                        if link.get("file_type") not in {"video", "audio"}:
+                            continue
+                        part_id = link.get("part_id")
+                        if part_id:
+                            media_parts[(lesson["id"], part_id)] = lesson["course_offering_id"]
+
+            if media_parts and user.study_mode == "online":
+                progress_rows = LectureProgress.objects.filter(
+                    student=user,
+                    lesson_id__in=[lesson_id for lesson_id, _part_id in media_parts],
+                ).values("lesson_id", "part_id", "merged_ranges", "unique_seconds", "percent")
+                progress_by_part = {
+                    (row["lesson_id"], row["part_id"]): row
+                    for row in progress_rows
+                }
+                for part_key, offering_id in media_parts.items():
+                    metric = course_progress[offering_id]
+                    metric["watchable_parts"] += 1
+                    progress = progress_by_part.get(part_key)
+                    if not progress:
+                        continue
+                    percent = min(int(progress["percent"] or 0), 100)
+                    ranges = progress["merged_ranges"] if isinstance(progress["merged_ranges"], list) else []
+                    seconds = progress["unique_seconds"] or unique_seconds(ranges)
+                    metric["watch_time_seconds"] += seconds
+                    metric["watch_percent"] += percent
+                    if percent >= 80:
+                        metric["watched_parts"] += 1
+
+                for metric in course_progress.values():
+                    metric["watch_time_minutes"] = int(round(metric["watch_time_seconds"] / 60))
+                    if metric["watchable_parts"]:
+                        metric["watch_percent"] = round(
+                            metric["watch_percent"] / metric["watchable_parts"]
+                        )
+
+            meeting_dates = defaultdict(set)
+            for row in AcademicYearLevelMeeting.objects.filter(
+                course_offering_id__in=offering_ids
+            ).values("course_offering_id", "meeting_date"):
+                meeting_dates[row["course_offering_id"]].add(row["meeting_date"])
+
+            scanned_dates = defaultdict(lambda: {"entrance": set(), "exit": set()})
+            if user.study_mode != "online":
+                for row in AttendanceRecord.objects.filter(
+                    student=user,
+                    course_offering_id__in=offering_ids,
+                ).values("course_offering_id", "attendance_date", "action"):
+                    scanned_dates[row["course_offering_id"]][row["action"]].add(row["attendance_date"])
+
+            for offering_id, dates in meeting_dates.items():
+                attendance = scanned_dates[offering_id]
+                course_progress[offering_id]["attendance_total"] = len(dates)
+                course_progress[offering_id]["attendance_scanned"] = len(
+                    attendance["entrance"] & attendance["exit"]
+                )
+
+            quiz_filter = {} if user_has_management_role(user) else {"status": PublicationStatus.PUBLISHED}
+            quizzes = list(
+                Quiz.objects.filter(course_offering_id__in=offering_ids, **quiz_filter)
+                .select_related("quiz_type")
+                .order_by("opening_date", "pk")
+            )
+            quiz_ids = [quiz.pk for quiz in quizzes]
+            for quiz in quizzes:
+                if not quiz.quiz_type:
+                    continue
+                metric = course_progress[quiz.course_offering_id]
+                if quiz.quiz_type.code == "weekly":
+                    metric["weekly_total"] += 1
+                elif quiz.quiz_type.code == "final":
+                    metric["final_total"] += 1
+
+            for grade in Grade.objects.filter(user=user, quiz_id__in=quiz_ids).select_related(
+                "quiz", "quiz__quiz_type"
+            ).order_by("quiz__opening_date", "quiz_id"):
+                if not grade.quiz.quiz_type:
+                    continue
+                grade_data = {
+                    "name": grade.quiz.name,
+                    "score": grade.total_grade,
+                    "total": grade.quiz.total_grade,
+                }
+                metric = course_progress[grade.quiz.course_offering_id]
+                if grade.quiz.quiz_type.code == "weekly":
+                    metric["weekly_taken"] += 1
+                    metric["weekly_grades"].append(grade_data)
+                elif grade.quiz.quiz_type.code == "final":
+                    metric["final_taken"] += 1
+                    metric["final_grades"].append(grade_data)
+
+        for offering in offerings:
+            offering.profile_progress = course_progress[offering.pk]
+
         levels_map = {}
         for o in offerings:
             lvl = o.academic_year_level.level
@@ -2184,6 +2314,7 @@ def quiz_dashboard(request):
         "subjects" : _content_offering_filter_options(),
         "filters" : ["course_filter.html"],
         "submission_view" : True,
+        "page_size" : 10,
     }
 
     return render_dashboard(request, quizzes, view, context)
@@ -2489,9 +2620,11 @@ def submission_dashboard(request, quiz_id):
         "filtering" : year or "",
         "columns" : Grade.get_columns(),
         "options" : [_("Choose Academic Year"), *[str(value) for value in Grade.get_years(quiz_id)]], # Translate "Choose Academic Year"
-        "filters" : ["submission_filter.html"],
         "submission_user" : True,
-        "templates" : [""]
+        "template_name" : "submission_dashboard.html",
+        "quiz_id" : quiz_id,
+        "quiz" : quiz,
+        "view_name" : view,
     }
 
     return render_dashboard(request, grades, view, context, parameters=[quiz_id, ])
@@ -4608,6 +4741,7 @@ def progress_heartbeat(request):
     else:
         progress.merged_ranges = merged
 
+    progress.unique_seconds = int(round(unique_secs))
     COMPLETION_THRESHOLD = 80
     if not progress.completed_at and percent >= COMPLETION_THRESHOLD:
         progress.completed_at = timezone.now()

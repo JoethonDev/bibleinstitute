@@ -750,6 +750,41 @@
 
 .ad-filters { display: flex; flex-wrap: wrap; gap: .4rem; }
 
+.submission-filters {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: .75rem;
+}
+
+.submission-filter-field {
+    flex: 1 1 11rem;
+    min-width: 11rem;
+}
+
+.submission-filter-field--search { flex-basis: 16rem; }
+
+.submission-filter-field label {
+    display: block;
+    margin-bottom: .3rem;
+    color: var(--ps-muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.submission-filter-actions { flex: 0 0 auto; }
+
+@media (max-width: 767.98px) {
+    .submission-filter-field,
+    .submission-filter-field--search,
+    .submission-filter-actions {
+        flex-basis: 100%;
+        min-width: 100%;
+    }
+
+    .submission-filter-actions .ad-btn { width: 100%; }
+}
+
 .ad-filter-pill {
     display: inline-flex;
     align-items: center;

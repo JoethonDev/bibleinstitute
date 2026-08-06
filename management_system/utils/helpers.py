@@ -133,7 +133,7 @@ def render_dashboard(request, obj, view, context, parameters=[]):
         return HttpResponse(_("Unauthorized"), status=403)
     
     # Paginate objects
-    page_obj = paginate_obj(request, obj)
+    page_obj = paginate_obj(request, obj, context.get("page_size", 15))
     
     # Prepare filters
     pagination_params = request.GET.copy()
@@ -159,7 +159,7 @@ def render_dashboard(request, obj, view, context, parameters=[]):
         })
     
     # Full page rendering
-    return render(request, "dashboard.html", {
+    return render(request, context.get("template_name", "dashboard.html"), {
         "page_obj": page_obj,
         "header": _(view.capitalize()),
         "view": view,

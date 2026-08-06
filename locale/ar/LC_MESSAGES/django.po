@@ -6089,3 +6089,18 @@ msgstr "امسح رمز QR أو ابحث عن طالب. يتم أخذ الماد
 
 msgid "Today's records:"
 msgstr "سجلات اليوم:"
+
+msgid "Watch time"
+msgstr "وقت المشاهدة"
+
+msgid "Watch time progress"
+msgstr "تقدم وقت المشاهدة"
+
+msgid "media parts completed"
+msgstr "أجزاء الوسائط المكتملة"
+
+msgid "Weekly quizzes"
+msgstr "الاختبارات الأسبوعية"
+
+msgid "Final quizzes"
+msgstr "الاختبارات النهائية"

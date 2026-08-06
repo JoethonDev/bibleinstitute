@@ -111,8 +111,34 @@
                                             <a href="{% url 'course-details' offering.pk %}"
                                                class="sd-mini-row text-decoration-none">
                                                 <i class="fas fa-book"></i>
-                                                <span>{{ offering.course.name }}</span>
-                                                <span class="sd-mini-end"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i></span>
+                                                <span class="w-100">
+                                                    <span class="d-flex align-items-center justify-content-between gap-2">
+                                                        <span>{{ offering.course.name }}</span>
+                                                        <span class="sd-mini-end"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i></span>
+                                                    </span>
+                                                    <span class="d-block small mt-1">
+                                                        {% if object.study_mode == "online" %}
+                                                        <span class="d-flex justify-content-between">
+                                                            <span>{% translate "Watch time" %}: {{ offering.profile_progress.watch_time_minutes }} {% translate "minutes" %}</span>
+                                                            <span>{{ offering.profile_progress.watch_percent }}%</span>
+                                                        </span>
+                                                        <span class="progress mt-1" style="height: 5px;" role="progressbar" aria-label="{% translate 'Watch time progress' %}" aria-valuenow="{{ offering.profile_progress.watch_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                                            <span class="progress-bar" style="width: {{ offering.profile_progress.watch_percent }}%;"></span>
+                                                        </span>
+                                                        <span class="ps-muted-text">{{ offering.profile_progress.watched_parts }}/{{ offering.profile_progress.watchable_parts }} {% translate "media parts completed" %}</span>
+                                                        {% else %}
+                                                        <span class="ps-muted-text">{% translate "Attendance" %}: {{ offering.profile_progress.attendance_scanned }}/{{ offering.profile_progress.attendance_total }}</span>
+                                                        {% endif %}
+                                                        <span class="d-block ps-muted-text mt-1">
+                                                            {% translate "Weekly quizzes" %}: {{ offering.profile_progress.weekly_taken }}/{{ offering.profile_progress.weekly_total }}
+                                                            {% if offering.profile_progress.weekly_grades %} — {% for grade in offering.profile_progress.weekly_grades %}{{ grade.name }}: {{ grade.score }}/{{ grade.total }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                                                        </span>
+                                                        <span class="d-block ps-muted-text">
+                                                            {% translate "Final quizzes" %}: {{ offering.profile_progress.final_taken }}/{{ offering.profile_progress.final_total }}
+                                                            {% if offering.profile_progress.final_grades %} — {% for grade in offering.profile_progress.final_grades %}{{ grade.name }}: {{ grade.score }}/{{ grade.total }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                                                        </span>
+                                                    </span>
+                                                </span>
                                             </a>
                                         {% empty %}
                                             <span class="ps-muted-text sd-empty-course-note">{% translate "No courses in this level." %}</span>

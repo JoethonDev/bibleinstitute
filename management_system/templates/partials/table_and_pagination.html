@@ -123,6 +123,10 @@
                     {% if submission_view %}
                     <td class="column-actions">
                         <div class="ad-actions">
+                            <a href="{{ values.url }}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                                <i class="fas fa-question-circle me-1"></i>
+                                <span>{% translate "Quiz Details" %}</span>
+                            </a>
                             <button class="ad-btn ad-btn--teal ad-btn--sm"
                                     hx-get="{{ values.url }}view-submission/"
                                     hx-swap="innerHTML"
