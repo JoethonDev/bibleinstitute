@@ -389,6 +389,9 @@ msgstr "National ID / Passport (Back)"
 msgid "Payment Receipt"
 msgstr "Payment Receipt"
 
+msgid "Payment Receipt (optional)"
+msgstr "Payment Receipt (optional)"
+
 #: .\management_system\forms.py:362
 msgid "Profile Photo"
 msgstr "Profile Photo"
@@ -6137,6 +6140,9 @@ msgstr "Replace identity back"
 
 msgid "Replace payment receipt"
 msgstr "Replace payment receipt"
+
+msgid "Replace payment receipt (optional)"
+msgstr "Replace payment receipt (optional)"
 
 msgid "Replace profile photo"
 msgstr "Replace profile photo"

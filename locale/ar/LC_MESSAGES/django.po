@@ -389,6 +389,9 @@ msgstr "الرقم القومي / جواز السفر (الوجه الخلفي)"
 msgid "Payment Receipt"
 msgstr "إيصال الدفع"
 
+msgid "Payment Receipt (optional)"
+msgstr "إيصال الدفع (اختياري)"
+
 #: .\management_system\forms.py:362
 msgid "Profile Photo"
 msgstr "صورة الملف الشخصي"
@@ -6137,6 +6140,9 @@ msgstr "استبدال صورة ظهر إثبات الهوية"
 
 msgid "Replace payment receipt"
 msgstr "استبدال إيصال الدفع"
+
+msgid "Replace payment receipt (optional)"
+msgstr "استبدال إيصال الدفع (اختياري)"
 
 msgid "Replace profile photo"
 msgstr "استبدال الصورة الشخصية"

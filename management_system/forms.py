@@ -440,7 +440,7 @@ class ApplicationAdminForm(forms.ModelForm):
     time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
     identity_front = forms.FileField(required=False, label=_("Replace identity front"))
     identity_back = forms.FileField(required=False, label=_("Replace identity back"))
-    payment = forms.FileField(required=False, label=_("Replace payment receipt"))
+    payment = forms.FileField(required=False, label=_("Replace payment receipt (optional)"))
     profile = forms.FileField(required=False, label=_("Replace profile photo"))
     clear_identity_front = forms.BooleanField(required=False, label=_("Remove identity front"))
     clear_identity_back = forms.BooleanField(required=False, label=_("Remove identity back"))
@@ -527,7 +527,7 @@ class SignupForm(forms.ModelForm):
     agree_terms = forms.BooleanField(required=True, label=_("I agree to the Terms and Conditions"))
     identity_front = forms.FileField(required=True, label=_("National ID / Passport (Front)"))
     identity_back = forms.FileField(required=False, label=_("National ID / Passport (Back)"))
-    payment = forms.FileField(required=True, label=_("Payment Receipt"))
+    payment = forms.FileField(required=False, label=_("Payment Receipt (optional)"))
     profile = forms.FileField(required=True, label=_("Profile Photo"))
     time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
     country = forms.ChoiceField(
