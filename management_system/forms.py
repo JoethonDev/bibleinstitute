@@ -493,6 +493,8 @@ class ApplicationAdminForm(forms.ModelForm):
         if not phone:
             return phone
         phone = normalize_phone(phone)
+        if not phone:
+            raise forms.ValidationError(_("Enter a valid international phone number."))
         if User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError(_("This phone number is already in use."))
         return phone
@@ -602,6 +604,8 @@ class SignupForm(forms.ModelForm):
         if not phone:
             return phone
         phone = normalize_phone(phone)
+        if not phone:
+            raise forms.ValidationError(_("Enter a valid international phone number."))
         qs = User.objects.filter(phone=phone)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)

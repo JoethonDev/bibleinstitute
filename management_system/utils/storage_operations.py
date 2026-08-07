@@ -7,9 +7,24 @@ import os
 from typing import Optional
 from urllib.parse import unquote
 from logging import getLogger
+
+import boto3
+from django.conf import settings
+
 from management_system.utils.r2_filters import R2FileFilter, FileFilterConfig
 
 logger = getLogger(__name__)
+
+
+def get_r2_client():
+    """Return the shared S3-compatible client for the configured R2 account."""
+    return boto3.client(
+        "s3",
+        endpoint_url=getattr(settings, "R2_ENDPOINT_URL", None),
+        aws_access_key_id=getattr(settings, "R2_ACCESS_KEY_ID", None),
+        aws_secret_access_key=getattr(settings, "R2_SECRET_ACCESS_KEY", None),
+        region_name="auto",
+    )
 
 
 def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config: Optional[FileFilterConfig] = None, folders_only=False):

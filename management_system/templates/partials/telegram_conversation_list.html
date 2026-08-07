@@ -1,0 +1,135 @@
+{% load i18n %}
+<div id="telegram-conversation-list"
+     class="tg-chat-list"
+     hx-get="{{ conversation_list_url }}?fragment=1{% if search %}&amp;search={{ search|urlencode }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}"
+     hx-trigger="every 15s"
+     hx-target="this"
+     hx-swap="outerHTML">
+
+    <div class="tg-chat-polling">
+        <i class="fas fa-sync fa-spin" aria-hidden="true"></i>
+        <span class="visually-hidden">{% translate "Checking for new conversations" %}</span>
+    </div>
+
+    <div class="ad-table-wrap tg-chat-table-wrap">
+        <table class="ad-table tg-chat-table">
+            <caption class="visually-hidden">{% translate "Telegram support conversations" %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{% translate "Student" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Messages" %}</th>
+                    <th scope="col">{% translate "Last Activity" %}</th>
+                    <th scope="col" class="text-end">{% translate "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conversation in page_obj %}
+                {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
+                <tr>
+                    <td>
+                        <div class="tg-chat-user">
+                            <span class="tg-chat-user-name">{{ student_name }}</span>
+                            <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if conversation.status == "open" %}
+                        <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
+                        {% elif conversation.status == "claimed" %}
+                        <span class="ad-pill ad-pill--teal">{{ conversation.get_status_display }}</span>
+                        {% elif conversation.status == "handled" %}
+                        <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
+                        {% elif conversation.status == "blocked" %}
+                        <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
+                        {% else %}
+                        <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="tg-chat-count">{{ conversation.message_count }}</span></td>
+                    <td>
+                        {% if conversation.last_message_at %}
+                        <time datetime="{{ conversation.last_message_at|date:'c' }}">{{ conversation.last_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+                        {% else %}
+                        <span class="ps-muted-text">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a class="ad-btn ad-btn--teal ad-btn--sm"
+                           href="{% url 'telegram-conversation-detail' conversation.pk %}"
+                           aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
+                            <i class="fas fa-comments me-1" aria-hidden="true"></i>{% translate "Open" %}
+                        </a>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="ad-empty">
+                        <i class="fas fa-inbox" aria-hidden="true"></i>
+                        <h5>{% translate "No conversations found" %}</h5>
+                        <p>{% translate "There are no support conversations matching the current filters." %}</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="ad-page-wrapper">
+        <nav aria-label="{% translate 'Conversation list pagination' %}">
+            <ul class="ad-page-nav">
+                {% if page_obj.has_previous %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ conversation_list_url }}?{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}page={{ page_obj.previous_page_number }}"
+                       aria-label="{% translate 'Previous page' %}"
+                       title="{% translate 'Previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </span>
+                </li>
+                {% endif %}
+                {% for number in page_obj.paginator.page_range %}
+                <li>
+                    <a class="ad-page-link {% if number == page_obj.number %}is-active{% endif %}"
+                       href="{{ conversation_list_url }}?{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}page={{ number }}"
+                       {% if number == page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
+                </li>
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ conversation_list_url }}?{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}page={{ page_obj.next_page_number }}"
+                       aria-label="{% translate 'Next page' %}"
+                       title="{% translate 'Next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="ad-page-info">
+            {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+                Showing {{ start }}–{{ end }} of {{ total }} conversations
+            {% endblocktranslate %}
+        </div>
+    </div>
+    {% endif %}
+</div>

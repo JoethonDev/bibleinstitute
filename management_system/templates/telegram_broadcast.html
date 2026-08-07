@@ -1,0 +1,118 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item"><a href="{{ broadcast_list_url }}">{% translate "Telegram Broadcasts" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% translate "Compose Broadcast" %}</li>
+        </ol>
+    </nav>
+
+    <div class="tg-broadcast-header">
+        <div>
+            <h4 class="mb-1"><i class="fas fa-bullhorn me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Compose Broadcast" %}</h4>
+            <p class="tg-broadcast-head-desc mb-0">{% translate "Compose one announcement that will be delivered to students of the active academic year." %}</p>
+        </div>
+        <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ broadcast_list_url }}">
+            <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
+        </a>
+    </div>
+
+    {% if active_year %}
+    <div class="ad-alert ad-alert--info mb-3" role="status">
+        <i class="fas fa-calendar-check me-2" aria-hidden="true"></i>
+        <span>
+            {% blocktranslate with year=active_year.name %}Broadcasts are delivered to students of the active academic year {{ year }}.{% endblocktranslate %}
+            {% if active_year.starts_on and active_year.ends_on %}
+            <span class="tg-broadcast-year-range">{{ active_year.starts_on|date:"Y-m-d" }} &rarr; {{ active_year.ends_on|date:"Y-m-d" }}</span>
+            {% endif %}
+        </span>
+    </div>
+    {% endif %}
+
+    <div class="ad-card">
+        <div class="ad-card-head">
+            <i class="fas fa-pen me-2" aria-hidden="true"></i>
+            {% translate "Broadcast Details" %}
+        </div>
+        <div class="ad-card-body">
+            <form method="post" action="{{ compose_url }}" enctype="multipart/form-data" class="tg-broadcast-form">
+                {% csrf_token %}
+                {% if broadcast_form.non_field_errors %}
+                <div class="ad-alert ad-alert--danger mb-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
+                    <span>{{ broadcast_form.non_field_errors }}</span>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label class="form-label" for="{{ broadcast_form.message.id_for_label }}">
+                        {{ broadcast_form.message.label }}
+                    </label>
+                    {{ broadcast_form.message }}
+                    {% if broadcast_form.message.errors %}
+                    <div class="text-danger mt-1">{{ broadcast_form.message.errors }}</div>
+                    {% endif %}
+                    <small class="text-muted d-block mt-1">
+                        {% blocktranslate with limit=4000 %}The message must not exceed {{ limit }} characters and will be sent exactly as written.{% endblocktranslate %}
+                    </small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="{{ broadcast_form.level.id_for_label }}">
+                        {{ broadcast_form.level.label }}
+                    </label>
+                    {{ broadcast_form.level }}
+                    {% if broadcast_form.level.errors %}
+                    <div class="text-danger mt-1">{{ broadcast_form.level.errors }}</div>
+                    {% endif %}
+                    <small id="telegram-broadcast-level-help" class="text-muted d-block mt-1">
+                        {% if levels %}
+                        {% translate "Choose one level or send to all levels of the active academic year. Available levels:" %}
+                        <span class="tg-broadcast-level-hints">
+                            {% for level in levels %}
+                            <span class="ad-pill ad-pill--muted">{% firstof level.level.display_name level.display_name %}</span>
+                            {% endfor %}
+                        </span>
+                        {% else %}
+                        {% translate "No levels are opened in the active academic year yet." %}
+                        {% endif %}
+                    </small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="{{ broadcast_form.attachments.id_for_label }}">
+                        {{ broadcast_form.attachments.label }}
+                    </label>
+                    {{ broadcast_form.attachments }}
+                    {% if broadcast_form.attachments.errors %}
+                    <div class="text-danger mt-1">{{ broadcast_form.attachments.errors }}</div>
+                    {% endif %}
+                    <small class="text-muted d-block mt-1">
+                        {% if max_attachment_bytes %}
+                        {% blocktranslate with size=max_attachment_bytes|filesizeformat %}Optional. You may attach several files; each attachment must be at most {{ size }}.{% endblocktranslate %}
+                        {% else %}
+                        {% translate "Optional. You may attach several files to be sent with the broadcast." %}
+                        {% endif %}
+                    </small>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="ad-btn ad-btn--teal">
+                        <i class="fas fa-chevron-circle-right me-2" aria-hidden="true"></i>{% translate "Review Broadcast" %}
+                    </button>
+                    <a class="ad-btn ad-btn--ghost" href="{{ broadcast_list_url }}">
+                        <i class="fas fa-times me-2" aria-hidden="true"></i>{% translate "Cancel" %}
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

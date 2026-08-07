@@ -82,6 +82,7 @@ def copy_offerings(
                 [
                     Lesson(
                         name=lesson.name,
+                        description=lesson.description,
                         links=lesson.links,
                         course_offering=new_offering,
                         status=PublicationStatus.DRAFT,

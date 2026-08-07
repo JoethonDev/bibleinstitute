@@ -1,0 +1,118 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div id="content" class="container-fluid py-3 ad-page tg-chat-page">
+    {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item"><a href="{{ conversation_list_url }}">{% translate "Telegram Support Chat" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ student_name }}</li>
+        </ol>
+    </nav>
+
+    <div class="tg-chat-detail-head">
+        <div class="tg-chat-detail-title">
+            <h4 class="mb-1">
+                <i class="fas fa-comments me-2 ad-page-header-icon" aria-hidden="true"></i>
+                {% blocktranslate with student=student_name %}Conversation with {{ student }}{% endblocktranslate %}
+            </h4>
+            <div class="tg-chat-student-meta">
+                <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
+            </div>
+        </div>
+        <div class="tg-chat-detail-actions">
+            {% if conversation.status == "open" %}
+            <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
+            {% elif conversation.status == "claimed" %}
+            <span class="ad-pill ad-pill--teal">{{ conversation.get_status_display }}</span>
+            {% elif conversation.status == "handled" %}
+            <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
+            {% elif conversation.status == "blocked" %}
+            <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
+            {% else %}
+            <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
+            {% endif %}
+
+            {% if conversation.claimed_by %}
+            {% with claimed_name=conversation.claimed_by.get_full_name|default:conversation.claimed_by.username %}
+            <span class="tg-chat-claim">
+                <i class="fas fa-user-check me-1" aria-hidden="true"></i>
+                {% blocktranslate with name=claimed_name %}Claimed by {{ name }}{% endblocktranslate %}
+            </span>
+            {% endwith %}
+            {% endif %}
+
+            <a class="ad-btn ad-btn--ghost ad-btn--sm"
+               href="{{ detail_url }}{% if messages_page_obj.number != 1 %}?page={{ messages_page_obj.number }}{% endif %}">
+                <i class="fas fa-sync-alt me-1" aria-hidden="true"></i>{% translate "Refresh" %}
+            </a>
+            <a class="ad-btn ad-btn--ghost ad-btn--sm"
+               href="{{ conversation_list_url }}{% if search or status %}?{% if search %}search={{ search|urlencode }}{% endif %}{% if search and status %}&amp;{% endif %}{% if status %}status={{ status }}{% endif %}{% endif %}">
+                <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
+            </a>
+        </div>
+    </div>
+
+    <div class="tg-chat-kv">
+        {% if conversation.last_message_at %}
+        <span><i class="far fa-clock me-1" aria-hidden="true"></i>{% translate "Last message" %}: {{ conversation.last_message_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+        {% endif %}
+        <span><i class="far fa-calendar-alt me-1" aria-hidden="true"></i>{% translate "Created" %}: {{ conversation.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+    </div>
+
+    {% include 'partials/telegram_message_list.html' %}
+
+    <div class="tg-chat-reply ad-card mt-3">
+        <div class="ad-card-head">
+            <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>{% translate "Send a Reply" %}
+        </div>
+        <div class="ad-card-body">
+            {% if reply_to_message_id %}
+            <div class="ad-alert ad-alert--info mb-3" role="status">
+                <i class="fas fa-reply me-2" aria-hidden="true"></i>
+                {% translate "You are replying to a specific message in this conversation." %}
+            </div>
+            {% endif %}
+
+            <form method="post" action="{{ reply_url }}" class="tg-chat-reply-form">
+                {% csrf_token %}
+                {% if reply_form.non_field_errors %}
+                <div class="ad-alert ad-alert--danger mb-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
+                    <span>{{ reply_form.non_field_errors }}</span>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    {{ reply_form.message.label_tag }}
+                    {{ reply_form.message }}
+                    {% if reply_form.message.errors %}
+                    <div class="text-danger mt-1">{{ reply_form.message.errors }}</div>
+                    {% endif %}
+                </div>
+
+                {{ reply_form.reply_to_telegram_message_id }}
+                {% if reply_form.reply_to_telegram_message_id.errors %}
+                <div class="text-danger mt-1">{{ reply_form.reply_to_telegram_message_id.errors }}</div>
+                {% endif %}
+
+                <p class="tg-chat-reply-note">
+                    <i class="fas fa-user-secret me-1" aria-hidden="true"></i>
+                    {% translate "Replies are delivered to the student anonymously as Admin." %}
+                </p>
+
+                <button type="submit" class="ad-btn ad-btn--teal">
+                    <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>{% translate "Send Reply" %}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% endwith %}
+</div>
+{% endblock %}

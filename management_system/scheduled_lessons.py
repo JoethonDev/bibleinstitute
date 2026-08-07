@@ -73,9 +73,11 @@ def _validate_expected_media(expected_media: Any) -> list[dict[str, Any]]:
     return links
 
 
-def create_scheduled_lesson(*, lesson_name: str, offering_id: int, expected_media: Any) -> Lesson:
+def create_scheduled_lesson(*, lesson_name: str, offering_id: int, expected_media: Any, description: str | None = None) -> Lesson:
     if not isinstance(lesson_name, str) or not lesson_name.strip() or len(lesson_name.strip()) > 255:
         raise ValidationError(_("Lesson name is required and must be 255 characters or fewer."))
+    if description is not None and not isinstance(description, str):
+        raise ValidationError(_("Lesson description is invalid."))
     links = _validate_expected_media(expected_media)
     offering = CourseOffering.objects.select_related(
         "academic_year_level__academic_year",
@@ -89,6 +91,7 @@ def create_scheduled_lesson(*, lesson_name: str, offering_id: int, expected_medi
     with transaction.atomic():
         return Lesson.objects.create(
             name=lesson_name.strip(),
+            description=(description.strip() if isinstance(description, str) else "") or None,
             course_offering=offering,
             links=json.dumps(links, ensure_ascii=False),
             status=PublicationStatus.DRAFT,

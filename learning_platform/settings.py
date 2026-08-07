@@ -89,6 +89,7 @@ for configured_origin in _env_csv('DJANGO_CSRF_TRUSTED_ORIGINS'):
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
+DJANGO_SITE_DOMAIN = os.getenv('DJANGO_SITE_DOMAIN', '').rstrip('/')
 
 # Application definition
 
@@ -171,6 +172,7 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
 )
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_IMPORTS = ("management_system.telegram_tasks",)
 
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
 # Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by
@@ -239,10 +241,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "https://weathered-wave-c7f0.elprincedoca.workers.dev/")
 MEDIA_WORKER_HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET") or SECRET_KEY
 WORKER_RECEIPT_SECRET = os.environ.get("WORKER_RECEIPT_SECRET") or MEDIA_WORKER_HMAC_SECRET
+TELEGRAM_ENCRYPTION_KEY = os.environ.get("TELEGRAM_ENCRYPTION_KEY") or SECRET_KEY
 R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL") or os.environ.get("endpoint")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID") or os.environ.get("key_id")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY") or os.environ.get("access_key")
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME") or os.environ.get("bucket") or ""
+TELEGRAM_R2_BUCKET_NAME = os.environ.get("TELEGRAM_R2_BUCKET_NAME", "")
 CLOUDFLARE_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
 CLOUDFLARE_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 

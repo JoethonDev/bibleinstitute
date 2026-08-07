@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# setup_env.sh — Interactive .env setup. Phase 1: core settings only.
+# setup_env.sh — Interactive .env setup.  Core settings plus optional Telegram
+# infrastructure settings (encryption key and dedicated R2 bucket).
 # Prompts domain, PostgreSQL, Django secret, TLS dir.  Rerunnable.
 # Creates a minimal runtime .env on the first run or updates an existing .env
-# on reruns.  Existing optional email/R2/Worker settings are preserved.
+# on reruns.  Existing optional email/R2/Worker/Telegram settings are preserved.
+# The Telegram bot token and webhook secret are NOT environment variables:
+# they are dashboard/database-managed, encrypted, and never written here.
 set -Eeuo pipefail
 
 TMP=".env.$$.tmp"
@@ -22,6 +25,11 @@ Usage: bash deploy/setup_env.sh
 
   TLS certificates are NOT provisioned here — do that separately.
   Rerun at any time to update settings.
+
+  Telegram: the optional encryption key and dedicated R2 bucket are
+  prompted below.  The bot token and webhook secret are managed in the
+  admin dashboard and stored encrypted in the database — they are never
+  written to .env by this script.
 
 Options:  --help, -h    Show this message.
 HELP
@@ -168,6 +176,30 @@ echo ""
 # ── 4. TLS directory ───────────────────────────────────────────────────
 tls_dir="$(read_value NGINX_TLS_CERT_DIR "TLS certificate directory" ./certs)"
 write_value NGINX_TLS_CERT_DIR "$tls_dir"
+echo ""
+
+# ── 5. Telegram (optional infrastructure) ──────────────────────────────
+# The Telegram bot token and webhook secret are dashboard/database-managed
+# and encrypted; this builder never prompts for, generates, or writes them.
+# The encryption key is hidden and never printed; blank preserves Django's
+# documented SECRET_KEY fallback and must not be auto-generated on rerun.
+enc_key="$(value_from_tmp TELEGRAM_ENCRYPTION_KEY "")"
+if [[ -n "$enc_key" ]]; then
+    echo -n "Telegram encryption key [press Enter to keep existing]: " >&2
+    read -s enc_input; echo >&2
+    enc="${enc_input:-$enc_key}"
+else
+    echo -n "Telegram encryption key (optional; blank = use Django SECRET_KEY; at least 16 characters if set): " >&2
+    read -s enc_input; echo >&2
+    enc="$enc_input"
+fi
+if [[ -n "$enc" && ${#enc} -lt 16 ]]; then
+    die "Telegram encryption key must be at least 16 characters when set"
+fi
+write_value TELEGRAM_ENCRYPTION_KEY "$enc"
+# Dedicated private Telegram bucket; never the academic media bucket.
+# Blank disables Telegram media storage (no fallback to R2_BUCKET_NAME).
+write_value TELEGRAM_R2_BUCKET_NAME "$(read_value TELEGRAM_R2_BUCKET_NAME "Dedicated private Telegram media bucket (blank = disabled)" "")"
 echo ""
 
 # ── Production defaults ────────────────────────────────────────────────

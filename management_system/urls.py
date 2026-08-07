@@ -1,6 +1,21 @@
 from django.urls import path
 from management_system.views import *
 from management_system.forms import UserLoginForm
+from management_system.telegram_views import (
+    telegram_attachment,
+    telegram_broadcast_confirm,
+    telegram_broadcast_confirm_page,
+    telegram_broadcast_cancel,
+    telegram_broadcast_create,
+    telegram_broadcast_detail,
+    telegram_broadcast_retry,
+    telegram_broadcasts,
+    telegram_config,
+    telegram_conversation_detail,
+    telegram_conversation_reply,
+    telegram_conversations,
+    telegram_unlink,
+)
 
 urlpatterns = [
     path(
@@ -18,6 +33,7 @@ urlpatterns = [
     path('profile/', ProfileDetail.as_view(), name="view-profile"),
     path('profile/<int:user_id>/', ProfileDetail.as_view(), name="check-profile"),
     path('profile/<int:user_id>/update/', ProfileUpdate.as_view(), name="update-profile"),
+    path('profile/telegram/unlink/', telegram_unlink, name="telegram-unlink"),
     path('courses/', view_courses, name="courses"),
     # path('design/student-ui/', student_ui_proposal, name="student-ui-proposal"),
     # path('design/admin-ui/', admin_ui_proposal, name="admin-ui-proposal"),
@@ -126,6 +142,18 @@ urlpatterns = [
     path('dashboard/academic/promotion-formula/result/<int:result_id>/promote/', promotion_result, name="promotion-result"),
     path('dashboard/academic/promotion-formula/promote/', bulk_promotion_results, name="bulk-promotion-results"),
     path('dashboard/academic/promotion-history/', promotion_history, name="promotion-history"),
+    path('dashboard/telegram/', telegram_config, name="telegram-config"),
+    path('dashboard/telegram/conversations/', telegram_conversations, name="telegram-conversations"),
+    path('dashboard/telegram/conversations/<int:conversation_id>/', telegram_conversation_detail, name="telegram-conversation-detail"),
+    path('dashboard/telegram/conversations/<int:conversation_id>/reply/', telegram_conversation_reply, name="telegram-conversation-reply"),
+    path('dashboard/telegram/attachments/<int:attachment_id>/', telegram_attachment, name="telegram-attachment"),
+    path('dashboard/telegram/broadcasts/', telegram_broadcasts, name="telegram-broadcasts"),
+    path('dashboard/telegram/broadcasts/new/', telegram_broadcast_create, name="telegram-broadcast-create"),
+    path('dashboard/telegram/broadcasts/<int:broadcast_id>/confirm/', telegram_broadcast_confirm_page, name="telegram-broadcast-confirm-page"),
+    path('dashboard/telegram/broadcasts/<int:broadcast_id>/confirm/send/', telegram_broadcast_confirm, name="telegram-broadcast-confirm"),
+    path('dashboard/telegram/broadcasts/<int:broadcast_id>/cancel/', telegram_broadcast_cancel, name="telegram-broadcast-cancel"),
+    path('dashboard/telegram/broadcasts/<int:broadcast_id>/retry/', telegram_broadcast_retry, name="telegram-broadcast-retry"),
+    path('dashboard/telegram/broadcasts/<int:broadcast_id>/', telegram_broadcast_detail, name="telegram-broadcast-detail"),
 
     # Phase 3 — Student Applications
     path('signup/', signup, name="signup"),

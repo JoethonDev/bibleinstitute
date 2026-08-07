@@ -125,6 +125,497 @@ class User(AbstractUser):
         return [_("Username"), _("Name"), _("Role"), _("Joined Date"), _("Last Login")]
 
 
+class TelegramBotConfig(models.Model):
+    """The single encrypted Telegram bot configuration for this deployment."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    token_ciphertext = models.TextField(blank=True, default="")
+    webhook_secret_ciphertext = models.TextField(blank=True, default="")
+    bot_id = models.BigIntegerField(null=True, blank=True)
+    bot_username = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=False)
+    webhook_url = models.URLField(blank=True, default="")
+    activated_at = models.DateTimeField(null=True, blank=True)
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+    activated_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_activated_configs",
+    )
+    deactivated_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_deactivated_configs",
+    )
+    last_validated_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=Q(is_active=True),
+                name="telegram_one_active_config",
+            ),
+        ]
+        verbose_name = _("Telegram Bot Configuration")
+        verbose_name_plural = _("Telegram Bot Configurations")
+
+    def __str__(self):
+        return self.bot_username or str(_("Telegram Bot Configuration"))
+
+
+class TelegramAccount(models.Model):
+    """A single private Telegram identity linked to one eligible LMS user."""
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="telegram_account",
+    )
+    telegram_user_id = models.BigIntegerField(unique=True)
+    telegram_chat_id = models.BigIntegerField(unique=True)
+    linked_at = models.DateTimeField(auto_now_add=True)
+    last_inbound_at = models.DateTimeField(null=True, blank=True)
+    last_outbound_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["is_active", "user"], name="telegram_account_active_idx"),
+        ]
+
+    def __str__(self):
+        return self.user.get_full_name() or self.user.username
+
+
+class TelegramLinkToken(models.Model):
+    """A permanent-until-used one-time LMS-to-Telegram linking token."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_link_tokens")
+    token_digest = models.CharField(max_length=64, unique=True)
+    token_ciphertext = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    linked_account = models.ForeignKey(
+        TelegramAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="link_tokens",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=Q(used_at__isnull=True, revoked_at__isnull=True),
+                name="telegram_one_current_link_token",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="telegram_link_user_created_idx"),
+        ]
+
+    def __str__(self):
+        return f"Telegram link token for {self.user.username}"
+
+
+class TelegramWebhookUpdate(models.Model):
+    """Durable deduplication record for accepted private-chat webhook updates."""
+
+    bot_id = models.BigIntegerField()
+    update_id = models.BigIntegerField()
+    payload = models.JSONField(default=dict)
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    processing_error = models.TextField(blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["bot_id", "update_id"],
+                name="telegram_webhook_bot_update_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["bot_id", "processed_at"], name="telegram_webhook_pending_idx"),
+        ]
+
+    def __str__(self):
+        return f"Telegram update {self.update_id}"
+
+
+class TelegramNotificationDelivery(models.Model):
+    """Durable, idempotent lesson/exam notification delivery state."""
+
+    class NotificationType(models.TextChoices):
+        LESSON_PUBLISHED = "lesson_published", _("Lesson published")
+        QUIZ_OPENING = "quiz_opening", _("Exam opening")
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        SENT = "sent", _("Sent")
+        FAILED = "failed", _("Failed")
+        SKIPPED = "skipped", _("Skipped")
+
+    idempotency_key = models.CharField(max_length=255, unique=True)
+    notification_type = models.CharField(max_length=32, choices=NotificationType.choices)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_notification_deliveries")
+    telegram_account = models.ForeignKey(
+        TelegramAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notification_deliveries",
+    )
+    lesson = models.ForeignKey(
+        "Lesson",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_notification_deliveries",
+    )
+    quiz = models.ForeignKey(
+        "Quiz",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_notification_deliveries",
+    )
+    scheduled_for = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True, default="")
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        notification_type="lesson_published",
+                        lesson__isnull=False,
+                        quiz__isnull=True,
+                    )
+                    | models.Q(
+                        notification_type="quiz_opening",
+                        lesson__isnull=True,
+                        quiz__isnull=False,
+                    )
+                ),
+                name="telegram_delivery_source_matches_type",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "scheduled_for"], name="tg_delivery_due_idx"),
+            models.Index(fields=["user", "status"], name="tg_delivery_user_status_idx"),
+            models.Index(fields=["notification_type", "lesson"], name="tg_delivery_lesson_idx"),
+            models.Index(fields=["notification_type", "quiz"], name="tg_delivery_quiz_idx"),
+        ]
+
+    def __str__(self):
+        return self.idempotency_key
+
+
+class TelegramConversation(models.Model):
+    """One durable support conversation per student at a time."""
+
+    class Status(models.TextChoices):
+        OPEN = "open", _("Open")
+        CLAIMED = "claimed", _("Claimed")
+        HANDLED = "handled", _("Handled")
+        BLOCKED = "blocked", _("Blocked")
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_conversations")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    claimed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="claimed_telegram_conversations",
+    )
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    handled_at = models.DateTimeField(null=True, blank=True)
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(status__in=["open", "claimed"]),
+                name="telegram_one_active_conversation",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "last_message_at"], name="tg_conversation_status_idx"),
+            models.Index(fields=["user", "status"], name="tg_conversation_user_idx"),
+        ]
+
+    def __str__(self):
+        return f"Telegram conversation {self.pk}"
+
+
+class TelegramMessage(models.Model):
+    """Inbound/outbound support history without exposing Telegram identities."""
+
+    class Direction(models.TextChoices):
+        INBOUND = "inbound", _("Inbound")
+        OUTBOUND = "outbound", _("Outbound")
+
+    class ContentType(models.TextChoices):
+        TEXT = "text", _("Text")
+        PHOTO = "photo", _("Photo")
+        DOCUMENT = "document", _("Document")
+        VIDEO = "video", _("Video")
+        DIGEST = "digest", _("Digest")
+        UNSUPPORTED = "unsupported", _("Unsupported")
+
+    class DeliveryStatus(models.TextChoices):
+        RECEIVED = "received", _("Received")
+        QUEUED = "queued", _("Queued")
+        SENT = "sent", _("Sent")
+        FAILED = "failed", _("Failed")
+
+    conversation = models.ForeignKey(TelegramConversation, on_delete=models.CASCADE, related_name="messages")
+    direction = models.CharField(max_length=16, choices=Direction.choices)
+    sender_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_messages",
+    )
+    telegram_chat_id = models.BigIntegerField(null=True, blank=True)
+    telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    telegram_update_id = models.BigIntegerField(null=True, blank=True)
+    reply_to_telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    content_type = models.CharField(max_length=16, choices=ContentType.choices)
+    text = models.TextField(blank=True, default="")
+    delivery_status = models.CharField(max_length=16, choices=DeliveryStatus.choices, default=DeliveryStatus.RECEIVED)
+    delivery_error = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["telegram_update_id"],
+                condition=models.Q(telegram_update_id__isnull=False),
+                name="telegram_message_update_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["telegram_chat_id", "telegram_message_id"],
+                condition=models.Q(telegram_chat_id__isnull=False, telegram_message_id__isnull=False),
+                name="telegram_message_chat_id_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["conversation", "created_at"], name="tg_message_conversation_idx"),
+            models.Index(fields=["delivery_status", "created_at"], name="tg_message_delivery_idx"),
+        ]
+
+    def __str__(self):
+        return f"Telegram message {self.pk}"
+
+
+class TelegramAttachment(models.Model):
+    """Controlled R2 metadata for a supported Telegram attachment."""
+
+    message = models.ForeignKey(TelegramMessage, on_delete=models.CASCADE, related_name="attachments")
+    telegram_file_id = models.CharField(max_length=255)
+    media_type = models.CharField(max_length=16)
+    r2_key = models.CharField(max_length=1024, blank=True, default="")
+    original_name = models.CharField(max_length=255, blank=True, default="")
+    mime_type = models.CharField(max_length=255, blank=True, default="")
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True, default="")
+    is_available = models.BooleanField(default=False)
+    error = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["message", "telegram_file_id"],
+                name="telegram_attachment_file_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["media_type", "is_available"], name="tg_attachment_media_idx"),
+        ]
+
+    def __str__(self):
+        return self.original_name or self.telegram_file_id
+
+
+class TelegramBroadcast(models.Model):
+    """An admin-confirmed active-year message sent outside support history."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        COMPLETED = "completed", _("Completed")
+        FAILED = "failed", _("Failed")
+
+    academic_year = models.ForeignKey(
+        "AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="telegram_broadcasts",
+    )
+    level = models.ForeignKey(
+        "Level",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="telegram_broadcasts",
+    )
+    message = models.TextField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_telegram_broadcasts",
+    )
+    confirmed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_telegram_broadcasts",
+    )
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    queued_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    recipient_count = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    last_error = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="tg_broadcast_status_idx"),
+            models.Index(fields=["academic_year", "level"], name="tg_broadcast_target_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(message=""),
+                name="tg_broadcast_message_not_empty",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Telegram broadcast {self.pk}"
+
+
+class TelegramBroadcastAttachment(models.Model):
+    """Private R2 metadata for one broadcast attachment."""
+
+    broadcast = models.ForeignKey(
+        TelegramBroadcast,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    r2_key = models.CharField(max_length=1024)
+    original_name = models.CharField(max_length=255)
+    mime_type = models.CharField(max_length=255, blank=True, default="")
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True, default="")
+    is_available = models.BooleanField(default=False)
+    error = models.CharField(max_length=500, blank=True, default="")
+    ordering = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ordering", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["broadcast", "r2_key"],
+                name="tg_broadcast_attachment_key_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return self.original_name
+
+
+class TelegramBroadcastRecipient(models.Model):
+    """Immutable-at-queue-time recipient snapshot and delivery state."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        SENT = "sent", _("Sent")
+        FAILED = "failed", _("Failed")
+        SKIPPED = "skipped", _("Skipped")
+
+    broadcast = models.ForeignKey(
+        TelegramBroadcast,
+        on_delete=models.CASCADE,
+        related_name="recipients",
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_broadcast_recipients",
+    )
+    telegram_account = models.ForeignKey(
+        TelegramAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="broadcast_recipients",
+    )
+    telegram_chat_id = models.BigIntegerField()
+    user_username = models.CharField(max_length=150, blank=True, default="")
+    user_display_name = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    scheduled_for = models.DateTimeField()
+    sent_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["broadcast", "user"],
+                name="tg_broadcast_recipient_user_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["broadcast", "status", "scheduled_for"], name="tg_broadcast_due_idx"),
+            models.Index(fields=["broadcast", "status"], name="tg_bcast_recipient_status_idx"),
+        ]
+
+    def __str__(self):
+        return f"Broadcast {self.broadcast_id} → {self.telegram_chat_id}"
+
+
 class OfflineCity(models.Model):
     name = models.CharField(max_length=255, unique=True)
     is_active = models.BooleanField(default=True)
@@ -796,6 +1287,7 @@ class LectureProgress(models.Model):
 
 class Lesson(models.Model):
     name = models.CharField(max_length=255, null=False)
+    description = models.TextField(null=True, blank=True)
     links = models.TextField() # Null must be false
     course_offering = models.ForeignKey(
         CourseOffering,

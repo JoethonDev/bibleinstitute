@@ -85,6 +85,8 @@ from .academic_access import accessible_offerings, active_year_offerings_for_stu
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .scheduled_lessons import create_scheduled_lesson, finalize_scheduled_lesson
 from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
+from .telegram.linking import TelegramLinkError, current_telegram_link
+from .telegram.notifications import enqueue_lesson_notifications, schedule_quiz_opening_notifications
 
 # Standard Library (moved from function-local)
 import calendar as py_calendar
@@ -786,6 +788,21 @@ class ProfileDetail(LoginProtection, DetailView):
             and user.role
             and user.role.role in {"student", "admin"}
         )
+        context["telegram_account"] = None
+        context["telegram_link_url"] = None
+        context["telegram_can_unlink"] = False
+        if user == self.request.user:
+            try:
+                telegram_account, telegram_link_url = current_telegram_link(user)
+            except TelegramLinkError:
+                telegram_account, telegram_link_url = None, None
+            context["telegram_account"] = telegram_account
+            context["telegram_link_url"] = telegram_link_url
+            context["telegram_can_unlink"] = bool(
+                telegram_account
+                and user.role
+                and user.role.role == "admin"
+            )
 
         # Recent quiz grade submissions (last 5)
         context['recent_grades'] = (
@@ -1649,6 +1666,7 @@ def quiz_exceptional_opening(request, quiz_id):
     except ValidationError as exc:
         messages.error(request, "; ".join(str(message) for message in exc.messages))
     else:
+        schedule_quiz_opening_notifications(quiz)
         messages.success(request, _("Exceptional opening saved for %(count)s student(s).") % {"count": count})
     return redirect("quiz-view", quiz_id=quiz.pk)
 
@@ -1705,6 +1723,7 @@ def create_lesson(request):
             "is_root" : True,
             "content_status" : PublicationStatus.DRAFT,
             "content_status_display" : PublicationStatus.DRAFT.label,
+            "lesson_description": "",
             "publication_statuses" : PublicationStatus.choices,
         })
     elif request.method == "POST":
@@ -1712,6 +1731,7 @@ def create_lesson(request):
         if publication_status is None:
             return HttpResponse(_("Invalid publication status."), status=400)
         lesson_name = request.POST.get("lesson_name", "")
+        lesson_description = request.POST.get("description", "").strip()
         offering_id = request.POST.get("course_offering")
         videos = request.POST.getlist("videos", [])
         videos_name = request.POST.getlist("videos_name", [])
@@ -1732,12 +1752,15 @@ def create_lesson(request):
                     pk=offering_id,
                     academic_year_level__academic_year__is_active=True,
                 )
-                Lesson.objects.create(
+                lesson = Lesson.objects.create(
                     name=lesson_name,
+                    description=lesson_description or None,
                     course_offering=course_offering,
                     links=json.dumps(links),
                     status=publication_status,
                 )
+                if publication_status == PublicationStatus.PUBLISHED:
+                    enqueue_lesson_notifications(lesson)
                 success(request, _("Lesson is created successfully"), extra_tags="alert-success") # Translate
                 logger.info(
                     "Lesson %s is added in offering %s with media length of %s",
@@ -1792,6 +1815,7 @@ def update_lesson(request, lesson_id):
                 "is_root" : True,
                 "selected_offering_id" : lesson.course_offering_id,
                 "lesson_name" : lesson.name,
+                "lesson_description": lesson.description or "",
                 "videos" : json.loads(lesson.links),
                 "content_status" : lesson.status,
                 "content_status_display" : lesson.get_status_display(),
@@ -1809,11 +1833,15 @@ def update_lesson(request, lesson_id):
         if not lesson.can_edit:
             if publication_status == lesson.status:
                 return HttpResponse(_("Published or archived lesson cannot be edited."), status=403)
+            previous_status = lesson.status
             lesson.status = publication_status
             lesson.save(update_fields=["status", "updated_date"])
+            if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                enqueue_lesson_notifications(lesson)
             success(request, _("Lesson status is updated successfully"), extra_tags="alert-success")
             return redirect(reverse("lesson-update", args=[lesson_id]))
         lesson_name = request.POST.get("lesson_name", "")
+        lesson_description = request.POST.get("description", "").strip()
         offering_id = request.POST.get("course_offering")
         videos = request.POST.getlist("videos", [])
         videos_name = request.POST.getlist("videos_name", [])
@@ -1828,13 +1856,17 @@ def update_lesson(request, lesson_id):
                     } for file_no in range(len(videos))
                 ]
 
+                previous_status = lesson.status
                 lesson.name = lesson_name
+                lesson.description = lesson_description or None
                 lesson.course_offering = get_object_or_404(
                     CourseOffering, pk=offering_id
                 )
                 lesson.links = json.dumps(links)
                 lesson.status = publication_status
                 lesson.save()
+                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                    enqueue_lesson_notifications(lesson)
 
                 logger.info(
                     "Lesson %s is updated successfully in offering %s with media length of %s",
@@ -1893,6 +1925,7 @@ def scheduled_lesson_create(request):
         payload = json.loads(request.body)
         lesson = create_scheduled_lesson(
             lesson_name=payload.get("lesson_name"),
+            description=payload.get("description"),
             offering_id=int(payload.get("course_offering")),
             expected_media=payload.get("expected_media"),
         )
@@ -1923,6 +1956,7 @@ def scheduled_lesson_finalize(request, lesson_id):
                 status=400,
             )
         return JsonResponse({"message": exc.messages}, status=400)
+    enqueue_lesson_notifications(lesson)
     return JsonResponse({"lesson_id": lesson.pk, "status": "published"})
 
 @capability_required(can_manage_content)
@@ -2392,6 +2426,9 @@ def create_quiz(request):
                 quiz.save()
                 Question.objects.bulk_create(questions_obj)
 
+                if publication_status == PublicationStatus.PUBLISHED:
+                    schedule_quiz_opening_notifications(quiz)
+
                 logger.info(
                     "Quiz %s is added in offering %s with %s questions",
                     quiz.name,
@@ -2446,10 +2483,14 @@ def update_quiz(request, quiz_id):
             if not quiz.can_edit:
                 if publication_status == quiz.status:
                     return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                previous_status = quiz.status
                 quiz.status = publication_status
                 quiz.save(update_fields=["status"])
+                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                    schedule_quiz_opening_notifications(quiz)
                 success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
                 return redirect(reverse("quiz-update", args=[quiz_id]))
+            previous_status = quiz.status
             quiz.name = quiz_data['quiz_name']
             quiz.opening_date = get_datetime(quiz_data['opening_date'])
             quiz.closing_date = get_datetime(quiz_data['closing_date'])
@@ -2487,6 +2528,9 @@ def update_quiz(request, quiz_id):
                 # Current New Questions
                 Question.objects.bulk_create(questions_obj)
                 quiz.save()
+
+            if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                schedule_quiz_opening_notifications(quiz)
 
             logger.info(
                 "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",
@@ -3341,7 +3385,7 @@ def signup(request):
                         is_offline = OfflineCity.objects.filter(name__iexact=user.city, is_active=True).exists()
                         user.study_mode = "offline" if is_offline else "online"
                     file_type_map = {"identity_front": "identity_front_key", "identity_back": "identity_back_key", "payment": "payment_key", "profile": "profile_image_key"}
-                    required_upload_types = {"identity_front", "payment", "profile"}
+                    required_upload_types = {"identity_front", "profile"}
                     if user.identity_type == "national_id":
                         required_upload_types.add("identity_back")
                     for upload_type, model_field in file_type_map.items():
@@ -3350,8 +3394,18 @@ def signup(request):
                             if key:
                                 setattr(user, model_field, key)
                                 uploaded_keys.append(key)
-                    if any(not getattr(user, file_type_map[upload_type], None) for upload_type in required_upload_types):
-                        raise ValidationError(_("All required application documents must be uploaded."))
+                    missing_documents = [
+                        upload_type for upload_type in required_upload_types
+                        if not getattr(user, file_type_map[upload_type], None)
+                    ]
+                    if missing_documents:
+                        document_labels = {
+                            "identity_front": _("Identity Front"),
+                            "identity_back": _("Identity Back"),
+                            "profile": _("Profile Photo"),
+                        }
+                        named = ", ".join(str(document_labels[t]) for t in file_type_map if t in missing_documents)
+                        raise ValidationError(_("Missing required document(s): %(documents)s.") % {"documents": named})
                     if uploaded_keys:
                         user.save(update_fields=[v for v in file_type_map.values() if getattr(user, v, None)] + ["study_mode"])
                     elif user.study_mode:

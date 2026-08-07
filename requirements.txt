@@ -17,3 +17,4 @@ asgiref==3.8.1
 celery==5.4.0
 redis==5.2.1
 gunicorn==23.0.0
+pyTelegramBotAPI==4.29.1

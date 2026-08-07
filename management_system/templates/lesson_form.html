@@ -95,6 +95,19 @@
                                  </div>
                              </div>
 
+                             <!-- Lesson Description (optional) -->
+                             <div class="form-group">
+                                 <label for="lesson-description" class="form-label">
+                                     {% translate "Lesson Description" %}
+                                 </label>
+                                 <textarea class="form-control"
+                                           id="lesson-description"
+                                           name="description"
+                                           rows="4"
+                                           placeholder="{% translate 'Enter lesson description' %}">{{ lesson_description|default:"" }}</textarea>
+                                 <div class="form-text">{% translate "Optional short description shown for this lesson." %}</div>
+                             </div>
+
                              <!-- Course Offering (determines course and level) -->
                              <div class="form-group">
                                  <label for="course_offering" class="form-label">

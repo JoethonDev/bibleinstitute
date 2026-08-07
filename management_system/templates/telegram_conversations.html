@@ -1,0 +1,82 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div id="content" class="container-fluid py-3 ad-page tg-chat-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% translate "Telegram Support Chat" %}</li>
+        </ol>
+    </nav>
+
+    <div class="tg-chat-header">
+        <div>
+            <h4 class="mb-1"><i class="fas fa-comments me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Telegram Support Chat" %}</h4>
+            <p class="tg-chat-head-desc mb-0">{% translate "View, claim, and reply to student support conversations received through Telegram." %}</p>
+        </div>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            <form method="get" action="{{ conversation_list_url }}" class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label" for="telegram-conversation-search">{% translate "Search" %}</label>
+                    <input id="telegram-conversation-search"
+                           class="form-control"
+                           type="search"
+                           name="search"
+                           value="{{ search }}"
+                           placeholder="{% translate 'Student name, username, or message text' %}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="telegram-conversation-status">{% translate "Status" %}</label>
+                    <select id="telegram-conversation-status" class="form-select" name="status">
+                        <option value="" {% if status == '' %}selected{% endif %}>{% translate "All" %}</option>
+                        <option value="open" {% if status == 'open' %}selected{% endif %}>{% translate "Open" %}</option>
+                        <option value="claimed" {% if status == 'claimed' %}selected{% endif %}>{% translate "Claimed" %}</option>
+                        <option value="handled" {% if status == 'handled' %}selected{% endif %}>{% translate "Handled" %}</option>
+                        <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>{% translate "Blocked" %}</option>
+                    </select>
+                </div>
+                <div class="col-md-auto d-flex flex-wrap gap-2">
+                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                        <i class="fas fa-search me-1" aria-hidden="true"></i>{% translate "Search" %}
+                    </button>
+                    <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ conversation_list_url }}">
+                        <i class="fas fa-times me-1" aria-hidden="true"></i>{% translate "Clear" %}
+                    </a>
+                </div>
+            </form>
+
+            <div class="tg-chat-pills ad-filters mt-3" role="group" aria-label="{% translate 'Filter conversations by status' %}">
+                <a class="ad-filter-pill nav-link {% if status == '' %}is-on{% endif %}"
+                   href="{{ conversation_list_url }}{% if search %}?search={{ search|urlencode }}{% endif %}">
+                    {% translate "All" %} <span class="tg-chat-pill-count">({{ status_counts.all }})</span>
+                </a>
+                <a class="ad-filter-pill nav-link {% if status == 'open' %}is-on{% endif %}"
+                   href="{{ conversation_list_url }}?status=open{% if search %}&amp;search={{ search|urlencode }}{% endif %}">
+                    {% translate "Open" %} <span class="tg-chat-pill-count">({{ status_counts.open }})</span>
+                </a>
+                <a class="ad-filter-pill nav-link {% if status == 'claimed' %}is-on{% endif %}"
+                   href="{{ conversation_list_url }}?status=claimed{% if search %}&amp;search={{ search|urlencode }}{% endif %}">
+                    {% translate "Claimed" %} <span class="tg-chat-pill-count">({{ status_counts.claimed }})</span>
+                </a>
+                <a class="ad-filter-pill nav-link {% if status == 'handled' %}is-on{% endif %}"
+                   href="{{ conversation_list_url }}?status=handled{% if search %}&amp;search={{ search|urlencode }}{% endif %}">
+                    {% translate "Handled" %} <span class="tg-chat-pill-count">({{ status_counts.handled }})</span>
+                </a>
+                <a class="ad-filter-pill nav-link {% if status == 'blocked' %}is-on{% endif %}"
+                   href="{{ conversation_list_url }}?status=blocked{% if search %}&amp;search={{ search|urlencode }}{% endif %}">
+                    {% translate "Blocked" %} <span class="tg-chat-pill-count">({{ status_counts.blocked }})</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% include 'partials/telegram_conversation_list.html' %}
+</div>
+{% endblock %}

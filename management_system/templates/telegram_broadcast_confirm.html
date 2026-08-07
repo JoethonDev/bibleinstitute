@@ -1,0 +1,104 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item"><a href="{{ broadcast_list_url }}">{% translate "Telegram Broadcasts" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% translate "Confirm Broadcast" %}</li>
+        </ol>
+    </nav>
+
+    <div class="tg-broadcast-header">
+        <div>
+            <h4 class="mb-1"><i class="fas fa-check-circle me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Confirm Broadcast" %}</h4>
+            <p class="tg-broadcast-head-desc mb-0">{% translate "Review the exact recipients, message, and attachments before sending." %}</p>
+        </div>
+    </div>
+
+    <div class="ad-alert ad-alert--warning mb-3" role="alert">
+        <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
+        <span>{% translate "Sending cannot be undone. Confirming snapshots the recipients and queues delivery immediately." %}</span>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head">
+            <i class="fas fa-bullhorn me-2" aria-hidden="true"></i>
+            {% translate "Broadcast Summary" %}
+        </div>
+        <div class="ad-card-body">
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Academic Year" %}</span>
+                <span class="ad-kv-value">{{ broadcast.academic_year.name }}</span>
+            </div>
+            {% if broadcast.academic_year.starts_on and broadcast.academic_year.ends_on %}
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Academic Year Period" %}</span>
+                <span class="ad-kv-value">{{ broadcast.academic_year.starts_on|date:"Y-m-d" }} &rarr; {{ broadcast.academic_year.ends_on|date:"Y-m-d" }}</span>
+            </div>
+            {% endif %}
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Target" %}</span>
+                <span class="ad-kv-value">{{ target_label }}</span>
+            </div>
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Recipients" %}</span>
+                <span class="ad-kv-value tg-broadcast-count">{{ recipient_preview_count }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head">
+            <i class="fas fa-envelope-open-text me-2" aria-hidden="true"></i>
+            {% translate "Message" %}
+        </div>
+        <div class="ad-card-body">
+            <div class="tg-broadcast-message-preview">{{ broadcast.message }}</div>
+        </div>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head">
+            <i class="fas fa-paperclip me-2" aria-hidden="true"></i>
+            {% translate "Attachments" %}
+        </div>
+        <div class="ad-card-body">
+            {% if attachments %}
+            <ul class="tg-broadcast-attachments">
+                {% for attachment in attachments %}
+                <li class="tg-broadcast-attachment">
+                    <i class="fas fa-file me-2" aria-hidden="true"></i>
+                    <span class="tg-broadcast-attachment-name">{% firstof attachment.original_name "—" %}</span>
+                    <span class="tg-broadcast-attachment-type">{{ attachment.mime_type|default:"—" }}</span>
+                    <span class="tg-broadcast-attachment-size">{{ attachment.size_bytes|filesizeformat }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="ad-empty-state mb-0">{% translate "No attachments." %}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 tg-broadcast-confirm-form">
+        <form method="post" action="{{ confirm_url }}">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--teal">
+                <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>{% translate "Confirm and Send" %}
+            </button>
+        </form>
+        <form method="post" action="{{ cancel_url }}">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--ghost">
+                <i class="fas fa-times me-2" aria-hidden="true"></i>{% translate "Cancel" %}
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

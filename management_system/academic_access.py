@@ -70,6 +70,20 @@ def active_year_offerings_for_student(student: User, include_targeted: bool = Fa
     return _with_content(CourseOffering.objects.filter(status=PublicationStatus.PUBLISHED).filter(access_query))
 
 
+def active_year_published_offerings_for_user(user: User) -> QuerySet[CourseOffering]:
+    """Return the current published offerings visible to a student or manager."""
+    if not user.is_authenticated:
+        return CourseOffering.objects.none()
+    if _management_user(user):
+        return _with_content(
+            CourseOffering.objects.filter(
+                status=PublicationStatus.PUBLISHED,
+                academic_year_level__academic_year__is_active=True,
+            )
+        )
+    return active_year_offerings_for_student(user, include_targeted=True)
+
+
 def _with_content(offerings: QuerySet[CourseOffering], include_drafts: bool = False) -> QuerySet[CourseOffering]:
     lesson_filter = {} if include_drafts else {"lessons__status": PublicationStatus.PUBLISHED}
     quiz_filter = {} if include_drafts else {"quizzes__status": PublicationStatus.PUBLISHED}

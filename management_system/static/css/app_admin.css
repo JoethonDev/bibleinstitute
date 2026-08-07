@@ -1760,3 +1760,447 @@
     .ad-bar-label { min-width: 56px; font-size: 0.72rem; }
     .ad-page-header h4 { font-size: 1.1rem; }
 }
+
+/* ================================================================================
+   Telegram support chat (Phase 6 admin web chat)
+   ================================================================================ */
+
+/* ── Page header ── */
+.tg-chat-page .breadcrumb { font-size: .85rem; }
+
+.tg-chat-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.tg-chat-header h4 { font-size: 1.25rem; font-weight: 700; }
+
+.tg-chat-head-desc {
+    color: var(--ps-muted);
+    font-size: .86rem;
+    max-width: 46rem;
+    margin-top: .25rem;
+}
+
+/* ── Status filter pills (counts) ── */
+.tg-chat-pills {
+    border-top: 1px solid var(--ps-line);
+    padding-top: .75rem;
+}
+
+.tg-chat-pill-count { font-weight: 600; }
+
+/* ── Conversation list surface ── */
+.tg-chat-list { position: relative; }
+
+.tg-chat-table-wrap .ad-table { min-width: 42rem; }
+
+.tg-chat-user {
+    display: flex;
+    flex-direction: column;
+    gap: .05rem;
+    min-width: 0;
+}
+
+.tg-chat-user-name {
+    font-weight: 600;
+    color: var(--ps-ink);
+    overflow-wrap: anywhere;
+}
+
+.tg-chat-user-username {
+    font-size: .76rem;
+    color: var(--ps-muted);
+    direction: ltr;
+    text-align: start;
+    unicode-bidi: embed;
+    overflow-wrap: anywhere;
+}
+
+.tg-chat-count { font-variant-numeric: tabular-nums; font-weight: 650; }
+
+.tg-chat-list time,
+.tg-chat-msg-time {
+    font-size: .78rem;
+    color: var(--ps-muted);
+    white-space: nowrap;
+}
+
+/* ── Conversation detail header ── */
+.tg-chat-detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .75rem;
+}
+
+.tg-chat-detail-title h4 { font-size: 1.2rem; font-weight: 700; }
+
+.tg-chat-student-meta {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .15rem;
+}
+
+.tg-chat-detail-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.tg-chat-claim {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .8rem;
+    color: var(--ps-muted);
+}
+
+.tg-chat-kv {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem 1.25rem;
+    font-size: .8rem;
+    color: var(--ps-muted);
+    margin-bottom: 1rem;
+    padding-bottom: .6rem;
+    border-bottom: 1px solid var(--ps-line);
+}
+
+/* ── Message thread (chronological history) ── */
+.tg-chat-thread {
+    display: flex;
+    flex-direction: column;
+    gap: .9rem;
+    max-height: 34rem;
+    overflow-y: auto;
+    padding: 1rem;
+    background: var(--ps-cream);
+    border: 1px solid var(--ps-line);
+    border-radius: var(--ps-radius);
+}
+
+.tg-chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.tg-chat-msg {
+    max-width: 78%;
+    padding: .7rem .9rem;
+    border-radius: var(--ps-radius);
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-line);
+    box-shadow: var(--ps-shadow);
+}
+
+.tg-chat-msg--inbound { align-self: flex-start; border-inline-start: 3px solid var(--ps-teal); }
+.tg-chat-msg--outbound { align-self: flex-end; border-inline-start: 3px solid var(--ps-gold); }
+
+.tg-chat-msg-head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    font-size: .74rem;
+    color: var(--ps-muted);
+    margin-bottom: .35rem;
+}
+
+.tg-chat-msg-role {
+    font-weight: 700;
+    color: var(--ps-ink);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    font-size: .7rem;
+}
+
+.tg-chat-msg-type { font-size: .72rem; }
+
+.tg-chat-msg-body {
+    font-size: .9rem;
+    line-height: 1.6;
+    color: var(--ps-ink);
+    overflow-wrap: anywhere;
+}
+
+/* ── Attachments ── */
+.tg-chat-attachments {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    margin-top: .5rem;
+    padding-top: .5rem;
+    border-top: 1px dashed var(--ps-line);
+}
+
+.tg-chat-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    max-width: 100%;
+    font-size: .8rem;
+    color: var(--ps-teal);
+    text-decoration: none;
+    padding: .25rem .55rem;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .6rem;
+    background: var(--ps-mist);
+    transition: border-color var(--ps-motion), color var(--ps-motion), background-color var(--ps-motion);
+}
+
+.tg-chat-attachment span { overflow-wrap: anywhere; }
+
+.tg-chat-attachment:hover,
+.tg-chat-attachment:focus-visible {
+    border-color: var(--ps-gold);
+    color: var(--ps-gold-deep);
+    background: var(--ps-gold-soft);
+}
+
+/* ── Message meta (delivery state, errors, reply affordance) ── */
+.tg-chat-msg-meta {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .5rem;
+    font-size: .74rem;
+    color: var(--ps-muted);
+}
+
+.tg-chat-msg-error {
+    color: var(--ps-danger);
+    font-size: .76rem;
+    overflow-wrap: anywhere;
+}
+
+.tg-chat-reply-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .76rem;
+    font-weight: 600;
+    color: var(--ps-teal);
+    text-decoration: none;
+}
+
+.tg-chat-reply-link:hover,
+.tg-chat-reply-link:focus-visible {
+    color: var(--ps-gold-deep);
+    text-decoration: underline;
+}
+
+/* ── Reply form ── */
+.tg-chat-reply-note {
+    font-size: .78rem;
+    color: var(--ps-muted);
+    margin: .5rem 0 .75rem;
+}
+
+.tg-chat-reply-form textarea { min-height: 6rem; }
+
+/* ── Polling indicator (HTMX request state only, no JS) ── */
+.tg-chat-polling {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    align-self: flex-start;
+    font-size: .78rem;
+    color: var(--ps-muted);
+    opacity: 0;
+    transition: opacity var(--ps-motion);
+}
+
+.htmx-request .tg-chat-polling,
+.tg-chat-polling.htmx-request { opacity: 1; }
+
+/* ── Narrow screens / RTL-safe adjustments ── */
+@media (max-width: 767.98px) {
+    .tg-chat-detail-head { flex-direction: column; align-items: stretch; }
+    .tg-chat-msg { max-width: 92%; }
+    .tg-chat-thread { padding: .6rem; }
+    .tg-chat-kv { flex-direction: column; gap: .15rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tg-chat-attachment,
+    .tg-chat-polling { transition: none; }
+}
+
+/* ================================================================================
+   Telegram broadcasts (Phase 7 admin active-year announcements)
+   ================================================================================ */
+
+.tg-broadcast-page .breadcrumb { font-size: .85rem; }
+
+.tg-broadcast-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.tg-broadcast-header h4 { font-size: 1.25rem; font-weight: 700; }
+
+.tg-broadcast-head-desc {
+    color: var(--ps-muted);
+    font-size: .86rem;
+    max-width: 46rem;
+    margin-top: .25rem;
+}
+
+.tg-broadcast-year-range {
+    font-weight: 600;
+    color: var(--ps-teal);
+    margin-inline-start: .35rem;
+}
+
+/* ── Composition form ── */
+.tg-broadcast-form textarea { min-height: 10rem; }
+
+.tg-broadcast-form select { max-width: 30rem; }
+
+.tg-broadcast-form input[type="file"] { max-width: 100%; }
+
+.tg-broadcast-level-hints {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-inline-start: .35rem;
+}
+
+/* ── Confirmation summary ── */
+.tg-broadcast-message-preview {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: .92rem;
+    line-height: 1.7;
+    color: var(--ps-ink);
+    background: var(--ps-mist);
+    border: 1px solid var(--ps-line);
+    border-radius: var(--ps-radius);
+    padding: 1rem 1.1rem;
+    max-height: 26rem;
+    overflow-y: auto;
+}
+
+.tg-broadcast-attachments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+}
+
+.tg-broadcast-attachment {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    padding: .5rem .7rem;
+    border: 1px solid var(--ps-line);
+    border-radius: .6rem;
+    background: var(--ps-mist);
+    font-size: .82rem;
+    transition: border-color var(--ps-motion), background-color var(--ps-motion);
+}
+
+.tg-broadcast-attachment > i { color: var(--ps-gold); flex-shrink: 0; }
+
+.tg-broadcast-attachment-name {
+    font-weight: 600;
+    color: var(--ps-ink);
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.tg-broadcast-attachment-type {
+    color: var(--ps-muted);
+    font-size: .74rem;
+    overflow-wrap: anywhere;
+    direction: ltr;
+    unicode-bidi: embed;
+}
+
+.tg-broadcast-attachment-size {
+    color: var(--ps-muted);
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: embed;
+    margin-inline-start: auto;
+}
+
+/* ── List surface ── */
+.tg-broadcast-list { position: relative; }
+
+.tg-broadcast-table-wrap .ad-table { min-width: 40rem; }
+
+.tg-broadcast-count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+
+.tg-broadcast-target {
+    display: flex;
+    flex-direction: column;
+    gap: .05rem;
+    min-width: 0;
+}
+
+.tg-broadcast-year {
+    font-weight: 600;
+    color: var(--ps-ink);
+    overflow-wrap: anywhere;
+}
+
+.tg-broadcast-level {
+    font-size: .76rem;
+    color: var(--ps-muted);
+    overflow-wrap: anywhere;
+}
+
+.tg-broadcast-created {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+    min-width: 0;
+}
+
+.tg-broadcast-created time {
+    font-size: .78rem;
+    color: var(--ps-muted);
+    white-space: nowrap;
+}
+
+.tg-broadcast-author {
+    font-size: .74rem;
+    color: var(--ps-muted);
+    overflow-wrap: anywhere;
+}
+
+.tg-broadcast-status { text-transform: capitalize; }
+
+/* ── Narrow screens / RTL-safe adjustments ── */
+@media (max-width: 767.98px) {
+    .tg-broadcast-header { flex-direction: column; align-items: stretch; }
+    .tg-broadcast-attachment-size { margin-inline-start: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tg-broadcast-attachment { transition: none; }
+}

@@ -1,0 +1,126 @@
+{% load i18n %}
+<div id="telegram-broadcast-list" class="tg-broadcast-list">
+
+    <div class="ad-table-wrap tg-broadcast-table-wrap">
+        <table class="ad-table tg-broadcast-table">
+            <caption class="visually-hidden">{% translate "Telegram broadcasts" %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{% translate "Actions" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Target" %}</th>
+                    <th scope="col">{% translate "Recipients" %}</th>
+                    <th scope="col">{% translate "Created" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for broadcast in page_obj %}
+                <tr>
+                    <td>
+                        <a href="{% url 'telegram-broadcast-detail' broadcast_id=broadcast.pk %}" class="ad-btn ad-btn--ghost ad-btn--sm">
+                            {% translate "View" %}
+                        </a>
+                    </td>
+                    <td>
+                        {% if broadcast.status == "queued" %}
+                        <span class="ad-pill ad-pill--warning tg-broadcast-status">{{ broadcast.get_status_display }}</span>
+                        {% elif broadcast.status == "sending" %}
+                        <span class="ad-pill ad-pill--teal tg-broadcast-status">{{ broadcast.get_status_display }}</span>
+                        {% elif broadcast.status == "completed" %}
+                        <span class="ad-pill ad-pill--success tg-broadcast-status">{{ broadcast.get_status_display }}</span>
+                        {% elif broadcast.status == "failed" %}
+                        <span class="ad-pill ad-pill--danger tg-broadcast-status">{{ broadcast.get_status_display }}</span>
+                        {% else %}
+                        <span class="ad-pill ad-pill--muted tg-broadcast-status">{{ broadcast.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="tg-broadcast-target">
+                            <span class="tg-broadcast-year">{{ broadcast.academic_year.name }}</span>
+                            {% if broadcast.level %}
+                            <span class="tg-broadcast-level">{{ broadcast.level.display_name }}</span>
+                            {% else %}
+                            <span class="tg-broadcast-level">{% translate "All levels" %}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td><span class="tg-broadcast-count">{{ broadcast.recipient_count }}</span></td>
+                    <td>
+                        <div class="tg-broadcast-created">
+                            <time datetime="{{ broadcast.created_at|date:'c' }}">{{ broadcast.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+                            {% if broadcast.created_by %}
+                            <span class="tg-broadcast-author">{{ broadcast.created_by.get_full_name|default:broadcast.created_by.username }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="ad-empty">
+                        <i class="fas fa-bullhorn" aria-hidden="true"></i>
+                        <h5>{% translate "No broadcasts yet" %}</h5>
+                        <p>{% translate "Compose the first broadcast to announce news to students of the active academic year." %}</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="ad-page-wrapper">
+        <nav aria-label="{% translate 'Broadcast list pagination' %}">
+            <ul class="ad-page-nav">
+                {% if page_obj.has_previous %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ broadcast_list_url }}?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+                       aria-label="{% translate 'Previous page' %}"
+                       title="{% translate 'Previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </span>
+                </li>
+                {% endif %}
+                {% for number in page_obj.paginator.page_range %}
+                <li>
+                    <a class="ad-page-link {% if number == page_obj.number %}is-active{% endif %}"
+                       href="{{ broadcast_list_url }}?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ number }}"
+                       {% if number == page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
+                </li>
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ broadcast_list_url }}?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+                       aria-label="{% translate 'Next page' %}"
+                       title="{% translate 'Next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="ad-page-info">
+            {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+                Showing {{ start }}–{{ end }} of {{ total }} broadcasts
+            {% endblocktranslate %}
+        </div>
+    </div>
+    {% endif %}
+</div>

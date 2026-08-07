@@ -1,0 +1,111 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item"><a href="{{ broadcast_list_url }}">{% translate "Telegram Broadcasts" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% translate "Broadcast Details" %}</li>
+        </ol>
+    </nav>
+
+    <div class="tg-broadcast-header">
+        <div>
+            <h4 class="mb-1"><i class="fas fa-bullhorn me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Broadcast Details" %}</h4>
+            <p class="tg-broadcast-head-desc mb-0">{% translate "Inspect the recipient snapshot and delivery status. Support conversation history is not changed." %}</p>
+        </div>
+        <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ broadcast_list_url }}">
+            <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
+        </a>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head"><i class="fas fa-circle-info me-2" aria-hidden="true"></i>{% translate "Broadcast Summary" %}</div>
+        <div class="ad-card-body">
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Status" %}</span><span class="ad-kv-value">{{ broadcast.get_status_display }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Academic Year" %}</span><span class="ad-kv-value">{{ broadcast.academic_year.name }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Target" %}</span><span class="ad-kv-value">{{ target_label }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Recipients" %}</span><span class="ad-kv-value tg-broadcast-count">{{ broadcast.recipient_count }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Sent" %}</span><span class="ad-kv-value tg-broadcast-count">{{ broadcast.sent_count }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Failed" %}</span><span class="ad-kv-value tg-broadcast-count">{{ broadcast.failed_count }}</span></div>
+        </div>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head"><i class="fas fa-envelope-open-text me-2" aria-hidden="true"></i>{% translate "Message" %}</div>
+        <div class="ad-card-body"><div class="tg-broadcast-message-preview">{{ broadcast.message }}</div></div>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head"><i class="fas fa-paperclip me-2" aria-hidden="true"></i>{% translate "Attachments" %}</div>
+        <div class="ad-card-body">
+            {% if attachments %}
+            <ul class="tg-broadcast-attachments">
+                {% for attachment in attachments %}
+                <li class="tg-broadcast-attachment">
+                    <i class="fas fa-file me-2" aria-hidden="true"></i>
+                    <span class="tg-broadcast-attachment-name">{% firstof attachment.original_name "—" %}</span>
+                    <span class="tg-broadcast-attachment-type">{{ attachment.mime_type|default:"—" }}</span>
+                    <span class="tg-broadcast-attachment-size">{{ attachment.size_bytes|filesizeformat }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="ad-empty-state mb-0">{% translate "No attachments." %}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if broadcast.status == 'failed' and broadcast.failed_count %}
+    <form method="post" action="{{ retry_url }}" class="mb-3">
+        {% csrf_token %}
+        <button type="submit" class="ad-btn ad-btn--outline-gold">
+            <i class="fas fa-rotate-right me-2" aria-hidden="true"></i>{% translate "Retry failed deliveries" %}
+        </button>
+    </form>
+    {% endif %}
+
+    <div class="ad-card">
+        <div class="ad-card-head"><i class="fas fa-users me-2" aria-hidden="true"></i>{% translate "Recipient Delivery" %}</div>
+        <div class="ad-card-body">
+            <div class="ad-table-wrap tg-broadcast-table-wrap">
+                <table class="ad-table">
+                    <caption class="visually-hidden">{% translate "Broadcast recipient delivery" %}</caption>
+                    <thead><tr><th scope="col">{% translate "Student" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Attempts" %}</th><th scope="col">{% translate "Error" %}</th></tr></thead>
+                    <tbody>
+                    {% for recipient in recipient_page_obj %}
+                        <tr>
+                            <td>{{ recipient.user_display_name|default:recipient.user_username }}</td>
+                            <td>{{ recipient.get_status_display }}</td>
+                            <td class="tg-broadcast-count">{{ recipient.attempt_count }}</td>
+                            <td>{{ recipient.last_error|default:"—" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="ad-empty">{% translate "No recipient records are available." %}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if recipient_page_obj.has_other_pages %}
+            <nav class="ad-page-wrapper" aria-label="{% translate 'Recipient pagination' %}">
+                {% if recipient_page_obj.has_previous %}
+                <a class="ad-page-link" href="?page={{ recipient_page_obj.previous_page_number }}">{% translate "Previous" %}</a>
+                {% else %}
+                <span class="ad-page-link is-disabled" aria-disabled="true">{% translate "Previous" %}</span>
+                {% endif %}
+                <span class="ad-page-info">{% blocktranslate with page=recipient_page_obj.number total=recipient_page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktranslate %}</span>
+                {% if recipient_page_obj.has_next %}
+                <a class="ad-page-link" href="?page={{ recipient_page_obj.next_page_number }}">{% translate "Next" %}</a>
+                {% else %}
+                <span class="ad-page-link is-disabled" aria-disabled="true">{% translate "Next" %}</span>
+                {% endif %}
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

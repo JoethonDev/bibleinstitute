@@ -1,0 +1,103 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block body %}
+<div id="content" class="container-fluid px-3 ad-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% translate "Telegram Bot" %}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0"><i class="fas fa-paper-plane me-2"></i>{% translate "Telegram Bot Configuration" %}</h4>
+        <span class="ad-pill ad-pill--teal">{{ status_label }}</span>
+    </div>
+
+    <div class="ad-alert ad-alert--info mb-3">
+        <i class="fas fa-shield-alt me-2"></i>
+        <span>{% translate "The bot token is encrypted and never shown again after it is saved. Saving a token does not activate the bot." %}</span>
+    </div>
+
+    <div class="ad-card mb-3">
+        <div class="ad-card-head">
+            <i class="fas fa-info-circle me-2"></i>
+            {% translate "Bot Status" %}
+        </div>
+        <div class="ad-card-body">
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Status" %}</span>
+                <span class="ad-kv-value">{{ status_label }}</span>
+            </div>
+            {% if config.bot_username %}
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Bot Username" %}</span>
+                <span class="ad-kv-value">@{{ config.bot_username }}</span>
+            </div>
+            {% endif %}
+            <div class="ad-kv-row">
+                <span class="ad-kv-label">{% translate "Webhook URL" %}</span>
+                <span class="ad-kv-value">{{ webhook_url }}</span>
+            </div>
+            {% if config_error %}
+            <div class="ad-alert ad-alert--danger mt-3" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <span>{{ config_error }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ad-card">
+        <div class="ad-card-head">
+            <i class="fas fa-key me-2"></i>
+            {% translate "Bot Token" %}
+        </div>
+        <div class="ad-card-body">
+            <form method="post" action="{% url 'telegram-config' %}">
+                {% csrf_token %}
+                {% if config_form.non_field_errors %}
+                <div class="ad-alert ad-alert--danger mb-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>{{ config_form.non_field_errors }}</span>
+                </div>
+                {% endif %}
+
+                <div class="form-group mb-3">
+                    <label for="{{ config_form.token.id_for_label }}" class="form-label">
+                        {% translate "Bot Token" %}
+                    </label>
+                    {{ config_form.token }}
+                    {% if config_form.token.errors %}
+                    <div class="text-danger">{{ config_form.token.errors }}</div>
+                    {% endif %}
+                    <small class="text-muted d-block mt-1">
+                        {% translate "Enter a new token to save or replace the current one. The saved token is encrypted and never displayed again." %}
+                    </small>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    {% if config.is_active %}
+                    <button type="submit" name="action" value="rotate" class="ad-btn ad-btn--teal">
+                        <i class="fas fa-sync-alt me-2"></i>{% translate "Rotate Token" %}
+                    </button>
+                    <button type="submit" name="action" value="deactivate" class="ad-btn ad-btn--danger">
+                        <i class="fas fa-power-off me-2"></i>{% translate "Deactivate Bot" %}
+                    </button>
+                    {% else %}
+                    <button type="submit" name="action" value="save" class="ad-btn ad-btn--ghost">
+                        <i class="fas fa-save me-2"></i>{% translate "Save Token" %}
+                    </button>
+                    <button type="submit" name="action" value="activate" class="ad-btn ad-btn--teal">
+                        <i class="fas fa-play me-2"></i>{% translate "Activate Bot" %}
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

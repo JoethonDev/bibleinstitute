@@ -116,6 +116,17 @@
   </div>
 
   <!-- ── Content Section ── -->
+  {% if not is_quiz and content.description %}
+  <div class="ad-card mb-4">
+    <div class="ad-card-head">
+      <i class="fas fa-align-left"></i>
+      <span>{% translate "Lesson Description" %}</span>
+    </div>
+    <div class="ad-card-body">
+      {{ content.description|linebreaksbr }}
+    </div>
+  </div>
+  {% endif %}
   {% if is_quiz %}
     {% if exception_form %}
     <div class="ad-card mb-4">

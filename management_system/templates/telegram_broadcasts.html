@@ -1,0 +1,28 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block body %}
+<div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% translate "Telegram Broadcasts" %}</li>
+        </ol>
+    </nav>
+
+    <div class="tg-broadcast-header">
+        <div>
+            <h4 class="mb-1"><i class="fas fa-bullhorn me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Telegram Broadcasts" %}</h4>
+            <p class="tg-broadcast-head-desc mb-0">{% translate "Announcements sent to every student of the active academic year through Telegram." %}</p>
+        </div>
+        <a class="ad-btn ad-btn--teal ad-btn--sm" href="{{ compose_url }}">
+            <i class="fas fa-plus me-1" aria-hidden="true"></i>{% translate "Compose Broadcast" %}
+        </a>
+    </div>
+
+    {% include 'partials/telegram_broadcast_list.html' %}
+</div>
+{% endblock %}

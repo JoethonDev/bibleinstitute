@@ -169,6 +169,47 @@
         </li>
         {% endif %}
 
+        {% if request.user.role.role == "admin" %}
+        <li class="nav-item">
+            <a class="ad-tab" href="{% url 'telegram-config' %}">
+                <i class="fas fa-paper-plane"></i>
+                <span>{% translate "Telegram Bot" %}</span>
+            </a>
+        </li>
+        {% endif %}
+
+        {% if request.user.role.role == "admin" %}
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'telegram-conversations' %}"
+               hx-get="{% url 'telegram-conversations' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-comments"></i>
+                <span>{% translate "Telegram Chat" %}</span>
+            </a>
+        </li>
+        {% endif %}
+
+        {% if request.user.role.role == "admin" %}
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'telegram-broadcasts' %}"
+               hx-get="{% url 'telegram-broadcasts' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-bullhorn"></i>
+                <span>{% translate "Telegram Broadcasts" %}</span>
+            </a>
+        </li>
+        {% endif %}
+
         <li class="nav-item">
             <a class="ad-tab" href="{% url 'scanner' %}">
                 <i class="fas fa-qrcode"></i>
