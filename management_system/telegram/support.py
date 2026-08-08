@@ -257,15 +257,6 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
         conversation = TelegramConversation.objects.prefetch_related("messages__attachments").get(pk=conversation_id)
     except TelegramConversation.DoesNotExist:
         return 0
-    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        telebot.types.InlineKeyboardButton(
-            _("Claim conversation"), callback_data=_support_callback("claim", conversation.pk)
-        ),
-        telebot.types.InlineKeyboardButton(
-            _("Send all messages"), callback_data=_support_callback("sendall", conversation.pk)
-        ),
-    )
     sent = 0
     inbound_messages = [
         message for message in conversation.messages.all()
@@ -275,7 +266,7 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
     for message in inbound_messages:
         text = _("Support message from a student") + "\n\n" + _message_text(message)
         for account in _admin_accounts().iterator(chunk_size=100):
-            result = bot.send_message(account.telegram_chat_id, text, reply_markup=keyboard)
+            result = bot.send_message(account.telegram_chat_id, text)
             TelegramMessage.objects.create(
                 conversation=conversation,
                 direction=TelegramMessage.Direction.OUTBOUND,
@@ -308,22 +299,55 @@ def handle_student_message(bot: telebot.TeleBot, *, user: User, update_id: int, 
     return True
 
 
-def _claim_conversation(conversation_id: int, admin: User) -> TelegramConversation | None:
+def _queue_reply(
+    *,
+    admin: User,
+    conversation_id: int,
+    text: str,
+    reply_to_telegram_message_id: int | None,
+) -> tuple[TelegramMessage, int, int | None]:
+    """Queue one reply under a short row lock, then release before API I/O."""
+    _require_admin(admin)
     with transaction.atomic():
         try:
             conversation = TelegramConversation.objects.select_for_update().get(pk=conversation_id)
-        except TelegramConversation.DoesNotExist:
-            return None
-        if conversation.status == TelegramConversation.Status.OPEN:
-            conversation.status = TelegramConversation.Status.CLAIMED
-            conversation.claimed_by = admin
-            conversation.claimed_at = timezone.now()
-            conversation.version += 1
-            conversation.save(update_fields=["status", "claimed_by", "claimed_at", "version", "updated_at"])
-            return conversation
-        if conversation.status == TelegramConversation.Status.CLAIMED and conversation.claimed_by_id == admin.pk:
-            return conversation
-        return None
+        except TelegramConversation.DoesNotExist as exc:
+            raise SupportReplyError(_("This conversation is no longer available.")) from exc
+        if conversation.status == TelegramConversation.Status.BLOCKED:
+            raise SupportReplyError(_("This conversation is blocked."))
+
+        reply_target = None
+        if reply_to_telegram_message_id is not None:
+            reply_target = TelegramMessage.objects.filter(
+                conversation_id=conversation.pk,
+                telegram_message_id=reply_to_telegram_message_id,
+            ).first()
+            if reply_target is None:
+                raise SupportReplyError(_("The selected message is no longer available."))
+
+        student_account = TelegramAccount.objects.filter(
+            user_id=conversation.user_id,
+            is_active=True,
+        ).first()
+        if student_account is None:
+            raise SupportReplyError(_("The student's Telegram account is no longer available."))
+
+        telegram_reply_to = None
+        if reply_target and reply_target.content_type != TelegramMessage.ContentType.DIGEST:
+            if reply_target.telegram_chat_id == student_account.telegram_chat_id:
+                telegram_reply_to = reply_to_telegram_message_id
+
+        outbound = TelegramMessage.objects.create(
+            conversation=conversation,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            sender_user=admin,
+            telegram_chat_id=student_account.telegram_chat_id,
+            reply_to_telegram_message_id=reply_to_telegram_message_id,
+            content_type=TelegramMessage.ContentType.TEXT,
+            text=text,
+            delivery_status=TelegramMessage.DeliveryStatus.QUEUED,
+        )
+        return outbound, student_account.telegram_chat_id, telegram_reply_to
 
 
 def reply_to_conversation(
@@ -334,47 +358,16 @@ def reply_to_conversation(
     text: str,
     reply_to_telegram_message_id: int | None = None,
 ) -> TelegramMessage:
-    """Claim and deliver one anonymous admin reply for Telegram or the web chat."""
-    try:
-        conversation = TelegramConversation.objects.get(pk=conversation_id)
-    except TelegramConversation.DoesNotExist as exc:
-        raise SupportReplyError(_("This conversation is no longer available.")) from exc
-
-    reply_target = None
-    if reply_to_telegram_message_id is not None:
-        reply_target = TelegramMessage.objects.filter(
-            conversation_id=conversation.pk,
-            telegram_message_id=reply_to_telegram_message_id,
-        ).first()
-        if reply_target is None:
-            raise SupportReplyError(_("The selected message is no longer available."))
-
-    claimed = _claim_conversation(conversation.pk, admin)
-    if claimed is None:
-        raise SupportReplyError(_("This conversation is already claimed or handled."))
-
-    student_account = TelegramAccount.objects.filter(user_id=conversation.user_id, is_active=True).first()
-    if student_account is None:
-        raise SupportReplyError(_("The student's Telegram account is no longer available."))
-
-    telegram_reply_to = None
-    if reply_target and reply_target.content_type != TelegramMessage.ContentType.DIGEST:
-        if reply_target.telegram_chat_id == student_account.telegram_chat_id:
-            telegram_reply_to = reply_to_telegram_message_id
-
-    outbound = TelegramMessage.objects.create(
-        conversation=conversation,
-        direction=TelegramMessage.Direction.OUTBOUND,
-        sender_user=admin,
-        telegram_chat_id=student_account.telegram_chat_id,
-        reply_to_telegram_message_id=reply_to_telegram_message_id,
-        content_type=TelegramMessage.ContentType.TEXT,
+    """Queue and deliver one anonymous admin reply for Telegram or web chat."""
+    outbound, student_chat_id, telegram_reply_to = _queue_reply(
+        admin=admin,
+        conversation_id=conversation_id,
         text=text,
-        delivery_status=TelegramMessage.DeliveryStatus.QUEUED,
+        reply_to_telegram_message_id=reply_to_telegram_message_id,
     )
     try:
         result = bot.send_message(
-            student_account.telegram_chat_id,
+            student_chat_id,
             _("Admin") + ": " + text,
             reply_to_message_id=telegram_reply_to,
         )
@@ -382,14 +375,16 @@ def reply_to_conversation(
         outbound.delivery_status = TelegramMessage.DeliveryStatus.FAILED
         outbound.delivery_error = _("Telegram message delivery failed.")
         outbound.save(update_fields=["delivery_status", "delivery_error"])
-        raise SupportReplyError(_("The reply could not be delivered; the conversation remains claimed.")) from exc
+        raise SupportReplyError(_("The reply could not be delivered; the conversation remains open.")) from exc
 
     outbound.telegram_message_id = getattr(result, "message_id", None)
     outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
     outbound.sent_at = timezone.now()
     outbound.save(update_fields=["telegram_message_id", "delivery_status", "sent_at"])
-    TelegramConversation.objects.filter(pk=conversation.pk).update(
+    TelegramConversation.objects.filter(pk=outbound.conversation_id).update(
         status=TelegramConversation.Status.HANDLED,
+        claimed_by=None,
+        claimed_at=None,
         handled_at=timezone.now(),
         last_message_at=outbound.created_at,
         version=F("version") + 1,
@@ -422,18 +417,11 @@ def handle_support_callback(bot: telebot.TeleBot, callback: dict) -> bool:
     if account is None:
         bot.answer_callback_query(callback_id, text=_("This action is for administrators only."), show_alert=True)
         return True
-    if action == "sendall":
-        if send_support_digest(bot, conversation_id) == 0:
-            bot.answer_callback_query(callback_id, text=_("This conversation is no longer available."), show_alert=True)
-        else:
-            bot.answer_callback_query(callback_id, text=_("Messages sent to administrators."))
-        return True
-    if action == "claim":
-        claimed = _claim_conversation(conversation_id, account.user)
+    if action in {"sendall", "claim"}:
         bot.answer_callback_query(
             callback_id,
-            text=_("Conversation claimed.") if claimed else _("This conversation is already claimed or handled."),
-            show_alert=not bool(claimed),
+            text=_("This action is no longer available."),
+            show_alert=True,
         )
         return True
     return True

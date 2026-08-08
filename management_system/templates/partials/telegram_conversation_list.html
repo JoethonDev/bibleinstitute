@@ -58,7 +58,7 @@
                             {% if conversation.status == "open" %}
                             <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
                             {% elif conversation.status == "claimed" %}
-                            <span class="ad-pill ad-pill--teal">{{ conversation.get_status_display }}</span>
+                            <span class="ad-pill ad-pill--warning">{% translate "Open" %}</span>
                             {% elif conversation.status == "handled" %}
                             <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
                             {% elif conversation.status == "blocked" %}

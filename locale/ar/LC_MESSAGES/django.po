@@ -2213,6 +2213,10 @@ msgstr "نوع الرسالة هذا غير مدعوم. تُقبل النصوص 
 msgid "This conversation is no longer available."
 msgstr "لم تعد هذه المحادثة متاحة."
 
+#: .\management_system\telegram\support.py:317
+msgid "This conversation is blocked."
+msgstr "هذه المحادثة محظورة."
+
 #: .\management_system\telegram\support.py:320
 msgid "The selected message is no longer available."
 msgstr "لم تعد الرسالة المحددة متاحة."
@@ -2229,6 +2233,10 @@ msgstr "لم يعد حساب تيليجرام الخاص بالطالب متاح
 #: .\management_system\telegram\support.py:355
 msgid "The reply could not be delivered; the conversation remains claimed."
 msgstr "تعذر تسليم الرد؛ تظل المحادثة مُتولاّة."
+
+#: .\management_system\telegram\support.py:378
+msgid "The reply could not be delivered; the conversation remains open."
+msgstr "تعذر تسليم الرد؛ وتظل المحادثة مفتوحة."
 
 #: .\management_system\telegram\support.py:392
 msgid "This action is for administrators only."
@@ -6028,10 +6036,8 @@ msgid "Refresh"
 msgstr "تحديث"
 
 #: .\management_system\templates\telegram_conversation_detail.html:63
-#, fuzzy
-#| msgid "Last page"
 msgid "Last message"
-msgstr "الصفحة الأخيرة"
+msgstr "آخر رسالة"
 
 #: .\management_system\templates\telegram_conversation_detail.html:72
 msgid "Send a Reply"
@@ -6057,6 +6063,10 @@ msgstr "إرسال الرسالة"
 #: .\management_system\templates\telegram_conversations.html:19
 msgid "View, claim, and reply to student support conversations received through Telegram."
 msgstr "اعرض محادثات دعم الطلاب الواردة عبر تيليجرام وتولَّها وردّ عليها."
+
+#: .\management_system\templates\telegram_conversations.html:19
+msgid "View and reply to student support conversations received through Telegram."
+msgstr "عرض والرد على محادثات دعم الطلاب الواردة عبر تيليجرام."
 
 #: .\management_system\templates\telegram_conversations.html:33
 msgid "Student name, username, or message text"

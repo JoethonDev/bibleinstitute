@@ -2318,30 +2318,24 @@
     .tg-chat-workspace .tg-chat-thread { flex: none; max-height: 24rem; }
 }
 
-/* ── Start-conversation linked-user picker (sidebar) ── */
-.tg-chat-start-card { margin-bottom: 1rem; }
-
-.tg-chat-start-card .ad-card-body { padding: .9rem 1rem; }
-
-.tg-chat-start-title {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    margin-bottom: .35rem;
-    font-size: .92rem;
-    font-weight: 700;
-    color: var(--ps-ink);
+/* ── Start-conversation modal (linked-user picker) ── */
+.tg-chat-start-modal .modal-dialog {
+    max-width: 38rem;
 }
 
-.tg-chat-start-title i { color: var(--ps-gold); }
+.tg-chat-start-modal .modal-title i { color: var(--ps-gold); }
 
-.tg-chat-start-desc {
+.tg-chat-start-modal .modal-body {
+    padding-top: .9rem;
+}
+
+.tg-chat-start-modal .tg-chat-start-desc {
     margin-bottom: .6rem;
     font-size: .78rem;
     color: var(--ps-muted);
 }
 
-.tg-chat-start-form .form-label {
+.tg-chat-start-modal .tg-chat-start-form .form-label {
     display: block;
     font-size: .78rem;
     font-weight: 600;
@@ -2349,7 +2343,7 @@
     margin-bottom: .25rem;
 }
 
-.tg-chat-start-form input[type="search"].form-control {
+.tg-chat-start-modal .tg-chat-start-form input[type="search"].form-control {
     background: var(--ps-paper);
     border: 1px solid var(--ps-line);
     color: var(--ps-ink);
@@ -2357,24 +2351,32 @@
     transition: border-color var(--ps-motion), box-shadow var(--ps-motion), background-color var(--ps-motion);
 }
 
-.tg-chat-start-form input[type="search"].form-control:focus,
-.tg-chat-start-form input[type="search"].form-control:focus-visible {
+.tg-chat-start-modal .tg-chat-start-form input[type="search"].form-control:focus,
+.tg-chat-start-modal .tg-chat-start-form input[type="search"].form-control:focus-visible {
     border-color: var(--ps-gold);
     box-shadow: 0 0 0 .18rem var(--ps-gold-soft);
     background: var(--ps-paper);
     outline: none;
 }
 
-.tg-chat-start-actions {
+.tg-chat-start-modal .tg-chat-start-actions {
     display: flex;
     flex-wrap: wrap;
     gap: .4rem;
     margin-top: .5rem;
 }
 
-.tg-chat-start-actions .ad-btn:focus-visible {
+.tg-chat-start-modal .tg-chat-start-actions .ad-btn:focus-visible,
+.tg-chat-start-modal .btn-close:focus-visible {
     outline: 2px solid var(--ps-gold);
     outline-offset: 2px;
+}
+
+@media (max-width: 575.98px) {
+    .tg-chat-start-modal .modal-dialog {
+        max-width: none;
+        margin-inline: .75rem;
+    }
 }
 
 /* Linked user rows */

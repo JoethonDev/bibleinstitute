@@ -308,12 +308,12 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
     return message_id
 
 
-def _conversation_detail_context(request, conversation, reply_form=None):
+def _conversation_detail_context(request, conversation, reply_form=None, panel_notice=None):
     messages_queryset = TelegramMessage.objects.filter(
         conversation=conversation,
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
-    ).prefetch_related("attachments").order_by("created_at", "pk")
+    ).prefetch_related("attachments").order_by("-created_at", "-pk")
     messages_page_obj = Paginator(messages_queryset, 30).get_page(request.GET.get("page", 1))
     reply_to_message_id = _valid_reply_target(
         conversation.pk,
@@ -336,6 +336,7 @@ def _conversation_detail_context(request, conversation, reply_form=None):
         "search": request.GET.get("search", "").strip()[:120],
         "status": request.GET.get("status", "").strip(),
         "reply_to_message_id": reply_to_message_id,
+        "panel_notice": panel_notice,
     }
 
 
@@ -370,9 +371,15 @@ def telegram_conversation_reply(request, conversation_id):
 
     config = TelegramBotConfig.objects.filter(is_active=True).first()
     if not config:
-        messages.error(request, _("Telegram bot is not active."))
+        error_message = _("Telegram bot is not active.")
+        form.add_error(None, error_message)
         if panel_request:
-            return render(request, "partials/telegram_chat_panel.html", _conversation_detail_context(request, conversation))
+            return render(
+                request,
+                "partials/telegram_chat_panel.html",
+                _conversation_detail_context(request, conversation, form),
+            )
+        messages.error(request, error_message)
         return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
     try:
         bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
@@ -384,19 +391,35 @@ def telegram_conversation_reply(request, conversation_id):
             reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
         )
     except SupportReplyError as exc:
-        messages.error(request, str(exc))
+        form.add_error(None, str(exc))
+        if not panel_request:
+            messages.error(request, str(exc))
     except TelegramConfigurationError:
-        messages.error(request, _("Telegram bot configuration is unavailable."))
+        form.add_error(None, _("Telegram bot configuration is unavailable."))
+        if not panel_request:
+            messages.error(request, _("Telegram bot configuration is unavailable."))
     except Exception:
-        messages.error(request, _("The reply could not be delivered."))
+        form.add_error(None, _("The reply could not be delivered."))
+        if not panel_request:
+            messages.error(request, _("The reply could not be delivered."))
     else:
-        messages.success(request, _("Reply sent successfully."))
+        if not panel_request:
+            messages.success(request, _("Reply sent successfully."))
     if panel_request:
         refreshed = get_object_or_404(
             TelegramConversation.objects.select_related("user", "claimed_by"),
             pk=conversation.pk,
         )
-        return render(request, "partials/telegram_chat_panel.html", _conversation_detail_context(request, refreshed))
+        return render(
+            request,
+            "partials/telegram_chat_panel.html",
+            _conversation_detail_context(
+                request,
+                refreshed,
+                TelegramSupportReplyForm() if not form.errors else form,
+                None if form.errors else _("Reply sent successfully."),
+            ),
+        )
     return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
 
 

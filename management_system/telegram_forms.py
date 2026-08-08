@@ -32,7 +32,7 @@ class MultipleFileField(forms.FileField):
 class TelegramBotConfigForm(forms.Form):
     """Accept an optional replacement Telegram bot token without persisting it."""
 
-    token = forms.CharField(required=False, label=_("Telegram bot token"), widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "spellcheck": "false"}))
+    token = forms.CharField(required=False, label=_("Telegram bot token"), widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "spellcheck": "false", "class": "form-control"}))
 
     def clean_token(self) -> str:
         token = self.cleaned_data.get("token", "")

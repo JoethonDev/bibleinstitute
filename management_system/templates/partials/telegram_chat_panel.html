@@ -26,22 +26,13 @@
         {% if conversation.status == "open" %}
         <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
         {% elif conversation.status == "claimed" %}
-        <span class="ad-pill ad-pill--teal">{{ conversation.get_status_display }}</span>
+        <span class="ad-pill ad-pill--warning">{% translate "Open" %}</span>
         {% elif conversation.status == "handled" %}
         <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
         {% elif conversation.status == "blocked" %}
         <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
         {% else %}
         <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
-        {% endif %}
-
-        {% if conversation.claimed_by %}
-        {% with claimed_name=conversation.claimed_by.get_full_name|default:conversation.claimed_by.username %}
-        <span class="tg-chat-claim">
-            <i class="fas fa-user-check me-1" aria-hidden="true"></i>
-            {% blocktranslate with name=claimed_name %}Claimed by {{ name }}{% endblocktranslate %}
-        </span>
-        {% endwith %}
         {% endif %}
 
         <a class="ad-btn ad-btn--ghost ad-btn--sm"
@@ -64,6 +55,12 @@
     {% endif %}
     <span><i class="far fa-calendar-alt me-1" aria-hidden="true"></i>{% translate "Created" %}: {{ conversation.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
 </div>
+
+{% if panel_notice %}
+<div class="ad-alert ad-alert--success" role="status">
+    <i class="fas fa-check-circle me-2" aria-hidden="true"></i>{{ panel_notice }}
+</div>
+{% endif %}
 
 {% include 'partials/telegram_message_list.html' %}
 
