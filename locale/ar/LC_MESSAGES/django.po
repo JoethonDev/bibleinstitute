@@ -1903,6 +1903,14 @@ msgstr "التالي"
 msgid "My courses"
 msgstr "دوراتي"
 
+#: .\management_system\telegram\navigation.py:170
+msgid "Contact support"
+msgstr "التواصل مع الدعم"
+
+#: .\management_system\telegram_tasks.py:297
+msgid "Send your message to support. You can send text, photos, documents, or videos."
+msgstr "أرسل رسالتك إلى الدعم. يمكنك إرسال نصوص أو صور أو مستندات أو مقاطع فيديو."
+
 #: .\management_system\telegram\navigation.py:185
 #: .\management_system\telegram\navigation.py:195
 #: .\management_system\telegram\navigation.py:213

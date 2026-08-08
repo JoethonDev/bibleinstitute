@@ -53,6 +53,7 @@ _ACTION_ARITY = {
     "lesson_audio": 2,  # offering_id, lesson_id
     "quizzes": 2,  # offering_id, page
     "quiz": 2,  # offering_id, quiz_id
+    "support": 0,
     "noop": 0,  # page indicator / placeholder button
 }
 _BACK_ACTION = "back"
@@ -163,9 +164,10 @@ def _pagination_row(action: str, page: int, page_count: int, offering_id: int | 
 
 
 def home_keyboard() -> telebot.types.InlineKeyboardMarkup:
-    """Top-level keyboard with one entry point into the course lists."""
+    """Top-level keyboard for courses and student support."""
     keyboard = _KB(row_width=1)
     keyboard.add(_ROW(_("My courses"), callback_data=make_callback("offerings", 1)))
+    keyboard.add(_ROW(_("Contact support"), callback_data=make_callback("support")))
     return keyboard
 
 

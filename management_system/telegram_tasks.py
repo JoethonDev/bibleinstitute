@@ -36,6 +36,7 @@ from .telegram.navigation import (
     quiz_detail_keyboard,
     quiz_list_keyboard,
     home_keyboard,
+    back_home_keyboard,
 )
 from .telegram.broadcasts import process_due_broadcast
 from .telegram.notifications import process_due_notifications
@@ -291,6 +292,11 @@ def _handle_callback(bot, callback: dict) -> None:
     try:
         if action == "home":
             text, keyboard = format_home(user), home_keyboard()
+        elif action == "support":
+            text = _(
+                "Send your message to support. You can send text, photos, documents, or videos."
+            )
+            keyboard = back_home_keyboard("home")
         elif action == "offerings":
             offerings, current, page_count = _page(
                 active_year_published_offerings_for_user(user).order_by("course__name", "pk"),

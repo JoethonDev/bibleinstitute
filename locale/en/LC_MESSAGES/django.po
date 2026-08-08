@@ -1924,6 +1924,14 @@ msgstr "Next"
 msgid "My courses"
 msgstr "My Courses"
 
+#: .\management_system\telegram\navigation.py:170
+msgid "Contact support"
+msgstr "Contact support"
+
+#: .\management_system\telegram_tasks.py:297
+msgid "Send your message to support. You can send text, photos, documents, or videos."
+msgstr "Send your message to support. You can send text, photos, documents, or videos."
+
 #: .\management_system\telegram\navigation.py:185
 #: .\management_system\telegram\navigation.py:195
 #: .\management_system\telegram\navigation.py:213
