@@ -1473,9 +1473,9 @@ class UpdateUser(UserBaseView, UpdateView):
         form = super().get_form(form_class)
         user = User.objects.get(username=self.request.user)
         if user.role and user.role.role != "admin":
-            form.fields.pop("role", None)
+            for field_name in UserUpdateForm.admin_only_fields:
+                form.fields.pop(field_name, None)
             form.fields.pop("password", None)
-            form.fields.pop("time_zone", None)
         return form
 
     def form_valid(self, form):

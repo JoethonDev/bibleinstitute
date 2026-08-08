@@ -5,7 +5,7 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3 ad-page" id="content">
+<div class="container-fluid py-3 ad-page" id="content" x-data="{ applicationEditing: false }">
     <div class="ad-detail-head">
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-0">
@@ -16,15 +16,24 @@
         </nav>
         <div class="d-flex justify-content-between align-items-center ad-detail-content">
             <h4 class="ad-detail-title mb-0">{% translate "Application Review" %}</h4>
-            <div class="ad-detail-badges">
+            <div class="ad-detail-badges d-flex align-items-center gap-2">
                 <span class="ad-detail-badge {% if app_user.application_status == 'active' %}ad-pill--success{% elif app_user.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">
                     {{ app_user.get_application_status_display }}
                 </span>
+                <button type="button"
+                        class="ad-btn ad-btn--ghost"
+                        x-show="!applicationEditing"
+                        x-cloak
+                        @click="applicationEditing = true"
+                        aria-controls="application-edit-form"
+                        :aria-expanded="applicationEditing">
+                    <i class="fas fa-edit me-1"></i>{% translate "Edit" %}
+                </button>
             </div>
         </div>
     </div>
 
-    <div class="ad-card mb-3">
+    <div id="application-edit-form" class="ad-card mb-3" x-show="applicationEditing" x-cloak>
         <div class="ad-card-head"><strong>{% translate "Edit student and application" %}</strong></div>
         <div class="ad-card-body">
             <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}">
@@ -34,12 +43,15 @@
                     <button type="submit" class="ad-btn ad-btn--teal">
                         <i class="fas fa-save me-1"></i>{% translate "Save changes" %}
                     </button>
-                    <a href="{% url 'applications-dashboard' %}" class="ad-btn ad-btn--ghost">{% translate "Cancel" %}</a>
+                    <button type="button" class="ad-btn ad-btn--ghost" @click="applicationEditing = false">
+                        {% translate "Cancel" %}
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
+    <div x-show="!applicationEditing" x-cloak>
     <div class="row">
         <div class="col-md-6">
             <div class="ad-card mb-3">
@@ -115,6 +127,7 @@
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     {% if app_user.application_status == "pending" %}

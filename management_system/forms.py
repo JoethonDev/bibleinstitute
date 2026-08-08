@@ -98,30 +98,155 @@ class UserCreationForm(forms.ModelForm):
 
 
 class UserUpdateForm(UserCreationForm):
+    admin_only_fields = frozenset({
+        "role", "time_zone", "application_status", "decision_notes",
+        "study_mode", "study_mode_override", "identity_type", "identity_number",
+    })
+
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={
             'placeholder': _('Password'), # Localized
             'id': 'password',
         }), required=False)
 
+    email = forms.EmailField(
+        max_length=254,
+        required=False,
+        label=_("Email"),
+        widget=forms.EmailInput(attrs={"placeholder": _("Email")}),
+    )
+    phone = forms.CharField(
+        max_length=20,
+        required=False,
+        label=_("Phone"),
+        widget=forms.TextInput(attrs={"placeholder": _("Phone")}),
+    )
+    country = forms.ChoiceField(
+        label=_("Country"),
+        choices=country_choices(),
+        required=False,
+    )
+    city = forms.CharField(
+        max_length=255,
+        required=False,
+        label=_("City"),
+        widget=forms.TextInput(attrs={"placeholder": _("City")}),
+    )
+    education_or_job = forms.CharField(
+        max_length=255,
+        required=False,
+        label=_("Educational qualification / occupation"),
+        widget=forms.TextInput(attrs={"placeholder": _("Educational qualification / occupation")}),
+    )
+    priest_name = forms.CharField(
+        max_length=255,
+        required=False,
+        label=_("Confessor Name"),
+        widget=forms.TextInput(attrs={"placeholder": _("Confessor Name")}),
+    )
+    priest_phone = forms.CharField(
+        max_length=20,
+        required=False,
+        label=_("Confessor Phone"),
+        widget=forms.TextInput(attrs={"placeholder": _("Confessor Phone")}),
+    )
+    church = forms.CharField(
+        max_length=255,
+        required=False,
+        label=_("Church"),
+        widget=forms.TextInput(attrs={"placeholder": _("Church")}),
+    )
+    service = forms.CharField(
+        max_length=255,
+        required=False,
+        label=_("Service (if any)"),
+        widget=forms.TextInput(attrs={"placeholder": _("Service (if any)")}),
+    )
+    identity_type = forms.ChoiceField(
+        label=_("Identity type"),
+        choices=User.IDENTITY_TYPES,
+        required=False,
+    )
+    identity_number = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("Identity Number"),
+        widget=forms.TextInput(attrs={"placeholder": _("Identity Number")}),
+    )
+    study_mode = forms.ChoiceField(
+        label=_("Study mode"),
+        choices=User.STUDY_MODES,
+        required=False,
+    )
+    study_mode_override = forms.BooleanField(
+        required=False,
+        label=_("Study mode override"),
+    )
+    application_status = forms.ChoiceField(
+        label=_("Application status"),
+        choices=User.APPLICATION_STATUSES,
+        required=False,
+    )
+    decision_notes = forms.CharField(
+        required=False,
+        label=_("Decision notes"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    class Meta:
+        model = User
+        fields = [
+            "first_name", "last_name", "username", "password", "joined_date", "role", "time_zone",
+            "email", "phone", "country", "city", "education_or_job", "priest_name", "priest_phone",
+            "church", "service", "identity_type", "identity_number", "study_mode",
+            "study_mode_override", "application_status", "decision_notes",
+        ]
+        exclude = []
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._original_password = self.instance.password
+        current_country = getattr(self.instance, "country", None)
+        if current_country and current_country not in dict(country_choices()):
+            self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        if not phone:
+            return None
+        phone = normalize_phone(phone)
+        if not phone:
+            raise forms.ValidationError(_("Enter a valid international phone number."))
+        if User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError(_("This phone number is already in use."))
+        return phone
+
+    def clean_identity_number(self):
+        identity_number = self.cleaned_data.get("identity_number")
+        identity_type = self.cleaned_data.get("identity_type")
+        if not identity_number:
+            return None
+        if identity_type and identity_number:
+            try:
+                validate_identity_by_type(identity_type, identity_number)
+            except ValidationError as exc:
+                raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
+        return identity_number
 
     def save(self, commit=True):
         password = self.cleaned_data.get("password")
         if not password:
             self.instance.password = self._original_password
         return super(UserUpdateForm, self).save(commit)
-    
+
 
 class ProfileUpdateForm(UserUpdateForm):
     readonly_fields = {"username", "joined_date"}
 
     def __init__(self, *args, **kwargs):
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
-        self.fields.pop("role", None)
-        self.fields.pop("time_zone", None)
+        for fname in self.admin_only_fields:
+            self.fields.pop(fname, None)
         for fname in self.readonly_fields:
             if fname in self.fields:
                 self.fields[fname].disabled = True
@@ -437,7 +562,7 @@ class ApplicationAdminForm(forms.ModelForm):
         label=_("Password (leave blank to keep current)"),
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
-    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
+    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=False)
     identity_front = forms.FileField(required=False, label=_("Replace identity front"))
     identity_back = forms.FileField(required=False, label=_("Replace identity back"))
     payment = forms.FileField(required=False, label=_("Replace payment receipt (optional)"))
@@ -446,7 +571,7 @@ class ApplicationAdminForm(forms.ModelForm):
     clear_identity_back = forms.BooleanField(required=False, label=_("Remove identity back"))
     clear_payment = forms.BooleanField(required=False, label=_("Remove payment receipt"))
     clear_profile = forms.BooleanField(required=False, label=_("Remove profile photo"))
-    country = forms.ChoiceField(label=_("Country"), choices=country_choices(), required=True)
+    country = forms.ChoiceField(label=_("Country"), choices=country_choices(), required=False)
 
     class Meta:
         model = User
@@ -491,7 +616,7 @@ class ApplicationAdminForm(forms.ModelForm):
     def clean_phone(self):
         phone = self.cleaned_data.get("phone")
         if not phone:
-            return phone
+            return None
         phone = normalize_phone(phone)
         if not phone:
             raise forms.ValidationError(_("Enter a valid international phone number."))
@@ -507,7 +632,7 @@ class ApplicationAdminForm(forms.ModelForm):
                 validate_identity_by_type(identity_type, identity_number)
             except ValidationError as exc:
                 raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
-        return identity_number
+        return identity_number or None
 
     def save(self, commit=True):
         user = super().save(commit=False)

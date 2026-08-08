@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
+import unicodedata
+from urllib.parse import parse_qs
 
 from celery import shared_task
 from django.conf import settings
@@ -200,6 +203,30 @@ def _linked_prompt(bot, chat_id: int) -> None:
     )
 
 
+def _telegram_command(text: object) -> tuple[str, str] | None:
+    """Normalize Telegram command text and return its command and payload."""
+    if not isinstance(text, str):
+        return None
+    normalized = unicodedata.normalize("NFKC", text).strip()
+    if not normalized:
+        return None
+    parts = normalized.split(None, 1)
+    raw_command = parts[0]
+    payload = parts[1] if len(parts) == 2 else ""
+    if raw_command.startswith("/"):
+        raw_command = raw_command[1:]
+    command_part, separator, query = raw_command.partition("?")
+    command = command_part.casefold().split("@", 1)[0]
+    if separator and command == "start":
+        token_values = parse_qs(query, keep_blank_values=True).get("token", [])
+        payload = token_values[0] if len(token_values) == 1 and token_values[0] else payload
+    return command, payload.strip()
+
+
+def _looks_like_link_token(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]{32,64}", value))
+
+
 def _handle_audio(bot, user, chat_id: int, offering_id: str, lesson_id: str) -> None:
     offering, lesson = _active_lesson(user, offering_id, lesson_id)
     if offering is None or lesson is None:
@@ -324,10 +351,11 @@ def _handle_callback(bot, callback: dict) -> None:
 
 
 def _start_reply(bot, chat_id: int, sender_id: int, text: str) -> None:
-    parts = text.split(maxsplit=1)
-    if len(parts) == 2 and parts[1].strip():
+    command = _telegram_command(text)
+    payload = command[1] if command and command[0] == "start" else ""
+    if payload:
         try:
-            link_with_token(parts[1].strip(), sender_id, chat_id)
+            link_with_token(payload, sender_id, chat_id)
         except TelegramLinkError as exc:
             bot.send_message(chat_id, str(exc))
         else:
@@ -346,20 +374,22 @@ def _start_reply(bot, chat_id: int, sender_id: int, text: str) -> None:
 
 def _message_reply(bot, message: dict, sender_id: int, chat_id: int, update_id: int) -> None:
     text = message.get("text")
-    if isinstance(text, str) and text.strip().lower().split("@", 1)[0] in {"/start", "start"}:
+    command = _telegram_command(text)
+    command_name = command[0] if command else ""
+    if command_name == "start":
         _start_reply(bot, chat_id, sender_id, text.strip())
         return
-    if isinstance(text, str) and text.strip().lower().split("@", 1)[0] in {"/menu", "menu", "/courses", "courses"}:
+    if command_name in {"menu", "courses"}:
         user = _linked_user(sender_id, chat_id)
         if user is None:
             _linked_prompt(bot, chat_id)
         else:
             bot.send_message(chat_id, format_home(user), reply_markup=home_keyboard())
         return
-    if isinstance(text, str) and text.strip().lower().split("@", 1)[0] in {"/help", "help"}:
+    if command_name == "help":
         bot.send_message(chat_id, _("Use your LMS profile link to connect your account, or share your phone number."), reply_markup=home_keyboard())
         return
-    if isinstance(text, str) and text.strip().lower().split("@", 1)[0] in {"/status", "status"}:
+    if command_name == "status":
         linked = TelegramAccount.objects.filter(
             telegram_user_id=sender_id,
             telegram_chat_id=chat_id,
@@ -398,6 +428,18 @@ def _message_reply(bot, message: dict, sender_id: int, chat_id: int, update_id: 
         handle_admin_message(bot, admin=linked_user, message=message)
         return
 
+    if linked_user is None and isinstance(text, str) and _looks_like_link_token(text.strip()):
+        try:
+            link_with_token(text.strip(), sender_id, chat_id)
+        except TelegramLinkError as exc:
+            bot.send_message(chat_id, str(exc))
+        else:
+            bot.send_message(chat_id, _("Your LMS account is now linked to Telegram."), reply_markup=home_keyboard())
+        return
+
+    if linked_user is None:
+        _linked_prompt(bot, chat_id)
+        return
     bot.send_message(chat_id, _("This message type is not supported for account linking."))
 
 
