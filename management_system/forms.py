@@ -626,20 +626,6 @@ class ApplicationAdminForm(forms.ModelForm):
         current_country = getattr(self.instance, "country", None)
         if current_country and current_country not in dict(country_choices()):
             self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
-        self.fields["enrollment_scope"].queryset = AcademicYearLevel.objects.filter(
-            academic_year__is_active=True,
-        ).select_related("academic_year", "level").order_by(
-            "level__ordering", "academic_year__ordering",
-        )
-        active_enrollment = Enrollment.objects.filter(
-            student=self.instance,
-            academic_year_level__academic_year__is_active=True,
-            enrollment_type=Enrollment.Type.NORMAL,
-            course_offering__isnull=True,
-            status=Enrollment.Status.ACTIVE,
-        ).select_related("academic_year_level").first()
-        if active_enrollment:
-            self.fields["enrollment_scope"].initial = active_enrollment.academic_year_level_id
         self.fields["country"].widget.attrs.update({
             "id": "id_country",
             "data-country-select": "true",
