@@ -7393,6 +7393,10 @@ msgstr "الإجمالي العام"
 msgid "Submitted At"
 msgstr "تاريخ الإرسال"
 
+#: .\management_system\templates\yearly_transcript_dashboard.html:76
+msgid "Taken / Completion Date"
+msgstr "تاريخ الحل / الإكمال"
+
 #: .\management_system\templates\yearly_transcript_dashboard.html:98
 msgid "No transcript rows found for the selected filters."
 msgstr "لم يتم العثور على صفوف كشف درجات وفق عوامل التصفية المحددة."

@@ -7472,6 +7472,10 @@ msgstr "Overall Total"
 msgid "Submitted At"
 msgstr "Submitted At"
 
+#: .\management_system\templates\yearly_transcript_dashboard.html:76
+msgid "Taken / Completion Date"
+msgstr "Taken / Completion Date"
+
 #: .\management_system\templates\yearly_transcript_dashboard.html:98
 msgid "No transcript rows found for the selected filters."
 msgstr "No transcript rows found for the selected filters."

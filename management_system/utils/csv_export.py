@@ -133,7 +133,15 @@ def yearly_transcript_queryset(year, name=None, course=None, role=None):
         course_accumulated_total=Window(Sum("quiz__total_grade"), partition_by=partition, order_by=["submitted_at", "pk"]),
         overall_accumulated_grade=Window(Sum("total_grade"), partition_by=[F("user_id")], order_by=["submitted_at", "pk"]),
         overall_accumulated_total=Window(Sum("quiz__total_grade"), partition_by=[F("user_id")], order_by=["submitted_at", "pk"]),
-    ).order_by("user__username", "quiz__course_offering__course__name", "quiz__name", "pk")
+    ).order_by(
+        "quiz__course_offering__course__name",
+        "quiz__course_offering__course_id",
+        "quiz__name",
+        "quiz_id",
+        "submitted_at",
+        "user__username",
+        "pk",
+    )
 
 
 def _transcript_row(grade):

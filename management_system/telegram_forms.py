@@ -113,13 +113,19 @@ class TelegramBroadcastForm(forms.Form):
                 "rows": 8,
                 "maxlength": 4000,
                 "aria-label": _("Broadcast message"),
+                "class": "form-control tg-broadcast-textarea",
             }
         ),
     )
     level = forms.ChoiceField(
         required=True,
         label=_("Target level"),
-        widget=forms.Select(attrs={"aria-describedby": "telegram-broadcast-level-help"}),
+        widget=forms.Select(
+            attrs={
+                "aria-describedby": "telegram-broadcast-level-help",
+                "class": "form-select tg-broadcast-select",
+            }
+        ),
     )
     attachments = MultipleFileField(
         required=False,
@@ -128,7 +134,7 @@ class TelegramBroadcastForm(forms.Form):
         error_messages={
             "empty": _("Empty files are not accepted."),
         },
-        widget=MultipleFileInput(),
+        widget=MultipleFileInput(attrs={"class": "tg-broadcast-files"}),
     )
 
     def __init__(self, *args, level_choices=None, **kwargs):

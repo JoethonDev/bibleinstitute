@@ -2227,6 +2227,74 @@
 
 .tg-broadcast-form input[type="file"] { max-width: 100%; }
 
+/* ── Broadcast control skin (Bootstrap-compatible Psalmodia controls) ── */
+.tg-broadcast-textarea,
+.tg-broadcast-select,
+.tg-broadcast-files {
+    background-color: var(--ps-paper);
+    border: 1px solid var(--ps-line-cool);
+    border-radius: calc(var(--ps-radius) - .5rem);
+    color: var(--ps-ink);
+    font-size: .9375rem;
+    transition: border-color var(--ps-motion), box-shadow var(--ps-motion), background-color var(--ps-motion);
+}
+
+.tg-broadcast-textarea,
+.tg-broadcast-select {
+    padding: .625rem .875rem;
+    width: 100%;
+}
+
+.tg-broadcast-textarea {
+    min-height: 10rem;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.tg-broadcast-select {
+    max-width: 30rem;
+    min-height: 2.75rem;
+}
+
+.tg-broadcast-files {
+    display: block;
+    width: 100%;
+    padding: .55rem .75rem;
+    cursor: pointer;
+}
+
+.tg-broadcast-files::file-selector-button {
+    border: 1px solid var(--ps-line-cool);
+    border-radius: calc(var(--ps-radius) - .6rem);
+    background: var(--ps-mist);
+    color: var(--ps-ink);
+    font-weight: 600;
+    padding: .4rem .85rem;
+    margin-inline-end: .75rem;
+    cursor: pointer;
+    transition: background-color var(--ps-motion), border-color var(--ps-motion);
+}
+
+.tg-broadcast-files::file-selector-button:hover {
+    background: var(--ps-gold-soft);
+    border-color: var(--ps-gold);
+}
+
+.tg-broadcast-textarea:focus,
+.tg-broadcast-select:focus,
+.tg-broadcast-files:focus {
+    border-color: var(--ps-gold);
+    box-shadow: 0 0 0 .2rem rgba(180, 133, 58, .18);
+    outline: none;
+}
+
+.tg-broadcast-textarea:focus-visible,
+.tg-broadcast-select:focus-visible,
+.tg-broadcast-files:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
 .tg-broadcast-level-hints {
     display: inline-flex;
     flex-wrap: wrap;
