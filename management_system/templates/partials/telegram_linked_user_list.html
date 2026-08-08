@@ -1,0 +1,107 @@
+{% load i18n %}
+<div id="telegram-linked-user-list" class="tg-chat-linked-list">
+    <ul class="tg-chat-linked-items list-unstyled mb-0">
+        {% for account in linked_user_page_obj %}
+        {% with student_name=account.user.get_full_name|default:account.user.username %}
+        <li class="tg-chat-linked-row">
+            <span class="tg-chat-avatar" aria-hidden="true">
+                {% if account.user.profile_image_key %}
+                <img class="tg-chat-avatar-img"
+                     src="{% url 'application-document' account.user.pk 'profile' %}"
+                     alt=""
+                     loading="lazy"
+                     referrerpolicy="no-referrer">
+                {% else %}
+                <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
+                {% endif %}
+            </span>
+
+            <span class="tg-chat-linked-main">
+                <span class="tg-chat-linked-name">{{ student_name }}</span>
+                <span class="tg-chat-linked-username">{{ account.user.username }}</span>
+            </span>
+
+            <span class="tg-chat-linked-actions">
+                {% if account.active_conversation_id %}
+                <a class="ad-btn ad-btn--ghost ad-btn--sm"
+                   href="{% url 'telegram-conversation-detail' account.active_conversation_id %}"
+                   aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
+                    {% translate "Open" %}
+                </a>
+                {% else %}
+                <form method="post" action="{% url 'telegram-start-conversation' account.user.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                        {% translate "Start Telegram conversation" %}
+                    </button>
+                </form>
+                {% endif %}
+            </span>
+        </li>
+        {% endwith %}
+        {% empty %}
+        <li class="ad-empty">
+            <i class="fas fa-user-slash" aria-hidden="true"></i>
+            <h5>{% translate "No linked users found" %}</h5>
+            <p>{% translate "No linked Telegram users match your search." %}</p>
+        </li>
+        {% endfor %}
+    </ul>
+
+    {% if linked_user_page_obj.has_other_pages %}
+    <div class="ad-page-wrapper tg-chat-linked-pagination">
+        <nav aria-label="{% translate 'Linked user pagination' %}">
+            <ul class="ad-page-nav">
+                {% if linked_user_page_obj.has_previous %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ conversation_list_url }}?{% if start_search %}start_search={{ start_search|urlencode }}&amp;{% endif %}{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}start_page={{ linked_user_page_obj.previous_page_number }}"
+                       aria-label="{% translate 'Previous page' %}"
+                       title="{% translate 'Previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                    </span>
+                </li>
+                {% endif %}
+                {% for number in linked_user_page_obj.paginator.page_range %}
+                <li>
+                    <a class="ad-page-link {% if number == linked_user_page_obj.number %}is-active{% endif %}"
+                       href="{{ conversation_list_url }}?{% if start_search %}start_search={{ start_search|urlencode }}&amp;{% endif %}{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}start_page={{ number }}"
+                       {% if number == linked_user_page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
+                </li>
+                {% endfor %}
+                {% if linked_user_page_obj.has_next %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ conversation_list_url }}?{% if start_search %}start_search={{ start_search|urlencode }}&amp;{% endif %}{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}start_page={{ linked_user_page_obj.next_page_number }}"
+                       aria-label="{% translate 'Next page' %}"
+                       title="{% translate 'Next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
+                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="ad-page-info">
+            {% blocktranslate with start=linked_user_page_obj.start_index end=linked_user_page_obj.end_index total=linked_user_page_obj.paginator.count %}
+                Showing {{ start }}–{{ end }} of {{ total }} linked users
+            {% endblocktranslate %}
+        </div>
+    </div>
+    {% endif %}
+</div>

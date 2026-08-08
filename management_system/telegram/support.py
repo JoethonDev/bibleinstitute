@@ -36,6 +36,36 @@ class SupportReplyError(Exception):
     """A safe, localized failure from the shared support reply boundary."""
 
 
+def _require_admin(user: User) -> None:
+    if not user.is_authenticated or not user.role or user.role.role != "admin":
+        raise SupportReplyError(_("Only administrators can start Telegram conversations."))
+
+
+@transaction.atomic
+def start_conversation(*, admin: User, user_id: int) -> TelegramConversation:
+    """Open or return one support conversation for a linked Telegram user."""
+    _require_admin(admin)
+    try:
+        target = User.objects.select_for_update().get(pk=user_id)
+    except User.DoesNotExist as exc:
+        raise SupportReplyError(_("The selected user no longer exists.")) from exc
+
+    account = TelegramAccount.objects.filter(user=target, is_active=True).first()
+    if account is None:
+        raise SupportReplyError(_("This user has no active linked Telegram account."))
+
+    conversation = TelegramConversation.objects.select_for_update().filter(
+        user=target,
+        status__in=(TelegramConversation.Status.OPEN, TelegramConversation.Status.CLAIMED),
+    ).first()
+    if conversation:
+        return conversation
+    return TelegramConversation.objects.create(
+        user=target,
+        status=TelegramConversation.Status.OPEN,
+    )
+
+
 def _support_callback(action: str, conversation_id: int) -> str:
     return f"{SUPPORT_CALLBACK_PREFIX}:{action}:{int(conversation_id)}"
 
@@ -202,21 +232,15 @@ def store_attachment(bot: telebot.TeleBot, attachment: TelegramAttachment) -> bo
         return False
 
 
-def _digest_text(conversation: TelegramConversation) -> str:
-    lines = []
-    for message in conversation.messages.all():
-        if message.direction != TelegramMessage.Direction.INBOUND:
-            continue
-        body = message.text.strip() or _("[media message]")
-        if message.content_type == TelegramMessage.ContentType.UNSUPPORTED:
-            body = _("Unsupported message") + ": " + body
-        else:
-            attachments = list(message.attachments.all())
-            if attachments:
-                attachment = attachments[0]
-                body += "\n" + _("Attachment") + ": " + (attachment.original_name or attachment.media_type)
-        lines.append(body)
-    return "\n\n".join(lines)
+def _message_text(message: TelegramMessage) -> str:
+    body = message.text.strip() or _("[media message]")
+    if message.content_type == TelegramMessage.ContentType.UNSUPPORTED:
+        return _("Unsupported message") + ": " + body
+    attachments = list(message.attachments.all())
+    if attachments:
+        attachment = attachments[0]
+        body += "\n" + _("Attachment") + ": " + (attachment.original_name or attachment.media_type)
+    return body
 
 
 def _admin_accounts():
@@ -228,12 +252,11 @@ def _admin_accounts():
     )
 
 
-def send_support_digest(bot: telebot.TeleBot, conversation_id: int) -> int:
+def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: int | None = None) -> int:
     try:
         conversation = TelegramConversation.objects.prefetch_related("messages__attachments").get(pk=conversation_id)
     except TelegramConversation.DoesNotExist:
         return 0
-    text = _("Support message from a student") + "\n\n" + _digest_text(conversation)
     keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         telebot.types.InlineKeyboardButton(
@@ -244,19 +267,26 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int) -> int:
         ),
     )
     sent = 0
-    for account in _admin_accounts().iterator(chunk_size=100):
-        result = bot.send_message(account.telegram_chat_id, text, reply_markup=keyboard)
-        TelegramMessage.objects.create(
-            conversation=conversation,
-            direction=TelegramMessage.Direction.OUTBOUND,
-            telegram_chat_id=account.telegram_chat_id,
-            telegram_message_id=getattr(result, "message_id", None),
-            content_type=TelegramMessage.ContentType.DIGEST,
-            text=text,
-            delivery_status=TelegramMessage.DeliveryStatus.SENT,
-            sent_at=timezone.now(),
-        )
-        sent += 1
+    inbound_messages = [
+        message for message in conversation.messages.all()
+        if message.direction == TelegramMessage.Direction.INBOUND
+        and (message_id is None or message.pk == message_id)
+    ]
+    for message in inbound_messages:
+        text = _("Support message from a student") + "\n\n" + _message_text(message)
+        for account in _admin_accounts().iterator(chunk_size=100):
+            result = bot.send_message(account.telegram_chat_id, text, reply_markup=keyboard)
+            TelegramMessage.objects.create(
+                conversation=conversation,
+                direction=TelegramMessage.Direction.OUTBOUND,
+                telegram_chat_id=account.telegram_chat_id,
+                telegram_message_id=getattr(result, "message_id", None),
+                content_type=TelegramMessage.ContentType.DIGEST,
+                text=text,
+                delivery_status=TelegramMessage.DeliveryStatus.SENT,
+                sent_at=timezone.now(),
+            )
+            sent += 1
     return sent
 
 
@@ -274,7 +304,7 @@ def handle_student_message(bot: telebot.TeleBot, *, user: User, update_id: int, 
             _("This message type is not supported. Text, photos, documents, and videos are accepted."),
         )
     else:
-        send_support_digest(bot, conversation.pk)
+        send_support_digest(bot, conversation.pk, message_id=stored.pk)
     return True
 
 

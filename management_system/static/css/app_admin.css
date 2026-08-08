@@ -2190,6 +2190,282 @@
     .tg-chat-polling { transition: none; }
 }
 
+/* ── Split workspace (conversation sidebar + chat pane) ── */
+.tg-chat-workspace {
+    display: grid;
+    grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: stretch;
+    height: min(72vh, 46rem);
+    min-height: 30rem;
+}
+
+.tg-chat-sidebar {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-line);
+    border-radius: var(--ps-radius);
+    padding: 1rem;
+    overflow: hidden;
+}
+
+.tg-chat-sidebar .ad-card { margin-bottom: .75rem; }
+
+.tg-chat-sidebar > .tg-chat-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-inline-end: .25rem;
+}
+
+.tg-chat-sidebar > .tg-chat-list > .tg-chat-conv-list { margin-top: 0; }
+
+.tg-chat-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    gap: .75rem;
+}
+
+.tg-chat-workspace .tg-chat-thread {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
+
+.tg-chat-workspace .tg-chat-reply { flex: 0 0 auto; margin-top: 0; }
+
+/* ── Empty chat pane ── */
+.tg-chat-empty {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: .35rem;
+    padding: 2.5rem 1.5rem;
+    color: var(--ps-muted);
+    background: var(--ps-paper);
+    border: 1px dashed var(--ps-line);
+    border-radius: var(--ps-radius);
+    min-height: 16rem;
+}
+
+.tg-chat-empty i {
+    font-size: 2rem;
+    color: var(--ps-gold);
+    opacity: .75;
+    margin-bottom: .4rem;
+}
+
+.tg-chat-empty h5 { color: var(--ps-ink); font-weight: 700; margin-bottom: .15rem; }
+.tg-chat-empty p { max-width: 30rem; margin-bottom: 0; font-size: .88rem; }
+
+/* ── Composer row (textarea + send) ── */
+.tg-chat-composer-row {
+    display: flex;
+    align-items: flex-end;
+    gap: .6rem;
+}
+
+.tg-chat-composer-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tg-chat-reply-form .tg-chat-composer-field label {
+    display: block;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--ps-muted);
+    margin-bottom: .25rem;
+}
+
+.tg-chat-reply-form textarea.tg-chat-reply-input {
+    min-height: 3.5rem;
+    resize: vertical;
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-line);
+    color: var(--ps-ink);
+    transition: border-color var(--ps-motion), box-shadow var(--ps-motion), background-color var(--ps-motion);
+}
+
+.tg-chat-reply-input:focus {
+    border-color: var(--ps-gold);
+    box-shadow: 0 0 0 .18rem var(--ps-gold-soft);
+    background: var(--ps-paper);
+}
+
+.tg-chat-send-btn {
+    flex: 0 0 auto;
+    min-height: 3.5rem;
+    padding-inline: 1.1rem;
+}
+
+@media (max-width: 991.98px) {
+    .tg-chat-workspace {
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+        min-height: 0;
+    }
+    .tg-chat-sidebar { max-height: 42vh; }
+    .tg-chat-panel { min-height: 20rem; }
+    .tg-chat-workspace .tg-chat-thread { flex: none; max-height: 24rem; }
+}
+
+/* ── Start-conversation linked-user picker (sidebar) ── */
+.tg-chat-start-card { margin-bottom: 1rem; }
+
+.tg-chat-start-card .ad-card-body { padding: .9rem 1rem; }
+
+.tg-chat-start-title {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .35rem;
+    font-size: .92rem;
+    font-weight: 700;
+    color: var(--ps-ink);
+}
+
+.tg-chat-start-title i { color: var(--ps-gold); }
+
+.tg-chat-start-desc {
+    margin-bottom: .6rem;
+    font-size: .78rem;
+    color: var(--ps-muted);
+}
+
+.tg-chat-start-form .form-label {
+    display: block;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--ps-muted);
+    margin-bottom: .25rem;
+}
+
+.tg-chat-start-form input[type="search"].form-control {
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-line);
+    color: var(--ps-ink);
+    font-size: .85rem;
+    transition: border-color var(--ps-motion), box-shadow var(--ps-motion), background-color var(--ps-motion);
+}
+
+.tg-chat-start-form input[type="search"].form-control:focus,
+.tg-chat-start-form input[type="search"].form-control:focus-visible {
+    border-color: var(--ps-gold);
+    box-shadow: 0 0 0 .18rem var(--ps-gold-soft);
+    background: var(--ps-paper);
+    outline: none;
+}
+
+.tg-chat-start-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-top: .5rem;
+}
+
+.tg-chat-start-actions .ad-btn:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
+/* Linked user rows */
+.tg-chat-linked-list { margin-top: .75rem; }
+
+.tg-chat-linked-items {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    max-height: 15rem;
+    overflow-y: auto;
+    padding-inline-end: .15rem;
+}
+
+.tg-chat-linked-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    padding: .5rem .6rem;
+    border: 1px solid var(--ps-line);
+    border-radius: var(--ps-radius);
+    background: var(--ps-paper);
+    box-shadow: var(--ps-shadow);
+    transition: border-color var(--ps-motion), background-color var(--ps-motion), box-shadow var(--ps-motion);
+}
+
+.tg-chat-linked-row:hover,
+.tg-chat-linked-row:focus-within {
+    border-color: var(--ps-teal);
+    background: var(--ps-mist);
+    box-shadow: var(--ps-shadow-md);
+}
+
+.tg-chat-linked-row .tg-chat-avatar { width: 2.35rem; height: 2.35rem; }
+
+.tg-chat-linked-row .tg-chat-avatar-fallback { font-size: .85rem; }
+
+.tg-chat-linked-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .05rem;
+}
+
+.tg-chat-linked-name {
+    font-size: .84rem;
+    font-weight: 600;
+    color: var(--ps-ink);
+    overflow-wrap: anywhere;
+}
+
+.tg-chat-linked-username {
+    font-size: .72rem;
+    color: var(--ps-muted);
+    direction: ltr;
+    unicode-bidi: embed;
+    text-align: start;
+    overflow-wrap: anywhere;
+}
+
+.tg-chat-linked-actions { flex: 0 0 auto; }
+
+.tg-chat-linked-actions form { display: inline; margin: 0; }
+
+.tg-chat-linked-actions .ad-btn { white-space: nowrap; }
+
+.tg-chat-linked-actions .ad-btn:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
+/* Picker pagination */
+.tg-chat-linked-pagination { padding: .5rem 0 0; }
+
+.tg-chat-linked-pagination .ad-page-link { min-height: 30px; min-width: 30px; font-size: .78rem; }
+
+.tg-chat-linked-pagination .ad-page-link:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
+@media (max-width: 1199.98px) {
+    .tg-chat-linked-row { flex-wrap: wrap; }
+    .tg-chat-linked-actions { margin-inline-start: auto; }
+}
+
+@media (max-width: 991.98px) {
+    .tg-chat-linked-items { max-height: 10rem; }
+}
+
 /* ================================================================================
    Telegram broadcasts (Phase 7 admin active-year announcements)
    ================================================================================ */

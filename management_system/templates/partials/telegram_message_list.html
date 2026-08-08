@@ -55,6 +55,9 @@
                 {% if message.telegram_message_id and message.content_type != "digest" %}
                 <a class="tg-chat-reply-link"
                    href="{{ detail_url }}?reply_to={{ message.telegram_message_id }}"
+                   hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}"
+                   hx-target="#telegram-chat-panel"
+                   hx-swap="innerHTML"
                    aria-label="{% translate 'Reply to this message' %}">
                     <i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}
                 </a>

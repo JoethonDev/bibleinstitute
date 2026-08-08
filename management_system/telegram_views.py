@@ -24,6 +24,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .models import (
     AcademicYear,
     TelegramAttachment,
+    TelegramAccount,
     TelegramBotConfig,
     TelegramBroadcast,
     TelegramBroadcastRecipient,
@@ -42,7 +43,7 @@ from .telegram.configuration import (
     webhook_secret,
 )
 from .telegram.linking import unlink_own_telegram_account
-from .telegram.support import SupportReplyError, reply_to_conversation
+from .telegram.support import SupportReplyError, reply_to_conversation, start_conversation
 from .telegram_tasks import process_telegram_update
 from .telegram.policy import webhook_url
 from .telegram.broadcasts import (
@@ -262,6 +263,31 @@ def telegram_conversations(request):
     context = _conversation_list_context(request)
     if request.GET.get("fragment") == "1":
         return render(request, "partials/telegram_conversation_list.html", context)
+
+    start_search = request.GET.get("start_search", "").strip()[:120]
+    linked_users = TelegramAccount.objects.filter(
+        is_active=True,
+    ).select_related("user", "user__role")
+    if start_search:
+        linked_users = linked_users.filter(
+            Q(user__username__icontains=start_search)
+            | Q(user__first_name__icontains=start_search)
+            | Q(user__last_name__icontains=start_search)
+            | Q(user__email__icontains=start_search)
+        )
+    active_conversation = TelegramConversation.objects.filter(
+        user_id=OuterRef("user_id"),
+        status__in=(TelegramConversation.Status.OPEN, TelegramConversation.Status.CLAIMED),
+    ).order_by("pk")
+    linked_users = linked_users.annotate(
+        active_conversation_id=Subquery(active_conversation.values("pk")[:1]),
+    ).order_by("user__username", "user__pk")
+    context.update({
+        "start_search": start_search,
+        "linked_user_page_obj": Paginator(linked_users, 10).get_page(
+            request.GET.get("start_page", 1)
+        ),
+    })
     return render(request, "telegram_conversations.html", context)
 
 
@@ -285,6 +311,8 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
 def _conversation_detail_context(request, conversation, reply_form=None):
     messages_queryset = TelegramMessage.objects.filter(
         conversation=conversation,
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
     ).prefetch_related("attachments").order_by("created_at", "pk")
     messages_page_obj = Paginator(messages_queryset, 30).get_page(request.GET.get("page", 1))
     reply_to_message_id = _valid_reply_target(
@@ -303,6 +331,7 @@ def _conversation_detail_context(request, conversation, reply_form=None):
         "reply_form": reply_form,
         "reply_url": reverse("telegram-conversation-reply", kwargs={"conversation_id": conversation.pk}),
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
+        "panel_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "conversation_list_url": reverse("telegram-conversations"),
         "search": request.GET.get("search", "").strip()[:120],
         "status": request.GET.get("status", "").strip(),
@@ -318,6 +347,8 @@ def telegram_conversation_detail(request, conversation_id):
         pk=conversation_id,
     )
     context = _conversation_detail_context(request, conversation)
+    if request.GET.get("fragment") == "panel":
+        return render(request, "partials/telegram_chat_panel.html", context)
     if request.GET.get("fragment") == "1":
         return render(request, "partials/telegram_message_list.html", context)
     return render(request, "telegram_conversation_detail.html", context)
@@ -331,13 +362,17 @@ def telegram_conversation_reply(request, conversation_id):
         pk=conversation_id,
     )
     form = TelegramSupportReplyForm(request.POST)
+    panel_request = request.GET.get("fragment") == "panel"
     if not form.is_valid():
         context = _conversation_detail_context(request, conversation, form)
-        return render(request, "telegram_conversation_detail.html", context, status=400)
+        template = "partials/telegram_chat_panel.html" if panel_request else "telegram_conversation_detail.html"
+        return render(request, template, context, status=200 if panel_request else 400)
 
     config = TelegramBotConfig.objects.filter(is_active=True).first()
     if not config:
         messages.error(request, _("Telegram bot is not active."))
+        if panel_request:
+            return render(request, "partials/telegram_chat_panel.html", _conversation_detail_context(request, conversation))
         return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
     try:
         bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
@@ -356,6 +391,23 @@ def telegram_conversation_reply(request, conversation_id):
         messages.error(request, _("The reply could not be delivered."))
     else:
         messages.success(request, _("Reply sent successfully."))
+    if panel_request:
+        refreshed = get_object_or_404(
+            TelegramConversation.objects.select_related("user", "claimed_by"),
+            pk=conversation.pk,
+        )
+        return render(request, "partials/telegram_chat_panel.html", _conversation_detail_context(request, refreshed))
+    return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_start_conversation(request, user_id):
+    try:
+        conversation = start_conversation(admin=request.user, user_id=user_id)
+    except SupportReplyError as exc:
+        messages.error(request, str(exc))
+        return redirect("user-profile", user_id=user_id)
     return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
 
 

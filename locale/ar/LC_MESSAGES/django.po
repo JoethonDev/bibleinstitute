@@ -2151,6 +2151,18 @@ msgstr "بوت تيليجرام غير نشط."
 msgid "Recipient is no longer authorized."
 msgstr "لم يعد المستلم مصرحًا له."
 
+#: .\management_system\telegram\support.py:41
+msgid "Only administrators can start Telegram conversations."
+msgstr "يمكن للمسؤولين فقط بدء محادثات تيليجرام."
+
+#: .\management_system\telegram\support.py:51
+msgid "The selected user no longer exists."
+msgstr "المستخدم المحدد لم يعد موجودًا."
+
+#: .\management_system\telegram\support.py:55
+msgid "This user has no active linked Telegram account."
+msgstr "لا يوجد لدى هذا المستخدم حساب تيليجرام مرتبط ونشط."
+
 #: .\management_system\telegram\support.py:85
 #, python-format
 msgid "Unsupported Telegram message: %(types)s"
@@ -2349,6 +2361,41 @@ msgstr "استخدم رابط ملفك الشخصي في المنصة لربط �
 #: .\management_system\templates\profile.html:90
 msgid "Your Telegram account is linked."
 msgstr "حساب تيليجرام الخاص بك مرتبط."
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:35
+msgid "Start Telegram conversation"
+msgstr "بدء محادثة عبر تيليجرام"
+
+#: .\management_system\templates\telegram_conversations.html:88
+msgid "Find a linked student to open or start their conversation."
+msgstr "ابحث عن طالب مرتبط لفتح محادثته أو بدء محادثة معه."
+
+#: .\management_system\templates\telegram_conversations.html:93
+msgid "Search linked users"
+msgstr "البحث عن المستخدمين المرتبطين"
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:45
+msgid "No linked users found"
+msgstr "لم يتم العثور على مستخدمين مرتبطين"
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:46
+msgid "No linked Telegram users match your search."
+msgstr "لا يوجد مستخدمون مرتبطون بتيليجرام يطابقون بحثك."
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:53
+msgid "Linked user pagination"
+msgstr "ترقيم صفحات المستخدمين المرتبطين"
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:101
+#, python-format
+msgid ""
+"\n"
+"                Showing %(start)s–%(end)s of %(total)s linked users\n"
+"            "
+msgstr ""
+"\n"
+"                عرض %(start)s–%(end)s من أصل %(total)s من المستخدمين المرتبطين\n"
+"            "
 
 #: .\management_system\telegram_tasks.py:379
 #: .\management_system\telegram_tasks.py:382
@@ -6002,6 +6049,11 @@ msgstr "تُسلَّم الردود إلى الطالب بشكل مجهول با
 msgid "Send Reply"
 msgstr "إرسال الرد"
 
+#: .\management_system\templates\partials\telegram_chat_panel.html:72
+#: .\management_system\templates\partials\telegram_chat_panel.html:107
+msgid "Send Message"
+msgstr "إرسال الرسالة"
+
 #: .\management_system\templates\telegram_conversations.html:19
 msgid "View, claim, and reply to student support conversations received through Telegram."
 msgstr "اعرض محادثات دعم الطلاب الواردة عبر تيليجرام وتولَّها وردّ عليها."
@@ -6013,6 +6065,14 @@ msgstr "اسم الطالب أو اسم المستخدم أو نص الرسال�
 #: .\management_system\templates\telegram_conversations.html:55
 msgid "Filter conversations by status"
 msgstr "تصفية المحادثات حسب الحالة"
+
+#: .\management_system\templates\telegram_conversations.html:90
+msgid "Select a conversation"
+msgstr "اختر محادثة"
+
+#: .\management_system\templates\telegram_conversations.html:91
+msgid "Choose a conversation from the list to view messages and reply."
+msgstr "اختر محادثة من القائمة لعرض الرسائل والرد عليها."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:6
 msgid "Admin Consistory — UI Proposal"

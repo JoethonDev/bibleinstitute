@@ -14,6 +14,7 @@ from management_system.telegram_views import (
     telegram_conversation_detail,
     telegram_conversation_reply,
     telegram_conversations,
+    telegram_start_conversation,
     telegram_unlink,
 )
 
@@ -146,6 +147,7 @@ urlpatterns = [
     path('dashboard/telegram/conversations/', telegram_conversations, name="telegram-conversations"),
     path('dashboard/telegram/conversations/<int:conversation_id>/', telegram_conversation_detail, name="telegram-conversation-detail"),
     path('dashboard/telegram/conversations/<int:conversation_id>/reply/', telegram_conversation_reply, name="telegram-conversation-reply"),
+    path('dashboard/telegram/conversations/start/<int:user_id>/', telegram_start_conversation, name="telegram-start-conversation"),
     path('dashboard/telegram/attachments/<int:attachment_id>/', telegram_attachment, name="telegram-attachment"),
     path('dashboard/telegram/broadcasts/', telegram_broadcasts, name="telegram-broadcasts"),
     path('dashboard/telegram/broadcasts/new/', telegram_broadcast_create, name="telegram-broadcast-create"),

@@ -17,6 +17,9 @@
         <li class="tg-chat-row">
             <a class="tg-chat-row-link"
                href="{% url 'telegram-conversation-detail' conversation.pk %}{% if search or status %}?{% if search %}search={{ search|urlencode }}{% endif %}{% if search and status %}&amp;{% endif %}{% if status %}status={{ status }}{% endif %}{% endif %}"
+               hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel{% if search %}&amp;search={{ search|urlencode }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}"
+               hx-target="#telegram-chat-panel"
+               hx-swap="innerHTML"
                aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
                 <span class="tg-chat-avatar" aria-hidden="true">
                     {% if conversation.user.profile_image_key %}

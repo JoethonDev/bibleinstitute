@@ -67,6 +67,7 @@ class TelegramSupportReplyForm(forms.Form):
                 "rows": 4,
                 "maxlength": 4000,
                 "aria-label": _("Reply message"),
+                "class": "form-control tg-chat-reply-input",
             }
         ),
     )

@@ -2194,6 +2194,18 @@ msgstr "Telegram bot deactivated."
 msgid "Recipient is no longer authorized."
 msgstr ""
 
+#: .\management_system\telegram\support.py:41
+msgid "Only administrators can start Telegram conversations."
+msgstr "Only administrators can start Telegram conversations."
+
+#: .\management_system\telegram\support.py:51
+msgid "The selected user no longer exists."
+msgstr "The selected user no longer exists."
+
+#: .\management_system\telegram\support.py:55
+msgid "This user has no active linked Telegram account."
+msgstr "This user has no active linked Telegram account."
+
 #: .\management_system\telegram\support.py:85
 #, python-format
 msgid "Unsupported Telegram message: %(types)s"
@@ -2422,6 +2434,41 @@ msgstr ""
 #| msgid "Telegram activation failed."
 msgid "Your Telegram account is linked."
 msgstr "Telegram activation failed."
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:35
+msgid "Start Telegram conversation"
+msgstr "Start Telegram conversation"
+
+#: .\management_system\templates\telegram_conversations.html:88
+msgid "Find a linked student to open or start their conversation."
+msgstr "Find a linked student to open or start their conversation."
+
+#: .\management_system\templates\telegram_conversations.html:93
+msgid "Search linked users"
+msgstr "Search linked users"
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:45
+msgid "No linked users found"
+msgstr "No linked users found"
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:46
+msgid "No linked Telegram users match your search."
+msgstr "No linked Telegram users match your search."
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:53
+msgid "Linked user pagination"
+msgstr "Linked user pagination"
+
+#: .\management_system\templates\partials\telegram_linked_user_list.html:101
+#, python-format
+msgid ""
+"\n"
+"                Showing %(start)s–%(end)s of %(total)s linked users\n"
+"            "
+msgstr ""
+"\n"
+"                Showing %(start)s–%(end)s of %(total)s linked users\n"
+"            "
 
 #: .\management_system\telegram_tasks.py:379
 #: .\management_system\telegram_tasks.py:382
@@ -6081,6 +6128,11 @@ msgstr "Replies are delivered to the student anonymously as Admin."
 msgid "Send Reply"
 msgstr "Send Reply"
 
+#: .\management_system\templates\partials\telegram_chat_panel.html:72
+#: .\management_system\templates\partials\telegram_chat_panel.html:107
+msgid "Send Message"
+msgstr "Send Message"
+
 #: .\management_system\templates\telegram_conversations.html:19
 msgid "View, claim, and reply to student support conversations received through Telegram."
 msgstr "View, claim, and reply to student support conversations received through Telegram."
@@ -6092,6 +6144,14 @@ msgstr "Student name, username, or message text"
 #: .\management_system\templates\telegram_conversations.html:55
 msgid "Filter conversations by status"
 msgstr "Filter conversations by status"
+
+#: .\management_system\templates\telegram_conversations.html:90
+msgid "Select a conversation"
+msgstr "Select a conversation"
+
+#: .\management_system\templates\telegram_conversations.html:91
+msgid "Choose a conversation from the list to view messages and reply."
+msgstr "Choose a conversation from the list to view messages and reply."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:6
 msgid "Admin Consistory — UI Proposal"
