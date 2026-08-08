@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -227,12 +227,25 @@ def _conversation_list_context(request):
         status = ""
     searched = _conversation_search_queryset(search)
     status_counts = _conversation_status_counts(searched)
-    conversations = searched.select_related("user", "claimed_by").annotate(
-        message_count=Count("messages", distinct=True),
-    )
+    conversations = searched.select_related("user", "claimed_by")
     if status:
         conversations = conversations.filter(status=status)
-    conversations = conversations.order_by("-last_message_at", "-pk")
+    last_message = TelegramMessage.objects.filter(
+        conversation_id=OuterRef("pk"),
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
+    ).order_by("-created_at", "-pk")
+    conversations = conversations.annotate(
+        latest_message_at=Subquery(last_message.values("created_at")[:1]),
+        last_message_text=Subquery(last_message.values("text")[:1]),
+        last_message_content_type=Subquery(last_message.values("content_type")[:1]),
+        last_message_direction=Subquery(last_message.values("direction")[:1]),
+        message_count=Count(
+            "messages",
+            filter=~Q(messages__content_type=TelegramMessage.ContentType.DIGEST),
+            distinct=True,
+        ),
+    ).order_by("-latest_message_at", "-pk")
     page_obj = Paginator(conversations, 25).get_page(request.GET.get("page", 1))
     return {
         "page_obj": page_obj,

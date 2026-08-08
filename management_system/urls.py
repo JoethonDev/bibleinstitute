@@ -160,6 +160,7 @@ urlpatterns = [
     path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
     path('dashboard/applications/<int:user_id>/', application_review, name="application-review"),
     path('dashboard/applications/<int:user_id>/document/<str:document_type>/', application_document, name="application-document"),
+    path('dashboard/applications/<int:user_id>/delete/', application_delete, name="application-delete"),
     path('dashboard/applications/<int:user_id>/<str:decision>/', application_decision, name="application-decision"),
     path('api/bulk-application-decision/', bulk_application_decision, name="bulk-application-decision"),
 

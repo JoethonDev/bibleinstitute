@@ -180,7 +180,7 @@
                                     hx-target="closest tr"
                                     hx-trigger="click"
                                     hx-confirm="{% translate 'Are you sure you want to delete this item?' %}"
-                                    @click="$store.notifications.add('{% translate "Item deleted successfully" %}', 'success')">
+                                    hx-on::after-request="if (event.detail.successful && window.Alpine && window.Alpine.store) { window.Alpine.store('notifications').add('{% translate "Item deleted successfully" %}', 'success'); }">
                                 <i class="fas fa-trash me-1"></i>
                                 <span>{% translate "Delete" %}</span>
                             </button>

@@ -49,18 +49,21 @@
         <div class="ad-card-body p-0">
             {% if page_obj.object_list %}
             <div class="ad-alert ad-alert--info d-flex justify-content-between align-items-center px-3 py-2 mb-0 border-0 rounded-0">
-                <div class="d-flex gap-2">
-                    {% if current_status == "pending" %}
+                <div class="d-flex gap-2 flex-wrap">
                     <button class="ad-btn ad-btn--teal ad-btn--sm" id="bulk-activate" data-decision="activate">
                         <i class="fas fa-check me-1"></i>{% translate "Activate Selected" %}
                     </button>
                     <button class="ad-btn ad-btn--danger ad-btn--sm" id="bulk-decline" data-decision="decline">
                         <i class="fas fa-times me-1"></i>{% translate "Decline Selected" %}
                     </button>
+                    {% if current_status != "pending" %}
+                    <button class="ad-btn ad-btn--outline-gold ad-btn--sm" id="bulk-reopen" data-decision="pending">
+                        <i class="fas fa-undo me-1"></i>{% translate "Reopen Selected" %}
+                    </button>
+                    {% endif %}
                     <button class="ad-btn ad-btn--outline-gold ad-btn--sm d-none" id="select-all-records">
                         {% translate "Select all matching records" %}
                     </button>
-                    {% endif %}
                 </div>
                 <small class="ps-muted-text">
                     {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
@@ -93,6 +96,15 @@
                                     <a href="{% url 'application-review' u.id %}" class="ad-btn ad-btn--ghost ad-btn--sm">
                                         <i class="fas fa-eye"></i> {% translate "Review" %}
                                     </a>
+                                    <form method="post"
+                                          action="{% url 'application-delete' u.id %}"
+                                          class="ps-inline-form"
+                                          onsubmit="return confirm('{% translate "Permanently delete this application and student account? This cannot be undone." %}');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
+                                            <i class="fas fa-trash"></i> {% translate "Delete" %}
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -160,37 +172,80 @@
 
 <script>
 (function() {
-    var section = document.getElementById('app-table-section');
-    if (!section) return;
-    var selectAllRecords = false;
-    section.addEventListener('change', function(e) {
-        if (e.target && e.target.id === 'select-all') {
-            section.querySelectorAll('.user-checkbox').forEach(function(cb) {
-                cb.checked = e.target.checked;
-            });
-            selectAllRecords = false;
-            var allButton = section.querySelector('#select-all-records');
-            if (allButton) allButton.classList.toggle('d-none', !e.target.checked);
-        }
+    'use strict';
+    var sectionId = 'app-table-section';
+    var selectAllRecordsBtn = '#select-all-records';
+    var bulkButtons = '#bulk-activate, #bulk-decline, #bulk-reopen';
+    var noSelectionMessage = '{% translate "Please select at least one application." %}';
+    var requestFailedMessage = '{% translate "The request failed. Please try again." %}';
+    var confirmMessage = '{% translate "Are you sure?" %}';
+
+    function currentSection() {
+        return document.getElementById(sectionId);
+    }
+
+    function showFeedback(message, isError) {
+        try {
+            if (window.Alpine && Alpine.store && Alpine.store('notifications')) {
+                Alpine.store('notifications').add(message, isError ? 'danger' : 'warning');
+                return;
+            }
+        } catch (e) { /* fall through to a safe alert */ }
+        window.alert(message);
+    }
+
+    // Delegated listener: survives HTMX replacement of #app-table-section.
+    document.addEventListener('change', function(e) {
+        var target = e.target;
+        if (!target || target.id !== 'select-all') return;
+        var section = currentSection();
+        if (!section) return;
+        section.querySelectorAll('.user-checkbox').forEach(function(cb) {
+            cb.checked = target.checked;
+        });
+        section.dataset.selectAllRecords = target.checked ? '0' : '';
+        var allButton = section.querySelector(selectAllRecordsBtn);
+        if (allButton) allButton.classList.toggle('d-none', !target.checked);
     });
-    section.addEventListener('click', function(e) {
-        if (e.target.closest('#select-all-records')) {
-            selectAllRecords = true;
-            e.target.closest('#select-all-records').classList.add('d-none');
+
+    // Delegated click handler: covers both the select-all-records toggle and
+    // the bulk decision buttons for the currently rendered section.
+    document.addEventListener('click', function(e) {
+        var allButton = e.target.closest(selectAllRecordsBtn);
+        if (allButton) {
+            var section = currentSection();
+            if (section) section.dataset.selectAllRecords = '1';
+            allButton.classList.add('d-none');
+            return;
         }
-    });
-    section.addEventListener('click', function(e) {
-        var btn = e.target.closest('#bulk-activate, #bulk-decline');
+        var btn = e.target.closest(bulkButtons);
         if (!btn) return;
-        var selected = Array.from(section.querySelectorAll('.user-checkbox:checked')).map(function(cb) { return parseInt(cb.value); });
-        if (selected.length === 0 && !selectAllRecords) return;
-        if (!confirm('{% translate "Are you sure?" %}')) return;
+        var current = currentSection();
+        if (!current) return;
+        var selected = Array.from(current.querySelectorAll('.user-checkbox:checked')).map(function(cb) { return parseInt(cb.value, 10); });
+        var selectAllRecords = current.dataset.selectAllRecords === '1';
+        if (selected.length === 0 && !selectAllRecords) {
+            showFeedback(noSelectionMessage, false);
+            return;
+        }
+        if (!confirm(confirmMessage)) return;
         fetch('{% url "bulk-application-decision" %}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
             body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, select_all: selectAllRecords, status: '{{ current_status }}'})
-        }).then(function(r) { return r.json(); }).then(function(data) {
-            if (data.success) location.reload();
+        }).then(function(response) {
+            return response.json().then(function(data) {
+                return {ok: response.ok, data: data};
+            });
+        }).then(function(result) {
+            if (result.ok) {
+                location.reload();
+            } else {
+                var message = result.data && result.data.error ? result.data.error : requestFailedMessage;
+                showFeedback(message, true);
+            }
+        }).catch(function() {
+            showFeedback(requestFailedMessage, true);
         });
     });
 })();

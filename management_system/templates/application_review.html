@@ -130,22 +130,42 @@
     </div>
     </div>
 
-    {% if app_user.application_status == "pending" %}
-    <div class="d-flex gap-2 align-items-end">
+    <div class="d-flex gap-2 align-items-end flex-wrap">
+        {% if app_user.application_status != "active" %}
         <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" class="application-decision-form ps-inline-form">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--teal">
                 <i class="fas fa-check me-1"></i>{% translate "Activate" %}
             </button>
         </form>
+        {% endif %}
+        {% if app_user.application_status != "declined" %}
         <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" class="application-decision-form ps-inline-form">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--danger">
                 <i class="fas fa-times me-1"></i>{% translate "Decline" %}
             </button>
         </form>
+        {% endif %}
+        {% if app_user.application_status != "pending" %}
+        <form method="post" action="{% url 'application-decision' app_user.id 'pending' %}" class="application-decision-form ps-inline-form">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--outline-gold">
+                <i class="fas fa-undo me-1"></i>{% translate "Reopen" %}
+            </button>
+        </form>
+        {% endif %}
+        <form method="post"
+              action="{% url 'application-delete' app_user.id %}"
+              class="ps-inline-form"
+              onsubmit="return confirm('{% translate "Permanently delete this application and student account? This cannot be undone." %}');">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--danger">
+                <i class="fas fa-trash me-1"></i>{% translate "Delete Application" %}
+            </button>
+        </form>
     </div>
-    {% elif app_user.decided_by %}
+    {% if app_user.decided_by %}
     <div class="ad-alert ad-alert--info mt-3">
         <i class="fas fa-info-circle"></i>
         <div>

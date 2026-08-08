@@ -125,15 +125,26 @@ def activate_academic_year(year: AcademicYear, actor: User) -> AcademicYear:
 
 
 @transaction.atomic
-def accept_application(application: User, actor: User) -> tuple[User, Enrollment]:
-    """Accept one pending application into the lowest level of the active year."""
+def set_application_status(application: User, actor: User, status: str) -> tuple[User, Enrollment | None]:
+    """Set an application status with admin-only locking and enrollment rules."""
     _require_admin(actor)
     locked_user = User.objects.select_for_update().get(pk=application.pk)
-    if locked_user.application_status != "pending":
-        raise ValidationError(
-            _("Cannot accept a %(status)s application.")
-            % {"status": locked_user.application_status}
-        )
+    if status not in {"pending", "active", "declined"}:
+        raise ValidationError(_("Invalid application status."))
+
+    if status != "active":
+        locked_user.application_status = status
+        locked_user.is_active = False
+        if status == "pending":
+            locked_user.decided_by = None
+            locked_user.decided_at = None
+        else:
+            locked_user.decided_by = actor
+            locked_user.decided_at = now()
+        locked_user.save(update_fields=[
+            "application_status", "is_active", "decided_by", "decided_at",
+        ])
+        return locked_user, None
 
     active_years = list(AcademicYear.objects.select_for_update().filter(is_active=True).order_by("pk"))
     if len(active_years) != 1:
@@ -172,21 +183,66 @@ def accept_application(application: User, actor: User) -> tuple[User, Enrollment
 
 
 @transaction.atomic
+def accept_application(application: User, actor: User) -> tuple[User, Enrollment]:
+    """Accept or re-accept one application into the active year's lowest level."""
+    user, enrollment = set_application_status(application, actor, "active")
+    return user, enrollment
+
+
+@transaction.atomic
 def decline_application(application: User, actor: User) -> User:
-    """Decline one pending application under the same locking rules as acceptance."""
+    """Decline or re-decline an application with the same locking rules."""
+    user, _enrollment = set_application_status(application, actor, "declined")
+    return user
+
+
+@transaction.atomic
+def reopen_application(application: User, actor: User) -> User:
+    """Return an application to pending without deleting academic history."""
+    user, _enrollment = set_application_status(application, actor, "pending")
+    return user
+
+
+@transaction.atomic
+def set_user_normal_enrollment_scope(
+    student: User,
+    actor: User,
+    scope: AcademicYearLevel,
+) -> Enrollment:
+    """Assign one admin-selected active-year normal enrollment scope."""
     _require_admin(actor)
-    locked_user = User.objects.select_for_update().get(pk=application.pk)
-    if locked_user.application_status != "pending":
-        raise ValidationError(
-            _("Cannot decline a %(status)s application.")
-            % {"status": locked_user.application_status}
-        )
-    locked_user.application_status = "declined"
-    locked_user.is_active = False
-    locked_user.decided_by = actor
-    locked_user.decided_at = now()
-    locked_user.save(update_fields=["application_status", "is_active", "decided_by", "decided_at"])
-    return locked_user
+    locked_user = User.objects.select_for_update().get(pk=student.pk)
+    selected_scope = AcademicYearLevel.objects.select_related(
+        "academic_year", "level"
+    ).get(pk=scope.pk)
+    if not selected_scope.academic_year.is_active:
+        raise ValidationError(_("The selected academic year is not active."))
+
+    Enrollment.objects.select_for_update().filter(
+        student=locked_user,
+        academic_year_level__academic_year__is_active=True,
+        enrollment_type=Enrollment.Type.NORMAL,
+        course_offering__isnull=True,
+    ).exclude(academic_year_level=selected_scope).update(
+        status=Enrollment.Status.INACTIVE,
+    )
+    enrollment, _ = Enrollment.objects.select_for_update().get_or_create(
+        student=locked_user,
+        academic_year_level=selected_scope,
+        course_offering=None,
+        defaults={
+            "enrollment_type": Enrollment.Type.NORMAL,
+            "status": Enrollment.Status.ACTIVE,
+            "enrolled_by": actor,
+        },
+    )
+    if enrollment.enrollment_type != Enrollment.Type.NORMAL or enrollment.course_offering_id:
+        raise ValidationError(_("The selected enrollment is not a normal full-year enrollment."))
+    if enrollment.status != Enrollment.Status.ACTIVE or enrollment.enrolled_by_id is None:
+        enrollment.status = Enrollment.Status.ACTIVE
+        enrollment.enrolled_by = enrollment.enrolled_by or actor
+        enrollment.save(update_fields=["status", "enrolled_by"])
+    return enrollment
 
 
 @transaction.atomic

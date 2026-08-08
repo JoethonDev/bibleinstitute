@@ -3,7 +3,7 @@ from django import forms
 import secrets
 
 from django.core.exceptions import ValidationError
-from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, CourseOffering, Level, QuizType, PromotionRule, QUIZ_TYPE_CODES, assign_academic_date
+from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, CourseOffering, Enrollment, Level, QuizType, PromotionRule, QUIZ_TYPE_CODES, assign_academic_date
 from .utils.validators import normalize_phone, validate_identity_by_type
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
@@ -101,6 +101,7 @@ class UserUpdateForm(UserCreationForm):
     admin_only_fields = frozenset({
         "role", "time_zone", "application_status", "decision_notes",
         "study_mode", "study_mode_override", "identity_type", "identity_number",
+        "enrollment_scope",
     })
 
     password = forms.CharField(widget=forms.PasswordInput(
@@ -192,6 +193,11 @@ class UserUpdateForm(UserCreationForm):
         label=_("Decision notes"),
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+    enrollment_scope = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        required=False,
+        label=_("Academic year and level"),
+    )
 
     class Meta:
         model = User
@@ -199,7 +205,7 @@ class UserUpdateForm(UserCreationForm):
             "first_name", "last_name", "username", "password", "joined_date", "role", "time_zone",
             "email", "phone", "country", "city", "education_or_job", "priest_name", "priest_phone",
             "church", "service", "identity_type", "identity_number", "study_mode",
-            "study_mode_override", "application_status", "decision_notes",
+            "study_mode_override", "application_status", "decision_notes", "enrollment_scope",
         ]
         exclude = []
 
@@ -209,6 +215,20 @@ class UserUpdateForm(UserCreationForm):
         current_country = getattr(self.instance, "country", None)
         if current_country and current_country not in dict(country_choices()):
             self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
+        self.fields["enrollment_scope"].queryset = AcademicYearLevel.objects.filter(
+            academic_year__is_active=True,
+        ).select_related("academic_year", "level").order_by(
+            "level__ordering", "academic_year__ordering",
+        )
+        active_enrollment = Enrollment.objects.filter(
+            student=self.instance,
+            academic_year_level__academic_year__is_active=True,
+            enrollment_type=Enrollment.Type.NORMAL,
+            course_offering__isnull=True,
+            status=Enrollment.Status.ACTIVE,
+        ).select_related("academic_year_level").first()
+        if active_enrollment:
+            self.fields["enrollment_scope"].initial = active_enrollment.academic_year_level_id
 
     def clean_phone(self):
         phone = self.cleaned_data.get("phone")
@@ -606,6 +626,20 @@ class ApplicationAdminForm(forms.ModelForm):
         current_country = getattr(self.instance, "country", None)
         if current_country and current_country not in dict(country_choices()):
             self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
+        self.fields["enrollment_scope"].queryset = AcademicYearLevel.objects.filter(
+            academic_year__is_active=True,
+        ).select_related("academic_year", "level").order_by(
+            "level__ordering", "academic_year__ordering",
+        )
+        active_enrollment = Enrollment.objects.filter(
+            student=self.instance,
+            academic_year_level__academic_year__is_active=True,
+            enrollment_type=Enrollment.Type.NORMAL,
+            course_offering__isnull=True,
+            status=Enrollment.Status.ACTIVE,
+        ).select_related("academic_year_level").first()
+        if active_enrollment:
+            self.fields["enrollment_scope"].initial = active_enrollment.academic_year_level_id
         self.fields["country"].widget.attrs.update({
             "id": "id_country",
             "data-country-select": "true",

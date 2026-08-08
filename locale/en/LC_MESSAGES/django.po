@@ -3309,6 +3309,59 @@ msgstr "No applications found."
 msgid "Are you sure?"
 msgstr "Are you sure?"
 
+#: .\management_system\academic_enrollment.py:133
+msgid "Invalid application status."
+msgstr "Invalid application status."
+
+#: .\management_system\views.py:3607
+#, python-format
+msgid "%(name)s returned to pending."
+msgstr "%(name)s returned to pending."
+
+#: .\management_system\views.py:3630
+msgid "Invalid application status"
+msgstr "Invalid application status"
+
+#: .\management_system\academic_enrollment.py:300
+msgid "The selected academic year is not active."
+msgstr "The selected academic year is not active."
+
+#: .\management_system\academic_enrollment.py:320
+msgid "The selected enrollment is not a normal full-year enrollment."
+msgstr "The selected enrollment is not a normal full-year enrollment."
+
+#: .\management_system\views.py:3580
+msgid "You cannot delete your own administrator account."
+msgstr "You cannot delete your own administrator account."
+
+#: .\management_system\views.py:3610
+msgid "The application no longer exists."
+msgstr "The application no longer exists."
+
+#: .\management_system\views.py:3614
+msgid "This user cannot be permanently deleted because other records depend on the account."
+msgstr "This user cannot be permanently deleted because other records depend on the account."
+
+#: .\management_system\views.py:3617
+msgid "The application and student account were permanently deleted."
+msgstr "The application and student account were permanently deleted."
+
+#: .\management_system\templates\applications_dashboard.html:61
+msgid "Reopen Selected"
+msgstr "Reopen Selected"
+
+#: .\management_system\templates\applications_dashboard.html:170
+msgid "Please select at least one application."
+msgstr "Please select at least one application."
+
+#: .\management_system\templates\applications_dashboard.html:171
+msgid "The request failed. Please try again."
+msgstr "The request failed. Please try again."
+
+#: .\management_system\templates\application_review.html:154
+msgid "Reopen"
+msgstr "Reopen"
+
 #: .\management_system\templates\attendance_correction.html:10
 #: .\management_system\templates\attendance_correction.html:14
 msgid "Correct Attendance Record"
@@ -8461,6 +8514,15 @@ msgstr "Day"
 #| msgid "Promotion Formula Builder"
 msgid "Promotion formula is required."
 msgstr "Promotion Formula Builder"
+
+msgid "Media message"
+msgstr "Media message"
+
+msgid "Delete Application"
+msgstr "Delete Application"
+
+msgid "Permanently delete this application and student account? This cannot be undone."
+msgstr "Permanently delete this application and student account? This cannot be undone."
 
 #~ msgid "All required application documents must be uploaded."
 #~ msgstr "All required application documents must be uploaded."

@@ -3232,6 +3232,59 @@ msgstr "لم يتم العثور على طلبات."
 msgid "Are you sure?"
 msgstr "هل أنت متأكد؟"
 
+#: .\management_system\academic_enrollment.py:133
+msgid "Invalid application status."
+msgstr "حالة الطلب غير صالحة."
+
+#: .\management_system\views.py:3607
+#, python-format
+msgid "%(name)s returned to pending."
+msgstr "تمت إعادة %(name)s إلى حالة الانتظار."
+
+#: .\management_system\views.py:3630
+msgid "Invalid application status"
+msgstr "حالة الطلب غير صالحة"
+
+#: .\management_system\academic_enrollment.py:300
+msgid "The selected academic year is not active."
+msgstr "السنة الدراسية المحددة غير نشطة."
+
+#: .\management_system\academic_enrollment.py:320
+msgid "The selected enrollment is not a normal full-year enrollment."
+msgstr "القيد المحدد ليس قيدًا عاديًا للعام الدراسي بأكمله."
+
+#: .\management_system\views.py:3580
+msgid "You cannot delete your own administrator account."
+msgstr "لا يمكنك حذف حسابك الإداري الخاص."
+
+#: .\management_system\views.py:3610
+msgid "The application no longer exists."
+msgstr "الطلب لم يعد موجودًا."
+
+#: .\management_system\views.py:3614
+msgid "This user cannot be permanently deleted because other records depend on the account."
+msgstr "لا يمكن حذف هذا المستخدم نهائيًا لأن سجلات أخرى تعتمد على الحساب."
+
+#: .\management_system\views.py:3617
+msgid "The application and student account were permanently deleted."
+msgstr "تم حذف الطلب وحساب الطالب نهائيًا."
+
+#: .\management_system\templates\applications_dashboard.html:61
+msgid "Reopen Selected"
+msgstr "إعادة فتح المحدد"
+
+#: .\management_system\templates\applications_dashboard.html:170
+msgid "Please select at least one application."
+msgstr "يرجى تحديد طلب واحد على الأقل."
+
+#: .\management_system\templates\applications_dashboard.html:171
+msgid "The request failed. Please try again."
+msgstr "فشل الطلب. يرجى المحاولة مرة أخرى."
+
+#: .\management_system\templates\application_review.html:154
+msgid "Reopen"
+msgstr "إعادة فتح"
+
 #: .\management_system\templates\attendance_correction.html:10
 #: .\management_system\templates\attendance_correction.html:14
 msgid "Correct Attendance Record"
@@ -8382,6 +8435,15 @@ msgstr "اليوم"
 #| msgid "Promotion Formula Builder"
 msgid "Promotion formula is required."
 msgstr "منشئ صيغة الترقية"
+
+msgid "Media message"
+msgstr "رسالة وسائط"
+
+msgid "Delete Application"
+msgstr "حذف الطلب"
+
+msgid "Permanently delete this application and student account? This cannot be undone."
+msgstr "حذف نهائي لهذا الطلب وحساب الطالب؟ لا يمكن التراجع عن هذا الإجراء."
 
 #~ msgid "All required application documents must be uploaded."
 #~ msgstr "يجب رفع جميع المستندات المطلوبة."

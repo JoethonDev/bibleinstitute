@@ -11,70 +11,76 @@
         <span class="visually-hidden">{% translate "Checking for new conversations" %}</span>
     </div>
 
-    <div class="ad-table-wrap tg-chat-table-wrap">
-        <table class="ad-table tg-chat-table">
-            <caption class="visually-hidden">{% translate "Telegram support conversations" %}</caption>
-            <thead>
-                <tr>
-                    <th scope="col">{% translate "Student" %}</th>
-                    <th scope="col">{% translate "Status" %}</th>
-                    <th scope="col">{% translate "Messages" %}</th>
-                    <th scope="col">{% translate "Last Activity" %}</th>
-                    <th scope="col" class="text-end">{% translate "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for conversation in page_obj %}
-                {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-                <tr>
-                    <td>
-                        <div class="tg-chat-user">
-                            <span class="tg-chat-user-name">{{ student_name }}</span>
-                            <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
-                        </div>
-                    </td>
-                    <td>
-                        {% if conversation.status == "open" %}
-                        <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
-                        {% elif conversation.status == "claimed" %}
-                        <span class="ad-pill ad-pill--teal">{{ conversation.get_status_display }}</span>
-                        {% elif conversation.status == "handled" %}
-                        <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
-                        {% elif conversation.status == "blocked" %}
-                        <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
-                        {% else %}
-                        <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
-                        {% endif %}
-                    </td>
-                    <td><span class="tg-chat-count">{{ conversation.message_count }}</span></td>
-                    <td>
-                        {% if conversation.last_message_at %}
-                        <time datetime="{{ conversation.last_message_at|date:'c' }}">{{ conversation.last_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
-                        {% else %}
-                        <span class="ps-muted-text">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        <a class="ad-btn ad-btn--teal ad-btn--sm"
-                           href="{% url 'telegram-conversation-detail' conversation.pk %}"
-                           aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
-                            <i class="fas fa-comments me-1" aria-hidden="true"></i>{% translate "Open" %}
-                        </a>
-                    </td>
-                </tr>
-                {% endwith %}
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="ad-empty">
-                        <i class="fas fa-inbox" aria-hidden="true"></i>
-                        <h5>{% translate "No conversations found" %}</h5>
-                        <p>{% translate "There are no support conversations matching the current filters." %}</p>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <ul class="tg-chat-conv-list list-unstyled mb-0">
+        {% for conversation in page_obj %}
+        {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
+        <li class="tg-chat-row">
+            <a class="tg-chat-row-link"
+               href="{% url 'telegram-conversation-detail' conversation.pk %}{% if search or status %}?{% if search %}search={{ search|urlencode }}{% endif %}{% if search and status %}&amp;{% endif %}{% if status %}status={{ status }}{% endif %}{% endif %}"
+               aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
+                <span class="tg-chat-avatar" aria-hidden="true">
+                    {% if conversation.user.profile_image_key %}
+                    <img class="tg-chat-avatar-img"
+                         src="{% url 'application-document' conversation.user.pk 'profile' %}"
+                         alt=""
+                         loading="lazy"
+                         referrerpolicy="no-referrer">
+                    {% else %}
+                    <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
+                    {% endif %}
+                </span>
+
+                <span class="tg-chat-row-main">
+                    <span class="tg-chat-row-head">
+                        <span class="tg-chat-user-name">{{ student_name }}</span>
+                        <span class="tg-chat-row-username">{{ conversation.user.username }}</span>
+                        <span class="tg-chat-row-time">
+                             {% if conversation.latest_message_at %}
+                             <time datetime="{{ conversation.latest_message_at|date:'c' }}">{{ conversation.latest_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+                            {% endif %}
+                        </span>
+                    </span>
+
+                    <span class="tg-chat-row-sub">
+                        <span class="tg-chat-row-preview">
+                            {% if conversation.last_message_text %}
+                            {{ conversation.last_message_text|truncatechars:64 }}
+                            {% elif conversation.last_message_content_type %}
+                            <i class="fas fa-paperclip me-1" aria-hidden="true"></i>{% translate "Media message" %}
+                            {% else %}
+                            {% translate "No messages yet" %}
+                            {% endif %}
+                        </span>
+                        <span class="tg-chat-row-status">
+                            {% if conversation.status == "open" %}
+                            <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
+                            {% elif conversation.status == "claimed" %}
+                            <span class="ad-pill ad-pill--teal">{{ conversation.get_status_display }}</span>
+                            {% elif conversation.status == "handled" %}
+                            <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
+                            {% elif conversation.status == "blocked" %}
+                            <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
+                            {% else %}
+                            <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
+                            {% endif %}
+                        </span>
+                    </span>
+                </span>
+
+                <span class="tg-chat-row-chevron" aria-hidden="true">
+                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
+                </span>
+            </a>
+        </li>
+        {% endwith %}
+        {% empty %}
+        <li class="ad-empty">
+            <i class="fas fa-inbox" aria-hidden="true"></i>
+            <h5>{% translate "No conversations found" %}</h5>
+            <p>{% translate "There are no support conversations matching the current filters." %}</p>
+        </li>
+        {% endfor %}
+    </ul>
 
     {% if page_obj.has_other_pages %}
     <div class="ad-page-wrapper">

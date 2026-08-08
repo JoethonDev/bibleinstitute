@@ -361,6 +361,7 @@ def reply_to_conversation(
     TelegramConversation.objects.filter(pk=conversation.pk).update(
         status=TelegramConversation.Status.HANDLED,
         handled_at=timezone.now(),
+        last_message_at=outbound.created_at,
         version=F("version") + 1,
         updated_at=timezone.now(),
     )

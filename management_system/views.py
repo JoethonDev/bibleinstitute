@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Avg, Count, F, Prefetch, Q, Sum
+from django.db.models import Avg, Case, Count, F, IntegerField, Prefetch, Q, Sum, When
 from django.db import IntegrityError, transaction
 from django.contrib import messages
 from django.contrib.messages import success, error, info
@@ -54,7 +54,7 @@ from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset,
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
 from .utils.file_validator import validate_upload_filename, validate_hls_object_key, FileValidator, MAX_FILE_SIZE
-from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url
+from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url, get_r2_client
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
@@ -68,6 +68,9 @@ from .academic_enrollment import (
     activate_academic_year,
     accept_application,
     decline_application,
+    reopen_application,
+    set_application_status,
+    set_user_normal_enrollment_scope,
     promote_evaluation_result,
     promote_evaluation_results,
 )
@@ -1479,7 +1482,16 @@ class UpdateUser(UserBaseView, UpdateView):
         return form
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        try:
+            with transaction.atomic():
+                response = super().form_valid(form)
+                user = User.objects.get(username=self.request.user)
+                scope = form.cleaned_data.get("enrollment_scope")
+                if user.role and user.role.role == "admin" and scope:
+                    set_user_normal_enrollment_scope(self.object, user, scope)
+        except ValidationError as exc:
+            form.add_error("enrollment_scope", exc)
+            return self.form_invalid(form)
         # If the password field was changed, update the session to keep user logged in
         if self.object.pk == self.request.user.pk and "password" in form.cleaned_data and form.cleaned_data["password"]:
             update_session_auth_hash(self.request, self.object)
@@ -3434,17 +3446,26 @@ def signup(request):
 @capability_required(can_manage_applications)
 def applications_dashboard(request):
     status_filter = request.GET.get("status", "all")
+    application_order = [
+        Case(
+            When(application_status="pending", then=0),
+            default=1,
+            output_field=IntegerField(),
+        ),
+        "-date_joined",
+        "-pk",
+    ]
     if status_filter == "all":
         users = User.objects.filter(
             Q(application_status__in=["pending", "active", "declined"])
-        ).select_related("role").order_by("date_joined")
+        ).select_related("role").order_by(*application_order)
     elif status_filter in ("pending", "active", "declined"):
-        users = User.objects.filter(application_status=status_filter).select_related("role").order_by("date_joined")
+        users = User.objects.filter(application_status=status_filter).select_related("role").order_by(*application_order)
     else:
         status_filter = "all"
         users = User.objects.filter(
             Q(application_status__in=["pending", "active", "declined"])
-        ).select_related("role").order_by("date_joined")
+        ).select_related("role").order_by(*application_order)
     paginator = Paginator(users, 15)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -3500,17 +3521,7 @@ def application_review(request, user_id):
                     user.save()
 
                     if desired_status != original_status:
-                        user.application_status = "pending"
-                        user.is_active = False
-                        user.save(update_fields=["application_status", "is_active"])
-                        if desired_status == "active":
-                            user, _enrollment = accept_application(user, request.user)
-                        elif desired_status == "declined":
-                            user = decline_application(user, request.user)
-                        else:
-                            user.decided_by = None
-                            user.decided_at = None
-                            user.save(update_fields=["decided_by", "decided_at"])
+                        user, _enrollment = set_application_status(user, request.user, desired_status)
                 for old_key in set(old_keys):
                     try:
                         CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=old_key)
@@ -3560,6 +3571,66 @@ def application_review(request, user_id):
     })
 
 
+def _delete_user_storage(document_keys: list[str], telegram_keys: list[str]) -> None:
+    for key in set(document_keys):
+        try:
+            CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+        except Exception:
+            logger.exception("Could not delete application document after user deletion")
+    if telegram_keys:
+        try:
+            telegram_client = get_r2_client()
+            for key in set(telegram_keys):
+                telegram_client.delete_object(
+                    Bucket=getattr(settings, "TELEGRAM_R2_BUCKET_NAME", ""),
+                    Key=key,
+                )
+        except Exception:
+            logger.exception("Could not delete Telegram attachments after user deletion")
+
+
+@capability_required(can_manage_applications)
+@require_POST
+def application_delete(request, user_id):
+    """Permanently delete an application and its user-owned records."""
+    if request.user.pk == user_id:
+        messages.error(request, _("You cannot delete your own administrator account."))
+        return redirect("applications-dashboard")
+    document_keys = []
+    telegram_keys = []
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=user_id)
+            document_keys = [
+                key for key in (
+                    user.identity_front_key,
+                    user.identity_back_key,
+                    user.payment_key,
+                    user.profile_image_key,
+                ) if key
+            ]
+            telegram_keys = list(
+                TelegramAttachment.objects.filter(
+                    message__conversation__user_id=user.pk,
+                ).exclude(r2_key="").values_list("r2_key", flat=True)
+            )
+            user.delete()
+            transaction.on_commit(
+                lambda: _delete_user_storage(document_keys, telegram_keys)
+            )
+    except User.DoesNotExist:
+        messages.error(request, _("The application no longer exists."))
+        return redirect("applications-dashboard")
+    except ProtectedError:
+        messages.error(
+            request,
+            _("This user cannot be permanently deleted because other records depend on the account."),
+        )
+        return redirect("applications-dashboard")
+    messages.success(request, _("The application and student account were permanently deleted."))
+    return redirect("applications-dashboard")
+
+
 @capability_required(can_manage_applications)
 def application_document(request, user_id, document_type):
     document_fields = {
@@ -3592,21 +3663,27 @@ def application_document(request, user_id, document_type):
 
 @capability_required(can_manage_applications)
 def application_decision(request, user_id, decision):
-    if decision not in ("activate", "decline"):
+    if decision not in ("activate", "decline", "pending"):
         return HttpResponse(_("Invalid decision"), status=400)
     if request.method != "POST":
         return HttpResponse(_("Method not allowed"), status=405)
     user = get_object_or_404(User, pk=user_id)
 
     try:
+        original_status = user.application_status
         if decision == "activate":
             user, _enrollment = accept_application(user, request.user)
-            send_application_activated(user)
+            if original_status != user.application_status:
+                send_application_activated(user)
             messages.success(request, _("%(name)s activated.") % {"name": user.get_full_name() or user.username})
-        else:
+        elif decision == "decline":
             user = decline_application(user, request.user)
-            send_application_declined(user)
+            if original_status != user.application_status:
+                send_application_declined(user)
             messages.success(request, _("%(name)s declined.") % {"name": user.get_full_name() or user.username})
+        else:
+            user = reopen_application(user, request.user)
+            messages.success(request, _("%(name)s returned to pending.") % {"name": user.get_full_name() or user.username})
     except (ValidationError, PermissionDenied) as exc:
         message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)
         messages.error(request, message)
@@ -3624,22 +3701,33 @@ def bulk_application_decision(request):
     user_ids = data.get("user_ids", [])
     if data.get("select_all"):
         status = data.get("status", "pending")
-        user_ids = list(User.objects.filter(application_status=status).values_list("id", flat=True)[:1000])
+        if status == "all":
+            status_filter = ["pending", "active", "declined"]
+        elif status in ("pending", "active", "declined"):
+            status_filter = [status]
+        else:
+            return JsonResponse({"error": _("Invalid application status")}, status=400)
+        user_ids = list(User.objects.filter(application_status__in=status_filter).values_list("id", flat=True)[:1000])
     elif not isinstance(user_ids, list):
         return JsonResponse({"error": _("user_ids must be a list.")}, status=400)
     user_ids = user_ids[:1000]
-    if decision not in ("activate", "decline"):
+    if decision not in ("activate", "decline", "pending"):
         return JsonResponse({"error": _("Invalid decision")}, status=400)
     results = {"success": [], "errors": []}
     for uid in user_ids:
         try:
             user = User.objects.get(pk=uid)
+            original_status = user.application_status
             if decision == "activate":
                 user, _enrollment = accept_application(user, request.user)
-                send_application_activated(user)
-            else:
+                if original_status != user.application_status:
+                    send_application_activated(user)
+            elif decision == "decline":
                 user = decline_application(user, request.user)
-                send_application_declined(user)
+                if original_status != user.application_status:
+                    send_application_declined(user)
+            else:
+                user = reopen_application(user, request.user)
             results["success"].append(uid)
         except (ValidationError, PermissionDenied) as exc:
             message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)

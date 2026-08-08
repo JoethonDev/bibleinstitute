@@ -16,13 +16,25 @@
     </nav>
 
     <div class="tg-chat-detail-head">
-        <div class="tg-chat-detail-title">
-            <h4 class="mb-1">
-                <i class="fas fa-comments me-2 ad-page-header-icon" aria-hidden="true"></i>
-                {% blocktranslate with student=student_name %}Conversation with {{ student }}{% endblocktranslate %}
-            </h4>
-            <div class="tg-chat-student-meta">
-                <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
+        <div class="tg-chat-detail-user">
+            <span class="tg-chat-avatar tg-chat-avatar--lg" aria-hidden="true">
+                {% if conversation.user.profile_image_key %}
+                <img class="tg-chat-avatar-img"
+                     src="{% url 'application-document' conversation.user.pk 'profile' %}"
+                     alt=""
+                     loading="lazy"
+                     referrerpolicy="no-referrer">
+                {% else %}
+                <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
+                {% endif %}
+            </span>
+            <div class="tg-chat-detail-title">
+                <h4 class="mb-1">
+                    {% blocktranslate with student=student_name %}Conversation with {{ student }}{% endblocktranslate %}
+                </h4>
+                <div class="tg-chat-student-meta">
+                    <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
+                </div>
             </div>
         </div>
         <div class="tg-chat-detail-actions">
