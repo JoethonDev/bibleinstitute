@@ -6165,6 +6165,18 @@ msgstr "Select a conversation"
 msgid "Choose a conversation from the list to view messages and reply."
 msgstr "Choose a conversation from the list to view messages and reply."
 
+#: .\management_system\templates\partials\telegram_chat_panel.html:27
+#: .\management_system\templates\partials\telegram_conversation_list.html:59
+msgid "Processed"
+msgstr "Processed"
+
+#: .\management_system\templates\partials\telegram_conversation_list.html:65
+#, python-format
+msgid "%(counter)s message"
+msgid_plural "%(counter)s messages"
+msgstr[0] "%(counter)s message"
+msgstr[1] "%(counter)s messages"
+
 #: .\management_system\templates\theme_showcase\admin_proposal.html:6
 msgid "Admin Consistory — UI Proposal"
 msgstr "Admin Consistory — UI Proposal"

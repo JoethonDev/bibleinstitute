@@ -38,35 +38,34 @@
                         <span class="tg-chat-user-name">{{ student_name }}</span>
                         <span class="tg-chat-row-username">{{ conversation.user.username }}</span>
                         <span class="tg-chat-row-time">
-                             {% if conversation.latest_message_at %}
-                             <time datetime="{{ conversation.latest_message_at|date:'c' }}">{{ conversation.latest_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+                             {% if conversation.latest_user_message_at %}
+                             <time datetime="{{ conversation.latest_user_message_at|date:'c' }}">{{ conversation.latest_user_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
                             {% endif %}
                         </span>
                     </span>
 
                     <span class="tg-chat-row-sub">
                         <span class="tg-chat-row-preview">
-                            {% if conversation.last_message_text %}
-                            {{ conversation.last_message_text|truncatechars:64 }}
-                            {% elif conversation.last_message_content_type %}
+                            {% if conversation.latest_user_message_text %}
+                            {{ conversation.latest_user_message_text|truncatechars:64 }}
+                            {% elif conversation.latest_user_message_content_type %}
                             <i class="fas fa-paperclip me-1" aria-hidden="true"></i>{% translate "Media message" %}
                             {% else %}
                             {% translate "No messages yet" %}
                             {% endif %}
                         </span>
                         <span class="tg-chat-row-status">
-                            {% if conversation.status == "open" %}
-                            <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
-                            {% elif conversation.status == "claimed" %}
-                            <span class="ad-pill ad-pill--warning">{% translate "Open" %}</span>
-                            {% elif conversation.status == "handled" %}
-                            <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
-                            {% elif conversation.status == "blocked" %}
-                            <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
+                            {% if conversation.latest_user_message_direction == "outbound" %}
+                            <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
                             {% else %}
-                            <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
+                            <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
                             {% endif %}
                         </span>
+                        {% if conversation.message_count %}
+                        <span class="tg-chat-row-count" title="{% blocktranslate count counter=conversation.message_count %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktranslate %}">
+                            <i class="far fa-comment-dots" aria-hidden="true"></i>{{ conversation.message_count }}
+                        </span>
+                        {% endif %}
                     </span>
                 </span>
 

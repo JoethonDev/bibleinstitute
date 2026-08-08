@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, F, OuterRef, Q, Subquery
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -189,23 +189,42 @@ def telegram_unlink(request):
 
 TELEGRAM_CONVERSATION_STATUSES = frozenset(
     {
-        TelegramConversation.Status.OPEN,
-        TelegramConversation.Status.CLAIMED,
-        TelegramConversation.Status.HANDLED,
-        TelegramConversation.Status.BLOCKED,
+        "pending",
+        "processed",
     }
 )
 
 
+def _latest_user_message_queryset():
+    return TelegramMessage.objects.filter(
+        conversation__user_id=OuterRef("user_id"),
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
+    ).order_by("-created_at", "-pk")
+
+
+def _representative_conversations():
+    latest_conversation = TelegramConversation.objects.filter(
+        user_id=OuterRef("user_id"),
+    ).order_by(
+        F("last_message_at").desc(nulls_last=True),
+        F("updated_at").desc(nulls_last=True),
+        "-pk",
+    )
+    return TelegramConversation.objects.filter(
+        pk=Subquery(latest_conversation.values("pk")[:1]),
+    )
+
+
 def _conversation_search_queryset(search: str):
-    queryset = TelegramConversation.objects.all()
+    queryset = _representative_conversations()
     if search:
         queryset = queryset.filter(
             Q(user__username__icontains=search)
             | Q(user__first_name__icontains=search)
             | Q(user__last_name__icontains=search)
             | Q(user__email__icontains=search)
-            | Q(messages__text__icontains=search)
+            | Q(user__telegram_conversations__messages__text__icontains=search)
         ).distinct()
     return queryset
 
@@ -213,10 +232,8 @@ def _conversation_search_queryset(search: str):
 def _conversation_status_counts(queryset):
     counts = queryset.aggregate(
         all=Count("pk"),
-        open=Count("pk", filter=Q(status=TelegramConversation.Status.OPEN)),
-        claimed=Count("pk", filter=Q(status=TelegramConversation.Status.CLAIMED)),
-        handled=Count("pk", filter=Q(status=TelegramConversation.Status.HANDLED)),
-        blocked=Count("pk", filter=Q(status=TelegramConversation.Status.BLOCKED)),
+        pending=Count("pk", filter=~Q(latest_user_message_direction=TelegramMessage.Direction.OUTBOUND)),
+        processed=Count("pk", filter=Q(latest_user_message_direction=TelegramMessage.Direction.OUTBOUND)),
     )
     return counts
 
@@ -226,27 +243,28 @@ def _conversation_list_context(request):
     status = request.GET.get("status", "").strip()
     if status not in TELEGRAM_CONVERSATION_STATUSES:
         status = ""
-    searched = _conversation_search_queryset(search)
-    status_counts = _conversation_status_counts(searched)
-    conversations = searched.select_related("user", "claimed_by")
-    if status:
-        conversations = conversations.filter(status=status)
-    last_message = TelegramMessage.objects.filter(
-        conversation_id=OuterRef("pk"),
-    ).exclude(
-        content_type=TelegramMessage.ContentType.DIGEST,
-    ).order_by("-created_at", "-pk")
-    conversations = conversations.annotate(
-        latest_message_at=Subquery(last_message.values("created_at")[:1]),
-        last_message_text=Subquery(last_message.values("text")[:1]),
-        last_message_content_type=Subquery(last_message.values("content_type")[:1]),
-        last_message_direction=Subquery(last_message.values("direction")[:1]),
+    searched = _conversation_search_queryset(search).select_related("user", "claimed_by").annotate(
+        latest_user_message_at=Subquery(_latest_user_message_queryset().values("created_at")[:1]),
+        latest_user_message_text=Subquery(_latest_user_message_queryset().values("text")[:1]),
+        latest_user_message_content_type=Subquery(_latest_user_message_queryset().values("content_type")[:1]),
+        latest_user_message_direction=Subquery(_latest_user_message_queryset().values("direction")[:1]),
         message_count=Count(
-            "messages",
-            filter=~Q(messages__content_type=TelegramMessage.ContentType.DIGEST),
+            "user__telegram_conversations__messages",
+            filter=~Q(user__telegram_conversations__messages__content_type=TelegramMessage.ContentType.DIGEST),
             distinct=True,
         ),
-    ).order_by("-latest_message_at", "-pk")
+    )
+    status_counts = _conversation_status_counts(searched)
+    conversations = searched
+    if status == "pending":
+        conversations = conversations.filter(
+            ~Q(latest_user_message_direction=TelegramMessage.Direction.OUTBOUND),
+        )
+    elif status == "processed":
+        conversations = conversations.filter(
+            latest_user_message_direction=TelegramMessage.Direction.OUTBOUND,
+        )
+    conversations = conversations.order_by("-latest_user_message_at", "-pk")
     page_obj = Paginator(conversations, 25).get_page(request.GET.get("page", 1))
     return {
         "page_obj": page_obj,
@@ -301,7 +319,7 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
     if message_id <= 0:
         return None
     if not TelegramMessage.objects.filter(
-        conversation_id=conversation_id,
+        conversation__user_id=conversation_id,
         telegram_message_id=message_id,
     ).exclude(content_type=TelegramMessage.ContentType.DIGEST).exists():
         return None
@@ -310,13 +328,16 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
 
 def _conversation_detail_context(request, conversation, reply_form=None, panel_notice=None):
     messages_queryset = TelegramMessage.objects.filter(
-        conversation=conversation,
+        conversation__user_id=conversation.user_id,
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
-    ).prefetch_related("attachments").order_by("-created_at", "-pk")
-    messages_page_obj = Paginator(messages_queryset, 30).get_page(request.GET.get("page", 1))
+    ).prefetch_related("attachments").order_by("created_at", "pk")
+    paginator = Paginator(messages_queryset, 30)
+    requested_page = request.GET.get("page")
+    page_number = requested_page or paginator.num_pages or 1
+    messages_page_obj = paginator.get_page(page_number)
     reply_to_message_id = _valid_reply_target(
-        conversation.pk,
+        conversation.user_id,
         request.GET.get("reply_to"),
     )
     if reply_form is None:
@@ -344,7 +365,11 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
 @require_GET
 def telegram_conversation_detail(request, conversation_id):
     conversation = get_object_or_404(
-        TelegramConversation.objects.select_related("user", "claimed_by"),
+        TelegramConversation.objects.select_related("user", "claimed_by").annotate(
+            latest_user_message_direction=Subquery(
+                _latest_user_message_queryset().values("direction")[:1],
+            ),
+        ),
         pk=conversation_id,
     )
     context = _conversation_detail_context(request, conversation)
@@ -359,7 +384,11 @@ def telegram_conversation_detail(request, conversation_id):
 @require_POST
 def telegram_conversation_reply(request, conversation_id):
     conversation = get_object_or_404(
-        TelegramConversation.objects.select_related("user", "claimed_by"),
+        TelegramConversation.objects.select_related("user", "claimed_by").annotate(
+            latest_user_message_direction=Subquery(
+                _latest_user_message_queryset().values("direction")[:1],
+            ),
+        ),
         pk=conversation_id,
     )
     form = TelegramSupportReplyForm(request.POST)
@@ -407,7 +436,11 @@ def telegram_conversation_reply(request, conversation_id):
             messages.success(request, _("Reply sent successfully."))
     if panel_request:
         refreshed = get_object_or_404(
-            TelegramConversation.objects.select_related("user", "claimed_by"),
+            TelegramConversation.objects.select_related("user", "claimed_by").annotate(
+                latest_user_message_direction=Subquery(
+                    _latest_user_message_queryset().values("direction")[:1],
+                ),
+            ),
             pk=conversation.pk,
         )
         return render(

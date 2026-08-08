@@ -1964,6 +1964,21 @@
 
 .tg-chat-row-status { flex: 0 0 auto; }
 
+.tg-chat-row-count {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--ps-teal);
+    background: var(--ps-mist);
+    border: 1px solid var(--ps-line-cool);
+    border-radius: 999px;
+    padding: .1rem .5rem;
+    white-space: nowrap;
+}
+
 .tg-chat-row-chevron {
     flex: 0 0 auto;
     color: var(--ps-muted);
@@ -2149,15 +2164,6 @@
     text-decoration: underline;
 }
 
-/* ── Reply form ── */
-.tg-chat-reply-note {
-    font-size: .78rem;
-    color: var(--ps-muted);
-    margin: .5rem 0 .75rem;
-}
-
-.tg-chat-reply-form textarea { min-height: 6rem; }
-
 /* ── Polling indicator (HTMX request state only, no JS) ── */
 .tg-chat-polling {
     display: inline-flex;
@@ -2183,6 +2189,11 @@
     .tg-chat-avatar { width: 2.5rem; height: 2.5rem; }
     .tg-chat-avatar--lg { width: 2.75rem; height: 2.75rem; }
     .tg-chat-row-time { display: none; }
+    .tg-chat-composer {
+        margin-inline: -.6rem;
+        margin-bottom: -.6rem;
+        padding: .6rem .7rem .7rem;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2236,8 +2247,6 @@
     min-height: 0;
     max-height: none;
 }
-
-.tg-chat-workspace .tg-chat-reply { flex: 0 0 auto; margin-top: 0; }
 
 /* ── Empty chat pane ── */
 .tg-chat-empty {
@@ -2305,6 +2314,23 @@
     flex: 0 0 auto;
     min-height: 3.5rem;
     padding-inline: 1.1rem;
+}
+
+/* ── Compact composer pinned to the thread bottom ── */
+.tg-chat-composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin-top: auto;
+    margin-inline: -1rem;
+    margin-bottom: -1rem;
+    padding: .8rem 1rem .9rem;
+    background: var(--ps-paper);
+    border-top: 1px solid var(--ps-line);
+    border-radius: 0 0 var(--ps-radius) var(--ps-radius);
 }
 
 @media (max-width: 991.98px) {

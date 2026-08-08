@@ -1,6 +1,8 @@
 {% load i18n %}
 <div id="telegram-message-list"
      class="tg-chat-thread"
+     x-data
+     x-init="$nextTick(() => { $el.scrollTop = $el.scrollHeight; })"
      hx-get="{{ detail_url }}?fragment=1&amp;page={{ messages_page_obj.number }}"
      hx-trigger="every 10s"
      hx-target="this"
@@ -128,4 +130,39 @@
         </div>
     </div>
     {% endif %}
+
+    <form method="post"
+          action="{{ reply_url }}"
+          class="tg-chat-reply-form tg-chat-composer"
+          hx-post="{{ reply_url }}?fragment=panel"
+          hx-target="#telegram-chat-panel"
+          hx-swap="innerHTML"
+          x-on:keydown.enter.exact.prevent="$event.target.form.requestSubmit()">
+        {% csrf_token %}
+        {% if reply_form.non_field_errors %}
+        <div class="ad-alert ad-alert--danger" role="alert">
+            <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
+            <span>{{ reply_form.non_field_errors }}</span>
+        </div>
+        {% endif %}
+
+        <div class="tg-chat-composer-row">
+            <div class="tg-chat-composer-field">
+                <span class="visually-hidden">{{ reply_form.message.label_tag }}</span>
+                {{ reply_form.message }}
+                {% if reply_form.message.errors %}
+                <div class="text-danger mt-1">{{ reply_form.message.errors }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="ad-btn ad-btn--teal tg-chat-send-btn">
+                <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                <span class="visually-hidden">{% translate "Send Message" %}</span>
+            </button>
+        </div>
+
+        {{ reply_form.reply_to_telegram_message_id }}
+        {% if reply_form.reply_to_telegram_message_id.errors %}
+        <div class="text-danger mt-1">{{ reply_form.reply_to_telegram_message_id.errors }}</div>
+        {% endif %}
+    </form>
 </div>

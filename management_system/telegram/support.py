@@ -56,9 +56,16 @@ def start_conversation(*, admin: User, user_id: int) -> TelegramConversation:
 
     conversation = TelegramConversation.objects.select_for_update().filter(
         user=target,
-        status__in=(TelegramConversation.Status.OPEN, TelegramConversation.Status.CLAIMED),
-    ).first()
+    ).order_by("-last_message_at", "-updated_at", "-pk").first()
     if conversation:
+        if conversation.status == TelegramConversation.Status.HANDLED:
+            conversation.status = TelegramConversation.Status.OPEN
+            conversation.claimed_by = None
+            conversation.claimed_at = None
+            conversation.handled_at = None
+            conversation.save(update_fields=[
+                "status", "claimed_by", "claimed_at", "handled_at", "updated_at",
+            ])
         return conversation
     return TelegramConversation.objects.create(
         user=target,
@@ -129,6 +136,18 @@ def _conversation_for_user(user: User) -> TelegramConversation:
     ).first()
     if active:
         return active
+    latest = TelegramConversation.objects.select_for_update().filter(
+        user=user,
+    ).order_by("-last_message_at", "-updated_at", "-pk").first()
+    if latest:
+        latest.status = TelegramConversation.Status.OPEN
+        latest.claimed_by = None
+        latest.claimed_at = None
+        latest.handled_at = None
+        latest.save(update_fields=[
+            "status", "claimed_by", "claimed_at", "handled_at", "updated_at",
+        ])
+        return latest
     try:
         with transaction.atomic():
             return TelegramConversation.objects.create(
@@ -319,7 +338,7 @@ def _queue_reply(
         reply_target = None
         if reply_to_telegram_message_id is not None:
             reply_target = TelegramMessage.objects.filter(
-                conversation_id=conversation.pk,
+                conversation__user_id=conversation.user_id,
                 telegram_message_id=reply_to_telegram_message_id,
             ).first()
             if reply_target is None:

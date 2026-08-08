@@ -23,16 +23,10 @@
         </div>
     </div>
     <div class="tg-chat-detail-actions">
-        {% if conversation.status == "open" %}
-        <span class="ad-pill ad-pill--warning">{{ conversation.get_status_display }}</span>
-        {% elif conversation.status == "claimed" %}
-        <span class="ad-pill ad-pill--warning">{% translate "Open" %}</span>
-        {% elif conversation.status == "handled" %}
-        <span class="ad-pill ad-pill--success">{{ conversation.get_status_display }}</span>
-        {% elif conversation.status == "blocked" %}
-        <span class="ad-pill ad-pill--danger">{{ conversation.get_status_display }}</span>
+        {% if conversation.latest_user_message_direction == "outbound" %}
+        <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
         {% else %}
-        <span class="ad-pill ad-pill--muted">{{ conversation.get_status_display }}</span>
+        <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
         {% endif %}
 
         <a class="ad-btn ad-btn--ghost ad-btn--sm"
@@ -63,58 +57,4 @@
 {% endif %}
 
 {% include 'partials/telegram_message_list.html' %}
-
-<div class="tg-chat-reply ad-card">
-    <div class="ad-card-head">
-        <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>{% translate "Send Message" %}
-    </div>
-    <div class="ad-card-body">
-        {% if reply_to_message_id %}
-        <div class="ad-alert ad-alert--info mb-3" role="status">
-            <i class="fas fa-reply me-2" aria-hidden="true"></i>
-            {% translate "You are replying to a specific message in this conversation." %}
-        </div>
-        {% endif %}
-
-        <form method="post"
-              action="{{ reply_url }}"
-              class="tg-chat-reply-form"
-              hx-post="{{ reply_url }}?fragment=panel"
-              hx-target="#telegram-chat-panel"
-              hx-swap="innerHTML"
-              x-on:keydown.enter.exact.prevent="$event.target.form.requestSubmit()">
-            {% csrf_token %}
-            {% if reply_form.non_field_errors %}
-            <div class="ad-alert ad-alert--danger mb-3" role="alert">
-                <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
-                <span>{{ reply_form.non_field_errors }}</span>
-            </div>
-            {% endif %}
-
-            <div class="tg-chat-composer-row">
-                <div class="tg-chat-composer-field">
-                    {{ reply_form.message.label_tag }}
-                    {{ reply_form.message }}
-                    {% if reply_form.message.errors %}
-                    <div class="text-danger mt-1">{{ reply_form.message.errors }}</div>
-                    {% endif %}
-                </div>
-                <button type="submit" class="ad-btn ad-btn--teal tg-chat-send-btn">
-                    <i class="fas fa-paper-plane" aria-hidden="true"></i>
-                    <span class="visually-hidden">{% translate "Send Message" %}</span>
-                </button>
-            </div>
-
-            {{ reply_form.reply_to_telegram_message_id }}
-            {% if reply_form.reply_to_telegram_message_id.errors %}
-            <div class="text-danger mt-1">{{ reply_form.reply_to_telegram_message_id.errors }}</div>
-            {% endif %}
-
-            <p class="tg-chat-reply-note">
-                <i class="fas fa-user-secret me-1" aria-hidden="true"></i>
-                {% translate "Replies are delivered to the student anonymously as Admin." %}
-            </p>
-        </form>
-    </div>
-</div>
 {% endwith %}
