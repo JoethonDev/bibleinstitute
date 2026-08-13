@@ -106,6 +106,7 @@ def _failed_destination_offerings(source_scope, destination_scope, failed_result
     offerings = list(CourseOffering.objects.select_for_update().select_related("course").filter(
         academic_year_level=destination_scope,
         course_id__in=course_ids,
+        status=PublicationStatus.PUBLISHED,
     ))
     by_course = {offering.course_id: offering for offering in offerings}
     missing = sorted(set(course_ids) - set(by_course))
@@ -355,6 +356,10 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
         )
         if enrollment.academic_year_level_id != offering.academic_year_level_id:
             raise ValidationError(_("Exceptional enrollment scope does not match its offering."))
+        if not created and enrollment.status != Enrollment.Status.ACTIVE:
+            enrollment.status = Enrollment.Status.ACTIVE
+            enrollment.enrolled_by = actor
+            enrollment.save(update_fields=["status", "enrolled_by"])
         created_exceptional.append(enrollment)
 
     source.status = Enrollment.Status.COMPLETED

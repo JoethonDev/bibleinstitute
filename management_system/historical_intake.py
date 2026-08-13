@@ -246,7 +246,9 @@ def _create_or_get_user(row: dict[str, str], actor: User) -> User:
         is_active=True,
         application_status="active",
     )
-    user.set_unusable_password()
+    # Shared fixed password for operator-created historical-intake accounts;
+    # set_password hashes it before storage, so plaintext is never persisted.
+    user.set_password("123456789")
     user.full_clean()
     user.save()
     return user
