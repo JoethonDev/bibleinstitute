@@ -84,6 +84,7 @@ function lessonForm() {
                 <div class="card video-container mb-3">
                     <input type="hidden" name="videos" value="${id}">
                     <input type="hidden" name="videos_name" value="${name}">
+                    <input type="hidden" name="download_ids" value="">
                     <div class="card-body p-3">
                         <button type="button" class="btn-close position-absolute top-0 end-0 m-2" 
                                 @click="removeFile($event)" aria-label="${this.getTranslation('close')}"></button>

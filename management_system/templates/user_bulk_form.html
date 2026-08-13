@@ -48,7 +48,7 @@
             class="needs-validation"
             novalidate
           >
-            {% include 'messages.html' %} {% csrf_token %}
+            {% csrf_token %}
             <div class="form-content mb-4">{{ form|crispy }}</div>
 
             <div class="d-grid">

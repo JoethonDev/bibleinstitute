@@ -69,6 +69,20 @@
     </form>
     {% endif %}
 
+    {% if broadcast.status == 'draft' %}
+    <div class="d-flex flex-wrap gap-2 mb-3 tg-broadcast-draft-actions">
+        <a class="ad-btn ad-btn--teal" href="{{ confirm_url }}">
+            <i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>{% translate "Review Broadcast" %}
+        </a>
+        <form method="post" action="{{ cancel_url }}" class="tg-broadcast-delete-form" onsubmit="return confirm('{% translate "Are you sure?" %}')">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--danger">
+                <i class="fas fa-trash me-2" aria-hidden="true"></i>{% translate "Delete Draft" %}
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
     <div class="ad-card">
         <div class="ad-card-head"><i class="fas fa-users me-2" aria-hidden="true"></i>{% translate "Recipient Delivery" %}</div>
         <div class="ad-card-body">

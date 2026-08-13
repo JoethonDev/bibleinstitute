@@ -11,6 +11,13 @@
         return translations[key] || fallback;
     }
 
+    function shouldUseNativeHls(media) {
+        const native = media?.canPlayType('application/vnd.apple.mpegurl');
+        if (!native) return false;
+        if (!window.Hls || !Hls.isSupported()) return true;
+        return 'ManagedMediaSource' in window;
+    }
+
     function disposeVideoJsPlayers(container) {
         container.querySelectorAll('video.video-js').forEach(videoEl => {
             const player = videoEl.player;
@@ -24,6 +31,11 @@
         if (!video || video.player) return;
         const source = video.querySelector('source');
         if (!source || !source.src) return;
+        if (shouldUseNativeHls(video)) {
+            video.src = source.src;
+            video.load();
+            return;
+        }
         const player = videojs(video, {
             controls: true,
             fluid: true,
@@ -41,9 +53,15 @@
     }
 
     function initializeHlsAudio(audio) {
-        if (!audio || audio.hls || !window.Hls || !Hls.isSupported()) return;
+        if (!audio || audio.hls) return;
         const source = audio.querySelector('source');
         if (!source || !source.src) return;
+        if (shouldUseNativeHls(audio)) {
+            audio.src = source.src;
+            audio.load();
+            return;
+        }
+        if (!window.Hls || !Hls.isSupported()) return;
         const hls = new Hls();
         hls.loadSource(source.src);
         hls.attachMedia(audio);
@@ -60,6 +78,11 @@
         if (!element || !source || !url) return;
         source.src = url;
         if (element.tagName.toLowerCase() === 'video') {
+            if (shouldUseNativeHls(element)) {
+                element.src = url;
+                element.load();
+                return;
+            }
             let player = element.player;
             if (!player) {
                 initializeVideoJs(element);

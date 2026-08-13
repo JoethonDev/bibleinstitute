@@ -33,6 +33,7 @@
     {% endblock %}
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    {% include 'partials/components/backend_messages.html' %}
     
     <!-- Toast Notifications -->
     {% include 'partials/components/toast_container.html' %}

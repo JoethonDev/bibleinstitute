@@ -93,10 +93,10 @@
                 <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>{% translate "Confirm and Send" %}
             </button>
         </form>
-        <form method="post" action="{{ cancel_url }}">
+        <form method="post" action="{{ cancel_url }}" class="tg-broadcast-delete-form" onsubmit="return confirm('{% translate "Are you sure?" %}')">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--ghost">
-                <i class="fas fa-times me-2" aria-hidden="true"></i>{% translate "Cancel" %}
+                <i class="fas fa-trash me-2" aria-hidden="true"></i>{% translate "Delete Draft" %}
             </button>
         </form>
     </div>

@@ -4,6 +4,7 @@ Supports MP4 (video), MP3 (audio), and PDF (document) validation
 """
 import os
 import mimetypes
+import posixpath
 from typing import Tuple, List, Optional
 from django.utils.translation import gettext as _
 
@@ -17,6 +18,33 @@ ALLOWED_MIME_TYPES = {
     'application/pdf'
 }
 MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB in bytes
+DOWNLOADABLE_AUDIO_FOLDER = "Downloadable Files"
+
+
+def downloadable_audio_key(manifest_key: str) -> str | None:
+    """Return the canonical MP3 sibling key for an HLS audio manifest."""
+    if not isinstance(manifest_key, str) or not manifest_key.lower().endswith(".m3u8"):
+        return None
+    folder = posixpath.dirname(manifest_key)
+    basename = posixpath.basename(manifest_key)[:-5]
+    if not basename or any(part in {"", ".", ".."} for part in manifest_key.split("/")):
+        return None
+    return posixpath.join(folder, DOWNLOADABLE_AUDIO_FOLDER, f"{basename}.mp3")
+
+
+def validate_downloadable_audio_key(key: str) -> tuple[bool, list[str]]:
+    """Validate an MP3 key in the canonical Downloadable Files folder."""
+    errors: list[str] = []
+    if not isinstance(key, str) or not key:
+        return False, [_('Downloadable audio key cannot be empty.')]
+    if len(key) > 1024 or key.startswith("/") or "\\" in key or "?" in key or "#" in key:
+        return False, [_('Downloadable audio key is invalid.')]
+    parts = key.split("/")
+    if any(not part or part in {".", ".."} for part in parts):
+        return False, [_('Downloadable audio key is invalid.')]
+    if len(parts) < 2 or parts[-2] != DOWNLOADABLE_AUDIO_FOLDER or not parts[-1].lower().endswith(".mp3"):
+        errors.append(_('Downloadable audio must be an MP3 inside "Downloadable Files".'))
+    return not errors, errors
 
 
 class FileValidator:

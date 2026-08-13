@@ -12,7 +12,11 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 
 from .models import CourseOffering, Lesson, PublicationStatus
-from .utils.file_validator import validate_hls_object_key
+from .utils.file_validator import (
+    downloadable_audio_key,
+    validate_downloadable_audio_key,
+    validate_hls_object_key,
+)
 
 
 PART_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
@@ -45,6 +49,7 @@ def _validate_expected_media(expected_media: Any) -> list[dict[str, Any]]:
         name = item.get("name")
         key = _safe_object_key(item.get("id"))
         part_id = item.get("part_id")
+        download_id = item.get("download_id")
         if file_type not in MEDIA_TYPES | {"book"}:
             raise ValidationError(_("Expected upload type is invalid."))
         if not isinstance(name, str) or not name or len(name) > 255:
@@ -62,13 +67,32 @@ def _validate_expected_media(expected_media: Any) -> list[dict[str, Any]]:
         elif not key.lower().endswith(".pdf"):
             raise ValidationError(_("Expected book key must be a PDF."))
 
-        links.append({
+        # Validate the optional downloadable MP3 sibling key. Audio links must
+        # carry one; video links may carry one; book links must not.
+        if file_type == "book":
+            if download_id:
+                raise ValidationError(_("Expected book media must not include a download key."))
+        elif download_id:
+            download_key = _safe_object_key(download_id)
+            valid, errors = validate_downloadable_audio_key(download_key)
+            if not valid:
+                raise ValidationError(errors or [_('Downloadable audio key is invalid.')])
+            if download_key != downloadable_audio_key(key):
+                raise ValidationError(_("Downloadable audio key must be the canonical sibling of the media manifest."))
+            download_id = download_key
+        elif file_type == "audio":
+            raise ValidationError(_("Expected audio media must include a downloadable MP3 key."))
+
+        link = {
             "file_type": file_type,
             "name": name,
             "id": key,
             "part_id": part_id,
             "scheduled": True,
-        })
+        }
+        if download_id:
+            link["download_id"] = download_id
+        links.append(link)
 
     return links
 
@@ -142,7 +166,14 @@ def _missing_r2_objects(lesson: Lesson, cloud_client, bucket_name: str) -> list[
 
     for link in links:
         key = link["id"]
-        if not check_object(key) or link.get("file_type") not in MEDIA_TYPES:
+        if not check_object(key):
+            continue
+        download_id = link.get("download_id")
+        if download_id:
+            check_object(download_id)
+        elif link.get("file_type") == "audio":
+            missing.append(key)
+        if link.get("file_type") not in MEDIA_TYPES:
             continue
         try:
             response = cloud_client.get_object(Bucket=bucket_name, Key=key)

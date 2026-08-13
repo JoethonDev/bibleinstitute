@@ -1982,6 +1982,33 @@ msgstr "مفتاح بيان HLS المتوقع غير صالح."
 msgid "Expected book key must be a PDF."
 msgstr "يجب أن يكون مفتاح الكتاب المتوقع ملف PDF."
 
+msgid "Expected book media must not include a download key."
+msgstr "يجب ألا تتضمن وسائط الكتاب مفتاح تنزيل."
+
+msgid "Expected audio media must include a downloadable MP3 key."
+msgstr "يجب أن تتضمن الوسائط الصوتية مفتاح MP3 قابلًا للتنزيل."
+
+msgid "Downloadable audio key is invalid."
+msgstr "مفتاح الصوت القابل للتنزيل غير صالح."
+
+msgid "Downloadable audio key must be the canonical sibling of the media manifest."
+msgstr "يجب أن يكون مفتاح الصوت القابل للتنزيل هو المفتاح الشقيق القياسي لبيان الوسائط."
+
+msgid "Downloadable audio key cannot be empty."
+msgstr "لا يمكن أن يكون مفتاح الصوت القابل للتنزيل فارغًا."
+
+msgid "Downloadable audio must be an MP3 inside \"Downloadable Files\"."
+msgstr "يجب أن يكون الصوت القابل للتنزيل ملف MP3 داخل مجلد \"Downloadable Files\"."
+
+msgid "Lesson files are incomplete."
+msgstr "ملفات الدرس غير مكتملة."
+
+msgid "Book media cannot have a downloadable audio file."
+msgstr "لا يمكن أن تحتوي وسائط الكتاب على ملف صوتي قابل للتنزيل."
+
+msgid "Download is temporarily unavailable."
+msgstr "التنزيل غير متاح مؤقتًا."
+
 #: .\management_system\scheduled_lessons.py:78
 msgid "Lesson name is required and must be 255 characters or fewer."
 msgstr "اسم الدرس مطلوب ويجب ألا يتجاوز 255 حرفًا."
@@ -9116,6 +9143,13 @@ msgstr "اليوم"
 #| msgid "Promotion Formula Builder"
 msgid "Promotion formula is required."
 msgstr "منشئ صيغة الترقية"
+
+#: .\management_system\templates\partials\telegram_broadcast_list.html:29
+#: .\management_system\templates\partials\telegram_broadcast_list.html:31
+#: .\management_system\templates\telegram_broadcast_detail.html:80
+#: .\management_system\templates\telegram_broadcast_confirm.html:99
+msgid "Delete Draft"
+msgstr "حذف المسودة"
 
 #, python-format
 #~ msgid "Cannot accept a %(status)s application."

@@ -523,6 +523,13 @@
                             console.log("Segmentation Complete:", videoSegments.segments.length, "video segments created.");
                             await uploadSegments(videoSegments, videoName, result.folder, 'Video Segments');
                             await uploadSegments(audioSegments, audioName, result.folder, 'Audio Segments');
+                            // Standalone MP3 for browser download (same basename as the HLS audio playlist)
+                            try {
+                                const downloadable = await encodeDownloadableMp3(fullFileName, audioName);
+                                await uploadFfmpegOutputToDownloadable(downloadable, result.folder, 'audio/mpeg');
+                            } catch (mp3Error) {
+                                console.error('Downloadable MP3 upload failed for', fileName, mp3Error);
+                            }
                             return { success: true, type: 'video', fileName: fullFileName };
                         } catch (error) {
                             console.error(getJsTranslation_upload('videoProcessingFailed'), fileName, error);
@@ -545,6 +552,14 @@
 
                             console.log("Audio Segmentation Complete:", audioSegments.segments.length, "segments created.");
                             await uploadSegments(audioSegments, audioName, result.folder, 'Audio Segments');
+                            // Upload the original MP3 as a downloadable file (no second encode required)
+                            try {
+                                const f = (result.folder || '').replace(/\/+$/, '');
+                                const folderPrefix = f ? `${f}/` : '';
+                                await uploadR2(`${folderPrefix}Downloadable Files/${audioName}.mp3`, file);
+                            } catch (mp3Error) {
+                                console.error('Downloadable MP3 upload failed for', fileName, mp3Error);
+                            }
                             return { success: true, type: 'audio', fileName: fullFileName };
                         } catch (error) {
                             console.error(getJsTranslation_upload('audioSegmentationFailed'), fileName, error);
@@ -637,16 +652,22 @@
                     await ffmpeg.run(
                         '-i', fullFileName,
                         '-c:v', 'libx264',     // H.264 video encoding
-                        '-crf', '27',          // Quality/size tradeoff (higher=smaller)
-                        '-preset', 'medium',   // Default encoding speed/compression
-                        '-b:v', '900k',        // Cap video bitrate for lecture content
-                        '-pix_fmt', 'yuv420p', // Broad player compatibility
-                        '-map', '0:v:0',       // First video stream only (no audio)
-                        '-an',                 // No audio in video playlist
-                        '-f', 'hls',           // Use HLS format
-                        '-hls_time', '6',      // 6-second segments for shorter chunks
-                        '-hls_list_size', '0', // Keep all segments in playlist
-                        '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
+                         '-crf', '27',          // Quality/size tradeoff (higher=smaller)
+                         '-preset', 'medium',   // Default encoding speed/compression
+                         '-b:v', '900k',        // Cap video bitrate for lecture content
+                         '-profile:v', 'high',  // H.264 profile supported by Safari and modern browsers
+                         '-level', '4.1',       // Keep the stream within broad device limits
+                         '-pix_fmt', 'yuv420p', // Broad player compatibility
+                         '-map', '0:v:0',       // First video stream only (no audio)
+                         '-an',                 // No audio in video playlist
+                         '-force_key_frames', 'expr:gte(t,n_forced*6)', // Start each target segment at an IDR
+                         '-sc_threshold', '0',  // Keep segment boundaries independent
+                         '-f', 'hls',           // Use HLS format
+                         '-hls_time', '6',      // 6-second segments for shorter chunks
+                         '-hls_list_size', '0', // Keep all segments in playlist
+                         '-hls_playlist_type', 'vod', // Explicit VOD semantics for native Safari HLS
+                         '-hls_flags', 'independent_segments',
+                         '-hls_segment_filename', `${fileName}_%03d.ts`, // TS file pattern
                         `${fileName}.m3u8`        // Main playlist file
                     );
 
@@ -665,12 +686,14 @@
                     await ffmpeg.run(
                         '-i', fullFileName,
                         '-vn',                    // no video
-                        '-acodec', 'aac',
-                        '-b:a', '96k',           // Reduced audio bitrate
-                        '-f', 'hls',
-                        '-hls_time', '8',        // 8-second segments
-                        '-hls_list_size', '0',
-                        '-hls_segment_filename', `${baseName}_%03d.ts`,
+                         '-acodec', 'aac',
+                         '-b:a', '96k',           // Reduced audio bitrate
+                         '-f', 'hls',
+                         '-hls_time', '8',        // 8-second segments
+                         '-hls_list_size', '0',
+                         '-hls_playlist_type', 'vod', // Explicit VOD semantics for native Safari HLS
+                         '-hls_flags', 'independent_segments',
+                         '-hls_segment_filename', `${baseName}_%03d.ts`,
                         `${baseName}.m3u8`
                     );
 
@@ -700,12 +723,14 @@
                     // Process audio file and segment it
                     await ffmpeg.run(
                         '-i', fullFileName,
-                        '-acodec', 'aac',
-                        '-b:a', '96k',           // Reduced audio bitrate
-                        '-f', 'hls',
-                        '-hls_time', '8',        // 8-second segments
-                        '-hls_list_size', '0',
-                        '-hls_segment_filename', `${baseName}_%03d.ts`,
+                         '-acodec', 'aac',
+                         '-b:a', '96k',           // Reduced audio bitrate
+                         '-f', 'hls',
+                         '-hls_time', '8',        // 8-second segments
+                         '-hls_list_size', '0',
+                         '-hls_playlist_type', 'vod', // Explicit VOD semantics for native Safari HLS
+                         '-hls_flags', 'independent_segments',
+                         '-hls_segment_filename', `${baseName}_%03d.ts`,
                         `${baseName}.m3u8`
                     );
 
@@ -715,6 +740,41 @@
                     console.error(getJsTranslation_upload('audioSegmentationFailed'), error);
                     throw error;
                 }
+            }
+
+            // Encode a standalone MP3 for browser download (video stripped,
+            // same basename as the HLS audio playlist).
+            async function encodeDownloadableMp3(fullFileName, audioName) {
+                await ffmpeg.run(
+                    '-i', fullFileName,
+                    '-vn',                    // no video
+                    '-acodec', 'libmp3lame',  // MP3 audio codec
+                    '-b:a', '96k',            // Reduced audio bitrate
+                    `${audioName}.mp3`        // MP3 output in FFmpeg FS
+                );
+                return `${audioName}.mp3`;
+            }
+
+            // Read an FFmpeg FS output file into a Blob and upload it under
+            // <folder>/Downloadable Files/<fileName>. Cleans up the FS output
+            // safely when it is absent.
+            async function uploadFfmpegOutputToDownloadable(fileName, folder, blobType = 'application/octet-stream') {
+                const f = (folder || '').replace(/\/+$/, '');
+                const folderPrefix = f ? `${f}/` : '';
+
+                const data = ffmpeg.FS('readFile', fileName);
+                const blob = new Blob([data], { type: blobType });
+
+                const filePath = `${folderPrefix}Downloadable Files/${fileName}`;
+                await uploadR2(filePath, blob);
+
+                // Safe cleanup: ignore when the FS output is already gone.
+                try {
+                    ffmpeg.FS('unlink', fileName);
+                } catch (e) {
+                    // output already removed or never created
+                }
+                return filePath;
             }
 
             async function requestUploadUrl(fileName, size) {
@@ -781,7 +841,7 @@
 
                     // Rewrite playlist with canonical segment subfolder references
                     const rewrittenPlaylist = rewritePlaylist(sections.playlistText, segmentFolder);
-                    const playlistBlob = new Blob([rewrittenPlaylist], { type: 'application/x-mpegURL' });
+                    const playlistBlob = new Blob([rewrittenPlaylist], { type: 'application/vnd.apple.mpegurl' });
 
                     // Upload playlist to selected-folder root
                     const playlistPath = `${folderPrefix}${baseName}.m3u8`;
@@ -886,7 +946,8 @@
                             file_type: 'audio',
                             name: audioName,
                             id: folderPrefix + audioName + '.m3u8',
-                            part_id: partId
+                            part_id: partId,
+                            download_id: folderPrefix + 'Downloadable Files/' + audioName + '.mp3'
                         });
                     } else if (result.type === 'audio') {
                         const audioName = 'audio_' + base;
@@ -894,7 +955,8 @@
                             file_type: 'audio',
                             name: audioName,
                             id: folderPrefix + audioName + '.m3u8',
-                            part_id: partId
+                            part_id: partId,
+                            download_id: folderPrefix + 'Downloadable Files/' + audioName + '.mp3'
                         });
                     } else if (result.type === 'document') {
                         const normalizedFullName = result.file.name.split(' ').join('_');
@@ -940,6 +1002,13 @@
                     li.appendChild(labelElement);
                     li.appendChild(document.createElement('br'));
                     li.appendChild(keyElement);
+                    if (d.download_id) {
+                        const downloadKeyElement = document.createElement('small');
+                        downloadKeyElement.className = 'text-muted';
+                        downloadKeyElement.textContent = getJsTranslation_upload('expectedKey') + ' ' + d.download_id;
+                        li.appendChild(document.createElement('br'));
+                        li.appendChild(downloadKeyElement);
+                    }
                     list.appendChild(li);
                 });
                 container.classList.remove('d-none');

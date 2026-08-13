@@ -15,8 +15,8 @@
                 {% if hls_url.type == 'video' %}
                     <!-- Responsive video container (Psalmodia) -->
                     <div class="lesson-video-wrapper sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
-                        <video playsinline controls class="video-js vjs-theme-city" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
-                            <source type="application/x-mpegURL"/>
+                        <video playsinline controls crossorigin="anonymous" class="video-js vjs-theme-city" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
+                            <source type="application/vnd.apple.mpegurl"/>
                             <p class="vjs-no-js">
                             {% translate "To view this video please enable JavaScript, and consider upgrading to a web browser that" %}
                             <a href="https://videojs.com/html5-video-support/" target="_blank">{% translate "supports HTML5 video" %}</a>
@@ -30,8 +30,8 @@
                     </div>
                 {% elif hls_url.type == 'audio' %}
                     <div class="sd-audio-body" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
-                    <audio controls class="w-100" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
-                        <source type="application/x-mpegURL"/>
+                    <audio controls crossorigin="anonymous" class="w-100" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate">
+                        <source type="application/vnd.apple.mpegurl"/>
                     </audio>
                     <div class="mt-2 d-flex align-items-center gap-2 sd-track">
                         <span class="text-muted small">{% translate "Progress" %}:</span>
@@ -40,22 +40,10 @@
                     </div>
                     <!-- Audio Download Button (Psalmodia) -->
                     <div class="mt-3">
-                        <button class="btn btn-primary audio-download-btn sd-btn--teal min-w-160 d-flex align-items-center justify-content-center"
-                                onclick="downloadAudio(this, '{{ hls_url.name }}')">
+                        <a class="btn btn-primary audio-download-btn sd-btn--teal min-w-160 d-inline-flex align-items-center justify-content-center"
+                           href="{{ hls_url.download_url }}">
                             <i class="fas fa-download me-2"></i>{% translate "Download Audio" %}
-                        </button>
-                        <div class="download-progress hidden-initially mt-3" id="progress-{{ forloop.counter }}">
-                            <div class="progress progress-download">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success progress-zero"
-                                     id="progress-bar-{{ forloop.counter }}" 
-                                     role="progressbar"
-                                     aria-valuenow="0" 
-                                     aria-valuemin="0" 
-                                     aria-valuemax="100">
-                                    <span class="fw-bold">0%</span>
-                                </div>
-                            </div>
-                        </div>
+                        </a>
                     </div>
                 {% else %}
                    <div class="d-flex justify-content-center">
@@ -73,119 +61,5 @@
         </div>
     {% endfor %}
 
-    <script>
-    // --- MAIN EXECUTION ---
-    // Move downloadAudio to global scope and declare as async
-    async function downloadAudio(button, fileName) {
-        const m3u8Url = button.closest('.card-body').querySelector('audio source').src;
-        const progressContainer = button.parentElement.querySelector('.download-progress');
-        const progressBar = progressContainer.querySelector('.progress-bar');
-        try {
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>{% translate "Processing..." %}';
-            progressContainer.style.display = 'block';
-            const progressText = progressBar.querySelector('span');
-            progressText.textContent = '{% translate "Fetching playlist..."|escapejs %}';
-            const response = await fetch(m3u8Url);
-            const m3u8Text = await response.text();
-            const tsUrls = parseM3U8(m3u8Text, m3u8Url);
-            if (tsUrls.length === 0) {
-                throw new Error('{% translate "No audio segments found in playlist"|escapejs %}');
-            }
-            const audioBlob = await downloadAndConcatenateTS(tsUrls, (downloadedFiles, totalFiles) => {
-                const progressPercentage = Math.round((downloadedFiles / totalFiles) * 100);
-                progressBar.style.width = progressPercentage + '%';
-                progressBar.setAttribute('aria-valuenow', progressPercentage);
-                progressText.textContent = `${progressPercentage}%`;
-            });
-            progressText.textContent = '{% translate "Processing..."|escapejs %}';
-            let baseFileName = m3u8Url.split('/').filter(part => part.trim() !== '').slice(1).join('_');
-            if (baseFileName.endsWith('.m3u8')) {
-                baseFileName = baseFileName.slice(0, -5);
-            }
-            baseFileName = baseFileName || 'audio';
-            const url = URL.createObjectURL(audioBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = baseFileName + '.mp3';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            progressBar.style.width = '100%';
-            progressBar.setAttribute('aria-valuenow', '100');
-            progressBar.classList.remove('progress-bar-animated');
-            progressBar.classList.add('bg-success');
-            progressText.textContent = '{% translate "Complete!" %}';
-            setTimeout(() => {
-                progressContainer.style.display = 'none';
-                button.disabled = false;
-                button.innerHTML = '<i class="fas fa-download me-2"></i>{% translate "Download Audio" %}';
-            }, 2000);
-        } catch (error) {
-            console.error('Download failed:', error);
-            alert('{% translate "Download failed. Please try again." %}');
-            progressContainer.style.display = 'none';
-            button.disabled = false;
-            button.innerHTML = '<i class="fas fa-download me-2"></i>{% translate "Download Audio" %}';
-        }
-    }
-    function parseM3U8(m3u8Text, baseUrl) {
-            const lines = m3u8Text.split('\n');
-            const tsUrls = [];
-            const baseUrlWithoutFile = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
-            
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine && !trimmedLine.startsWith('#')) {
-                    if (trimmedLine.startsWith('http')) {
-                        tsUrls.push(trimmedLine);
-                    } else {
-                        tsUrls.push(baseUrlWithoutFile + trimmedLine);
-                    }
-                }
-            }
-            
-            return tsUrls;
-        }
-
-        async function downloadAndConcatenateTS(tsUrls, onProgress) {
-            const audioChunks = [];
-            let totalDownloaded = 0;
-            const totalSize = tsUrls.length;
-
-            for (let i = 0; i < tsUrls.length; i++) {
-                try {
-                    const response = await fetch(tsUrls[i]);
-                    if (!response.ok) {
-                        console.warn(`Failed to download segment ${i + 1}: ${response.status}`);
-                        continue;
-                    }
-
-                    const arrayBuffer = await response.arrayBuffer();
-                    audioChunks.push(new Uint8Array(arrayBuffer));
-
-                    // Update total downloaded and progress
-                    totalDownloaded++;
-                    onProgress(totalDownloaded, totalSize);
-                } catch (error) {
-                    console.warn(`Error downloading segment ${i + 1}:`, error);
-                }
-            }
-
-            // Concatenate all chunks
-            const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-            const concatenated = new Uint8Array(totalLength);
-
-            let offset = 0;
-            for (const chunk of audioChunks) {
-                concatenated.set(chunk, offset);
-                offset += chunk.length;
-            }
-
-            return new Blob([concatenated], { type: 'audio/mpeg' });
-        }
-
-    </script>
 </div>
 {% endblock %}

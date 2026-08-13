@@ -1982,6 +1982,33 @@ msgstr "Expected HLS manifest key is invalid."
 msgid "Expected book key must be a PDF."
 msgstr "Expected book key must be a PDF."
 
+msgid "Expected book media must not include a download key."
+msgstr "Expected book media must not include a download key."
+
+msgid "Expected audio media must include a downloadable MP3 key."
+msgstr "Expected audio media must include a downloadable MP3 key."
+
+msgid "Downloadable audio key is invalid."
+msgstr "Downloadable audio key is invalid."
+
+msgid "Downloadable audio key must be the canonical sibling of the media manifest."
+msgstr "Downloadable audio key must be the canonical sibling of the media manifest."
+
+msgid "Downloadable audio key cannot be empty."
+msgstr "Downloadable audio key cannot be empty."
+
+msgid "Downloadable audio must be an MP3 inside \"Downloadable Files\"."
+msgstr "Downloadable audio must be an MP3 inside \"Downloadable Files\"."
+
+msgid "Lesson files are incomplete."
+msgstr "Lesson files are incomplete."
+
+msgid "Book media cannot have a downloadable audio file."
+msgstr "Book media cannot have a downloadable audio file."
+
+msgid "Download is temporarily unavailable."
+msgstr "Download is temporarily unavailable."
+
 #: .\management_system\scheduled_lessons.py:78
 msgid "Lesson name is required and must be 255 characters or fewer."
 msgstr "Lesson name is required and must be 255 characters or fewer."
@@ -9185,6 +9212,13 @@ msgstr "Day"
 #| msgid "Promotion Formula Builder"
 msgid "Promotion formula is required."
 msgstr "Promotion Formula Builder"
+
+#: .\management_system\templates\partials\telegram_broadcast_list.html:29
+#: .\management_system\templates\partials\telegram_broadcast_list.html:31
+#: .\management_system\templates\telegram_broadcast_detail.html:80
+#: .\management_system\templates\telegram_broadcast_confirm.html:99
+msgid "Delete Draft"
+msgstr "Delete Draft"
 
 #, python-format
 #~ msgid "Cannot accept a %(status)s application."

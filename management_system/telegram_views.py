@@ -659,6 +659,8 @@ def telegram_broadcast_detail(request, broadcast_id):
             "recipient_page_obj": recipient_page_obj,
             "broadcast_list_url": reverse("telegram-broadcasts"),
             "retry_url": reverse("telegram-broadcast-retry", kwargs={"broadcast_id": broadcast.pk}),
+            "confirm_url": reverse("telegram-broadcast-confirm-page", kwargs={"broadcast_id": broadcast.pk}),
+            "cancel_url": reverse("telegram-broadcast-cancel", kwargs={"broadcast_id": broadcast.pk}),
         },
     )
 

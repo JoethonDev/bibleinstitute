@@ -16,12 +16,6 @@
     <span>{% translate "Scan a QR code or look up a student. The course is taken automatically from today's calendar." %}</span>
   </div>
 
-  {% if messages %}
-    {% for msg in messages %}
-      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
-    {% endfor %}
-  {% endif %}
-
   <div class="row g-3">
     {# --- Camera Scanner --- #}
     <div class="col-md-6">

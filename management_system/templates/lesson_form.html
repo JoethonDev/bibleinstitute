@@ -59,7 +59,6 @@
                 </h4>
             </div>
             <div class="ad-card-body">
-                {% include 'messages.html' %}
                 
                 <form action="" method="post" 
                       class="admin-form"
@@ -162,10 +161,14 @@
                                   </div>
                                   <div id="lectures-display" class="ad-card-body p-3">
                                      <div id="videos-input" class="d-flex flex-column">
-                                         {% for video in videos %}
-                                         <div class="card video-container mb-3">
-                                             <input type="hidden" name="videos" value="{{ video.id }}">
-                                             <input type="hidden" name="videos_name" value="{{ video.name }}">
+                                          {% for video in videos %}
+                                          <div class="card video-container mb-3">
+                                              <input type="hidden" name="videos" value="{{ video.id }}">
+                                              <input type="hidden" name="videos_name" value="{{ video.name }}">
+                                              <input type="hidden" name="download_ids" value="{{ video.download_id|default:'' }}">
+                                             {% if video.download_id %}
+                                             <input type="hidden" name="download_ids" value="{{ video.download_id }}">
+                                             {% endif %}
                                              <div class="card-body p-3">
                                                  <button type="button"
                                                          class="btn-close position-absolute top-0 end-0 m-2"

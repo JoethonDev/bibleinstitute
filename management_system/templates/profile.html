@@ -26,11 +26,6 @@
 
                 <!-- Profile form -->
                 <div id="profile" class="sd-profile-form">
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert {{ message.tags }}">{{ message }}</div>
-                        {% endfor %}
-                    {% endif %}
                     {% if profile_editable %}
                     <form method="post" action="{% url 'view-profile' %}">
                         {% csrf_token %}

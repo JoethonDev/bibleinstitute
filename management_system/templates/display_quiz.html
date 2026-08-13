@@ -49,11 +49,6 @@
                 </div>
 
                 <div class="sd-screen">
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert {{ message.tags }}">{{ message }}</div>
-                        {% endfor %}
-                    {% endif %}
 
                     <!-- Closed / not taken banner -->
                     {% if mode == "closed_unsolved" %}

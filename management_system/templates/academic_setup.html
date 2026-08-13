@@ -21,12 +21,6 @@
         </div>
     </div>
 
-    {% if messages %}
-        {% for msg in messages %}
-            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
-        {% endfor %}
-    {% endif %}
-
     {# --- Academic Years Section --- #}
     <div class="ad-pane-head">
         <h5 class="ad-pane-title">{% translate "Academic Years" %}</h5>

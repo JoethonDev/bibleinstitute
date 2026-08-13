@@ -155,6 +155,8 @@
     {% endif %}
     {% endblock %}
 
+    {% include 'partials/components/backend_messages.html' %}
+
     <!-- Toast Notifications (Psalmodia) -->
     <div class="ps-toast-stack" x-data>
         <template x-for="notification in $store.notifications.items" :key="notification.id">

@@ -16,12 +16,6 @@
   </div>
 
   <div id="calendar-content">
-  {% if messages %}
-    {% for msg in messages %}
-      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}</div>
-    {% endfor %}
-  {% endif %}
-
   {# Academic year selector — level selection is not required for the calendar entry page #}
   <div class="row g-2 mb-3 align-items-end ad-calendar-year-picker">
     <div class="col-auto">

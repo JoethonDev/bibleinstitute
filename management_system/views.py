@@ -38,7 +38,6 @@ import json
 import re
 import os
 import csv
-import requests
 import mimetypes
 from datetime import date
 
@@ -54,7 +53,14 @@ from .utils.reports import build_report_data, build_report_page_rows, iter_repor
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
-from .utils.file_validator import validate_upload_filename, validate_hls_object_key, FileValidator, MAX_FILE_SIZE
+from .utils.file_validator import (
+    downloadable_audio_key,
+    validate_downloadable_audio_key,
+    validate_upload_filename,
+    validate_hls_object_key,
+    FileValidator,
+    MAX_FILE_SIZE,
+)
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url, get_r2_client
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
@@ -129,6 +135,35 @@ cf_api_token = getattr(settings, "CLOUDFLARE_API_TOKEN", "")
 cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_account_id and cf_api_token else None
 
 PromotionRuleFormSet = formset_factory(PromotionRuleForm, extra=0, can_delete=True)
+
+
+def _lesson_links_from_form(request) -> list[dict]:
+    """Build lesson link metadata while preserving downloadable MP3 siblings."""
+    videos = request.POST.getlist("videos", [])
+    videos_name = request.POST.getlist("videos_name", [])
+    files_type = request.POST.getlist("files_type", [])
+    download_ids = request.POST.getlist("download_ids", [])
+    if not videos or len(videos) != len(videos_name) or len(videos) != len(files_type):
+        raise ValidationError(_("Lesson files are incomplete."))
+
+    links = []
+    for index, video_key in enumerate(videos):
+        download_key = download_ids[index].strip() if index < len(download_ids) else ""
+        if download_key:
+            valid, errors = validate_downloadable_audio_key(download_key)
+            if not valid or download_key != downloadable_audio_key(video_key):
+                raise ValidationError(errors or [_('Downloadable audio key is invalid.')])
+            if files_type[index] == "book":
+                raise ValidationError(_("Book media cannot have a downloadable audio file."))
+        link = {
+            "file_type": files_type[index],
+            "name": videos_name[index],
+            "id": video_key,
+        }
+        if download_key:
+            link["download_id"] = download_key
+        links.append(link)
+    return links
 
 # Initialize R2 Manager
 R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name, cloudflare_client)
@@ -970,6 +1005,10 @@ def view_lesson_details(request, offering_id, lesson_id):
             "type": file.get("file_type", ""),
             "part_id": file.get("part_id", ""),
             "file_index": file_index,
+            "download_url": (
+                f"{reverse('audio-download', args=[offering.pk, lesson_id])}?file_index={file_index}"
+                if file.get("file_type") == "audio" else ""
+            ),
         } for file_index, file in enumerate(lesson_links)]
     })
 
@@ -1911,18 +1950,9 @@ def create_lesson(request):
         lesson_description = request.POST.get("description", "").strip()
         offering_id = request.POST.get("course_offering")
         videos = request.POST.getlist("videos", [])
-        videos_name = request.POST.getlist("videos_name", [])
-        files_type = request.POST.getlist("files_type", [])
         if lesson_name and offering_id and videos:
             try:
-                links = [
-                    {
-                        "file_type": files_type[file_no],
-                        "name" : videos_name[file_no],
-                        "id" : videos[file_no],
-                        # "prefix" : videos[file_no].split("/")[:-1]
-                    } for file_no in range(len(videos))
-                ]
+                links = _lesson_links_from_form(request)
 
                 course_offering = get_object_or_404(
                     CourseOffering,
@@ -1946,8 +1976,9 @@ def create_lesson(request):
                     len(links),
                 )
 
-            except Http404:
+            except (Http404, ValidationError) as exc:
                 error(request, _("Create lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
+                logger.error("Lesson link validation failed: %s", exc)
                 logger.error("Offering %s is not found to create a lesson!", offering_id)
         else:
             error(request, _("Create lesson has failed, offering, name, and files are required!"), extra_tags="alert-danger")
@@ -2021,17 +2052,9 @@ def update_lesson(request, lesson_id):
         lesson_description = request.POST.get("description", "").strip()
         offering_id = request.POST.get("course_offering")
         videos = request.POST.getlist("videos", [])
-        videos_name = request.POST.getlist("videos_name", [])
-        files_type = request.POST.getlist("files_type", [])
         if lesson_name and offering_id and videos:
             try:
-                links = [
-                    {
-                        "file_type": files_type[file_no],
-                        "name" : videos_name[file_no],
-                        "id" : videos[file_no],
-                    } for file_no in range(len(videos))
-                ]
+                links = _lesson_links_from_form(request)
 
                 previous_status = lesson.status
                 lesson.name = lesson_name
@@ -2053,8 +2076,9 @@ def update_lesson(request, lesson_id):
                 )
                 success(request, _("Lesson is updated successfully"), extra_tags="alert-success") # Translate
 
-            except Http404:
+            except (Http404, ValidationError) as exc:
                 error(request, _("Update lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
+                logger.error("Lesson link validation failed: %s", exc)
             logger.error("Offering %s or Lesson with id %s was not found", offering_id, lesson_id)
         else:
             error(request, _("Update lesson has failed, offering, name, and files are required!"), extra_tags="alert-danger")
@@ -2921,34 +2945,46 @@ def submission_user(request, quiz_id, user_id):
 
 @login_required(login_url=LOGIN_URL)
 def generate_audio_download(request, offering_id, lesson_id):
+    user = User.objects.get(pk=request.user.pk)
+    offering = get_accessible_offering_or_403(user, offering_id)
+    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
+    if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
+        raise PermissionDenied(_("You do not have access to this lesson."))
+
     try:
-        user = User.objects.get(pk=request.user.pk)
-        offering = get_accessible_offering_or_403(user, offering_id)
-        lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
-        if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
-            raise PermissionDenied(_("You do not have access to this lesson."))
+        file_index = int(request.GET.get("file_index", "-1"))
+    except (TypeError, ValueError):
+        raise Http404
+    lesson_links = json.loads(lesson.links or "[]")
+    if file_index < 0 or file_index >= len(lesson_links):
+        raise Http404
+    link = lesson_links[file_index]
+    if link.get("file_type") != "audio":
+        raise Http404
 
-        # Extract the m3u8 file URL from the lesson links
-        m3u8_url = lesson.links
+    manifest_key = link.get("id", "")
+    download_key = link.get("download_id") or downloadable_audio_key(manifest_key)
+    valid, errors = validate_downloadable_audio_key(download_key or "")
+    if not valid or download_key != downloadable_audio_key(manifest_key):
+        logger.warning("Invalid downloadable audio metadata for lesson %s link %s: %s", lesson.pk, file_index, errors)
+        raise Http404
 
-        # Fetch the m3u8 file content
-        response = requests.get(m3u8_url)
-        if response.status_code != 200:
-            return JsonResponse({"error": _("Failed to fetch m3u8 file.")}, status=500)
-
-        # Parse the m3u8 file to extract .ts file URLs
-        ts_files = []
-        base_url = os.path.dirname(m3u8_url)
-        for line in response.text.splitlines():
-            if line.endswith(".ts"):
-                ts_files.append(os.path.join(base_url, line))
-
-        # Return the .ts file URLs to the client for concatenation
-        return JsonResponse({"ts_files": ts_files})
-
-    except Exception as e:
-        logger.error(f"Error generating audio download: {str(e)}")
-        return JsonResponse({"error": _("An error occurred while processing the request.")}, status=500)
+    filename = re.sub(r"[^A-Za-z0-9._-]+", "_", posixpath.basename(download_key)) or "audio.mp3"
+    try:
+        download_url = CLOUD_CLIENT.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": bucket_name,
+                "Key": download_key,
+                "ResponseContentType": "audio/mpeg",
+                "ResponseContentDisposition": f'attachment; filename="{filename}"',
+            },
+            ExpiresIn=3600,
+        )
+    except Exception:
+        logger.exception("Error generating downloadable audio URL for lesson %s", lesson.pk)
+        return JsonResponse({"error": _("Download is temporarily unavailable.")}, status=503)
+    return redirect(download_url)
 
 # Bulk Operations
 @capability_required(can_delete_content)
