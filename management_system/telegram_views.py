@@ -578,7 +578,7 @@ def telegram_broadcast_create(request):
     except (BroadcastError, ValueError) as exc:
         form.add_error(None, str(exc))
         return render(request, "telegram_broadcast.html", context, status=400)
-    return redirect("telegram-broadcast-confirm", broadcast_id=broadcast.pk)
+    return redirect("telegram-broadcast-confirm-page", broadcast_id=broadcast.pk)
 
 
 @capability_required(can_manage_academic_setup)

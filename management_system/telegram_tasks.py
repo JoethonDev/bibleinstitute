@@ -418,7 +418,10 @@ def _message_reply(bot, message: dict, sender_id: int, chat_id: int, update_id: 
             bot.send_message(chat_id, _("Please share your own phone number using the button below."), reply_markup=_phone_keyboard())
             return
         try:
-            link_with_phone(contact.get("phone", ""), sender_id, chat_id)
+            # Telegram names this Contact field ``phone_number``.  ``phone``
+            # is not part of the Bot API payload and always produced an empty
+            # value here, even when the user shared their own contact.
+            link_with_phone(contact.get("phone_number", ""), sender_id, chat_id)
         except TelegramLinkError as exc:
             bot.send_message(chat_id, str(exc))
         else:
