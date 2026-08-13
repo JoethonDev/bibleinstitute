@@ -2164,20 +2164,37 @@
     text-decoration: underline;
 }
 
-/* ── Polling indicator (HTMX request state only, no JS) ── */
-.tg-chat-polling {
+/* ── Auto-refresh toggle (Alpine poller control) ── */
+.tg-chat-autorefresh {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-bottom: .25rem;
+}
+
+.tg-chat-autorefresh-label {
     display: inline-flex;
     align-items: center;
     gap: .4rem;
-    align-self: flex-start;
     font-size: .78rem;
+    font-weight: 600;
     color: var(--ps-muted);
-    opacity: 0;
-    transition: opacity var(--ps-motion);
+    cursor: pointer;
+    user-select: none;
 }
 
-.htmx-request .tg-chat-polling,
-.tg-chat-polling.htmx-request { opacity: 1; }
+.tg-chat-autorefresh-label input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--ps-teal);
+    cursor: pointer;
+}
+
+.tg-chat-autorefresh-label input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 .18rem var(--ps-gold-soft);
+}
 
 /* ── Narrow screens / RTL-safe adjustments ── */
 @media (max-width: 767.98px) {
@@ -2197,8 +2214,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .tg-chat-attachment,
-    .tg-chat-polling { transition: none; }
+    .tg-chat-attachment { transition: none; }
 }
 
 /* ── Split workspace (conversation sidebar + chat pane) ── */

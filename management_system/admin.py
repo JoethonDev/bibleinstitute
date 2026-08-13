@@ -248,7 +248,7 @@ class EvaluationResultAdmin(admin.ModelAdmin):
 class PromotionHistoryAdmin(admin.ModelAdmin):
     list_display = [
         "student", "source_year_level", "destination_year_level",
-        "outcome", "score", "final_status", "created_at",
+        "outcome", "promotion_method", "score", "final_status", "actor", "reason", "created_at",
     ]
     list_filter = ["outcome", "source_year_level"]
     search_fields = ["student__username"]
@@ -260,7 +260,7 @@ class PromotionHistoryAdmin(admin.ModelAdmin):
         "student", "source_year_level", "destination_year_level",
         "outcome", "score", "computed_status", "final_status",
         "override_note", "override_actor", "exceptional_offering_ids",
-        "formula_snapshot", "actor", "created_at",
+        "formula_snapshot", "promotion_method", "reason", "actor", "created_at",
     ]
 
     def has_add_permission(self, request):
@@ -273,6 +273,32 @@ class PromotionHistoryAdmin(admin.ModelAdmin):
         return self.has_module_permission(request)
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HistoricalAcademicSummary)
+class HistoricalAcademicSummaryAdmin(admin.ModelAdmin):
+    list_display = ["student", "academic_year_level", "outcome", "certificate_eligible", "promoted_at", "reviewed_by"]
+    list_filter = ["outcome", "certificate_eligible", "academic_year_level"]
+    search_fields = ["student__username", "student__first_name", "student__last_name", "source_name"]
+    ordering = ["-created_at"]
+    list_per_page = 50
+    raw_id_fields = ["student", "reviewed_by"]
+    readonly_fields = ["source_key", "created_at", "updated_at", "promoted_at"]
+
+    def has_module_permission(self, request):
+        return _is_admin_user(request)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_admin_user(request)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_admin_user(request)
+
+    def has_add_permission(self, request):
         return False
 
     def has_delete_permission(self, request, obj=None):

@@ -45,8 +45,11 @@
                         <th scope="col">{% translate "From" %}</th>
                         <th scope="col">{% translate "To" %}</th>
                         <th scope="col">{% translate "Outcome" %}</th>
+                        <th scope="col">{% translate "Method" %}</th>
                         <th scope="col">{% translate "Score" %}</th>
                         <th scope="col">{% translate "Exceptional Courses" %}</th>
+                        <th scope="col">{% translate "Recorded by" %}</th>
+                        <th scope="col">{% translate "Reason" %}</th>
                         <th scope="col">{% translate "Recorded" %}</th>
                     </tr></thead>
                     <tbody>
@@ -70,7 +73,20 @@
                             {{ item.get_outcome_display|default:item.outcome }}
                             {% endif %}
                         </td>
-                        <td>{{ item.score|floatformat:1 }}%</td>
+                        <td>
+                            {% with method=item.get_promotion_method_display %}
+                            {% if item.promotion_method == "manual_historical" %}
+                            <span class="ad-pill ad-pill--brand">{% translate "Manual historical" %}</span>
+                            {% elif item.promotion_method == "system" %}
+                            <span class="ad-pill ad-pill--teal">{% translate "System" %}</span>
+                            {% elif method %}
+                            {{ method }}
+                            {% else %}
+                            <span class="ps-muted-text">—</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>{% if item.score is not None %}{{ item.score|floatformat:1 }}%{% else %}<span class="ps-muted-text">—</span>{% endif %}</td>
                         <td class="small">
                             {% if item.exceptional_offering_ids %}
                             <ul class="list-unstyled mb-0">
@@ -82,9 +98,11 @@
                             <span class="ps-muted-text">—</span>
                             {% endif %}
                         </td>
+                        <td>{{ item.actor.get_full_name|default:item.actor.username }}</td>
+                        <td class="small">{% if item.reason %}<span class="ps-text-muted">{{ item.reason }}</span>{% else %}<span class="ps-muted-text">—</span>{% endif %}</td>
                         <td>{{ item.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                     </tr>
-                    {% empty %}<tr><td colspan="7" class="ad-empty">{% translate "No promotion history found." %}</td></tr>{% endfor %}
+                    {% empty %}<tr><td colspan="10" class="ad-empty">{% translate "No promotion history found." %}</td></tr>{% endfor %}
                     </tbody>
                 </table>
             </div>

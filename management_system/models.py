@@ -1117,9 +1117,84 @@ class EvaluationResult(models.Model):
             raise ValidationError(_("Invalid evaluation result status."))
 
 
+class HistoricalAcademicSummary(models.Model):
+    """Reviewed academic outcome imported when the source year has no LMS exams."""
+
+    class Outcome(models.TextChoices):
+        PENDING_REVIEW = "pending_review", _("Pending review")
+        COMPLETED = "completed", _("Completed")
+        PASSED = "passed", _("Passed")
+        PARTIAL = "partial", _("Partial success")
+        FAILED = "failed", _("Failed")
+
+    student = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="historical_academic_summaries",
+    )
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel,
+        on_delete=models.PROTECT,
+        related_name="historical_summaries",
+    )
+    source_key = models.CharField(max_length=255, unique=True)
+    source_name = models.CharField(max_length=255)
+    source_file = models.CharField(max_length=255, blank=True, default="")
+    source_row = models.PositiveIntegerField(null=True, blank=True)
+    outcome = models.CharField(
+        max_length=20,
+        choices=Outcome.choices,
+        default=Outcome.PENDING_REVIEW,
+    )
+    notes = models.TextField(blank=True, default="")
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_historical_summaries",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    certificate_eligible = models.BooleanField(default=False)
+    promoted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "academic_year_level"],
+                name="historical_summary_student_scope_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["academic_year_level", "outcome"], name="hist_summary_scope_outcome_idx"),
+            models.Index(fields=["outcome", "promoted_at"], name="hist_summary_outcome_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.student.username} — {self.academic_year_level}"
+
+
 class PromotionHistory(models.Model):
+    class Method(models.TextChoices):
+        SYSTEM = "system", _("System")
+        MANUAL_HISTORICAL = "manual_historical", _("Manual historical")
+
     evaluation_result = models.OneToOneField(
-        EvaluationResult, on_delete=models.PROTECT, related_name="promotion_history"
+        EvaluationResult,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="promotion_history",
+    )
+    historical_summary = models.OneToOneField(
+        HistoricalAcademicSummary,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="promotion_history",
     )
     source_enrollment = models.ForeignKey(
         Enrollment, on_delete=models.PROTECT, related_name="source_promotion_history"
@@ -1135,17 +1210,45 @@ class PromotionHistory(models.Model):
         AcademicYearLevel, on_delete=models.PROTECT, null=True, blank=True, related_name="destination_promotion_history"
     )
     outcome = models.CharField(max_length=32)
-    score = models.DecimalField(max_digits=6, decimal_places=2)
-    computed_status = models.CharField(max_length=10)
-    final_status = models.CharField(max_length=10)
+    promotion_method = models.CharField(max_length=24, choices=Method.choices, default=Method.SYSTEM)
+    score = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    computed_status = models.CharField(max_length=20)
+    final_status = models.CharField(max_length=20)
     override_note = models.TextField(blank=True, default="")
     override_actor = models.ForeignKey(
         User, on_delete=models.PROTECT, null=True, blank=True, related_name="promotion_override_history"
     )
     exceptional_offering_ids = models.JSONField(default=list)
     formula_snapshot = models.JSONField(default=dict)
+    reason = models.TextField(blank=True, default="")
     actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name="recorded_promotions")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(evaluation_result__isnull=True, historical_summary__isnull=True),
+                name="promotion_history_source_required",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(evaluation_result__isnull=False, historical_summary__isnull=True)
+                    | models.Q(evaluation_result__isnull=True, historical_summary__isnull=False)
+                ),
+                name="promotion_history_one_source",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(promotion_method="manual_historical", reason=""),
+                name="promotion_history_manual_reason_required",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.promotion_method not in self.Method.values:
+            raise ValidationError(_("Invalid promotion method."))
+        if self.promotion_method == self.Method.MANUAL_HISTORICAL and not self.reason.strip():
+            raise ValidationError(_("A manual historical promotion requires a reason."))
 
 
 class MigrationReviewItem(models.Model):

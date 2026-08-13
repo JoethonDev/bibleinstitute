@@ -332,10 +332,22 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
     ).prefetch_related("attachments").order_by("created_at", "pk")
-    paginator = Paginator(messages_queryset, 30)
-    requested_page = request.GET.get("page")
-    page_number = requested_page or paginator.num_pages or 1
-    messages_page_obj = paginator.get_page(page_number)
+    after_raw = request.GET.get("after")
+    message_items = None
+    messages_page_obj = None
+    latest_message_pk = None
+    if after_raw is not None:
+        try:
+            after_id = int(after_raw)
+        except (TypeError, ValueError):
+            after_id = 0
+        message_items = list(messages_queryset.filter(pk__gt=after_id))
+    else:
+        paginator = Paginator(messages_queryset, 30)
+        requested_page = request.GET.get("page")
+        page_number = requested_page or paginator.num_pages or 1
+        messages_page_obj = paginator.get_page(page_number)
+        latest_message_pk = messages_queryset.values_list("pk", flat=True).last()
     reply_to_message_id = _valid_reply_target(
         conversation.user_id,
         request.GET.get("reply_to"),
@@ -349,6 +361,8 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     return {
         "conversation": conversation,
         "messages_page_obj": messages_page_obj,
+        "message_items": message_items,
+        "latest_message_pk": latest_message_pk,
         "reply_form": reply_form,
         "reply_url": reverse("telegram-conversation-reply", kwargs={"conversation_id": conversation.pk}),
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
@@ -376,6 +390,8 @@ def telegram_conversation_detail(request, conversation_id):
     if request.GET.get("fragment") == "panel":
         return render(request, "partials/telegram_chat_panel.html", context)
     if request.GET.get("fragment") == "1":
+        if context.get("message_items") is not None:
+            return render(request, "partials/telegram_message_items.html", context)
         return render(request, "partials/telegram_message_list.html", context)
     return render(request, "telegram_conversation_detail.html", context)
 

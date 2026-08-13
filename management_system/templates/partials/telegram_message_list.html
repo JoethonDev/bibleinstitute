@@ -1,77 +1,47 @@
 {% load i18n %}
 <div id="telegram-message-list"
      class="tg-chat-thread"
-     x-data
-     x-init="$nextTick(() => { $el.scrollTop = $el.scrollHeight; })"
-     hx-get="{{ detail_url }}?fragment=1&amp;page={{ messages_page_obj.number }}"
-     hx-trigger="every 10s"
-     hx-target="this"
-     hx-swap="outerHTML">
+     x-data="{
+         autoRefresh: true,
+         _timer: null,
+         init() {
+             this.$watch('autoRefresh', (value) => value ? this._start() : this._stop());
+             if (this.autoRefresh) this._start();
+             this.$nextTick(() => {
+                 this.$el.scrollTop = this.$el.scrollHeight;
+             });
+         },
+         destroy() { this._stop(); },
+         _start() { if (!this._timer) this._timer = setInterval(() => this._poll(), 10000); },
+         _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
+         _poll() {
+             const el = this.$el.querySelector('#telegram-message-items');
+             if (!el || !el.dataset.pollUrl) return;
+             const url = el.dataset.pollUrl + '&after=' + (el.dataset.lastId || '0');
+             htmx.ajax('GET', url, { target: el, swap: 'beforeend' })
+                 .then(() => {
+                     const items = el.querySelectorAll('li[data-msg-pk]');
+                     if (items.length) el.dataset.lastId = items[items.length - 1].dataset.msgPk;
+                     if (this.$el.scrollTop + this.$el.clientHeight >= this.$el.scrollHeight - 80) {
+                         this.$el.scrollTop = this.$el.scrollHeight;
+                     }
+                 })
+                 .catch(() => {});
+         }
+     }">
 
-    <div class="tg-chat-polling">
-        <i class="fas fa-sync fa-spin" aria-hidden="true"></i>
-        <span class="visually-hidden">{% translate "Checking for new messages" %}</span>
+    <div class="tg-chat-autorefresh">
+        <label class="tg-chat-autorefresh-label">
+            <input type="checkbox" x-model="autoRefresh">
+            <span>{% translate "Auto refresh" %}</span>
+        </label>
     </div>
 
-    <ol class="tg-chat-messages list-unstyled mb-0">
-        {% for message in messages_page_obj %}
-        <li class="tg-chat-msg tg-chat-msg--{{ message.direction }}">
-            <div class="tg-chat-msg-head">
-                <span class="tg-chat-msg-role">
-                    {% if message.direction == "inbound" %}{% translate "Student" %}{% else %}{% translate "Admin" %}{% endif %}
-                </span>
-                <span class="tg-chat-msg-type">{{ message.get_content_type_display }}</span>
-                <time class="tg-chat-msg-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
-            </div>
-
-            {% if message.text %}
-            <div class="tg-chat-msg-body">{{ message.text|linebreaksbr }}</div>
-            {% endif %}
-
-            {% with attachments=message.attachments.all %}
-            {% if attachments %}
-            <ul class="tg-chat-attachments list-unstyled mb-0">
-                {% for attachment in attachments %}
-                <li>
-                    <a class="tg-chat-attachment"
-                       href="{% url 'telegram-attachment' attachment_id=attachment.pk %}">
-                        <i class="fas fa-paperclip" aria-hidden="true"></i>
-                        <span>{{ attachment.original_name|default:attachment.media_type }}</span>
-                    </a>
-                </li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            {% endwith %}
-
-            <div class="tg-chat-msg-meta">
-                <span class="ad-pill ad-pill--muted">{{ message.get_delivery_status_display }}</span>
-                {% if message.sent_at %}
-                <time class="tg-chat-msg-time" datetime="{{ message.sent_at|date:'c' }}">
-                    {% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}
-                </time>
-                {% endif %}
-                {% if message.delivery_error %}
-                <span class="tg-chat-msg-error" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>
-                {% endif %}
-                {% if message.telegram_message_id and message.content_type != "digest" %}
-                <a class="tg-chat-reply-link"
-                   href="{{ detail_url }}?reply_to={{ message.telegram_message_id }}"
-                   hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}"
-                   hx-target="#telegram-chat-panel"
-                   hx-swap="innerHTML"
-                   aria-label="{% translate 'Reply to this message' %}">
-                    <i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}
-                </a>
-                {% endif %}
-            </div>
-        </li>
-        {% empty %}
-        <li class="ad-empty">
-            <i class="fas fa-inbox" aria-hidden="true"></i>
-            {% translate "No messages yet." %}
-        </li>
-        {% endfor %}
+    <ol id="telegram-message-items"
+        class="tg-chat-messages list-unstyled mb-0"
+        data-poll-url="{{ panel_url }}?fragment=1"
+        data-last-id="{{ latest_message_pk|default:0 }}">
+        {% include 'partials/telegram_message_items.html' with message_items=messages_page_obj show_empty=True %}
     </ol>
 
     {% if messages_page_obj.has_other_pages %}

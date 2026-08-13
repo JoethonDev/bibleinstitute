@@ -56,6 +56,9 @@ urlpatterns = [
     path('dashboard/users/<int:user_id>/', index, name="user-profile"),
     path('dashboard/users/<int:user_id>/delete/', DeleteUser.as_view(), name="user-delete"),
     path('dashboard/users/<int:user_id>/update/', UpdateUser.as_view(), name="user-update"),
+    path('dashboard/users/historical-intake/', historical_intake, name="historical-intake"),
+    path('dashboard/users/historical-intake/<int:summary_id>/promote/', historical_promote, name="historical-promote"),
+    path('dashboard/users/<int:user_id>/exceptional-courses/', exceptional_course_assign, name="exceptional-course-assign"),
     
     # Courses Dashboard
     path('dashboard/courses/', course_dashboard, name="course-dashboard"),

@@ -1,0 +1,30 @@
+{% load i18n %}
+{% for message in message_items %}
+<li class="tg-chat-msg tg-chat-msg--{{ message.direction }}" data-msg-pk="{{ message.pk }}">
+    <div class="tg-chat-msg-head">
+        <span class="tg-chat-msg-role">{% if message.direction == "inbound" %}{% translate "Student" %}{% else %}{% translate "Admin" %}{% endif %}</span>
+        <span class="tg-chat-msg-type">{{ message.get_content_type_display }}</span>
+        <time class="tg-chat-msg-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+    </div>
+    {% if message.text %}<div class="tg-chat-msg-body">{{ message.text|linebreaksbr }}</div>{% endif %}
+    {% with attachments=message.attachments.all %}
+    {% if attachments %}
+    <ul class="tg-chat-attachments list-unstyled mb-0">
+        {% for attachment in attachments %}
+        <li><a class="tg-chat-attachment" href="{% url 'telegram-attachment' attachment_id=attachment.pk %}"><i class="fas fa-paperclip" aria-hidden="true"></i><span>{{ attachment.original_name|default:attachment.media_type }}</span></a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
+    <div class="tg-chat-msg-meta">
+        <span class="ad-pill ad-pill--muted">{{ message.get_delivery_status_display }}</span>
+        {% if message.sent_at %}<time class="tg-chat-msg-time" datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
+        {% if message.delivery_error %}<span class="tg-chat-msg-error" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
+        {% if message.telegram_message_id and message.content_type != "digest" %}
+        <a class="tg-chat-reply-link" href="{{ detail_url }}?reply_to={{ message.telegram_message_id }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        {% endif %}
+    </div>
+</li>
+{% empty %}
+{% if show_empty %}<li class="ad-empty"><i class="fas fa-inbox" aria-hidden="true"></i>{% translate "No messages yet." %}</li>{% endif %}
+{% endfor %}

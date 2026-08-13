@@ -1,0 +1,106 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+
+{% block body %}
+{% translate "Promoted" as promoted_label %}
+<div class="ad-pane is-active" id="content">
+    <div class="ad-toolbar">
+        <div>
+            <h2 class="h5 mb-1"><i class="fas fa-clock-rotate-left me-2"></i>{% translate "Historical Academic Intake" %}</h2>
+            <p class="ad-pane-desc mb-0">{% translate "Review previous academic records, find or create student accounts, and promote students safely." %}</p>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}<div class="alert alert-{{ message.tags }}">{{ message }}</div>{% endfor %}
+    {% endif %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="ad-card mb-4">
+        <div class="ad-card-head"><h5 class="mb-0">{% translate "Add one student" %}</h5></div>
+        <div class="ad-card-body">
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-md-4">{{ form.source_year_level.label_tag }}{{ form.source_year_level }}{{ form.source_year_level.errors }}</div>
+                <div class="col-md-4">{{ form.source_name.label_tag }}{{ form.source_name }}{{ form.source_name.errors }}</div>
+                <div class="col-md-4">{{ form.account_action.label_tag }}{{ form.account_action }}{{ form.account_action.errors }}</div>
+                <div class="col-md-4">{{ form.lms_user_id.label_tag }}{{ form.lms_user_id }}{{ form.lms_user_id.errors }}</div>
+                <div class="col-md-4">{{ form.lms_username.label_tag }}{{ form.lms_username }}{{ form.lms_username.errors }}</div>
+                <div class="col-md-4">{{ form.lms_email.label_tag }}{{ form.lms_email }}{{ form.lms_email.errors }}</div>
+                <div class="col-md-4">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
+                <div class="col-md-4">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
+                <div class="col-md-4">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
+                <div class="col-md-4">{{ form.historical_outcome.label_tag }}{{ form.historical_outcome }}{{ form.historical_outcome.errors }}</div>
+                <div class="col-md-4">{{ form.destination_scope.label_tag }}{{ form.destination_scope }}{{ form.destination_scope.errors }}</div>
+                <div class="col-md-4">{{ form.exceptional_offering_ids.label_tag }}{{ form.exceptional_offering_ids }}{{ form.exceptional_offering_ids.errors }}</div>
+                <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+                <div class="col-12">{{ form.promotion_reason.label_tag }}{{ form.promotion_reason }}{{ form.promotion_reason.errors }}</div>
+                <div class="col-12 d-flex gap-3 align-items-center">
+                    <label class="form-check">{{ form.promote_now }} <span class="form-check-label">{% translate "Promote after review" %}</span></label>
+                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-save me-1"></i>{% translate "Save historical record" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="ad-card mb-4">
+        <div class="ad-card-head"><h5 class="mb-0">{% translate "Add multiple existing students" %}</h5></div>
+        <div class="ad-card-body">
+            <p class="text-muted">{% translate "Use usernames or numeric LMS IDs. This action is bounded to 1,000 students and runs transactionally." %}</p>
+            {% if bulk_form.non_field_errors %}<div class="alert alert-danger">{{ bulk_form.non_field_errors }}</div>{% endif %}
+            <form method="post" class="row g-3">
+                {% csrf_token %}<input type="hidden" name="action" value="bulk_historical">
+                <div class="col-md-4">{{ bulk_form.source_year_level.label_tag }}{{ bulk_form.source_year_level }}{{ bulk_form.source_year_level.errors }}</div>
+                <div class="col-md-8">{{ bulk_form.student_identifiers.label_tag }}{{ bulk_form.student_identifiers }}{{ bulk_form.student_identifiers.errors }}</div>
+                <div class="col-md-4">{{ bulk_form.historical_outcome.label_tag }}{{ bulk_form.historical_outcome }}{{ bulk_form.historical_outcome.errors }}</div>
+                <div class="col-md-4">{{ bulk_form.destination_scope.label_tag }}{{ bulk_form.destination_scope }}{{ bulk_form.destination_scope.errors }}</div>
+                <div class="col-md-4">{{ bulk_form.exceptional_offering_ids.label_tag }}{{ bulk_form.exceptional_offering_ids }}{{ bulk_form.exceptional_offering_ids.errors }}</div>
+                <div class="col-12">{{ bulk_form.notes.label_tag }}{{ bulk_form.notes }}{{ bulk_form.notes.errors }}</div>
+                <div class="col-12">{{ bulk_form.promotion_reason.label_tag }}{{ bulk_form.promotion_reason }}{{ bulk_form.promotion_reason.errors }}</div>
+                <div class="col-12 d-flex gap-3 align-items-center">
+                    <label class="form-check">{{ bulk_form.promote_now }} <span class="form-check-label">{% translate "Promote after review" %}</span></label>
+                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-users me-1"></i>{% translate "Save selected students" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="ad-card mb-4">
+        <div class="ad-card-head"><h5 class="mb-0">{% translate "CSV/XLSX reviewed upload" %}</h5></div>
+        <div class="ad-card-body">
+            <p class="text-muted">{% translate "Upload the reviewed template. The first submission is a dry-run; apply is allowed only when every row is valid." %}</p>
+            <form method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-end">
+                {% csrf_token %}
+                <div><label for="intake-file" class="form-label">{% translate "Intake CSV or XLSX" %}</label><input id="intake-file" class="form-control" type="file" name="intake_file" accept=".csv,.xlsx" required></div>
+                <button class="ad-btn ad-btn--outline-gold" type="submit" name="preview_upload" value="yes"><i class="fas fa-search me-1"></i>{% translate "Validate upload" %}</button>
+                {% if preview %}<button class="ad-btn ad-btn--teal" type="submit" name="apply_upload" value="yes"><i class="fas fa-check me-1"></i>{% translate "Apply reviewed upload" %}</button>{% endif %}
+            </form>
+            {% if preview %}
+            <div class="ad-table-wrap mt-3"><table class="ad-table"><thead><tr><th>{% translate "Row" %}</th><th>{% translate "Source student" %}</th><th>{% translate "Account" %}</th><th>{% translate "Result" %}</th><th>{% translate "Message" %}</th></tr></thead><tbody>{% for item in preview %}<tr><td>{{ item.row }}</td><td>{{ item.source_name }}</td><td>{{ item.account }}</td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}</tbody></table></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ad-card mb-4">
+        <div class="ad-card-head"><h5 class="mb-0">{% translate "Assign exceptional failed courses" %}</h5></div>
+        <div class="ad-card-body">
+            <p class="text-muted">{% translate "Select a student and only the active-year course offerings they must complete. This creates targeted access, not full-year access." %}</p>
+            {% if exceptional_form.non_field_errors %}<div class="alert alert-danger">{{ exceptional_form.non_field_errors }}</div>{% endif %}
+            <form method="post" class="row g-3">
+                {% csrf_token %}<input type="hidden" name="action" value="assign_exceptional">
+                <div class="col-md-4">{{ exceptional_form.student_identifier.label_tag }}{{ exceptional_form.student_identifier }}{{ exceptional_form.student_identifier.errors }}</div>
+                <div class="col-12">{{ exceptional_form.course_offerings.label_tag }}{{ exceptional_form.course_offerings }}{{ exceptional_form.course_offerings.errors }}</div>
+                <div class="col-12"><button class="ad-btn ad-btn--outline-gold" type="submit"><i class="fas fa-book-open me-1"></i>{% translate "Assign failed courses" %}</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="ad-card">
+        <div class="ad-card-head"><h5 class="mb-0">{% translate "Historical records" %}</h5></div>
+        <div class="ad-table-wrap"><table class="ad-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Account" %}</th><th>{% translate "Promotion" %}</th></tr></thead><tbody>
+            {% for summary in summaries %}<tr><td>{{ summary.student.get_full_name|default:summary.student.username }}</td><td>{{ summary.academic_year_level }}</td><td>{{ summary.get_outcome_display }}</td><td>{{ summary.student.username }}</td><td>{% if summary.promoted_at %}<div class="d-flex flex-column gap-1 align-items-start">{% if summary.promotion_history %}{% if summary.promotion_history.promotion_method == "manual_historical" %}<span class="ad-pill ad-pill--brand">{% translate "Manual historical" %}</span>{% else %}<span class="ad-pill ad-pill--success">{{ summary.promotion_history.get_promotion_method_display|default:promoted_label }}</span>{% endif %}<span class="small text-muted">{% translate "Recorded by" %} {{ summary.promotion_history.actor.get_full_name|default:summary.promotion_history.actor.username }}</span>{% if summary.promotion_history.reason %}<span class="small text-muted">{% translate "Reason" %}: {{ summary.promotion_history.reason }}</span>{% endif %}{% else %}<span class="ad-pill ad-pill--success">{{ promoted_label }}</span>{% endif %}</div>{% else %}<form method="post" action="{% url 'historical-promote' summary.pk %}" class="d-flex flex-wrap gap-1">{% csrf_token %}<select name="destination_scope" class="form-select form-select-sm" aria-label="{% translate 'Destination academic scope' %}"><option value="">{% translate "Destination" %}</option>{% for scope in form.destination_scope.field.queryset %}<option value="{{ scope.pk }}">{{ scope }}</option>{% endfor %}</select><input class="form-control form-control-sm" name="exceptional_offering_ids" placeholder="{% translate 'Failed offering IDs' %}" aria-label="{% translate 'Failed offering IDs' %}"><input class="form-control form-control-sm" name="promotion_reason" required placeholder="{% translate 'Promotion reason' %}" aria-label="{% translate 'Promotion reason' %}"><button class="ad-btn ad-btn--teal ad-btn--sm" type="submit">{% translate "Promote" %}</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="ad-empty">{% translate "No historical records yet." %}</td></tr>{% endfor %}
+        </tbody></table></div>
+        {% if summary_page_obj.paginator.num_pages > 1 %}<div class="ad-page-wrapper"><nav aria-label="{% translate 'Historical intake pagination' %}"><ul class="ad-page-nav">{% if summary_page_obj.has_previous %}<li><a class="ad-page-link" href="?page={{ summary_page_obj.previous_page_number }}">{% translate "Previous" %}</a></li>{% endif %}<li><span class="ad-page-link is-active">{{ summary_page_obj.number }}</span></li>{% if summary_page_obj.has_next %}<li><a class="ad-page-link" href="?page={{ summary_page_obj.next_page_number }}">{% translate "Next" %}</a></li>{% endif %}</ul></nav></div>{% endif %}
+    </div>
+</div>
+{% endblock %}

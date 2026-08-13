@@ -1,14 +1,29 @@
 {% load i18n %}
 <div id="telegram-conversation-list"
      class="tg-chat-list"
-     hx-get="{{ conversation_list_url }}?fragment=1{% if search %}&amp;search={{ search|urlencode }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}"
-     hx-trigger="every 15s"
-     hx-target="this"
-     hx-swap="outerHTML">
+     data-poll-url="{{ conversation_list_url }}?fragment=1{% if search %}&amp;search={{ search|urlencode }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}"
+     x-data="{
+         autoRefresh: true,
+         _timer: null,
+         init() {
+             this.$watch('autoRefresh', (value) => value ? this._start() : this._stop());
+             if (this.autoRefresh) this._start();
+         },
+         destroy() { this._stop(); },
+         _start() { if (!this._timer) this._timer = setInterval(() => this._poll(), 15000); },
+         _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
+         _poll() {
+             const el = this.$el;
+             if (!el.dataset.pollUrl) return;
+             htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerHTML' }).catch(() => {});
+         }
+     }">
 
-    <div class="tg-chat-polling">
-        <i class="fas fa-sync fa-spin" aria-hidden="true"></i>
-        <span class="visually-hidden">{% translate "Checking for new conversations" %}</span>
+    <div class="tg-chat-autorefresh">
+        <label class="tg-chat-autorefresh-label">
+            <input type="checkbox" x-model="autoRefresh">
+            <span>{% translate "Auto refresh" %}</span>
+        </label>
     </div>
 
     <ul class="tg-chat-conv-list list-unstyled mb-0">

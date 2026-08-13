@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import io
 import secrets
+import uuid
 import random
 import posixpath
 from collections import defaultdict
@@ -45,7 +46,7 @@ from datetime import date
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, yearly_transcript_queryset, _csv_safe_cell, _safe_filename
@@ -73,6 +74,14 @@ from .academic_enrollment import (
     set_user_normal_enrollment_scope,
     promote_evaluation_result,
     promote_evaluation_results,
+    promote_historical_summary,
+)
+from .historical_intake import (
+    INTAKE_COLUMNS,
+    assign_exceptional_courses,
+    intake_historical_row,
+    parse_intake_upload,
+    preview_intake_rows,
 )
 from .academic_copy import copy_offerings
 from .academic_formula import normalize_formula_rules, save_promotion_formula
@@ -1358,6 +1367,162 @@ def user_dashboard(request):
     }
 
     return render_dashboard(request, users, view, context)
+
+
+@capability_required(can_manage_academic_setup)
+def historical_intake(request):
+    form = HistoricalIntakeForm(request.POST or None)
+    exceptional_form = ExceptionalCourseAssignmentForm(request.POST or None)
+    bulk_form = HistoricalBulkIntakeForm(request.POST or None)
+    preview = []
+    upload_digest = ""
+    if request.method == "POST":
+        if request.POST.get("action") == "assign_exceptional":
+            if exceptional_form.is_valid():
+                try:
+                    assign_exceptional_courses(
+                        student_id=exceptional_form.cleaned_data["student_identifier"].pk,
+                        offering_ids=exceptional_form.cleaned_data["course_offerings"].values_list("pk", flat=True),
+                        actor=request.user,
+                    )
+                    messages.success(request, _("Exceptional course access was assigned."))
+                    return redirect("historical-intake")
+                except (ValidationError, PermissionDenied) as exc:
+                    exceptional_form.add_error(None, str(exc))
+        elif request.POST.get("action") == "bulk_historical" and bulk_form.is_valid():
+            cleaned = bulk_form.cleaned_data
+            identifiers = cleaned["student_identifiers"]
+            rows = []
+            for identifier in identifiers:
+                user = User.objects.filter(pk=int(identifier)).first() if identifier.isdigit() else User.objects.filter(username=identifier).first()
+                if user is None or not user.role or user.role.role != "student":
+                    bulk_form.add_error("student_identifiers", _("Student account not found: %(identifier)s") % {"identifier": identifier})
+                    break
+                rows.append({
+                    "source_name": user.get_full_name() or user.username,
+                    "source_level": str(cleaned["source_year_level"].level.ordering),
+                    "source_academic_year": cleaned["source_year_level"].academic_year.name,
+                    "historical_outcome": cleaned["historical_outcome"],
+                    "account_action": "find",
+                    "lms_user_id": str(user.pk),
+                    "lms_username": user.username,
+                    "lms_email": user.email,
+                    "destination_academic_year": cleaned["destination_scope"].academic_year.name if cleaned["destination_scope"] else "",
+                    "destination_level": str(cleaned["destination_scope"].level.ordering) if cleaned["destination_scope"] else "",
+                    "promote_now": "yes" if cleaned["promote_now"] else "no",
+                    "failed_course_offering_ids": cleaned["exceptional_offering_ids"],
+                    "promotion_reason": cleaned["promotion_reason"],
+                    "admin_note": cleaned["notes"],
+                })
+            if rows and not bulk_form.errors:
+                try:
+                    with transaction.atomic():
+                        for index, row in enumerate(rows):
+                            intake_historical_row(row=row, actor=request.user, source_key=f"bulk:{request.user.pk}:{uuid.uuid4().hex}:{index}", source_file="admin-bulk")
+                    messages.success(request, _("Historical intake applied for %(count)d student(s).") % {"count": len(rows)})
+                    return redirect("historical-intake")
+                except ValidationError as exc:
+                    bulk_form.add_error(None, str(exc))
+        elif request.FILES.get("intake_file"):
+            try:
+                rows, upload_digest = parse_intake_upload(request.FILES["intake_file"])
+                preview = preview_intake_rows(rows)
+                if request.POST.get("apply_upload") == "yes":
+                    errors = [item for item in preview if item["action"] == "error"]
+                    if errors:
+                        raise ValidationError(_("Resolve all upload errors before applying the intake."))
+                    for index, row in enumerate(rows, start=2):
+                        intake_historical_row(
+                            row=row,
+                            actor=request.user,
+                            source_key=f"upload:{upload_digest}:{index}",
+                            source_file=request.FILES["intake_file"].name,
+                            source_row=index,
+                        )
+                    messages.success(request, _("Historical intake applied for %(count)d student(s).") % {"count": len(rows)})
+                    return redirect("historical-intake")
+            except (ValidationError, UnicodeDecodeError, ValueError) as exc:
+                messages.error(request, str(exc))
+        elif form.is_valid():
+            cleaned = form.cleaned_data
+            row = {
+                "source_name": cleaned["source_name"],
+                "source_level": str(cleaned["source_year_level"].level.ordering),
+                "source_academic_year": cleaned["source_year_level"].academic_year.name,
+                "historical_outcome": cleaned["historical_outcome"],
+                "account_action": cleaned["account_action"],
+                "lms_user_id": str(cleaned["lms_user_id"] or ""),
+                "lms_username": cleaned["lms_username"] or cleaned["username"],
+                "lms_email": cleaned["lms_email"],
+                "username": cleaned["username"],
+                "first_name": cleaned["first_name"],
+                "last_name": cleaned["last_name"],
+                "destination_academic_year": cleaned["destination_scope"].academic_year.name if cleaned["destination_scope"] else "",
+                "destination_level": str(cleaned["destination_scope"].level.ordering) if cleaned["destination_scope"] else "",
+                "promote_now": "yes" if cleaned["promote_now"] else "no",
+                "failed_course_offering_ids": cleaned["exceptional_offering_ids"],
+                "promotion_reason": cleaned["promotion_reason"],
+                "admin_note": cleaned["notes"],
+            }
+            try:
+                summary = intake_historical_row(
+                    row=row,
+                    actor=request.user,
+                    source_key=f"manual:{uuid.uuid4().hex}",
+                    source_file="admin-manual",
+                )
+                messages.success(request, _("Historical record saved for %(student)s.") % {"student": summary.student.username})
+                return redirect("historical-intake")
+            except (ValidationError, User.DoesNotExist) as exc:
+                form.add_error(None, str(exc))
+    summaries = HistoricalAcademicSummary.objects.select_related(
+        "student", "academic_year_level__academic_year", "academic_year_level__level", "promotion_history__actor"
+    ).order_by("-created_at")
+    summary_page_obj = Paginator(summaries, 25).get_page(request.GET.get("page", 1))
+    return render(request, "historical_intake.html", {
+        "form": form,
+        "exceptional_form": exceptional_form,
+        "bulk_form": bulk_form,
+        "summaries": summary_page_obj.object_list,
+        "summary_page_obj": summary_page_obj,
+        "preview": preview,
+        "upload_digest": upload_digest,
+        "intake_columns": INTAKE_COLUMNS,
+    })
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def historical_promote(request, summary_id):
+    summary = get_object_or_404(HistoricalAcademicSummary, pk=summary_id)
+    destination_id = request.POST.get("destination_scope")
+    try:
+        destination = AcademicYearLevel.objects.get(pk=destination_id) if destination_id else None
+        exceptional_ids = [int(value) for value in request.POST.getlist("exceptional_offering_ids") if value.isdigit()]
+        reason = request.POST.get("promotion_reason", "").strip()
+        promote_historical_summary(
+            summary_id=summary.pk,
+            destination_scope_id=destination.pk if destination else None,
+            exceptional_offering_ids=exceptional_ids,
+            reason=reason,
+            actor=request.user,
+        )
+        messages.success(request, _("Historical student promotion was recorded."))
+    except (ValidationError, PermissionDenied, AcademicYearLevel.DoesNotExist) as exc:
+        messages.error(request, str(exc))
+    return redirect("historical-intake")
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def exceptional_course_assign(request, user_id):
+    try:
+        values = [int(value) for value in request.POST.getlist("course_offering_ids") if value.isdigit()]
+        assign_exceptional_courses(student_id=user_id, offering_ids=values, actor=request.user)
+        messages.success(request, _("Exceptional course access was assigned."))
+    except (ValidationError, PermissionDenied, User.DoesNotExist) as exc:
+        messages.error(request, str(exc))
+    return redirect("historical-intake")
 
 @capability_required(can_manage_content)
 def user_bulk_create(request):

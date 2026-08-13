@@ -39,6 +39,22 @@
                 <span>{% translate "Users" %}</span>
             </a>
         </li>
+
+        {% if request.user.role.role == "admin" %}
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'historical-intake' %}"
+               hx-get="{% url 'historical-intake' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span>{% translate "Historical Intake" %}</span>
+            </a>
+        </li>
+        {% endif %}
         
         <li class="nav-item">
             <a class="ad-tab"

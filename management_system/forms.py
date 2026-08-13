@@ -3,7 +3,7 @@ from django import forms
 import secrets
 
 from django.core.exceptions import ValidationError
-from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, CourseOffering, Enrollment, Level, QuizType, PromotionRule, QUIZ_TYPE_CODES, assign_academic_date
+from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
 from .utils.validators import normalize_phone, validate_identity_by_type
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
@@ -368,6 +368,143 @@ class AcademicYearLevelWeekdayForm(forms.ModelForm):
 
     def clean_meeting_weekdays(self):
         return sorted({int(day) for day in self.cleaned_data["meeting_weekdays"]})
+
+
+class HistoricalIntakeForm(forms.Form):
+    source_year_level = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Historical academic scope"),
+    )
+    source_name = forms.CharField(widget=forms.TextInput(attrs={"class": "form-control"}), label=_("Source student name"))
+    account_action = forms.ChoiceField(
+        choices=(("find", _("Find existing account")), ("create", _("Create new account"))),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    lms_user_id = forms.IntegerField(required=False, min_value=1, widget=forms.NumberInput(attrs={"class": "form-control"}))
+    lms_username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    lms_email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={"class": "form-control"}))
+    username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}), label=_("New username"))
+    first_name = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    last_name = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    historical_outcome = forms.ChoiceField(
+        choices=HistoricalAcademicSummary.Outcome.choices,
+        initial=HistoricalAcademicSummary.Outcome.PENDING_REVIEW,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    destination_scope = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Destination academic scope"),
+    )
+    promote_now = forms.BooleanField(required=False, label=_("Promote after review"))
+    exceptional_offering_ids = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "12, 15"}),
+        label=_("Failed course offering IDs"),
+    )
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}))
+    promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["source_year_level"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=False).select_related("academic_year", "level").order_by("academic_year__ordering", "level__ordering")
+        self.fields["destination_scope"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by("level__ordering")
+
+    def clean(self):
+        cleaned = super().clean()
+        action = cleaned.get("account_action")
+        if action == "find" and not any(cleaned.get(field) for field in ("lms_user_id", "lms_username", "lms_email")):
+            self.add_error("lms_username", _("Find mode requires an LMS user ID, username, or email."))
+        if action == "create" and not cleaned.get("username"):
+            self.add_error("username", _("Create mode requires a new username."))
+        if cleaned.get("promote_now") and cleaned.get("historical_outcome") == HistoricalAcademicSummary.Outcome.PENDING_REVIEW:
+            self.add_error("historical_outcome", _("Review the historical outcome before promotion."))
+        if cleaned.get("promote_now") and not cleaned.get("promotion_reason", "").strip():
+            self.add_error("promotion_reason", _("A manual historical promotion requires a reason."))
+        return cleaned
+
+
+class ExceptionalCourseAssignmentForm(forms.Form):
+    student_identifier = forms.CharField(
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Username or numeric student ID")}),
+        label=_("Student"),
+    )
+    course_offerings = forms.ModelMultipleChoiceField(
+        queryset=CourseOffering.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        label=_("Failed course offerings"),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["course_offerings"].queryset = CourseOffering.objects.filter(
+            academic_year_level__academic_year__is_active=True,
+            status="published",
+        ).select_related("course", "academic_year_level__level").order_by("academic_year_level__level__ordering", "course__name")
+
+    def clean_student_identifier(self):
+        value = self.cleaned_data["student_identifier"].strip()
+        queryset = User.objects.select_related("role")
+        if value.isdigit():
+            student = queryset.filter(pk=int(value)).first()
+        else:
+            student = queryset.filter(username=value).first()
+        if student is None or not student.role or student.role.role != "student":
+            raise forms.ValidationError(_("Select an existing student account."))
+        return student
+
+
+class HistoricalBulkIntakeForm(forms.Form):
+    source_year_level = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Historical academic scope"),
+    )
+    student_identifiers = forms.CharField(
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": _("Usernames or numeric IDs, separated by commas or lines")}),
+        label=_("Existing students"),
+    )
+    historical_outcome = forms.ChoiceField(
+        choices=HistoricalAcademicSummary.Outcome.choices,
+        initial=HistoricalAcademicSummary.Outcome.PENDING_REVIEW,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    destination_scope = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Destination academic scope"),
+    )
+    promote_now = forms.BooleanField(required=False, label=_("Promote after review"))
+    exceptional_offering_ids = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "12, 15"}),
+        label=_("Failed course offering IDs"),
+    )
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}))
+    promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["source_year_level"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=False).select_related("academic_year", "level").order_by("academic_year__ordering", "level__ordering")
+        self.fields["destination_scope"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by("level__ordering")
+
+    def clean_student_identifiers(self):
+        values = [value.strip() for value in self.cleaned_data["student_identifiers"].replace(",", "\n").splitlines() if value.strip()]
+        values = list(dict.fromkeys(values))
+        if not values or len(values) > 1000:
+            raise forms.ValidationError(_("Select between one and 1,000 students."))
+        return values
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("promote_now") and cleaned.get("historical_outcome") == HistoricalAcademicSummary.Outcome.PENDING_REVIEW:
+            self.add_error("historical_outcome", _("Review the historical outcome before promotion."))
+        if cleaned.get("promote_now") and not cleaned.get("promotion_reason", "").strip():
+            self.add_error("promotion_reason", _("A manual historical promotion requires a reason."))
+        return cleaned
 
 
 class OfferingCopyForm(forms.Form):

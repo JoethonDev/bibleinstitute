@@ -13,11 +13,20 @@ from .models import (
     CourseOffering,
     Enrollment,
     EvaluationResult,
+    PublicationStatus,
     Level,
     PromotionHistory,
     Role,
     User,
+    HistoricalAcademicSummary,
 )
+
+
+PROMOTABLE_HISTORICAL_OUTCOMES = frozenset({
+    HistoricalAcademicSummary.Outcome.COMPLETED,
+    HistoricalAcademicSummary.Outcome.PASSED,
+    HistoricalAcademicSummary.Outcome.PARTIAL,
+})
 
 
 def _require_admin(actor: User) -> None:
@@ -334,7 +343,7 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
 
     created_exceptional = []
     for offering in exceptional_offerings:
-        enrollment, _ = Enrollment.objects.get_or_create(
+        enrollment, created = Enrollment.objects.get_or_create(
             student=source.student,
             course_offering=offering,
             defaults={
@@ -365,6 +374,8 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
         override_actor_id=result.overridden_by_id,
         exceptional_offering_ids=[enrollment.course_offering_id for enrollment in created_exceptional],
         formula_snapshot=_promotion_formula_snapshot(result, course_results),
+        promotion_method=PromotionHistory.Method.SYSTEM,
+        reason="",
         actor=actor,
     )
 
@@ -381,6 +392,161 @@ def promote_evaluation_results(*, result_ids: list[int], actor: User) -> tuple[l
         except (EvaluationResult.DoesNotExist, ValidationError, PermissionDenied) as exc:
             errors.append({"result_id": result_id, "message": str(exc)})
     return histories, errors
+
+
+@transaction.atomic
+def promote_historical_summary(
+    *,
+    summary_id: int,
+    destination_scope_id: int | None,
+    exceptional_offering_ids: list[int] | None,
+    reason: str,
+    actor: User,
+) -> PromotionHistory:
+    """Promote a reviewed historical intake row without inventing exam results."""
+    _require_admin(actor)
+    promotion_reason = reason.strip()
+    if not promotion_reason:
+        raise ValidationError(_("A manual historical promotion requires a reason."))
+    summary = HistoricalAcademicSummary.objects.select_for_update().select_related(
+        "student", "academic_year_level__academic_year", "academic_year_level__level"
+    ).get(pk=summary_id)
+    if summary.promoted_at:
+        raise ValidationError(_("This historical summary has already been promoted."))
+    if summary.outcome not in PROMOTABLE_HISTORICAL_OUTCOMES:
+        raise ValidationError(_("Review the historical outcome before promotion."))
+    if not summary.reviewed_by_id or not summary.reviewed_at:
+        raise ValidationError(_("A reviewed historical outcome is required before promotion."))
+    is_last_level = not Level.objects.filter(ordering__gt=summary.academic_year_level.level.ordering).exists()
+    destination = None
+    if destination_scope_id:
+        destination = AcademicYearLevel.objects.select_for_update().select_related(
+            "academic_year", "level"
+        ).get(pk=destination_scope_id)
+        if not destination.academic_year.is_active:
+            raise ValidationError(_("The destination academic year must be active."))
+        if destination.academic_year.ordering <= summary.academic_year_level.academic_year.ordering:
+            raise ValidationError(_("The destination academic year must be later than the historical year."))
+    active_years = list(AcademicYear.objects.select_for_update().filter(is_active=True))
+    if len(active_years) != 1:
+        raise ValidationError(_("Exactly one active academic year is required for promotion."))
+    if destination is not None and destination.academic_year_id != active_years[0].pk:
+        raise ValidationError(_("The destination must belong to the sole active academic year."))
+    if is_last_level and summary.outcome in {
+        HistoricalAcademicSummary.Outcome.COMPLETED,
+        HistoricalAcademicSummary.Outcome.PASSED,
+    } and destination is not None:
+        raise ValidationError(_("A completed last-level student does not need a destination enrollment."))
+    if not is_last_level and destination is None:
+        raise ValidationError(_("Select a destination academic scope before promotion."))
+    if summary.outcome == HistoricalAcademicSummary.Outcome.PARTIAL and destination is None:
+        raise ValidationError(_("Partial promotion requires a destination academic scope."))
+    if destination is not None:
+        expected_level = summary.academic_year_level.level.ordering
+        if not is_last_level:
+            expected_level += 1
+        if destination.level.ordering != expected_level:
+            raise ValidationError(_("The destination level does not match the historical promotion outcome."))
+
+    source = Enrollment.objects.select_for_update().get(
+        student=summary.student,
+        academic_year_level=summary.academic_year_level,
+        course_offering=None,
+    )
+    if source.enrollment_type != Enrollment.Type.NORMAL:
+        raise ValidationError(_("The historical source enrollment must be normal."))
+    if source.status == Enrollment.Status.WITHDRAWN:
+        raise ValidationError(_("The historical source enrollment is withdrawn."))
+    source.status = Enrollment.Status.COMPLETED
+    source.save(update_fields=["status"])
+
+    exceptional_ids = list(dict.fromkeys(exceptional_offering_ids or []))
+    if summary.outcome == HistoricalAcademicSummary.Outcome.PARTIAL and not exceptional_ids:
+        raise ValidationError(_("Partial promotion requires at least one failed course."))
+    last_level_partial = is_last_level and summary.outcome == HistoricalAcademicSummary.Outcome.PARTIAL
+    last_level_pass = is_last_level and summary.outcome in {
+        HistoricalAcademicSummary.Outcome.COMPLETED,
+        HistoricalAcademicSummary.Outcome.PASSED,
+    }
+    destination_enrollment = None
+    if not last_level_partial and not last_level_pass:
+        destination_enrollment, created = Enrollment.objects.select_for_update().get_or_create(
+            student=summary.student,
+            academic_year_level=destination,
+            course_offering=None,
+            defaults={
+                "enrollment_type": Enrollment.Type.NORMAL,
+                "status": Enrollment.Status.ACTIVE,
+                "enrolled_by": actor,
+            },
+        )
+        if destination_enrollment.enrollment_type != Enrollment.Type.NORMAL:
+            raise ValidationError(_("The destination enrollment is not a normal enrollment."))
+        if not created and destination_enrollment.status == Enrollment.Status.WITHDRAWN:
+            raise ValidationError(_("The destination enrollment is withdrawn."))
+        if destination_enrollment.status != Enrollment.Status.ACTIVE:
+            destination_enrollment.status = Enrollment.Status.ACTIVE
+            destination_enrollment.enrolled_by = destination_enrollment.enrolled_by or actor
+            destination_enrollment.save(update_fields=["status", "enrolled_by"])
+    exceptional_offerings = list(CourseOffering.objects.select_for_update().filter(
+        pk__in=exceptional_ids,
+        academic_year_level=destination,
+        status=PublicationStatus.PUBLISHED,
+    )) if destination is not None else []
+    if exceptional_ids and destination is None:
+        raise ValidationError(_("Exceptional courses require a destination academic scope."))
+    if last_level_partial and not exceptional_offerings:
+        raise ValidationError(_("Last-level partial promotion requires failed course offerings."))
+    if len(exceptional_offerings) != len(exceptional_ids):
+        raise ValidationError(_("Every exceptional course must belong to the destination year and be published."))
+    exceptional_enrollment_ids = []
+    for offering in exceptional_offerings:
+        enrollment, created = Enrollment.objects.get_or_create(
+            student=summary.student,
+            course_offering=offering,
+            defaults={
+                "academic_year_level": destination,
+                "enrollment_type": Enrollment.Type.REPEAT,
+                "status": Enrollment.Status.ACTIVE,
+                "enrolled_by": actor,
+            },
+        )
+        if enrollment.enrollment_type == Enrollment.Type.NORMAL:
+            raise ValidationError(_("An exceptional offering cannot use a normal enrollment."))
+        if enrollment.academic_year_level_id != offering.academic_year_level_id:
+            raise ValidationError(_("Exceptional enrollment scope does not match its offering."))
+        if not created and enrollment.status != Enrollment.Status.ACTIVE:
+            enrollment.status = Enrollment.Status.ACTIVE
+            enrollment.enrolled_by = actor
+            enrollment.save(update_fields=["status", "enrolled_by"])
+        exceptional_enrollment_ids.append(offering.pk)
+
+    summary.promoted_at = now()
+    summary.reviewed_by = summary.reviewed_by or actor
+    summary.reviewed_at = summary.reviewed_at or now()
+    summary.certificate_eligible = summary.outcome in {
+        HistoricalAcademicSummary.Outcome.COMPLETED,
+        HistoricalAcademicSummary.Outcome.PASSED,
+    } and not exceptional_enrollment_ids
+    summary.save(update_fields=["promoted_at", "reviewed_by", "reviewed_at", "certificate_eligible", "updated_at"])
+    return PromotionHistory.objects.create(
+        evaluation_result=None,
+        historical_summary=summary,
+        source_enrollment=source,
+        destination_enrollment=destination_enrollment,
+        student=summary.student,
+        source_year_level=summary.academic_year_level,
+        destination_year_level=destination,
+        outcome=("historical_graduated" if last_level_pass else ("historical_last_level_partial" if last_level_partial else ("historical_partial" if exceptional_enrollment_ids else "historical_promoted"))),
+        score=None,
+        computed_status=summary.outcome,
+        final_status=summary.outcome,
+        exceptional_offering_ids=exceptional_enrollment_ids,
+        formula_snapshot={"historical_summary_id": summary.pk, "outcome": summary.outcome},
+        promotion_method=PromotionHistory.Method.MANUAL_HISTORICAL,
+        reason=promotion_reason,
+        actor=actor,
+    )
 
 
 def _materialize_last_level_exceptional_access(destination_year: AcademicYear, actor: User) -> int:
@@ -507,6 +673,8 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
                 override_actor_id=result.overridden_by_id,
                 exceptional_offering_ids=created_ids,
                 formula_snapshot=_promotion_formula_snapshot(result, rows),
+                promotion_method=PromotionHistory.Method.SYSTEM,
+                reason="",
                 actor=actor,
             ))
         PromotionHistory.objects.bulk_create(histories, batch_size=500)
