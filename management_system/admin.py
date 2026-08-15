@@ -319,3 +319,42 @@ class MigrationReviewItemAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(MediaProcessingJob)
+class MediaProcessingJobAdmin(admin.ModelAdmin):
+    """Inspection-only admin for durable media-processing job state."""
+
+    list_display = [
+        "original_filename", "created_by", "source_kind", "status", "phase",
+        "progress", "attempt_count", "attachment_status", "created_at", "finished_at",
+    ]
+    list_filter = ["status", "source_kind", "attachment_status"]
+    search_fields = [
+        "public_id", "original_filename", "source_key",
+        "error_code", "created_by__username",
+    ]
+    ordering = ["-created_at", "-pk"]
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            "created_by",
+            "lesson__course_offering__course",
+            "lesson__course_offering__academic_year_level",
+        )
+
+    def has_module_permission(self, request):
+        return _is_admin_user(request)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_admin_user(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

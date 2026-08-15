@@ -85,7 +85,7 @@
                     {% for col in columns %}
                     <th class="sortable-column" 
                         x-show="columns[{{ forloop.counter0 }}].visible"
-                        hx-get="?sort={{ col }}&order={% if request.GET.sort == col and request.GET.order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.name %}&name={{ request.GET.name }}{% endif %}{% if request.GET.filtering %}&filtering={{ request.GET.filtering }}{% endif %}"
+                        hx-get="?sort={{ col }}&order={% if request.GET.sort == col and request.GET.order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.name %}&name={{ request.GET.name }}{% endif %}{% if request.GET.filtering %}&filtering={{ request.GET.filtering }}{% endif %}{% if request.GET.academic_year %}&academic_year={{ request.GET.academic_year }}{% endif %}{% if request.GET.course %}&course={{ request.GET.course }}{% endif %}"
                         hx-target="#table-container"
                         hx-indicator="#table-loading"
                         role="button"

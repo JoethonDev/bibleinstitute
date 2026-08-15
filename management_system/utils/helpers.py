@@ -11,9 +11,10 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.timezone import now
 from django.http import HttpResponse
+from django.core.exceptions import ValidationError
 from logging import getLogger
 from management_system.utils.decorators import check_role_permission
-from management_system.models import User, MANAGEMENT_ROLES, Grade
+from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade
 from management_system.academic_access import user_can_write_offering_activity
 from .timezones import ensure_aware, parse_application_datetime
 from .quiz_access import quiz_window
@@ -139,7 +140,8 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
     context["pagination_query"] = pagination_params.urlencode()
-    filters = ["year_filter.html", "naming_filter.html"]
+    year_filter = "academic_year_filter.html" if context.get("academic_year_filter") else "year_filter.html"
+    filters = [year_filter, "naming_filter.html"]
     if "filters" in context:
         context['filters'].extend(filters)
     else:
@@ -167,6 +169,23 @@ def render_dashboard(request, obj, view, context, parameters=[]):
         "parameters": parameters,
         **context
     })
+
+
+def select_content_academic_year(request):
+    """Resolve the requested management content year, defaulting to active."""
+    active_year = AcademicYear.objects.get(is_active=True)
+    requested_id = request.GET.get("academic_year")
+    if not requested_id:
+        selected_year = active_year
+    elif not str(requested_id).isdigit():
+        raise ValidationError(_("Invalid academic year."))
+    else:
+        selected_year = AcademicYear.objects.filter(pk=int(requested_id)).first()
+        if selected_year is None:
+            raise ValidationError(_("Invalid academic year."))
+
+    academic_years = AcademicYear.objects.order_by("-is_active", "-ordering")
+    return selected_year, academic_years
 
 
 def unpack_quiz_form(form_dict):

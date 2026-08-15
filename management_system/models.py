@@ -34,6 +34,37 @@ class PublicationStatus(models.TextChoices):
     ARCHIVED = "archived", _("Archived")
 
 
+class MediaProcessingStatus(models.TextChoices):
+    AWAITING_UPLOAD = "awaiting_upload", _("Awaiting upload")
+    QUEUED = "queued", _("Queued")
+    PROCESSING = "processing", _("Processing")
+    UPLOADING = "uploading", _("Uploading")
+    VERIFYING = "verifying", _("Verifying")
+    SUCCEEDED = "succeeded", _("Succeeded")
+    FAILED = "failed", _("Failed")
+    CANCELLED = "cancelled", _("Cancelled")
+
+
+class MediaProcessingPhase(models.TextChoices):
+    UPLOAD = "upload", _("Upload")
+    QUEUED = "queued", _("Queued")
+    DOWNLOAD = "download", _("Downloading source")
+    PROBE = "probe", _("Inspecting source")
+    ENCODE = "encode", _("Processing media")
+    UPLOAD_OUTPUT = "upload_output", _("Uploading output")
+    VERIFY = "verify", _("Verifying output")
+    ATTACH = "attach", _("Attaching to lesson")
+    COMPLETE = "complete", _("Complete")
+    FAILED = "failed", _("Failed")
+
+
+class MediaAttachmentStatus(models.TextChoices):
+    NOT_REQUESTED = "not_requested", _("Not requested")
+    PENDING = "pending", _("Pending")
+    ATTACHED = "attached", _("Attached")
+    FAILED = "failed", _("Failed")
+
+
 # Create your models here.
 class Role(models.Model):
     ROLES = [
@@ -1468,6 +1499,94 @@ class Lesson(models.Model):
         
         return [value for value in separated_parts.values()]
     
+class MediaProcessingJob(models.Model):
+    """Durable state for one source-file media processing job."""
+
+    public_id = models.UUIDField(unique=True, editable=False)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="media_processing_jobs",
+    )
+    requested_folder = models.CharField(max_length=1024)
+    original_filename = models.CharField(max_length=255)
+    output_base_name = models.CharField(max_length=255)
+    source_kind = models.CharField(max_length=16)
+    source_key = models.CharField(max_length=1024, unique=True)
+    source_size = models.PositiveBigIntegerField()
+    source_etag = models.CharField(max_length=255, blank=True, default="")
+    source_sha256 = models.CharField(max_length=64, blank=True, default="")
+    lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="media_processing_jobs",
+    )
+    part_id = models.CharField(max_length=100, blank=True, default="")
+    status = models.CharField(
+        max_length=24,
+        choices=MediaProcessingStatus.choices,
+        default=MediaProcessingStatus.AWAITING_UPLOAD,
+    )
+    phase = models.CharField(
+        max_length=24,
+        choices=MediaProcessingPhase.choices,
+        default=MediaProcessingPhase.UPLOAD,
+    )
+    progress = models.PositiveSmallIntegerField(default=0)
+    attempt_count = models.PositiveIntegerField(default=0)
+    error_code = models.CharField(max_length=80, blank=True, default="")
+    error_message = models.TextField(blank=True, default="")
+    failure_history = models.JSONField(default=list)
+    output_keys = models.JSONField(default=list)
+    manifest_key = models.CharField(max_length=1024, blank=True, default="")
+    audio_manifest_key = models.CharField(max_length=1024, blank=True, default="")
+    download_key = models.CharField(max_length=1024, blank=True, default="")
+    attachment_status = models.CharField(
+        max_length=20,
+        choices=MediaAttachmentStatus.choices,
+        default=MediaAttachmentStatus.NOT_REQUESTED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    source_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    upload_ack_deadline_at = models.DateTimeField()
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    last_dispatched_at = models.DateTimeField(null=True, blank=True)
+    staging_deleted_at = models.DateTimeField(null=True, blank=True)
+    staging_expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["status", "last_dispatched_at"],
+                name="media_job_status_dispatch_idx",
+            ),
+            models.Index(
+                fields=["status", "last_heartbeat_at"],
+                name="media_job_status_heartbeat_idx",
+            ),
+            models.Index(
+                fields=["status", "upload_ack_deadline_at"],
+                name="media_job_status_upload_idx",
+            ),
+            models.Index(
+                fields=["created_by", "created_at"],
+                name="media_job_creator_created_idx",
+            ),
+            models.Index(
+                fields=["lesson", "attachment_status"],
+                name="media_job_lesson_attach_idx",
+            ),
+        ]
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.public_id})"
+
+
 class Quiz(models.Model):
     name = models.CharField(max_length=64)
     quiz_type = models.ForeignKey(

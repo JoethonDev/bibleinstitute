@@ -39,7 +39,9 @@ import re
 import os
 import csv
 import mimetypes
+import redis
 from datetime import date
+from functools import wraps
 
 # Internal Imports - Models
 from .models import *
@@ -48,7 +50,15 @@ from .models import *
 from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
 
 # Internal Imports - Utilities
-from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, export_yearly_transcript_to_csv, build_yearly_transcript_rows, yearly_transcript_queryset, _csv_safe_cell, _safe_filename
+from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
+from .grade_matrix import (
+    GRADE_MATRIX_PAGE_SIZE,
+    grade_matrix_courses,
+    grade_matrix_page,
+    grade_matrix_selection,
+    grade_matrix_student_queryset,
+    grade_matrix_workbook,
+)
 from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
 from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
 from .utils.r2_manager import R2Manager
@@ -56,13 +66,11 @@ from .utils.cloudflare_provider import CloudflareR2Client
 from .utils.file_validator import (
     downloadable_audio_key,
     validate_downloadable_audio_key,
-    validate_upload_filename,
     validate_hls_object_key,
     FileValidator,
-    MAX_FILE_SIZE,
 )
 from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url, get_r2_client
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
@@ -99,10 +107,27 @@ from .academic_evaluation import (
     save_formula_and_results,
 )
 from .evaluation_export import build_evaluation_workbook
-from .academic_access import accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
+from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
 from .utils.hls_parser import get_lesson_segments, get_segment_number
-from .scheduled_lessons import create_scheduled_lesson, finalize_scheduled_lesson
 from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
+from .media_processing import (
+    claim_attachment_retry,
+    initialize_deadlines,
+    job_is_visible_to,
+    queue_job,
+    safe_output_base_name,
+    validate_part_id,
+    validate_requested_folder,
+    validate_source_descriptor,
+)
+from .media_storage import (
+    MediaStorageError,
+    build_staging_key,
+    content_type_for_key,
+    create_staging_upload_url,
+    verify_staging_object,
+)
+from .media_tasks import enqueue_media_attachment_retry, enqueue_media_job
 from .telegram.linking import TelegramLinkError, current_telegram_link
 from .telegram.notifications import enqueue_lesson_notifications, schedule_quiz_opening_notifications
 
@@ -1763,7 +1788,7 @@ class DeleteCourse(CourseBaseView, DeleteView):
     success_url = reverse_lazy("course-dashboard")
 
 
-def _content_offering_filter_options():
+def _content_offering_filter_options(academic_year_id=None):
     offerings = CourseOffering.objects.select_related(
         "course", "academic_year_level__level", "academic_year_level__academic_year"
     ).order_by(
@@ -1771,6 +1796,8 @@ def _content_offering_filter_options():
         "academic_year_level__level__ordering",
         "academic_year_level__academic_year__ordering",
     )
+    if academic_year_id is not None:
+        offerings = offerings.filter(academic_year_level__academic_year_id=academic_year_id)
     return [
         {
             "value": str(offering.pk),
@@ -1891,36 +1918,48 @@ def quiz_exceptional_opening(request, quiz_id):
 @capability_required(can_manage_content)
 def lesson_dashboard(request):   
     name = request.GET.get("name", None)
-    year = request.GET.get("filtering", None)
     course = request.GET.get("course", None)
     user = request.user
     view = "lesson"
-    query = Q()
+    try:
+        selected_year, academic_years = select_content_academic_year(request)
+    except ValidationError as exc:
+        return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
+
+    query = Q(course_offering__academic_year_level__academic_year_id=selected_year.pk)
     if name:
         query &= Q(name__icontains=name)
-    if year:
-        for level_obj in Level.objects.order_by("ordering"):
-            if level_obj.display_name == year:
-                query &= Q(course_offering__course__level__ordering=level_obj.ordering)
     if course:
-        query &= Q(course_offering_id=course) if course.isdigit() else Q(pk__in=[])
+        if course.isdigit() and CourseOffering.objects.filter(
+            pk=int(course), academic_year_level__academic_year_id=selected_year.pk
+        ).exists():
+            query &= Q(course_offering_id=int(course))
+        else:
+            course = None
     lessons = Lesson.objects.filter(query).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
         "course_offering__academic_year_level__academic_year",
     )
     
-    logger.info(f"User : {user} filters users using {name} name and {year} level and {course} course")
+    logger.info(
+        "User %s filters lessons using %s name, academic year %s, and %s course",
+        user,
+        name,
+        selected_year.pk,
+        course,
+    )
 
     lessons = lessons.order_by("name")
 
     context = {
         "name_value" : name or "",
-        "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Lesson.get_columns(),
-        "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
-        "subjects" : _content_offering_filter_options(),
+        "academic_year_filter": True,
+        "academic_years": academic_years,
+        "selected_academic_year_id": selected_year.pk,
+        "subjects" : _content_offering_filter_options(selected_year.pk),
         "filters" : ["course_filter.html"],
     }
 
@@ -2094,115 +2133,345 @@ class DeleteLesson(LessonBaseView, DeleteView):
         return super(LessonBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 
-# Upload Videos
-def ffmpeg_headers(view_func):
+def _media_job_lesson_target(lesson_id, part_id):
+    if lesson_id in (None, ""):
+        if part_id not in (None, ""):
+            raise ValidationError(_("A media part requires a lesson target."))
+        return None, ""
+    try:
+        lesson_pk = int(lesson_id)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValidationError(_("The selected lesson is invalid.")) from exc
+    lesson = get_object_or_404(Lesson.objects.select_related("course_offering"), pk=lesson_pk)
+    if not lesson.can_edit:
+        raise ValidationError(_("Only an editable draft lesson can receive new media."))
+    return lesson, validate_part_id(part_id) or f"p{uuid.uuid4().hex[:32]}"
+
+
+def _media_api_required(view_func):
+    """Use API authentication semantics without weakening browser POST CSRF."""
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        response = view_func(request, *args, **kwargs)
-        # Set required security headers
-        response['Cross-Origin-Embedder-Policy'] = 'require-corp'
-        response['Cross-Origin-Opener-Policy'] = 'same-origin'
-        response['Cross-Origin-Resource-Policy'] = 'same-origin'
-        return response
+        if not request.user.is_authenticated:
+            return JsonResponse({"message": _("Authentication required.")}, status=401)
+        if not can_manage_content(request.user):
+            return JsonResponse({"message": _("Unauthorized")}, status=403)
+        return view_func(request, *args, **kwargs)
     return wrapper
 
-@ffmpeg_headers
+
+def _media_job_visible_or_403(request, job):
+    if not job_is_visible_to(request.user, job):
+        return JsonResponse({"message": _("You are not allowed to access this media job.")}, status=403)
+    return None
+
+
+def _serialize_media_job(job, live=None):
+    live = live or {}
+    return {
+        "id": str(job.public_id),
+        "filename": job.original_filename,
+        "requested_folder": job.requested_folder,
+        "source_kind": job.source_kind,
+        "status": live.get("status", job.status),
+        "phase": live.get("phase", job.phase),
+        "progress": int(live.get("progress", job.progress)),
+        "attempt_count": job.attempt_count,
+        "lesson_id": job.lesson_id,
+        "part_id": job.part_id,
+        "attachment_status": job.attachment_status,
+        "error_code": job.error_code,
+        "error_message": job.error_message,
+        "output_keys": job.output_keys or [],
+        "manifest_key": job.manifest_key,
+        "audio_manifest_key": job.audio_manifest_key,
+        "download_key": job.download_key,
+        "source_acknowledged": bool(job.source_acknowledged_at),
+        "staging_deleted": bool(job.staging_deleted_at),
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+    }
+
+
+@require_POST
+@_media_api_required
+def media_job_create(request):
+    """Create independent jobs and return one direct R2 upload per source."""
+    try:
+        payload = json.loads(request.body)
+        if not isinstance(payload, dict) or not isinstance(payload.get("files"), list):
+            raise ValidationError(_("Media job files are required."))
+        files = payload["files"]
+        if not files or len(files) > 100:
+            raise ValidationError(_("Select between one and 100 files."))
+        folder = validate_requested_folder(payload.get("requested_folder", ""))
+        default_lesson_id = payload.get("lesson_id")
+        default_part_id = payload.get("part_id")
+        default_lesson, default_part_id = _media_job_lesson_target(default_lesson_id, default_part_id)
+        jobs = []
+        with transaction.atomic():
+            for item in files:
+                if not isinstance(item, dict):
+                    raise ValidationError(_("Each media file descriptor is invalid."))
+                filename, source_kind, source_size = validate_source_descriptor(
+                    item.get("filename", item.get("name")), item.get("size")
+                )
+                lesson_id = item.get("lesson_id", default_lesson_id)
+                part_id_value = item.get("part_id", default_part_id)
+                if lesson_id == default_lesson_id and part_id_value == default_part_id:
+                    lesson, part_id = default_lesson, default_part_id
+                else:
+                    lesson, part_id = _media_job_lesson_target(lesson_id, part_id_value)
+                public_id = uuid.uuid4()
+                source_key = build_staging_key(str(public_id), filename)
+                ack_deadline, staging_expires = initialize_deadlines()
+                job = MediaProcessingJob.objects.create(
+                    public_id=public_id,
+                    created_by=request.user,
+                    requested_folder=folder,
+                    original_filename=filename,
+                    output_base_name=safe_output_base_name(filename),
+                    source_kind=source_kind,
+                    source_key=source_key,
+                    source_size=source_size,
+                    lesson=lesson,
+                    part_id=part_id,
+                    attachment_status=(MediaAttachmentStatus.PENDING if lesson else MediaAttachmentStatus.NOT_REQUESTED),
+                    upload_ack_deadline_at=ack_deadline,
+                    staging_expires_at=staging_expires,
+                )
+                authorization = create_staging_upload_url(
+                    source_key,
+                    content_type=content_type_for_key(filename),
+                )
+                jobs.append({
+                    "id": str(job.public_id),
+                    "filename": job.original_filename,
+                    "source_kind": job.source_kind,
+                    "source_size": job.source_size,
+                    "source_key": job.source_key,
+                    "output_base_name": job.output_base_name,
+                    "requested_folder": job.requested_folder,
+                    "lesson_id": job.lesson_id,
+                    "part_id": job.part_id,
+                    "upload": authorization,
+                    "ack_deadline": job.upload_ack_deadline_at.isoformat(),
+                })
+    except (json.JSONDecodeError, TypeError, ValueError, OverflowError, ValidationError, MediaStorageError) as exc:
+        message = "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))
+        return JsonResponse({"message": message}, status=400)
+    return JsonResponse({"jobs": jobs}, status=201)
+
+
+@require_POST
+@_media_api_required
+def media_job_source_complete(request, job_uuid):
+    """Verify one staged R2 object and enqueue its independent media task."""
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    if job.status in {
+        MediaProcessingStatus.QUEUED,
+        MediaProcessingStatus.PROCESSING,
+        MediaProcessingStatus.UPLOADING,
+        MediaProcessingStatus.VERIFYING,
+        MediaProcessingStatus.SUCCEEDED,
+    }:
+        return JsonResponse({"job": _serialize_media_job(job), "duplicate": True})
+    if job.status != MediaProcessingStatus.AWAITING_UPLOAD:
+        return JsonResponse({"message": _("This media job is no longer awaiting its source upload.")}, status=409)
+    try:
+        payload = json.loads(request.body or b"{}")
+        if not isinstance(payload, dict) or payload.get("source_key") != job.source_key:
+            raise ValidationError(_("The staging object key does not match the media job."))
+        client_size = payload.get("size")
+        if client_size is not None and client_size != job.source_size:
+            raise ValidationError(_("The uploaded source size does not match the media job."))
+        metadata = verify_staging_object(
+            job.source_key,
+            expected_size=job.source_size,
+            expected_etag=payload.get("etag") or None,
+        )
+        with transaction.atomic():
+            queued = queue_job(job.public_id, acknowledged_at=timezone.now())
+            queued.source_etag = metadata.get("etag", "")
+            queued.save(update_fields=["source_etag"])
+            transaction.on_commit(lambda public_id=queued.public_id: enqueue_media_job(public_id))
+    except (json.JSONDecodeError, TypeError, ValueError, ValidationError, MediaStorageError) as exc:
+        message = "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))
+        return JsonResponse({"message": message}, status=400)
+    return JsonResponse({"job": _serialize_media_job(queued)}, status=202)
+
+
+@_media_api_required
+def media_job_status(request, job_uuid):
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    live = {}
+    try:
+        live = redis.Redis.from_url(
+            getattr(settings, "CELERY_BROKER_URL", "redis://redis:6379/0"),
+            decode_responses=True,
+        ).hgetall(f"media:job:{job.public_id}")
+    except Exception:
+        live = {}
+    return JsonResponse({"job": _serialize_media_job(job, live)})
+
+
+@_media_api_required
+def media_job_list(request):
+    try:
+        page_number = max(1, int(request.GET.get("page", "1")))
+        page_size = min(100, max(1, int(request.GET.get("page_size", "25"))))
+    except (TypeError, ValueError):
+        return JsonResponse({"message": _("Invalid pagination.")}, status=400)
+    queryset = MediaProcessingJob.objects.select_related("lesson", "created_by")
+    if getattr(getattr(request.user, "role", None), "role", None) != "admin":
+        queryset = queryset.filter(created_by=request.user)
+    paginator = Paginator(queryset, page_size)
+    page = paginator.get_page(page_number)
+    return JsonResponse({
+        "results": [_serialize_media_job(job) for job in page.object_list],
+        "page": page.number,
+        "page_size": page_size,
+        "pages": paginator.num_pages,
+        "total": paginator.count,
+    })
+
+
+@_media_api_required
+def media_jobs_collection(request):
+    """Expose the proposal's collection URL for POST create and GET list."""
+    if request.method == "POST":
+        return media_job_create(request)
+    if request.method == "GET":
+        return media_job_list(request)
+    return JsonResponse({"message": _("Method not allowed.")}, status=405)
+
+
+@require_POST
+@_media_api_required
+def media_job_retry(request, job_uuid):
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    if job.status != MediaProcessingStatus.FAILED or not job.source_acknowledged_at:
+        return JsonResponse({"message": _("Only failed jobs with a retained source can be retried.")}, status=409)
+    try:
+        metadata = verify_staging_object(job.source_key, expected_size=job.source_size)
+        with transaction.atomic():
+            queued = queue_job(job.public_id, acknowledged_at=job.source_acknowledged_at)
+            queued.source_etag = metadata.get("etag", "")
+            queued.save(update_fields=["source_etag"])
+            transaction.on_commit(lambda public_id=queued.public_id: enqueue_media_job(public_id))
+    except (ValidationError, MediaStorageError) as exc:
+        return JsonResponse({"message": "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))}, status=400)
+    return JsonResponse({"job": _serialize_media_job(queued)}, status=202)
+
+
+@require_POST
+@_media_api_required
+def media_job_attachment_retry(request, job_uuid):
+    """Retry only a failed lesson attachment; the verified source is not needed."""
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    try:
+        pending = claim_attachment_retry(job.public_id)
+        transaction.on_commit(lambda public_id=pending.public_id: enqueue_media_attachment_retry(public_id))
+    except ValidationError as exc:
+        return JsonResponse({"message": "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))}, status=409)
+    return JsonResponse({"job": _serialize_media_job(pending)}, status=202)
+
 @capability_required(can_manage_content)
 def upload_file(request):
     course_offerings = CourseOffering.objects.filter(
         academic_year_level__academic_year__is_active=True,
     ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
+    editable_lessons = Lesson.objects.filter(
+        status=PublicationStatus.DRAFT,
+    ).select_related(
+        "course_offering__course",
+        "course_offering__academic_year_level__level",
+        "course_offering__academic_year_level__academic_year",
+    ).order_by(
+        "course_offering__academic_year_level__academic_year__starts_on",
+        "course_offering__course__name",
+        "name",
+    )
     return render(request, "upload_video.html", {
         "drive" : list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=True)[0],
         "is_root" : True,
         "course_offerings": course_offerings,
-        "scheduled_lesson_finalize_url_template": reverse("scheduled-lesson-finalize", args=[0]),
+        "editable_lessons": editable_lessons,
+        "media_job_collection_url": reverse("media-job-create"),
+        "media_job_source_complete_url_template": reverse(
+            "media-job-source-complete",
+            args=["00000000-0000-0000-0000-000000000000"],
+        ),
+        "media_job_status_url_template": reverse(
+            "media-job-status",
+            args=["00000000-0000-0000-0000-000000000000"],
+        ),
+        "media_job_retry_url_template": reverse(
+            "media-job-retry",
+            args=["00000000-0000-0000-0000-000000000000"],
+        ),
+        "media_job_attachment_retry_url_template": reverse(
+            "media-job-attachment-retry",
+            args=["00000000-0000-0000-0000-000000000000"],
+        ),
     })
 
 
-@require_POST
 @capability_required(can_manage_content)
-def scheduled_lesson_create(request):
-    try:
-        payload = json.loads(request.body)
-        lesson = create_scheduled_lesson(
-            lesson_name=payload.get("lesson_name"),
-            description=payload.get("description"),
-            offering_id=int(payload.get("course_offering")),
-            expected_media=payload.get("expected_media"),
+def media_processing_status(request):
+    """Render the SQL-paginated operational media-job status page."""
+    status_filter = request.GET.get("status", "").strip()
+    search = request.GET.get("q", "").strip()[:100]
+    valid_statuses = {value for value, _label in MediaProcessingStatus.choices}
+    if status_filter not in valid_statuses:
+        status_filter = ""
+    queryset = MediaProcessingJob.objects.select_related("lesson", "created_by")
+    if getattr(getattr(request.user, "role", None), "role", None) != "admin":
+        queryset = queryset.filter(created_by=request.user)
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+    if search:
+        queryset = queryset.filter(
+            Q(original_filename__icontains=search)
+            | Q(lesson__name__icontains=search)
+            | Q(created_by__username__icontains=search)
         )
-    except (json.JSONDecodeError, TypeError, ValueError, OverflowError, ValidationError) as exc:
-        message = str(exc) or _("Unable to create lesson draft.")
-        return JsonResponse({"message": message}, status=400)
-    return JsonResponse({"lesson_id": lesson.pk, "status": "draft"})
-
-
-@require_POST
-@capability_required(can_manage_content)
-def scheduled_lesson_finalize(request, lesson_id):
-    try:
-        lesson = finalize_scheduled_lesson(
-            lesson_id=lesson_id,
-            cloud_client=CLOUD_CLIENT,
-            bucket_name=bucket_name,
-        )
-    except Lesson.DoesNotExist:
-        return JsonResponse({"message": _("Scheduled lesson was not found.")}, status=404)
-    except ValidationError as exc:
-        if hasattr(exc, "message_dict"):
-            return JsonResponse(
-                {
-                    "message": _("Upload is incomplete; expected files are missing."),
-                    "errors": exc.message_dict,
-                },
-                status=400,
-            )
-        return JsonResponse({"message": exc.messages}, status=400)
-    enqueue_lesson_notifications(lesson)
-    return JsonResponse({"lesson_id": lesson.pk, "status": "published"})
-
-@capability_required(can_manage_content)
-def upload_link(request):
-    try:
-        body = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"message": _("Invalid request format.")}, status=400)
-    filename = body.get("filename", "")
-    if not isinstance(filename, str):
-        return JsonResponse({"message": _("Invalid file name.")}, status=400)
-
-    size = body.get("size")
-    # Validate size: must be present, non-negative integer, not boolean
-    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
-        return JsonResponse({"message": _("Invalid file size.")}, status=400)
-    max_size_mb = MAX_FILE_SIZE // (1024 * 1024)
-    if size > MAX_FILE_SIZE:
-        return JsonResponse({
-            "message": _("File size exceeds maximum allowed size of %(max_size)sMB") % {'max_size': max_size_mb}
-        }, status=400)
-
-    # Generated HLS objects use a separate, exact folder contract. Ordinary
-    # uploads retain the existing MP4/MP3/PDF validation.
-    if filename.lower().endswith((".m3u8", ".ts")):
-        is_valid, errors = validate_hls_object_key(filename)
-    else:
-        is_valid, errors = validate_upload_filename(filename, size)
-    if not is_valid:
-        return JsonResponse({
-            "message": _("Invalid file"),
-            "errors": errors
-        }, status=400)
-
-    presigned_url = CLOUD_CLIENT.generate_presigned_url(
-        'put_object',
-        Params={
-            'Bucket': bucket_name,
-            'Key': filename,
-        },
-        ExpiresIn=3600  # 1 hour expiration
-    )
-    return JsonResponse({
-        'url': presigned_url,
-        'method': 'PUT',
+    paginator = Paginator(queryset, 25)
+    jobs_page = paginator.get_page(request.GET.get("page", "1"))
+    return render(request, "media_processing_status.html", {
+        "jobs_page": jobs_page,
+        "status_choices": MediaProcessingStatus.choices,
+        "status_labels_json": json.dumps(
+            {value: str(label) for value, label in MediaProcessingStatus.choices},
+            ensure_ascii=False,
+        ),
+        "phase_labels_json": json.dumps(
+            {value: str(label) for value, label in MediaProcessingPhase.choices},
+            ensure_ascii=False,
+        ),
+        "status_filter": status_filter,
+        "search": search,
+        "media_job_retry_url_template": reverse(
+            "media-job-retry",
+            args=["00000000-0000-0000-0000-000000000000"],
+        ),
+        "media_job_attachment_retry_url_template": reverse(
+            "media-job-attachment-retry",
+            args=["00000000-0000-0000-0000-000000000000"],
+        ),
     })
 
 # Quiz Dashboard
@@ -2517,19 +2786,27 @@ def promotion_history(request):
 @capability_required(can_manage_content)
 def quiz_dashboard(request):   
     name = request.GET.get("name", None)
-    year = request.GET.get("filtering", None)
     course = request.GET.get("course", None)
     user = request.user
     view = "quiz"
-    query = Q(course_offering__isnull=False)
+    try:
+        selected_year, academic_years = select_content_academic_year(request)
+    except ValidationError as exc:
+        return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
+
+    query = Q(
+        course_offering__isnull=False,
+        course_offering__academic_year_level__academic_year_id=selected_year.pk,
+    )
     if name:
         query &= Q(name__icontains=name)
-    if year:
-        for level_obj in Level.objects.order_by("ordering"):
-            if level_obj.display_name == year:
-                query &= Q(course_offering__course__level__ordering=level_obj.ordering)
     if course:
-        query &= Q(course_offering_id=course) if course.isdigit() else Q(pk__in=[])
+        if course.isdigit() and CourseOffering.objects.filter(
+            pk=int(course), academic_year_level__academic_year_id=selected_year.pk
+        ).exists():
+            query &= Q(course_offering_id=int(course))
+        else:
+            course = None
     quizzes = Quiz.objects.filter(query).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
@@ -2537,17 +2814,24 @@ def quiz_dashboard(request):
         "quiz_type",
     )
     
-    logger.info(f"User : {user} filters users using {name} name and {year} level and {course} course")
+    logger.info(
+        "User %s filters quizzes using %s name, academic year %s, and %s course",
+        user,
+        name,
+        selected_year.pk,
+        course,
+    )
 
     quizzes = quizzes.order_by("name")
 
     context = {
         "name_value" : name or "",
-        "filtering" : year or "",
         "course_value" : course or "",
         "columns" : Quiz.get_columns(),
-        "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
-        "subjects" : _content_offering_filter_options(),
+        "academic_year_filter": True,
+        "academic_years": academic_years,
+        "selected_academic_year_id": selected_year.pk,
+        "subjects" : _content_offering_filter_options(selected_year.pk),
         "filters" : ["course_filter.html"],
         "submission_view" : True,
         "page_size" : 10,
@@ -2774,56 +3058,116 @@ def export_quiz_summary_csv(request, quiz_id):
 def export_submission_csv(request, grade_id):
     return export_single_submission_to_csv(grade_id)
 
-@capability_required(can_view_reports)
-def export_yearly_transcript_csv(request):
-    year = request.GET.get("year", now().year)
-    name = request.GET.get("name")
-    course = request.GET.get("course")
-    role = request.GET.get("role") or None
-    return export_yearly_transcript_to_csv(year, name=name, course=course, role=role)
+def _grade_matrix_request_state(request):
+    academic_year_id = request.GET.get("academic_year")
+    level_id = request.GET.get("level")
+    selected_year_id = int(academic_year_id) if academic_year_id and academic_year_id.isdigit() else None
+    selected_level_id = int(level_id) if level_id and level_id.isdigit() else None
+    years, selected_year, levels, selected_scope = grade_matrix_selection(
+        academic_year_id=selected_year_id,
+        level_id=selected_level_id,
+    )
 
-@capability_required(can_view_reports)
-def yearly_transcript_dashboard(request):
-    year = request.GET.get("year", now().year)
-    name = request.GET.get("name", "").strip()
-    course = request.GET.get("course", "").strip()
-    role = request.GET.get("role", "").strip()
+    course_value = request.GET.get("course", "").strip()
+    selected_course_id = int(course_value) if course_value.isdigit() else None
+    course_options = grade_matrix_courses(selected_scope)
+    valid_course_ids = {course["id"] for course in course_options}
+    if selected_course_id not in valid_course_ids:
+        selected_course_id = None
 
-    transcript_query = yearly_transcript_queryset(year, name=name or None, course=course or None, role=role or None)
-    transcript_page = Paginator(transcript_query, 25).get_page(request.GET.get("page", 1))
-    transcript_rows = [
-        {
-            "user_id": grade.user_id,
-            "username": grade.user.username,
-            "first_name": grade.user.first_name,
-            "last_name": grade.user.last_name,
-            "course_name": grade.quiz.course_offering.course.name,
-            "quiz_name": grade.quiz.name,
-            "quiz_grade": grade.total_grade,
-            "quiz_total": grade.quiz.total_grade,
-            "course_accumulated_grade": grade.course_accumulated_grade,
-            "course_accumulated_total": grade.course_accumulated_total,
-            "overall_accumulated_grade": grade.overall_accumulated_grade,
-            "overall_accumulated_total": grade.overall_accumulated_total,
-            "submitted_at_display": grade.submitted_at.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        for grade in transcript_page
-    ]
-    student_count = transcript_query.values("user_id").distinct().count()
-
-    context = {
-        "title": _("Yearly Transcript"),
-        "year_value": int(year) if str(year).isdigit() else now().year,
+    name = request.GET.get("name", "").strip()[:100]
+    return {
+        "years": years,
+        "selected_year": selected_year,
+        "levels": levels,
+        "selected_scope": selected_scope,
+        "course_options": course_options,
+        "selected_course_id": selected_course_id,
         "name_value": name,
-        "course_value": course,
-        "selected_role": role,
-        "role_options": Role.ROLES,
-        "transcript_rows": transcript_rows,
-        "transcript_page_obj": transcript_page,
-        "student_count": student_count,
-        "result_count": transcript_page.paginator.count,
     }
 
+
+@capability_required(can_view_reports)
+def export_grades_matrix_xlsx(request):
+    state = _grade_matrix_request_state(request)
+    selected_scope = state["selected_scope"]
+    selected_course_id = state["selected_course_id"]
+    courses = (
+        state["course_options"]
+        if selected_course_id is None
+        else grade_matrix_courses(selected_scope, course_id=selected_course_id)
+    )
+    offering_ids = tuple(course["offering_id"] for course in courses)
+    students = grade_matrix_student_queryset(
+        selected_scope,
+        name=state["name_value"],
+        course_offering_ids=offering_ids if selected_course_id else (),
+    )
+    workbook = grade_matrix_workbook(students, courses)
+    response = FileResponse(
+        workbook,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    safe_name = _safe_filename(
+        f"{state['selected_year'].name}-{selected_scope.level.display_name}"
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="grades_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    )
+    return response
+
+
+@capability_required(can_view_reports)
+def grades_matrix_dashboard(request):
+    state = _grade_matrix_request_state(request)
+    selected_scope = state["selected_scope"]
+    selected_course_id = state["selected_course_id"]
+    matrix_courses = (
+        state["course_options"]
+        if selected_course_id is None
+        else grade_matrix_courses(selected_scope, course_id=selected_course_id)
+    )
+    offering_ids = tuple(course["offering_id"] for course in matrix_courses)
+    students = grade_matrix_student_queryset(
+        selected_scope,
+        name=state["name_value"],
+        course_offering_ids=offering_ids if selected_course_id else (),
+    )
+    page_obj = Paginator(students, GRADE_MATRIX_PAGE_SIZE).get_page(request.GET.get("page", 1))
+    matrix_rows = grade_matrix_page(page_obj, matrix_courses)
+
+    level_counts = {
+        row["academic_year_level_id"]: row["student_count"]
+        for row in Enrollment.objects.filter(
+            academic_year_level_id__in=[level.pk for level in state["levels"]],
+            status__in=READABLE_ENROLLMENT_STATUSES,
+            student__role__role="student",
+        ).values("academic_year_level_id").annotate(
+            student_count=Count("student", distinct=True),
+        )
+    }
+    level_tabs = [
+        {
+            "level_id": level.level_id,
+            "name": level.level.display_name,
+            "student_count": level_counts.get(level.pk, 0),
+            "selected": level.pk == selected_scope.pk,
+        }
+        for level in state["levels"]
+    ]
+
+    context = {
+        "title": _("Grades Matrix"),
+        **state,
+        "level_tabs": level_tabs,
+        "matrix_courses": matrix_courses,
+        "matrix_rows": matrix_rows,
+        "page_obj": page_obj,
+        "student_count": page_obj.paginator.count,
+        "quiz_count": sum(len(course["quizzes"]) for course in matrix_courses),
+        "total_matrix_columns": 1 + sum(course["detail_span"] for course in matrix_courses),
+        "active_year": state["selected_year"].is_active,
+    }
     return render(request, "yearly_transcript_dashboard.html", context)
 
 @capability_required(can_grade)

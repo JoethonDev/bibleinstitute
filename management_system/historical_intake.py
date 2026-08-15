@@ -5,11 +5,14 @@ import hashlib
 import io
 from collections.abc import Iterable
 
+from openpyxl import load_workbook
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 
+from .academic_enrollment import promote_historical_summary
 from .models import (
     AcademicYear,
     AcademicYearLevel,
@@ -90,8 +93,6 @@ def parse_intake_upload(upload) -> tuple[list[dict[str, str]], str]:
         headers = tuple(reader.fieldnames or ())
         rows = [{key: _text(value) for key, value in row.items()} for row in reader]
     elif name.endswith(".xlsx"):
-        from openpyxl import load_workbook
-
         workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         if "Intake" not in workbook.sheetnames:
             raise ValidationError(_("The XLSX file must contain an Intake sheet."))
@@ -304,8 +305,6 @@ def intake_historical_row(*, row: dict[str, str], actor: User, source_key: str, 
         enrollment.enrolled_by = enrollment.enrolled_by or actor
         enrollment.save(update_fields=["status", "enrolled_by"])
     if plan["promote"]:
-        from .academic_enrollment import promote_historical_summary
-
         promote_historical_summary(
             summary_id=summary.pk,
             destination_scope_id=plan["destination"].pk if plan["destination"] else None,

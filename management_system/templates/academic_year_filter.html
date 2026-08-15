@@ -1,0 +1,10 @@
+{% load i18n %}
+<div class="ad-filters">
+  <div class="position-relative d-flex align-items-center">
+    <select class="form-select filters-fields pe-4" aria-label="{% translate 'Academic Year' %}" name="academic_year" hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}" hx-include=".filters-fields" hx-trigger="change" hx-target="#table-container" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#table-loading">
+      {% for year in academic_years %}
+        <option value="{{ year.pk }}" {% if selected_academic_year_id|stringformat:"s" == year.pk|stringformat:"s" %}selected{% endif %}>{{ year.name }}{% if year.starts_on and year.ends_on %} ({{ year.starts_on|date:"Y-m-d" }} – {{ year.ends_on|date:"Y-m-d" }}){% endif %}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>

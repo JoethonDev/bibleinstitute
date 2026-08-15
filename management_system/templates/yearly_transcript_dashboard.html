@@ -2,186 +2,184 @@
 {% load i18n %}
 
 {% block body %}
-<div class="container-fluid py-3 ad-page" id="content">
-  <div class="row">
-    <div class="col-12">
-      <div class="ad-pane-head">
-        <h3 class="ad-pane-title mb-0">{% translate "Yearly Transcript" %}</h3>
-        <p class="ad-pane-desc">{% translate "Trace student quiz grades across the selected year." %}</p>
-        <a href="{% url 'export-yearly-transcript-csv' %}?year={{ year_value }}&name={{ name_value|urlencode }}&course={{ course_value|urlencode }}&role={{ selected_role|urlencode }}" class="ad-btn ad-btn--ghost ad-btn--sm">
-          <i class="fas fa-file-csv"></i>
-          {% translate "Export Transcript CSV" %}
-        </a>
-      </div>
-
-      <div class="ad-card mb-4">
-        <div class="ad-card-body">
-          <form method="get" class="row g-3 align-items-end">
-            <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">{% translate "Year" %}</label>
-              <input type="number" name="year" class="form-control" value="{{ year_value }}" placeholder="{% translate 'Year' %}">
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">{% translate "Student name" %}</label>
-              <input type="search" name="name" class="form-control" value="{{ name_value }}" placeholder="{% translate 'Search by first, last, or username' %}">
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">{% translate "Course" %}</label>
-              <input type="search" name="course" class="form-control" value="{{ course_value }}" placeholder="{% translate 'Course name' %}">
-            </div>
-            <div class="col-12 col-md-2">
-              <label class="form-label fw-semibold">{% translate "Role" %}</label>
-              <select name="role" class="form-select">
-                <option value="">{% translate "All roles" %}</option>
-                {% for role_code, role_label in role_options %}
-                  <option value="{{ role_code }}" {% if selected_role == role_code %}selected{% endif %}>{{ role_label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-12 col-md-1 d-grid">
-              <button type="submit" class="ad-btn ad-btn--ghost">{% translate "Filter" %}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div class="ad-stats mb-4">
-        <div class="ad-stat">
-          <div class="ad-stat-ic"><i class="fas fa-table"></i></div>
-          <div><b>{{ result_count }}</b><span>{% translate "Rows" %}</span></div>
-        </div>
-        <div class="ad-stat">
-          <div class="ad-stat-ic"><i class="fas fa-users"></i></div>
-          <div><b>{{ student_count }}</b><span>{% translate "Students" %}</span></div>
-        </div>
-      </div>
-
-      <div class="ad-card">
-        <div class="ad-table-wrap">
-          <table class="ad-table ad-table--dense">
-            <thead>
-              <tr>
-                <th scope="col">{% translate "User ID" %}</th>
-                <th scope="col">{% translate "Username" %}</th>
-                <th scope="col">{% translate "First Name" %}</th>
-                <th scope="col">{% translate "Last Name" %}</th>
-                <th scope="col">{% translate "Course" %}</th>
-                <th scope="col">{% translate "Quiz" %}</th>
-                <th scope="col">{% translate "Quiz Grade" %}</th>
-                <th scope="col">{% translate "Quiz Total" %}</th>
-                <th scope="col">{% translate "Course Grade" %}</th>
-                <th scope="col">{% translate "Course Total" %}</th>
-                <th scope="col">{% translate "Overall Grade" %}</th>
-                <th scope="col">{% translate "Overall Total" %}</th>
-                <th scope="col">{% translate "Taken / Completion Date" %}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in transcript_rows %}
-                <tr>
-                  <td>{{ row.user_id }}</td>
-                  <td>{{ row.username }}</td>
-                  <td>{{ row.first_name }}</td>
-                  <td>{{ row.last_name }}</td>
-                  <td>{{ row.course_name }}</td>
-                  <td>{{ row.quiz_name }}</td>
-                  <td>{{ row.quiz_grade }}</td>
-                  <td>{{ row.quiz_total }}</td>
-                  <td>{{ row.course_accumulated_grade }}</td>
-                  <td>{{ row.course_accumulated_total }}</td>
-                  <td>{{ row.overall_accumulated_grade }}</td>
-                  <td>{{ row.overall_accumulated_total }}</td>
-                  <td>{{ row.submitted_at_display }}</td>
-                </tr>
-              {% empty %}
-                <tr>
-                  <td colspan="13" class="ad-empty">{% translate "No transcript rows found for the selected filters." %}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {% if transcript_page_obj.paginator.num_pages > 1 %}
-      <div class="ad-page-wrapper mt-3">
-        <nav aria-label="{% translate 'Transcript pagination' %}">
-          <ul class="ad-page-nav">
-            {% if transcript_page_obj.has_previous %}
-              <li>
-                <a class="ad-page-link" href="?page=1&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'First page' %}">
-                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                  <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
-                </a>
-              </li>
-              <li>
-                <a class="ad-page-link" href="?page={{ transcript_page_obj.previous_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Previous page' %}">
-                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                  <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                </a>
-              </li>
-            {% else %}
-              <li>
-                <span class="ad-page-link is-disabled" aria-disabled="true">
-                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                  <span class="d-none d-md-inline ms-1">{% translate "First" %}</span>
-                </span>
-              </li>
-              <li>
-                <span class="ad-page-link is-disabled" aria-disabled="true">
-                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                  <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                </span>
-              </li>
-            {% endif %}
-
-            {% for page_num in transcript_page_obj.paginator.page_range %}
-              {% if page_num == transcript_page_obj.number %}
-                <li aria-current="page">
-                  <span class="ad-page-link is-active">{{ page_num }}</span>
-                </li>
-              {% else %}
-                <li>
-                  <a class="ad-page-link" href="?page={{ page_num }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}">{{ page_num }}</a>
-                </li>
-              {% endif %}
-            {% endfor %}
-
-            {% if transcript_page_obj.has_next %}
-              <li>
-                <a class="ad-page-link" href="?page={{ transcript_page_obj.next_page_number }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Next page' %}">
-                  <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </a>
-              </li>
-              <li>
-                <a class="ad-page-link" href="?page={{ transcript_page_obj.paginator.num_pages }}&amp;year={{ year_value }}&amp;name={{ name_value|urlencode }}&amp;course={{ course_value|urlencode }}&amp;role={{ selected_role|urlencode }}" aria-label="{% translate 'Last page' %}">
-                  <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
-                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </a>
-              </li>
-            {% else %}
-              <li>
-                <span class="ad-page-link is-disabled" aria-disabled="true">
-                  <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                  <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </span>
-              </li>
-              <li>
-                <span class="ad-page-link is-disabled" aria-disabled="true">
-                  <span class="d-none d-md-inline me-1">{% translate "Last" %}</span>
-                  <i class="fas fa-angle-double-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                </span>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
-        <div class="ad-page-info">
-          {% blocktranslate with start=transcript_page_obj.start_index end=transcript_page_obj.end_index total=transcript_page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}
-        </div>
-      </div>
-      {% endif %}
+<div class="container-fluid py-3 ad-page grade-matrix-page" id="content">
+  <div class="grade-matrix-header">
+    <div>
+      <div class="ad-kicker"><i class="fas fa-chart-line"></i> {% translate "Academic performance" %}</div>
+      <h3 class="ad-title mb-2">{% translate "Grades matrix" %}</h3>
+      <p class="ad-lede mb-0">{% translate "Review student results across quizzes, weekly totals, and final assessments." %}</p>
+    </div>
+    <div class="grade-matrix-actions">
+      <a href="{% url 'export-grades-matrix-xlsx' %}?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}" class="ad-btn ad-btn--teal ad-btn--sm">
+        <i class="fas fa-file-excel"></i> {% translate "Export XLSX" %}
+      </a>
     </div>
   </div>
+
+  <nav class="grade-matrix-level-tabs ad-card" role="tablist" aria-label="{% translate 'Academic level' %}">
+    {% for tab in level_tabs %}
+      <a class="grade-matrix-level-tab{% if tab.selected %} is-active{% endif %}"
+         role="tab"
+         aria-selected="{{ tab.selected|yesno:'true,false' }}"
+         href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}">
+        <span>{{ tab.name }}</span>
+        <small>{{ tab.student_count }} {% translate "students" %}</small>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Grades filters' %}">
+    <form method="get" class="grade-matrix-filter-grid">
+      <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
+      <div class="grade-matrix-filter-field">
+        <label for="grade-matrix-search">{% translate "Search student" %}</label>
+        <div class="grade-matrix-input-wrap">
+          <i class="fas fa-search" aria-hidden="true"></i>
+          <input id="grade-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}">
+        </div>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="grade-matrix-course">{% translate "Course offering" %}</label>
+        <select id="grade-matrix-course" name="course" class="form-select">
+          <option value="">{% translate "All courses" %}</option>
+          {% for course in course_options %}
+            <option value="{{ course.id }}"{% if selected_course_id == course.id %} selected{% endif %}>{{ course.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="grade-matrix-year">{% translate "Academic year" %}</label>
+        <select id="grade-matrix-year" name="academic_year" class="form-select" onchange="this.form.submit()">
+          {% for year in years %}
+            <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} · {% translate "Active" %}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grade-matrix-filter-actions">
+        <button type="submit" class="ad-btn ad-btn--teal">{% translate "Apply" %}</button>
+        <a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a>
+      </div>
+    </form>
+    <div class="grade-matrix-filter-summary">
+      <span>{% translate "Showing" %}:</span>
+      <span class="ad-pill ad-pill--teal">{{ selected_scope.level.display_name }}</span>
+      <span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if active_year %} · {% translate "Active year" %}{% else %} · {% translate "Historical year" %}{% endif %}</span>
+      {% if selected_course_id %}<span class="ad-pill ad-pill--muted">{% translate "Course filtered" %}</span>{% endif %}
+      <span class="grade-matrix-summary-spacer"></span>
+      <span>{{ student_count }} {% translate "students" %} · {{ quiz_count }} {% translate "quizzes" %}</span>
+    </div>
+  </section>
+
+  <section class="ad-card grade-matrix-card" aria-labelledby="grade-matrix-heading">
+    <div class="grade-matrix-card-head">
+      <div>
+        <h4 id="grade-matrix-heading" class="mb-1">{{ selected_scope.level.display_name }} · {{ selected_year.name }}</h4>
+        <p class="mb-0">{% translate "Weekly and final quiz results grouped by course offering." %}</p>
+      </div>
+      <div class="grade-matrix-card-actions">
+        <span class="ad-pill ad-pill--success"><i class="fas fa-circle"></i> {% if active_year %}{% translate "Active year" %}{% else %}{% translate "Historical year" %}{% endif %}</span>
+        <button id="grade-matrix-detail-toggle" type="button" class="ad-btn ad-btn--ghost ad-btn--sm" aria-pressed="true" data-detail-label="{% translate 'Quiz detail' %}" data-total-label="{% translate 'Course totals only' %}">
+          <i class="fas fa-table-columns" aria-hidden="true"></i>
+          <span id="grade-matrix-detail-label">{% translate "Quiz detail" %}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="grade-matrix-table-wrap">
+      <table class="ad-table grade-matrix-table">
+        <thead>
+          <tr class="grade-matrix-course-row">
+            <th class="grade-matrix-identity" rowspan="2" scope="col">{% translate "Student name" %}</th>
+            {% for course in matrix_courses %}
+              <th scope="col" colspan="{{ course.detail_span }}" class="grade-matrix-course-group" data-detail-span="{{ course.detail_span }}">
+                {{ course.name }}
+                {% if course.instructor %}<span>{{ course.instructor }}</span>{% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+          <tr class="grade-matrix-quiz-row">
+            {% for course in matrix_courses %}
+              {% for quiz in course.quizzes %}
+                <th scope="col" class="{% if quiz.type == 'final' %}grade-matrix-final-head{% else %}grade-matrix-weekly-head{% endif %}" data-detail-col="true">
+                  {{ quiz.name }}<span>{{ quiz.type_label }}</span>
+                </th>
+              {% endfor %}
+              <th scope="col" class="grade-matrix-weekly-total">{% translate "Weekly total" %}</th>
+              <th scope="col" class="grade-matrix-final-total">{% translate "Final total" %}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matrix_rows %}
+            <tr>
+              <th scope="row" class="grade-matrix-identity">
+                <span class="grade-matrix-student-name">{{ row.name }}</span>
+                <span class="grade-matrix-student-meta">{{ row.username }} · #{{ row.id }}</span>
+              </th>
+              {% for course in row.courses %}
+                {% for cell in course.quiz_cells %}
+                  <td data-detail-cell="true">
+                    {% if cell.submitted %}<span class="grade-matrix-score">{{ cell.grade }}/{{ cell.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                  </td>
+                {% endfor %}
+                <td class="grade-matrix-weekly-total">
+                  {% if course.weekly.has_grade %}<span class="grade-matrix-score">{{ course.weekly.earned }}/{{ course.weekly.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                </td>
+                <td class="grade-matrix-final-total">
+                  {% if course.final.has_grade %}<span class="grade-matrix-score">{{ course.final.earned }}/{{ course.final.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{{ total_matrix_columns }}" class="ad-empty">{% translate "No enrolled students or quiz results match the selected filters." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="grade-matrix-legend">
+      <span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Weekly assessment" %}</span>
+      <span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Final assessment" %}</span>
+      <span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Not submitted" %}</span>
+      <span class="grade-matrix-legend-note">{% translate "The student name column stays fixed while the matrix scrolls." %}</span>
+    </div>
+  </section>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+    <div class="ad-page-wrapper mt-3">
+      <nav aria-label="{% translate 'Grades matrix pagination' %}">
+        <ul class="ad-page-nav">
+          {% if page_obj.has_previous %}
+            <li><a class="ad-page-link" href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}&amp;page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}"><i class="fas fa-chevron-left"></i></a></li>
+          {% endif %}
+          <li><span class="ad-page-link is-active">{{ page_obj.number }}</span></li>
+          {% if page_obj.has_next %}
+            <li><a class="ad-page-link" href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}&amp;page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}"><i class="fas fa-chevron-right"></i></a></li>
+          {% endif %}
+        </ul>
+      </nav>
+      <div class="ad-page-info">{% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}</div>
+    </div>
+  {% endif %}
 </div>
+
+<script>
+  (() => {
+    const toggle = document.getElementById('grade-matrix-detail-toggle');
+    const label = document.getElementById('grade-matrix-detail-label');
+    const table = document.querySelector('.grade-matrix-table');
+    if (!toggle || !label || !table) return;
+    let detail = true;
+    toggle.addEventListener('click', () => {
+      detail = !detail;
+      table.querySelectorAll('[data-detail-col], [data-detail-cell]').forEach((cell) => {
+        cell.hidden = !detail;
+      });
+      table.querySelectorAll('.grade-matrix-course-group').forEach((group) => {
+        group.colSpan = detail ? Number(group.dataset.detailSpan) : 2;
+      });
+      toggle.setAttribute('aria-pressed', String(detail));
+      label.textContent = detail ? toggle.dataset.detailLabel : toggle.dataset.totalLabel;
+    });
+  })();
+</script>
 {% endblock %}

@@ -1751,6 +1751,191 @@
     transform: rotate(90deg);
 }
 
+/* ---------------- Grades matrix ---------------- */
+.grade-matrix-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.grade-matrix-actions,
+.grade-matrix-card-actions {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+}
+
+.grade-matrix-level-tabs {
+    display: flex;
+    gap: .35rem;
+    padding: .45rem;
+    margin-bottom: .9rem;
+    overflow-x: auto;
+}
+
+.grade-matrix-level-tab {
+    flex: 1 0 10rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    min-height: 2.9rem;
+    padding: .45rem .8rem;
+    border-radius: .65rem;
+    color: var(--ps-muted);
+    text-decoration: none;
+    font-weight: 750;
+    transition: background-color var(--ps-motion), color var(--ps-motion), box-shadow var(--ps-motion);
+}
+
+.grade-matrix-level-tab small { font-size: .68rem; font-weight: 600; opacity: .8; }
+.grade-matrix-level-tab:hover { color: var(--ps-teal-deep); background: var(--ps-teal-soft); }
+.grade-matrix-level-tab.is-active {
+    color: #fff;
+    background: linear-gradient(135deg, var(--ps-teal), var(--ps-teal-deep));
+    box-shadow: 0 5px 14px rgba(23, 107, 112, .22);
+}
+.grade-matrix-level-tab.is-active small { color: #dceae7; }
+
+.grade-matrix-controls { padding: 1rem 1.15rem .95rem; margin-bottom: .9rem; }
+.grade-matrix-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(14rem, 1.25fr) minmax(12rem, .9fr) minmax(12rem, .9fr) auto;
+    gap: .75rem;
+    align-items: end;
+}
+.grade-matrix-filter-field { display: grid; gap: .35rem; min-width: 0; }
+.grade-matrix-filter-field label { color: var(--ps-muted); font-size: .72rem; font-weight: 750; }
+.grade-matrix-input-wrap { position: relative; }
+.grade-matrix-input-wrap i { position: absolute; inset-inline-start: .75rem; top: .7rem; color: var(--ps-muted); pointer-events: none; }
+.grade-matrix-input-wrap input { padding-inline-start: 2.15rem; }
+.grade-matrix-filter-actions { display: flex; gap: .45rem; }
+.grade-matrix-filter-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .85rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--ps-line);
+    color: var(--ps-muted);
+    font-size: .72rem;
+}
+.grade-matrix-summary-spacer { flex: 1; }
+
+.grade-matrix-card { overflow: hidden; }
+.grade-matrix-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.15rem .85rem;
+    border-bottom: 1px solid var(--ps-line);
+}
+.grade-matrix-card-head h4 { font-size: 1.05rem; font-weight: 750; }
+.grade-matrix-card-head p { color: var(--ps-muted); font-size: .75rem; }
+.grade-matrix-card-actions .ad-pill i { font-size: .45rem; }
+
+.grade-matrix-table-wrap {
+    max-height: 42rem;
+    overflow: auto;
+    background: var(--ps-paper);
+}
+.grade-matrix-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+.grade-matrix-table th,
+.grade-matrix-table td {
+    height: 3rem;
+    padding: .5rem .65rem;
+    border-inline-end: 1px solid var(--ps-line);
+    border-bottom: 1px solid var(--ps-line);
+    text-align: center;
+    white-space: nowrap;
+    font-size: .76rem;
+    font-variant-numeric: tabular-nums;
+}
+.grade-matrix-table thead th {
+    position: sticky;
+    z-index: 3;
+    color: var(--ps-ink);
+    background: var(--ps-mist);
+    font-size: .67rem;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+.grade-matrix-table thead .grade-matrix-course-row th {
+    top: 0;
+    height: 2.7rem;
+    color: var(--ps-teal-deep);
+    background: var(--ps-gold-soft);
+    border-bottom-color: var(--ps-line);
+    font-size: .78rem;
+    text-transform: none;
+}
+.grade-matrix-table thead .grade-matrix-quiz-row th { top: 2.7rem; }
+.grade-matrix-course-group span,
+.grade-matrix-quiz-row th span {
+    display: block;
+    margin-top: .15rem;
+    color: var(--ps-muted);
+    font-size: .62rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.grade-matrix-identity {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 4;
+    width: 15rem;
+    min-width: 15rem;
+    text-align: start !important;
+    background: var(--ps-paper) !important;
+    border-inline-end: 2px solid var(--ps-gold) !important;
+    box-shadow: 8px 0 12px -12px rgba(24, 43, 49, .55);
+}
+.grade-matrix-table thead .grade-matrix-identity { z-index: 6; background: var(--ps-gold-soft) !important; }
+.grade-matrix-table tbody tr:nth-child(even) td { background: rgba(250, 247, 239, .72); }
+.grade-matrix-table tbody tr:hover td { background: var(--ps-teal-soft); }
+.grade-matrix-student-name { display: block; color: var(--ps-ink); font-weight: 750; }
+.grade-matrix-student-meta { display: block; margin-top: .1rem; color: var(--ps-muted); font-size: .65rem; direction: ltr; text-align: start; }
+.grade-matrix-weekly-head,
+.grade-matrix-weekly-total { color: var(--ps-teal-deep) !important; background: var(--ps-teal-soft) !important; }
+.grade-matrix-final-head,
+.grade-matrix-final-total { color: var(--ps-gold-deep) !important; background: var(--ps-gold-soft) !important; }
+.grade-matrix-score { font-weight: 750; }
+.grade-matrix-missing { color: var(--ps-muted); font-weight: 650; }
+.grade-matrix-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: .75rem 1.15rem;
+    color: var(--ps-muted);
+    font-size: .68rem;
+}
+.grade-matrix-legend-dot { color: var(--ps-teal); font-size: .45rem; vertical-align: middle; }
+.grade-matrix-legend-dot--gold { color: var(--ps-gold); }
+.grade-matrix-legend-dot--muted { color: var(--ps-muted); }
+.grade-matrix-legend-note { margin-inline-start: auto; color: var(--ps-teal-deep); font-weight: 700; }
+
+@media (max-width: 900px) {
+    .grade-matrix-header,
+    .grade-matrix-card-head { align-items: flex-start; flex-direction: column; }
+    .grade-matrix-filter-grid { grid-template-columns: 1fr 1fr; }
+    .grade-matrix-filter-actions { grid-column: 1 / -1; }
+    .grade-matrix-filter-actions .ad-btn { flex: 1; }
+    .grade-matrix-legend-note { margin-inline-start: 0; width: 100%; }
+}
+
 /* ---------------- Dense table variant (transcripts) ---------------- */
 .ad-table--dense th,
 .ad-table--dense td { padding: .4rem .6rem; font-size: .82rem; white-space: nowrap; }

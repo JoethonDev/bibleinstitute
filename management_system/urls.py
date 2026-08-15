@@ -93,14 +93,17 @@ urlpatterns = [
     path('dashboard/quizzez/<int:quiz_id>/export-csv/', export_quiz_submissions_csv, name="export-quiz-submissions-csv"),
     path('dashboard/quizzez/<int:quiz_id>/summary-csv/', export_quiz_summary_csv, name="export-quiz-summary-csv"),
     path('dashboard/grade/<int:grade_id>/export-csv/', export_submission_csv, name="export-submission-csv"),
-    path('dashboard/reports/transcript/', yearly_transcript_dashboard, name="yearly-transcript-dashboard"),
-    path('dashboard/reports/transcript/export-csv/', export_yearly_transcript_csv, name="export-yearly-transcript-csv"),
+    path('dashboard/reports/grades/', grades_matrix_dashboard, name="grades-matrix-dashboard"),
+    path('dashboard/reports/grades/export-xlsx/', export_grades_matrix_xlsx, name="export-grades-matrix-xlsx"),
 
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),
-    path('api/get-presigned-url/', upload_link, name="upload-link"),
-    path('api/scheduled-lessons/create/', scheduled_lesson_create, name="scheduled-lesson-create"),
-    path('api/scheduled-lessons/<int:lesson_id>/finalize/', scheduled_lesson_finalize, name="scheduled-lesson-finalize"),
+    path('api/media/jobs/', media_jobs_collection, name="media-job-create"),
+    path('api/media/jobs/<uuid:job_uuid>/source-complete/', media_job_source_complete, name="media-job-source-complete"),
+    path('api/media/jobs/<uuid:job_uuid>/', media_job_status, name="media-job-status"),
+    path('api/media/jobs/<uuid:job_uuid>/retry/', media_job_retry, name="media-job-retry"),
+    path('api/media/jobs/<uuid:job_uuid>/attachment-retry/', media_job_attachment_retry, name="media-job-attachment-retry"),
+    path('dashboard/media-processing/', media_processing_status, name="media-processing-status"),
     
     # R2 File Management
     path('dashboard/r2-management/', r2_management_dashboard, name="r2-management-dashboard"),

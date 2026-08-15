@@ -100,9 +100,73 @@ services:
     cpus: 0.5
     mem_limit: 1G
 
+  # ── Media processing worker (dedicated FFmpeg queue) ───────────
+  # Runs native ffmpeg/ffprobe only for `media`-queue jobs (server-side FFmpeg
+  # migration, proposal sections 15-16). One job at a time: concurrency 1 and
+  # prefetch 1. Private named volume mounted at MEDIA_WORK_DIR only; it does
+  # not attach the shared lms_static_data volume. The environment block below
+  # repeats x-app-base because a service-level `environment` key replaces the
+  # anchored mapping in Compose YAML merge semantics; values are identical to
+  # the anchor plus the MEDIA_* settings.
+  media-worker:
+    <<: *app-base
+    command:
+      - celery
+      - -A
+      - learning_platform
+      - worker
+      - --loglevel=INFO
+      - --queues=media
+      - --concurrency=1
+      - --prefetch-multiplier=1
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      POSTGRES_DB: ${POSTGRES_DB:-lms_database}
+      POSTGRES_USER: ${POSTGRES_USER:-lms_user}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      SQLITE_SOURCE_PATH: /app/db.sqlite3
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      WEB_THREADS: ${WEB_THREADS:-8}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
+      STATIC_ASSET_VERSION: ${STATIC_ASSET_VERSION:-dev}
+      MEDIA_WORK_DIR: ${MEDIA_WORK_DIR:-/var/lib/lms-media-processing}
+      MEDIA_MAX_SOURCE_SIZE: ${MEDIA_MAX_SOURCE_SIZE:-2147483648}
+      MEDIA_MAX_DURATION_SECONDS: ${MEDIA_MAX_DURATION_SECONDS:-10800}
+      MEDIA_JOB_TIMEOUT_SECONDS: ${MEDIA_JOB_TIMEOUT_SECONDS:-7200}
+      MEDIA_SEGMENT_SECONDS: ${MEDIA_SEGMENT_SECONDS:-12}
+      MEDIA_SOURCE_RETENTION_HOURS: ${MEDIA_SOURCE_RETENTION_HOURS:-24}
+      MEDIA_FAILED_SOURCE_RETENTION_HOURS: ${MEDIA_FAILED_SOURCE_RETENTION_HOURS:-72}
+      MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS: ${MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS:-90}
+      MEDIA_WORKER_CONCURRENCY: ${MEDIA_WORKER_CONCURRENCY:-1}
+    volumes:
+      - media_processing_data:${MEDIA_WORK_DIR:-/var/lib/lms-media-processing}
+    cpus: 0.25
+    mem_limit: 1G
+
+  # ── Celery beat (bounded media recovery schedule) ──────────────
+  celery-beat:
+    <<: *app-base
+    command:
+      - celery
+      - -A
+      - learning_platform
+      - beat
+      - --loglevel=INFO
+    volumes: []
+    cpus: 0.1
+    mem_limit: 256M
+
 volumes:
   lms_static_data:
     external: true
+  # Private disposable processing disk for the media worker; separate from
+  # static files and R2 data and mounted only at MEDIA_WORK_DIR.
+  media_processing_data:
 
 networks:
   lms_network:

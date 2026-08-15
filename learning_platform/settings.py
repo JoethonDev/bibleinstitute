@@ -110,7 +110,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    # ponytail: removed global COEP — breaks CDN resources; scoped to upload view via ffmpeg_headers
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware', # Add this for localization
     'django.middleware.common.CommonMiddleware',
@@ -172,7 +171,30 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
 )
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_IMPORTS = ("management_system.telegram_tasks",)
+CELERY_IMPORTS = ("management_system.telegram_tasks", "management_system.media_tasks")
+CELERY_TASK_ROUTES = {
+    "management_system.media_tasks.*": {"queue": "media"},
+}
+CELERY_BEAT_SCHEDULE = {
+    "recover-pending-media-jobs": {
+        "task": "management_system.media_tasks.recover_pending_media_jobs",
+        "schedule": 60.0,
+        "kwargs": {"limit": 100},
+    },
+}
+
+# Server-side media processing limits. Native FFmpeg runs only in the
+# dedicated media worker; these values are also exposed in the worker's
+# Compose environment for operational inspection.
+MEDIA_WORK_DIR = os.getenv("MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
+MEDIA_MAX_SOURCE_SIZE = int(os.getenv("MEDIA_MAX_SOURCE_SIZE", str(2 * 1024 ** 3)))
+MEDIA_MAX_DURATION_SECONDS = int(os.getenv("MEDIA_MAX_DURATION_SECONDS", str(3 * 60 * 60)))
+MEDIA_JOB_TIMEOUT_SECONDS = int(os.getenv("MEDIA_JOB_TIMEOUT_SECONDS", str(2 * 60 * 60)))
+MEDIA_SEGMENT_SECONDS = int(os.getenv("MEDIA_SEGMENT_SECONDS", "12"))
+MEDIA_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_SOURCE_RETENTION_HOURS", "24"))
+MEDIA_FAILED_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_FAILED_SOURCE_RETENTION_HOURS", "72"))
+MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS = int(os.getenv("MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS", "90"))
+MEDIA_WORKER_CONCURRENCY = int(os.getenv("MEDIA_WORKER_CONCURRENCY", "1"))
 
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
 # Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by

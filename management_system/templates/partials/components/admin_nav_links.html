@@ -68,9 +68,23 @@
                 <i class="fas fa-book-open"></i>
                 <span>{% translate "Courses" %}</span>
             </a>
-        </li>
-        
-        <li class="nav-item">
+         </li>
+
+         <li class="nav-item">
+             <a class="ad-tab"
+                href="{% url 'media-processing-status' %}"
+                hx-get="{% url 'media-processing-status' %}"
+                hx-trigger="click"
+                hx-target="#display-page"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-select="#content">
+                 <i class="fas fa-spinner"></i>
+                 <span>{% translate "Media processing" %}</span>
+             </a>
+         </li>
+
+         <li class="nav-item">
             <a class="ad-tab"
                href="{% url 'lesson-dashboard' %}"
                hx-get="{% url 'lesson-dashboard' %}"
@@ -263,15 +277,15 @@
         
         <li class="nav-item">
             <a class="ad-tab"
-               href="{% url 'yearly-transcript-dashboard' %}"
-               hx-get="{% url 'yearly-transcript-dashboard' %}"
+               href="{% url 'grades-matrix-dashboard' %}"
+               hx-get="{% url 'grades-matrix-dashboard' %}"
                hx-trigger="click"
                hx-target="#display-page"
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-select="#content">
                 <i class="fas fa-chart-bar"></i>
-                <span>{% translate "Transcripts" %}</span>
+                <span>{% translate "Grades Matrix" %}</span>
             </a>
         </li>
     {% endif %}

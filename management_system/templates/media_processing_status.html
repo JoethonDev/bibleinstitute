@@ -1,0 +1,106 @@
+{% extends 'admin_panel.html' %}
+{% load i18n static %}
+
+{% block body %}
+<div id="content" class="ad-page media-status-page"
+     data-status-labels="{{ status_labels_json|escapejs }}"
+     data-phase-labels="{{ phase_labels_json|escapejs }}"
+     data-trans-retry-failed="{% translate 'Retry failed' %}">
+    <div class="ad-pane-head">
+        <div>
+            <h1 class="ad-page-title">{% translate "Media processing" %}</h1>
+            <p class="ad-page-subtitle">{% translate "Each selected source file is processed independently." %}</p>
+        </div>
+        <a class="ad-btn ad-btn--teal" href="{% url 'upload-files' %}">
+            <i class="fas fa-upload me-1" aria-hidden="true"></i>{% translate "Upload files" %}
+        </a>
+    </div>
+
+    <form method="get" class="ad-card ad-filters mb-3" role="search">
+        <div class="ad-search">
+            <label for="media-status-search" class="visually-hidden">{% translate "Search media jobs" %}</label>
+            <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}">
+        </div>
+        <div>
+            <label for="media-status-filter" class="visually-hidden">{% translate "Filter by status" %}</label>
+            <select id="media-status-filter" class="form-select" name="status">
+                <option value="">{% translate "All statuses" %}</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="ad-btn ad-btn--teal" type="submit">{% translate "Filter" %}</button>
+        {% if search or status_filter %}
+        <a class="ad-btn ad-btn--ghost" href="{% url 'media-processing-status' %}">{% translate "Clear" %}</a>
+        {% endif %}
+    </form>
+
+    <form id="media-status-csrf" class="d-none">{% csrf_token %}</form>
+    <div class="ad-card ad-table-wrap">
+        <table class="ad-table">
+            <caption class="visually-hidden">{% translate "Media processing jobs" %}</caption>
+            <thead>
+                <tr data-media-status-url="{% url 'media-job-status' job.public_id %}">
+                    <th scope="col">{% translate "File" %}</th>
+                    <th scope="col">{% translate "Destination" %}</th>
+                    <th scope="col">{% translate "Lesson" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Progress" %}</th>
+                    <th scope="col">{% translate "Created" %}</th>
+                    <th scope="col"><span class="visually-hidden">{% translate "Actions" %}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs_page.object_list %}
+                <tr>
+                    <td>
+                        <strong>{{ job.original_filename }}</strong>
+                        <small class="d-block text-muted">{{ job.source_kind|upper }} · {{ job.source_size|filesizeformat }}</small>
+                    </td>
+                    <td dir="ltr">{{ job.requested_folder|default:"/" }}</td>
+                    <td>
+                        {% if job.lesson %}{{ job.lesson.name }}{% else %}<span class="text-muted">{% translate "Standalone output" %}</span>{% endif %}
+                        {% if job.part_id %}<small class="d-block text-muted" dir="ltr">{{ job.part_id }}</small>{% endif %}
+                    </td>
+                    <td>
+                        <span class="ad-pill ad-pill--muted" data-media-status-value>{{ job.get_status_display }}</span>
+                        <small class="d-block text-muted" data-media-phase-value>{{ job.get_phase_display }}</small>
+                        {% if job.attachment_status == 'failed' %}<small class="d-block text-danger">{% translate "Lesson attachment failed" %}</small>{% endif %}
+                    </td>
+                    <td class="media-status-progress">
+                        <div class="progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ job.progress }}">
+                            <div class="progress-bar" data-media-progress-bar style="width: {{ job.progress }}%"></div>
+                        </div>
+                        <small data-media-progress-value>{{ job.progress }}%</small>
+                    </td>
+                    <td>{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    <td>
+                        <div class="ad-actions">
+                            {% if job.status == 'failed' and job.source_acknowledged_at %}
+                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-url="{% url 'media-job-retry' job.public_id %}">{% translate "Retry" %}</button>
+                            {% endif %}
+                            {% if job.status == 'succeeded' and job.attachment_status == 'failed' %}
+                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-url="{% url 'media-job-attachment-retry' job.public_id %}">{% translate "Retry lesson attachment" %}</button>
+                            {% endif %}
+                        </div>
+                        <small class="d-block text-danger mt-1" data-media-error>{% if job.error_message %}{{ job.error_message }}{% endif %}</small>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7"><div class="ad-empty">{% translate "No media processing jobs found." %}</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if jobs_page.paginator.num_pages > 1 %}
+    <nav class="ad-page-nav" aria-label="{% translate 'Media job pages' %}">
+        {% if jobs_page.has_previous %}<a class="ad-page-link" href="?page={{ jobs_page.previous_page_number }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}">{% translate "Previous" %}</a>{% endif %}
+        <span class="ad-page-info">{% blocktrans with page=jobs_page.number pages=jobs_page.paginator.num_pages %}Page {{ page }} of {{ pages }}{% endblocktrans %}</span>
+        {% if jobs_page.has_next %}<a class="ad-page-link" href="?page={{ jobs_page.next_page_number }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}">{% translate "Next" %}</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>
+<script src="{% static 'js/media_status.js' %}?v={{ static_asset_version }}"></script>
+{% endblock %}

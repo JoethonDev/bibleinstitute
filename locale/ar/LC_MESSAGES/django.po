@@ -1363,7 +1363,7 @@ msgstr "يفحص عدّادات حالة الإعلانات والمهام ال�
 msgid "Process up to --limit due or stale broadcasts now; this may call the Telegram API and R2."
 msgstr "يعالج حتى --limit من الإعلانات المستحقة أو العالقة الآن؛ قد يتصل بواجهة تيليجرام البرمجية وR2."
 
-#: .\management_system\management\commands\process_telegram_notifications.py:73
+#: .\management_system\management\commands\process_media_jobs.py:36 .\management_system\management\commands\process_telegram_notifications.py:73
 #, python-format
 msgid "--limit must be between %(min)s and %(max)s."
 msgstr "يجب أن تكون قيمة --limit بين %(min)s و%(max)s."
@@ -6762,7 +6762,7 @@ msgstr "إنشاء درس"
 msgid "Attach the verified media"
 msgstr "أرفق الوسائط الموثقة"
 
-#: .\management_system\templates\theme_showcase\admin_proposal.html:89
+#: .\management_system\templates\media_processing_status.html:12 .\management_system\templates\theme_showcase\admin_proposal.html:89
 msgid "Upload files"
 msgstr "رفع الملفات"
 
@@ -8542,11 +8542,9 @@ msgstr "صيغة الطلب غير صالحة."
 msgid "Invalid file name."
 msgstr "اسم الملف غير صالح"
 
-#: .\management_system\views.py:2148
-#, fuzzy
-#| msgid "Invalid file name."
+#: .\management_system\media_processing.py:131
 msgid "Invalid file size."
-msgstr "اسم الملف غير صالح"
+msgstr "حجم الملف غير صالح"
 
 #: .\management_system\views.py:2163
 msgid "Invalid file"
@@ -9150,6 +9148,447 @@ msgstr "منشئ صيغة الترقية"
 #: .\management_system\templates\telegram_broadcast_confirm.html:99
 msgid "Delete Draft"
 msgstr "حذف المسودة"
+
+#: .\management_system/models.py:38
+msgid "Awaiting upload"
+msgstr "في انتظار الرفع"
+
+#: .\management_system/models.py:40
+msgid "Processing"
+msgstr "قيد المعالجة"
+
+#: .\management_system/models.py:41
+msgid "Uploading"
+msgstr "جارٍ الرفع"
+
+#: .\management_system/models.py:42
+msgid "Verifying"
+msgstr "جارٍ التحقق"
+
+#: .\management_system/models.py:43
+msgid "Succeeded"
+msgstr "تمت بنجاح"
+
+#: .\management_system/models.py:45
+msgid "Cancelled"
+msgstr "ملغاة"
+
+#: .\management_system/models.py:51
+msgid "Downloading source"
+msgstr "جارٍ تنزيل المصدر"
+
+#: .\management_system/models.py:52
+msgid "Inspecting source"
+msgstr "جارٍ فحص المصدر"
+
+#: .\management_system/models.py:53
+msgid "Processing media"
+msgstr "جارٍ معالجة الوسائط"
+
+#: .\management_system/models.py:54
+msgid "Uploading output"
+msgstr "جارٍ رفع الناتج"
+
+#: .\management_system/models.py:55
+msgid "Verifying output"
+msgstr "جارٍ التحقق من الناتج"
+
+#: .\management_system/models.py:56
+msgid "Attaching to lesson"
+msgstr "جارٍ الإرفاق بالدرس"
+
+#: .\management_system/models.py:62
+msgid "Not requested"
+msgstr "غير مطلوب"
+
+#: .\management_system/models.py:64
+msgid "Attached"
+msgstr "مرفق"
+
+#: .\management_system/media_processing.py:84 .\management_system/media_processing.py:91 .\management_system/media_processing.py:93 .\management_system/media_processing.py:96
+msgid "Requested folder is invalid."
+msgstr "المجلد المطلوب غير صالح."
+
+#: .\management_system/media_processing.py:87
+msgid "Requested folder is too long."
+msgstr "المجلد المطلوب طويل جدًا."
+
+#: .\management_system/media_processing.py:98
+msgid "This storage folder is reserved."
+msgstr "مجلد التخزين هذا محجوز."
+
+#: .\management_system/media_processing.py:110
+msgid "Unsupported media file type."
+msgstr "نوع ملف الوسائط غير مدعوم."
+
+#: .\management_system/media_processing.py:135
+#, python-format
+msgid "File size exceeds the maximum allowed source size of %(size)s bytes."
+msgstr "يتجاوز حجم الملف الحد الأقصى المسموح لحجم المصدر وهو %(size)s بايت."
+
+#: .\management_system/media_processing.py:146
+msgid "Media part identifier is invalid."
+msgstr "معرّف جزء الوسائط غير صالح."
+
+#: .\management_system/media_processing.py:165
+#, python-format
+msgid "Media job cannot transition from %(current)s to %(target)s."
+msgstr "لا يمكن نقل مهمة الوسائط من %(current)s إلى %(target)s."
+
+#: .\management_system/media_processing.py:169
+msgid "Media job progress must be between 0 and 100."
+msgstr "يجب أن يكون تقدم مهمة الوسائط بين 0 و100."
+
+#: .\management_system/media_processing.py:204
+msgid "Media processing failed."
+msgstr "فشلت معالجة الوسائط."
+
+#: .\management_system/media_processing.py:237
+msgid "This media job is not ready to be queued."
+msgstr "مهمة الوسائط هذه ليست جاهزة بعد لوضعها في قائمة الانتظار."
+
+#: .\management_system/media_processing.py:305
+msgid "Native media tools are unavailable."
+msgstr "أدوات الوسائط الأصلية غير متوفرة."
+
+#: .\management_system/media_processing.py:335 .\management_system/media_processing.py:342
+msgid "Media processing exceeded the allowed time."
+msgstr "تجاوزت معالجة الوسائط الوقت المسموح."
+
+#: .\management_system/media_processing.py:344
+msgid "Native media processing failed."
+msgstr "فشلت المعالجة الأصلية للوسائط."
+
+#: .\management_system/media_processing.py:373
+msgid "The uploaded PDF is invalid."
+msgstr "ملف PDF المرفوع غير صالح."
+
+#: .\management_system/media_processing.py:375
+msgid "The uploaded source cannot be read."
+msgstr "تعذرت قراءة المصدر المرفوع."
+
+#: .\management_system/media_processing.py:391
+msgid "The uploaded media could not be inspected."
+msgstr "تعذر فحص الوسائط المرفوعة."
+
+#: .\management_system/media_processing.py:394
+msgid "The uploaded media is corrupt."
+msgstr "الوسائط المرفوعة تالفة."
+
+#: .\management_system/media_processing.py:402
+msgid "The media inspection result is invalid."
+msgstr "نتيجة فحص الوسائط غير صالحة."
+
+#: .\management_system/media_processing.py:413
+msgid "The media duration exceeds the allowed limit."
+msgstr "تتجاوز مدة الوسائط الحد المسموح."
+
+#: .\management_system/media_processing.py:415
+msgid "The video source has no video stream."
+msgstr "لا يحتوي مصدر الفيديو على مسار فيديو."
+
+#: .\management_system/media_processing.py:417
+msgid "The audio source has no audio stream."
+msgstr "لا يحتوي مصدر الصوت على مسار صوت."
+
+#: .\management_system/media_processing.py:434 .\management_system/media_processing.py:455
+msgid "Generated HLS playlist cannot be read."
+msgstr "تعذرت قراءة قائمة تشغيل HLS المُنشأة."
+
+#: .\management_system/media_processing.py:441
+msgid "Generated HLS playlist contains an invalid segment."
+msgstr "تحتوي قائمة تشغيل HLS المُنشأة على مقطع غير صالح."
+
+#: .\management_system/media_processing.py:444
+msgid "Generated HLS playlist contains an unsafe path."
+msgstr "تحتوي قائمة تشغيل HLS المُنشأة على مسار غير آمن."
+
+#: .\management_system/media_processing.py:447
+msgid "Generated HLS playlist contains no segments."
+msgstr "لا تحتوي قائمة تشغيل HLS المُنشأة على أي مقاطع."
+
+#: .\management_system/media_processing.py:467
+msgid "Generated HLS playlist cannot be written."
+msgstr "تعذرت كتابة قائمة تشغيل HLS المُنشأة."
+
+#: .\management_system/media_processing.py:579
+msgid "The lesson is no longer editable."
+msgstr "لم يعد الدرس قابلاً للتعديل."
+
+#: .\management_system/media_processing.py:583 .\management_system/media_processing.py:585
+msgid "The lesson media links are invalid."
+msgstr "روابط وسائط الدرس غير صالحة."
+
+#: .\management_system/media_processing.py:612
+msgid "The lesson already contains one of these media files."
+msgstr "يحتوي الدرس بالفعل على أحد ملفات الوسائط هذه."
+
+#: .\management_system/media_processing.py:623
+msgid "Only successful jobs with a failed lesson attachment can be retried."
+msgstr "يمكن إعادة المحاولة فقط للمهام الناجحة التي فشل إرفاقها بالدرس."
+
+#: .\management_system/views.py:2139
+msgid "A media part requires a lesson target."
+msgstr "يتطلب جزء الوسائط درسًا مستهدفًا."
+
+#: .\management_system/views.py:2144
+msgid "The selected lesson is invalid."
+msgstr "الدرس المحدد غير صالح."
+
+#: .\management_system/views.py:2147
+msgid "Only an editable draft lesson can receive new media."
+msgstr "يمكن للدرس المسودة القابل للتعديل فقط استقبال وسائط جديدة."
+
+#: .\management_system/views.py:2165
+msgid "You are not allowed to access this media job."
+msgstr "غير مسموح لك بالوصول إلى مهمة الوسائط هذه."
+
+#: .\management_system/views.py:2204
+msgid "Media job files are required."
+msgstr "ملفات مهمة الوسائط مطلوبة."
+
+#: .\management_system/views.py:2207
+msgid "Select between one and 100 files."
+msgstr "اختر من ملف واحد إلى 100 ملف."
+
+#: .\management_system/views.py:2216
+msgid "Each media file descriptor is invalid."
+msgstr "وصف ملف الوسائط غير صالح."
+
+#: .\management_system/views.py:2284
+msgid "This media job is no longer awaiting its source upload."
+msgstr "لم تعد مهمة الوسائط هذه تنتظر رفع مصدرها."
+
+#: .\management_system/views.py:2288
+msgid "The staging object key does not match the media job."
+msgstr "لا يطابق مفتاح الكائن المؤقت مهمة الوسائط."
+
+#: .\management_system/views.py:2291
+msgid "The uploaded source size does not match the media job."
+msgstr "لا يتطابق حجم المصدر المرفوع مع مهمة الوسائط."
+
+#: .\management_system/views.py:2331
+msgid "Invalid pagination."
+msgstr "ترقيم صفحات غير صالح."
+
+#: .\management_system/views.py:2353
+msgid "Method not allowed."
+msgstr "الطريقة غير مسموح بها."
+
+#: .\management_system/views.py:2364
+msgid "Only failed jobs with a retained source can be retried."
+msgstr "يمكن إعادة المحاولة فقط للمهام الفاشلة التي ما زال مصدرها محتفظًا به."
+
+#: .\management_system/views.py:2156
+msgid "Authentication required."
+msgstr "المصادقة مطلوبة."
+
+#: .\management_system/management/commands/process_media_jobs.py:22
+msgid "Inspect media-processing jobs and optionally recover pending or failed jobs. Read-only by default."
+msgstr "افحص مهام معالجة الوسائط، ويمكن استعادة المهام المعلقة أو الفاشلة. القراءة فقط افتراضيًا."
+
+#: .\management_system/management/commands/process_media_jobs.py:28
+msgid "Maximum jobs to recover (1-100)."
+msgstr "الحد الأقصى للمهام المطلوب استعادتها (1-100)."
+
+#: .\management_system/management/commands/process_media_jobs.py:29
+msgid "Inspect durable job counts (the default)."
+msgstr "افحص أعداد المهام المحفوظة (الافتراضي)."
+
+#: .\management_system/management/commands/process_media_jobs.py:30
+msgid "Verify retained sources and retry failed jobs."
+msgstr "تحقق من المصادر المحتفظ بها وأعد محاولة المهام الفاشلة."
+
+#: .\management_system/management/commands/process_media_jobs.py:31
+msgid "Recover delayed uploads and stale worker dispatches."
+msgstr "استعد الرفعات المتأخرة وإرسالات العامل القديمة."
+
+#: .\management_system/management/commands/process_media_jobs.py:42
+#, python-format
+msgid "Retried %(queued)s failed job(s); %(rejected)s source(s) were unavailable."
+msgstr "أُعيدت محاولة %(queued)s مهمة فاشلة؛ تعذر الوصول إلى %(rejected)s مصدر."
+
+#: .\management_system/management/commands/process_media_jobs.py:47
+#, python-format
+msgid "Recovered %(queued)s job(s); marked %(failed)s job(s) failed."
+msgstr "استُعيدت %(queued)s مهمة؛ اعتُبرت %(failed)s مهمة فاشلة."
+
+#: .\management_system/management/commands/process_media_jobs.py:51 .\management_system/management/commands/cleanup_media_jobs.py:55
+msgid "The media-processing table is unavailable; apply migration 0060 before using this command."
+msgstr "جدول معالجة الوسائط غير متاح؛ طبّق الترحيل 0060 قبل استخدام هذا الأمر."
+
+#: .\management_system/management/commands/process_media_jobs.py:70 .\management_system/templates/media_processing_status.html:39
+msgid "Media processing jobs"
+msgstr "مهام معالجة الوسائط"
+
+#: .\management_system/management/commands/process_media_jobs.py:74
+msgid "overdue uploads"
+msgstr "الرفعات المتأخرة"
+
+#: .\management_system/management/commands/process_media_jobs.py:75
+msgid "stale processing"
+msgstr "معالجة قديمة"
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:22
+msgid "Identify expired media staging objects. Dry-run is the default; --apply is required before any deletion."
+msgstr "تحديد كائنات الوسائط المؤقتة منتهية الصلاحية. التشغيل التجريبي هو الافتراضي؛ --apply مطلوب قبل أي حذف."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:32
+msgid "Failed staging retention threshold in hours; default 72."
+msgstr "حد الاحتفاظ بالمصدر الفاشل بالساعات؛ الافتراضي 72."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:34
+msgid "Maximum jobs to inspect (1-100)."
+msgstr "الحد الأقصى للمهام المطلوب فحصها (1-100)."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:35
+msgid "Delete exact expired staging keys."
+msgstr "حذف المفاتيح المؤقتة منتهية الصلاحية بدقة."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:39
+msgid "With --apply, purge successful job rows older than the configured 90-day retention."
+msgstr "مع --apply، حذف صفوف المهام الناجحة الأقدم من حد الاحتفاظ المحدد وهو 90 يومًا."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:46
+msgid "--older-than-hours must be positive."
+msgstr "يجب أن تكون قيمة --older-than-hours موجبة."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:48
+msgid "--limit must be between 1 and 100."
+msgstr "يجب أن تكون قيمة --limit بين 1 و100."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:68
+#, python-format
+msgid "Expired failed staging jobs: %(count)s"
+msgstr "مهام المصدر الفاشل منتهية الصلاحية: %(count)s"
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:72
+msgid "Dry run only; no staging objects were deleted."
+msgstr "تشغيل تجريبي فقط؛ لم يُحذف أي كائن مؤقت."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:85
+#, python-format
+msgid "Deleted %(count)s exact staging object(s)."
+msgstr "حُذف %(count)s كائن مؤقت بدقة."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:95
+#, python-format
+msgid "Successful job rows eligible for purge: %(count)s"
+msgstr "صفوف المهام الناجحة المؤهلة للحذف: %(count)s"
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:97
+msgid "Dry run only; successful job rows were retained."
+msgstr "تشغيل تجريبي فقط؛ احتُفظ بصفوف المهام الناجحة."
+
+#: .\management_system/management/commands/cleanup_media_jobs.py:101
+#, python-format
+msgid "Purged %(count)s successful job row(s)."
+msgstr "حُذفت %(count)s صف من صفوف المهام الناجحة."
+
+#: .\management_system/templates/media_processing_status.html:8 .\management_system/templates/partials/components/admin_nav_links.html:83
+msgid "Media processing"
+msgstr "معالجة الوسائط"
+
+#: .\management_system/templates/media_processing_status.html:9
+msgid "Each selected source file is processed independently."
+msgstr "تتم معالجة كل ملف مصدر محدد بشكل مستقل."
+
+#: .\management_system/templates/media_processing_status.html:18
+msgid "Search media jobs"
+msgstr "ابحث في مهام الوسائط"
+
+#: .\management_system/templates/media_processing_status.html:19
+msgid "Filename, lesson, or creator"
+msgstr "اسم الملف أو الدرس أو المنشئ"
+
+#: .\management_system/templates/media_processing_status.html:24
+msgid "All statuses"
+msgstr "كل الحالات"
+
+#: .\management_system/templates/media_processing_status.html:42
+msgid "File"
+msgstr "الملف"
+
+#: .\management_system/templates/media_processing_status.html:60
+msgid "Standalone output"
+msgstr "ناتج مستقل"
+
+#: .\management_system/templates/media_processing_status.html:66
+msgid "Lesson attachment failed"
+msgstr "فشل الإرفاق بالدرس"
+
+#: .\management_system/templates/media_processing_status.html:69
+msgid "Processing progress"
+msgstr "تقدم المعالجة"
+
+#: .\management_system/templates/media_processing_status.html:78 .\management_system/templates/upload_video.html:24
+msgid "Retry"
+msgstr "إعادة المحاولة"
+
+#: .\management_system/templates/media_processing_status.html:7
+msgid "Retry failed"
+msgstr "فشلت إعادة المحاولة"
+
+#: .\management_system/templates/media_processing_status.html:81 .\management_system/templates/upload_video.html:25
+msgid "Retry lesson attachment"
+msgstr "إعادة محاولة الإرفاق بالدرس"
+
+#: .\management_system/templates/media_processing_status.html:88
+msgid "No media processing jobs found."
+msgstr "لم يتم العثور على أي مهام لمعالجة الوسائط."
+
+#: .\management_system/templates/media_processing_status.html:95
+msgid "Media job pages"
+msgstr "صفحات مهام الوسائط"
+
+#: .\management_system/templates/media_processing_status.html:97
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr "الصفحة %(page)s من %(pages)s"
+
+#: .\management_system/templates/upload_video.html:14
+msgid "Uploading..."
+msgstr "جارٍ الرفع..."
+
+#: .\management_system/templates/upload_video.html:15
+msgid "Waiting for upload"
+msgstr "في انتظار الرفع"
+
+#: .\management_system/templates/upload_video.html:16
+msgid "Source upload complete"
+msgstr "اكتمل رفع المصدر"
+
+#: .\management_system/templates/upload_video.html:26
+msgid "Retrying..."
+msgstr "جارٍ إعادة المحاولة..."
+
+#: .\management_system/templates/upload_video.html:27
+msgid "Retry is not available because the original source is no longer retained."
+msgstr "إعادة المحاولة غير متاحة لأن المصدر الأصلي لم يعد محتفظًا به."
+
+#: .\management_system/templates/upload_video.html:28
+msgid "The page security token is missing. Reload the page and try again."
+msgstr "رمز أمان الصفحة مفقود. أعد تحميل الصفحة وحاول مرة أخرى."
+
+#: .\management_system/templates/upload_video.html:29
+msgid "Could not start the media upload."
+msgstr "تعذر بدء رفع الوسائط."
+
+#: .\management_system/templates/upload_video.html:30
+msgid "Could not load the job status."
+msgstr "تعذر تحميل حالة المهمة."
+
+#: .\management_system/templates/upload_video.html:61
+msgid "Optional lesson (editable draft)"
+msgstr "درس اختياري (مسودة قابلة للتعديل)"
+
+#: .\management_system/templates/upload_video.html:63
+msgid "None / Standalone output"
+msgstr "لا شيء / ناتج مستقل"
+
+#: .\management_system/templates/upload_video.html:71
+msgid "The selected draft lesson is metadata only; the server validates and attaches verified output."
+msgstr "الدرس المسودة المحدد هو بيانات وصفية فقط؛ يتحقق الخادم من الناتج الموثق ويرفقه."
 
 #, python-format
 #~ msgid "Cannot accept a %(status)s application."

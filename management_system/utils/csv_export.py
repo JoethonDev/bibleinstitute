@@ -3,11 +3,10 @@ import io
 import json
 import re
 from collections import defaultdict
-from django.http import HttpResponse, StreamingHttpResponse
-from django.db.models import F, Q, Sum, Window
+from django.http import HttpResponse
 from django.utils.translation import gettext as _
 from django.utils import timezone
-from ..models import User, Quiz, Submission, Question, Grade, Role
+from ..models import User, Quiz, Submission, Question, Grade
 from .timezones import format_application_datetime
 
 
@@ -104,73 +103,6 @@ def _build_submission_map(submissions):
     for submission in submissions:
         grouped[submission.user_id][submission.question_id] = submission
     return grouped
-
-
-def yearly_transcript_queryset(year, name=None, course=None, role=None):
-    """Return a lazy transcript query with running totals calculated in SQL."""
-    try:
-        year = int(year)
-    except (TypeError, ValueError):
-        year = timezone.now().year
-    query = Grade.objects.select_related("user", "quiz", "quiz__course_offering__course").filter(
-        submitted_at__year=year
-    )
-    if name:
-        query = query.filter(
-            Q(user__first_name__icontains=name)
-            | Q(user__last_name__icontains=name)
-            | Q(user__username__icontains=name)
-        )
-
-    if course:
-        query = query.filter(quiz__course_offering__course__name__icontains=course)
-
-    if role:
-        query = query.filter(user__role__role=role)
-    partition = [F("user_id"), F("quiz__course_offering__course_id")]
-    return query.annotate(
-        course_accumulated_grade=Window(Sum("total_grade"), partition_by=partition, order_by=["submitted_at", "pk"]),
-        course_accumulated_total=Window(Sum("quiz__total_grade"), partition_by=partition, order_by=["submitted_at", "pk"]),
-        overall_accumulated_grade=Window(Sum("total_grade"), partition_by=[F("user_id")], order_by=["submitted_at", "pk"]),
-        overall_accumulated_total=Window(Sum("quiz__total_grade"), partition_by=[F("user_id")], order_by=["submitted_at", "pk"]),
-    ).order_by(
-        "quiz__course_offering__course__name",
-        "quiz__course_offering__course_id",
-        "quiz__name",
-        "quiz_id",
-        "submitted_at",
-        "user__username",
-        "pk",
-    )
-
-
-def _transcript_row(grade):
-    return {
-        "user_id": grade.user_id,
-        "username": grade.user.username,
-        "first_name": grade.user.first_name,
-        "last_name": grade.user.last_name,
-        "course_name": grade.quiz.course_offering.course.name,
-        "quiz_name": grade.quiz.name,
-        "quiz_grade": grade.total_grade,
-        "quiz_total": grade.quiz.total_grade,
-        "course_accumulated_grade": grade.course_accumulated_grade,
-        "course_accumulated_total": grade.course_accumulated_total,
-        "overall_accumulated_grade": grade.overall_accumulated_grade,
-        "overall_accumulated_total": grade.overall_accumulated_total,
-        "submitted_at": grade.submitted_at,
-        "submitted_at_display": grade.submitted_at.strftime("%Y-%m-%d %H:%M:%S"),
-    }
-
-
-def build_yearly_transcript_rows(year, name=None, course=None, role=None):
-    """Build transcript rows for existing export callers."""
-    try:
-        normalized_year = int(year)
-    except (TypeError, ValueError):
-        normalized_year = timezone.now().year
-    grades = yearly_transcript_queryset(normalized_year, name, course, role)
-    return {"year": normalized_year, "rows": [_transcript_row(grade) for grade in grades]}
 
 
 def export_quiz_with_submissions_to_csv(quiz_id):
@@ -334,53 +266,6 @@ def export_quiz_summary_to_csv(quiz_id):
     response = HttpResponse(output.read(), content_type='text/csv')
     safe_quiz_name = _safe_filename(quiz.name)
     response['Content-Disposition'] = f'attachment; filename="quiz_summary_{safe_quiz_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-    return response
-
-
-def export_yearly_transcript_to_csv(year, name=None, course=None, role=None):
-    """
-    Export a transcript-style CSV grouped by student and course for a given year.
-    """
-    try:
-        normalized_year = int(year)
-    except (TypeError, ValueError):
-        normalized_year = timezone.now().year
-
-    def csv_rows():
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow([_('Yearly Transcript Export')])
-        writer.writerow([_('Academic Year'), normalized_year])
-        writer.writerow([])
-        yield output.getvalue()
-
-        output.seek(0)
-        output.truncate(0)
-        headers = [
-            _('User ID'), _('Username'), _('First Name'), _('Last Name'),
-            _('Course Name'), _('Quiz Name'), _('Quiz Grade'), _('Quiz Total'),
-            _('Course Accumulated Grade'), _('Course Accumulated Total'),
-            _('Overall Accumulated Grade'), _('Overall Accumulated Total'), _('Submitted At'),
-        ]
-        writer.writerow(headers)
-        yield output.getvalue()
-        for grade in yearly_transcript_queryset(normalized_year, name, course, role).iterator(chunk_size=500):
-            row = _transcript_row(grade)
-            output.seek(0)
-            output.truncate(0)
-            writer.writerow([
-                _csv_safe_cell(row['user_id']), _csv_safe_cell(row['username']),
-                _csv_safe_cell(row['first_name']), _csv_safe_cell(row['last_name']),
-                _csv_safe_cell(row['course_name']), _csv_safe_cell(row['quiz_name']),
-                _csv_safe_cell(row['quiz_grade']), _csv_safe_cell(row['quiz_total']),
-                _csv_safe_cell(row['course_accumulated_grade']), _csv_safe_cell(row['course_accumulated_total']),
-                _csv_safe_cell(row['overall_accumulated_grade']), _csv_safe_cell(row['overall_accumulated_total']),
-                _csv_safe_cell(row['submitted_at_display']),
-            ])
-            yield output.getvalue()
-
-    response = StreamingHttpResponse(csv_rows(), content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="transcript_{normalized_year}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
     return response
 
 
