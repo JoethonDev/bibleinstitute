@@ -9,7 +9,7 @@
 # 2. Resolves the target slot (inactive blue or green), loads runtime state.
 # 3. Verifies infrastructure containers (postgres, redis, nginx) are running.
 # 4. Runs forward migrations and collectstatic in the target slot.
-# 5. Builds and starts the inactive app slot + celery with the new image.
+# 5. Builds and starts the inactive app slot + celery + media-worker with the new image.
 # 6. Waits for the new slot's Docker healthcheck to pass.
 # 7. Atomically switches the Nginx upstream pointer to the new slot.
 # 8. Verifies HTTPS reachability through Nginx (curl smoke with retries).
@@ -229,11 +229,11 @@ fi
 info "Saved prior state for rollback."
 
 # ---------------------------------------------------------------------------
-# Step 1 — Build the target slot and celery images first
+# Step 1 — Build the target slot, celery, and media-worker images first
 # ---------------------------------------------------------------------------
-info "Building lms-app-${TARGET_SLOT} and celery images…"
+info "Building lms-app-${TARGET_SLOT}, celery, and media-worker images…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" build \
-    "lms-app-${TARGET_SLOT}" celery \
+    "lms-app-${TARGET_SLOT}" celery media-worker \
     || die "Image build failed — aborting."
 
 # ---------------------------------------------------------------------------
@@ -251,13 +251,22 @@ docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-de
     python manage.py collectstatic --noinput \
     || die "collectstatic failed — aborting."
 
+info "Verifying collected responsive CSS…"
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-deps \
+    "lms-app-${TARGET_SLOT}" \
+    python -c 'from pathlib import Path; p=Path("/app/collectstatic/css/app_admin.css"); text=p.read_text(); required=(".admin-sidebar.ad-rail {\n    display: flex;", "#mobileAdminMenu", "grid-column: 1 / -1", "grid-template-columns: minmax(0, 1fr)"); missing=[marker for marker in required if marker not in text]; raise SystemExit("stale or incomplete app_admin.css: " + ", ".join(missing)) if missing else None' \
+    || die "Collected CSS verification failed — aborting."
+
 # ---------------------------------------------------------------------------
-# Step 3 — Start the target slot + celery from the already-built image
+# Step 3 — Start the target slot + celery + media-worker from the already-built
+# image. media-worker is shared between the blue/green web slots; its command,
+# queue, concurrency, volume, and environment are defined only in
+# compose.application.yml and are never duplicated here.
 # ---------------------------------------------------------------------------
-info "Starting lms-app-${TARGET_SLOT} and celery…"
+info "Starting lms-app-${TARGET_SLOT}, celery, and media-worker…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" up -d --force-recreate --no-build \
-    "lms-app-${TARGET_SLOT}" celery \
-    || die "Failed to start target slot and celery."
+    "lms-app-${TARGET_SLOT}" celery media-worker \
+    || die "Failed to start target slot, celery, and media-worker."
 
 # ---------------------------------------------------------------------------
 # Step 4 — Wait for target healthcheck
