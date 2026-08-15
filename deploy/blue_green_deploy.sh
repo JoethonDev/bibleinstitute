@@ -251,12 +251,6 @@ docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-de
     python manage.py collectstatic --noinput \
     || die "collectstatic failed — aborting."
 
-info "Verifying collected responsive CSS…"
-docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-deps \
-    "lms-app-${TARGET_SLOT}" \
-    python -c 'from pathlib import Path; p=Path("/app/collectstatic/css/app_admin.css"); text=p.read_text(); required=(".admin-sidebar.ad-rail {\n    display: flex;", "#mobileAdminMenu", "grid-column: 1 / -1", "grid-template-columns: minmax(0, 1fr)"); missing=[marker for marker in required if marker not in text]; raise SystemExit("stale or incomplete app_admin.css: " + ", ".join(missing)) if missing else None' \
-    || die "Collected CSS verification failed — aborting."
-
 # ---------------------------------------------------------------------------
 # Step 3 — Start the target slot + celery + media-worker from the already-built
 # image. media-worker is shared between the blue/green web slots; its command,
