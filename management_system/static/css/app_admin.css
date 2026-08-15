@@ -750,6 +750,19 @@
 
 .ad-filters { display: flex; flex-wrap: wrap; gap: .4rem; }
 
+/* Media processing dashboard filters (scoped rectangular control family) */
+.media-status-search { position: relative; }
+.media-status-search i {
+    position: absolute;
+    inset-inline-start: .85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ps-muted);
+    font-size: .8rem;
+    pointer-events: none;
+}
+.media-status-search .form-control { padding-inline-start: 2.25rem; }
+
 .submission-filters {
     display: flex;
     align-items: end;

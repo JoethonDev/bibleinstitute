@@ -16,25 +16,32 @@
         </a>
     </div>
 
-    <form method="get" class="ad-card ad-filters mb-3" role="search">
-        <div class="ad-search">
-            <label for="media-status-search" class="visually-hidden">{% translate "Search media jobs" %}</label>
-            <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}">
-        </div>
-        <div>
-            <label for="media-status-filter" class="visually-hidden">{% translate "Filter by status" %}</label>
-            <select id="media-status-filter" class="form-select" name="status">
-                <option value="">{% translate "All statuses" %}</option>
-                {% for value, label in status_choices %}
-                <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button class="ad-btn ad-btn--teal" type="submit">{% translate "Filter" %}</button>
-        {% if search or status_filter %}
-        <a class="ad-btn ad-btn--ghost" href="{% url 'media-processing-status' %}">{% translate "Clear" %}</a>
-        {% endif %}
-    </form>
+    <div class="ad-card ad-card-body media-status-filters mb-3">
+        <form method="get" class="row g-3 align-items-end" role="search">
+            <div class="col-12 col-md-6 col-lg-5">
+                <label for="media-status-search" class="form-label">{% translate "Search media jobs" %}</label>
+                <div class="media-status-search">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}">
+                </div>
+            </div>
+            <div class="col-12 col-md-4 col-lg-3">
+                <label for="media-status-filter" class="form-label">{% translate "Filter by status" %}</label>
+                <select id="media-status-filter" class="form-select" name="status">
+                    <option value="">{% translate "All statuses" %}</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
+                <button class="ad-btn ad-btn--teal ad-btn--sm" type="submit">{% translate "Filter" %}</button>
+                {% if search or status_filter %}
+                <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{% url 'media-processing-status' %}">{% translate "Clear" %}</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 
     <form id="media-status-csrf" class="d-none">{% csrf_token %}</form>
     <div class="ad-card ad-table-wrap">
