@@ -115,6 +115,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'management_system.middleware.RequestObservabilityMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'management_system.middleware.SessionExpiryUpdate'
@@ -310,15 +311,21 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
-            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "format": "time={asctime} level={levelname} logger={name} event={event} request_id={request_id} route={route} method={method} status={status_code} duration_ms={duration_ms} user_id={user_id} username={username} role_id={role_id} ip={remote_ip} device={device} browser={browser} os={os} query_keys={query_keys} msg={message}",
             "style": "{",
         }
+    },
+    "filters": {
+        "request_context": {
+            "()": "management_system.middleware.RequestContextFilter",
+        },
     },
     "handlers": {
         "console": {
             "level": "INFO",
             "class": "logging.StreamHandler",
-            "formatter": "verbose"
+            "formatter": "verbose",
+            "filters": ["request_context"],
         },
     },
     "root": {
@@ -329,7 +336,7 @@ LOGGING = {
         "django": {
             "handlers": ["console"],
             "level": "DEBUG",
-            "propagate": True,
+            "propagate": False,
         },
     },
 }

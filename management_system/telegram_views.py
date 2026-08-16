@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import os
 import secrets
@@ -60,6 +61,9 @@ from .telegram.broadcasts import (
 from .telegram_forms import TelegramBotConfigForm, TelegramBroadcastForm, TelegramSupportReplyForm
 from .utils.decorators import can_manage_academic_setup, capability_required
 from .utils.storage_operations import get_r2_client
+
+
+logger = logging.getLogger(__name__)
 
 
 def _configuration_context(config, form, config_error=""):
@@ -133,33 +137,141 @@ def _private_chat_id(payload: dict) -> int | None:
     return None
 
 
+def _webhook_sender_context(payload: dict) -> dict:
+    """Extract only privacy-safe Telegram sender metadata for webhook diagnostics.
+
+    Values are limited to numeric identifiers, the chat type, and optional
+    username/language code. Never include message text, captions, contact or
+    phone data, file IDs, URLs, names, or any other payload content.
+    """
+    context: dict = {}
+    update_id = payload.get("update_id")
+    try:
+        context["update_id"] = int(update_id)
+    except (KeyError, TypeError, ValueError):
+        pass
+    chat = None
+    sender = None
+    message = payload.get("message")
+    if isinstance(message, dict):
+        chat = message.get("chat")
+        sender = message.get("from")
+    callback = payload.get("callback_query")
+    if chat is None and isinstance(callback, dict) and isinstance(callback.get("message"), dict):
+        chat = callback["message"].get("chat")
+        if sender is None:
+            sender = callback.get("from")
+    if isinstance(chat, dict):
+        chat_type = chat.get("type")
+        if isinstance(chat_type, str):
+            context["chat_type"] = chat_type
+        try:
+            context["chat_id"] = int(chat["id"])
+        except (KeyError, TypeError, ValueError):
+            pass
+    if isinstance(sender, dict):
+        try:
+            context["sender_id"] = int(sender["id"])
+        except (KeyError, TypeError, ValueError):
+            pass
+        username = sender.get("username")
+        if isinstance(username, str) and username:
+            context["sender_username"] = username
+        language_code = sender.get("language_code")
+        if isinstance(language_code, str) and language_code:
+            context["sender_language_code"] = language_code
+    return context
+
+
+def _sender_log_args(context: dict) -> tuple:
+    """Flatten safe sender metadata into fixed %-style log arguments."""
+    return (
+        context.get("update_id"),
+        context.get("chat_id"),
+        context.get("chat_type"),
+        context.get("sender_id"),
+        context.get("sender_username"),
+        context.get("sender_language_code"),
+    )
+
+
 @csrf_exempt
 @require_POST
 def telegram_webhook(request):
     """Validate Telegram before parsing and enqueue one private update quickly."""
     config = TelegramBotConfig.objects.filter(is_active=True).first()
     if not config or not config.bot_id:
+        logger.warning(
+            "event=%s stage=%s reason=%s",
+            "webhook_rejected",
+            "inactive_config",
+            "no_active_bot_configuration",
+        )
         return JsonResponse({"ok": False}, status=404)
     try:
         expected_secret = webhook_secret(config)
     except TelegramConfigurationError:
+        logger.exception(
+            "event=%s stage=%s reason=%s",
+            "webhook_rejected",
+            "config_secret_unavailable",
+            "webhook_secret_unavailable",
+        )
         return JsonResponse({"ok": False}, status=503)
     supplied_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if not supplied_secret or not secrets.compare_digest(supplied_secret, expected_secret):
+        logger.warning(
+            "event=%s stage=%s reason=%s",
+            "webhook_rejected",
+            "secret_mismatch",
+            "missing_or_invalid_secret_header",
+        )
         return JsonResponse({"ok": False}, status=403)
     if len(request.body) > 1_000_000:
+        logger.warning(
+            "event=%s stage=%s reason=%s body_bytes=%s",
+            "webhook_rejected",
+            "body_too_large",
+            "payload_exceeds_limit",
+            len(request.body),
+        )
         return JsonResponse({"ok": False}, status=413)
     try:
         payload = json.loads(request.body)
     except (TypeError, json.JSONDecodeError):
+        logger.exception(
+            "event=%s stage=%s reason=%s",
+            "webhook_rejected",
+            "json_decode",
+            "malformed_payload",
+        )
         return JsonResponse({"ok": False}, status=400)
     if not isinstance(payload, dict) or isinstance(payload.get("update_id"), bool):
+        logger.warning(
+            "event=%s stage=%s reason=%s",
+            "webhook_rejected",
+            "invalid_payload",
+            "non_object_payload_or_bool_update_id",
+        )
         return JsonResponse({"ok": False}, status=400)
     try:
         update_number = int(payload["update_id"])
     except (KeyError, TypeError, ValueError):
+        logger.warning(
+            "event=%s stage=%s reason=%s",
+            "webhook_rejected",
+            "invalid_update_id",
+            "update_id_not_an_integer",
+        )
         return JsonResponse({"ok": False}, status=400)
+    sender = _webhook_sender_context(payload)
     if _private_chat_id(payload) is None:
+        logger.info(
+            "event=%s reason=%s update_id=%s chat_id=%s chat_type=%s sender_id=%s sender_username=%s sender_language_code=%s",
+            "webhook_ignored",
+            "non_private_chat",
+            *_sender_log_args(sender),
+        )
         return JsonResponse({"ok": True, "ignored": True})
 
     try:
@@ -170,10 +282,30 @@ def telegram_webhook(request):
                 defaults={"payload": payload},
             )
     except IntegrityError:
+        logger.debug(
+            "event=%s stage=%s reason=%s update_id=%s",
+            "webhook_duplicate_conflict",
+            "persist",
+            "concurrent_duplicate_insert",
+            update_number,
+        )
         update = TelegramWebhookUpdate.objects.get(bot_id=config.bot_id, update_id=update_number)
         created = False
     if created:
         transaction.on_commit(lambda: process_telegram_update.delay(update.pk))
+        logger.info(
+            "event=%s created=%s update_id=%s chat_id=%s chat_type=%s sender_id=%s sender_username=%s sender_language_code=%s",
+            "webhook_accepted",
+            created,
+            *_sender_log_args(sender),
+        )
+    else:
+        logger.info(
+            "event=%s created=%s update_id=%s chat_id=%s chat_type=%s sender_id=%s sender_username=%s sender_language_code=%s",
+            "webhook_duplicate",
+            created,
+            *_sender_log_args(sender),
+        )
     return JsonResponse({"ok": True, "duplicate": not created})
 
 
