@@ -64,13 +64,24 @@ if [[ ! -f "$USERS_FILE" ]]; then
     display_name="${display_name:-LMS Administrator}"
     read -r -p "Dozzle email (optional): " email
 
+    read -r -s -p "Dozzle password: " password
+    printf '\n'
+    read -r -s -p "Confirm Dozzle password: " password_confirm
+    printf '\n'
+    [[ -n "$password" ]] || die "Dozzle password must not be empty"
+    [[ "$password" == "$password_confirm" ]] || die "Dozzle passwords do not match"
+    unset password_confirm
+
     temp_file="${USERS_FILE}.tmp.$$"
     trap 'rm -f "$temp_file"' EXIT
-    info "Generating the bcrypt Dozzle password interactively; it will not be printed or stored in shell history."
+    info "Generating the bcrypt hash for the password entered in the hidden prompts above; it will not be printed or stored in shell history."
     generate_args=("$username" --name "$display_name")
     [[ -n "$email" ]] && generate_args+=(--email "$email")
-    docker run --rm -it "$DOZZLE_IMAGE" generate "${generate_args[@]}" > "$temp_file" \
-        || die "Dozzle credential generation failed"
+    if ! printf '%s\n' "$password" | docker run --rm -i "$DOZZLE_IMAGE" generate "${generate_args[@]}" > "$temp_file"; then
+        unset password
+        die "Dozzle credential generation failed"
+    fi
+    unset password
     grep -Eq '^users:[[:space:]]*$' "$temp_file" || die "Generated Dozzle users file is invalid"
     grep -Eq '^[[:space:]]+password:[[:space:]]+\$2' "$temp_file" || die "Generated Dozzle password hash is missing"
     chmod 600 "$temp_file"
