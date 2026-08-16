@@ -26,18 +26,81 @@
 
                 <!-- Profile form -->
                 <div id="profile" class="sd-profile-form">
-                    {% if profile_editable %}
-                    <form method="post" action="{% url 'view-profile' %}">
-                        {% csrf_token %}
-                        {{ form|crispy }}
-                        <div class="d-grid mt-3">
-                            <button type="submit" class="sd-btn sd-btn--teal w-100">
-                                <i class="fas fa-save"></i>{% translate "Save Profile" %}
-                            </button>
+                    <!-- Signup details: owner-only POST save form; read-only disabled form otherwise -->
+                    <div class="sd-panel-card">
+                        <div class="sd-panel-head">
+                            <i class="fas fa-address-card"></i>
+                            {% translate "Signup Details" %}
                         </div>
-                    </form>
-                    {% else %}
-                    {{ form|crispy }}
+                        <div class="p-3">
+                            {% if profile_editable %}
+                            <form method="post" action="{% url 'view-profile' %}">
+                                {% csrf_token %}
+                                {{ signup_details_form|crispy }}
+                                <div class="d-grid mt-3">
+                                    <button type="submit" class="sd-btn sd-btn--teal w-100">
+                                        <i class="fas fa-save"></i>{% translate "Save Profile" %}
+                                    </button>
+                                </div>
+                            </form>
+                            {% else %}
+                            {{ signup_details_form|crispy }}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if application_documents %}
+                    <div class="sd-panel-card mt-3">
+                        <div class="sd-panel-head">
+                            <i class="fas fa-folder-open"></i>
+                            {% translate "Application Documents" %}
+                        </div>
+                        <div class="p-3">
+                            <ul class="list-unstyled mb-0">
+                                {% for doc in application_documents %}
+                                <li class="sd-mini-row">
+                                    <i class="fas fa-file-alt"></i>
+                                    <span class="w-100">{{ doc.label }}</span>
+                                    <span class="sd-mini-end d-flex gap-2 flex-shrink-0">
+                                        {% if doc.url %}
+                                        <a href="{{ doc.url }}"
+                                           {% if doc.is_image %}target="_blank" rel="noopener noreferrer"{% endif %}
+                                           class="sd-btn sd-btn--gold-outline btn-sm">{% translate "View" %}</a>
+                                        {% endif %}
+                                        {% if doc.download_url %}
+                                        <a href="{{ doc.download_url }}"
+                                           download
+                                           class="sd-btn sd-btn--teal btn-sm">{% translate "Download" %}</a>
+                                        {% endif %}
+                                    </span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if can_upload_missing_documents and missing_documents_form.fields %}
+                    <div class="sd-panel-card mt-3">
+                        <div class="sd-panel-head">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            {% translate "Missing Documents" %}
+                        </div>
+                        <div class="p-3">
+                            <p class="ps-muted-text small">{% translate "Payment receipt upload is deferred." %}</p>
+                            <form method="post"
+                                  action="{% url 'profile-missing-documents' %}"
+                                  enctype="multipart/form-data">
+                                {% csrf_token %}
+                                {{ missing_documents_form|crispy }}
+                                <div class="d-grid mt-3">
+                                    <button type="submit" class="sd-btn sd-btn--teal w-100">
+                                        <i class="fas fa-upload"></i>{% translate "Upload" %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
 

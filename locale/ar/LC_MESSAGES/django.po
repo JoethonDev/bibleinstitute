@@ -9590,7 +9590,38 @@ msgstr "لا شيء / ناتج مستقل"
 msgid "The selected draft lesson is metadata only; the server validates and attaches verified output."
 msgstr "الدرس المسودة المحدد هو بيانات وصفية فقط؛ يتحقق الخادم من الناتج الموثق ويرفقه."
 
-#, python-format
+#: .\management_system\templates\profile.html
+msgid "Signup Details"
+msgstr "تفاصيل التسجيل"
+
+#: .\management_system\templates\profile.html
+msgid "Application Documents"
+msgstr "مستندات التقديم"
+
+#: .\management_system\templates\profile.html
+msgid "Missing Documents"
+msgstr "المستندات الناقصة"
+
+#: .\management_system\templates\profile.html
+msgid "Payment receipt upload is deferred."
+msgstr "تم تأجيل رفع إيصال الدفع."
+
+#: .\management_system\views.py
+msgid "Profile details are read-only."
+msgstr "بيانات الملف الشخصي للقراءة فقط."
+
+#: .\management_system\views.py
+msgid "Select at least one missing document."
+msgstr "اختر مستندًا ناقصًا واحدًا على الأقل."
+
+#: .\management_system\views.py
+msgid "Only missing signup documents can be uploaded."
+msgstr "يمكن رفع مستندات التسجيل الناقصة فقط."
+
+#: .\management_system\views.py
+msgid "Missing signup documents uploaded successfully."
+msgstr "تم رفع مستندات التسجيل الناقصة بنجاح."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

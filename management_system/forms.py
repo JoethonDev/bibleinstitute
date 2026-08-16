@@ -5,6 +5,7 @@ import secrets
 from django.core.exceptions import ValidationError
 from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
 from .utils.validators import normalize_phone, validate_identity_by_type
+from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
 from django.conf import settings
@@ -258,24 +259,6 @@ class UserUpdateForm(UserCreationForm):
         if not password:
             self.instance.password = self._original_password
         return super(UserUpdateForm, self).save(commit)
-
-
-class ProfileUpdateForm(UserUpdateForm):
-    readonly_fields = {"username", "joined_date"}
-
-    def __init__(self, *args, **kwargs):
-        super(ProfileUpdateForm, self).__init__(*args, **kwargs)
-        for fname in self.admin_only_fields:
-            self.fields.pop(fname, None)
-        for fname in self.readonly_fields:
-            if fname in self.fields:
-                self.fields[fname].disabled = True
-
-    def clean_username(self):
-        return self.instance.username
-
-    def clean_joined_date(self):
-        return self.instance.joined_date
 
 
 class CourseForm(forms.ModelForm):
@@ -924,6 +907,218 @@ class SignupForm(forms.ModelForm):
         user.application_status = "pending"
         user.is_active = False
         user.qr_token = secrets.token_urlsafe(32)
+        if commit:
+            user.save()
+        return user
+
+
+class MissingApplicationDocumentsForm(forms.Form):
+    """Self-service upload for signup documents that are still missing.
+
+    The form only describes and validates the file inputs; the caller enforces
+    self-only authorization, CSRF, transactions, and exact allowed-field checks.
+    Existing documents are never replaceable here and payment receipt upload is
+    intentionally never offered. File-content validation reuses the same
+    boundary used by signup application uploads.
+    """
+
+    identity_front = forms.FileField(
+        required=False,
+        label=_("National ID / Passport (Front)"),
+        validators=[validate_application_file],
+    )
+    identity_back = forms.FileField(
+        required=False,
+        label=_("National ID / Passport (Back)"),
+        validators=[validate_application_file],
+    )
+    profile = forms.FileField(
+        required=False,
+        label=_("Profile Photo"),
+        validators=[validate_application_file],
+    )
+
+    def __init__(self, *args, **kwargs):
+        instance = kwargs.pop("instance", None)
+        super().__init__(*args, **kwargs)
+        self.instance = instance
+        # Maps each offered field name to its User document-key field. It
+        # contains only the currently missing, eligible documents and mirrors
+        # the remaining fields so the view never duplicates the rule.
+        self.document_types = self._missing_document_types(instance)
+        for field_name in list(self.fields):
+            if field_name not in self.document_types:
+                self.fields.pop(field_name)
+
+    @staticmethod
+    def _missing_document_types(instance):
+        if instance is None:
+            return {}
+        mapping = {}
+        if not getattr(instance, "identity_front_key", None):
+            mapping["identity_front"] = "identity_front_key"
+        if (
+            getattr(instance, "identity_type", None) == "national_id"
+            and not getattr(instance, "identity_back_key", None)
+        ):
+            mapping["identity_back"] = "identity_back_key"
+        if not getattr(instance, "profile_image_key", None):
+            mapping["profile"] = "profile_image_key"
+        return mapping
+
+
+class SignupDetailsForm(forms.ModelForm):
+    """Self-service completion of missing signup details.
+
+    The form never mutates the database itself: the caller owns self-only
+    authorization, row locking, the transaction, session-hash refresh, and
+    save invocation. Only currently missing signup fields plus email and
+    password are editable; any nonblank signup value stays disabled so forged
+    POST data cannot overwrite it. Username is an identity key and is never
+    editable. ``has_editable_fields`` is always true for the own profile
+    because email and password are always editable.
+    """
+
+    # Required at signup; any blank value becomes enabled and required.
+    SIGNUP_REQUIRED_FIELDS = frozenset({
+        "phone", "country", "city", "education_or_job", "priest_name",
+        "priest_phone", "church", "identity_type", "identity_number", "time_zone",
+    })
+
+    password = forms.CharField(
+        label=_("Password"),
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            "placeholder": _("Password"),
+            "autocomplete": "new-password",
+        }),
+    )
+    full_name = forms.CharField(label=_("Full Name"), required=False)
+    country = forms.ChoiceField(label=_("Country"), choices=country_choices(), required=False)
+    identity_type = forms.ChoiceField(
+        label=_("Identity Type"),
+        choices=User.IDENTITY_TYPES,
+        required=False,
+    )
+    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=False)
+
+    class Meta:
+        model = User
+        # ``password`` is intentionally excluded: it is not a model-bound
+        # form field here, so ``model_to_dict`` never seeds the stored hash
+        # into initial and ``construct_instance`` never copies plaintext or a
+        # blank value onto the instance. The declared field is merged into
+        # the form below.
+        fields = [
+            "full_name", "username", "email", "phone", "country", "city",
+            "education_or_job", "priest_name", "priest_phone", "church", "service",
+            "identity_type", "identity_number", "time_zone",
+        ]
+        widgets = {
+            "full_name": forms.TextInput(),
+            "username": forms.TextInput(),
+            "email": forms.EmailInput(),
+            "phone": forms.TextInput(),
+            "city": forms.TextInput(),
+            "education_or_job": forms.TextInput(),
+            "priest_name": forms.TextInput(),
+            "priest_phone": forms.TextInput(),
+            "church": forms.TextInput(),
+            "service": forms.TextInput(),
+            "identity_number": forms.TextInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["username"].label = _("Username")
+        self.fields["password"].label = _("Password")
+        self.fields["email"].label = _("Email")
+        self.fields["phone"].label = _("Phone")
+        self.fields["city"].label = _("City")
+        self.fields["education_or_job"].label = _("Educational qualification / occupation")
+        self.fields["priest_name"].label = _("Confessor Name")
+        self.fields["priest_phone"].label = _("Confessor Phone")
+        self.fields["church"].label = _("Church")
+        self.fields["service"].label = _("Service (if any)")
+        self.fields["identity_number"].label = _("Identity Number")
+        self.fields["full_name"].initial = self.instance.get_full_name()
+        self.fields["time_zone"].choices = user_time_zone_choices()
+        self.fields["time_zone"].initial = getattr(self.instance, "time_zone", None) or settings.TIME_ZONE
+        current_country = getattr(self.instance, "country", None)
+        if current_country and current_country not in dict(country_choices()):
+            self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
+        self.order_fields([
+            "full_name", "username", "password", "email", "phone", "country", "city",
+            "education_or_job", "priest_name", "priest_phone", "church", "service",
+            "identity_type", "identity_number", "time_zone",
+        ])
+        full_name_editable = not (
+            getattr(self.instance, "first_name", None)
+            and getattr(self.instance, "last_name", None)
+        )
+        for field_name, field in self.fields.items():
+            if field_name == "username":
+                field.disabled = True
+                field.required = False
+            elif field_name in ("email", "password"):
+                field.disabled = False
+                field.required = False
+            elif field_name == "full_name":
+                field.disabled = not full_name_editable
+                field.required = full_name_editable
+            else:
+                missing = not (getattr(self.instance, field_name, None) or "").strip()
+                field.disabled = not missing
+                field.required = (
+                    field_name in self.SIGNUP_REQUIRED_FIELDS and missing
+                )
+        self.has_editable_fields = any(
+            not field.disabled for field in self.fields.values()
+        )
+
+    def clean_full_name(self):
+        full_name = " ".join((self.cleaned_data.get("full_name") or "").split())
+        if self.fields["full_name"].disabled:
+            # Disabled fields keep the stored full name; forged POST data is
+            # never consulted for it.
+            return full_name
+        if len(full_name.split()) < 2:
+            raise forms.ValidationError(_("Enter your full name."))
+        return full_name
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        if not phone:
+            return phone
+        phone = normalize_phone(phone)
+        if not phone:
+            raise forms.ValidationError(_("Enter a valid international phone number."))
+        qs = User.objects.filter(phone=phone)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(_("This phone number is already in use."))
+        return phone
+
+    def clean_identity_number(self):
+        identity_number = self.cleaned_data.get("identity_number")
+        identity_type = self.cleaned_data.get("identity_type")
+        if identity_type and identity_number:
+            try:
+                validate_identity_by_type(identity_type, identity_number)
+            except ValidationError as e:
+                raise forms.ValidationError(e.message if hasattr(e, "message") else str(e))
+        return identity_number
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if not self.fields["full_name"].disabled:
+            name_parts = self.cleaned_data["full_name"].split()
+            user.first_name = name_parts[0]
+            user.last_name = " ".join(name_parts[1:])
+        password = self.cleaned_data.get("password")
+        if password:
+            user.set_password(password)
         if commit:
             user.save()
         return user

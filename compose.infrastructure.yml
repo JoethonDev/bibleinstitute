@@ -77,6 +77,89 @@ services:
     cpus: 0.25
     mem_limit: 256M
 
+  # ── Dozzle live Docker log viewer (read-only) ────────────────
+  # Lightweight authenticated container log viewer exposed ONLY through the
+  # existing Nginx HTTPS server on the dedicated monitor.<primary-domain>
+  # host at the site root (https://monitor.<primary-domain>/). No host port
+  # is published and Dozzle actions/shell access stay disabled
+  # (DOZZLE_ENABLE_ACTIONS is not set). Dozzle is live log viewing only: it
+  # does not retain or index historical logs, so it is not an offline
+  # log-search/retention database.
+  dozzle:
+    image: amir20/dozzle:v10.7.2@sha256:01f9018ffdaa0ec523f9a91dea3eff65b25cdb5f0566ac6d5a2cb4cf591e35e9
+    restart: unless-stopped
+    # Container port 8080 is reachable only inside Docker networks; no
+    # host `ports:` mapping is published for Dozzle.
+    expose:
+      - "8080"
+    environment:
+      # Root base path: the monitor.<primary-domain> host proxies the site
+      # root to Dozzle, so requests must not be redirected to a sub-path.
+      DOZZLE_BASE: /
+      # Simple file authentication: /data/users.yml (generated outside Git
+      # by the monitoring setup script) is required before startup.
+      DOZZLE_AUTH_PROVIDER: simple
+      DOZZLE_AUTH_TTL: 12h
+      DOZZLE_NO_ANALYTICS: "true"
+      # Dozzle reaches the Docker API only through the socket proxy on the
+      # isolated dozzle_control network; it never mounts /var/run/docker.sock.
+      DOZZLE_REMOTE_HOST: tcp://dozzle-socket-proxy:2375
+      DOZZLE_HOSTNAME: LMS Docker Logs
+    volumes:
+      # Read-write runtime data/auth directory (bind source defaults to
+      # ./runtime/dozzle). The setup script creates the directory with mode
+      # 700 and users.yml with mode 600 BEFORE this service is started.
+      - type: bind
+        source: ${DOZZLE_DATA_DIR:-./runtime/dozzle}
+        target: /data
+    networks:
+      - lms_network
+      - dozzle_control
+    depends_on:
+      dozzle-socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    cpus: 0.25
+    mem_limit: 256M
+
+  # ── Docker socket proxy (minimal read-only API gateway) ──────
+  # Grants Dozzle only the Docker API access it needs (container list/logs,
+  # info, events, ping, version). POST and every other endpoint stay
+  # disabled, so no action/shell/container-mutation route exists. The proxy
+  # is attached ONLY to the internal dozzle_control network and publishes no
+  # port, so it can never be reached from lms_network, the host, or the
+  # public internet. The tecnativa image needs no privileged mode: it proxies
+  # HTTP to the read-only mounted Docker socket.
+  dozzle-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Explicit minimal read-only access set (all other proxy endpoints
+      # default to disabled).
+      CONTAINERS: "1"
+      INFO: "1"
+      EVENTS: "1"
+      PING: "1"
+      VERSION: "1"
+      POST: "0"
+    networks:
+      - dozzle_control
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2375/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    cpus: 0.10
+    mem_limit: 128M
+
 volumes:
   lms_postgres_data:
     name: lms_postgres_data
@@ -90,3 +173,8 @@ networks:
   lms_network:
     external: true
     name: lms_network
+  # Internal network connecting Dozzle to the socket proxy only. No gateway,
+  # no host/public exposure; the socket proxy is never on lms_network.
+  dozzle_control:
+    name: dozzle_control
+    internal: true

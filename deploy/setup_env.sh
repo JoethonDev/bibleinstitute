@@ -84,6 +84,7 @@ NGINX_HTTP_PORT|80
 NGINX_HTTPS_PORT|443
 NGINX_TLS_CERT_DIR|./certs
 LMS_RUNTIME_DIR|./runtime
+DOZZLE_DATA_DIR|./runtime/dozzle
 REDIS_URL|redis://redis:6379/0
 CELERY_BROKER_URL|redis://redis:6379/0
 CELERY_RESULT_BACKEND|redis://redis:6379/0
@@ -130,6 +131,7 @@ domain="${raw#https://}"; domain="${domain#http://}"; domain="${domain%%/*}"
 write_value DJANGO_ALLOWED_HOSTS "$domain,.$domain"
 write_value DJANGO_CSRF_TRUSTED_ORIGINS "https://$domain,https://*.$domain"
 write_value DJANGO_SITE_DOMAIN "https://$domain"
+write_value MONITORING_DOMAIN "monitor.$domain"
 write_value DEPLOY_HEALTHCHECK_URL "https://${domain}/"
 echo ""
 
@@ -222,6 +224,7 @@ echo ""
 echo "  Next steps:"
 echo "    1. Provision TLS certificates at: $tls_dir"
 echo "    2. Run: bash deploy/setup_infrastructure.sh"
-echo "    3. Deploy the application after TLS is ready"
+echo "    3. Run: bash deploy/setup_monitoring.sh"
+echo "    4. Run: bash deploy/blue_green_deploy.sh"
 echo ""
 echo "  Rerun this script at any time to update settings."

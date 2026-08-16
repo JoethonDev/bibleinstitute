@@ -47,7 +47,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, ProfileUpdateForm, SignupForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
@@ -691,14 +691,36 @@ class ProfileDetail(LoginProtection, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.object
-        form = context.get("form") or ProfileUpdateForm(instance=user)
+        signup_details_form = kwargs.get("form") or SignupDetailsForm(instance=user)
         profile_editable = user == self.request.user
         if not profile_editable:
-            for field in form.fields.values():
+            for field in signup_details_form.fields.values():
                 field.disabled = True
-
-        context['form'] = form
-        context['profile_editable'] = profile_editable
+                field.required = False
+        context["signup_details_form"] = signup_details_form
+        context["form"] = signup_details_form
+        context["profile_editable"] = profile_editable
+        context["can_upload_missing_documents"] = user == self.request.user
+        context["missing_documents_form"] = MissingApplicationDocumentsForm(instance=user)
+        document_fields = (
+            ("identity_front", "identity_front_key", _("Identity Front")),
+            ("identity_back", "identity_back_key", _("Identity Back")),
+            ("payment", "payment_key", _("Payment")),
+            ("profile", "profile_image_key", _("Profile")),
+        )
+        application_documents = []
+        for document_type, model_field, label in document_fields:
+            key = getattr(user, model_field, None)
+            if not key:
+                continue
+            application_documents.append({
+                "type": document_type,
+                "label": label,
+                "url": reverse("application-document", args=[user.pk, document_type]),
+                "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
+                "is_image": (mimetypes.guess_type(key)[0] or "").startswith("image/"),
+            })
+        context["application_documents"] = application_documents
         if user_has_management_role(user):
             offerings = CourseOffering.objects.select_related(
                 "course", "academic_year_level__academic_year", "academic_year_level__level"
@@ -897,55 +919,38 @@ class ProfileDetail(LoginProtection, DetailView):
         return context
 
     def get(self, request, *args, **kwargs):
-        # Check request has user_id route
-        # If user is not admin and pk in url
-        if not request.get_full_path().endswith("/profile/") and not can_manage_content(request.user):
+        if self.kwargs.get(self.pk_url_kwarg) and not can_manage_content(request.user):
             return HttpResponse(_("Unauthorized"), status=403) # Translate "Unauthorized"
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        if self.kwargs.get(self.pk_url_kwarg) and not can_manage_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=403)
-
         self.object = self.get_object()
         if self.object != request.user:
             return HttpResponse(_("Unauthorized"), status=403)
 
-        form = ProfileUpdateForm(request.POST, instance=self.object)
-        if form.is_valid():
-            self.object = form.save()
-            if form.cleaned_data.get("password"):
-                update_session_auth_hash(request, self.object)
-            success(request, _("Profile is updated successfully!"), extra_tags="alert-success")
-            return redirect("view-profile")
+        with transaction.atomic():
+            locked_user = User.objects.select_for_update().get(pk=request.user.pk)
+            form = SignupDetailsForm(request.POST, instance=locked_user)
+            if form.is_valid():
+                self.object = form.save()
+                password_changed = bool(form.cleaned_data.get("password"))
+                form_valid = True
+            else:
+                password_changed = False
+                form_valid = False
 
-        return self.render_to_response(self.get_context_data(form=form))
+        if not form_valid:
+            return self.render_to_response(self.get_context_data(form=form))
+        if password_changed:
+            update_session_auth_hash(request, self.object)
+        success(request, _("Profile is updated successfully!"), extra_tags="alert-success")
+        return redirect("view-profile")
 
     def get_object(self, queryset = None):
         # if not pk in route
         if not self.kwargs.get(self.pk_url_kwarg):
             return self.request.user
         return super().get_object(queryset)
-
-# Update
-class ProfileUpdate(LoginProtection, UpdateView):
-    form_class = ProfileUpdateForm
-    model = User
-    pk_url_kwarg = "user_id"
-    success_url = reverse_lazy("view-profile")
-    template_name = "update_profile.html"
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        success(self.request, _("Profile is updated successfully!"), extra_tags="alert-success") # Translate
-        # If the password field was changed, update the session to keep user logged in
-        if "password" in form.cleaned_data and form.cleaned_data["password"]:
-            update_session_auth_hash(self.request, self.object)
-
-        return response
-
-    def get_object(self, queryset = None):
-        return self.request.user
 
 # Course Routes
 @login_required(login_url=LOGIN_URL)
@@ -4176,8 +4181,10 @@ def application_delete(request, user_id):
     return redirect("applications-dashboard")
 
 
-@capability_required(can_manage_applications)
+@login_required(login_url=LOGIN_URL)
 def application_document(request, user_id, document_type):
+    if request.user.pk != user_id and not can_manage_applications(request.user):
+        raise PermissionDenied
     document_fields = {
         "identity_front": "identity_front_key",
         "identity_back": "identity_back_key",
@@ -4205,6 +4212,73 @@ def application_document(request, user_id, document_type):
     except Exception as exc:
         logger.warning("Application document unavailable for user=%s type=%s: %s", user_id, document_type, exc)
         raise Http404 from exc
+
+
+@login_required(login_url=LOGIN_URL)
+@require_POST
+def profile_missing_documents(request):
+    """Accept only currently missing signup documents for the logged-in user."""
+    uploaded_keys = []
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            form = MissingApplicationDocumentsForm(
+                request.POST,
+                request.FILES,
+                instance=user,
+            )
+            submitted_types = set(request.FILES)
+            allowed_types = set(form.document_types)
+            if not submitted_types:
+                raise ValidationError(_("Select at least one missing document."))
+            if not submitted_types.issubset(allowed_types):
+                raise ValidationError(_("Only missing signup documents can be uploaded."))
+            if not form.is_valid():
+                raise ValidationError(form.errors.as_text())
+
+            update_fields = []
+            for document_type, model_field in form.document_types.items():
+                uploaded_file = form.cleaned_data.get(document_type)
+                if not uploaded_file:
+                    continue
+                key = upload_application_file(
+                    CLOUD_CLIENT,
+                    bucket_name,
+                    user.pk,
+                    uploaded_file,
+                    document_type,
+                )
+                if not key:
+                    raise ValidationError(
+                        _("The %(document)s could not be uploaded.")
+                        % {"document": form.fields[document_type].label}
+                    )
+                setattr(user, model_field, key)
+                update_fields.append(model_field)
+                uploaded_keys.append(key)
+            if not update_fields:
+                raise ValidationError(_("Select at least one missing document."))
+            user.save(update_fields=update_fields)
+    except (ValidationError, User.DoesNotExist) as exc:
+        for key in uploaded_keys:
+            try:
+                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+            except Exception:
+                logger.exception("Could not clean up profile document %s", key)
+        if isinstance(exc, User.DoesNotExist):
+            raise Http404 from exc
+        messages.error(request, str(exc))
+        return redirect("view-profile")
+    except Exception:
+        for key in uploaded_keys:
+            try:
+                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
+            except Exception:
+                logger.exception("Could not clean up profile document %s", key)
+        raise
+
+    messages.success(request, _("Missing signup documents uploaded successfully."))
+    return redirect("view-profile")
 
 @capability_required(can_manage_applications)
 def application_decision(request, user_id, decision):

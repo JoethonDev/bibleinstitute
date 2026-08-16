@@ -7,7 +7,7 @@
 #
 # 1. Acquires a lock (/tmp/lms-blue-green.lock) to prevent concurrent deploys.
 # 2. Resolves the target slot (inactive blue or green), loads runtime state.
-# 3. Verifies infrastructure containers (postgres, redis, nginx) are running.
+# 3. Verifies infrastructure containers (postgres, redis, nginx, Dozzle) are running.
 # 4. Runs forward migrations and collectstatic in the target slot.
 # 5. Builds and starts the inactive app slot + celery + media-worker with the new image.
 # 6. Waits for the new slot's Docker healthcheck to pass.
@@ -199,17 +199,17 @@ fi
 # Verify infrastructure is running
 # ---------------------------------------------------------------------------
 info "Verifying infrastructure containers…"
-for svc in postgres redis nginx; do
+for svc in postgres redis nginx dozzle-socket-proxy dozzle; do
     CID="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps -q "$svc" 2>/dev/null || true)"
     [[ -n "$CID" ]] || die "Infrastructure service '$svc' has no container. Start it first via deploy/setup_infrastructure.sh."
     STATE="$(docker inspect --format='{{.State.Status}}' "$CID" 2>/dev/null || true)"
     [[ "$STATE" == "running" ]] || die "Infrastructure service '$svc' is not running (state: ${STATE:-unknown})."
-    if [[ "$svc" == "postgres" || "$svc" == "redis" ]]; then
+    if [[ "$svc" != "nginx" ]]; then
         HEALTH="$(docker inspect --format='{{.State.Health.Status}}' "$CID" 2>/dev/null || true)"
         [[ "$HEALTH" == "healthy" ]] || die "Infrastructure service '$svc' is not healthy (health: ${HEALTH:-unknown})."
     fi
 done
-info "All infrastructure services are running and healthy (Nginx running, Postgres/Redis healthy)."
+info "All infrastructure services are running and healthy (Nginx, Postgres, Redis, and Dozzle monitoring)."
 
 # Also verify the target app slot is NOT currently running (it should be inactive)
 TARGET_RUNNING=$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps --status running --format '{{.Service}}' 2>/dev/null | grep -Fx "lms-app-${TARGET_SLOT}" || true)

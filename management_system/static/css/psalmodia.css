@@ -353,6 +353,11 @@ html::-webkit-scrollbar-thumb {
     max-width: 22rem;
 }
 
+/* Backend message stack sits clear of the dynamic notification stack */
+.ps-toast-stack.ps-backend-messages {
+    inset-block-start: 11rem;
+}
+
 .ps-toast {
     display: flex;
     align-items: center;

@@ -9659,7 +9659,38 @@ msgstr "None / Standalone output"
 msgid "The selected draft lesson is metadata only; the server validates and attaches verified output."
 msgstr "The selected draft lesson is metadata only; the server validates and attaches verified output."
 
-#, python-format
+#: .\management_system\templates\profile.html
+msgid "Signup Details"
+msgstr "Signup Details"
+
+#: .\management_system\templates\profile.html
+msgid "Application Documents"
+msgstr "Application Documents"
+
+#: .\management_system\templates\profile.html
+msgid "Missing Documents"
+msgstr "Missing Documents"
+
+#: .\management_system\templates\profile.html
+msgid "Payment receipt upload is deferred."
+msgstr "Payment receipt upload is deferred."
+
+#: .\management_system\views.py
+msgid "Profile details are read-only."
+msgstr "Profile details are read-only."
+
+#: .\management_system\views.py
+msgid "Select at least one missing document."
+msgstr "Select at least one missing document."
+
+#: .\management_system\views.py
+msgid "Only missing signup documents can be uploaded."
+msgstr "Only missing signup documents can be uploaded."
+
+#: .\management_system\views.py
+msgid "Missing signup documents uploaded successfully."
+msgstr "Missing signup documents uploaded successfully."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 
