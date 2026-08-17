@@ -764,13 +764,13 @@ class AcademicPayment(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["student", "academic_year_level"],
-                name="academic_payment_student_scope_unique",
+                name="academic_payment_student_unique",
             ),
         ]
         indexes = [
             models.Index(
                 fields=["academic_year_level", "student"],
-                name="academic_payment_scope_student_idx",
+                name="academic_payment_student_idx",
             ),
         ]
 
