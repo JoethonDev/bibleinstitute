@@ -23,7 +23,7 @@
          aria-selected="{{ tab.selected|yesno:'true,false' }}"
          href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}">
         <span>{{ tab.name }}</span>
-        <small>{{ tab.student_count }} {% translate "students" %}</small>
+        <small>{{ tab.student_count }} {% translate "Students" %}</small>
       </a>
     {% endfor %}
   </nav>
@@ -66,7 +66,7 @@
       <span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if active_year %} · {% translate "Active year" %}{% else %} · {% translate "Historical year" %}{% endif %}</span>
       {% if selected_course_id %}<span class="ad-pill ad-pill--muted">{% translate "Course filtered" %}</span>{% endif %}
       <span class="grade-matrix-summary-spacer"></span>
-      <span>{{ student_count }} {% translate "students" %} · {{ quiz_count }} {% translate "quizzes" %}</span>
+      <span>{{ student_count }} {% translate "Students" %} · {{ quiz_count }} {% translate "Quizzes" %}</span>
     </div>
   </section>
 

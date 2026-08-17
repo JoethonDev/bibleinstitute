@@ -3186,7 +3186,7 @@ def grades_matrix_dashboard(request):
     ]
 
     context = {
-        "title": _("Grades Matrix"),
+        "title": _("Grades matrix"),
         **state,
         "level_tabs": level_tabs,
         "matrix_courses": matrix_courses,
@@ -3245,7 +3245,7 @@ def payments_matrix_dashboard(request):
         for level in levels
     ]
     context = {
-        "title": _("Payments Matrix"),
+        "title": _("Payments matrix"),
         "years": years,
         "selected_year": selected_year,
         "levels": levels,

@@ -10479,3 +10479,46 @@ msgstr "تتطلب الترقية الجزئية تحديد نطاق دراسي 
 
 msgid "Row %(row)d manual promotion requires a reason."
 msgstr "تتطلب الترقية اليدوية في الصف %(row)d ذكر السبب."
+
+#, python-format
+msgid "%(count)s Students shown"
+msgstr "عدد الطلاب المعروضين: %(count)s"
+
+msgid "Start date"
+msgstr "تاريخ البدء"
+
+msgid "End date"
+msgstr "تاريخ الانتهاء"
+
+msgid "Meeting weekdays"
+msgstr "أيام الاجتماع"
+
+msgid "First name"
+msgstr "الاسم الأول"
+
+msgid "Last name"
+msgstr "اسم العائلة"
+
+msgid "Joined date"
+msgstr "تاريخ الانضمام"
+
+msgid "Full name"
+msgstr "الاسم الكامل"
+
+msgid "Source academic scope"
+msgstr "النطاق الدراسي المصدر"
+
+msgid "Target academic scope"
+msgstr "النطاق الدراسي المستهدف"
+
+msgid "Offerings to copy"
+msgstr "عروض المقررات المراد نسخها"
+
+msgid "Copy lessons"
+msgstr "نسخ الدروس"
+
+msgid "Copy quizzes"
+msgstr "نسخ الاختبارات"
+
+msgid "Quiz type"
+msgstr "نوع الاختبار"

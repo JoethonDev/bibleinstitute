@@ -18,7 +18,7 @@
          aria-selected="{{ tab.selected|yesno:'true,false' }}"
          href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;name={{ name_value|urlencode }}&amp;status={{ status }}">
         <span>{{ tab.name }}</span>
-        <small>{{ tab.student_count }} {% translate "students" %}</small>
+        <small>{{ tab.student_count }} {% translate "Students" %}</small>
       </a>
     {% endfor %}
   </nav>
@@ -65,7 +65,7 @@
   <section class="ad-card">
     <div class="ad-card-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
       <strong>{{ selected_scope.level.display_name }} — {{ selected_year.name }}</strong>
-      <span class="ad-pill ad-pill--muted">{% blocktranslate with count=student_count %}{{ count }} students shown{% endblocktranslate %}</span>
+      <span class="ad-pill ad-pill--muted">{% blocktranslate with count=student_count %}{{ count }} Students shown{% endblocktranslate %}</span>
     </div>
     <div class="ad-table-wrap">
       <table class="ad-table">

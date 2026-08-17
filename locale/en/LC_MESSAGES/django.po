@@ -10207,3 +10207,46 @@ msgstr "Partial promotion requires a destination academic scope."
 
 msgid "Row %(row)d manual promotion requires a reason."
 msgstr "Row %(row)d manual promotion requires a reason."
+
+#, python-format
+msgid "%(count)s Students shown"
+msgstr "%(count)s Students shown"
+
+msgid "Start date"
+msgstr "Start date"
+
+msgid "End date"
+msgstr "End date"
+
+msgid "Meeting weekdays"
+msgstr "Meeting weekdays"
+
+msgid "First name"
+msgstr "First name"
+
+msgid "Last name"
+msgstr "Last name"
+
+msgid "Joined date"
+msgstr "Joined date"
+
+msgid "Full name"
+msgstr "Full name"
+
+msgid "Source academic scope"
+msgstr "Source academic scope"
+
+msgid "Target academic scope"
+msgstr "Target academic scope"
+
+msgid "Offerings to copy"
+msgstr "Offerings to copy"
+
+msgid "Copy lessons"
+msgstr "Copy lessons"
+
+msgid "Copy quizzes"
+msgstr "Copy quizzes"
+
+msgid "Quiz type"
+msgstr "Quiz type"
