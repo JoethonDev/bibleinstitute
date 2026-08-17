@@ -593,30 +593,86 @@
         </div>
     </div>
 
-    <!-- Safe modal helpers — catch Bootstrap backdrop edge cases -->
+    <!-- Safe modal helpers — all destructive actions use this confirmation UI. -->
     <script>
-        document.addEventListener('htmx:confirm', function (e) {
-            if (!e.detail.question) return;
-            e.preventDefault();
-
+        (function () {
             const modal = document.getElementById('globalConfirmModal');
             const message = document.getElementById('globalConfirmMessage');
-            const confirmBtn = document.getElementById('globalConfirmButton');
-            if (!modal) return;
+            const confirmButton = document.getElementById('globalConfirmButton');
+            if (!modal || !message || !confirmButton || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
 
-            message.textContent = e.detail.question;
+            let pendingAction = null;
 
-            const newBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+            function showConfirmation(question, action) {
+                if (!question || typeof action !== 'function') return;
+                pendingAction = action;
+                message.textContent = question;
 
-            newBtn.addEventListener('click', function () {
-                const inst = bootstrap.Modal.getInstance(modal);
-                if (inst) inst.hide();
-                e.detail.issueRequest(true);
+                const currentButton = document.getElementById('globalConfirmButton');
+                const button = currentButton.cloneNode(true);
+                currentButton.replaceWith(button);
+                button.addEventListener('click', function () {
+                    const callback = pendingAction;
+                    pendingAction = null;
+                    const instance = bootstrap.Modal.getInstance(modal);
+                    if (instance) instance.hide();
+                    if (callback) callback();
+                }, { once: true });
+
+                const instance = bootstrap.Modal.getOrCreateInstance(modal);
+                if (instance) instance.show();
+            }
+
+            window.appConfirm = showConfirmation;
+
+            // Normal forms, including deletion forms, opt in with
+            // data-confirm-message. requestSubmit preserves validation and CSRF.
+            document.addEventListener('submit', function (event) {
+                const form = event.target;
+                if (!form || !form.matches || !form.matches('form[data-confirm-message]')) return;
+                if (form.dataset.confirmed === 'true') {
+                    delete form.dataset.confirmed;
+                    return;
+                }
+                event.preventDefault();
+                const submitter = event.submitter;
+                showConfirmation(form.dataset.confirmMessage, function () {
+                    form.dataset.confirmed = 'true';
+                    if (form.requestSubmit) {
+                        submitter ? form.requestSubmit(submitter) : form.requestSubmit();
+                    } else {
+                        HTMLFormElement.prototype.submit.call(form);
+                    }
+                });
+            }, true);
+
+            // Destructive links (for example attendance deletion) use the same
+            // modal and navigate only after the user confirms.
+            document.addEventListener('click', function (event) {
+                const trigger = event.target.closest && event.target.closest('[data-confirm-message]');
+                if (!trigger || trigger.matches('form') || trigger.closest('form[data-confirm-message]')) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                showConfirmation(trigger.dataset.confirmMessage, function () {
+                    if (trigger.tagName === 'A' && trigger.href) window.location.assign(trigger.href);
+                });
+            }, true);
+
+            // Alpine components can request the shared modal without using a
+            // browser-native confirmation dialog.
+            document.addEventListener('app:confirm', function (event) {
+                const detail = event.detail || {};
+                showConfirmation(detail.message, detail.onConfirm);
             });
 
-            try { bootstrap.Modal.getOrCreateInstance(modal).show(); } catch (_) {}
-        });
+            document.addEventListener('htmx:confirm', function (event) {
+                if (!event.detail || !event.detail.question) return;
+                event.preventDefault();
+                showConfirmation(event.detail.question, function () {
+                    event.detail.issueRequest(true);
+                });
+            });
+        }());
 
         // Patch Bootstrap Modal to suppress backdrop edge-case errors
         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {

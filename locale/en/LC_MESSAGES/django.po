@@ -10117,3 +10117,93 @@ msgstr "Weight percentage"
 
 msgid "Minimum percentage"
 msgstr "Minimum percentage"
+
+msgid "Delete this holiday?"
+msgstr "Delete this holiday?"
+
+msgid "Delete this meeting?"
+msgstr "Delete this meeting?"
+
+msgid "Delete this draft?"
+msgstr "Delete this draft?"
+
+msgid "Academic performance"
+msgstr "Academic performance"
+
+msgid "Grades matrix"
+msgstr "Grades matrix"
+
+msgid "Review student results across quizzes, weekly totals, and final assessments."
+msgstr "Review student results across quizzes, weekly totals, and final assessments."
+
+msgid "Search student"
+msgstr "Search student"
+
+msgid "Apply"
+msgstr "Apply"
+
+msgid "Showing"
+msgstr "Showing"
+
+msgid "Historical year"
+msgstr "Historical year"
+
+msgid "Course filtered"
+msgstr "Course filtered"
+
+msgid "Weekly and final quiz results grouped by course offering."
+msgstr "Weekly and final quiz results grouped by course offering."
+
+msgid "Quiz detail"
+msgstr "Quiz detail"
+
+msgid "Weekly total"
+msgstr "Weekly total"
+
+msgid "Final total"
+msgstr "Final total"
+
+msgid "No enrolled students or quiz results match the selected filters."
+msgstr "No enrolled students or quiz results match the selected filters."
+
+msgid "Weekly assessment"
+msgstr "Weekly assessment"
+
+msgid "Final assessment"
+msgstr "Final assessment"
+
+msgid "Not submitted"
+msgstr "Not submitted"
+
+msgid "The student name column stays fixed while the matrix scrolls."
+msgstr "The student name column stays fixed while the matrix scrolls."
+
+msgid "Academic level"
+msgstr "Academic level"
+
+msgid "Grades filters"
+msgstr "Grades filters"
+
+msgid "Name or username"
+msgstr "Name or username"
+
+msgid "Course totals only"
+msgstr "Course totals only"
+
+msgid "Grades matrix pagination"
+msgstr "Grades matrix pagination"
+
+msgid "Please ensure your CSV file has the following columns in this exact order:"
+msgstr "Please ensure your CSV file has the following columns in this exact order:"
+
+msgid "The 'role' should be one of the existing roles in the system (e.g., admin, teacher, junior, senior)."
+msgstr "The 'role' should be one of the existing roles in the system (e.g., admin, teacher, junior, senior)."
+
+msgid "A completed last-level student does not need a destination enrollment."
+msgstr "A completed last-level student does not need a destination enrollment."
+
+msgid "Partial promotion requires a destination academic scope."
+msgstr "Partial promotion requires a destination academic scope."
+
+msgid "Row %(row)d manual promotion requires a reason."
+msgstr "Row %(row)d manual promotion requires a reason."

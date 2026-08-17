@@ -95,7 +95,7 @@
                 <td class="text-end text-nowrap">
                   <div class="ad-actions">
                     <a href="{% url 'attendance-correction' r.id %}" class="ad-action-btn" title="{% translate 'Edit' %}"><i class="fas fa-pen"></i></a>
-                    <a href="{% url 'attendance-delete' r.id %}" class="ad-action-btn is-danger" onclick="return confirm('{% translate "Delete this record?" %}')" title="{% translate 'Delete' %}"><i class="fas fa-trash"></i></a>
+                    <a href="{% url 'attendance-delete' r.id %}" class="ad-action-btn is-danger" data-confirm-message="{% translate 'Delete this record?' %}" title="{% translate 'Delete' %}"><i class="fas fa-trash"></i></a>
                   </div>
                 </td>
               </tr>

@@ -118,7 +118,7 @@
          {% if day.is_holiday %}
             <div class="ad-calendar-holiday">
               <small>{{ day.holiday_name }}</small>
-            <form method="post" action="{% url 'delete-holiday' day.holiday_id %}" class="ps-inline-form">
+            <form method="post" action="{% url 'delete-holiday' day.holiday_id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this holiday?' %}">
               {% csrf_token %}
               <button type="submit" class="btn-close btn-sm holiday-delete" aria-label="{% translate 'Delete' %}"></button>
             </form>
@@ -128,7 +128,7 @@
           <div class="ad-calendar-meeting" title="{{ meeting.course_name }}">
             <strong class="ad-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="ad-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
             {% if can_edit_meetings %}
-            <form method="post" action="{% url 'delete-meeting' meeting.id %}" class="ps-inline-form">
+            <form method="post" action="{% url 'delete-meeting' meeting.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this meeting?' %}">
               {% csrf_token %}
               <button type="submit" class="btn-close btn-sm" aria-label="{% translate 'Delete meeting' %}"></button>
             </form>

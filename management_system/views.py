@@ -4158,13 +4158,7 @@ def application_review(request, user_id):
                         form.instance.application_status = original_status
                         form.instance.is_active = user.is_active
                     user = form.save()
-                    file_fields = {
-                        "identity_front": "identity_front_key",
-                        "identity_back": "identity_back_key",
-                        "payment": "payment_key",
-                        "profile": "profile_image_key",
-                    }
-                    for upload_type, model_field in file_fields.items():
+                    for upload_type, (model_field, document_label) in document_fields.items():
                         previous_key = getattr(user, model_field, None)
                         if form.cleaned_data.get(f"clear_{upload_type}"):
                             if previous_key:
@@ -4174,7 +4168,7 @@ def application_review(request, user_id):
                         if uploaded_file:
                             new_key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, uploaded_file, upload_type)
                             if not new_key:
-                                raise ValidationError(_("The %(document)s could not be uploaded.") % {"document": upload_type})
+                                raise ValidationError(_("The %(document)s could not be uploaded.") % {"document": document_label})
                             if previous_key and previous_key != new_key:
                                 old_keys.append(previous_key)
                             setattr(user, model_field, new_key)

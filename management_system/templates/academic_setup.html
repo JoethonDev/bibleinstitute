@@ -70,7 +70,7 @@
                         <td>
                             <div class="ad-actions">
                             {% if not y.is_active %}
-                            <form method="post" action="{% url 'academic-year-activate' y.id %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Activate this academic year?" %}')">
+                            <form method="post" action="{% url 'academic-year-activate' y.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Activate this academic year?' %}">
                                 {% csrf_token %}
                                 <button type="submit" class="ad-action-btn" title="{% translate "Activate" %}"><i class="fas fa-check"></i></button>
                             </form>
@@ -81,7 +81,7 @@
                             <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}" title="{% translate "Edit" %}">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <form method="post" action="{% url 'academic-year-delete' y.id %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Delete this year?" %}')">
+                            <form method="post" action="{% url 'academic-year-delete' y.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this year?' %}">
                                 {% csrf_token %}
                                 <button type="submit" class="ad-action-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
                             </form>
@@ -159,7 +159,7 @@
                         <a href="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" class="ad-btn ad-btn--ghost ad-btn--sm">
                             <i class="fas fa-book me-1"></i>{% translate "Offerings" %}
                         </a>
-                        <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Delete this level from the academic year?" %}')">
+                        <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this level from the academic year?' %}">
                             {% csrf_token %}
                             <button type="submit" class="ad-action-btn is-danger"><i class="fas fa-trash"></i></button>
                         </form>
@@ -235,7 +235,7 @@
                             <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}" title="{% translate "Edit" %}">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <form method="post" action="{% url 'course-offering-delete' o.id %}" class="ps-inline-form" onsubmit="return confirm('{% translate "Delete this offering?" %}')">
+                            <form method="post" action="{% url 'course-offering-delete' o.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this offering?' %}">
                                 {% csrf_token %}
                                 <button type="submit" class="ad-action-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
                             </form>

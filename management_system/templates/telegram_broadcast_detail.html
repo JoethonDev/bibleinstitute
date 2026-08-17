@@ -74,7 +74,7 @@
         <a class="ad-btn ad-btn--teal" href="{{ confirm_url }}">
             <i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>{% translate "Review Broadcast" %}
         </a>
-        <form method="post" action="{{ cancel_url }}" class="tg-broadcast-delete-form" onsubmit="return confirm('{% translate "Are you sure?" %}')">
+        <form method="post" action="{{ cancel_url }}" class="tg-broadcast-delete-form" data-confirm-message="{% translate 'Delete this draft?' %}">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--danger">
                 <i class="fas fa-trash me-2" aria-hidden="true"></i>{% translate "Delete Draft" %}

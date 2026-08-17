@@ -27,11 +27,21 @@ function bulkActions(deleteUrl) {
         
         async deleteSelected() {
             if (this.selected.length === 0) return;
-            
-            if (!confirm(interpolate(gettext('Delete %(count)s selected item(s)?'), { count: this.selected.length }, true))) {
-                return;
-            }
-            
+
+            const message = interpolate(
+                gettext('Delete %(count)s selected item(s)?'),
+                { count: this.selected.length },
+                true
+            );
+            document.dispatchEvent(new CustomEvent('app:confirm', {
+                detail: {
+                    message,
+                    onConfirm: () => this._deleteSelected(),
+                },
+            }));
+        },
+
+        async _deleteSelected() {
             try {
                 const response = await fetch(deleteUrl, {
                     method: 'DELETE',

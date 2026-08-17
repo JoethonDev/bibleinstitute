@@ -10389,3 +10389,93 @@ msgstr "النسبة الدنيا"
 
 #~ msgid "Replace payment receipt"
 #~ msgstr "استبدال إيصال الدفع"
+
+msgid "Delete this holiday?"
+msgstr "حذف هذا العيد؟"
+
+msgid "Delete this meeting?"
+msgstr "حذف هذا الاجتماع؟"
+
+msgid "Delete this draft?"
+msgstr "حذف هذه المسودة؟"
+
+msgid "Academic performance"
+msgstr "الأداء الأكاديمي"
+
+msgid "Grades matrix"
+msgstr "مصفوفة الدرجات"
+
+msgid "Review student results across quizzes, weekly totals, and final assessments."
+msgstr "مراجعة نتائج الطلاب عبر الاختبارات والإجماليات الأسبوعية والتقييمات النهائية."
+
+msgid "Search student"
+msgstr "البحث عن طالب"
+
+msgid "Apply"
+msgstr "تطبيق"
+
+msgid "Showing"
+msgstr "عرض"
+
+msgid "Historical year"
+msgstr "سنة تاريخية"
+
+msgid "Course filtered"
+msgstr "تمت تصفية المقرر"
+
+msgid "Weekly and final quiz results grouped by course offering."
+msgstr "نتائج الاختبارات الأسبوعية والنهائية مجمعة حسب عرض المقرر."
+
+msgid "Quiz detail"
+msgstr "تفاصيل الاختبار"
+
+msgid "Weekly total"
+msgstr "الإجمالي الأسبوعي"
+
+msgid "Final total"
+msgstr "الإجمالي النهائي"
+
+msgid "No enrolled students or quiz results match the selected filters."
+msgstr "لا يوجد طلاب مسجلون أو نتائج اختبارات تطابق عوامل التصفية المحددة."
+
+msgid "Weekly assessment"
+msgstr "التقييم الأسبوعي"
+
+msgid "Final assessment"
+msgstr "التقييم النهائي"
+
+msgid "Not submitted"
+msgstr "لم يتم الإرسال"
+
+msgid "The student name column stays fixed while the matrix scrolls."
+msgstr "يظل عمود اسم الطالب ثابتًا أثناء تمرير المصفوفة."
+
+msgid "Academic level"
+msgstr "المستوى الدراسي"
+
+msgid "Grades filters"
+msgstr "عوامل تصفية الدرجات"
+
+msgid "Name or username"
+msgstr "الاسم أو اسم المستخدم"
+
+msgid "Course totals only"
+msgstr "إجماليات المقرر فقط"
+
+msgid "Grades matrix pagination"
+msgstr "ترقيم صفحات مصفوفة الدرجات"
+
+msgid "Please ensure your CSV file has the following columns in this exact order:"
+msgstr "يرجى التأكد من أن ملف CSV يحتوي على الأعمدة التالية بهذا الترتيب تمامًا:"
+
+msgid "The 'role' should be one of the existing roles in the system (e.g., admin, teacher, junior, senior)."
+msgstr "يجب أن يكون الحقل 'role' أحد الأدوار الموجودة في النظام (مثل admin أو teacher أو junior أو senior)."
+
+msgid "A completed last-level student does not need a destination enrollment."
+msgstr "لا يحتاج الطالب الذي أكمل المستوى الأخير إلى تسجيل في نطاق دراسي وجهة."
+
+msgid "Partial promotion requires a destination academic scope."
+msgstr "تتطلب الترقية الجزئية تحديد نطاق دراسي للوجهة."
+
+msgid "Row %(row)d manual promotion requires a reason."
+msgstr "تتطلب الترقية اليدوية في الصف %(row)d ذكر السبب."

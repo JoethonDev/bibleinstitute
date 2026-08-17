@@ -158,7 +158,7 @@
         <form method="post"
               action="{% url 'application-delete' app_user.id %}"
               class="ps-inline-form"
-              onsubmit="return confirm('{% translate "Permanently delete this application and student account? This cannot be undone." %}');">
+              data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--danger">
                 <i class="fas fa-trash me-1"></i>{% translate "Delete Application" %}

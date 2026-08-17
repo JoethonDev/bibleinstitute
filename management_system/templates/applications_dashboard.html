@@ -99,7 +99,7 @@
                                     <form method="post"
                                           action="{% url 'application-delete' u.id %}"
                                           class="ps-inline-form"
-                                          onsubmit="return confirm('{% translate "Permanently delete this application and student account? This cannot be undone." %}');">
+                                          data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
                                         {% csrf_token %}
                                         <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
                                             <i class="fas fa-trash"></i> {% translate "Delete" %}
@@ -228,25 +228,31 @@
             showFeedback(noSelectionMessage, false);
             return;
         }
-        if (!confirm(confirmMessage)) return;
-        fetch('{% url "bulk-application-decision" %}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, select_all: selectAllRecords, status: '{{ current_status }}'})
-        }).then(function(response) {
-            return response.json().then(function(data) {
-                return {ok: response.ok, data: data};
+        document.dispatchEvent(new CustomEvent('app:confirm', {
+            detail: {
+                message: confirmMessage,
+                onConfirm: function() {
+                    fetch('{% url "bulk-application-decision" %}', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+                        body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, select_all: selectAllRecords, status: '{{ current_status }}'})
+                    }).then(function(response) {
+                        return response.json().then(function(data) {
+                            return {ok: response.ok, data: data};
+                        });
+                    }).then(function(result) {
+                        if (result.ok) {
+                            location.reload();
+                        } else {
+                            var message = result.data && result.data.error ? result.data.error : requestFailedMessage;
+                            showFeedback(message, true);
+                        }
+                    }).catch(function() {
+                        showFeedback(requestFailedMessage, true);
+                    });
+                }
             });
-        }).then(function(result) {
-            if (result.ok) {
-                location.reload();
-            } else {
-                var message = result.data && result.data.error ? result.data.error : requestFailedMessage;
-                showFeedback(message, true);
-            }
-        }).catch(function() {
-            showFeedback(requestFailedMessage, true);
-        });
+        }));
     });
 })();
 </script>

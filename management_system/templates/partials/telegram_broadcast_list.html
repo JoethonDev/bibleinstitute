@@ -24,7 +24,7 @@
                         <a href="{% url 'telegram-broadcast-confirm-page' broadcast_id=broadcast.pk %}" class="ad-btn ad-btn--ghost ad-btn--sm">
                             <i class="fas fa-clipboard-check me-1" aria-hidden="true"></i>{% translate "Review" %}
                         </a>
-                        <form method="post" action="{% url 'telegram-broadcast-cancel' broadcast_id=broadcast.pk %}" class="d-inline tg-broadcast-delete-form" onsubmit="return confirm('{% translate "Are you sure?" %}')">
+                        <form method="post" action="{% url 'telegram-broadcast-cancel' broadcast_id=broadcast.pk %}" class="d-inline tg-broadcast-delete-form" data-confirm-message="{% translate 'Delete this draft?' %}">
                             {% csrf_token %}
                             <button type="submit" class="ad-btn ad-btn--ghost ad-btn--sm ad-action-btn is-danger" title="{% translate 'Delete Draft' %}" aria-label="{% translate 'Delete Draft' %}">
                                 <i class="fas fa-trash" aria-hidden="true"></i>
