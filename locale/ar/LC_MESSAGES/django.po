@@ -9693,8 +9693,8 @@ msgstr "تم رفع مستندات التسجيل الناقصة بنجاح."
 #~ msgid "Graduated students cannot receive exceptional course enrollments."
 #~ msgstr "لا يمكن للطلاب المتخرجين الحصول على تسجيلات مقررات استثنائية."
 
-#~ msgid "Payment Receipt"
-#~ msgstr "إيصال الدفع"
+msgid "Payment Receipt"
+msgstr "إيصال الدفع"
 
 #~ msgid "Priest Name"
 #~ msgstr "اسم الكاهن"
@@ -9831,3 +9831,87 @@ msgstr "تم رفع مستندات التسجيل الناقصة بنجاح."
 
 #~ msgid "Replace payment receipt"
 #~ msgstr "استبدال إيصال الدفع"
+
+msgid "Academic Payment"
+msgstr "دفع السنة الدراسية"
+
+msgid "Academic Payment Receipts"
+msgstr "إيصالات الدفع الدراسية"
+
+msgid "Upload academic payment"
+msgstr "رفع إيصال الدفع الدراسي"
+
+msgid "A new academic year needs its own payment receipt before promotion can be recorded."
+msgstr "تحتاج السنة الدراسية الجديدة إلى إيصال دفع مستقل قبل تسجيل الترفيع."
+
+msgid "Stay in the loop"
+msgstr "ابقَ على اطلاع"
+
+msgid "Connect Telegram"
+msgstr "اربط تيليجرام"
+
+msgid "Connect Telegram and get your lesson and quiz alerts where you already chat."
+msgstr "اربط تيليجرام لتصلك تنبيهات الدروس والاختبارات حيث تتواصل بالفعل."
+
+msgid "Your profile is almost ready"
+msgstr "ملفك الشخصي أوشك على الاكتمال"
+
+msgid "Complete these last details so your student record stays ready for every academic step:"
+msgstr "أكمل هذه التفاصيل الأخيرة ليظل ملفك الطلابي جاهزًا لكل خطوة دراسية:"
+
+msgid "Complete now"
+msgstr "أكمل الآن"
+
+msgid "Upload any signup document that is still missing. Existing documents stay protected."
+msgstr "ارفع أي مستند تسجيل ما زال ناقصًا. ستظل المستندات الحالية محمية."
+
+msgid "Financial follow-up"
+msgstr "متابعة المصروفات"
+
+msgid "Payments matrix"
+msgstr "مصفوفة المدفوعات"
+
+msgid "See who has uploaded the payment receipt for each academic level and who still needs to pay."
+msgstr "اعرف من رفع إيصال الدفع لكل مستوى دراسي ومن لا يزال بحاجة إلى السداد."
+
+msgid "Payment filters"
+msgstr "فلاتر المدفوعات"
+
+msgid "Payment status"
+msgstr "حالة الدفع"
+
+msgid "All students"
+msgstr "كل الطلاب"
+
+msgid "Uploaded"
+msgstr "تم الرفع"
+
+msgid "Not uploaded"
+msgstr "لم يتم الرفع"
+
+msgid "Receipt"
+msgstr "الإيصال"
+
+msgid "Payment status by student"
+msgstr "حالة الدفع حسب الطالب"
+
+msgid "No students match the selected filters."
+msgstr "لا يوجد طلاب يطابقون الفلاتر المحددة."
+
+msgid "Payments matrix pagination"
+msgstr "ترقيم صفحات مصفوفة المدفوعات"
+
+msgid "%(count)s students shown"
+msgstr "عرض %(count)s من الطلاب"
+
+msgid "A payment receipt already exists for this academic level."
+msgstr "يوجد إيصال دفع بالفعل لهذا المستوى الدراسي."
+
+msgid "The payment receipt could not be uploaded."
+msgstr "تعذر رفع إيصال الدفع."
+
+msgid "Academic payment receipt uploaded successfully."
+msgstr "تم رفع إيصال الدفع الدراسي بنجاح."
+
+msgid "Upload the payment receipt for the destination academic year before promotion."
+msgstr "ارفع إيصال الدفع للسنة الدراسية المستهدفة قبل تسجيل الترفيع."

@@ -10,6 +10,7 @@ from django.utils.translation import gettext as _
 from .models import (
     AcademicYear,
     AcademicYearLevel,
+    AcademicPayment,
     CourseOffering,
     Enrollment,
     EvaluationResult,
@@ -321,6 +322,13 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
 
     if destination_scope is None and outcome != "graduated":
         raise ValidationError(_("The destination academic level is not open in the active year."))
+    if destination_scope is not None and not AcademicPayment.objects.filter(
+        student=source.student,
+        academic_year_level=destination_scope,
+    ).exists():
+        raise ValidationError(
+            _("Upload the payment receipt for the destination academic year before promotion.")
+        )
 
     exceptional_offerings = []
     if failed_results and partial_failure:

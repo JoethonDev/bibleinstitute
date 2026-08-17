@@ -6,6 +6,31 @@
 {% block body %}
 <div class="sd-page">
 <div class="container py-4 py-lg-5">
+    {% if profile_editable and telegram_link_url and not telegram_account %}
+    <div class="sd-profile-banner sd-profile-banner--telegram mb-3" role="status">
+        <span class="sd-profile-banner-icon"><i class="fab fa-telegram-plane"></i></span>
+        <div class="sd-profile-banner-copy">
+            <strong>{% translate "Stay in the loop" %}</strong>
+            <span>{% translate "Connect Telegram and get your lesson and quiz alerts where you already chat." %}</span>
+        </div>
+        <a href="{{ telegram_link_url }}" target="_blank" rel="noopener noreferrer" class="sd-btn sd-btn--teal sd-btn--sm">
+            <i class="fab fa-telegram-plane"></i> {% translate "Connect Telegram" %}
+        </a>
+    </div>
+    {% endif %}
+
+    {% if profile_editable and has_profile_gaps %}
+    <div class="sd-profile-banner sd-profile-banner--completion mb-3" role="status">
+        <span class="sd-profile-banner-icon"><i class="fas fa-sparkles"></i></span>
+        <div class="sd-profile-banner-copy">
+            <strong>{% translate "Your profile is almost ready" %}</strong>
+            <span>{% translate "Complete these last details so your student record stays ready for every academic step:" %}</span>
+            <span class="sd-profile-banner-list">{% for item in missing_profile_items %}{{ item }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+        </div>
+        <a href="#profile" class="sd-btn sd-btn--gold sd-btn--sm"><i class="fas fa-arrow-down"></i> {% translate "Complete now" %}</a>
+    </div>
+    {% endif %}
+
     <div class="sd-profile">
 
         <!-- ===== LEFT: Profile card ===== -->
@@ -87,7 +112,7 @@
                             {% translate "Missing Documents" %}
                         </div>
                         <div class="p-3">
-                            <p class="ps-muted-text small">{% translate "Payment receipt upload is deferred." %}</p>
+                            <p class="ps-muted-text small">{% translate "Upload any signup document that is still missing. Existing documents stay protected." %}</p>
                             <form method="post"
                                   action="{% url 'profile-missing-documents' %}"
                                   enctype="multipart/form-data">
@@ -99,6 +124,47 @@
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if profile_editable and academic_payment_scopes %}
+                    <div class="sd-panel-card mt-3">
+                        <div class="sd-panel-head">
+                            <i class="fas fa-money-check-dollar"></i>
+                            {% translate "Academic Payment" %}
+                        </div>
+                        <div class="p-3">
+                            <p class="ps-muted-text small">{% translate "A new academic year needs its own payment receipt before promotion can be recorded." %}</p>
+                            <form method="post" action="{% url 'profile-academic-payment' %}" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                {{ academic_payment_form|crispy }}
+                                <div class="d-grid mt-3">
+                                    <button type="submit" class="sd-btn sd-btn--gold w-100">
+                                        <i class="fas fa-cloud-arrow-up"></i> {% translate "Upload academic payment" %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if academic_payments %}
+                    <div class="sd-panel-card mt-3">
+                        <div class="sd-panel-head">
+                            <i class="fas fa-receipt"></i>
+                            {% translate "Academic Payment Receipts" %}
+                        </div>
+                        <div class="p-3">
+                            <ul class="list-unstyled mb-0">
+                                {% for payment in academic_payments %}
+                                <li class="sd-mini-row">
+                                    <i class="fas fa-circle-check"></i>
+                                    <span class="w-100">{{ payment.academic_year_level.level.display_name }} — {{ payment.academic_year_level.academic_year.name }}</span>
+                                    <a href="{% url 'academic-payment-document' payment.pk %}" target="_blank" rel="noopener noreferrer" class="sd-btn sd-btn--gold-outline btn-sm">{% translate "View" %}</a>
+                                </li>
+                                {% endfor %}
+                            </ul>
                         </div>
                     </div>
                     {% endif %}

@@ -746,6 +746,38 @@ class AcademicYearLevel(models.Model):
             raise ValidationError({"meeting_weekdays": _("Meeting weekdays must not repeat.")})
 
 
+class AcademicPayment(models.Model):
+    """The receipt for one student's academic-year-level payment."""
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="academic_payments")
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel,
+        on_delete=models.PROTECT,
+        related_name="academic_payments",
+    )
+    receipt_key = models.CharField(max_length=500)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-uploaded_at", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "academic_year_level"],
+                name="academic_payment_student_scope_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["academic_year_level", "student"],
+                name="academic_payment_scope_student_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.student.username} — {self.academic_year_level}"
+
+
 class AcademicYearLevelMeeting(models.Model):
     academic_year_level = models.ForeignKey(
         AcademicYearLevel,

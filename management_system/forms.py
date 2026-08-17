@@ -917,9 +917,9 @@ class MissingApplicationDocumentsForm(forms.Form):
 
     The form only describes and validates the file inputs; the caller enforces
     self-only authorization, CSRF, transactions, and exact allowed-field checks.
-    Existing documents are never replaceable here and payment receipt upload is
-    intentionally never offered. File-content validation reuses the same
-    boundary used by signup application uploads.
+    Existing documents are never replaceable here. The signup payment receipt
+    is included when it is still missing; academic-year receipts use the
+    separate ``AcademicPaymentForm`` below.
     """
 
     identity_front = forms.FileField(
@@ -935,6 +935,11 @@ class MissingApplicationDocumentsForm(forms.Form):
     profile = forms.FileField(
         required=False,
         label=_("Profile Photo"),
+        validators=[validate_application_file],
+    )
+    payment = forms.FileField(
+        required=False,
+        label=_("Payment Receipt"),
         validators=[validate_application_file],
     )
 
@@ -964,7 +969,32 @@ class MissingApplicationDocumentsForm(forms.Form):
             mapping["identity_back"] = "identity_back_key"
         if not getattr(instance, "profile_image_key", None):
             mapping["profile"] = "profile_image_key"
+        if not getattr(instance, "payment_key", None):
+            mapping["payment"] = "payment_key"
         return mapping
+
+
+class AcademicPaymentForm(forms.Form):
+    """Upload one missing receipt for an authorized academic scope."""
+
+    academic_year_level = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        label=_("Academic year and level"),
+        empty_label=None,
+    )
+    payment = forms.FileField(
+        required=True,
+        label=_("Payment Receipt"),
+        validators=[validate_application_file],
+    )
+
+    def __init__(self, *args, student=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.student = student
+        if student is not None:
+            from .payments import academic_payment_scopes_for_student
+
+            self.fields["academic_year_level"].queryset = academic_payment_scopes_for_student(student)
 
 
 class SignupDetailsForm(forms.ModelForm):

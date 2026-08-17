@@ -9754,8 +9754,8 @@ msgstr "Missing signup documents uploaded successfully."
 #~ msgid "Graduated students cannot receive exceptional course enrollments."
 #~ msgstr "Graduated students cannot receive exceptional course enrollments."
 
-#~ msgid "Payment Receipt"
-#~ msgstr "Payment Receipt"
+msgid "Payment Receipt"
+msgstr "Payment Receipt"
 
 #~ msgid "Priest Name"
 #~ msgstr "Priest Name"
@@ -9892,3 +9892,87 @@ msgstr "Missing signup documents uploaded successfully."
 
 #~ msgid "Replace payment receipt"
 #~ msgstr "Replace payment receipt"
+
+msgid "Academic Payment"
+msgstr "Academic Payment"
+
+msgid "Academic Payment Receipts"
+msgstr "Academic Payment Receipts"
+
+msgid "Upload academic payment"
+msgstr "Upload academic payment"
+
+msgid "A new academic year needs its own payment receipt before promotion can be recorded."
+msgstr "A new academic year needs its own payment receipt before promotion can be recorded."
+
+msgid "Stay in the loop"
+msgstr "Stay in the loop"
+
+msgid "Connect Telegram"
+msgstr "Connect Telegram"
+
+msgid "Connect Telegram and get your lesson and quiz alerts where you already chat."
+msgstr "Connect Telegram and get your lesson and quiz alerts where you already chat."
+
+msgid "Your profile is almost ready"
+msgstr "Your profile is almost ready"
+
+msgid "Complete these last details so your student record stays ready for every academic step:"
+msgstr "Complete these last details so your student record stays ready for every academic step:"
+
+msgid "Complete now"
+msgstr "Complete now"
+
+msgid "Upload any signup document that is still missing. Existing documents stay protected."
+msgstr "Upload any signup document that is still missing. Existing documents stay protected."
+
+msgid "Financial follow-up"
+msgstr "Financial follow-up"
+
+msgid "Payments matrix"
+msgstr "Payments matrix"
+
+msgid "See who has uploaded the payment receipt for each academic level and who still needs to pay."
+msgstr "See who has uploaded the payment receipt for each academic level and who still needs to pay."
+
+msgid "Payment filters"
+msgstr "Payment filters"
+
+msgid "Payment status"
+msgstr "Payment status"
+
+msgid "All students"
+msgstr "All students"
+
+msgid "Uploaded"
+msgstr "Uploaded"
+
+msgid "Not uploaded"
+msgstr "Not uploaded"
+
+msgid "Receipt"
+msgstr "Receipt"
+
+msgid "Payment status by student"
+msgstr "Payment status by student"
+
+msgid "No students match the selected filters."
+msgstr "No students match the selected filters."
+
+msgid "Payments matrix pagination"
+msgstr "Payments matrix pagination"
+
+msgid "%(count)s students shown"
+msgstr "%(count)s students shown"
+
+msgid "A payment receipt already exists for this academic level."
+msgstr "A payment receipt already exists for this academic level."
+
+msgid "The payment receipt could not be uploaded."
+msgstr "The payment receipt could not be uploaded."
+
+msgid "Academic payment receipt uploaded successfully."
+msgstr "Academic payment receipt uploaded successfully."
+
+msgid "Upload the payment receipt for the destination academic year before promotion."
+msgstr "Upload the payment receipt for the destination academic year before promotion."

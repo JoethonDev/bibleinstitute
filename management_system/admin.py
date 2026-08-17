@@ -36,6 +36,19 @@ admin.site.register(Submission)
 admin.site.register(Grade)
 
 
+@admin.register(AcademicPayment)
+class AcademicPaymentAdmin(AdminOnlyModelAdmin):
+    list_display = ["student", "academic_year_level", "uploaded_at"]
+    list_filter = ["academic_year_level__academic_year", "academic_year_level__level"]
+    search_fields = ["student__username", "student__first_name", "student__last_name", "student__email"]
+    readonly_fields = ["uploaded_at", "updated_at"]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            "student", "academic_year_level__academic_year", "academic_year_level__level"
+        )
+
+
 @admin.register(Level)
 class LevelAdmin(AdminOnlyModelAdmin):
     list_display = ["ordering", "name_en", "name_ar", "created_at"]

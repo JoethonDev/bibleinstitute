@@ -1657,6 +1657,50 @@ main:has(.sd-page) {
 .sd-qr-title { display: flex; justify-content: center; margin-bottom: .6rem; }
 .sd-qr-link { display: block; text-align: center; }
 .sd-qr-hint--centered { margin-top: .4rem; text-align: center; }
+
+.sd-profile-banner {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+    padding: .9rem 1rem;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: var(--ps-radius);
+    box-shadow: var(--ps-shadow-sm);
+    background: #fff;
+}
+
+.sd-profile-banner--telegram {
+    border-color: rgba(47, 93, 115, .35);
+    background: linear-gradient(120deg, rgba(232, 243, 241, .92), #fff 70%);
+}
+
+.sd-profile-banner--completion {
+    border-color: rgba(180, 133, 58, .42);
+    background: linear-gradient(120deg, rgba(251, 241, 223, .95), #fff 70%);
+}
+
+.sd-profile-banner-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 2.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--ps-ink-deep);
+    color: var(--ps-gold-soft);
+    font-size: 1.15rem;
+}
+
+.sd-profile-banner--telegram .sd-profile-banner-icon { background: var(--ps-teal); color: #fff; }
+.sd-profile-banner-copy { display: grid; gap: .15rem; flex: 1 1 auto; min-width: 0; color: var(--ps-ink); }
+.sd-profile-banner-copy strong { font-size: .95rem; }
+.sd-profile-banner-copy > span { color: var(--ps-muted); font-size: .8rem; }
+.sd-profile-banner-list { color: var(--ps-gold-deep) !important; font-weight: 700; }
+
+@media (max-width: 575.98px) {
+    .sd-profile-banner { align-items: flex-start; flex-wrap: wrap; }
+    .sd-profile-banner .sd-btn { margin-inline-start: 3.4rem; }
+}
 .sd-empty-course-note { display: block; padding: .5rem .8rem; font-size: .86rem; }
 .sd-centered-note { text-align: center; }
 .sd-results-body { padding-top: .85rem; }

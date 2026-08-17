@@ -34,6 +34,7 @@ urlpatterns = [
     path('profile/', ProfileDetail.as_view(), name="view-profile"),
     path('profile/<int:user_id>/', ProfileDetail.as_view(), name="check-profile"),
     path('profile/missing-documents/', profile_missing_documents, name="profile-missing-documents"),
+    path('profile/academic-payment/', profile_academic_payment, name="profile-academic-payment"),
     path('profile/telegram/unlink/', telegram_unlink, name="telegram-unlink"),
     path('courses/', view_courses, name="courses"),
     # path('design/student-ui/', student_ui_proposal, name="student-ui-proposal"),
@@ -95,6 +96,8 @@ urlpatterns = [
     path('dashboard/grade/<int:grade_id>/export-csv/', export_submission_csv, name="export-submission-csv"),
     path('dashboard/reports/grades/', grades_matrix_dashboard, name="grades-matrix-dashboard"),
     path('dashboard/reports/grades/export-xlsx/', export_grades_matrix_xlsx, name="export-grades-matrix-xlsx"),
+    path('dashboard/reports/payments/', payments_matrix_dashboard, name="payments-matrix-dashboard"),
+    path('dashboard/reports/payments/<int:payment_id>/', academic_payment_document, name="academic-payment-document"),
 
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),

@@ -288,6 +288,20 @@
                 <span>{% translate "Grades Matrix" %}</span>
             </a>
         </li>
+
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'payments-matrix-dashboard' %}"
+               hx-get="{% url 'payments-matrix-dashboard' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
+                <i class="fas fa-receipt"></i>
+                <span>{% translate "Payments Matrix" %}</span>
+            </a>
+        </li>
     {% endif %}
 </ul>
 {% endwith %}

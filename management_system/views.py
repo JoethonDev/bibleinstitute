@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 from django.utils import translation
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Avg, Case, Count, F, IntegerField, Prefetch, Q, Sum, When
+from django.db.models import Avg, BooleanField, Case, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
 from django.db import IntegrityError, transaction
 from django.contrib import messages
 from django.contrib.messages import success, error, info
@@ -47,7 +47,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
@@ -130,6 +130,8 @@ from .media_storage import (
 from .media_tasks import enqueue_media_attachment_retry, enqueue_media_job
 from .telegram.linking import TelegramLinkError, current_telegram_link
 from .telegram.notifications import enqueue_lesson_notifications, schedule_quiz_opening_notifications
+from .payments import academic_payment_scopes_for_student
+from .payment_matrix import PAYMENT_MATRIX_PAGE_SIZE, PAYMENT_STATUS_VALUES, payment_matrix_page, payment_matrix_student_queryset
 
 # Standard Library (moved from function-local)
 import calendar as py_calendar
@@ -701,7 +703,29 @@ class ProfileDetail(LoginProtection, DetailView):
         context["form"] = signup_details_form
         context["profile_editable"] = profile_editable
         context["can_upload_missing_documents"] = user == self.request.user
-        context["missing_documents_form"] = MissingApplicationDocumentsForm(instance=user)
+        missing_documents_form = MissingApplicationDocumentsForm(instance=user)
+        context["missing_documents_form"] = missing_documents_form
+        academic_payment_scopes = list(academic_payment_scopes_for_student(user)) if profile_editable else []
+        context["academic_payment_scopes"] = academic_payment_scopes
+        context["academic_payment_form"] = AcademicPaymentForm(student=user) if profile_editable else None
+        missing_profile_items = []
+        if profile_editable:
+            details_form = SignupDetailsForm(instance=user)
+            for field_name in sorted(SignupDetailsForm.SIGNUP_REQUIRED_FIELDS | {"full_name"}):
+                field = details_form.fields.get(field_name)
+                if field and not field.disabled and field.required:
+                    missing_profile_items.append(str(field.label))
+            missing_profile_items.extend(str(field.label) for field in missing_documents_form.fields.values())
+            missing_profile_items.extend(
+                f"{scope.level.display_name} — {scope.academic_year.name}"
+                for scope in academic_payment_scopes
+            )
+        context["missing_profile_items"] = missing_profile_items
+        context["has_profile_gaps"] = bool(missing_profile_items)
+        context["academic_payments"] = list(
+            AcademicPayment.objects.filter(student=user)
+            .select_related("academic_year_level__academic_year", "academic_year_level__level")
+        )
         document_fields = (
             ("identity_front", "identity_front_key", _("Identity Front")),
             ("identity_back", "identity_back_key", _("Identity Back")),
@@ -3175,6 +3199,93 @@ def grades_matrix_dashboard(request):
     }
     return render(request, "yearly_transcript_dashboard.html", context)
 
+
+@capability_required(can_view_reports)
+def payments_matrix_dashboard(request):
+    years, selected_year, levels, selected_scope = grade_matrix_selection(
+        academic_year_id=int(request.GET["academic_year"]) if request.GET.get("academic_year", "").isdigit() else None,
+        level_id=int(request.GET["level"]) if request.GET.get("level", "").isdigit() else None,
+    )
+    name_value = request.GET.get("name", "").strip()
+    status = request.GET.get("status", "all")
+    if status not in PAYMENT_STATUS_VALUES:
+        status = "all"
+
+    all_students = payment_matrix_student_queryset(selected_scope, name=name_value)
+    page_obj = Paginator(
+        payment_matrix_student_queryset(selected_scope, name=name_value, status=status),
+        PAYMENT_MATRIX_PAGE_SIZE,
+    ).get_page(request.GET.get("page", 1))
+    payment_rows = payment_matrix_page(page_obj, selected_scope)
+    for row in payment_rows:
+        receipt = row["receipt"]
+        if receipt:
+            row["receipt_url"] = reverse("academic-payment-document", args=[receipt.pk])
+            row["download_url"] = f"{row['receipt_url']}?download=1"
+        elif row["legacy_signup_payment"]:
+            row["receipt_url"] = reverse(
+                "application-document", args=[row["student"].pk, "payment"]
+            )
+            row["download_url"] = f"{row['receipt_url']}?download=1"
+        else:
+            row["receipt_url"] = None
+            row["download_url"] = None
+
+    level_counts = {
+        level.pk: payment_matrix_student_queryset(level).count()
+        for level in levels
+    }
+    level_tabs = [
+        {
+            "level_id": level.level_id,
+            "name": level.level.display_name,
+            "student_count": level_counts[level.pk],
+            "selected": level.pk == selected_scope.pk,
+        }
+        for level in levels
+    ]
+    context = {
+        "title": _("Payments Matrix"),
+        "years": years,
+        "selected_year": selected_year,
+        "levels": levels,
+        "selected_scope": selected_scope,
+        "level_tabs": level_tabs,
+        "name_value": name_value,
+        "status": status,
+        "payment_rows": payment_rows,
+        "page_obj": page_obj,
+        "student_count": page_obj.paginator.count,
+        "all_count": all_students.count(),
+        "paid_count": all_students.filter(payment_uploaded=True).count(),
+        "unpaid_count": all_students.filter(payment_uploaded=False).count(),
+    }
+    return render(request, "payment_matrix.html", context)
+
+
+@login_required(login_url=LOGIN_URL)
+def academic_payment_document(request, payment_id):
+    payment = get_object_or_404(AcademicPayment, pk=payment_id)
+    if payment.student_id != request.user.pk and not can_view_reports(request.user):
+        raise PermissionDenied
+    try:
+        storage_response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=payment.receipt_key)
+        response = FileResponse(
+            storage_response["Body"],
+            content_type=storage_response.get("ContentType")
+            or mimetypes.guess_type(payment.receipt_key)[0]
+            or "application/octet-stream",
+            as_attachment=request.GET.get("download") == "1",
+            filename=os.path.basename(payment.receipt_key),
+        )
+        if storage_response.get("ContentLength") is not None:
+            response["Content-Length"] = str(storage_response["ContentLength"])
+        return response
+    except Exception as exc:
+        logger.warning("Academic payment document unavailable for payment=%s: %s", payment_id, exc)
+        raise Http404 from exc
+
+
 @capability_required(can_grade)
 def submission_dashboard(request, quiz_id):
     try:
@@ -4279,6 +4390,60 @@ def profile_missing_documents(request):
 
     messages.success(request, _("Missing signup documents uploaded successfully."))
     return redirect("view-profile")
+
+
+@login_required(login_url=LOGIN_URL)
+@require_POST
+def profile_academic_payment(request):
+    """Accept one new, non-replaceable receipt for an eligible academic scope."""
+    uploaded_key = None
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            form = AcademicPaymentForm(request.POST, request.FILES, student=user)
+            if not form.is_valid():
+                raise ValidationError(form.errors.as_text())
+            scope = form.cleaned_data["academic_year_level"]
+            if AcademicPayment.objects.filter(
+                student=user,
+                academic_year_level=scope,
+            ).exists():
+                raise ValidationError(_("A payment receipt already exists for this academic level."))
+            uploaded_key = upload_application_file(
+                CLOUD_CLIENT,
+                bucket_name,
+                user.pk,
+                form.cleaned_data["payment"],
+                "academic_payment",
+            )
+            if not uploaded_key:
+                raise ValidationError(_("The payment receipt could not be uploaded."))
+            AcademicPayment.objects.create(
+                student=user,
+                academic_year_level=scope,
+                receipt_key=uploaded_key,
+            )
+    except (ValidationError, User.DoesNotExist) as exc:
+        if uploaded_key:
+            try:
+                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=uploaded_key)
+            except Exception:
+                logger.exception("Could not clean up academic payment %s", uploaded_key)
+        if isinstance(exc, User.DoesNotExist):
+            raise Http404 from exc
+        messages.error(request, str(exc))
+        return redirect("view-profile")
+    except Exception:
+        if uploaded_key:
+            try:
+                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=uploaded_key)
+            except Exception:
+                logger.exception("Could not clean up academic payment %s", uploaded_key)
+        raise
+
+    messages.success(request, _("Academic payment receipt uploaded successfully."))
+    return redirect("view-profile")
+
 
 @capability_required(can_manage_applications)
 def application_decision(request, user_id, decision):
