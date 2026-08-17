@@ -279,6 +279,11 @@ class CourseForm(forms.ModelForm):
 class AcademicYearForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["name"].label = _("Academic year name")
+        self.fields["levels"].label = _("Levels")
+        self.fields["starts_on"].label = _("Start date")
+        self.fields["ends_on"].label = _("End date")
+        self.fields["ordering"].label = _("Ordering")
         self.fields["levels"].queryset = Level.objects.order_by("ordering")
         self.fields["levels"].required = True
 
@@ -315,6 +320,10 @@ class CourseOfferingForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["course"].label = _("Course")
+        self.fields["academic_year_level"].label = _("Academic year and level")
+        self.fields["instructor"].label = _("Instructor")
+        self.fields["status"].label = _("Status")
         if "academic_year_level" in self.data:
             try:
                 scope_id = int(self.data.get("academic_year_level"))
@@ -337,6 +346,7 @@ class AcademicYearLevelWeekdayForm(forms.ModelForm):
             (5, _("Saturday")),
             (6, _("Sunday")),
         ],
+        label=_("Meeting weekdays"),
         widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 7}),
         required=False,
     )
@@ -363,17 +373,19 @@ class HistoricalIntakeForm(forms.Form):
     account_action = forms.ChoiceField(
         choices=(("find", _("Find existing account")), ("create", _("Create new account"))),
         widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Account action"),
     )
-    lms_user_id = forms.IntegerField(required=False, min_value=1, widget=forms.NumberInput(attrs={"class": "form-control"}))
-    lms_username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    lms_email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={"class": "form-control"}))
+    lms_user_id = forms.IntegerField(required=False, min_value=1, label=_("LMS user ID"), widget=forms.NumberInput(attrs={"class": "form-control"}))
+    lms_username = forms.CharField(required=False, label=_("LMS username"), widget=forms.TextInput(attrs={"class": "form-control"}))
+    lms_email = forms.EmailField(required=False, label=_("LMS email"), widget=forms.EmailInput(attrs={"class": "form-control"}))
     username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}), label=_("New username"))
-    first_name = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    last_name = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    first_name = forms.CharField(required=False, label=_("First name"), widget=forms.TextInput(attrs={"class": "form-control"}))
+    last_name = forms.CharField(required=False, label=_("Last name"), widget=forms.TextInput(attrs={"class": "form-control"}))
     historical_outcome = forms.ChoiceField(
         choices=HistoricalAcademicSummary.Outcome.choices,
         initial=HistoricalAcademicSummary.Outcome.PENDING_REVIEW,
         widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Historical outcome"),
     )
     destination_scope = forms.ModelChoiceField(
         queryset=AcademicYearLevel.objects.none(),
@@ -387,7 +399,7 @@ class HistoricalIntakeForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "12, 15"}),
         label=_("Failed course offering IDs"),
     )
-    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}))
+    notes = forms.CharField(required=False, label=_("Notes"), widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}))
     promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
 
     def __init__(self, *args, **kwargs):
@@ -453,6 +465,7 @@ class HistoricalBulkIntakeForm(forms.Form):
         choices=HistoricalAcademicSummary.Outcome.choices,
         initial=HistoricalAcademicSummary.Outcome.PENDING_REVIEW,
         widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Historical outcome"),
     )
     destination_scope = forms.ModelChoiceField(
         queryset=AcademicYearLevel.objects.none(),
@@ -466,7 +479,7 @@ class HistoricalBulkIntakeForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "12, 15"}),
         label=_("Failed course offering IDs"),
     )
-    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}))
+    notes = forms.CharField(required=False, label=_("Notes"), widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}))
     promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
 
     def __init__(self, *args, **kwargs):
@@ -491,15 +504,16 @@ class HistoricalBulkIntakeForm(forms.Form):
 
 
 class OfferingCopyForm(forms.Form):
-    source_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none())
-    target_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none())
+    source_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none(), label=_("Source academic scope"))
+    target_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none(), label=_("Target academic scope"))
     offerings = forms.ModelMultipleChoiceField(
         queryset=CourseOffering.objects.none(),
         widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
         required=True,
+        label=_("Offerings to copy"),
     )
-    copy_lessons = forms.BooleanField(required=False, initial=True)
-    copy_quizzes = forms.BooleanField(required=False, initial=True)
+    copy_lessons = forms.BooleanField(required=False, initial=True, label=_("Copy lessons"))
+    copy_quizzes = forms.BooleanField(required=False, initial=True, label=_("Copy quizzes"))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -551,6 +565,11 @@ class QuizTypeForm(forms.ModelForm):
     class Meta:
         model = QuizType
         fields = ["code", "name_en", "name_ar"]
+        labels = {
+            "code": _("Code"),
+            "name_en": _("English name"),
+            "name_ar": _("Arabic name"),
+        }
         widgets = {
             "code": forms.TextInput(attrs={"class": "form-control"}),
             "name_en": forms.TextInput(attrs={"class": "form-control"}),
@@ -564,6 +583,7 @@ class PromotionFormulaForm(forms.Form):
             "academic_year__ordering", "level__ordering"
         ),
         widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Academic year and level"),
     )
     course_offering = forms.ModelChoiceField(
         queryset=CourseOffering.objects.filter(academic_year_level__academic_year__is_active=True)
@@ -572,19 +592,24 @@ class PromotionFormulaForm(forms.Form):
         required=False,
         empty_label=_("All courses"),
         widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Course offering"),
     )
     overall_pass_percent = forms.DecimalField(
         min_value=0, max_value=100, max_digits=5, decimal_places=2,
+        label=_("Overall passing percentage"),
         widget=forms.NumberInput(attrs={"class": "form-control", "min": 0, "max": 100, "step": "0.01"}),
     )
     evaluation_starts_on = forms.DateField(
+        label=_("Evaluation start date"),
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     evaluation_ends_on = forms.DateField(
+        label=_("Evaluation end date"),
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     failed_courses_repeat_threshold = forms.IntegerField(
         min_value=1,
+        label=_("Failed-course repeat threshold"),
         widget=forms.NumberInput(attrs={"class": "form-control", "min": 1, "step": 1}),
     )
 
@@ -622,20 +647,24 @@ class PromotionFormulaForm(forms.Form):
 class PromotionRuleForm(forms.Form):
     metric = forms.ChoiceField(
         choices=PromotionRule.Metric.choices,
+        label=_("Metric"),
         widget=forms.Select(attrs={"class": "form-select rule-metric"}),
     )
     quiz_type = forms.ModelChoiceField(
         queryset=QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
         required=False,
         empty_label=_("All quiz types"),
+        label=_("Quiz type"),
         widget=forms.Select(attrs={"class": "form-select rule-quiz-type"}),
     )
     weight_percent = forms.DecimalField(
         required=False, min_value=0, max_value=100, max_digits=5, decimal_places=2,
+        label=_("Weight percentage"),
         widget=forms.NumberInput(attrs={"class": "form-control", "min": 0, "max": 100, "step": "0.01"}),
     )
     minimum_percent = forms.DecimalField(
         required=False, min_value=0, max_value=100, max_digits=5, decimal_places=2,
+        label=_("Minimum percentage"),
         widget=forms.NumberInput(attrs={"class": "form-control", "min": 0, "max": 100, "step": "0.01"}),
     )
 
@@ -741,6 +770,34 @@ class ApplicationAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        labels = {
+            "username": _("Username"),
+            "password": _("Password"),
+            "time_zone": _("Time zone"),
+            "first_name": _("First name"),
+            "last_name": _("Last name"),
+            "joined_date": _("Joined date"),
+            "role": _("Role"),
+            "is_active": _("Active"),
+            "application_status": _("Application status"),
+            "decision_notes": _("Decision notes"),
+            "email": _("Email"),
+            "phone": _("Phone"),
+            "country": _("Country"),
+            "city": _("City"),
+            "education_or_job": _("Educational qualification / occupation"),
+            "priest_name": _("Confessor Name"),
+            "priest_phone": _("Confessor Phone"),
+            "church": _("Church"),
+            "service": _("Service (if any)"),
+            "identity_type": _("Identity type"),
+            "identity_number": _("Identity Number"),
+            "study_mode": _("Study mode"),
+            "study_mode_override": _("Study mode override"),
+        }
+        for field_name, label in labels.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
         self.fields["time_zone"].choices = user_time_zone_choices()
         self.fields["time_zone"].initial = getattr(self.instance, "time_zone", None) or settings.TIME_ZONE
         current_country = getattr(self.instance, "country", None)
@@ -821,6 +878,26 @@ class SignupForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        labels = {
+            "full_name": _("Full name"),
+            "username": _("Username"),
+            "password": _("Password"),
+            "email": _("Email"),
+            "phone": _("Phone"),
+            "country": _("Country"),
+            "city": _("City"),
+            "education_or_job": _("Educational qualification / occupation"),
+            "priest_name": _("Confessor Name"),
+            "priest_phone": _("Confessor Phone"),
+            "church": _("Church"),
+            "service": _("Service (if any)"),
+            "identity_type": _("Identity Type"),
+            "identity_number": _("Identity Number"),
+            "time_zone": _("Time zone"),
+        }
+        for field_name, label in labels.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
         self.fields['time_zone'].choices = user_time_zone_choices()
         self.fields['time_zone'].initial = settings.TIME_ZONE
         self.fields['email'].required = False

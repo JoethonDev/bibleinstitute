@@ -10066,3 +10066,54 @@ msgstr "Delete failed. Please try again."
 
 msgid "YouTube video player"
 msgstr "YouTube video player"
+
+msgid "Academic year name"
+msgstr "Academic year name"
+
+msgid "Ordering"
+msgstr "Ordering"
+
+msgid "Account action"
+msgstr "Account action"
+
+msgid "LMS user ID"
+msgstr "LMS user ID"
+
+msgid "LMS username"
+msgstr "LMS username"
+
+msgid "LMS email"
+msgstr "LMS email"
+
+msgid "Historical outcome"
+msgstr "Historical outcome"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Code"
+msgstr "Code"
+
+msgid "English name"
+msgstr "English name"
+
+msgid "Arabic name"
+msgstr "Arabic name"
+
+msgid "Overall passing percentage"
+msgstr "Overall passing percentage"
+
+msgid "Evaluation start date"
+msgstr "Evaluation start date"
+
+msgid "Evaluation end date"
+msgstr "Evaluation end date"
+
+msgid "Failed-course repeat threshold"
+msgstr "Failed-course repeat threshold"
+
+msgid "Weight percentage"
+msgstr "Weight percentage"
+
+msgid "Minimum percentage"
+msgstr "Minimum percentage"
