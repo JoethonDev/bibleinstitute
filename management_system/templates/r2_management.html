@@ -129,7 +129,7 @@
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title">{% translate "Create New Folder" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
                     <div id="create-folder-error" class="alert alert-danger d-none"></div>
@@ -158,7 +158,7 @@
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title" x-text="renameIsFolder ? '{% translate "Rename Folder" %}' : '{% translate "Rename File" %}'"></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
                     <div id="rename-file-error" class="alert alert-danger d-none"></div>
@@ -188,7 +188,7 @@
             <div class="modal-content shadow-lg">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title">{% translate "Confirm Delete" %}</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
                     <p id="delete-confirm-message"></p>

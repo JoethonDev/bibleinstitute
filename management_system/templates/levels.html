@@ -4,7 +4,7 @@
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
 <div class="container-fluid py-3 ad-page" id="content">
-    <nav aria-label="breadcrumb">
+    <nav aria-label="{% translate 'Breadcrumb' %}">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
             <li class="breadcrumb-item active">{% translate "Academic Levels" %}</li>

@@ -9976,3 +9976,93 @@ msgstr "Academic payment receipt uploaded successfully."
 
 msgid "Upload the payment receipt for the destination academic year before promotion."
 msgstr "Upload the payment receipt for the destination academic year before promotion."
+
+msgid "Failed to save draft"
+msgstr "Failed to save draft"
+
+msgid "Draft restored from previous session"
+msgstr "Draft restored from previous session"
+
+msgid "Draft restored"
+msgstr "Draft restored"
+
+msgid "Please fix the errors before submitting"
+msgstr "Please fix the errors before submitting"
+
+msgid "Delete %(count)s selected item(s)?"
+msgstr "Delete %(count)s selected item(s)?"
+
+msgid "Items deleted successfully"
+msgstr "Items deleted successfully"
+
+msgid "Delete failed"
+msgstr "Delete failed"
+
+msgid "Failed to delete items"
+msgstr "Failed to delete items"
+
+msgid "Please enter a different name"
+msgstr "Please enter a different name"
+
+msgid "Rename failed"
+msgstr "Rename failed"
+
+msgid "Failed to rename"
+msgstr "Failed to rename"
+
+msgid "Are you sure you want to delete %(name)s?"
+msgstr "Are you sure you want to delete %(name)s?"
+
+msgid "Delete request failed"
+msgstr "Delete request failed"
+
+msgid "Are you sure you want to delete this folder and all its contents?"
+msgstr "Are you sure you want to delete this folder and all its contents?"
+
+msgid "Are you sure you want to delete %(count)s selected file(s)?"
+msgstr "Are you sure you want to delete %(count)s selected file(s)?"
+
+msgid "%(count)s file(s) deleted"
+msgstr "%(count)s file(s) deleted"
+
+msgid "%(count)s file(s) failed to delete"
+msgstr "%(count)s file(s) failed to delete"
+
+msgid "Bulk delete failed"
+msgstr "Bulk delete failed"
+
+msgid "Size"
+msgstr "Size"
+
+msgid "Last Modified"
+msgstr "Last Modified"
+
+msgid "Path"
+msgstr "Path"
+
+msgid "Failed to load metadata"
+msgstr "Failed to load metadata"
+
+msgid "Error loading metadata"
+msgstr "Error loading metadata"
+
+msgid "Please enter a folder name"
+msgstr "Please enter a folder name"
+
+msgid "%(count)s selected on this page"
+msgstr "%(count)s selected on this page"
+
+msgid "Bulk delete is not supported for this view."
+msgstr "Bulk delete is not supported for this view."
+
+msgid "Delete %(count)s selected item(s)? This action cannot be undone."
+msgstr "Delete %(count)s selected item(s)? This action cannot be undone."
+
+msgid "%(count)s item(s) deleted successfully."
+msgstr "%(count)s item(s) deleted successfully."
+
+msgid "Delete failed. Please try again."
+msgstr "Delete failed. Please try again."
+
+msgid "YouTube video player"
+msgstr "YouTube video player"

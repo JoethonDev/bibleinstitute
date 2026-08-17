@@ -7,7 +7,7 @@
 {% block body %}
 <div class="container-fluid py-3 ad-page" id="content" x-data="{ applicationEditing: false }">
     <div class="ad-detail-head">
-        <nav aria-label="breadcrumb">
+        <nav aria-label="{% translate 'Breadcrumb' %}">
             <ol class="breadcrumb mb-0">
                 <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'applications-dashboard' %}">{% translate "Applications" %}</a></li>

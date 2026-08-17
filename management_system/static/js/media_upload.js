@@ -59,27 +59,27 @@
 
     // ---- Translations (template-provided) ----
     var T = {
-        uploadingSource: attr('data-trans-uploading-source', 'Uploading...'),
-        waitingForUpload: attr('data-trans-waiting-for-upload', 'Waiting for upload'),
-        sourceComplete: attr('data-trans-source-complete', 'Source upload complete'),
-        uploadFailed: attr('data-trans-upload-failed', 'Upload failed'),
-        networkError: attr('data-trans-network-error', 'Network error during upload'),
-        invalidFileType: attr('data-trans-invalid-file-type', 'Invalid file type: {type}. Allowed types: MP4, MP3, PDF'),
-        fileSizeExceeded: attr('data-trans-file-size-exceeded', 'File size exceeds maximum: {size}MB. Maximum: 2048MB'),
-        noFilesSelected: attr('data-trans-no-files', 'No files selected'),
-        invalidFiles: attr('data-trans-invalid-files', 'Some files are invalid and will not be uploaded'),
-        valid: attr('data-trans-valid', 'Valid'),
-         retry: attr('data-trans-retry', 'Retry'),
-         retryAttachment: attr('data-trans-retry-attachment', 'Retry lesson attachment'),
-        retrying: attr('data-trans-retrying', 'Retrying...'),
-        retryUnavailable: attr('data-trans-retry-unavailable', 'Retry is not available because the original source is no longer retained.'),
-        csrfMissing: attr('data-trans-csrf-missing', 'The page security token is missing. Reload the page and try again.'),
-        jobCreateFailed: attr('data-trans-job-create-failed', 'Could not start the media upload.'),
-        statusFetchFailed: attr('data-trans-status-fetch-failed', 'Could not load the job status.'),
+        uploadingSource: attr('data-trans-uploading-source', gettext('Uploading...')),
+        waitingForUpload: attr('data-trans-waiting-for-upload', gettext('Waiting for upload')),
+        sourceComplete: attr('data-trans-source-complete', gettext('Source upload complete')),
+        uploadFailed: attr('data-trans-upload-failed', gettext('Upload failed')),
+        networkError: attr('data-trans-network-error', gettext('Network error during upload')),
+        invalidFileType: attr('data-trans-invalid-file-type', gettext('Invalid file type: {type}. Allowed types: MP4, MP3, PDF')),
+        fileSizeExceeded: attr('data-trans-file-size-exceeded', gettext('File size exceeds maximum: {size}MB. Maximum: 2048MB')),
+        noFilesSelected: attr('data-trans-no-files', gettext('No files selected')),
+        invalidFiles: attr('data-trans-invalid-files', gettext('Some files are invalid and will not be uploaded')),
+        valid: attr('data-trans-valid', gettext('Valid')),
+         retry: attr('data-trans-retry', gettext('Retry')),
+         retryAttachment: attr('data-trans-retry-attachment', gettext('Retry lesson attachment')),
+        retrying: attr('data-trans-retrying', gettext('Retrying...')),
+        retryUnavailable: attr('data-trans-retry-unavailable', gettext('Retry is not available because the original source is no longer retained.')),
+        csrfMissing: attr('data-trans-csrf-missing', gettext('The page security token is missing. Reload the page and try again.')),
+        jobCreateFailed: attr('data-trans-job-create-failed', gettext('Could not start the media upload.')),
+        statusFetchFailed: attr('data-trans-status-fetch-failed', gettext('Could not load the job status.')),
         typeLabels: {
-            mp4: attr('data-trans-type-mp4', 'MP4 Video'),
-            mp3: attr('data-trans-type-mp3', 'MP3 Audio'),
-            pdf: attr('data-trans-type-pdf', 'PDF Document')
+            mp4: attr('data-trans-type-mp4', gettext('MP4 Video')),
+            mp3: attr('data-trans-type-mp3', gettext('MP3 Audio')),
+            pdf: attr('data-trans-type-pdf', gettext('PDF Document'))
         },
         statusLabels: jsonAttr('data-status-labels', {}),
         phaseLabels: jsonAttr('data-phase-labels', {})
@@ -469,7 +469,7 @@
                 }
                  if (job.status === 'succeeded') {
                      setCardProgress(state, 100);
-                     setCardStatus(state, T.statusLabels['succeeded'] || 'Succeeded');
+                     setCardStatus(state, T.statusLabels['succeeded'] || gettext('Succeeded'));
                      if (job.attachment_status === 'failed') {
                          state.terminal = true;
                          stopPolling(state);
@@ -488,7 +488,7 @@
                 if (job.status === 'cancelled') {
                     state.terminal = true;
                     stopPolling(state);
-                    setCardStatus(state, T.statusLabels['cancelled'] || 'Cancelled');
+                    setCardStatus(state, T.statusLabels['cancelled'] || gettext('Cancelled'));
                     return;
                 }
                 if (job.status === 'failed') {

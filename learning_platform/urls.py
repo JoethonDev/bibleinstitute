@@ -17,11 +17,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.i18n import i18n_patterns
+from django.views.i18n import JavaScriptCatalog
 from management_system.telegram_views import telegram_webhook
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("i18n/", include("django.conf.urls.i18n")),
+    path(
+        "jsi18n/",
+        JavaScriptCatalog.as_view(domain="django", packages=["management_system"]),
+        name="javascript-catalog",
+    ),
     path("api/telegram/webhook/", telegram_webhook, name="telegram-webhook"),
     
 ]

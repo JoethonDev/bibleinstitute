@@ -42,7 +42,7 @@ function tableManager() {
 
         get selectionLabel() {
             if (this.selected.length > 0) {
-                return `${this.selected.length} selected on this page`;
+                return interpolate(gettext('%(count)s selected on this page'), { count: this.selected.length }, true);
             }
             return '';
         },
@@ -51,7 +51,7 @@ function tableManager() {
             if (this.selected.length === 0) return;
             if (!this.bulkDeleteUrl) {
                 if (window.Alpine && Alpine.store('notifications')) {
-                    Alpine.store('notifications').add('Bulk delete is not supported for this view.', 'warning');
+                    Alpine.store('notifications').add(gettext('Bulk delete is not supported for this view.'), 'warning');
                 }
                 return;
             }
@@ -62,7 +62,11 @@ function tableManager() {
             const confirmBtn = document.getElementById('globalConfirmButton');
 
             if (modal && window.bootstrap) {
-                message.textContent = `Delete ${this.selected.length} selected item(s)? This action cannot be undone.`;
+                message.textContent = interpolate(
+                    gettext('Delete %(count)s selected item(s)? This action cannot be undone.'),
+                    { count: this.selected.length },
+                    true
+                );
 
                 // Clone to remove previous listeners
                 const newBtn = confirmBtn.cloneNode(true);
@@ -112,17 +116,20 @@ function tableManager() {
                         if (row) row.remove();
                     });
                     if (window.Alpine && Alpine.store('notifications')) {
-                        Alpine.store('notifications').add(`${data.deleted} item(s) deleted successfully.`, 'success');
+                        Alpine.store('notifications').add(
+                            interpolate(gettext('%(count)s item(s) deleted successfully.'), { count: data.deleted }, true),
+                            'success'
+                        );
                     }
                 } else {
                     if (window.Alpine && Alpine.store('notifications')) {
-                        Alpine.store('notifications').add(data.error || 'Delete failed. Please try again.', 'danger');
+                        Alpine.store('notifications').add(data.error || gettext('Delete failed. Please try again.'), 'danger');
                     }
                 }
             } catch (err) {
                 console.error('Bulk delete error:', err);
                 if (window.Alpine && Alpine.store('notifications')) {
-                    Alpine.store('notifications').add('Delete failed. Please try again.', 'danger');
+                    Alpine.store('notifications').add(gettext('Delete failed. Please try again.'), 'danger');
                 }
             } finally {
                 this.selected = [];

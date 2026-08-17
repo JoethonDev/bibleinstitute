@@ -28,7 +28,7 @@ function bulkActions(deleteUrl) {
         async deleteSelected() {
             if (this.selected.length === 0) return;
             
-            if (!confirm(`Delete ${this.selected.length} selected item(s)?`)) {
+            if (!confirm(interpolate(gettext('Delete %(count)s selected item(s)?'), { count: this.selected.length }, true))) {
                 return;
             }
             
@@ -54,7 +54,7 @@ function bulkActions(deleteUrl) {
                     this.selectAll = false;
                     
                     if (Alpine.store('notifications')) {
-                        Alpine.store('notifications').success('Items deleted successfully');
+                        Alpine.store('notifications').success(gettext('Items deleted successfully'));
                     }
                     
                     // Reload table
@@ -62,12 +62,12 @@ function bulkActions(deleteUrl) {
                         htmx.trigger('#table-container', 'refresh');
                     }
                 } else {
-                    throw new Error('Delete failed');
+                    throw new Error(gettext('Delete failed'));
                 }
             } catch (error) {
                 console.error('Bulk delete error:', error);
                 if (Alpine.store('notifications')) {
-                    Alpine.store('notifications').error('Failed to delete items');
+                    Alpine.store('notifications').error(gettext('Failed to delete items'));
                 }
             }
         }

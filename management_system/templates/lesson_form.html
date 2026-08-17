@@ -173,7 +173,7 @@
                                                  <button type="button"
                                                          class="btn-close position-absolute top-0 end-0 m-2"
                                                          @click="removeFile($event)"
-                                                         aria-label="Close"></button>
+                                                         aria-label="{% translate 'Close' %}"></button>
                                                  <p class="fw-bold mb-2 text-primary">{{ video.name }}</p>
                                                  <select name="files_type" class="form-select form-select-sm">
                                                      <option value="video" {% if video.file_type == "video" %}selected{% endif %}>

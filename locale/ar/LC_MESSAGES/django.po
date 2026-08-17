@@ -68,17 +68,17 @@ msgstr "يمكن للمسؤولين فقط تغيير حالة التسجيل ا
 
 #: .\management_system\academic_enrollment.py:83
 msgid "No course-level evaluation results exist for this student."
-msgstr ""
+msgstr "لا توجد نتائج تقييم على مستوى المقرر لهذا الطالب."
 
 #: .\management_system\academic_enrollment.py:89
 msgid "Unevaluable courses must be resolved before promotion."
-msgstr ""
+msgstr "يجب معالجة المقررات غير القابلة للتقييم قبل الترفيع."
 
 #: .\management_system\academic_enrollment.py:114
 #: .\management_system\academic_enrollment.py:569
 #, python-format
 msgid "Destination offerings are missing for failed course IDs: %(ids)s."
-msgstr ""
+msgstr "عروض المقررات المقصودة مفقودة لمعرّفات المقررات الراسبة: %(ids)s."
 
 #: .\management_system\academic_enrollment.py:127
 msgid "Academic year does not exist."
@@ -126,7 +126,7 @@ msgstr "لا تتطابق صيغة التقييم مع نطاقات التسجي
 
 #: .\management_system\academic_enrollment.py:281
 msgid "An offering-specific formula cannot make an aggregate promotion decision."
-msgstr ""
+msgstr "لا يمكن لصيغة خاصة بعرض مقرر اتخاذ قرار ترفيع إجمالي."
 
 #: .\management_system\academic_enrollment.py:283
 msgid "Only a normal enrollment can be promoted."
@@ -194,7 +194,7 @@ msgstr "يجب مراجعة النتيجة التاريخية قبل الترق�
 
 #: .\management_system\academic_enrollment.py:426
 msgid "The historical source enrollment must be normal."
-msgstr ""
+msgstr "يجب أن يكون تسجيل المصدر التاريخي عاديًا."
 
 #: .\management_system\academic_enrollment.py:432
 msgid "Exactly one active academic year is required for promotion."
@@ -236,7 +236,7 @@ msgstr "يجب أن ينتمي كل مقرر استثنائي إلى سنة ال
 
 #: .\management_system\academic_enrollment.py:477
 msgid "An exceptional offering cannot use a normal enrollment."
-msgstr ""
+msgstr "لا يمكن للعرض الاستثنائي استخدام تسجيل عادي."
 
 #: .\management_system\academic_enrollment.py:497
 msgid "Exceptional courses require a destination academic scope."
@@ -244,7 +244,7 @@ msgstr "تتطلب المقررات الاستثنائية نطاقًا أكاد
 
 #: .\management_system\academic_enrollment.py:528
 msgid "The next academic year must open the last level before failed-course access can be created."
-msgstr ""
+msgstr "يجب أن تفتح السنة الأكاديمية التالية المستوى الأخير قبل إنشاء وصول للمقررات الراسبة."
 
 #: .\management_system\academic_evaluation.py:108
 #, python-format
@@ -264,7 +264,7 @@ msgstr "تم استبعاد %(count)d سؤالًا غير محسوم التصح�
 
 #: .\management_system\academic_evaluation.py:259
 msgid "This course has no published lectures."
-msgstr ""
+msgstr "لا توجد محاضرات منشورة لهذا المقرر."
 
 #: .\management_system\academic_evaluation.py:458
 #, fuzzy
@@ -412,11 +412,11 @@ msgstr "الدرجة المكتسبة"
 
 #: .\management_system\evaluation_export.py:93
 msgid "Denominator"
-msgstr ""
+msgstr "المقام"
 
 #: .\management_system\evaluation_export.py:95
 msgid "Min %"
-msgstr ""
+msgstr "الحد الأدنى %"
 
 #: .\management_system\evaluation_export.py:96
 #: .\management_system\models.py:1126
@@ -427,11 +427,11 @@ msgstr "ناجح"
 
 #: .\management_system\evaluation_export.py:119
 msgid "No Results"
-msgstr ""
+msgstr "لا توجد نتائج"
 
 #: .\management_system\evaluation_export.py:120
 msgid "No course-level evaluation results found for this formula."
-msgstr ""
+msgstr "لم يتم العثور على نتائج تقييم على مستوى المقرر لهذه الصيغة."
 
 #: .\management_system\evaluation_export.py:126
 #, fuzzy
@@ -614,7 +614,7 @@ msgstr "المستوى"
 
 #: .\management_system\evaluation_export.py:167
 msgid "Weighted Score"
-msgstr ""
+msgstr "الدرجة الموزونة"
 
 #: .\management_system\evaluation_export.py:167
 #, fuzzy
@@ -880,7 +880,7 @@ msgstr "اسم الطالب"
 
 #: .\management_system\forms.py:381
 msgid "Find existing account"
-msgstr ""
+msgstr "العثور على حساب موجود"
 
 #: .\management_system\forms.py:381
 #, fuzzy
@@ -905,7 +905,7 @@ msgstr "النطاق الدراسي الهدف"
 #: .\management_system\templates\historical_intake.html:37
 #: .\management_system\templates\historical_intake.html:57
 msgid "Promote after review"
-msgstr ""
+msgstr "الترفيع بعد المراجعة"
 
 #: .\management_system\forms.py:405 .\management_system\forms.py:483
 #, fuzzy
@@ -916,11 +916,11 @@ msgstr "المقرر الدراسي غير صالح."
 #: .\management_system\forms.py:418
 #: .\management_system\historical_intake.py:127
 msgid "Find mode requires an LMS user ID, username, or email."
-msgstr ""
+msgstr "يتطلب وضع البحث معرّف مستخدم LMS أو اسم مستخدم أو بريدًا إلكترونيًا."
 
 #: .\management_system\forms.py:420
 msgid "Create mode requires a new username."
-msgstr ""
+msgstr "يتطلب وضع الإنشاء اسم مستخدم جديدًا."
 
 #: .\management_system\forms.py:422 .\management_system\forms.py:502
 #, fuzzy
@@ -976,7 +976,7 @@ msgstr "اختر ١٬٠٠٠ طالب كحد أقصى في المرة الواح�
 
 #: .\management_system\forms.py:465
 msgid "Usernames or numeric IDs, separated by commas or lines"
-msgstr ""
+msgstr "أسماء المستخدمين أو المعرّفات الرقمية، مفصولة بفواصل أو أسطر"
 
 #: .\management_system\forms.py:466
 #, fuzzy
@@ -1163,7 +1163,7 @@ msgstr "جواز السفر يحتاج إلى صورة الوجه فقط."
 
 #: .\management_system\historical_intake.py:73
 msgid "Failed course offering IDs must be positive numbers separated by commas."
-msgstr ""
+msgstr "يجب أن تكون معرّفات عروض المقررات الراسبة أرقامًا موجبة مفصولة بفواصل."
 
 #: .\management_system\historical_intake.py:83
 #, fuzzy
@@ -1173,15 +1173,15 @@ msgstr "المرفق كبير جدًا بحيث لا يمكن تخزينه."
 
 #: .\management_system\historical_intake.py:95
 msgid "The XLSX file must contain an Intake sheet."
-msgstr ""
+msgstr "يجب أن يحتوي ملف XLSX على ورقة Intake."
 
 #: .\management_system\historical_intake.py:104
 msgid "Upload a CSV or XLSX intake file."
-msgstr ""
+msgstr "ارفع ملف إدخال بصيغة CSV أو XLSX."
 
 #: .\management_system\historical_intake.py:110
 msgid "The intake file columns do not match the approved template."
-msgstr ""
+msgstr "أعمدة ملف الإدخال لا تطابق القالب المعتمد."
 
 #: .\management_system\historical_intake.py:112
 #, fuzzy
@@ -1197,11 +1197,11 @@ msgstr "يجب أن يكون معرّف رسالة الرد عددًا صحيح�
 
 #: .\management_system\historical_intake.py:132
 msgid "The LMS identity matches more than one account."
-msgstr ""
+msgstr "هوية LMS تطابق أكثر من حساب."
 
 #: .\management_system\historical_intake.py:137
 msgid "The LMS identity fields refer to different accounts."
-msgstr ""
+msgstr "حقول هوية LMS تشير إلى حسابات مختلفة."
 
 #: .\management_system\historical_intake.py:139
 #, fuzzy
@@ -1230,32 +1230,32 @@ msgstr "السنة الدراسية المحددة غير نشطة."
 #: .\management_system\historical_intake.py:160
 #, python-format
 msgid "Row %(row)d has no source student name."
-msgstr ""
+msgstr "الصف %(row)d لا يحتوي على اسم الطالب المصدر."
 
 #: .\management_system\historical_intake.py:166
 #, python-format
 msgid "Row %(row)d must identify its source academic year and level."
-msgstr ""
+msgstr "يجب أن يحدد الصف %(row)d السنة الأكاديمية والمستوى المصدر."
 
 #: .\management_system\historical_intake.py:172
 #, python-format
 msgid "Row %(row)d has no matching source academic scope."
-msgstr ""
+msgstr "لا يملك الصف %(row)d نطاقًا أكاديميًا مصدرًا مطابقًا."
 
 #: .\management_system\historical_intake.py:175
 #, python-format
 msgid "Row %(row)d has an invalid historical outcome."
-msgstr ""
+msgstr "يحتوي الصف %(row)d على نتيجة تاريخية غير صالحة."
 
 #: .\management_system\historical_intake.py:178
 #, python-format
 msgid "Row %(row)d must set account_action to find or create."
-msgstr ""
+msgstr "يجب أن يحدد الصف %(row)d قيمة account_action إلى find أو create."
 
 #: .\management_system\historical_intake.py:183
 #, python-format
 msgid "Row %(row)d create mode requires lms_username."
-msgstr ""
+msgstr "يتطلب وضع الإنشاء في الصف %(row)d قيمة lms_username."
 
 #: .\management_system\historical_intake.py:185
 #, fuzzy, python-format
@@ -1266,26 +1266,26 @@ msgstr "السطر %(line)d: المستخدم '%(username)s' موجود بالف
 #: .\management_system\historical_intake.py:191
 #, python-format
 msgid "Row %(row)d cannot be promoted with this historical outcome."
-msgstr ""
+msgstr "لا يمكن ترفيع الصف %(row)d بهذه النتيجة التاريخية."
 
 #: .\management_system\historical_intake.py:195
 #, python-format
 msgid "Row %(row)d promotion requires destination academic year and level."
-msgstr ""
+msgstr "يتطلب ترفيع الصف %(row)d سنة أكاديمية ومستوى مقصودين."
 
 #: .\management_system\historical_intake.py:202
 #, python-format
 msgid "Row %(row)d has no matching active destination scope."
-msgstr ""
+msgstr "لا يملك الصف %(row)d نطاقًا مقصودًا نشطًا مطابقًا."
 
 #: .\management_system\historical_intake.py:204
 #, python-format
 msgid "Row %(row)d partial promotion requires failed course offering IDs."
-msgstr ""
+msgstr "يتطلب الترفيع الجزئي للصف %(row)d معرّفات عروض المقررات الراسبة."
 
 #: .\management_system\historical_intake.py:213
 msgid "Ready for review"
-msgstr ""
+msgstr "جاهز للمراجعة"
 
 #: .\management_system\historical_intake.py:224
 #, fuzzy
@@ -1295,7 +1295,7 @@ msgstr "المستخدم المحدد لم يعد موجودًا."
 
 #: .\management_system\historical_intake.py:263
 msgid "This source row is already linked to a different student or academic scope."
-msgstr ""
+msgstr "هذا الصف المصدر مرتبط بالفعل بطالب أو نطاق أكاديمي مختلف."
 
 #: .\management_system\historical_intake.py:279
 #, fuzzy
@@ -1321,7 +1321,7 @@ msgstr "يجب وجود سنة دراسية نشطة واحدة بالضبط ق�
 
 #: .\management_system\historical_intake.py:308
 msgid "Select between one and 100 exceptional course offerings."
-msgstr ""
+msgstr "اختر من عرض مقرر استثنائي واحد إلى 100 عرض."
 
 #: .\management_system\historical_intake.py:315
 #, fuzzy
@@ -1337,7 +1337,7 @@ msgstr "يوجد تسجيل عادي مستهدف بالفعل لهذا الطا
 
 #: .\management_system\historical_intake.py:340
 msgid "An existing normal enrollment cannot be converted to exceptional access."
-msgstr ""
+msgstr "لا يمكن تحويل تسجيل عادي موجود إلى وصول استثنائي."
 
 #: .\management_system\management\commands\process_telegram_notifications.py:34
 msgid "Inspect the Telegram notification outbox and optionally retry failed rows or process due rows. Read-only by default; never calls Telegram without --process."
@@ -1811,7 +1811,7 @@ msgstr "أحد المقررات المحددة لا يطابق مستوى نطا
 
 #: .\management_system\models.py:1115
 msgid "A course-specific formula requires a course result."
-msgstr ""
+msgstr "تتطلب الصيغة الخاصة بالمقرر نتيجة للمقرر."
 
 #: .\management_system\models.py:1117
 #, fuzzy
@@ -1827,7 +1827,7 @@ msgstr "قيد الانتظار"
 
 #: .\management_system\models.py:1127
 msgid "Partial success"
-msgstr ""
+msgstr "نجاح جزئي"
 
 #: .\management_system\models.py:1239
 #: .\management_system\templates\partials\components\file_actions_menu.html:45
@@ -3088,7 +3088,7 @@ msgstr "الصفحة التالية"
 #: .\management_system\templates\academic_setup.html:148
 #, python-format
 msgid "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
-msgstr ""
+msgstr "الصفحة %(year_page_obj.number)s من %(year_page_obj.paginator.num_pages)s (%(start)s–%(end)s من %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:157
 msgid "Year Levels"
@@ -3149,7 +3149,7 @@ msgstr "التنقل بين صفحات المقررات"
 #: .\management_system\templates\academic_setup.html:302
 #, python-format
 msgid "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
-msgstr ""
+msgstr "الصفحة %(offering_page_obj.number)s من %(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s من %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:314
 msgid "New Course Offering"
@@ -4582,23 +4582,23 @@ msgstr "إجمالي السنوات الدراسية"
 
 #: .\management_system\templates\historical_intake.html:9
 msgid "Review previous academic records, find or create student accounts, and promote students safely."
-msgstr ""
+msgstr "راجع السجلات الأكاديمية السابقة، وابحث عن حسابات الطلاب أو أنشئها، ورفّع الطلاب بأمان."
 
 #: .\management_system\templates\historical_intake.html:19
 msgid "Add one student"
-msgstr ""
+msgstr "إضافة طالب واحد"
 
 #: .\management_system\templates\historical_intake.html:38
 msgid "Save historical record"
-msgstr ""
+msgstr "حفظ السجل التاريخي"
 
 #: .\management_system\templates\historical_intake.html:45
 msgid "Add multiple existing students"
-msgstr ""
+msgstr "إضافة عدة طلاب موجودين"
 
 #: .\management_system\templates\historical_intake.html:47
 msgid "Use usernames or numeric LMS IDs. This action is bounded to 1,000 students and runs transactionally."
-msgstr ""
+msgstr "استخدم أسماء المستخدمين أو معرّفات LMS الرقمية. يقتصر هذا الإجراء على 1,000 طالب ويتم داخل معاملة واحدة."
 
 #: .\management_system\templates\historical_intake.html:57
 #, fuzzy
@@ -4608,23 +4608,23 @@ msgstr "ترقية الطلاب المحددين"
 
 #: .\management_system\templates\historical_intake.html:63
 msgid "CSV/XLSX reviewed upload"
-msgstr ""
+msgstr "رفع CSV/XLSX بعد المراجعة"
 
 #: .\management_system\templates\historical_intake.html:65
 msgid "Upload the reviewed template. The first submission is a dry-run; apply is allowed only when every row is valid."
-msgstr ""
+msgstr "ارفع القالب بعد مراجعته. الإرسال الأول تجربة جافة؛ ولا يُسمح بالتطبيق إلا عندما تكون كل الصفوف صالحة."
 
 #: .\management_system\templates\historical_intake.html:68
 msgid "Intake CSV or XLSX"
-msgstr ""
+msgstr "ملف إدخال CSV أو XLSX"
 
 #: .\management_system\templates\historical_intake.html:69
 msgid "Validate upload"
-msgstr ""
+msgstr "التحقق من الرفع"
 
 #: .\management_system\templates\historical_intake.html:70
 msgid "Apply reviewed upload"
-msgstr ""
+msgstr "تطبيق الرفع بعد المراجعة"
 
 #: .\management_system\templates\historical_intake.html:73
 #, fuzzy
@@ -4665,7 +4665,7 @@ msgstr "استثنائي"
 
 #: .\management_system\templates\historical_intake.html:81
 msgid "Select a student and only the active-year course offerings they must complete. This creates targeted access, not full-year access."
-msgstr ""
+msgstr "اختر طالبًا وعروض المقررات في السنة النشطة التي يجب عليه إكمالها فقط. ينشئ هذا وصولًا محددًا وليس وصولًا للعام بأكمله."
 
 #: .\management_system\templates\historical_intake.html:87
 #, fuzzy
@@ -5579,7 +5579,7 @@ msgstr "اختر نطاقًا…"
 
 #: .\management_system\templates\promotion_evaluation.html:60
 msgid "Leave empty for an all-courses formula, or select a specific course to configure a course-specific override."
-msgstr ""
+msgstr "اتركه فارغًا لصيغة كل المقررات، أو اختر مقررًا محددًا لإعداد تجاوز خاص بالمقرر."
 
 #: .\management_system\templates\promotion_evaluation.html:65
 msgid "Load"
@@ -5695,7 +5695,7 @@ msgstr "راسب"
 
 #: .\management_system\templates\promotion_evaluation.html:262
 msgid "threshold"
-msgstr ""
+msgstr "الحد"
 
 #: .\management_system\templates\promotion_evaluation.html:298
 msgid "Override status"
@@ -5721,7 +5721,7 @@ msgstr "وصف الكورس"
 
 #: .\management_system\templates\promotion_evaluation.html:315
 msgid "Cannot promote"
-msgstr ""
+msgstr "لا يمكن الترفيع"
 
 #: .\management_system\templates\promotion_evaluation.html:325
 msgid "Consumed"
@@ -5756,7 +5756,7 @@ msgstr "النطاق الدراسي"
 
 #: .\management_system\templates\promotion_evaluation.html:442
 msgid "Select a specific course to override the all-courses formula for that offering. Leave as All courses for the aggregate formula."
-msgstr ""
+msgstr "اختر مقررًا محددًا لتجاوز صيغة كل المقررات لهذا العرض. اتركه على كل المقررات للصيغة الإجمالية."
 
 #: .\management_system\templates\promotion_evaluation.html:454
 msgid "The minimum overall percentage a student must achieve to pass."
@@ -5764,15 +5764,15 @@ msgstr "أدنى نسبة إجمالية يجب أن يحققها الطالب �
 
 #: .\management_system\templates\promotion_evaluation.html:464
 msgid "Inclusive start date for the evaluation period. All quizzes, lessons, and attendance within this range are considered."
-msgstr ""
+msgstr "تاريخ بداية شامل لفترة التقييم. تُحتسب كل الاختبارات والدروس والحضور داخل هذا النطاق."
 
 #: .\management_system\templates\promotion_evaluation.html:474
 msgid "Inclusive end date for the evaluation period. Cannot be a future date."
-msgstr ""
+msgstr "تاريخ نهاية شامل لفترة التقييم. لا يمكن أن يكون تاريخًا مستقبليًا."
 
 #: .\management_system\templates\promotion_evaluation.html:487
 msgid "If a student fails fewer courses than this threshold, they are promoted with exceptional enrollments for the failed courses. If they fail at or above this threshold, they repeat the entire level."
-msgstr ""
+msgstr "إذا رسب الطالب في عدد من المقررات أقل من هذا الحد، يُرفّع مع تسجيلات استثنائية للمقررات الراسبة. وإذا رسب في هذا الحد أو أكثر، يعيد المستوى كاملًا."
 
 #: .\management_system\templates\promotion_evaluation.html:496
 msgid "Promotion Rules"
@@ -6840,7 +6840,7 @@ msgstr "حذف الدرس؟"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:160
 msgid "This is the same confirmation pattern the dashboards use today: the request keeps its CSRF token, goes through HTMX, and the row disappears only after the server agrees."
-msgstr ""
+msgstr "هذا هو نمط التأكيد نفسه المستخدم حاليًا في لوحات المعلومات: يحتفظ الطلب برمز CSRF، ويمر عبر HTMX، ولا يختفي الصف إلا بعد موافقة الخادم."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:161
 msgid "Destructive actions always stay server-confirmed."
@@ -8397,7 +8397,7 @@ msgstr "استثنائي"
 #: .\management_system\views.py:1399
 #, python-format
 msgid "Student account not found: %(identifier)s"
-msgstr ""
+msgstr "لم يتم العثور على حساب الطالب: %(identifier)s"
 
 #: .\management_system\views.py:1421 .\management_system\views.py:1441
 #, fuzzy, python-format
@@ -8407,7 +8407,7 @@ msgstr "تم حفظ الفتح الاستثنائي لعدد %(count)s من ال
 
 #: .\management_system\views.py:1432
 msgid "Resolve all upload errors before applying the intake."
-msgstr ""
+msgstr "عالج كل أخطاء الرفع قبل تطبيق الإدخال."
 
 #: .\management_system\views.py:1472
 #, fuzzy, python-format
@@ -9915,3 +9915,93 @@ msgstr "تم رفع إيصال الدفع الدراسي بنجاح."
 
 msgid "Upload the payment receipt for the destination academic year before promotion."
 msgstr "ارفع إيصال الدفع للسنة الدراسية المستهدفة قبل تسجيل الترفيع."
+
+msgid "Failed to save draft"
+msgstr "تعذر حفظ المسودة"
+
+msgid "Draft restored from previous session"
+msgstr "تمت استعادة المسودة من جلسة سابقة"
+
+msgid "Draft restored"
+msgstr "تمت استعادة المسودة"
+
+msgid "Please fix the errors before submitting"
+msgstr "يرجى إصلاح الأخطاء قبل الإرسال"
+
+msgid "Delete %(count)s selected item(s)?"
+msgstr "هل تريد حذف %(count)s من العناصر المحددة؟"
+
+msgid "Items deleted successfully"
+msgstr "تم حذف العناصر بنجاح"
+
+msgid "Delete failed"
+msgstr "تعذر الحذف"
+
+msgid "Failed to delete items"
+msgstr "تعذر حذف العناصر"
+
+msgid "Please enter a different name"
+msgstr "يرجى إدخال اسم مختلف"
+
+msgid "Rename failed"
+msgstr "تعذرت إعادة التسمية"
+
+msgid "Failed to rename"
+msgstr "تعذرت إعادة التسمية"
+
+msgid "Are you sure you want to delete %(name)s?"
+msgstr "هل أنت متأكد من حذف %(name)s؟"
+
+msgid "Delete request failed"
+msgstr "فشل طلب الحذف"
+
+msgid "Are you sure you want to delete this folder and all its contents?"
+msgstr "هل أنت متأكد من حذف هذا المجلد وكل محتوياته؟"
+
+msgid "Are you sure you want to delete %(count)s selected file(s)?"
+msgstr "هل أنت متأكد من حذف %(count)s من الملفات المحددة؟"
+
+msgid "%(count)s file(s) deleted"
+msgstr "تم حذف %(count)s من الملفات"
+
+msgid "%(count)s file(s) failed to delete"
+msgstr "تعذر حذف %(count)s من الملفات"
+
+msgid "Bulk delete failed"
+msgstr "فشل الحذف الجماعي"
+
+msgid "Size"
+msgstr "الحجم"
+
+msgid "Last Modified"
+msgstr "آخر تعديل"
+
+msgid "Path"
+msgstr "المسار"
+
+msgid "Failed to load metadata"
+msgstr "تعذر تحميل البيانات الوصفية"
+
+msgid "Error loading metadata"
+msgstr "خطأ أثناء تحميل البيانات الوصفية"
+
+msgid "Please enter a folder name"
+msgstr "يرجى إدخال اسم مجلد"
+
+msgid "%(count)s selected on this page"
+msgstr "تم تحديد %(count)s في هذه الصفحة"
+
+msgid "Bulk delete is not supported for this view."
+msgstr "الحذف الجماعي غير مدعوم في هذا العرض."
+
+msgid "Delete %(count)s selected item(s)? This action cannot be undone."
+msgstr "هل تريد حذف %(count)s من العناصر المحددة؟ لا يمكن التراجع عن هذا الإجراء."
+
+msgid "%(count)s item(s) deleted successfully."
+msgstr "تم حذف %(count)s من العناصر بنجاح."
+
+msgid "Delete failed. Please try again."
+msgstr "تعذر الحذف. يرجى المحاولة مرة أخرى."
+
+msgid "YouTube video player"
+msgstr "مشغل فيديو YouTube"

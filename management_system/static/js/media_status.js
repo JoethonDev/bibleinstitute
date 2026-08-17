@@ -14,7 +14,7 @@
     }
     var statusLabels = parseLabels('data-status-labels');
     var phaseLabels = parseLabels('data-phase-labels');
-    var retryFailed = root.getAttribute('data-trans-retry-failed') || 'Retry failed';
+    var retryFailed = root.getAttribute('data-trans-retry-failed') || gettext('Retry failed');
     var csrfInput = document.querySelector('#media-status-csrf input[name="csrfmiddlewaretoken"]');
     var csrf = csrfInput ? csrfInput.value : '';
     document.querySelectorAll('[data-media-retry-url]').forEach(function (button) {

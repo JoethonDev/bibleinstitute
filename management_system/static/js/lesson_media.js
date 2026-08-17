@@ -8,7 +8,7 @@
     const translations = window.lessonMediaTranslations || {};
 
     function translate(key, fallback) {
-        return translations[key] || fallback;
+        return translations[key] || (typeof gettext === 'function' ? gettext(fallback) : fallback);
     }
 
     function shouldUseNativeHls(media) {

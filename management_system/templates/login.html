@@ -31,7 +31,7 @@
             <div class="sd-frame login-card">
                 <div class="sd-screen p-4 p-sm-5">
                     <div class="text-center mb-4">
-                        <a href="{% url 'home' %}"><img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="Logo" class="login-logo"></a>
+                        <a href="{% url 'home' %}"><img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Logo' %}" class="login-logo"></a>
                         <h5 class="sd-serious mt-3">{% translate "Welcome Back" %}</h5>
                         <p class="ps-muted-text">{% translate "Sign in to continue" %}</p>
                     </div>

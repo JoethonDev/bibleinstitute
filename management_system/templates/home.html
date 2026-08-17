@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% load static %}
+{% extends 'base.html' %}{% load static %}{% load i18n %}
 {% block body %}
 <div class="public-site">
 <section class="public-home-hero">
@@ -19,7 +19,7 @@
 
 <section id="message" class="public-section public-video"><div class="container public-video-grid"><div><p class="public-kicker">{{ copy.video_kicker }}</p><h2>{{ copy.video_title }}</h2><p>{{ copy.video_text }}</p></div><div class="public-video-frame">
   <iframe src="https://www.youtube-nocookie.com/embed/Pr0iyXmR62g?si=Gn7QU4eywL3HVRcD"
-                                title="YouTube video player"
+                                title="{% translate 'YouTube video player' %}"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                 referrerpolicy="strict-origin-when-cross-origin"
                                 allowfullscreen></iframe>

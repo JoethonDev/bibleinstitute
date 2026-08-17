@@ -120,7 +120,7 @@ function r2Manager() {
         renameFile() {
             if (!this.renameFileNewName.trim() || this.renameFileNewName === this.renameFileOldName) {
                 const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = 'Please enter a different name'; errorEl.classList.remove('d-none'); }
+                if (errorEl) { errorEl.textContent = gettext('Please enter a different name'); errorEl.classList.remove('d-none'); }
                 return;
             }
 
@@ -156,13 +156,13 @@ function r2Manager() {
                     this._hideModal(document.getElementById('renameFileModal'), () => location.reload());
                 } else {
                     const errorEl = document.getElementById('rename-file-error');
-                    if (errorEl) { errorEl.textContent = data.error || 'Rename failed'; errorEl.classList.remove('d-none'); }
+                    if (errorEl) { errorEl.textContent = data.error || gettext('Rename failed'); errorEl.classList.remove('d-none'); }
                 }
             })
             .catch(error => {
                 console.error('Error renaming:', error);
                 const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = 'Failed to rename'; errorEl.classList.remove('d-none'); }
+                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
             });
         },
         
@@ -173,7 +173,11 @@ function r2Manager() {
             const isM3u8 = fileExt === '.m3u8';
             const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
             
-            document.getElementById('delete-confirm-message').textContent = `Are you sure you want to delete ${fileName}?`;
+            document.getElementById('delete-confirm-message').textContent = interpolate(
+                gettext('Are you sure you want to delete %(name)s?'),
+                { name: fileName },
+                true
+            );
             
             const warningEl = document.getElementById('delete-hls-warning');
             isM3u8 ? warningEl.classList.remove('d-none') : warningEl.classList.add('d-none');
@@ -197,13 +201,13 @@ function r2Manager() {
                         const card = this.$el.querySelector(`[data-file-key="${CSS.escape(fileKey)}"]`);
                         card?.closest('.col')?.remove();
                         this.selectedFiles = this.selectedFiles.filter(k => k !== fileKey);
-                        if (window.Alpine) Alpine.store('notifications').add('File deleted successfully', 'success');
+                        if (window.Alpine) Alpine.store('notifications').add(gettext('File deleted successfully'), 'success');
                     } else {
-                        if (window.Alpine) Alpine.store('notifications').add(data.error || 'Delete failed', 'danger');
+                        if (window.Alpine) Alpine.store('notifications').add(data.error || gettext('Delete failed'), 'danger');
                     }
                 })
                 .catch(() => {
-                    if (window.Alpine) Alpine.store('notifications').add('Delete request failed', 'danger');
+                    if (window.Alpine) Alpine.store('notifications').add(gettext('Delete request failed'), 'danger');
                 });
             });
             
@@ -216,7 +220,7 @@ function r2Manager() {
         deleteFolder(folderId) {
             const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
             
-            document.getElementById('delete-confirm-message').textContent = 'Are you sure you want to delete this folder and all its contents?';
+            document.getElementById('delete-confirm-message').textContent = gettext('Are you sure you want to delete this folder and all its contents?');
             document.getElementById('delete-hls-warning').classList.add('d-none');
             
             const confirmBtn = document.getElementById('confirm-delete-btn');
@@ -235,13 +239,13 @@ function r2Manager() {
                     if (data.success) {
                         const card = this.$el.querySelector(`[data-folder-id="${CSS.escape(folderId)}"]`);
                         card?.closest('.col')?.remove();
-                        if (window.Alpine) Alpine.store('notifications').add('Folder deleted successfully', 'success');
+                        if (window.Alpine) Alpine.store('notifications').add(gettext('Folder deleted successfully'), 'success');
                     } else {
-                        if (window.Alpine) Alpine.store('notifications').add(data.error || 'Delete failed', 'danger');
+                        if (window.Alpine) Alpine.store('notifications').add(data.error || gettext('Delete failed'), 'danger');
                     }
                 })
                 .catch(() => {
-                    if (window.Alpine) Alpine.store('notifications').add('Delete request failed', 'danger');
+                    if (window.Alpine) Alpine.store('notifications').add(gettext('Delete request failed'), 'danger');
                 });
             });
             
@@ -255,7 +259,11 @@ function r2Manager() {
             if (this.selectedFiles.length === 0) return;
             const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
             document.getElementById('delete-confirm-message').textContent =
-                `Are you sure you want to delete ${this.selectedFiles.length} selected file(s)?`;
+                interpolate(
+                    gettext('Are you sure you want to delete %(count)s selected file(s)?'),
+                    { count: this.selectedFiles.length },
+                    true
+                );
             document.getElementById('delete-hls-warning').classList.add('d-none');
             
             const confirmBtn = document.getElementById('confirm-delete-btn');
@@ -282,12 +290,18 @@ function r2Manager() {
                     });
                     this.selectedFiles = this.selectedFiles.filter(k => !succeeded.includes(k));
                     if (window.Alpine) {
-                        if (succeeded.length) Alpine.store('notifications').add(`${succeeded.length} file(s) deleted`, 'success');
-                        if (failed) Alpine.store('notifications').add(`${failed} file(s) failed to delete`, 'danger');
+                        if (succeeded.length) Alpine.store('notifications').add(
+                            interpolate(gettext('%(count)s file(s) deleted'), { count: succeeded.length }, true),
+                            'success'
+                        );
+                        if (failed) Alpine.store('notifications').add(
+                            interpolate(gettext('%(count)s file(s) failed to delete'), { count: failed }, true),
+                            'danger'
+                        );
                     }
                 })
                 .catch(() => {
-                    if (window.Alpine) Alpine.store('notifications').add('Bulk delete failed', 'danger');
+                    if (window.Alpine) Alpine.store('notifications').add(gettext('Bulk delete failed'), 'danger');
                 });
             });
             
@@ -304,7 +318,7 @@ function r2Manager() {
             bodyEl.innerHTML = `
                 <div class="d-flex justify-content-center">
                     <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                        <span class="visually-hidden">${gettext('Loading...')}</span>
                     </div>
                 </div>
             `;
@@ -320,20 +334,20 @@ function r2Manager() {
                         const metadata = data.metadata;
                         bodyEl.innerHTML = `
                             <table class="table table-sm">
-                                <tr><th>Name</th><td>${metadata.name}</td></tr>
-                                <tr><th>Size</th><td>${metadata.size_formatted}</td></tr>
-                                <tr><th>Type</th><td>${metadata.content_type}</td></tr>
-                                <tr><th>Last Modified</th><td>${metadata.last_modified}</td></tr>
-                                <tr><th>Path</th><td>${fileKey}</td></tr>
+                                <tr><th>${gettext('Name')}</th><td>${metadata.name}</td></tr>
+                                <tr><th>${gettext('Size')}</th><td>${metadata.size_formatted}</td></tr>
+                                <tr><th>${gettext('Type')}</th><td>${metadata.content_type}</td></tr>
+                                <tr><th>${gettext('Last Modified')}</th><td>${metadata.last_modified}</td></tr>
+                                <tr><th>${gettext('Path')}</th><td>${fileKey}</td></tr>
                             </table>
                         `;
                     } else {
-                        bodyEl.innerHTML = `<p class="text-danger">Failed to load metadata</p>`;
+                        bodyEl.innerHTML = `<p class="text-danger">${gettext('Failed to load metadata')}</p>`;
                     }
                 })
                 .catch(error => {
                     console.error('Metadata error:', error);
-                    bodyEl.innerHTML = `<p class="text-danger">Error loading metadata</p>`;
+                    bodyEl.innerHTML = `<p class="text-danger">${gettext('Error loading metadata')}</p>`;
                 });
         },
         
@@ -351,7 +365,7 @@ function r2Manager() {
         createFolder() {
             if (this.newFolderName.trim() === '') {
                 const errorEl = document.getElementById('create-folder-error');
-                errorEl.textContent = 'Please enter a folder name';
+                errorEl.textContent = gettext('Please enter a folder name');
                 errorEl.classList.remove('d-none');
                 return;
             }
@@ -380,7 +394,7 @@ function r2Manager() {
             .catch(error => {
                 console.error('Create folder error:', error);
                 const errorEl = document.getElementById('create-folder-error');
-                errorEl.textContent = 'Failed to create folder';
+                errorEl.textContent = gettext('Failed to create folder');
                 errorEl.classList.remove('d-none');
             });
         },

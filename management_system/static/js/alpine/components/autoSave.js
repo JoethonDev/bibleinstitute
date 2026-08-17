@@ -49,14 +49,14 @@ function autoSave(formKey) {
                     
                     // Show notification
                     if (window.Alpine && Alpine.store('notifications')) {
-                        Alpine.store('notifications').add('Draft saved', 'success');
+                        Alpine.store('notifications').add(gettext('Draft saved'), 'success');
                     }
                 } catch (e) {
                     console.error('Failed to save draft:', e);
                     this.isSaving = false;
                     
                     if (window.Alpine && Alpine.store('notifications')) {
-                        Alpine.store('notifications').add('Failed to save draft', 'danger');
+                        Alpine.store('notifications').add(gettext('Failed to save draft'), 'danger');
                     }
                 }
             }
@@ -74,7 +74,7 @@ function autoSave(formKey) {
                         
                         // Show notification with option to clear
                         if (window.Alpine && Alpine.store('notifications')) {
-                            Alpine.store('notifications').info('Draft restored from previous session');
+                            Alpine.store('notifications').info(gettext('Draft restored from previous session'));
                         }
                     }
                 } catch (e) {
@@ -98,7 +98,7 @@ function autoSave(formKey) {
                 });
                 
                 if (window.Alpine && Alpine.store('notifications')) {
-                    Alpine.store('notifications').add('Draft restored', 'info');
+                    Alpine.store('notifications').add(gettext('Draft restored'), 'info');
                 }
             }
         },
@@ -163,7 +163,7 @@ function formValidation() {
             
             if (!this.validateForm(form)) {
                 if (window.Alpine && Alpine.store('notifications')) {
-                    Alpine.store('notifications').add('Please fix the errors before submitting', 'danger');
+                    Alpine.store('notifications').add(gettext('Please fix the errors before submitting'), 'danger');
                 }
                 return;
             }

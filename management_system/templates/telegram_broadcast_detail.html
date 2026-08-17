@@ -5,7 +5,7 @@
 
 {% block body %}
 <div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
-    <nav aria-label="breadcrumb">
+    <nav aria-label="{% translate 'Breadcrumb' %}">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
             <li class="breadcrumb-item"><a href="{{ broadcast_list_url }}">{% translate "Telegram Broadcasts" %}</a></li>

@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const search = document.createElement('input');
         search.type = 'search';
         search.className = 'form-control mb-2';
-        search.placeholder = countrySelect.dataset.searchPlaceholder || 'Search countries';
+        search.placeholder = countrySelect.dataset.searchPlaceholder || gettext('Search countries');
         search.setAttribute('aria-label', countrySelect.getAttribute('aria-label') || search.placeholder);
         search.setAttribute('autocomplete', 'off');
         search.setAttribute('data-country-search', 'true');

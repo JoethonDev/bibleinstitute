@@ -1,7 +1,7 @@
 {% load i18n %}
 <div class="ad-card-body">
 {% if not is_root %}
-<nav aria-label="breadcrumb" class="ad-drive-crumb mb-3">
+<nav aria-label="{% translate 'Breadcrumb' %}" class="ad-drive-crumb mb-3">
     <a href="#"
        hx-get="{% url 'r2-management-dashboard' %}"
        hx-target="#file-list-container"
