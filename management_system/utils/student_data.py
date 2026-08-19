@@ -40,7 +40,7 @@ PAGE_SIZE = 20
 
 def student_offerings_queryset(user: User) -> QuerySet:
     """Return bounded published offerings readable by a mobile account."""
-    if getattr(getattr(user, "role", None), "role", None) == "admin":
+    if getattr(getattr(user, "role", None), "role", None) in {"admin", "staff"}:
         offerings = active_year_published_offerings_for_user(user)
     else:
         offerings = accessible_offerings(user)
@@ -295,7 +295,9 @@ def _quiz_mode(
         current = now()
         if ensure_aware(opening.opening_date) <= current <= ensure_aware(opening.closing_date) + timedelta(minutes=30):
             if can_write is None:
-                can_write = user_can_write_offering_activity(user, quiz.course_offering)
+                can_write = user_can_write_offering_activity(
+                    user, quiz.course_offering, allow_management=True
+                )
             if can_write:
                 return "exam"
     return "closed_unsolved"
@@ -319,7 +321,9 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
     opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first()
     if opening is None:
         opening = type("Opening", (), {"opening_date": quiz.opening_date, "closing_date": quiz.closing_date})()
-    can_write = user_can_write_offering_activity(user, quiz.course_offering)
+    can_write = user_can_write_offering_activity(
+        user, quiz.course_offering, allow_management=True
+    )
     mode = _quiz_mode(quiz, user, grade, opening, can_write)
     questions = list(Question.objects.filter(quiz=quiz).order_by("pk"))
     if grade:
@@ -358,7 +362,13 @@ def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
         row.quiz_id: row
         for row in QuizStudentOpening.objects.filter(student=user, quiz_id__in=[quiz.pk for quiz in quizzes])
     }
-    can_write = user_can_write_offering_activity(user, quizzes[0].course_offering) if quizzes else False
+    can_write = (
+        user_can_write_offering_activity(
+            user, quizzes[0].course_offering, allow_management=True
+        )
+        if quizzes
+        else False
+    )
     result = []
     for quiz in quizzes:
         opening = openings.get(quiz.pk)
@@ -374,7 +384,10 @@ def student_profile_data(user: User) -> dict:
         "id": user.pk,
         "username": user.username,
         "role": role,
-        "academic_activity_writable": role == "student",
+        "academic_activity_writable": Enrollment.objects.filter(
+            student=user,
+            status=Enrollment.Status.ACTIVE,
+        ).exists(),
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,
