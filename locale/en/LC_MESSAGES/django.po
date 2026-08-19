@@ -10118,6 +10118,78 @@ msgstr "Weight percentage"
 msgid "Minimum percentage"
 msgstr "Minimum percentage"
 
+msgid "Please correct the highlighted fields."
+msgstr "Please correct the highlighted fields."
+
+msgid "Invalid quiz submission."
+msgstr "Invalid quiz submission."
+
+msgid "This push device belongs to another account."
+msgstr "This push device belongs to another account."
+
+msgid "Too many login attempts. Try again later."
+msgstr "Too many login attempts. Try again later."
+
+msgid "Installation ID is required."
+msgstr "Installation ID is required."
+
+msgid "Progress could not be saved."
+msgstr "Progress could not be saved."
+
+msgid "The quiz is closed or already submitted."
+msgstr "The quiz is closed or already submitted."
+
+msgid "The quiz could not be submitted."
+msgstr "The quiz could not be submitted."
+
+msgid "Invalid push-device registration."
+msgstr "Invalid push-device registration."
+
+msgid "You do not have access to this notification."
+msgstr "You do not have access to this notification."
+
+msgid "You do not have access to this viewing session."
+msgstr "You do not have access to this viewing session."
+
+msgid "Invalid audio file."
+msgstr "Invalid audio file."
+
+msgid "OTP login is unavailable for this number."
+msgstr "OTP login is unavailable for this number."
+
+msgid "Link your Telegram account before using OTP login."
+msgstr "Link your Telegram account before using OTP login."
+
+msgid "OTP delivery is temporarily unavailable."
+msgstr "OTP delivery is temporarily unavailable."
+
+msgid "Too many OTP requests. Try again later."
+msgstr "Too many OTP requests. Try again later."
+
+msgid "Enter a valid phone number."
+msgstr "Enter a valid phone number."
+
+msgid "A device installation ID is required."
+msgstr "A device installation ID is required."
+
+msgid "Wait before requesting another OTP."
+msgstr "Wait before requesting another OTP."
+
+msgid "An OTP has already been sent. Enter it or wait for it to expire."
+msgstr "An OTP has already been sent. Enter it or wait for it to expire."
+
+msgid "Enter the six-digit OTP."
+msgstr "Enter the six-digit OTP."
+
+msgid "The OTP is invalid or expired."
+msgstr "The OTP is invalid or expired."
+
+msgid "Too many incorrect OTP attempts."
+msgstr "Too many incorrect OTP attempts."
+
+msgid "Too many time ranges."
+msgstr "Too many time ranges."
+
 msgid "Delete this holiday?"
 msgstr "Delete this holiday?"
 

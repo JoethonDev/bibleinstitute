@@ -28,6 +28,10 @@ urlpatterns = [
         JavaScriptCatalog.as_view(domain="django", packages=["management_system"]),
         name="javascript-catalog",
     ),
+    path(
+        "api/mobile/v1/",
+        include(("management_system.mobile_urls", "mobile-v1"), namespace="mobile-v1"),
+    ),
     path("api/telegram/webhook/", telegram_webhook, name="telegram-webhook"),
     
 ]

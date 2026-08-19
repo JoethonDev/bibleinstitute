@@ -170,9 +170,22 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or os.getenv(
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
     "REDIS_URL", "redis://redis:6379/0"
 )
+REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", "redis://redis:6379/1")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_CACHE_URL,
+        "TIMEOUT": None,
+    },
+}
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_IMPORTS = ("management_system.telegram_tasks", "management_system.media_tasks")
+CELERY_IMPORTS = (
+    "management_system.telegram_tasks",
+    "management_system.media_tasks",
+    "management_system.mobile_push_tasks",
+    "management_system.mobile_otp_tasks",
+)
 CELERY_TASK_ROUTES = {
     "management_system.media_tasks.*": {"queue": "media"},
 }
@@ -182,7 +195,45 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 60.0,
         "kwargs": {"limit": 100},
     },
+    "dispatch-due-mobile-push": {
+        "task": "management_system.mobile_push_tasks.dispatch_due_mobile_push",
+        "schedule": 15.0,
+        "kwargs": {"limit": 1000},
+    },
+    "process-mobile-push-receipts": {
+        "task": "management_system.mobile_push_tasks.process_mobile_push_receipts",
+        "schedule": 30.0,
+        "kwargs": {"limit": 1000},
+    },
 }
+
+# Expo Push Service is the only mobile push provider. The access token is
+# server-only and is never rendered, logged, or returned by an application API.
+def _expo_endpoint(setting_name: str, default_path: str) -> str:
+    value = os.getenv(setting_name, f"https://exp.host{default_path}").strip()
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "exp.host"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != default_path
+    ):
+        raise ImproperlyConfigured(f"{setting_name} must be an exact HTTPS Expo endpoint.")
+    return value
+
+
+EXPO_PUSH_SEND_URL = _expo_endpoint("EXPO_PUSH_SEND_URL", "/--/api/v2/push/send")
+EXPO_PUSH_RECEIPTS_URL = _expo_endpoint("EXPO_PUSH_RECEIPTS_URL", "/--/api/v2/push/getReceipts")
+EXPO_PUSH_ACCESS_TOKEN = os.getenv("EXPO_PUSH_ACCESS_TOKEN", "")
+EXPO_PUSH_TIMEOUT_SECONDS = float(os.getenv("EXPO_PUSH_TIMEOUT_SECONDS", "15"))
+# Expo documents a 600 notifications/second service ceiling. Five requests per
+# second at 100 messages per request keeps this application below that ceiling.
+EXPO_PUSH_REQUESTS_PER_SECOND = int(os.getenv("EXPO_PUSH_REQUESTS_PER_SECOND", "5"))
+EXPO_PUSH_SEND_BATCH_SIZE = 100
+EXPO_PUSH_RECEIPT_BATCH_SIZE = 1000
 
 # Server-side media processing limits. Native FFmpeg runs only in the
 # dedicated media worker; these values are also exposed in the worker's
@@ -261,7 +312,7 @@ STATIC_ROOT = BASE_DIR / "collectstatic/"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Modifications
-CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "https://weathered-wave-c7f0.elprincedoca.workers.dev/")
+CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "").rstrip("/")
 MEDIA_WORKER_HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET") or SECRET_KEY
 WORKER_RECEIPT_SECRET = os.environ.get("WORKER_RECEIPT_SECRET") or MEDIA_WORKER_HMAC_SECRET
 TELEGRAM_ENCRYPTION_KEY = os.environ.get("TELEGRAM_ENCRYPTION_KEY") or SECRET_KEY

@@ -26,11 +26,32 @@ class AdminOnlyModelAdmin(admin.ModelAdmin):
         return _is_admin_user(request)
 
 
+class AcademicContentReadOnlyAdmin(AdminOnlyModelAdmin):
+    """Keep direct admin edits away from publication event boundaries."""
+
+    list_per_page = 50
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 admin.site.register(User)
 admin.site.register(Role)
 admin.site.register(Course)
-admin.site.register(Lesson)
-admin.site.register(Quiz)
+admin.site.register(
+    Lesson,
+    AcademicContentReadOnlyAdmin,
+)
+admin.site.register(
+    Quiz,
+    AcademicContentReadOnlyAdmin,
+)
 admin.site.register(Question)
 admin.site.register(Submission)
 admin.site.register(Grade)

@@ -10163,6 +10163,78 @@ msgstr "نسبة الوزن"
 msgid "Minimum percentage"
 msgstr "النسبة الدنيا"
 
+msgid "Please correct the highlighted fields."
+msgstr "يرجى تصحيح الحقول المميزة."
+
+msgid "Invalid quiz submission."
+msgstr "إرسال الاختبار غير صالح."
+
+msgid "This push device belongs to another account."
+msgstr "جهاز الإشعارات هذا مرتبط بحساب آخر."
+
+msgid "Too many login attempts. Try again later."
+msgstr "محاولات تسجيل الدخول كثيرة جدًا. حاول مرة أخرى لاحقًا."
+
+msgid "Installation ID is required."
+msgstr "معرّف التثبيت مطلوب."
+
+msgid "Progress could not be saved."
+msgstr "تعذر حفظ التقدم."
+
+msgid "The quiz is closed or already submitted."
+msgstr "الاختبار مغلق أو تم إرساله بالفعل."
+
+msgid "The quiz could not be submitted."
+msgstr "تعذر إرسال الاختبار."
+
+msgid "Invalid push-device registration."
+msgstr "تسجيل جهاز الإشعارات غير صالح."
+
+msgid "You do not have access to this notification."
+msgstr "ليس لديك صلاحية الوصول إلى هذا الإشعار."
+
+msgid "You do not have access to this viewing session."
+msgstr "ليس لديك صلاحية الوصول إلى جلسة المشاهدة هذه."
+
+msgid "Invalid audio file."
+msgstr "ملف الصوت غير صالح."
+
+msgid "OTP login is unavailable for this number."
+msgstr "تسجيل الدخول برمز التحقق غير متاح لهذا الرقم."
+
+msgid "Link your Telegram account before using OTP login."
+msgstr "اربط حساب تيليجرام قبل استخدام تسجيل الدخول برمز التحقق."
+
+msgid "OTP delivery is temporarily unavailable."
+msgstr "إرسال رمز التحقق غير متاح مؤقتًا."
+
+msgid "Too many OTP requests. Try again later."
+msgstr "طلبات رموز التحقق كثيرة جدًا. حاول مرة أخرى لاحقًا."
+
+msgid "Enter a valid phone number."
+msgstr "أدخل رقم هاتف صحيحًا."
+
+msgid "A device installation ID is required."
+msgstr "معرّف تثبيت الجهاز مطلوب."
+
+msgid "Wait before requesting another OTP."
+msgstr "انتظر قبل طلب رمز تحقق آخر."
+
+msgid "An OTP has already been sent. Enter it or wait for it to expire."
+msgstr "تم إرسال رمز تحقق بالفعل. أدخله أو انتظر انتهاء صلاحيته."
+
+msgid "Enter the six-digit OTP."
+msgstr "أدخل رمز التحقق المكوّن من ستة أرقام."
+
+msgid "The OTP is invalid or expired."
+msgstr "رمز التحقق غير صالح أو انتهت صلاحيته."
+
+msgid "Too many incorrect OTP attempts."
+msgstr "عدد محاولات رمز التحقق الخاطئة كبير جدًا."
+
+msgid "Too many time ranges."
+msgstr "عدد نطاقات الوقت كبير جدًا."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

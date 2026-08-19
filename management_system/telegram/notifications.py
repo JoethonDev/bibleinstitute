@@ -6,155 +6,29 @@ import json
 from datetime import timedelta
 
 import telebot
-from celery import current_app
 from django.db import transaction
-from django.db.models import F, QuerySet
+from django.db.models import Case, Exists, F, IntegerField, OuterRef, When
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from ..academic_access import active_year_published_offerings_for_user
 from ..models import (
-    Lesson,
-    PublicationStatus,
-    Quiz,
-    QuizStudentOpening,
+    Enrollment,
+    StudentNotification,
     TelegramAccount,
     TelegramBotConfig,
     TelegramNotificationDelivery,
-    User,
+    QuizStudentOpening,
 )
-from ..utils.helpers import is_quiz_open
-from ..utils.quiz_access import quiz_window
+from ..student_notifications import is_active_published_lesson, is_active_published_quiz
 from ..utils.timezones import ensure_aware
-from .linking import is_eligible_user
 from .media import audio_links
 from .navigation import format_lesson, format_quiz, lesson_detail_keyboard, quiz_detail_keyboard
 from .configuration import stored_token
-from .recipients import eligible_student_queryset
 
 
 NOTIFICATION_BATCH_SIZE = 500
 MAX_DELIVERY_ATTEMPTS = 3
 RETRY_DELAYS = (60, 300, 900)
-
-
-def _eligible_recipient_queryset(offering) -> QuerySet[User]:
-    return eligible_student_queryset(
-        academic_year_id=offering.academic_year_level.academic_year_id,
-        academic_year_level_id=offering.academic_year_level_id,
-        course_offering_id=offering.pk,
-    )
-
-
-def _active_published_lesson(lesson: Lesson) -> Lesson | None:
-    if lesson.status != PublicationStatus.PUBLISHED:
-        return None
-    offering = lesson.course_offering
-    if offering.status != PublicationStatus.PUBLISHED:
-        return None
-    if not offering.academic_year_level.academic_year.is_active:
-        return None
-    return lesson
-
-
-def _active_published_quiz(quiz: Quiz) -> Quiz | None:
-    if quiz.status != PublicationStatus.PUBLISHED:
-        return None
-    offering = quiz.course_offering
-    if offering.status != PublicationStatus.PUBLISHED:
-        return None
-    if not offering.academic_year_level.academic_year.is_active:
-        return None
-    return quiz
-
-
-def _wake_delivery_task() -> None:
-    """Queue one recovery task after the surrounding transaction commits."""
-    transaction.on_commit(
-        lambda: current_app.send_task(
-            "management_system.telegram_tasks.process_due_telegram_notifications"
-        )
-    )
-
-
-def _bulk_create(rows: list[TelegramNotificationDelivery]) -> int:
-    created = 0
-    for start in range(0, len(rows), NOTIFICATION_BATCH_SIZE):
-        batch = rows[start:start + NOTIFICATION_BATCH_SIZE]
-        TelegramNotificationDelivery.objects.bulk_create(batch, ignore_conflicts=True)
-        created += len(batch)
-    return created
-
-
-def enqueue_lesson_notifications(lesson: Lesson) -> int:
-    """Create idempotent lesson notifications for currently authorized students."""
-    lesson = Lesson.objects.select_related(
-        "course_offering__academic_year_level__academic_year",
-    ).get(pk=lesson.pk)
-    if _active_published_lesson(lesson) is None:
-        return 0
-    recipients = _eligible_recipient_queryset(lesson.course_offering)
-    publication_key = lesson.updated_date.isoformat()
-    rows = [
-        TelegramNotificationDelivery(
-            idempotency_key=f"lesson:{lesson.pk}:user:{user.pk}:publication:{publication_key}",
-            notification_type=TelegramNotificationDelivery.NotificationType.LESSON_PUBLISHED,
-            user_id=user.pk,
-            telegram_account_id=user.telegram_account.pk,
-            lesson_id=lesson.pk,
-            scheduled_for=timezone.now(),
-        )
-        for user in recipients.iterator(chunk_size=NOTIFICATION_BATCH_SIZE)
-    ]
-    created = _bulk_create(rows) if rows else 0
-    if rows:
-        _wake_delivery_task()
-    return created
-
-
-def schedule_quiz_opening_notifications(quiz: Quiz) -> int:
-    """Create idempotent opening rows using each student's effective window."""
-    quiz = Quiz.objects.select_related(
-        "course_offering__academic_year_level__academic_year",
-    ).get(pk=quiz.pk)
-    if _active_published_quiz(quiz) is None:
-        return 0
-
-    TelegramNotificationDelivery.objects.filter(
-        quiz_id=quiz.pk,
-        status=TelegramNotificationDelivery.Status.QUEUED,
-    ).update(
-        status=TelegramNotificationDelivery.Status.SKIPPED,
-        last_error=_("Superseded by a newer exam opening window."),
-        updated_at=timezone.now(),
-    )
-
-    exceptional_windows = {
-        opening.student_id: (opening.opening_date, opening.closing_date)
-        for opening in QuizStudentOpening.objects.filter(quiz_id=quiz.pk)
-    }
-    rows = []
-    for user in _eligible_recipient_queryset(quiz.course_offering).iterator(chunk_size=NOTIFICATION_BATCH_SIZE):
-        opening, closing = exceptional_windows.get(user.pk, (quiz.opening_date, quiz.closing_date))
-        opening = ensure_aware(opening)
-        closing = ensure_aware(closing)
-        if closing <= opening:
-            continue
-        window_key = f"{opening.isoformat()}:{closing.isoformat()}"
-        rows.append(
-            TelegramNotificationDelivery(
-                idempotency_key=f"quiz:{quiz.pk}:user:{user.pk}:window:{window_key}",
-                notification_type=TelegramNotificationDelivery.NotificationType.QUIZ_OPENING,
-                user_id=user.pk,
-                telegram_account_id=user.telegram_account.pk,
-                quiz_id=quiz.pk,
-                scheduled_for=opening,
-            )
-        )
-    created = _bulk_create(rows) if rows else 0
-    if rows:
-        _wake_delivery_task()
-    return created
 
 
 def _claim_due_ids(limit: int) -> list[int]:
@@ -175,6 +49,7 @@ def _claim_due_ids(limit: int) -> list[int]:
             .filter(
                 status=TelegramNotificationDelivery.Status.QUEUED,
                 scheduled_for__lte=now,
+                student_notification__cancelled_at__isnull=True,
             )
             .order_by("scheduled_for", "pk")
             .values_list("pk", flat=True)[:max(1, min(limit, NOTIFICATION_BATCH_SIZE))]
@@ -188,33 +63,81 @@ def _claim_due_ids(limit: int) -> list[int]:
     return ids
 
 
-def _authorized_delivery(delivery: TelegramNotificationDelivery) -> bool:
+def _authorized_delivery(
+    delivery: TelegramNotificationDelivery,
+    authorized_ids: set[int],
+    exceptional_windows: dict[tuple[int, int], tuple[object, object]],
+) -> bool:
     account = delivery.telegram_account
     if (
         account is None
         or not account.is_active
         or account.user_id != delivery.user_id
-        or not is_eligible_user(delivery.user)
+        or delivery.pk not in authorized_ids
     ):
         return False
     if delivery.lesson_id:
-        lesson = _active_published_lesson(delivery.lesson)
+        lesson = is_active_published_lesson(delivery.lesson)
         return bool(
             lesson
-            and active_year_published_offerings_for_user(delivery.user)
-            .filter(pk=lesson.course_offering_id)
-            .exists()
+            and delivery.pk in authorized_ids
         )
     if delivery.quiz_id:
-        quiz = _active_published_quiz(delivery.quiz)
+        quiz = is_active_published_quiz(delivery.quiz)
         return bool(
             quiz
-            and active_year_published_offerings_for_user(delivery.user)
-            .filter(pk=quiz.course_offering_id)
-            .exists()
-            and is_quiz_open(quiz, timezone.now(), delivery.user)
+            and delivery.pk in authorized_ids
+            and _quiz_delivery_is_open(delivery, exceptional_windows)
         )
     return False
+
+
+def _quiz_delivery_is_open(
+    delivery: TelegramNotificationDelivery,
+    exceptional_windows: dict[tuple[int, int], tuple[object, object]],
+) -> bool:
+    opening, closing = exceptional_windows.get(
+        (delivery.quiz_id, delivery.user_id),
+        (delivery.quiz.opening_date, delivery.quiz.closing_date),
+    )
+    current = timezone.now()
+    return ensure_aware(opening) <= current <= ensure_aware(closing) + timedelta(minutes=30)
+
+
+def _authorized_delivery_ids(deliveries) -> set[int]:
+    normal_access = Enrollment.objects.filter(
+        student_id=OuterRef("user_id"),
+        status=Enrollment.Status.ACTIVE,
+        enrollment_type=Enrollment.Type.NORMAL,
+        academic_year_level_id=OuterRef("source_scope_id"),
+    )
+    targeted_access = Enrollment.objects.filter(
+        student_id=OuterRef("user_id"),
+        status=Enrollment.Status.ACTIVE,
+        enrollment_type__in=(Enrollment.Type.REPEAT, Enrollment.Type.REMEDIAL, Enrollment.Type.MANUAL),
+        course_offering_id=OuterRef("source_offering_id"),
+    )
+    return set(
+        deliveries.annotate(
+            source_offering_id=Case(
+                When(lesson_id__isnull=False, then=F("lesson__course_offering_id")),
+                default=F("quiz__course_offering_id"),
+                output_field=IntegerField(),
+            ),
+            source_scope_id=Case(
+                When(lesson_id__isnull=False, then=F("lesson__course_offering__academic_year_level_id")),
+                default=F("quiz__course_offering__academic_year_level_id"),
+                output_field=IntegerField(),
+            ),
+        )
+        .filter(
+            user__is_active=True,
+            user__application_status="active",
+            user__role__role="student",
+        )
+        .filter(Exists(normal_access) | Exists(targeted_access))
+        .values_list("pk", flat=True)
+    )
 
 
 def _mark_skipped(delivery_id: int, message: str) -> None:
@@ -256,7 +179,11 @@ def _mark_failed_or_retry(delivery_id: int, attempt_count: int | None, message: 
     )
 
 
-def _send_delivery(bot, delivery: TelegramNotificationDelivery):
+def _send_delivery(
+    bot,
+    delivery: TelegramNotificationDelivery,
+    exceptional_windows: dict[tuple[int, int], tuple[object, object]],
+):
     if delivery.lesson_id:
         try:
             links = audio_links(json.loads(delivery.lesson.links))
@@ -271,7 +198,10 @@ def _send_delivery(bot, delivery: TelegramNotificationDelivery):
                 bool(links),
             ),
         )
-    opening, closing = quiz_window(delivery.quiz, delivery.user)
+    opening, closing = exceptional_windows.get(
+        (delivery.quiz_id, delivery.user_id),
+        (delivery.quiz.opening_date, delivery.quiz.closing_date),
+    )
     return bot.send_message(
         delivery.telegram_account.telegram_chat_id,
         format_quiz(delivery.quiz, delivery.user, opening, closing),
@@ -279,8 +209,69 @@ def _send_delivery(bot, delivery: TelegramNotificationDelivery):
     )
 
 
+def _materialize_due_deliveries(limit: int) -> int:
+    """Create Telegram delivery rows at due time for eligible students.
+
+    Recipients are resolved at due time (mirroring the mobile dispatcher) so a
+    student who links a Telegram account after event creation still receives
+    the message. Idempotent: an existing delivery for the event key is kept.
+    """
+    now = timezone.now()
+    scan_limit = max(1, min(int(limit), NOTIFICATION_BATCH_SIZE))
+    notifications = list(
+        StudentNotification.objects.filter(
+            scheduled_for__lte=now,
+            cancelled_at__isnull=True,
+        )
+        .prefetch_related("telegram_deliveries")
+        .order_by("scheduled_for", "pk")[:scan_limit]
+    )
+    if not notifications:
+        return 0
+
+    existing_keys: set[str] = set()
+    for notification in notifications:
+        for delivery in notification.telegram_deliveries.all():
+            existing_keys.add(delivery.idempotency_key)
+
+    account_ids = dict(
+        TelegramAccount.objects.filter(
+            user_id__in=[notification.student_id for notification in notifications],
+            is_active=True,
+        ).values_list("user_id", "pk")
+    )
+
+    rows: list[TelegramNotificationDelivery] = []
+    for notification in notifications:
+        if notification.idempotency_key in existing_keys:
+            continue
+        account_id = account_ids.get(notification.student_id)
+        if account_id is None:
+            continue
+        rows.append(
+            TelegramNotificationDelivery(
+                idempotency_key=notification.idempotency_key,
+                notification_type=notification.notification_type,
+                user_id=notification.student_id,
+                telegram_account_id=account_id,
+                student_notification_id=notification.pk,
+                lesson_id=notification.lesson_id,
+                quiz_id=notification.quiz_id,
+                scheduled_for=now,
+            )
+        )
+    for start in range(0, len(rows), NOTIFICATION_BATCH_SIZE):
+        TelegramNotificationDelivery.objects.bulk_create(
+            rows[start:start + NOTIFICATION_BATCH_SIZE],
+            ignore_conflicts=True,
+        )
+    return len(rows)
+
+
 def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) -> dict[str, int]:
-    """Claim and deliver due rows, rechecking authorization immediately before send."""
+    """Materialize due rows, then claim and deliver them, rechecking
+    authorization immediately before send."""
+    _materialize_due_deliveries(limit)
     ids = _claim_due_ids(limit)
     if not ids:
         return {"sent": 0, "skipped": 0, "failed": 0}
@@ -305,14 +296,24 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
         "quiz__course_offering__academic_year_level__academic_year",
         "quiz__course_offering__course", "quiz__quiz_type",
     ).filter(pk__in=ids)
+    delivery_list = list(deliveries)
+    exceptional_windows = {
+        (opening.quiz_id, opening.student_id): (opening.opening_date, opening.closing_date)
+        for opening in QuizStudentOpening.objects.filter(
+            quiz_id__in=[delivery.quiz_id for delivery in delivery_list if delivery.quiz_id],
+            student_id__in=[delivery.user_id for delivery in delivery_list],
+        )
+    }
+    authorized_ids = _authorized_delivery_ids(deliveries)
     counts = {"sent": 0, "skipped": 0, "failed": 0}
-    for delivery in deliveries:
-        if not _authorized_delivery(delivery):
+    outbound_account_ids = set()
+    for delivery in delivery_list:
+        if not _authorized_delivery(delivery, authorized_ids, exceptional_windows):
             _mark_skipped(delivery.pk, _("Recipient is no longer authorized."))
             counts["skipped"] += 1
             continue
         try:
-            response = _send_delivery(bot, delivery)
+            response = _send_delivery(bot, delivery, exceptional_windows)
             message_id = getattr(response, "message_id", None)
             TelegramNotificationDelivery.objects.filter(
                 pk=delivery.pk,
@@ -324,11 +325,13 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
                 last_error="",
                 updated_at=timezone.now(),
             )
-            TelegramAccount.objects.filter(pk=delivery.telegram_account_id).update(
-                last_outbound_at=timezone.now(),
-            )
+            outbound_account_ids.add(delivery.telegram_account_id)
             counts["sent"] += 1
         except Exception:
             _mark_failed_or_retry(delivery.pk, delivery.attempt_count, _("Telegram message delivery failed."))
             counts["failed"] += 1
+    if outbound_account_ids:
+        TelegramAccount.objects.filter(pk__in=outbound_account_ids).update(
+            last_outbound_at=timezone.now(),
+        )
     return counts

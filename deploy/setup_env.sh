@@ -63,6 +63,26 @@ value_from_tmp() {
     printf '%s' "${value:-$default}"
 }
 
+# read_secret_value KEY PROMPT — hidden input; never prints the current value
+read_secret_value() {
+    local key="$1" prompt="$2" current input force_reentry=false
+    current="$(value_from_tmp "$key" "")"
+    if [[ "$current" == \"*\" && "$current" == *\" ]]; then
+        printf '%s' "$key has surrounding quote characters; re-enter without quotes: " >&2
+        force_reentry=true
+    elif [[ -n "$current" ]]; then
+        printf '%s' "$prompt [press Enter to keep existing]: " >&2
+    else
+        printf '%s' "$prompt: " >&2
+    fi
+    read -r -s input
+    echo >&2
+    if $force_reentry && [[ -z "$input" ]]; then
+        die "$key must be re-entered without surrounding quotes"
+    fi
+    printf '%s' "${input:-$current}"
+}
+
 write_compose_env() {
     # Compose parses its interpolation env file before it processes service
     # env_file entries.  Keep this file limited to non-secret settings so a
@@ -86,6 +106,7 @@ NGINX_TLS_CERT_DIR|./certs
 LMS_RUNTIME_DIR|./runtime
 DOZZLE_DATA_DIR|./runtime/dozzle
 REDIS_URL|redis://redis:6379/0
+REDIS_CACHE_URL|redis://redis:6379/1
 CELERY_BROKER_URL|redis://redis:6379/0
 CELERY_RESULT_BACKEND|redis://redis:6379/0
 CELERY_CONCURRENCY|2
@@ -154,6 +175,7 @@ else
 fi
 write_value POSTGRES_PASSWORD "$pass"
 write_value REDIS_URL redis://redis:6379/0
+write_value REDIS_CACHE_URL redis://redis:6379/1
 write_value CELERY_BROKER_URL redis://redis:6379/0
 write_value CELERY_RESULT_BACKEND redis://redis:6379/0
 write_value CELERY_CONCURRENCY 2
@@ -202,6 +224,22 @@ write_value TELEGRAM_ENCRYPTION_KEY "$enc"
 # Dedicated private Telegram bucket; never the academic media bucket.
 # Blank disables Telegram media storage (no fallback to R2_BUCKET_NAME).
 write_value TELEGRAM_R2_BUCKET_NAME "$(read_value TELEGRAM_R2_BUCKET_NAME "Dedicated private Telegram media bucket (blank = disabled)" "")"
+echo ""
+
+# ── 6. Mobile push and media Worker ────────────────────────────────────
+# Expo access tokens and Worker shared secrets are server-only. They are
+# hidden during input, preserved on Enter, and never copied to .compose.env.
+write_value EXPO_PUSH_ACCESS_TOKEN "$(read_secret_value EXPO_PUSH_ACCESS_TOKEN "Expo Push access token (blank = disabled)")"
+write_value EXPO_PUSH_SEND_URL "$(value_from_tmp EXPO_PUSH_SEND_URL "https://exp.host/--/api/v2/push/send")"
+write_value EXPO_PUSH_RECEIPTS_URL "$(value_from_tmp EXPO_PUSH_RECEIPTS_URL "https://exp.host/--/api/v2/push/getReceipts")"
+write_value EXPO_PUSH_TIMEOUT_SECONDS "$(value_from_tmp EXPO_PUSH_TIMEOUT_SECONDS "15")"
+write_value EXPO_PUSH_REQUESTS_PER_SECOND "$(value_from_tmp EXPO_PUSH_REQUESTS_PER_SECOND "5")"
+
+cloud_worker="$(read_value CLOUD_WORKER "Cloudflare Worker public HTTPS URL (blank = direct/local media)" "")"
+[[ -z "$cloud_worker" || "$cloud_worker" == https://* ]] || die "CLOUD_WORKER must be an HTTPS URL when set"
+write_value CLOUD_WORKER "$cloud_worker"
+write_value WORKER_HMAC_SECRET "$(read_secret_value WORKER_HMAC_SECRET "Worker HMAC secret (blank = disabled)")"
+write_value WORKER_RECEIPT_SECRET "$(read_secret_value WORKER_RECEIPT_SECRET "Worker receipt secret (blank = disabled)")"
 echo ""
 
 # ── Production defaults ────────────────────────────────────────────────

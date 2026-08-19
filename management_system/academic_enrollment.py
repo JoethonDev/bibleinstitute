@@ -21,6 +21,7 @@ from .models import (
     User,
     HistoricalAcademicSummary,
 )
+from .mobile_auth import revoke_user_mobile_access
 
 
 PROMOTABLE_HISTORICAL_OUTCOMES = frozenset({
@@ -155,6 +156,8 @@ def set_application_status(application: User, actor: User, status: str) -> tuple
         locked_user.save(update_fields=[
             "application_status", "is_active", "decided_by", "decided_at",
         ])
+        if status != "active":
+            revoke_user_mobile_access(locked_user)
         return locked_user, None
 
     active_years = list(AcademicYear.objects.select_for_update().filter(is_active=True).order_by("pk"))

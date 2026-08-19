@@ -23,6 +23,7 @@ from django.forms import formset_factory
 import hashlib
 import hmac
 import io
+import math
 import secrets
 import uuid
 import random
@@ -129,7 +130,11 @@ from .media_storage import (
 )
 from .media_tasks import enqueue_media_attachment_retry, enqueue_media_job
 from .telegram.linking import TelegramLinkError, current_telegram_link
-from .telegram.notifications import enqueue_lesson_notifications, schedule_quiz_opening_notifications
+from .student_notifications import (
+    cancel_future_quiz_opening_events,
+    create_lesson_publication_event,
+    schedule_quiz_opening_events,
+)
 from .payments import academic_payment_scopes_for_student
 from .payment_matrix import PAYMENT_MATRIX_PAGE_SIZE, PAYMENT_STATUS_VALUES, payment_matrix_page, payment_matrix_student_queryset
 
@@ -1196,7 +1201,11 @@ def take_exam(request, offering_id, quiz_id):
                 logger.info(f"User : {user} has submitted {quiz} at {submission_datetime.strftime('%d/%m/%Y, %H:%M:%S')}")
 
                 questions_data, not_used = unpack_quiz_form(request.POST)
-                valid_question_ids = set(Question.objects.filter(quiz_id=quiz_id).values_list("pk", flat=True))
+                question_by_id = {
+                    question.pk: question
+                    for question in Question.objects.filter(quiz_id=quiz_id)
+                }
+                valid_question_ids = set(question_by_id)
 
                 # Create Quesitons
                 submissions = []
@@ -1211,7 +1220,11 @@ def take_exam(request, offering_id, quiz_id):
                         continue
                     repeated_submissions.add(question_id)
                     # Create instance
-                    submission = Submission(question_id=question_id, submitted_answer=submitted_answer, user=user)
+                    submission = Submission(
+                        question=question_by_id[question_id],
+                        submitted_answer=submitted_answer,
+                        user=user,
+                    )
                     submission.assign_grade()
 
                     # Sum grades
@@ -1224,13 +1237,27 @@ def take_exam(request, offering_id, quiz_id):
                 unanswered_questions = valid_question_ids - repeated_submissions
                 for qid in unanswered_questions:
                     submissions.append(
-                        Submission(question_id=qid, submitted_answer="-", user=user)
+                        Submission(
+                            question=question_by_id[qid],
+                            submitted_answer="-",
+                            user=user,
+                        )
                     )
 
                 try:
                     with transaction.atomic():
+                        locked_user = User.objects.select_for_update().get(pk=user.pk)
+                        if Grade.objects.filter(user=locked_user, quiz=quiz).exists():
+                            return redirect(reverse("quiz-details", args=[offering_id, quiz_id]))
+                        for submission in submissions:
+                            submission.user = locked_user
                         Submission.objects.bulk_create(submissions)
-                        Grade.objects.create(quiz=quiz, user=user, submitted_at=submission_datetime, total_grade=total_grade)
+                        Grade.objects.create(
+                            quiz=quiz,
+                            user=locked_user,
+                            submitted_at=submission_datetime,
+                            total_grade=total_grade,
+                        )
                         logger.info(f"{user}'s submission is added successfully to {quiz}")
                     success(request, _("Quiz is sent successfully!"), extra_tags="alert-success") # Translate
 
@@ -1741,9 +1768,16 @@ class UpdateUser(UserBaseView, UpdateView):
 
     def form_valid(self, form):
         try:
+            original = User.objects.get(pk=self.object.pk)
             with transaction.atomic():
                 response = super().form_valid(form)
                 user = User.objects.get(username=self.request.user)
+                if (
+                    original.application_status != self.object.application_status
+                    or original.is_active and not self.object.is_active
+                    or original.role_id != self.object.role_id
+                ):
+                    revoke_user_mobile_access(self.object)
                 scope = form.cleaned_data.get("enrollment_scope")
                 if user.role and user.role.role == "admin" and scope:
                     set_user_normal_enrollment_scope(self.object, user, scope)
@@ -1921,25 +1955,37 @@ def quiz_detail(request, quiz_id):
 @require_POST
 @capability_required(can_manage_academic_setup)
 def quiz_exceptional_opening(request, quiz_id):
-    quiz = get_object_or_404(Quiz.objects.select_related("course_offering__academic_year_level"), pk=quiz_id)
-    form = QuizExceptionalOpeningForm(request.POST, quiz=quiz)
-    if not form.is_valid():
-        messages.error(request, _("Please correct the exceptional opening form."))
-        return redirect("quiz-view", quiz_id=quiz.pk)
+    invalid_form = False
     try:
         with transaction.atomic():
-            count = grant_quiz_openings(
-                quiz,
-                form.cleaned_data["students"],
-                form.cleaned_data["opening_date"],
-                form.cleaned_data["closing_date"],
-                request.user,
+            quiz = get_object_or_404(
+                Quiz.objects.select_for_update().select_related(
+                    "course_offering__course",
+                    "course_offering__academic_year_level__level",
+                    "course_offering__academic_year_level__academic_year",
+                    "quiz_type",
+                ),
+                pk=quiz_id,
             )
+            form = QuizExceptionalOpeningForm(request.POST, quiz=quiz)
+            if not form.is_valid():
+                invalid_form = True
+            else:
+                count = grant_quiz_openings(
+                    quiz,
+                    form.cleaned_data["students"],
+                    form.cleaned_data["opening_date"],
+                    form.cleaned_data["closing_date"],
+                    request.user,
+                )
+                schedule_quiz_opening_events(quiz, locked=True)
     except ValidationError as exc:
         messages.error(request, "; ".join(str(message) for message in exc.messages))
     else:
-        schedule_quiz_opening_notifications(quiz)
-        messages.success(request, _("Exceptional opening saved for %(count)s student(s).") % {"count": count})
+        if invalid_form:
+            messages.error(request, _("Please correct the exceptional opening form."))
+        else:
+            messages.success(request, _("Exceptional opening saved for %(count)s student(s).") % {"count": count})
     return redirect("quiz-view", quiz_id=quiz.pk)
 
 
@@ -2027,15 +2073,17 @@ def create_lesson(request):
                     pk=offering_id,
                     academic_year_level__academic_year__is_active=True,
                 )
-                lesson = Lesson.objects.create(
-                    name=lesson_name,
-                    description=lesson_description or None,
-                    course_offering=course_offering,
-                    links=json.dumps(links),
-                    status=publication_status,
-                )
-                if publication_status == PublicationStatus.PUBLISHED:
-                    enqueue_lesson_notifications(lesson)
+                with transaction.atomic():
+                    lesson = Lesson.objects.create(
+                        name=lesson_name,
+                        description=lesson_description or None,
+                        course_offering=course_offering,
+                        links=json.dumps(links),
+                        status=publication_status,
+                        publication_event_version=1 if publication_status == PublicationStatus.PUBLISHED else 0,
+                    )
+                    if publication_status == PublicationStatus.PUBLISHED:
+                        create_lesson_publication_event(lesson)
                 success(request, _("Lesson is created successfully"), extra_tags="alert-success") # Translate
                 logger.info(
                     "Lesson %s is added in offering %s with media length of %s",
@@ -2110,10 +2158,13 @@ def update_lesson(request, lesson_id):
             if publication_status == lesson.status:
                 return HttpResponse(_("Published or archived lesson cannot be edited."), status=403)
             previous_status = lesson.status
-            lesson.status = publication_status
-            lesson.save(update_fields=["status", "updated_date"])
-            if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                enqueue_lesson_notifications(lesson)
+            with transaction.atomic():
+                lesson.status = publication_status
+                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                    lesson.publication_event_version += 1
+                lesson.save(update_fields=["status", "updated_date", "publication_event_version"])
+                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                    create_lesson_publication_event(lesson)
             success(request, _("Lesson status is updated successfully"), extra_tags="alert-success")
             return redirect(reverse("lesson-update", args=[lesson_id]))
         lesson_name = request.POST.get("lesson_name", "")
@@ -2132,9 +2183,12 @@ def update_lesson(request, lesson_id):
                 )
                 lesson.links = json.dumps(links)
                 lesson.status = publication_status
-                lesson.save()
-                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                    enqueue_lesson_notifications(lesson)
+                with transaction.atomic():
+                    if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                        lesson.publication_event_version += 1
+                    lesson.save()
+                    if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                        create_lesson_publication_event(lesson)
 
                 logger.info(
                     "Lesson %s is updated successfully in offering %s with media length of %s",
@@ -2941,7 +2995,7 @@ def create_quiz(request):
                 Question.objects.bulk_create(questions_obj)
 
                 if publication_status == PublicationStatus.PUBLISHED:
-                    schedule_quiz_opening_notifications(quiz)
+                    schedule_quiz_opening_events(quiz)
 
                 logger.info(
                     "Quiz %s is added in offering %s with %s questions",
@@ -2997,23 +3051,35 @@ def update_quiz(request, quiz_id):
             if not quiz.can_edit:
                 if publication_status == quiz.status:
                     return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
-                previous_status = quiz.status
-                quiz.status = publication_status
-                quiz.save(update_fields=["status"])
-                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                    schedule_quiz_opening_notifications(quiz)
+                with transaction.atomic():
+                    quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
+                    if publication_status == quiz.status:
+                        return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                    previous_status = quiz.status
+                    quiz.status = publication_status
+                    quiz.save(update_fields=["status"])
+                    if previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
+                        cancel_future_quiz_opening_events(quiz)
+                    if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
+                        schedule_quiz_opening_events(quiz)
                 success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
                 return redirect(reverse("quiz-update", args=[quiz_id]))
-            previous_status = quiz.status
-            quiz.name = quiz_data['quiz_name']
-            quiz.opening_date = get_datetime(quiz_data['opening_date'])
-            quiz.closing_date = get_datetime(quiz_data['closing_date'])
-            quiz.total_grade = quiz_data['total_grade']
-            quiz.status = publication_status
+            requested_name = quiz_data['quiz_name']
+            requested_opening_date = get_datetime(quiz_data['opening_date'])
+            requested_closing_date = get_datetime(quiz_data['closing_date'])
+            requested_total_grade = quiz_data['total_grade']
             quiz_type_id = request.POST.get("quiz_type")
-            quiz.quiz_type = get_object_or_404(QuizType, pk=quiz_type_id, code__in=QUIZ_TYPE_CODES)
+            requested_quiz_type = get_object_or_404(QuizType, pk=quiz_type_id, code__in=QUIZ_TYPE_CODES)
             offering_id = request.POST.get("course_offering")
-            quiz.course_offering = get_object_or_404(CourseOffering, pk=offering_id)
+            requested_offering = get_object_or_404(CourseOffering, pk=offering_id)
+
+            quiz.name = requested_name
+            quiz.opening_date = requested_opening_date
+            quiz.closing_date = requested_closing_date
+            quiz.total_grade = requested_total_grade
+            quiz.status = publication_status
+            quiz.quiz_type = requested_quiz_type
+            quiz.course_offering = requested_offering
 
             # Create Questions
             questions_obj = []
@@ -3033,6 +3099,20 @@ def update_quiz(request, quiz_id):
                     questions_obj.append(question_instance)
             
             with transaction.atomic():
+                quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
+                if not quiz.can_edit:
+                    return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                previous_status = quiz.status
+                previous_opening_date = quiz.opening_date
+                previous_closing_date = quiz.closing_date
+                previous_offering_id = quiz.course_offering_id
+                quiz.name = requested_name
+                quiz.opening_date = requested_opening_date
+                quiz.closing_date = requested_closing_date
+                quiz.total_grade = requested_total_grade
+                quiz.status = publication_status
+                quiz.quiz_type = requested_quiz_type
+                quiz.course_offering = requested_offering
                 # Delete Removed Questions
                 Question.objects.filter(quiz=quiz).exclude(pk__in=questions_id).delete()
 
@@ -3042,9 +3122,15 @@ def update_quiz(request, quiz_id):
                 # Current New Questions
                 Question.objects.bulk_create(questions_obj)
                 quiz.save()
-
-            if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                schedule_quiz_opening_notifications(quiz)
+                published_window_changed = (
+                    previous_opening_date != quiz.opening_date
+                    or previous_closing_date != quiz.closing_date
+                    or previous_offering_id != quiz.course_offering_id
+                )
+                if publication_status == PublicationStatus.PUBLISHED and (
+                    previous_status != PublicationStatus.PUBLISHED or published_window_changed
+                ):
+                    schedule_quiz_opening_events(quiz)
 
             logger.info(
                 "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",
@@ -4151,6 +4237,8 @@ def application_review(request, user_id):
             uploaded_keys = []
             old_keys = []
             original_status = user.application_status
+            original_role_id = user.role_id
+            original_is_active = user.is_active
             desired_status = form.cleaned_data["application_status"]
             try:
                 with transaction.atomic():
@@ -4158,6 +4246,11 @@ def application_review(request, user_id):
                         form.instance.application_status = original_status
                         form.instance.is_active = user.is_active
                     user = form.save()
+                    if (
+                        original_role_id != user.role_id
+                        or original_is_active and not user.is_active
+                    ):
+                        revoke_user_mobile_access(user)
                     for upload_type, (model_field, document_label) in document_fields.items():
                         previous_key = getattr(user, model_field, None)
                         if form.cleaned_data.get(f"clear_{upload_type}"):
@@ -5712,10 +5805,24 @@ def progress_heartbeat(request):
     if not session_id or not isinstance(ranges, list):
         return JsonResponse({"error": _("Missing session identifier or time ranges.")}, status=400)
 
-    # Validate ranges are numeric
+    if len(ranges) > 200:
+        return JsonResponse({"error": _("Too many time ranges.")}, status=400)
+
+    # Validate ranges are finite, ordered, non-negative, and bounded before
+    # intersecting them with the verified media timeline.
     try:
         ranges = [[float(s), float(e)] for s, e in ranges]
     except (ValueError, TypeError):
+        return JsonResponse({"error": _("Invalid time range format.")}, status=400)
+    max_duration = float(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60))
+    if any(
+        not math.isfinite(start)
+        or not math.isfinite(end)
+        or start < 0
+        or end <= start
+        or end > max_duration
+        for start, end in ranges
+    ):
         return JsonResponse({"error": _("Invalid time range format.")}, status=400)
 
     session = get_object_or_404(ViewingSession, session_id=session_id)

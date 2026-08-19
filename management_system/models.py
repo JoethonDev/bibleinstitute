@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, timedelta
 import json
+import uuid
 from django.utils.translation import gettext_lazy as _
 from django.utils import translation
 from django.db.models import Max
@@ -308,6 +309,13 @@ class TelegramNotificationDelivery(models.Model):
         blank=True,
         related_name="notification_deliveries",
     )
+    student_notification = models.ForeignKey(
+        "StudentNotification",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_deliveries",
+    )
     lesson = models.ForeignKey(
         "Lesson",
         on_delete=models.SET_NULL,
@@ -358,6 +366,298 @@ class TelegramNotificationDelivery(models.Model):
 
     def __str__(self):
         return self.idempotency_key
+
+
+class StudentMobileSession(models.Model):
+    """Revocable mobile bearer-session state with digest-only token storage."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mobile_sessions",
+    )
+    token_digest = models.CharField(max_length=64, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "revoked_at", "expires_at"],
+                name="mobile_session_user_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Mobile session for {self.user.username}"
+
+
+class MobileOtpChallenge(models.Model):
+    """Digest-only, one-use Telegram OTP challenge for mobile login."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        SENT = "sent", _("Sent")
+        CONSUMED = "consumed", _("Consumed")
+        EXPIRED = "expired", _("Expired")
+        LOCKED = "locked", _("Locked")
+        FAILED = "failed", _("Failed")
+
+    challenge_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mobile_otp_challenges",
+    )
+    installation_id = models.CharField(max_length=128, blank=True, default="")
+    otp_digest = models.CharField(max_length=64, editable=False)
+    purpose = models.CharField(max_length=16, default="login")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    delivery_error = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "purpose", "installation_id"],
+                condition=models.Q(status__in=["queued", "sending", "sent"]),
+                name="mobile_otp_one_active_challenge",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(attempt_count__gte=0) & models.Q(attempt_count__lte=5),
+                name="mobile_otp_attempts_bounded",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["student", "purpose", "status", "expires_at"],
+                name="mobile_otp_student_status_idx",
+            ),
+            models.Index(
+                fields=["status", "expires_at"],
+                name="mobile_otp_due_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return str(self.challenge_id)
+
+
+class MobilePushDevice(models.Model):
+    """One Expo push subscription belonging to one mobile installation."""
+
+    class Platform(models.TextChoices):
+        ANDROID = "android", _("Android")
+        IOS = "ios", _("iOS")
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mobile_push_devices",
+    )
+    expo_push_token = models.CharField(max_length=255, unique=True)
+    installation_id = models.CharField(max_length=128)
+    platform = models.CharField(max_length=16, choices=Platform.choices)
+    is_active = models.BooleanField(default=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["installation_id"],
+                name="mobile_device_install_unique",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(is_active=True, disabled_at__isnull=True)
+                    | models.Q(is_active=False, disabled_at__isnull=False)
+                ),
+                name="mobile_device_active_state_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["user", "is_active"],
+                name="mobile_device_user_active_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} mobile device ({self.platform})"
+
+
+class StudentNotification(models.Model):
+    """One durable, student-visible academic notification event."""
+
+    class NotificationType(models.TextChoices):
+        LESSON_PUBLISHED = "lesson_published", _("Lesson published")
+        QUIZ_OPENING = "quiz_opening", _("Exam opening")
+
+    class NavigationType(models.TextChoices):
+        LESSON = "lesson", _("Lesson")
+        QUIZ = "quiz", _("Exam")
+
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="student_notifications",
+    )
+    notification_type = models.CharField(
+        max_length=32,
+        choices=NotificationType.choices,
+    )
+    lesson = models.ForeignKey(
+        "Lesson",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="student_notifications",
+    )
+    quiz = models.ForeignKey(
+        "Quiz",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="student_notifications",
+    )
+    effective_opening_at = models.DateTimeField(null=True, blank=True)
+    effective_closing_at = models.DateTimeField(null=True, blank=True)
+    idempotency_key = models.CharField(max_length=255, unique=True)
+    title_ar = models.CharField(max_length=255)
+    body_ar = models.TextField()
+    title_en = models.CharField(max_length=255)
+    body_en = models.TextField()
+    navigation_type = models.CharField(
+        max_length=16,
+        choices=NavigationType.choices,
+    )
+    offering_id = models.PositiveBigIntegerField()
+    entity_id = models.PositiveBigIntegerField()
+    scheduled_for = models.DateTimeField()
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        notification_type="lesson_published",
+                        quiz__isnull=True,
+                        navigation_type="lesson",
+                        effective_opening_at__isnull=True,
+                        effective_closing_at__isnull=True,
+                    )
+                    | models.Q(
+                        notification_type="quiz_opening",
+                        lesson__isnull=True,
+                        navigation_type="quiz",
+                        effective_opening_at__isnull=False,
+                        effective_closing_at__isnull=False,
+                    )
+                ),
+                name="student_notification_source_type_match",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(offering_id__gt=0) & models.Q(entity_id__gt=0),
+                name="student_notification_route_ids_positive",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["student", "read_at", "created_at"],
+                name="student_notification_inbox_idx",
+            ),
+            models.Index(
+                fields=["scheduled_for", "notification_type"],
+                name="student_notification_due_idx",
+            ),
+            models.Index(
+                fields=["cancelled_at", "scheduled_for"],
+                name="student_notif_cancel_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return self.idempotency_key
+
+
+class PushDelivery(models.Model):
+    """Per-device Expo delivery state for one logical notification."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        TICKETED = "ticketed", _("Ticketed")
+        DELIVERED = "delivered", _("Delivered")
+        FAILED = "failed", _("Failed")
+        SKIPPED = "skipped", _("Skipped")
+
+    notification = models.ForeignKey(
+        StudentNotification,
+        on_delete=models.CASCADE,
+        related_name="push_deliveries",
+    )
+    device = models.ForeignKey(
+        MobilePushDevice,
+        on_delete=models.CASCADE,
+        related_name="push_deliveries",
+    )
+    expo_ticket_id = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    error_code = models.CharField(max_length=80, blank=True, default="")
+    error_message = models.CharField(max_length=500, blank=True, default="")
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(default=timezone.now)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    ticketed_at = models.DateTimeField(null=True, blank=True)
+    receipt_checked_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notification", "device"],
+                name="push_delivery_notification_device_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(attempt_count__gte=0) & models.Q(attempt_count__lte=3),
+                name="push_delivery_attempts_bounded",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["status", "next_attempt_at"],
+                name="push_delivery_due_idx",
+            ),
+            models.Index(
+                fields=["notification", "status"],
+                name="push_delivery_notification_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Push delivery {self.notification_id}/{self.device_id}"
 
 
 class TelegramConversation(models.Model):
@@ -1467,6 +1767,7 @@ class Lesson(models.Model):
     )
     created_date = models.DateField(null=False, default=date.today)
     updated_date = models.DateField(null=False, auto_now=True)
+    publication_event_version = models.PositiveIntegerField(default=0, editable=False)
 
 
     def __str__(self):
@@ -1648,6 +1949,8 @@ class Quiz(models.Model):
 
     def clean(self):
         super().clean()
+        if self.opening_date and self.closing_date and self.closing_date <= self.opening_date:
+            raise ValidationError({"closing_date": _("Closing date must be after opening date.")})
         if self.quiz_type_id and self.quiz_type and self.quiz_type.code not in QUIZ_TYPE_CODES:
             raise ValidationError({"quiz_type": _("Quiz type must be weekly or final.")})
     def save(self, *args, **kwargs):
@@ -1972,6 +2275,3 @@ class Grade(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.quiz.name} ({self.total_grade})"
-
-
-
