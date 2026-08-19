@@ -23,11 +23,12 @@ def send_mobile_otp(self, challenge_id: str, encrypted_otp: str):
     now = timezone.now()
     with transaction.atomic():
         try:
-            challenge = (
-                MobileOtpChallenge.objects.select_for_update()
-                .select_related("student", "student__role")
-                .get(challenge_id=challenge_id)
+            challenge = MobileOtpChallenge.objects.select_for_update().get(
+                challenge_id=challenge_id
             )
+            challenge = MobileOtpChallenge.objects.select_related(
+                "student", "student__role"
+            ).get(pk=challenge.pk)
         except MobileOtpChallenge.DoesNotExist:
             return
         if challenge.status not in {

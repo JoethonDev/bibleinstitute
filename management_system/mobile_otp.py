@@ -184,11 +184,13 @@ def verify_mobile_otp(challenge_id: str, otp: str, installation_id: str):
         raise MobileOtpError("invalid_otp", _("Enter the six-digit OTP."))
     with transaction.atomic():
         try:
-            challenge = (
-                MobileOtpChallenge.objects.select_for_update()
-                .select_related("student", "student__role")
-                .get(challenge_id=challenge_uuid, purpose="login")
+            challenge = MobileOtpChallenge.objects.select_for_update().get(
+                challenge_id=challenge_uuid,
+                purpose="login",
             )
+            challenge = MobileOtpChallenge.objects.select_related(
+                "student", "student__role"
+            ).get(pk=challenge.pk)
         except MobileOtpChallenge.DoesNotExist:
             raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
         normalized_installation_id = installation_id.strip()[:128] if isinstance(installation_id, str) else ""
@@ -214,7 +216,8 @@ def verify_mobile_otp(challenge_id: str, otp: str, installation_id: str):
                 challenge.status = MobileOtpChallenge.Status.LOCKED
             challenge.save(update_fields=["attempt_count", "status"])
             raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
-        user = User.objects.select_for_update().select_related("role").get(pk=challenge.student_id)
+        User.objects.select_for_update().get(pk=challenge.student_id)
+        user = User.objects.select_related("role").get(pk=challenge.student_id)
         if (
             not user.is_active
             or not user.role
