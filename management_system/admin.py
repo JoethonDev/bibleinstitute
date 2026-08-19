@@ -1,5 +1,6 @@
 ﻿from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
+from .mobile_auth import revoke_user_mobile_access
 from .models import *
 
 # Register your models here.
@@ -7,6 +8,24 @@ from .models import *
 
 def _is_admin_user(request):
     return getattr(getattr(request.user, "role", None), "role", None) == "admin"
+
+
+class UserAdmin(admin.ModelAdmin):
+    """Revoke mobile access when direct admin edits invalidate an account."""
+
+    def save_model(self, request, obj, form, change):
+        original = None
+        if change and obj.pk:
+            original = User.objects.only(
+                "role_id", "application_status", "is_active"
+            ).get(pk=obj.pk)
+        super().save_model(request, obj, form, change)
+        if original is not None and (
+            original.role_id != obj.role_id
+            or original.application_status != obj.application_status
+            or original.is_active != obj.is_active
+        ):
+            revoke_user_mobile_access(obj)
 
 
 class AdminOnlyModelAdmin(admin.ModelAdmin):
@@ -41,7 +60,7 @@ class AcademicContentReadOnlyAdmin(AdminOnlyModelAdmin):
         return False
 
 
-admin.site.register(User)
+admin.site.register(User, UserAdmin)
 admin.site.register(Role)
 admin.site.register(Course)
 admin.site.register(

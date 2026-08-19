@@ -10,7 +10,6 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import override
 
-from .mobile_auth import MOBILE_LOGIN_ROLES
 from .models import MobileOtpChallenge, TelegramAccount, TelegramBotConfig
 from .telegram.configuration import decrypt_secret
 
@@ -45,8 +44,6 @@ def send_mobile_otp(self, challenge_id: str, encrypted_otp: str):
         if (
             not challenge.student.is_active
             or challenge.student.application_status != "active"
-            or not challenge.student.role
-            or challenge.student.role.role not in MOBILE_LOGIN_ROLES
         ):
             challenge.status = MobileOtpChallenge.Status.FAILED
             challenge.delivery_error = "Student is no longer eligible for mobile OTP."

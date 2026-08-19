@@ -1124,10 +1124,15 @@ def stream_lesson(request, offering_id, lesson_id, file_index):
 #         logger.error(f"Stack Trace : {str(e)}")
 
 @login_required(login_url=LOGIN_URL)
-def take_exam(request, offering_id, quiz_id):
+def take_exam(request, offering_id, quiz_id, *, allow_management=False):
     try:
         user = User.objects.get(pk=request.user.pk)
-        offering = get_accessible_offering_or_403(user, offering_id, write=request.method == "POST")
+        offering = get_accessible_offering_or_403(
+            user,
+            offering_id,
+            write=request.method == "POST",
+            allow_management=allow_management,
+        )
         quiz = get_object_or_404(Quiz, pk=quiz_id, course_offering=offering)
 
         submission_datetime = now()
@@ -4953,7 +4958,13 @@ def course_offering_create(request):
 def course_offering_edit(request, offering_id):
     offering = get_object_or_404(CourseOffering, pk=offering_id)
     if request.method == "POST":
-        form = CourseOfferingForm(request.POST, instance=offering)
+        # The offering scope is immutable through this edit path and is not
+        # rendered as an editable field in the modal. Bind it server-side so
+        # the required model form field remains validated without trusting a
+        # client-supplied scope.
+        post_data = request.POST.copy()
+        post_data["academic_year_level"] = str(offering.academic_year_level_id)
+        form = CourseOfferingForm(post_data, instance=offering)
         if form.is_valid():
             form.save()
             messages.success(request, _("Course offering updated."))
@@ -5791,7 +5802,7 @@ def worker_receipt(request):
     return JsonResponse({"status": "recorded" if created else "already_recorded"})
 
 @require_POST
-def progress_heartbeat(request):
+def progress_heartbeat(request, *, allow_management=False):
     if not request.user.is_authenticated:
         return JsonResponse({"error": _("Authentication required")}, status=401)
     try:
@@ -5834,7 +5845,11 @@ def progress_heartbeat(request):
     if timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Session expired.")}, status=403)
 
-    if not user_can_write_offering_activity(request.user, session.lesson.course_offering):
+    if not user_can_write_offering_activity(
+        request.user,
+        session.lesson.course_offering,
+        allow_management=allow_management,
+    ):
         return JsonResponse({"status": "ok", "note": _("Historical content is read-only")})
 
     session.last_heartbeat = timezone.now()

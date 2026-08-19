@@ -124,8 +124,13 @@ def user_can_read_offering(user: User, offering: CourseOffering) -> bool:
     return accessible_offerings(user).filter(pk=offering.pk).exists()
 
 
-def user_can_write_offering_activity(user: User, offering: CourseOffering) -> bool:
-    if not user.is_authenticated or _management_user(user):
+def user_can_write_offering_activity(
+    user: User,
+    offering: CourseOffering,
+    *,
+    allow_management: bool = False,
+) -> bool:
+    if not user.is_authenticated or (_management_user(user) and not allow_management):
         return False
     if offering.status != PublicationStatus.PUBLISHED or not offering.academic_year_level.academic_year.is_active:
         return False
@@ -144,13 +149,25 @@ def user_can_write_offering_activity(user: User, offering: CourseOffering) -> bo
     ).exists()
 
 
-def get_accessible_offering_or_403(user: User, offering_id: int, write: bool = False) -> CourseOffering:
+def get_accessible_offering_or_403(
+    user: User,
+    offering_id: int,
+    write: bool = False,
+    *,
+    allow_management: bool = False,
+) -> CourseOffering:
     offering = CourseOffering.objects.select_related(
         "course", "academic_year_level__academic_year", "academic_year_level__level"
     ).filter(pk=offering_id).first()
     if offering is None:
         raise PermissionDenied(_("You do not have access to this offering."))
-    allowed = user_can_write_offering_activity(user, offering) if write else user_can_read_offering(user, offering)
+    allowed = (
+        user_can_write_offering_activity(
+            user, offering, allow_management=allow_management
+        )
+        if write
+        else user_can_read_offering(user, offering)
+    )
     if not allowed:
         raise PermissionDenied(_("You do not have access to this offering."))
     return offering

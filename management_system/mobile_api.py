@@ -1,4 +1,4 @@
-"""Student-only JSON API for the native mobile client."""
+"""JSON API for the native mobile client."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ import qrcode
 
 from .forms import SignupDetailsForm
 from .mobile_auth import (
-    MOBILE_LOGIN_ROLES,
     get_mobile_session,
     issue_mobile_session,
     clear_mobile_login_failures,
@@ -31,7 +30,6 @@ from .mobile_auth import (
     require_mobile_session,
     revoke_mobile_session,
     record_mobile_login_failure,
-    mobile_user_can_write_academic_activity,
 )
 from .mobile_otp import MobileOtpError, request_mobile_otp, verify_mobile_otp
 from .models import (
@@ -137,8 +135,6 @@ def login(request):
     if (
         user is None
         or not user.is_active
-        or not user.role
-        or user.role.role not in MOBILE_LOGIN_ROLES
         or user.application_status != "active"
     ):
         record_mobile_login_failure(username_key, remote_addr)
@@ -319,13 +315,6 @@ def quiz_status(request, offering_id):
 @require_mobile_session
 @require_POST
 def quiz_submit(request, offering_id, quiz_id):
-    if not mobile_user_can_write_academic_activity(request.user):
-        return _error(
-            request,
-            "forbidden",
-            _localized(request, "This account cannot submit quizzes or save progress."),
-            403,
-        )
     payload = _json_body(request)
     if payload is None or not isinstance(payload.get("answers"), (list, dict)):
         return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
@@ -362,7 +351,7 @@ def quiz_submit(request, offering_id, quiz_id):
         query[f"questions[{index}][id]"] = str(question_id)
         query[f"questions[{index}][answer]"] = str(answer)
     request.POST = query
-    response = take_exam(request, offering_id, quiz_id)
+    response = take_exam(request, offering_id, quiz_id, allow_management=True)
     if getattr(response, "status_code", 0) in {301, 302, 303, 307, 308}:
         grade = Grade.objects.filter(user=request.user, quiz_id=quiz_id).values("total_grade", "submitted_at").first()
         if grade is None:
@@ -536,7 +525,12 @@ def _media_link(request, offering_id, lesson_id, file_index):
     lesson = _authorized_lesson(request.user, offering_id, lesson_id)
     if lesson is None:
         return None, None
-    links = json.loads(lesson.links or "[]")
+    try:
+        links = json.loads(lesson.links or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return lesson, None
+    if not isinstance(links, list):
+        return lesson, None
     if file_index < 0 or file_index >= len(links) or not isinstance(links[file_index], dict):
         return lesson, None
     return lesson, links[file_index]
@@ -621,7 +615,7 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
         offering_id is not None and session.lesson.course_offering_id != offering_id
     ):
         return _error(request, "forbidden", _("You do not have access to this viewing session."), 403)
-    response = existing_progress_heartbeat(request)
+    response = existing_progress_heartbeat(request, allow_management=True)
     try:
         data = json.loads(response.content)
     except (TypeError, ValueError, json.JSONDecodeError):
@@ -633,11 +627,4 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
 @require_mobile_session
 @require_POST
 def lesson_progress(request, offering_id, lesson_id):
-    if not mobile_user_can_write_academic_activity(request.user):
-        return _error(
-            request,
-            "forbidden",
-            _localized(request, "This account cannot submit quizzes or save progress."),
-            403,
-        )
     return _call_existing_progress(request, lesson_id, offering_id)
