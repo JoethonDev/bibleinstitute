@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from .models import MobileOtpChallenge, TelegramAccount, TelegramBotConfig, User
-from .mobile_auth import mobile_installation_conflict
+from .mobile_auth import MOBILE_LOGIN_ROLES, mobile_installation_conflict
 from .mobile_otp_tasks import send_mobile_otp
 from .telegram.configuration import decrypt_secret, encrypt_secret
 from .utils.validators import normalize_phone
@@ -69,14 +69,14 @@ def _check_rate_limit(prefix: str, value: str, limit: int) -> None:
         )
 
 
-def _eligible_student(phone: str) -> tuple[User, TelegramAccount]:
+def _eligible_mobile_user(phone: str) -> tuple[User, TelegramAccount]:
     try:
         user = User.objects.select_related("role").get(phone=phone)
     except User.DoesNotExist:
         raise MobileOtpError("otp_unavailable", _("OTP login is unavailable for this number."))
     if not user.is_active or user.application_status != "active":
         raise MobileOtpError("otp_unavailable", _("OTP login is unavailable for this number."))
-    if not user.role or user.role.role != "student":
+    if not user.role or user.role.role not in MOBILE_LOGIN_ROLES:
         raise MobileOtpError("otp_unavailable", _("OTP login is unavailable for this number."))
     account = TelegramAccount.objects.filter(user=user, is_active=True).first()
     if account is None:
@@ -118,7 +118,7 @@ def request_mobile_otp(phone: str, installation_id: str, remote_addr: str) -> Mo
         raise MobileOtpError("installation_required", _("A device installation ID is required."))
     _check_rate_limit("phone", normalized_phone, OTP_PHONE_LIMIT)
     _check_rate_limit("ip", remote_addr or "unknown", OTP_IP_LIMIT)
-    user, account = _eligible_student(normalized_phone)
+    user, account = _eligible_mobile_user(normalized_phone)
     token = _active_bot_token()
     otp = f"{secrets.randbelow(1_000_000):06d}"
     now = timezone.now()
@@ -218,7 +218,7 @@ def verify_mobile_otp(challenge_id: str, otp: str, installation_id: str):
         if (
             not user.is_active
             or not user.role
-            or user.role.role != "student"
+            or user.role.role not in MOBILE_LOGIN_ROLES
             or user.application_status != "active"
             or not TelegramAccount.objects.filter(user=user, is_active=True).exists()
         ):

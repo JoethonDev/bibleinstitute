@@ -6,13 +6,37 @@ from contextvars import ContextVar
 from logging import Filter, getLogger
 from re import fullmatch
 from time import monotonic
+from urllib.parse import urlsplit
 from uuid import uuid4
 
+from django.conf import settings
+from django.http import HttpResponse
 from django.urls import resolve, Resolver404
+from django.utils.cache import patch_vary_headers
 
 
 logger = getLogger(__name__)
 _request_context: ContextVar[dict] = ContextVar("lms_request_context", default={})
+
+
+def _mobile_cors_origin_allowed(origin):
+    if origin in settings.CORS_ALLOWED_ORIGINS:
+        return True
+    if settings.CORS_ALLOW_ALL_ORIGINS:
+        parsed = urlsplit(origin)
+        return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    if not settings.ALLOW_LOCALHOST_ORIGINS:
+        return False
+    parsed = urlsplit(origin)
+    return (
+        parsed.scheme in {"http", "https"}
+        and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        and not parsed.username
+        and not parsed.password
+        and not parsed.path
+        and not parsed.query
+        and not parsed.fragment
+    )
 
 
 def _clean(value, *, limit=128):
@@ -96,6 +120,35 @@ class RequestContextFilter(Filter):
         }.items():
             setattr(record, name, values.get(name, default))
         return True
+
+
+class MobileApiCorsMiddleware:
+    """Allow configured browser origins to call the bearer-authenticated API."""
+
+    API_PREFIX = "/api/mobile/"
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        origin = request.headers.get("Origin", "")
+        is_mobile_api = request.path_info.startswith(self.API_PREFIX)
+        allowed = bool(origin and is_mobile_api and _mobile_cors_origin_allowed(origin))
+        if allowed and request.method == "OPTIONS":
+            response = HttpResponse(status=204)
+        else:
+            response = self.get_response(request)
+        if allowed:
+            response["Access-Control-Allow-Origin"] = origin
+            response["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+            response["Access-Control-Allow-Headers"] = (
+                "Accept, Accept-Language, Authorization, Content-Type, "
+                "X-CSRFToken, X-Installation-ID, X-Request-ID"
+            )
+            response["Access-Control-Expose-Headers"] = "Content-Language, X-Request-ID"
+            response["Access-Control-Max-Age"] = "600"
+            patch_vary_headers(response, ["Origin"])
+        return response
 
 
 class RequestObservabilityMiddleware:

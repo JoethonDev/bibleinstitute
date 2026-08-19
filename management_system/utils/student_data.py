@@ -13,6 +13,7 @@ from django.utils.timezone import now
 
 from ..academic_access import (
     TARGETED_ENROLLMENT_TYPES,
+    active_year_published_offerings_for_user,
     accessible_offerings,
     user_can_write_offering_activity,
 )
@@ -38,8 +39,12 @@ PAGE_SIZE = 20
 
 
 def student_offerings_queryset(user: User) -> QuerySet:
-    """Return all published offerings readable by ``user`` in SQL."""
-    return accessible_offerings(user).prefetch_related(None).order_by(
+    """Return bounded published offerings readable by a mobile account."""
+    if getattr(getattr(user, "role", None), "role", None) == "admin":
+        offerings = active_year_published_offerings_for_user(user)
+    else:
+        offerings = accessible_offerings(user)
+    return offerings.prefetch_related(None).order_by(
         "-academic_year_level__academic_year__ordering",
         "academic_year_level__level__ordering",
         "course__name",
@@ -364,9 +369,12 @@ def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
 
 
 def student_profile_data(user: User) -> dict:
+    role = getattr(getattr(user, "role", None), "role", None)
     return {
         "id": user.pk,
         "username": user.username,
+        "role": role,
+        "academic_activity_writable": role == "student",
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,

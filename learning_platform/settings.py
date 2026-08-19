@@ -49,6 +49,10 @@ def _env_csv(name, default=''):
     return [value.strip() for value in os.getenv(name, default).split(',') if value.strip()]
 
 
+def _env_bool(name, default=False):
+    return os.getenv(name, str(default)).lower() in ('true', '1', 'yes')
+
+
 def _is_plain_domain(host):
     return (
         host
@@ -86,7 +90,27 @@ for configured_origin in _env_csv('DJANGO_CSRF_TRUSTED_ORIGINS'):
         and _is_plain_domain(origin_host)
     ):
         CSRF_TRUSTED_ORIGINS.append(f'{origin_parts.scheme}://*.{origin_host}')
+
+# Django requires explicit ports for CSRF trusted origins. Generate the
+# configured localhost development ports while keeping production origins
+# explicit. Bearer-authenticated mobile API writes are CSRF-exempt.
+ALLOW_LOCALHOST_ORIGINS = _env_bool('DJANGO_ALLOW_LOCALHOST_ORIGINS', DEBUG)
+if ALLOW_LOCALHOST_ORIGINS:
+    localhost_ports = _env_csv(
+        'DJANGO_LOCALHOST_PORTS',
+        '3000,4173,5173,8000,8080,8081,8082,8443',
+    )
+    for localhost_host in ('localhost', '127.0.0.1', '[::1]'):
+        for port in localhost_ports:
+            if port.isdigit() and 0 < int(port) <= 65535:
+                for scheme in ('http', 'https'):
+                    CSRF_TRUSTED_ORIGINS.append(f'{scheme}://{localhost_host}:{port}')
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
+
+# The built-in MobileApiCorsMiddleware consumes these settings; no CORS
+# dependency is needed for bearer-authenticated API requests.
+CORS_ALLOWED_ORIGINS = _env_csv('DJANGO_CORS_ALLOWED_ORIGINS')
+CORS_ALLOW_ALL_ORIGINS = DEBUG and _env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS')
 
 TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
 DJANGO_SITE_DOMAIN = os.getenv('DJANGO_SITE_DOMAIN', '').rstrip('/')
@@ -116,6 +140,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'management_system.middleware.RequestObservabilityMiddleware',
+    'management_system.middleware.MobileApiCorsMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'management_system.middleware.SessionExpiryUpdate'

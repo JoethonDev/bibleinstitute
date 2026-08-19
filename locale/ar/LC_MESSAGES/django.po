@@ -23,6 +23,9 @@ msgstr ""
 msgid "You do not have access to this offering."
 msgstr "ليس لديك صلاحية الوصول إلى هذا المقرر."
 
+msgid "This account cannot submit quizzes or save progress."
+msgstr "لا يمكن لهذا الحساب إرسال الاختبارات أو حفظ التقدم."
+
 #: .\management_system\academic_copy.py:12
 msgid "Only administrators can copy academic offerings."
 msgstr "يمكن للمسؤولين فقط نسخ المقررات الدراسية."

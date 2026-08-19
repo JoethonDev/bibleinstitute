@@ -1,19 +1,39 @@
-from management_system.models import Course, AcademicYear
+from datetime import date
+
+from management_system.models import Course, Level, AcademicYear, AcademicYearLevel
 
 def run():
     courses = []
     Course.objects.all().delete()
-    # Create AcademicYears for levels that don't exist yet
-    from datetime import date
-    for lvl in range(1, 4):
-        if not AcademicYear.objects.filter(level=lvl, is_current=True).exists():
-            AcademicYear.objects.create(
-                name=f"Year {lvl}",
-                level=lvl,
-                starts_on=date(date.today().year if date.today().month >= 8 else date.today().year - 1, 8, 1),
-                ends_on=date((date.today().year if date.today().month >= 8 else date.today().year - 1) + 1, 7, 31),
-                is_current=not AcademicYear.objects.filter(is_current=True).exists(),
-            )
+    # Ensure levels 1..3 exist
+    level_objs = {}
+    for ordering in range(1, 4):
+        level, _ = Level.objects.get_or_create(
+            ordering=ordering,
+            defaults={"name_en": f"Level {ordering}", "name_ar": f"المستوى {ordering}"},
+        )
+        level_objs[ordering] = level
+
+    # Create or reuse one active AcademicYear
+    year_start = date(date.today().year if date.today().month >= 8 else date.today().year - 1, 8, 1)
+    year_end = date(year_start.year + 1, 7, 31)
+    year, _ = AcademicYear.objects.get_or_create(
+        ordering=1,
+        defaults={
+            "name": f"{year_start.year}/{year_end.year}",
+            "starts_on": year_start,
+            "ends_on": year_end,
+            "is_active": not AcademicYear.objects.filter(is_active=True).exists(),
+        },
+    )
+
+    # Create AcademicYearLevel links for each level
+    for ordering in range(1, 4):
+        AcademicYearLevel.objects.get_or_create(
+            academic_year=year,
+            level=level_objs[ordering],
+        )
+
     text = """
 3 مادة عهد قديم
 العهد الجديد ترم اول – 1
@@ -34,16 +54,13 @@ def run():
 مادة القراءات الكنسية – القطمارس
 مادة تاريخ الكتاب المقدس
 """
-    levels = sorted(set(
-        list(AcademicYear.objects.values_list("level", flat=True).distinct())
-        + list(Course.objects.values_list("level", flat=True).distinct())
-    )) or [1, 2, 3]
     level_idx = 0
-    for course in text.split("\n"):
-        if course:
-            course = course.strip()
+    level_list = [level_objs[1], level_objs[2], level_objs[3]]
+    for line in text.split("\n"):
+        if line:
+            name = line.strip()
             courses.append(
-                Course(name=course, level=levels[level_idx % len(levels)])
+                Course(name=name, level=level_list[level_idx % len(level_list)])
             )
             level_idx += 1
     

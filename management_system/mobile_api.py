@@ -20,6 +20,7 @@ import qrcode
 
 from .forms import SignupDetailsForm
 from .mobile_auth import (
+    MOBILE_LOGIN_ROLES,
     get_mobile_session,
     issue_mobile_session,
     clear_mobile_login_failures,
@@ -30,6 +31,7 @@ from .mobile_auth import (
     require_mobile_session,
     revoke_mobile_session,
     record_mobile_login_failure,
+    mobile_user_can_write_academic_activity,
 )
 from .mobile_otp import MobileOtpError, request_mobile_otp, verify_mobile_otp
 from .models import (
@@ -136,7 +138,7 @@ def login(request):
         user is None
         or not user.is_active
         or not user.role
-        or user.role.role != "student"
+        or user.role.role not in MOBILE_LOGIN_ROLES
         or user.application_status != "active"
     ):
         record_mobile_login_failure(username_key, remote_addr)
@@ -317,6 +319,13 @@ def quiz_status(request, offering_id):
 @require_mobile_session
 @require_POST
 def quiz_submit(request, offering_id, quiz_id):
+    if not mobile_user_can_write_academic_activity(request.user):
+        return _error(
+            request,
+            "forbidden",
+            _localized(request, "This account cannot submit quizzes or save progress."),
+            403,
+        )
     payload = _json_body(request)
     if payload is None or not isinstance(payload.get("answers"), (list, dict)):
         return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
@@ -624,4 +633,11 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
 @require_mobile_session
 @require_POST
 def lesson_progress(request, offering_id, lesson_id):
+    if not mobile_user_can_write_academic_activity(request.user):
+        return _error(
+            request,
+            "forbidden",
+            _localized(request, "This account cannot submit quizzes or save progress."),
+            403,
+        )
     return _call_existing_progress(request, lesson_id, offering_id)

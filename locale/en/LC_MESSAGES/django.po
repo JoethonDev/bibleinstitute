@@ -22,6 +22,9 @@ msgstr ""
 msgid "You do not have access to this offering."
 msgstr "You do not have access to this offering."
 
+msgid "This account cannot submit quizzes or save progress."
+msgstr "This account cannot submit quizzes or save progress."
+
 #: .\management_system\academic_copy.py:12
 msgid "Only administrators can copy academic offerings."
 msgstr "Only administrators can copy academic offerings."

@@ -17,6 +17,7 @@ from .models import MobilePushDevice, StudentMobileSession
 
 MOBILE_SESSION_LIFETIME = timedelta(days=30)
 SUPPORTED_LANGUAGES = frozenset({"ar", "en"})
+MOBILE_LOGIN_ROLES = frozenset({"student", "admin"})
 LOGIN_RATE_WINDOW = 15 * 60
 LOGIN_USERNAME_LIMIT = 10
 LOGIN_IP_LIMIT = 30
@@ -89,6 +90,11 @@ def mobile_installation_conflict(user, installation_id: str | None) -> bool:
     )
 
 
+def mobile_user_can_write_academic_activity(user) -> bool:
+    """Only students may submit quizzes or persist academic progress."""
+    return bool(getattr(getattr(user, "role", None), "role", None) == "student")
+
+
 def issue_mobile_session(user):
     raw_token = secrets.token_urlsafe(32)
     session = StudentMobileSession.objects.create(
@@ -150,7 +156,7 @@ def get_mobile_session(request):
         not user.is_active
         or user.application_status != "active"
         or not user.role
-        or user.role.role != "student"
+        or user.role.role not in MOBILE_LOGIN_ROLES
     ):
         return None
     session.last_used_at = timezone.now()
