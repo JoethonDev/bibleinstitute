@@ -211,6 +211,7 @@
         <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-toggle="modal" data-bs-target="#copyModal">
             <i class="fas fa-copy me-1"></i>{% translate "Copy Offerings" %}
         </button>
+        </form>
     </div>
 
     <div class="ad-card mb-4">
@@ -232,7 +233,7 @@
                         <td><span class="ad-pill ad-pill--muted">{{ o.get_status_display }}</span></td>
                         <td>
                             <div class="ad-actions">
-                            <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}" title="{% translate "Edit" %}">
+                            <button type="button" class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}" title="{% translate "Edit" %}">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <form method="post" action="{% url 'course-offering-delete' o.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this offering?' %}">
