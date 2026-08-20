@@ -28,6 +28,7 @@ from .telegram.navigation import (
     format_lesson,
     format_offering,
     format_quiz,
+    audio_label,
     lesson_detail_keyboard,
     lesson_list_keyboard,
     offerings_keyboard,
@@ -187,8 +188,10 @@ def _present(bot, chat_id: int, text: str, keyboard, callback: dict | None = Non
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
 
-def _list_text(title: str, rows, empty_text: str) -> str:
+def _list_text(title: str, rows, empty_text: str, page: int = 1, page_count: int = 1) -> str:
     lines = [title]
+    if page_count > 1:
+        lines.append(_("Page %(current)s of %(total)s") % {"current": page, "total": page_count})
     if rows:
         lines.extend(f"• {row}" for row in rows)
     else:
@@ -228,38 +231,51 @@ def _looks_like_link_token(value: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z0-9_-]{32,64}", value))
 
 
-def _handle_audio(bot, user, chat_id: int, offering_id: str, lesson_id: str) -> None:
+def _handle_audio(bot, user, chat_id: int, offering_id: str, lesson_id: str, audio_index: str) -> None:
     offering, lesson = _active_lesson(user, offering_id, lesson_id)
     if offering is None or lesson is None:
+        bot.send_message(chat_id, _("This action is no longer available."))
+        return
+    try:
+        selected_index = int(audio_index)
+    except (TypeError, ValueError):
         bot.send_message(chat_id, _("This action is no longer available."))
         return
     try:
         links = audio_links(json.loads(lesson.links))
     except (TypeError, ValueError, json.JSONDecodeError):
         links = []
+    if selected_index < 0 or selected_index >= len(links):
+        bot.send_message(chat_id, _("This action is no longer available."))
+        return
     client = _r2_client()
-    delivered = 0
-    if client is not None:
-        for link in links:
-            audio = download_audio_asset(link, client, settings.R2_BUCKET_NAME)
-            if audio is None:
-                continue
-            stream, filename, _content_type = audio
-            try:
-                bot.send_audio(
-                    chat_id,
-                    telebot.types.InputFile(stream, file_name=filename),
-                    caption=f"{lesson.name}\n{filename}",
-                )
-                delivered += 1
-            except Exception:
-                logger.warning("Telegram lesson audio delivery failed.")
-            finally:
-                stream.close()
-    if not delivered:
-        text = format_lesson(lesson, bool(links), user)
+    if client is None:
+        text = format_lesson(lesson, True, user)
         text += "\n" + _("Audio is unavailable here. Open the lesson on the website instead.")
         bot.send_message(chat_id, text)
+        return
+    audio = download_audio_asset(links[selected_index], client, settings.R2_BUCKET_NAME)
+    if audio is None:
+        text = format_lesson(lesson, True, user)
+        text += "\n" + _("Audio is unavailable here. Open the lesson on the website instead.")
+        bot.send_message(chat_id, text)
+        return
+    stream, _filename, _content_type = audio
+    label = audio_label(links[selected_index], selected_index)
+    try:
+        bot.send_audio(
+            chat_id,
+            telebot.types.InputFile(
+                stream,
+                file_name=label,
+            ),
+            caption=f"{lesson.name}\n{label}",
+        )
+    except Exception:
+        logger.warning("Telegram lesson audio delivery failed.")
+        bot.send_message(chat_id, _("Audio is unavailable here. Open the lesson on the website instead."))
+    finally:
+        stream.close()
 
 
 def _handle_callback(bot, callback: dict) -> None:
@@ -278,9 +294,6 @@ def _handle_callback(bot, callback: dict) -> None:
         _answer_callback(bot, callback_id, _("This button is invalid. Please open the menu again."))
         return
     action, *parts = parsed
-    if action == "noop":
-        _answer_callback(bot, callback_id)
-        return
     if action == "back":
         action, *parts = parts
     user = _linked_user(sender_id, chat_id)
@@ -302,7 +315,13 @@ def _handle_callback(bot, callback: dict) -> None:
                 active_year_published_offerings_for_user(user).order_by("course__name", "pk"),
                 parts[0],
             )
-            text = _list_text(_("Available courses"), [offering.course.name for offering in offerings], _("No courses are currently available."))
+            text = _list_text(
+                _("Available courses"),
+                [offering.course.name for offering in offerings],
+                _("No courses are currently available."),
+                current,
+                page_count,
+            )
             keyboard = offerings_keyboard(offerings, current, page_count)
         elif action == "offering":
             offering = _active_offering(user, parts[0])
@@ -317,20 +336,29 @@ def _handle_callback(bot, callback: dict) -> None:
                 Lesson.objects.filter(course_offering=offering, status=PublicationStatus.PUBLISHED).order_by("created_date", "pk"),
                 parts[1],
             )
-            text = _list_text(_("Lessons"), [lesson.name for lesson in lessons], _("No published lessons are currently available."))
+            text = _list_text(
+                _("Lessons"),
+                [lesson.name for lesson in lessons],
+                _("No published lessons are currently available."),
+                current,
+                page_count,
+            )
             keyboard = lesson_list_keyboard(offering.pk, lessons, current, page_count)
         elif action == "lesson":
             offering, lesson = _active_lesson(user, parts[0], parts[1])
             if offering is None or lesson is None:
                 raise LookupError
             try:
-                has_audio = bool(audio_links(json.loads(lesson.links)))
+                lesson_audio_links = audio_links(json.loads(lesson.links))
             except (TypeError, ValueError, json.JSONDecodeError):
-                has_audio = False
-            text, keyboard = format_lesson(lesson, has_audio, user), lesson_detail_keyboard(offering.pk, lesson.pk, has_audio)
+                lesson_audio_links = []
+            text, keyboard = (
+                format_lesson(lesson, bool(lesson_audio_links), user),
+                lesson_detail_keyboard(offering.pk, lesson.pk, lesson_audio_links),
+            )
         elif action == "lesson_audio":
             _answer_callback(bot, callback_id, _("Preparing the audio."))
-            _handle_audio(bot, user, chat_id, parts[0], parts[1])
+            _handle_audio(bot, user, chat_id, parts[0], parts[1], parts[2])
             return
         elif action == "quizzes":
             offering = _active_offering(user, parts[0])
@@ -340,7 +368,13 @@ def _handle_callback(bot, callback: dict) -> None:
                 Quiz.objects.filter(course_offering=offering, status=PublicationStatus.PUBLISHED).select_related("quiz_type").order_by("opening_date", "pk"),
                 parts[1],
             )
-            text = _list_text(_("Exams"), [quiz.name for quiz in quizzes], _("No published exams are currently available."))
+            text = _list_text(
+                _("Exams"),
+                [quiz.name for quiz in quizzes],
+                _("No published exams are currently available."),
+                current,
+                page_count,
+            )
             keyboard = quiz_list_keyboard(offering.pk, quizzes, current, page_count)
         elif action == "quiz":
             offering, quiz = _active_quiz(user, parts[0], parts[1])

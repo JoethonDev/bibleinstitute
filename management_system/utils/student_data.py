@@ -271,13 +271,16 @@ def _question_payload(question: Question, exam_mode: bool) -> dict:
     return payload
 
 
-def _submitted_question_payload(submission: Submission) -> dict:
-    question = submission.question
+def _submitted_question_payload(question: Question, submission: Submission | None) -> dict:
     payload = _question_payload(question, False)
     payload.update({
-        "submitted_answer": question.get_submitted_answer_payload(submission.submitted_answer),
-        "grade_awarded": submission.grade,
-        "is_graded": submission.is_graded,
+        "submitted_answer": (
+            question.get_submitted_answer_payload(submission.submitted_answer)
+            if submission is not None
+            else None
+        ),
+        "grade_awarded": submission.grade if submission is not None and submission.is_graded else None,
+        "is_graded": bool(submission is not None and submission.is_graded),
     })
     return payload
 
@@ -331,7 +334,7 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
             row.question_id: row
             for row in Submission.objects.filter(user=user, question__quiz=quiz).select_related("question")
         }
-        question_data = [_submitted_question_payload(submitted[q.pk]) for q in questions if q.pk in submitted]
+        question_data = [_submitted_question_payload(question, submitted.get(question.pk)) for question in questions]
     else:
         question_data = [_question_payload(question, mode == "exam") for question in questions]
     return {
@@ -467,8 +470,8 @@ def student_progress_data(
             "lesson": row.lesson.name,
             "offering_id": row.lesson.course_offering_id,
             "part_id": row.part_id,
-            "percent": row.percent,
-            "unique_seconds": row.unique_seconds,
+            "percent": max(0, min(int(row.percent or 0), 100)),
+            "unique_seconds": max(0, int(row.unique_seconds or 0)),
             "completed": row.completed_at is not None,
         }
         for row in page_obj.object_list

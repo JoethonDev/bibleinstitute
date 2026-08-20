@@ -18,6 +18,7 @@ layer:
 
 from __future__ import annotations
 
+import posixpath
 import re
 from urllib.parse import urlsplit
 
@@ -50,11 +51,10 @@ _ACTION_ARITY = {
     "offering": 1,  # offering_id
     "lessons": 2,  # offering_id, page
     "lesson": 2,  # offering_id, lesson_id
-    "lesson_audio": 2,  # offering_id, lesson_id
+    "lesson_audio": 3,  # offering_id, lesson_id, audio index
     "quizzes": 2,  # offering_id, page
     "quiz": 2,  # offering_id, quiz_id
     "support": 0,
-    "noop": 0,  # page indicator / placeholder button
 }
 _BACK_ACTION = "back"
 
@@ -145,7 +145,7 @@ def _short_label(text: str, limit: int = 40) -> str:
 
 
 def _pagination_row(action: str, page: int, page_count: int, offering_id: int | None = None) -> list:
-    """Return Previous / page indicator / Next buttons for one paginated list."""
+    """Return only real Previous/Next buttons for one paginated list."""
     page = max(1, page)
     page_count = max(1, page_count)
     if page > page_count:
@@ -156,116 +156,164 @@ def _pagination_row(action: str, page: int, page_count: int, offering_id: int | 
     if page > 1:
         prev_args = (offering_id, page - 1) if offering_id is not None else (page - 1,)
         buttons.append(_ROW(_("Previous"), callback_data=make_callback(action, *prev_args)))
-    buttons.append(_ROW(_("Page %(current)s of %(total)s") % {"current": page, "total": page_count}, callback_data=make_callback("noop")))
     if page < page_count:
         next_args = (offering_id, page + 1) if offering_id is not None else (page + 1,)
         buttons.append(_ROW(_("Next"), callback_data=make_callback(action, *next_args)))
     return buttons
 
 
+def _add_paired(keyboard: telebot.types.InlineKeyboardMarkup, buttons: list) -> None:
+    """Append buttons in two-column rows, leaving only an unavoidable last item alone."""
+    for index in range(0, len(buttons), 2):
+        keyboard.row(*buttons[index:index + 2])
+
+
+def audio_label(link: dict, index: int) -> str:
+    """Return a short human-readable label without storage/media terminology."""
+    raw_name = link.get("name") if isinstance(link, dict) else ""
+    name = posixpath.basename(raw_name) if isinstance(raw_name, str) and raw_name.strip() else ""
+    name = re.sub(r"\.(?:m3u8|ts|mp3|m4a|ogg|wav)$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"[_-]+", " ", name)
+    name = re.sub(r"\b(?:audio|ts)\b", " ", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s+", " ", name).strip(" .")
+    return _short_label(name or _("Part") + f" {index + 1}")
+
+
 def home_keyboard() -> telebot.types.InlineKeyboardMarkup:
     """Top-level keyboard for courses and student support."""
-    keyboard = _KB(row_width=1)
-    keyboard.add(_ROW(_("My courses"), callback_data=make_callback("offerings", 1)))
-    keyboard.add(_ROW(_("Contact support"), callback_data=make_callback("support")))
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("My courses"), callback_data=make_callback("offerings", 1)),
+            _ROW(_("Contact support"), callback_data=make_callback("support")),
+        ],
+    )
     return keyboard
 
 
 def offerings_keyboard(offerings, page: int, page_count: int) -> telebot.types.InlineKeyboardMarkup:
-    """One button per offering plus pagination and Home."""
-    keyboard = _KB(row_width=1)
-    for offering in offerings:
-        keyboard.add(
-            _ROW(
-                _short_label(offering.course.name),
-                callback_data=make_callback("offering", offering.pk),
-            )
-        )
+    """Offering buttons in paired rows, followed by pagination and Home."""
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_short_label(offering.course.name), callback_data=make_callback("offering", offering.pk))
+            for offering in offerings
+        ],
+    )
     pagination = _pagination_row("offerings", page, page_count)
     if pagination:
         keyboard.row(*pagination)
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+    _add_paired(keyboard, [_ROW(_("Home"), callback_data=make_callback("home"))])
     return keyboard
 
 
 def offering_keyboard(offering_id: int) -> telebot.types.InlineKeyboardMarkup:
     """Menu for one offering: lessons, quizzes, back, and home."""
-    keyboard = _KB(row_width=1)
-    keyboard.add(_ROW(_("Lessons"), callback_data=make_callback("lessons", offering_id, 1)))
-    keyboard.add(_ROW(_("Exams"), callback_data=make_callback("quizzes", offering_id, 1)))
-    keyboard.add(_ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "offerings", 1)))
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("Lessons"), callback_data=make_callback("lessons", offering_id, 1)),
+            _ROW(_("Exams"), callback_data=make_callback("quizzes", offering_id, 1)),
+            _ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "offerings", 1)),
+            _ROW(_("Home"), callback_data=make_callback("home")),
+        ],
+    )
     return keyboard
 
 
 def lesson_list_keyboard(offering_id: int, lessons, page: int, page_count: int) -> telebot.types.InlineKeyboardMarkup:
-    """One button per lesson plus pagination, Back, and Home."""
-    keyboard = _KB(row_width=1)
-    for lesson in lessons:
-        keyboard.add(
-            _ROW(
-                _short_label(lesson.name),
-                callback_data=make_callback("lesson", offering_id, lesson.pk),
-            )
-        )
+    """Lesson buttons in paired rows, followed by pagination and navigation."""
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_short_label(lesson.name), callback_data=make_callback("lesson", offering_id, lesson.pk))
+            for lesson in lessons
+        ],
+    )
     pagination = _pagination_row("lessons", page, page_count, offering_id=offering_id)
     if pagination:
         keyboard.row(*pagination)
-    keyboard.add(_ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "offering", offering_id)))
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "offering", offering_id)),
+            _ROW(_("Home"), callback_data=make_callback("home")),
+        ],
+    )
     return keyboard
 
 
-def lesson_detail_keyboard(offering_id: int, lesson_id: int, audio_available: bool) -> telebot.types.InlineKeyboardMarkup:
-    """Lesson detail actions: audio (when available), Back, and Home.
-
-    ``audio_available`` comes from the caller's R2/lesson representation;
-    it is never inferred from video/PDF presence here.
-    """
-    keyboard = _KB(row_width=1)
-    if audio_available:
-        keyboard.add(
-            _ROW(
-                _("Listen to audio"),
-                callback_data=make_callback("lesson_audio", offering_id, lesson_id),
-            )
+def lesson_detail_keyboard(offering_id: int, lesson_id: int, audio_entries) -> telebot.types.InlineKeyboardMarkup:
+    """Audio choices in paired rows, followed by Back and Home."""
+    keyboard = _KB(row_width=2)
+    audio_buttons = [
+        _ROW(
+            audio_label(link, index),
+            callback_data=make_callback("lesson_audio", offering_id, lesson_id, index),
         )
-    keyboard.add(_ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "lessons", offering_id, 1)))
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+        for index, link in enumerate(audio_entries or [])
+    ]
+    _add_paired(keyboard, audio_buttons)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "lessons", offering_id, 1)),
+            _ROW(_("Home"), callback_data=make_callback("home")),
+        ],
+    )
     return keyboard
 
 
 def quiz_list_keyboard(offering_id: int, quizzes, page: int, page_count: int) -> telebot.types.InlineKeyboardMarkup:
-    """One button per quiz plus pagination, Back, and Home."""
-    keyboard = _KB(row_width=1)
-    for quiz in quizzes:
-        keyboard.add(
-            _ROW(
-                _short_label(quiz.name),
-                callback_data=make_callback("quiz", offering_id, quiz.pk),
-            )
-        )
+    """Quiz buttons in paired rows, followed by pagination and navigation."""
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_short_label(quiz.name), callback_data=make_callback("quiz", offering_id, quiz.pk))
+            for quiz in quizzes
+        ],
+    )
     pagination = _pagination_row("quizzes", page, page_count, offering_id=offering_id)
     if pagination:
         keyboard.row(*pagination)
-    keyboard.add(_ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "offering", offering_id)))
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "offering", offering_id)),
+            _ROW(_("Home"), callback_data=make_callback("home")),
+        ],
+    )
     return keyboard
 
 
 def quiz_detail_keyboard(offering_id: int, quiz_id: int) -> telebot.types.InlineKeyboardMarkup:
     """Quiz detail actions: Back and Home."""
-    keyboard = _KB(row_width=1)
-    keyboard.add(_ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "quizzes", offering_id, 1)))
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, "quizzes", offering_id, 1)),
+            _ROW(_("Home"), callback_data=make_callback("home")),
+        ],
+    )
     return keyboard
 
 
 def back_home_keyboard(back_action: str, *parts: int | str) -> telebot.types.InlineKeyboardMarkup:
     """Generic Back + Home keyboard to a caller-chosen destination action."""
-    keyboard = _KB(row_width=1)
-    keyboard.add(_ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, back_action, *parts)))
-    keyboard.add(_ROW(_("Home"), callback_data=make_callback("home")))
+    keyboard = _KB(row_width=2)
+    _add_paired(
+        keyboard,
+        [
+            _ROW(_("Back"), callback_data=make_callback(_BACK_ACTION, back_action, *parts)),
+            _ROW(_("Home"), callback_data=make_callback("home")),
+        ],
+    )
     return keyboard
 
 

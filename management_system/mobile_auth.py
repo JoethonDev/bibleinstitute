@@ -13,10 +13,10 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
 from .models import MobilePushDevice, StudentMobileSession
+from .utils.localization import normalize_language
 
 
 MOBILE_SESSION_LIFETIME = timedelta(days=30)
-SUPPORTED_LANGUAGES = frozenset({"ar", "en"})
 LOGIN_RATE_WINDOW = 15 * 60
 LOGIN_USERNAME_LIMIT = 10
 LOGIN_IP_LIMIT = 30
@@ -50,27 +50,6 @@ def clear_mobile_login_failures(username: str, remote_addr: str) -> None:
     if username:
         cache.delete(_login_rate_key("username", username))
     cache.delete(_login_rate_key("ip", remote_addr or "unknown"))
-
-
-def normalize_language(request) -> str:
-    value = request.headers.get("Accept-Language") or "en"
-    candidates = []
-    for position, candidate in enumerate(value.lower().split(",")):
-        parts = [part.strip() for part in candidate.split(";")]
-        language = parts[0].split("-", 1)[0]
-        quality = 1.0
-        for parameter in parts[1:]:
-            if parameter.startswith("q="):
-                try:
-                    quality = float(parameter[2:])
-                except ValueError:
-                    quality = 0.0
-        if quality > 0 and language in SUPPORTED_LANGUAGES:
-            candidates.append((-quality, position, language))
-    if candidates:
-        candidates.sort()
-        return candidates[0][2]
-    return "en"
 
 
 def json_api_response(request, payload: dict, status: int = 200) -> JsonResponse:

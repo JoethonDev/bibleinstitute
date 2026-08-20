@@ -195,6 +195,7 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or os.getenv(
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
     "REDIS_URL", "redis://redis:6379/0"
 )
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", "redis://redis:6379/1")
 CACHES = {
     "default": {

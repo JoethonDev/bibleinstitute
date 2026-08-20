@@ -45,7 +45,10 @@ def _claim_due_ids(limit: int) -> list[int]:
     )
     with transaction.atomic():
         ids = list(
-            TelegramNotificationDelivery.objects.select_for_update(skip_locked=True)
+            TelegramNotificationDelivery.objects.select_for_update(
+                of=("self",),
+                skip_locked=True,
+            )
             .filter(
                 status=TelegramNotificationDelivery.Status.QUEUED,
                 scheduled_for__lte=now,
@@ -195,7 +198,7 @@ def _send_delivery(
             reply_markup=lesson_detail_keyboard(
                 delivery.lesson.course_offering_id,
                 delivery.lesson.pk,
-                bool(links),
+                links,
             ),
         )
     opening, closing = exceptional_windows.get(

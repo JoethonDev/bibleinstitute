@@ -10,10 +10,13 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import JsonResponse, HttpResponse
 from django.urls import resolve, Resolver404
+from django.utils import translation
+from django.utils.translation import gettext as _
 from django.utils.cache import patch_vary_headers
 
+from .utils.localization import normalize_language
 
 logger = getLogger(__name__)
 _request_context: ContextVar[dict] = ContextVar("lms_request_context", default={})
@@ -201,8 +204,23 @@ class RequestObservabilityMiddleware:
                 "event=http_request_exception exception_type=%s",
                 type(exc).__name__,
             )
+            if request.path_info.startswith("/api/mobile/"):
+                language = normalize_language(request)
+                with translation.override(language):
+                    message = str(_("The server could not complete the request."))
+                response = JsonResponse(
+                    {"language": language, "error": {"code": "server_error", "message": message}},
+                    status=500,
+                )
+                response["X-Request-ID"] = request_id
+                return response
             raise
         finally:
+            observed_user = getattr(request, "user", None)
+            if getattr(observed_user, "is_authenticated", False):
+                context["user_id"] = observed_user.pk
+                context["username"] = _clean(observed_user.username)
+                context["role_id"] = observed_user.role_id
             context["duration_ms"] = round((monotonic() - started) * 1000, 2)
             if response is not None and response.status_code < 400:
                 context["event"] = "http_request_completed"

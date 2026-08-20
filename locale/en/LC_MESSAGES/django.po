@@ -10175,6 +10175,9 @@ msgstr "Enter a valid phone number."
 msgid "A device installation ID is required."
 msgstr "A device installation ID is required."
 
+msgid "The device installation ID is too long."
+msgstr "The device installation ID is too long."
+
 msgid "Wait before requesting another OTP."
 msgstr "Wait before requesting another OTP."
 
@@ -10189,6 +10192,24 @@ msgstr "The OTP is invalid or expired."
 
 msgid "Too many incorrect OTP attempts."
 msgstr "Too many incorrect OTP attempts."
+
+msgid "The QR code is unavailable."
+msgstr "The QR code is unavailable."
+
+msgid "The media is unavailable."
+msgstr "The media is unavailable."
+
+msgid "The viewing session is invalid."
+msgstr "The viewing session is invalid."
+
+msgid "Audio download is temporarily unavailable."
+msgstr "Audio download is temporarily unavailable."
+
+msgid "The server could not complete the request."
+msgstr "The server could not complete the request."
+
+msgid "Copy code"
+msgstr "Copy code"
 
 msgid "Too many time ranges."
 msgstr "Too many time ranges."

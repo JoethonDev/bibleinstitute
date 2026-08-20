@@ -9,7 +9,8 @@
 # 2. Resolves the target slot (inactive blue or green), loads runtime state.
 # 3. Verifies infrastructure containers (postgres, redis, nginx, Dozzle) are running.
 # 4. Runs forward migrations and collectstatic in the target slot.
-# 5. Builds and starts the inactive app slot + celery + media-worker with the new image.
+# 5. Builds and starts the inactive app slot + celery + celery-beat + media-worker
+#    with the new image.
 # 6. Waits for the new slot's Docker healthcheck to pass.
 # 7. Atomically switches the Nginx upstream pointer to the new slot.
 # 8. Verifies HTTPS reachability through Nginx (curl smoke with retries).
@@ -229,11 +230,12 @@ fi
 info "Saved prior state for rollback."
 
 # ---------------------------------------------------------------------------
-# Step 1 — Build the target slot, celery, and media-worker images first
+# Step 1 — Build the target slot, celery, celery-beat, and media-worker images
+# first
 # ---------------------------------------------------------------------------
-info "Building lms-app-${TARGET_SLOT}, celery, and media-worker images…"
+info "Building lms-app-${TARGET_SLOT}, celery, celery-beat, and media-worker images…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" build \
-    "lms-app-${TARGET_SLOT}" celery media-worker \
+    "lms-app-${TARGET_SLOT}" celery celery-beat media-worker \
     || die "Image build failed — aborting."
 
 # ---------------------------------------------------------------------------
@@ -252,15 +254,17 @@ docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" run --rm --no-de
     || die "collectstatic failed — aborting."
 
 # ---------------------------------------------------------------------------
-# Step 3 — Start the target slot + celery + media-worker from the already-built
-# image. media-worker is shared between the blue/green web slots; its command,
-# queue, concurrency, volume, and environment are defined only in
-# compose.application.yml and are never duplicated here.
+# Step 3 — Start the target slot + celery + celery-beat + media-worker from the
+# already-built image. media-worker is shared between the blue/green web slots;
+# its command, queue, concurrency, volume, and environment are defined only in
+# compose.application.yml and are never duplicated here. celery-beat is the
+# scheduler for the configured Telegram/mobile/media schedules and must run the
+# same released image as the worker.
 # ---------------------------------------------------------------------------
-info "Starting lms-app-${TARGET_SLOT}, celery, and media-worker…"
+info "Starting lms-app-${TARGET_SLOT}, celery, celery-beat, and media-worker…"
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" up -d --force-recreate --no-build \
-    "lms-app-${TARGET_SLOT}" celery media-worker \
-    || die "Failed to start target slot, celery, and media-worker."
+    "lms-app-${TARGET_SLOT}" celery celery-beat media-worker \
+    || die "Failed to start target slot, celery, celery-beat, and media-worker."
 
 # ---------------------------------------------------------------------------
 # Step 4 — Wait for target healthcheck
@@ -299,6 +303,15 @@ CELERY_CID="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps
 CELERY_STATE="$(docker inspect --format='{{.State.Status}}' "$CELERY_CID" 2>/dev/null || true)"
 [[ "$CELERY_STATE" == "running" ]] || die "Celery is not running after startup (state: ${CELERY_STATE:-unknown})."
 info "Celery container is running."
+
+# Celery Beat is the scheduler for the configured Telegram/mobile/media
+# schedules. Confirm its container is running so scheduled dispatch uses the
+# released image/settings rather than a stale beat process.
+BEAT_CID="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps -q celery-beat 2>/dev/null || true)"
+[[ -n "$BEAT_CID" ]] || die "Could not find the Celery Beat container after startup."
+BEAT_STATE="$(docker inspect --format='{{.State.Status}}' "$BEAT_CID" 2>/dev/null || true)"
+[[ "$BEAT_STATE" == "running" ]] || die "Celery Beat is not running after startup (state: ${BEAT_STATE:-unknown})."
+info "Celery Beat container is running."
 
 # ---------------------------------------------------------------------------
 # Step 5 — Atomic upstream switch
@@ -415,7 +428,8 @@ fi
 info "╔═══════════════════════════════════════════════════════════════╗"
 info "║  Blue/green deployment completed successfully!               ║"
 info "║  New slot: lms-app-${TARGET_SLOT} (was lms-app-${ACTIVE_SLOT})"
-info "║  Celery was rebuilt and restarted with the new image.        ║"
+info "║  Celery, Celery Beat, and media-worker were rebuilt          ║"
+info "║  with the new image.                                         ║"
 info "╚═══════════════════════════════════════════════════════════════╝"
 info ""
 info "⚠  Migration compatibility note:"

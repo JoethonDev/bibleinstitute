@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import secrets
 from io import BytesIO
 
 from django.contrib.auth import authenticate
@@ -79,8 +78,11 @@ def _json_body(request) -> dict | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _error(request, code: str, message: str, status: int):
-    return json_api_response(request, {"error": {"code": code, "message": message}}, status=status)
+def _error(request, code: str, message: str, status: int, details: dict | None = None):
+    error = {"code": code, "message": message}
+    if details:
+        error["details"] = details
+    return json_api_response(request, {"error": error}, status=status)
 
 
 def _form_error(request, form, message: str, status: int = 400):
@@ -167,7 +169,13 @@ def otp_request(request):
             request.META.get("REMOTE_ADDR", ""),
         )
     except MobileOtpError as exc:
-        response = _error(request, exc.code, _localized(request, exc.message), exc.status)
+        response = _error(
+            request,
+            exc.code,
+            _localized(request, exc.message),
+            exc.status,
+            getattr(exc, "details", None),
+        )
         if exc.retry_after is not None:
             response["Retry-After"] = str(exc.retry_after)
         return response
@@ -193,9 +201,16 @@ def otp_verify(request):
             payload.get("challenge_id", ""),
             payload.get("otp", ""),
             payload.get("installation_id", ""),
+            payload.get("phone_number", ""),
         )
     except MobileOtpError as exc:
-        response = _error(request, exc.code, _localized(request, exc.message), exc.status)
+        response = _error(
+            request,
+            exc.code,
+            _localized(request, exc.message),
+            exc.status,
+            getattr(exc, "details", None),
+        )
         if exc.retry_after is not None:
             response["Retry-After"] = str(exc.retry_after)
         return response
@@ -251,12 +266,7 @@ def profile(request):
 @require_http_methods(["GET"])
 def profile_qr(request):
     if not request.user.qr_token:
-        with transaction.atomic():
-            user = User.objects.select_for_update().get(pk=request.user.pk)
-            if not user.qr_token:
-                user.qr_token = secrets.token_urlsafe(32)
-                user.save(update_fields=["qr_token"])
-            request.user = user
+        return _error(request, "qr_unavailable", _("The QR code is unavailable."), 404)
     qr_data = request.build_absolute_uri(reverse("scan-preview", args=[request.user.qr_token]))
     image = qrcode.make(qr_data)
     buffer = BytesIO()
@@ -559,7 +569,7 @@ def media_session(request, offering_id, lesson_id, file_index):
         "token": sign_session(session.session_id, session.expires_at),
         "expires_at": session.expires_at.isoformat(),
         "manifest_url": request.build_absolute_uri(reverse("mobile-v1:media-manifest", kwargs={"offering_id": offering_id, "lesson_id": lesson_id, "file_index": file_index})),
-        "progress_percent": progress_percent,
+        "progress_percent": max(0, min(int(progress_percent), 100)),
     })
 
 
@@ -585,7 +595,15 @@ def media_manifest(request, offering_id, lesson_id, file_index):
         return _error(request, "viewing_session_expired", _("Viewing session expired."), 401)
     if not _valid_session_token(token, session):
         return _error(request, "invalid_viewing_session", _("Invalid viewing session token."), 403)
-    return lesson_manifest(request, offering_id, lesson_id, file_index)
+    response = lesson_manifest(request, offering_id, lesson_id, file_index)
+    if response.status_code >= 400:
+        return _error(
+            request,
+            "media_unavailable" if response.status_code == 404 else "invalid_viewing_session",
+            _("The media is unavailable.") if response.status_code == 404 else _("The viewing session is invalid."),
+            response.status_code,
+        )
+    return response
 
 
 @require_mobile_session
@@ -600,7 +618,10 @@ def lesson_audio(request, offering_id, lesson_id):
         return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
     if not link or link.get("file_type") != "audio":
         return _error(request, "invalid_media", _("Invalid audio file."), 400)
-    return generate_audio_download(request, offering_id, lesson_id)
+    response = generate_audio_download(request, offering_id, lesson_id)
+    if response.status_code in {301, 302, 303, 307, 308}:
+        return response
+    return _error(request, "audio_unavailable", _("Audio download is temporarily unavailable."), 503)
 
 
 def _call_existing_progress(request, lesson_id=None, offering_id=None):
@@ -619,6 +640,8 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
     try:
         data = json.loads(response.content)
     except (TypeError, ValueError, json.JSONDecodeError):
+        return _error(request, "progress_failed", _("Progress could not be saved."), response.status_code)
+    if response.status_code >= 400:
         return _error(request, "progress_failed", _("Progress could not be saved."), response.status_code)
     return json_api_response(request, data, response.status_code)
 

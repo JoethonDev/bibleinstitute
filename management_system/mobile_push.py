@@ -223,7 +223,10 @@ def _claim_due_deliveries(limit: int) -> list[PushDelivery]:
     claim_limit = max(1, min(int(limit), DELIVERY_SCAN_LIMIT))
     with transaction.atomic():
         deliveries = list(
-            PushDelivery.objects.select_for_update(skip_locked=True)
+            PushDelivery.objects.select_for_update(
+                of=("self",),
+                skip_locked=True,
+            )
             .select_related("notification", "device")
             .filter(
                 status=PushDelivery.Status.QUEUED,

@@ -10220,6 +10220,9 @@ msgstr "أدخل رقم هاتف صحيحًا."
 msgid "A device installation ID is required."
 msgstr "معرّف تثبيت الجهاز مطلوب."
 
+msgid "The device installation ID is too long."
+msgstr "معرّف تثبيت الجهاز طويل جدًا."
+
 msgid "Wait before requesting another OTP."
 msgstr "انتظر قبل طلب رمز تحقق آخر."
 
@@ -10234,6 +10237,24 @@ msgstr "رمز التحقق غير صالح أو انتهت صلاحيته."
 
 msgid "Too many incorrect OTP attempts."
 msgstr "عدد محاولات رمز التحقق الخاطئة كبير جدًا."
+
+msgid "The QR code is unavailable."
+msgstr "رمز QR غير متاح."
+
+msgid "The media is unavailable."
+msgstr "الوسائط غير متاحة."
+
+msgid "The viewing session is invalid."
+msgstr "جلسة المشاهدة غير صالحة."
+
+msgid "Audio download is temporarily unavailable."
+msgstr "تنزيل الصوت غير متاح مؤقتًا."
+
+msgid "The server could not complete the request."
+msgstr "تعذر على الخادم إكمال الطلب."
+
+msgid "Copy code"
+msgstr "نسخ الرمز"
 
 msgid "Too many time ranges."
 msgstr "عدد نطاقات الوقت كبير جدًا."

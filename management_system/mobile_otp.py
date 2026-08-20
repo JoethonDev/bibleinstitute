@@ -18,6 +18,7 @@ from .models import MobileOtpChallenge, TelegramAccount, TelegramBotConfig, User
 from .mobile_auth import mobile_installation_conflict
 from .mobile_otp_tasks import send_mobile_otp
 from .telegram.configuration import decrypt_secret, encrypt_secret
+from .telegram.linking import current_telegram_link
 from .utils.validators import normalize_phone
 
 
@@ -38,12 +39,20 @@ def _otp_digest(otp: str) -> str:
 
 
 class MobileOtpError(Exception):
-    def __init__(self, code: str, message: str, status: int = 400, retry_after: int | None = None):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status: int = 400,
+        retry_after: int | None = None,
+        details: dict | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.message = message
         self.status = status
         self.retry_after = retry_after
+        self.details = details
 
 
 def _cache_key(prefix: str, value: str) -> str:
@@ -78,9 +87,14 @@ def _eligible_mobile_user(phone: str) -> tuple[User, TelegramAccount]:
         raise MobileOtpError("otp_unavailable", _("OTP login is unavailable for this number."))
     account = TelegramAccount.objects.filter(user=user, is_active=True).first()
     if account is None:
+        try:
+            _account, link_url = current_telegram_link(user)
+        except Exception:
+            link_url = None
         raise MobileOtpError(
             "telegram_link_required",
             _("Link your Telegram account before using OTP login."),
+            details={"link_url": link_url} if link_url else None,
         )
     return user, account
 
@@ -111,9 +125,11 @@ def request_mobile_otp(phone: str, installation_id: str, remote_addr: str) -> Mo
         raise MobileOtpError("invalid_phone", _("Enter a valid phone number."))
     if not normalized_phone:
         raise MobileOtpError("invalid_phone", _("Enter a valid phone number."))
-    installation_id = installation_id.strip()[:128] if isinstance(installation_id, str) else ""
+    installation_id = installation_id.strip() if isinstance(installation_id, str) else ""
     if not installation_id:
         raise MobileOtpError("installation_required", _("A device installation ID is required."))
+    if len(installation_id) > 128:
+        raise MobileOtpError("invalid_installation", _("The device installation ID is too long."))
     _check_rate_limit("phone", normalized_phone, OTP_PHONE_LIMIT)
     _check_rate_limit("ip", remote_addr or "unknown", OTP_IP_LIMIT)
     user, account = _eligible_mobile_user(normalized_phone)
@@ -168,7 +184,12 @@ def request_mobile_otp(phone: str, installation_id: str, remote_addr: str) -> Mo
     return challenge
 
 
-def verify_mobile_otp(challenge_id: str, otp: str, installation_id: str):
+def verify_mobile_otp(
+    challenge_id: str,
+    otp: str,
+    installation_id: str,
+    phone_number: str,
+):
     """Consume a valid OTP and return the student used for session issuance."""
     now = timezone.now()
     if not isinstance(challenge_id, str) or not isinstance(otp, str):
@@ -176,6 +197,12 @@ def verify_mobile_otp(challenge_id: str, otp: str, installation_id: str):
     try:
         challenge_uuid = uuid.UUID(challenge_id)
     except (ValueError, TypeError, AttributeError):
+        raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
+    try:
+        normalized_phone = normalize_phone(phone_number)
+    except (TypeError, ValueError):
+        raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
+    if not normalized_phone:
         raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
     normalized_otp = otp.strip()
     if len(normalized_otp) != 6 or not normalized_otp.isascii() or not normalized_otp.isdigit():
@@ -191,8 +218,12 @@ def verify_mobile_otp(challenge_id: str, otp: str, installation_id: str):
             ).get(pk=challenge.pk)
         except MobileOtpChallenge.DoesNotExist:
             raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
-        normalized_installation_id = installation_id.strip()[:128] if isinstance(installation_id, str) else ""
+        normalized_installation_id = installation_id.strip() if isinstance(installation_id, str) else ""
+        if not normalized_installation_id or len(normalized_installation_id) > 128:
+            raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
         if challenge.installation_id != normalized_installation_id:
+            raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
+        if normalize_phone(challenge.student.phone or "") != normalized_phone:
             raise MobileOtpError("invalid_otp", _("The OTP is invalid or expired."))
         if challenge.status != MobileOtpChallenge.Status.SENT or challenge.expires_at <= now:
             if challenge.expires_at <= now and challenge.status in {

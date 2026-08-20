@@ -8,7 +8,7 @@ import telebot
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
-from django.utils.translation import override
+from django.utils.translation import gettext as _, override
 
 from .models import MobileOtpChallenge, TelegramAccount, TelegramBotConfig
 from .telegram.configuration import decrypt_secret
@@ -66,9 +66,17 @@ def send_mobile_otp(self, challenge_id: str, encrypted_otp: str):
         otp = decrypt_secret(encrypted_otp)
         bot = telebot.TeleBot(token, parse_mode=None, threaded=False)
         with override("ar"):
+            copy_keyboard = telebot.types.InlineKeyboardMarkup()
+            copy_keyboard.add(
+                telebot.types.InlineKeyboardButton(
+                    _("Copy code"),
+                    copy_text=telebot.types.CopyTextButton(text=otp),
+                )
+            )
             message = bot.send_message(
                 account.telegram_user_id,
                 f"رمز الدخول إلى تطبيق المعهد: {otp}\nصلاحية الرمز خمس دقائق.",
+                reply_markup=copy_keyboard,
             )
         MobileOtpChallenge.objects.filter(pk=challenge.pk, status=MobileOtpChallenge.Status.SENDING).update(
             status=MobileOtpChallenge.Status.SENT,
