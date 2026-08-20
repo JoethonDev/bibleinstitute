@@ -260,6 +260,9 @@ EXPO_PUSH_TIMEOUT_SECONDS = float(os.getenv("EXPO_PUSH_TIMEOUT_SECONDS", "15"))
 EXPO_PUSH_REQUESTS_PER_SECOND = int(os.getenv("EXPO_PUSH_REQUESTS_PER_SECOND", "5"))
 EXPO_PUSH_SEND_BATCH_SIZE = 100
 EXPO_PUSH_RECEIPT_BATCH_SIZE = 1000
+MOBILE_PUSH_LESSON_TTL_SECONDS = int(os.getenv("MOBILE_PUSH_LESSON_TTL_SECONDS", str(24 * 60 * 60)))
+if MOBILE_PUSH_LESSON_TTL_SECONDS <= 0:
+    raise ImproperlyConfigured("MOBILE_PUSH_LESSON_TTL_SECONDS must be positive.")
 
 # Server-side media processing limits. Native FFmpeg runs only in the
 # dedicated media worker; these values are also exposed in the worker's

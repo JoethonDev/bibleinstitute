@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from celery import current_app
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone, translation
@@ -100,6 +101,12 @@ def _telegram_account_ids_for_offering(offering) -> dict[int, int]:
 
 def _datetime_key(value: datetime) -> str:
     return ensure_aware(value).isoformat()
+
+
+def _push_expiry(event_type: str, scheduled_for: datetime, closing: datetime | None) -> datetime:
+    if event_type == StudentNotification.NotificationType.QUIZ_OPENING and closing is not None:
+        return ensure_aware(closing)
+    return scheduled_for + timedelta(seconds=settings.MOBILE_PUSH_LESSON_TTL_SECONDS)
 
 
 def _quiz_snapshot_body(quiz: Quiz, user: User, opening: datetime, closing: datetime, language: str) -> str:
@@ -198,6 +205,7 @@ def _persist_event_batch(
                 offering_id=source.course_offering_id,
                 entity_id=source.pk,
                 scheduled_for=scheduled_for,
+                push_expires_at=_push_expiry(event_type, scheduled_for, closing),
             )
         )
     StudentNotification.objects.bulk_create(rows, ignore_conflicts=True)

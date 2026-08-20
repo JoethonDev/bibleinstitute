@@ -10,7 +10,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import F, Prefetch, Window
+from django.db.models import Exists, F, OuterRef, Prefetch, Window
 from django.db.models.functions import RowNumber
 from django.utils import timezone
 
@@ -154,6 +154,11 @@ def _notification_payload(delivery: PushDelivery) -> dict:
 def _materialize_due_deliveries(limit: int) -> int:
     now = timezone.now()
     scan_limit = max(1, min(int(limit), DELIVERY_SCAN_LIMIT))
+    active_device_exists = MobilePushDevice.objects.filter(
+        user_id=OuterRef("student_id"),
+        is_active=True,
+        disabled_at__isnull=True,
+    )
     active_devices = MobilePushDevice.objects.filter(
         is_active=True,
         disabled_at__isnull=True,
@@ -169,11 +174,13 @@ def _materialize_due_deliveries(limit: int) -> int:
     notifications = list(
         StudentNotification.objects.filter(
             scheduled_for__lte=now,
+            push_expires_at__gt=now,
             cancelled_at__isnull=True,
             student__is_active=True,
             student__application_status="active",
             student__role__role="student",
         )
+        .filter(Exists(active_device_exists))
         .select_related("student")
         .prefetch_related(
             Prefetch(
@@ -233,6 +240,7 @@ def _claim_due_deliveries(limit: int) -> list[PushDelivery]:
                 next_attempt_at__lte=now,
                 attempt_count__lt=MAX_PUSH_ATTEMPTS,
                 notification__cancelled_at__isnull=True,
+                notification__push_expires_at__gt=now,
                 notification__student__is_active=True,
                 notification__student__application_status="active",
                 notification__student__role__role="student",
@@ -263,9 +271,41 @@ def _deactivate_devices(device_ids: set[int], now) -> None:
         )
 
 
+def _expire_pending_deliveries(limit: int = DELIVERY_SCAN_LIMIT) -> int:
+    now = timezone.now()
+    ids = list(
+        PushDelivery.objects.filter(
+            status=PushDelivery.Status.QUEUED,
+            notification__push_expires_at__lte=now,
+        ).values_list("pk", flat=True)[: max(1, min(int(limit), DELIVERY_SCAN_LIMIT))]
+    )
+    if not ids:
+        return 0
+    return PushDelivery.objects.filter(pk__in=ids).update(
+        status=PushDelivery.Status.SKIPPED,
+        error_code="notification_expired",
+        error_message="The push notification expired before delivery.",
+        next_attempt_at=now,
+        updated_at=now,
+    )
+
+
 def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     if not deliveries:
-        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0}
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": 0}
+    now = timezone.now()
+    expired = [delivery for delivery in deliveries if delivery.notification.push_expires_at <= now]
+    if expired:
+        PushDelivery.objects.filter(pk__in=[delivery.pk for delivery in expired]).update(
+            status=PushDelivery.Status.SKIPPED,
+            error_code="notification_expired",
+            error_message="The push notification expired before delivery.",
+            next_attempt_at=now,
+            updated_at=now,
+        )
+        deliveries = [delivery for delivery in deliveries if delivery not in expired]
+    if not deliveries:
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(expired)}
     outcome, data = _provider_post(
         settings.EXPO_PUSH_SEND_URL,
         {"messages": [_notification_payload(delivery) for delivery in deliveries]},
@@ -274,14 +314,14 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     if outcome != "ok":
         if outcome == "network_error" or outcome == "invalid_response" or outcome.startswith("http_5") or outcome == "http_429":
             _mark_retryable(deliveries, outcome, now)
-            return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0}
+            return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired)}
         _mark_permanent_failure(deliveries, outcome, "Expo rejected the push request.", now)
-        return {"ticketed": 0, "failed": len(deliveries), "retried": 0, "deactivated": 0}
+        return {"ticketed": 0, "failed": len(deliveries), "retried": 0, "deactivated": 0, "skipped": len(expired)}
 
     tickets = data.get("data") if isinstance(data, dict) else None
     if not isinstance(tickets, list) or len(tickets) != len(deliveries):
         _mark_retryable(deliveries, "invalid_response", now)
-        return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0}
+        return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired)}
 
     deactivated_ids: set[int] = set()
     retryable: list[PushDelivery] = []
@@ -334,7 +374,13 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     if retryable:
         _mark_retryable(retryable, "MessageRateExceeded", now)
     _deactivate_devices(deactivated_ids, now)
-    return {"ticketed": ticketed, "failed": failed, "retried": retried, "deactivated": len(deactivated_ids)}
+    return {
+        "ticketed": ticketed,
+        "failed": failed,
+        "retried": retried,
+        "deactivated": len(deactivated_ids),
+        "skipped": len(expired),
+    }
 
 
 def _recover_stale_sending() -> None:
@@ -342,13 +388,20 @@ def _recover_stale_sending() -> None:
     now = timezone.now()
     with transaction.atomic():
         stale = list(
-            PushDelivery.objects.select_for_update(skip_locked=True).filter(
+            PushDelivery.objects.select_for_update(of=("self",), skip_locked=True).select_related(
+                "notification",
+            ).filter(
                 status=PushDelivery.Status.SENDING,
                 updated_at__lt=cutoff,
             )[:DELIVERY_SCAN_LIMIT]
         )
         for delivery in stale:
-            if delivery.attempt_count >= MAX_PUSH_ATTEMPTS:
+            if delivery.notification.push_expires_at <= now:
+                delivery.status = PushDelivery.Status.SKIPPED
+                delivery.error_code = "notification_expired"
+                delivery.error_message = "The push notification expired before delivery."
+                delivery.next_attempt_at = now
+            elif delivery.attempt_count >= MAX_PUSH_ATTEMPTS:
                 delivery.status = PushDelivery.Status.FAILED
                 delivery.error_code = "stale_sending"
                 delivery.error_message = "Expo delivery worker lease expired."
@@ -387,10 +440,11 @@ def dispatch_due_mobile_push(*, limit: int = DELIVERY_SCAN_LIMIT) -> dict[str, i
     if not _configured():
         return {"created": 0, "ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": 0}
 
+    expired = _expire_pending_deliveries()
     _recover_stale_sending()
     created = _materialize_due_deliveries(limit)
     deliveries = _claim_due_deliveries(limit)
-    totals = {"created": created, "ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": 0}
+    totals = {"created": created, "ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": expired}
     if not deliveries:
         return totals
 
@@ -406,6 +460,7 @@ def dispatch_due_mobile_push(*, limit: int = DELIVERY_SCAN_LIMIT) -> dict[str, i
         counts = _send_chunk(deliveries[start:start + batch_size])
         for key in ("ticketed", "failed", "retried", "deactivated"):
             totals[key] += counts[key]
+        totals["skipped"] += counts["skipped"]
     return totals
 
 

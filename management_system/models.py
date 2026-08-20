@@ -545,6 +545,7 @@ class StudentNotification(models.Model):
     offering_id = models.PositiveBigIntegerField()
     entity_id = models.PositiveBigIntegerField()
     scheduled_for = models.DateTimeField()
+    push_expires_at = models.DateTimeField()
     cancelled_at = models.DateTimeField(null=True, blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -576,6 +577,10 @@ class StudentNotification(models.Model):
                 condition=models.Q(offering_id__gt=0) & models.Q(entity_id__gt=0),
                 name="student_notification_route_ids_positive",
             ),
+            models.CheckConstraint(
+                condition=models.Q(push_expires_at__gt=models.F("scheduled_for")),
+                name="student_notification_push_expiry_after_schedule",
+            ),
         ]
         indexes = [
             models.Index(
@@ -589,6 +594,10 @@ class StudentNotification(models.Model):
             models.Index(
                 fields=["cancelled_at", "scheduled_for"],
                 name="student_notif_cancel_idx",
+            ),
+            models.Index(
+                fields=["scheduled_for", "push_expires_at", "cancelled_at"],
+                name="student_notif_push_due_idx",
             ),
         ]
 
