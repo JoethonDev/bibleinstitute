@@ -19,18 +19,29 @@ import qrcode
 
 from .forms import SignupDetailsForm
 from .mobile_auth import (
+    MobileBiometricError,
+    enroll_mobile_biometric,
     get_mobile_session,
     issue_mobile_session,
     clear_mobile_login_failures,
+    normalize_mobile_installation_id,
     mobile_installation_conflict,
     mobile_login_rate_limited,
     json_api_response,
     normalize_language,
+    revoke_other_account_biometric,
+    revoke_mobile_biometric,
     require_mobile_session,
     revoke_mobile_session,
     record_mobile_login_failure,
+    unlock_mobile_biometric,
 )
-from .mobile_otp import MobileOtpError, request_mobile_otp, verify_mobile_otp
+from .mobile_otp import (
+    OTP_RESEND_INTERVAL,
+    MobileOtpError,
+    request_mobile_otp,
+    verify_mobile_otp,
+)
 from .models import (
     Grade,
     LectureProgress,
@@ -85,6 +96,13 @@ def _error(request, code: str, message: str, status: int, details: dict | None =
     return json_api_response(request, {"error": error}, status=status)
 
 
+def _mobile_installation_id(request, payload: dict) -> str | None:
+    value = request.headers.get("X-Installation-ID")
+    if value is None:
+        value = payload.get("installation_id")
+    return normalize_mobile_installation_id(value)
+
+
 def _form_error(request, form, message: str, status: int = 400):
     fields = {
         name: [str(error) for error in errors]
@@ -92,7 +110,7 @@ def _form_error(request, form, message: str, status: int = 400):
     }
     return json_api_response(
         request,
-        {"error": {"code": "validation_error", "message": message, "fields": fields}},
+        {"error": {"code": "validation_error", "message": message, "field_errors": fields}},
         status=status,
     )
 
@@ -145,6 +163,10 @@ def login(request):
     installation_id = payload.get("installation_id")
     if isinstance(installation_id, str) and mobile_installation_conflict(user, installation_id):
         return _error(request, "device_conflict", _localized(request, "This push device belongs to another account."), 409)
+    revoke_other_account_biometric(
+        user,
+        normalize_mobile_installation_id(payload.get("biometric_installation_id")),
+    )
     token, session = issue_mobile_session(
         user,
     )
@@ -182,9 +204,11 @@ def otp_request(request):
     return json_api_response(
         request,
         {
+            "status": "otp_sent",
             "challenge_id": str(challenge.challenge_id),
             "expires_at": challenge.expires_at.isoformat(),
             "delivery": "telegram",
+            "retry_after_seconds": int(OTP_RESEND_INTERVAL.total_seconds()),
         },
         status=202,
     )
@@ -214,7 +238,10 @@ def otp_verify(request):
         if exc.retry_after is not None:
             response["Retry-After"] = str(exc.retry_after)
         return response
-    installation_id = payload.get("installation_id")
+    revoke_other_account_biometric(
+        user,
+        normalize_mobile_installation_id(payload.get("biometric_installation_id")),
+    )
     token, session = issue_mobile_session(user)
     return json_api_response(
         request,
@@ -235,6 +262,71 @@ def logout(request):
     if not revoked:
         return _error(request, "authentication_required", _("Authentication required."), 401)
     return json_api_response(request, {"status": "logged_out"})
+
+
+@csrf_exempt
+@require_mobile_session
+@require_POST
+def biometric_enroll(request):
+    payload = _json_body(request)
+    if payload is None:
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    installation_id = _mobile_installation_id(request, payload)
+    if installation_id is None:
+        return _error(request, "installation_required", _localized(request, "A device installation ID is required."), 400)
+    try:
+        credential = enroll_mobile_biometric(request.user, installation_id)
+    except MobileBiometricError as exc:
+        return _error(request, exc.code, _localized(request, exc.message), exc.status)
+    return json_api_response(
+        request,
+        {"status": "enrolled", "credential": credential},
+    )
+
+
+@csrf_exempt
+@require_POST
+def biometric_unlock(request):
+    payload = _json_body(request)
+    if payload is None:
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    installation_id = _mobile_installation_id(request, payload)
+    if installation_id is None:
+        return _error(request, "installation_required", _localized(request, "A device installation ID is required."), 400)
+    try:
+        token, session, user = unlock_mobile_biometric(
+            installation_id,
+            payload.get("credential"),
+            request.META.get("REMOTE_ADDR", ""),
+        )
+    except MobileBiometricError as exc:
+        return _error(request, exc.code, _localized(request, exc.message), exc.status)
+    return json_api_response(
+        request,
+        {
+            "token": token,
+            "token_type": "Bearer",
+            "expires_at": session.expires_at.isoformat(),
+            "user": student_profile_data(user),
+        },
+    )
+
+
+@csrf_exempt
+@require_mobile_session
+@require_http_methods(["DELETE"])
+def biometric_revoke(request):
+    payload = _json_body(request)
+    if payload is None:
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    installation_id = _mobile_installation_id(request, payload)
+    if installation_id is None:
+        return _error(request, "installation_required", _localized(request, "A device installation ID is required."), 400)
+    try:
+        updated = revoke_mobile_biometric(request.user, installation_id)
+    except MobileBiometricError as exc:
+        return _error(request, exc.code, _localized(request, exc.message), exc.status)
+    return json_api_response(request, {"status": "revoked", "updated": updated})
 
 
 @require_mobile_session
@@ -380,7 +472,12 @@ def calendar(request):
 @require_http_methods(["GET"])
 def progress(request):
     raw_ids = request.GET.get("offering_ids", "")
-    offering_ids = [int(value) for value in raw_ids.split(",") if value.isdigit()][:PAGE_SIZE] if raw_ids else None
+    offering_ids = None
+    if raw_ids:
+        values = raw_ids.split(",")
+        if not values or any(not value.isdigit() for value in values):
+            return _error(request, "invalid_request", _localized(request, "Invalid offering identifier."), 400)
+        offering_ids = [int(value) for value in values[:PAGE_SIZE]]
     page_obj, items = student_progress_data(request.user, offering_ids, _page_value(request))
     return json_api_response(request, _paginated_payload(page_obj, items))
 
@@ -555,10 +652,16 @@ def media_session(request, offering_id, lesson_id, file_index):
         return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
     if not link or link.get("file_type") not in {"video", "audio"} or not link.get("id"):
         return _error(request, "invalid_media", _("Invalid media file."), 400)
+    payload = _json_body(request)
+    if payload is None:
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    renew = payload.get("renew") is True
     part_id = link.get("part_id", "")
-    session = ViewingSession.objects.filter(
-        student=request.user, lesson=lesson, part_id=part_id, expires_at__gt=timezone.now()
-    ).order_by("-expires_at").first()
+    session = None
+    if not renew:
+        session = ViewingSession.objects.filter(
+            student=request.user, lesson=lesson, part_id=part_id, expires_at__gt=timezone.now()
+        ).order_by("-expires_at").first()
     if session is None:
         session = create_viewing_session(request.user, lesson, part_id)
     progress_percent = LectureProgress.objects.filter(
@@ -573,28 +676,34 @@ def media_session(request, offering_id, lesson_id, file_index):
     })
 
 
-@require_mobile_session
 @require_http_methods(["GET"])
 def media_manifest(request, offering_id, lesson_id, file_index):
-    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
-    if lesson is None:
-        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
-    if not link or link.get("file_type") not in {"video", "audio"}:
-        return _error(request, "invalid_media", _("Invalid media file."), 400)
     session_id = request.GET.get("session_id", "")
     token = request.GET.get("token", "")
     if not session_id or not token:
         return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
     session = ViewingSession.objects.filter(
         session_id=session_id,
-        student=request.user,
-        lesson=lesson,
-        part_id=link.get("part_id", ""),
-    ).first()
-    if session is None or timezone.now() >= session.expires_at:
+    ).select_related("student").first()
+    if session is None or not session.student.is_active or session.student.application_status != "active":
+        return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
+    if timezone.now() >= session.expires_at:
         return _error(request, "viewing_session_expired", _("Viewing session expired."), 401)
     if not _valid_session_token(token, session):
         return _error(request, "invalid_viewing_session", _("Invalid viewing session token."), 403)
+    request.user = session.student
+    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
+    if lesson is None:
+        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
+    if (
+        not link
+        or link.get("file_type") not in {"video", "audio"}
+        or session.lesson_id != lesson.pk
+        or session.part_id != link.get("part_id", "")
+    ):
+        return _error(request, "invalid_viewing_session", _("The viewing session is invalid."), 403)
+    # The signed viewing session is the media credential. Native HLS requests
+    # must not carry the mobile bearer token to the media host.
     response = lesson_manifest(request, offering_id, lesson_id, file_index)
     if response.status_code >= 400:
         return _error(

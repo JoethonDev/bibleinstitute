@@ -1,4 +1,4 @@
-"""URL configuration for the locked student mobile API.
+"""URL configuration for the role-neutral mobile API.
 
 Included from the project root at the non-language-prefixed
 ``/api/mobile/v1/`` boundary. View behavior, authentication, and data
@@ -15,6 +15,9 @@ urlpatterns = [
     path("auth/login/", mobile_api.login, name="login"),
     path("auth/otp/request/", mobile_api.otp_request, name="otp-request"),
     path("auth/otp/verify/", mobile_api.otp_verify, name="otp-verify"),
+    path("auth/biometric/enroll/", mobile_api.biometric_enroll, name="biometric-enroll"),
+    path("auth/biometric/unlock/", mobile_api.biometric_unlock, name="biometric-unlock"),
+    path("auth/biometric/", mobile_api.biometric_revoke, name="biometric-revoke"),
     path("auth/logout/", mobile_api.logout, name="logout"),
     path("me/", mobile_api.me, name="me"),
     path("profile/", mobile_api.profile, name="profile"),

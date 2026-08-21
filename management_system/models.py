@@ -394,6 +394,33 @@ class StudentMobileSession(models.Model):
         return f"Mobile session for {self.user.username}"
 
 
+class MobileBiometricCredential(models.Model):
+    """Digest-only device credential used to issue a fresh mobile session."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mobile_biometric_credentials",
+    )
+    installation_id = models.CharField(max_length=128, unique=True)
+    credential_digest = models.CharField(max_length=64, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "revoked_at"],
+                name="mobile_bio_user_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Mobile biometric credential for {self.user.username}"
+
+
 class MobileOtpChallenge(models.Model):
     """Digest-only, one-use Telegram OTP challenge for mobile login."""
 
