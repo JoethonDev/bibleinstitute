@@ -15,7 +15,7 @@ from django.http import JsonResponse
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
-from .models import MobileBiometricCredential, MobilePushDevice, StudentMobileSession
+from .models import MobileBiometricCredential, MobilePushDevice, StudentMobileSession, User
 from .utils.localization import normalize_language
 
 
@@ -172,9 +172,9 @@ def unlock_mobile_biometric(
 
     now = timezone.now()
     with transaction.atomic():
+        # Keep the lock query free of the nullable User.role outer join.
         credential = (
             MobileBiometricCredential.objects.select_for_update()
-            .select_related("user", "user__role")
             .filter(
                 installation_id=installation_id,
                 credential_digest=digest,
@@ -185,7 +185,7 @@ def unlock_mobile_biometric(
         if credential is None:
             record_mobile_biometric_failure(installation_id, remote_addr)
             raise MobileBiometricError("biometric_invalid", _("Biometric unlock is unavailable."), status=401)
-        user = credential.user
+        user = User.objects.select_related("role").get(pk=credential.user_id)
         if not user.is_active or user.application_status != "active":
             credential.revoked_at = now
             credential.save(update_fields=["revoked_at", "updated_at"])
