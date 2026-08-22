@@ -1737,8 +1737,24 @@ class AttendanceRecord(models.Model):
 
 
 class ViewingSession(models.Model):
+    class AccessChannel(models.TextChoices):
+        WEB = "web", _("Web")
+        MOBILE = "mobile", _("Mobile")
+
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="viewing_sessions")
     lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="viewing_sessions")
+    mobile_session = models.ForeignKey(
+        StudentMobileSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="viewing_sessions",
+    )
+    access_channel = models.CharField(
+        max_length=12,
+        choices=AccessChannel.choices,
+        default=AccessChannel.WEB,
+    )
     part_id = models.CharField(max_length=100)
     session_id = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField()
@@ -1746,6 +1762,15 @@ class ViewingSession(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["session_id"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(access_channel="web", mobile_session__isnull=True)
+                    | models.Q(access_channel="mobile", mobile_session__isnull=False)
+                ),
+                name="viewing_session_channel_binding",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.name} part {self.part_id}"

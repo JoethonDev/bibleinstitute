@@ -41,7 +41,7 @@ import os
 import csv
 import mimetypes
 import redis
-from datetime import date
+from datetime import date, timedelta
 from functools import wraps
 
 # Internal Imports - Models
@@ -5600,17 +5600,47 @@ def delete_attendance(request, record_id):
 # PHASE 6 — Online Lecture Progress Tracking
 # ============================================================================
 
-def create_viewing_session(student, lesson, part_id):
+def create_viewing_session(student, lesson, part_id, *, mobile_session=None):
     session_id = secrets.token_urlsafe(32)
     expires_at = timezone.now() + timedelta(hours=2)
+    access_channel = ViewingSession.AccessChannel.MOBILE if mobile_session is not None else ViewingSession.AccessChannel.WEB
+    if mobile_session is not None and mobile_session.user_id != student.pk:
+        raise PermissionDenied(_("The viewing session is invalid."))
     session = ViewingSession.objects.create(
         student=student,
         lesson=lesson,
+        mobile_session=mobile_session,
+        access_channel=access_channel,
         part_id=part_id,
         session_id=session_id,
         expires_at=expires_at,
     )
     return session
+
+
+MEDIA_TOKEN_VERSION = "v2"
+MEDIA_AUDIENCES = frozenset({"web", "mobile"})
+MEDIA_SEGMENT_TOKEN_LIFETIME = timedelta(minutes=10)
+
+
+def _media_binding(audience, mobile_session_id=None):
+    """Return the opaque bearer-session binding carried by mobile tokens."""
+    if audience != "mobile":
+        return ""
+    if mobile_session_id is None:
+        raise ValueError("Mobile media tokens require a mobile session binding.")
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        f"mobile-media:{mobile_session_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _validate_media_audience(audience):
+    if audience not in MEDIA_AUDIENCES:
+        raise ValueError("Unsupported media audience.")
+    return audience
+
 
 def _sign_media_message(message):
     return hmac.new(
@@ -5620,32 +5650,54 @@ def _sign_media_message(message):
     ).hexdigest()
 
 
-def sign_session(session_id, expires_at):
-    message = f"{session_id}:{int(expires_at.timestamp())}"
-    signature = _sign_media_message(message)
-    return f"{message}:{signature}"
-
-
-def sign_media_token(session_id, expires_at, segment_key):
+def sign_session(session_id, expires_at, *, audience="web", mobile_session_id=None):
+    audience = _validate_media_audience(audience)
     expires_at_value = int(expires_at.timestamp())
-    message = f"{session_id}:{expires_at_value}:{segment_key}"
-    return f"{session_id}:{expires_at_value}:{_sign_media_message(message)}"
+    binding = _media_binding(audience, mobile_session_id)
+    message = f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|{expires_at_value}|{binding}"
+    signature = _sign_media_message(message)
+    return f"{MEDIA_TOKEN_VERSION}:{audience}:{session_id}:{expires_at_value}:{binding}:{signature}"
 
 
-def _valid_session_token(token, session):
+def sign_media_token(session_id, expires_at, segment_key, *, audience="web", token_expires_at=None):
+    audience = _validate_media_audience(audience)
+    token_expiry = token_expires_at or expires_at
+    expires_at_value = int(token_expiry.timestamp())
+    message = f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|{expires_at_value}|{segment_key}"
+    return f"{MEDIA_TOKEN_VERSION}:{audience}:{session_id}:{expires_at_value}:{_sign_media_message(message)}"
+
+
+def _valid_session_token(token, session, *, audience="web", mobile_session_id=None):
     if not token:
         return False
     parts = token.split(":")
-    if len(parts) != 3 or parts[0] != session.session_id:
+    if len(parts) != 6 or parts[0] != MEDIA_TOKEN_VERSION or parts[1] != audience:
+        return False
+    if parts[2] != session.session_id:
         return False
     try:
-        expires_at = int(parts[1])
+        expires_at = int(parts[3])
     except (TypeError, ValueError):
         return False
     if expires_at != int(session.expires_at.timestamp()) or timezone.now().timestamp() >= expires_at:
         return False
-    expected = _sign_media_message(f"{session.session_id}:{expires_at}")
-    return hmac.compare_digest(parts[2], expected)
+    binding = parts[4]
+    if audience == "mobile":
+        if not binding:
+            return False
+        if mobile_session_id is not None:
+            try:
+                expected_binding = _media_binding(audience, mobile_session_id)
+            except ValueError:
+                return False
+            if not hmac.compare_digest(binding, expected_binding):
+                return False
+    elif binding:
+        return False
+    expected = _sign_media_message(
+        f"{MEDIA_TOKEN_VERSION}|{audience}|{session.session_id}|{expires_at}|{binding}"
+    )
+    return hmac.compare_digest(parts[5], expected)
 
 @login_required
 def start_viewing_session(request, offering_id, lesson_id, file_index):
@@ -5669,7 +5721,7 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
     ).order_by("-expires_at").first()
     if session is None:
         session = create_viewing_session(request.user, lesson, part_id)
-    token = sign_session(session.session_id, session.expires_at)
+    token = sign_session(session.session_id, session.expires_at, audience="web")
     progress_percent = LectureProgress.objects.filter(
         student=request.user,
         lesson=lesson,
@@ -5709,7 +5761,15 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
     )
     if timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Viewing session expired.")}, status=401)
-    if not _valid_session_token(token, session):
+    audience = getattr(request, "media_audience", "web")
+    expected_channel = (
+        ViewingSession.AccessChannel.MOBILE
+        if audience == "mobile"
+        else ViewingSession.AccessChannel.WEB
+    )
+    if session.access_channel != expected_channel:
+        return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
+    if not _valid_session_token(token, session, audience=audience):
         return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
     try:
         response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
@@ -5731,7 +5791,17 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
                 return HttpResponse(status=404)
             if get_segment_number(segment_key) is None:
                 return HttpResponse(status=404)
-            signed_token = sign_media_token(session.session_id, session.expires_at, segment_key)
+            segment_expires_at = min(
+                session.expires_at,
+                timezone.now() + MEDIA_SEGMENT_TOKEN_LIFETIME,
+            )
+            signed_token = sign_media_token(
+                session.session_id,
+                session.expires_at,
+                segment_key,
+                audience=audience,
+                token_expires_at=segment_expires_at,
+            )
             worker_base = settings.CLOUD_WORKER.rstrip("/")
             playlist_lines.append(
                 f"{worker_base}/media/{quote(session.session_id, safe='')}/"
@@ -5756,14 +5826,20 @@ def worker_receipt(request):
     segment_key = data.get("segment_key")
     segment_number = data.get("segment_number")
     signature = data.get("signature")
+    audience = data.get("audience")
+    token_expires_at = data.get("expires_at")
 
     if (
         not isinstance(session_id, str)
         or not isinstance(segment_key, str)
         or not isinstance(signature, str)
+        or not isinstance(audience, str)
+        or isinstance(token_expires_at, bool)
         or not session_id
         or not segment_key
+        or audience not in MEDIA_AUDIENCES
         or segment_number is None
+        or token_expires_at is None
     ):
         return JsonResponse({"error": _("Missing required fields.")}, status=400)
     if request.headers.get("X-Worker-Secret") != settings.WORKER_RECEIPT_SECRET:
@@ -5776,16 +5852,32 @@ def worker_receipt(request):
         segment_number = int(segment_number)
     except (TypeError, ValueError, OverflowError):
         return JsonResponse({"error": _("Invalid segment number.")}, status=400)
+    try:
+        token_expires_at = int(token_expires_at)
+    except (TypeError, ValueError, OverflowError):
+        return JsonResponse({"error": _("Invalid request format.")}, status=400)
 
     session = get_object_or_404(ViewingSession, session_id=session_id)
+
+    expected_audience = (
+        "mobile"
+        if session.access_channel == ViewingSession.AccessChannel.MOBILE
+        else "web"
+    )
+    if audience != expected_audience:
+        return JsonResponse({"error": _("Invalid request signature.")}, status=403)
 
     if timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Session expired.")}, status=410)
 
+    if token_expires_at > int(session.expires_at.timestamp()) or token_expires_at <= 0:
+        return JsonResponse({"error": _("Invalid request format.")}, status=400)
+
     if get_segment_number(segment_key) != segment_number:
         return JsonResponse({"error": _("Invalid segment number.")}, status=400)
     expected = _sign_media_message(
-        f"{session_id}:{int(session.expires_at.timestamp())}:{segment_key}"
+        f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|"
+        f"{token_expires_at}|{segment_key}"
     )
     if not hmac.compare_digest(signature, expected):
         return JsonResponse({"error": _("Invalid request signature.")}, status=403)

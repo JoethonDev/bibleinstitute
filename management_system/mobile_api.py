@@ -660,16 +660,32 @@ def media_session(request, offering_id, lesson_id, file_index):
     session = None
     if not renew:
         session = ViewingSession.objects.filter(
-            student=request.user, lesson=lesson, part_id=part_id, expires_at__gt=timezone.now()
+            student=request.user,
+            lesson=lesson,
+            part_id=part_id,
+            access_channel=ViewingSession.AccessChannel.MOBILE,
+            mobile_session=request.mobile_session,
+            expires_at__gt=timezone.now(),
         ).order_by("-expires_at").first()
     if session is None:
-        session = create_viewing_session(request.user, lesson, part_id)
+        session = create_viewing_session(
+            request.user,
+            lesson,
+            part_id,
+            mobile_session=request.mobile_session,
+        )
     progress_percent = LectureProgress.objects.filter(
         student=request.user, lesson=lesson, part_id=part_id
     ).values_list("percent", flat=True).first() or 0
     return json_api_response(request, {
         "session_id": session.session_id,
-        "token": sign_session(session.session_id, session.expires_at),
+        "token": sign_session(
+            session.session_id,
+            session.expires_at,
+            audience="mobile",
+            mobile_session_id=request.mobile_session.pk,
+        ),
+        "media_audience": "mobile",
         "expires_at": session.expires_at.isoformat(),
         "manifest_url": request.build_absolute_uri(reverse("mobile-v1:media-manifest", kwargs={"offering_id": offering_id, "lesson_id": lesson_id, "file_index": file_index})),
         "progress_percent": max(0, min(int(progress_percent), 100)),
@@ -684,14 +700,28 @@ def media_manifest(request, offering_id, lesson_id, file_index):
         return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
     session = ViewingSession.objects.filter(
         session_id=session_id,
-    ).select_related("student").first()
-    if session is None or not session.student.is_active or session.student.application_status != "active":
+    ).select_related("student", "mobile_session").first()
+    if (
+        session is None
+        or session.access_channel != ViewingSession.AccessChannel.MOBILE
+        or session.mobile_session_id is None
+        or session.mobile_session.revoked_at is not None
+        or session.mobile_session.expires_at <= timezone.now()
+        or not session.student.is_active
+        or session.student.application_status != "active"
+    ):
         return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
     if timezone.now() >= session.expires_at:
         return _error(request, "viewing_session_expired", _("Viewing session expired."), 401)
-    if not _valid_session_token(token, session):
+    if not _valid_session_token(
+        token,
+        session,
+        audience="mobile",
+        mobile_session_id=session.mobile_session_id,
+    ):
         return _error(request, "invalid_viewing_session", _("Invalid viewing session token."), 403)
     request.user = session.student
+    request.media_audience = "mobile"
     lesson, link = _media_link(request, offering_id, lesson_id, file_index)
     if lesson is None:
         return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
@@ -738,11 +768,24 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
     if payload is None:
         return _error(request, "invalid_request", _("Invalid request format."), 400)
     session_id = payload.get("session_id")
+    viewing_token = payload.get("viewing_token")
+    if not isinstance(viewing_token, str) or not viewing_token:
+        return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
     session = ViewingSession.objects.select_related("lesson__course_offering").filter(
-        session_id=session_id, student=request.user
+        session_id=session_id,
+        student=request.user,
+        access_channel=ViewingSession.AccessChannel.MOBILE,
+        mobile_session=request.mobile_session,
     ).first()
     if session is None or (lesson_id is not None and session.lesson_id != lesson_id) or (
         offering_id is not None and session.lesson.course_offering_id != offering_id
+    ):
+        return _error(request, "forbidden", _("You do not have access to this viewing session."), 403)
+    if not _valid_session_token(
+        viewing_token,
+        session,
+        audience="mobile",
+        mobile_session_id=request.mobile_session.pk,
     ):
         return _error(request, "forbidden", _("You do not have access to this viewing session."), 403)
     response = existing_progress_heartbeat(request, allow_management=True)
