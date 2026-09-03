@@ -14,6 +14,22 @@
 
     <div class="ad-pane-head">
         <h4 class="ad-pane-title">{% translate "Student Applications" %}</h4>
+        <form class="ad-search" method="get" action="{% url 'applications-dashboard' %}" role="search">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search"
+                   name="name"
+                   value="{{ application_search }}"
+                   placeholder="{% translate 'Search username, email, name, phone, or national ID' %}"
+                   aria-label="{% translate 'Search applications' %}"
+                   hx-get="{% url 'applications-dashboard' %}?status={{ current_status }}"
+                   hx-include="closest form"
+                   hx-trigger="keyup changed delay:500ms, search"
+                   hx-target="#applications-workspace"
+                   hx-select="#applications-workspace"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">
+            <input type="hidden" name="status" value="{{ current_status }}">
+        </form>
     </div>
 
     <div id="application-bulk-result"
@@ -27,30 +43,30 @@
 
     <div id="applications-workspace">
     <div class="ad-filters mb-3">
-        <a class="ad-filter-pill nav-link {% if current_status == 'all' %}is-on{% endif %}" href="?status=all"
+        <a class="ad-filter-pill nav-link {% if current_status == 'all' %}is-on{% endif %}" href="?status=all{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            {% if current_status == 'all' %}aria-current="page"{% endif %}
-           hx-get="{% url 'applications-dashboard' %}?status=all"
+           hx-get="{% url 'applications-dashboard' %}?status=all{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            hx-target="#applications-workspace"
            hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "All" %}</a>
-        <a class="ad-filter-pill nav-link {% if current_status == 'pending' %}is-on{% endif %}" href="?status=pending"
+        <a class="ad-filter-pill nav-link {% if current_status == 'pending' %}is-on{% endif %}" href="?status=pending{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            {% if current_status == 'pending' %}aria-current="page"{% endif %}
-           hx-get="{% url 'applications-dashboard' %}?status=pending"
+           hx-get="{% url 'applications-dashboard' %}?status=pending{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            hx-target="#applications-workspace"
            hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "Pending" %}</a>
-        <a class="ad-filter-pill nav-link {% if current_status == 'active' %}is-on{% endif %}" href="?status=active"
+        <a class="ad-filter-pill nav-link {% if current_status == 'active' %}is-on{% endif %}" href="?status=active{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            {% if current_status == 'active' %}aria-current="page"{% endif %}
-           hx-get="{% url 'applications-dashboard' %}?status=active"
+           hx-get="{% url 'applications-dashboard' %}?status=active{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            hx-target="#applications-workspace"
            hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "Active" %}</a>
-        <a class="ad-filter-pill nav-link {% if current_status == 'declined' %}is-on{% endif %}" href="?status=declined"
+        <a class="ad-filter-pill nav-link {% if current_status == 'declined' %}is-on{% endif %}" href="?status=declined{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            {% if current_status == 'declined' %}aria-current="page"{% endif %}
-           hx-get="{% url 'applications-dashboard' %}?status=declined"
+           hx-get="{% url 'applications-dashboard' %}?status=declined{% if application_search %}&amp;name={{ application_search|urlencode }}{% endif %}"
            hx-target="#applications-workspace"
            hx-select="#applications-workspace"
            hx-swap="outerHTML"
@@ -114,12 +130,7 @@
                             <td><span class="ad-pill {% if u.application_status == 'active' %}ad-pill--success{% elif u.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ u.get_application_status_display }}</span></td>
                             <td>
                                 <div class="ad-actions">
-                                    <a href="{% url 'application-review' u.id %}" class="ad-btn ad-btn--ghost ad-btn--sm"
-                                       hx-get="{% url 'application-review' u.id %}?status={{ current_status }}&page={{ page_obj.number }}"
-                                       hx-target="#application-review-drawer-body"
-                                       hx-select="#application-review-drawer-body"
-                                       hx-swap="outerHTML"
-                                       hx-on::after-request="if (event.detail.successful) bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('applicationReviewDrawer')).show()">
+                                    <a href="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}" class="ad-btn ad-btn--ghost ad-btn--sm">
                                         <i class="fas fa-eye"></i> {% translate "Review" %}
                                     </a>
                                     <form method="post"
@@ -208,13 +219,4 @@
     </div>
 </div>
     </div>
-<div class="offcanvas offcanvas-end" tabindex="-1" id="applicationReviewDrawer" aria-labelledby="applicationReviewDrawerLabel">
-    <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="applicationReviewDrawerLabel">{% translate "Application Review" %}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
-    </div>
-    <div class="offcanvas-body" id="application-review-drawer-body">
-        <p class="text-muted">{% translate "Select Review to load the authoritative application record." %}</p>
-    </div>
-</div>
 {% endblock %}

@@ -1,0 +1,142 @@
+{% extends 'admin_panel.html' %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block body %}
+<div class="container-fluid py-3 ad-page" id="content" x-data="{ editing: false }">
+    <nav aria-label="{% translate 'Breadcrumb' %}">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'user-dashboard' %}">{% translate "Users" %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ profile_user.get_full_name|default:profile_user.username }}</li>
+        </ol>
+    </nav>
+
+    <div class="ad-detail-head mb-3">
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+            <div>
+                <h4 class="ad-detail-title mb-1">{% translate "User details" %}</h4>
+                <p class="mb-0 text-white-50">{{ profile_user.get_full_name|default:profile_user.username }}</p>
+            </div>
+            <button type="button"
+                    class="ad-btn ad-btn--ghost"
+                    x-show="!editing"
+                    @click="editing = true"
+                    aria-controls="user-edit-form"
+                    :aria-expanded="editing.toString()">
+                <i class="fas fa-edit me-1" aria-hidden="true"></i>{% translate "Edit" %}
+            </button>
+        </div>
+    </div>
+
+    <div id="user-edit-form" class="ad-card mb-3" x-show="editing" x-cloak>
+        <div class="ad-card-head"><strong>{% translate "Edit user" %}</strong></div>
+        <div class="ad-card-body">
+            <form method="post" action="{% url 'user-profile' profile_user.pk %}">
+                {% csrf_token %}
+                {{ edit_form|crispy }}
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="ad-btn ad-btn--teal">
+                        <i class="fas fa-save me-1" aria-hidden="true"></i>{% translate "Save changes" %}
+                    </button>
+                    <button type="button" class="ad-btn ad-btn--ghost" @click="editing = false">
+                        {% translate "Cancel" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="!editing" x-cloak>
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="ad-card mb-3">
+                    <div class="ad-card-head"><strong>{% translate "Account information" %}</strong></div>
+                    <div class="ad-card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">{% translate "Username" %}</dt><dd class="col-sm-7">{{ profile_user.username }}</dd>
+                            <dt class="col-sm-5">{% translate "First name" %}</dt><dd class="col-sm-7">{{ profile_user.first_name|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Last name" %}</dt><dd class="col-sm-7">{{ profile_user.last_name|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Email" %}</dt><dd class="col-sm-7">{{ profile_user.email|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Role" %}</dt><dd class="col-sm-7">{{ profile_user.role.get_role_display|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Active" %}</dt><dd class="col-sm-7">{% if profile_user.is_active %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd>
+                            <dt class="col-sm-5">{% translate "Joined date" %}</dt><dd class="col-sm-7">{{ profile_user.joined_date|date:"Y-m-d"|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Last login" %}</dt><dd class="col-sm-7">{{ profile_user.last_login|date:"Y-m-d H:i"|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Time zone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.time_zone|default:"—" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="ad-card mb-3">
+                    <div class="ad-card-head"><strong>{% translate "Personal information" %}</strong></div>
+                    <div class="ad-card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">{% translate "Phone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.phone|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Country" %}</dt><dd class="col-sm-7">{{ profile_user.country|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "City" %}</dt><dd class="col-sm-7">{{ profile_user.city|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Educational qualification / occupation" %}</dt><dd class="col-sm-7">{{ profile_user.education_or_job|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Study mode" %}</dt><dd class="col-sm-7">{{ profile_user.get_study_mode_display|default:"—" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="ad-card mb-3">
+                    <div class="ad-card-head"><strong>{% translate "Church information" %}</strong></div>
+                    <div class="ad-card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">{% translate "Confessor name" %}</dt><dd class="col-sm-7">{{ profile_user.priest_name|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Confessor phone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.priest_phone|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Church" %}</dt><dd class="col-sm-7">{{ profile_user.church|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Service (if any)" %}</dt><dd class="col-sm-7">{{ profile_user.service|default:"—" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if can_view_application_data %}
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="ad-card mb-3">
+                    <div class="ad-card-head"><strong>{% translate "Application information" %}</strong></div>
+                    <div class="ad-card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">{% translate "Application status" %}</dt>
+                            <dd class="col-sm-7"><span class="ad-pill {% if profile_user.application_status == 'active' %}ad-pill--success{% elif profile_user.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ profile_user.get_application_status_display }}</span></dd>
+                            <dt class="col-sm-5">{% translate "Identity type" %}</dt><dd class="col-sm-7">{{ profile_user.get_identity_type_display|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "National ID / passport number" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.identity_number|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Decision notes" %}</dt><dd class="col-sm-7">{{ profile_user.decision_notes|default:"—"|linebreaksbr }}</dd>
+                            <dt class="col-sm-5">{% translate "Decided by" %}</dt><dd class="col-sm-7">{% if profile_user.decided_by %}{{ profile_user.decided_by.get_full_name|default:profile_user.decided_by.username }}{% else %}—{% endif %}</dd>
+                            <dt class="col-sm-5">{% translate "Decided at" %}</dt><dd class="col-sm-7">{{ profile_user.decided_at|date:"Y-m-d H:i"|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Active enrollment" %}</dt>
+                            <dd class="col-sm-7">{% if active_enrollment %}{{ active_enrollment.academic_year_level.academic_year.name }} — {{ active_enrollment.academic_year_level.level.display_name }}{% else %}{% translate "None" %}{% endif %}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="ad-card mb-3">
+                    <div class="ad-card-head"><strong>{% translate "Application documents" %}</strong></div>
+                    <div class="ad-card-body">
+                        {% if application_documents %}
+                        <ul class="list-unstyled mb-0">
+                            {% for document in application_documents %}
+                            <li class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                <span class="flex-grow-1">{{ document.label }}</span>
+                                <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ document.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
+                                <a class="ad-btn ad-btn--outline-gold ad-btn--sm" href="{{ document.download_url }}">{% translate "Download" %}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="mb-0 text-muted">{% translate "No application documents uploaded." %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

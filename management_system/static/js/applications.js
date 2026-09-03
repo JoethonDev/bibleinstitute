@@ -23,9 +23,13 @@
     function getState(root) {
         var owner = stateOwner();
         var status = root.dataset.selectionStatus || 'all';
-        if (!owner._applicationBulkState || owner._applicationBulkState.status !== status) {
+        var token = root.dataset.selectionToken || '';
+        if (!owner._applicationBulkState
+            || owner._applicationBulkState.status !== status
+            || owner._applicationBulkState.token !== token) {
             owner._applicationBulkState = {
                 status: status,
+                token: token,
                 all: false,
                 selected: new Set(),
                 excluded: new Set()

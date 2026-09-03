@@ -18,9 +18,12 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.i18n import i18n_patterns
 from django.views.i18n import JavaScriptCatalog
+from django.views.generic import RedirectView
+from django.templatetags.static import static
 from management_system.telegram_views import telegram_webhook
 
 urlpatterns = [
+    path("favicon.ico", RedirectView.as_view(url=static("login-logo.png"), permanent=False)),
     path('admin/', admin.site.urls),
     path("i18n/", include("django.conf.urls.i18n")),
     path(

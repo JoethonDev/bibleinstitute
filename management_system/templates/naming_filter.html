@@ -1,7 +1,7 @@
 {% load i18n %}
 <div class="ad-search position-relative">
     <i class="fas fa-search"></i>
-    <input class="filters-fields pe-4" type="search" placeholder="{% translate 'Search' %}" name="name" value="{{ name_value }}" hx-push-url="true" aria-label="{% translate 'Search' %}" hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}" hx-include=".filters-fields" hx-trigger="keyup changed delay:500ms, search" hx-target="#table-container" hx-swap="innerHTML" hx-indicator="#search-spinner">
+    <input class="filters-fields pe-4" type="search" placeholder="{{ search_placeholder|default:_('Search') }}" name="name" value="{{ name_value }}" hx-push-url="true" aria-label="{{ search_placeholder|default:_('Search') }}" hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}" hx-include=".filters-fields" hx-trigger="keyup changed delay:500ms, search" hx-target="#table-container" hx-swap="innerHTML" hx-indicator="#search-spinner">
     <span id="search-spinner" class="htmx-indicator position-absolute end-0 me-2">
         <div class="spinner-border spinner-border-sm text-primary" role="status">
             <span class="visually-hidden">{% translate "Loading..." %}</span>

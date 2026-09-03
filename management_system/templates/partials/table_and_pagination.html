@@ -163,6 +163,19 @@
                         </div>
                         {% else %}
                         <div class="ad-actions">
+                            {% if view == "user" %}
+                            <a class="ad-btn ad-btn--outline-gold ad-btn--sm"
+                               href="{{ values.url }}"
+                               hx-get="{{ values.url }}"
+                               hx-swap="innerHTML"
+                               hx-target="#display-page"
+                               hx-trigger="click"
+                               hx-push-url="true"
+                               hx-select="#content">
+                                <i class="fas fa-eye me-1"></i>
+                                <span>{% translate "View" %}</span>
+                            </a>
+                            {% endif %}
                             <button class="ad-btn ad-btn--ghost ad-btn--sm"
                                     hx-get="{{ values.url }}update/"
                                     hx-swap="innerHTML"

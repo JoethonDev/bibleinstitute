@@ -1458,7 +1458,14 @@ def user_dashboard(request):
 
     query = Q()
     if name:
-        query &= Q(username__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
+        query &= (
+            Q(username__icontains=name)
+            | Q(email__icontains=name)
+            | Q(first_name__icontains=name)
+            | Q(last_name__icontains=name)
+            | Q(phone__icontains=name)
+            | Q(identity_number__icontains=name)
+        )
     if role_value:
         role_name = Role.get_by_readable_value(role_value)
         query &= Q(role=role_name)
@@ -1490,10 +1497,79 @@ def user_dashboard(request):
         "name_value" : name or "",
         "filtering" : role_value or "",
         "columns" : User.get_columns(),
-        "options" : [_("Choose Role"), *Role.get_readable_values()],
+        "options" : [_('Choose Role'), *Role.get_readable_values()],
+        "search_placeholder": _("Search username, email, name, phone, or national ID"),
     }
 
     return render_dashboard(request, users, view, context)
+
+
+@capability_required(can_manage_content)
+def user_profile(request, user_id):
+    user = get_object_or_404(
+        User.objects.select_related("role", "decided_by"),
+        pk=user_id,
+    )
+    form = UserUpdateForm(request.POST or None, instance=user)
+    _restrict_user_update_form(form, request.user)
+
+    if request.method == "POST" and form.is_valid():
+        original = User.objects.get(pk=user.pk)
+        actor_role = getattr(getattr(request.user, "role", None), "role", None)
+        try:
+            with transaction.atomic():
+                updated_user = form.save()
+                if (
+                    original.application_status != updated_user.application_status
+                    or original.is_active and not updated_user.is_active
+                    or original.role_id != updated_user.role_id
+                ):
+                    revoke_user_mobile_access(updated_user)
+                scope = form.cleaned_data.get("enrollment_scope")
+                if actor_role == "admin" and scope:
+                    set_user_normal_enrollment_scope(updated_user, request.user, scope)
+        except ValidationError as exc:
+            form.add_error("enrollment_scope", exc)
+        else:
+            if user.pk == request.user.pk and form.cleaned_data.get("password"):
+                update_session_auth_hash(request, updated_user)
+            messages.success(request, _("User data updated successfully."))
+            return redirect("user-profile", user_id=user.pk)
+
+    active_enrollment = (
+        Enrollment.objects.filter(
+            student=user,
+            academic_year_level__academic_year__is_active=True,
+            enrollment_type=Enrollment.Type.NORMAL,
+            course_offering__isnull=True,
+            status=Enrollment.Status.ACTIVE,
+        )
+        .select_related("academic_year_level__academic_year", "academic_year_level__level")
+        .first()
+    )
+    can_view_application_data = can_manage_applications(request.user)
+    application_documents = []
+    if can_view_application_data:
+        for document_type, field_name, label in (
+            ("identity_front", "identity_front_key", _("Identity Front")),
+            ("identity_back", "identity_back_key", _("Identity Back")),
+            ("payment", "payment_key", _("Payment")),
+            ("profile", "profile_image_key", _("Profile")),
+        ):
+            if getattr(user, field_name, None):
+                application_documents.append({
+                    "label": label,
+                    "url": reverse("application-document", args=[user.pk, document_type]),
+                    "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
+                })
+
+    return render(request, "user_detail.html", {
+        "profile_user": user,
+        "edit_form": form,
+        "active_enrollment": active_enrollment,
+        "can_view_application_data": can_view_application_data,
+        "application_documents": application_documents,
+    })
 
 
 @capability_required(can_manage_academic_setup)
@@ -1760,18 +1836,23 @@ class CreateUser(UserBaseView, CreateView):
             form.fields.pop("time_zone", None)
         return form
 
+
+def _restrict_user_update_form(form, actor):
+    actor_role = getattr(getattr(actor, "role", None), "role", None)
+    if actor_role != "admin":
+        for field_name in UserUpdateForm.admin_only_fields:
+            form.fields.pop(field_name, None)
+        form.fields.pop("password", None)
+    return form
+
+
 class UpdateUser(UserBaseView, UpdateView):
     form_class = UserUpdateForm
     action = _("update") # Translate action
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        user = User.objects.get(username=self.request.user)
-        if user.role and user.role.role != "admin":
-            for field_name in UserUpdateForm.admin_only_fields:
-                form.fields.pop(field_name, None)
-            form.fields.pop("password", None)
-        return form
+        return _restrict_user_update_form(form, self.request.user)
 
     def form_valid(self, form):
         try:
@@ -4250,8 +4331,22 @@ def signup(request):
         form = SignupForm()
     return render(request, "signup.html", {"form": form, "copy": copy})
 
+def _application_search_query(value):
+    if not value:
+        return Q()
+    return (
+        Q(username__icontains=value)
+        | Q(email__icontains=value)
+        | Q(first_name__icontains=value)
+        | Q(last_name__icontains=value)
+        | Q(phone__icontains=value)
+        | Q(identity_number__icontains=value)
+    )
+
+
 def _applications_dashboard_context(request):
     status_filter = request.GET.get("status", "all")
+    application_search = request.GET.get("name", "").strip()[:100]
     application_order = [
         Case(
             When(application_status="pending", then=0),
@@ -4272,6 +4367,8 @@ def _applications_dashboard_context(request):
         users = User.objects.filter(
             Q(application_status__in=["pending", "active", "declined"])
         ).select_related("role").order_by(*application_order)
+    if application_search:
+        users = users.filter(_application_search_query(application_search))
     paginator = Paginator(users, 15)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -4280,10 +4377,15 @@ def _applications_dashboard_context(request):
     return {
         "page_obj": page_obj,
         "current_status": status_filter,
+        "application_search": application_search,
         "pagination_query": pagination_params.urlencode(),
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
         "bulk_selection_token": signing.dumps(
-            {"status": status_filter, "actor": request.user.pk},
+            {
+                "status": status_filter,
+                "search": application_search,
+                "actor": request.user.pk,
+            },
             salt="bulk-application-selection",
         ),
     }
@@ -4702,11 +4804,15 @@ def bulk_application_decision(request):
     if status_filter is None:
         return JsonResponse({"error": _("Invalid application status")}, status=400)
 
+    application_search = str(selection.get("search", "")).strip()[:100]
+
     select_all = bool(data.get("select_all"))
     if select_all:
         selection_queryset = User.objects.filter(
             application_status__in=status_filter,
         ).exclude(pk__in=excluded_ids).order_by("pk")
+        if application_search:
+            selection_queryset = selection_queryset.filter(_application_search_query(application_search))
         selected_ids = selection_queryset.values_list("id", flat=True).iterator(chunk_size=100)
         requested = selection_queryset.count()
     else:
@@ -4729,7 +4835,9 @@ def bulk_application_decision(request):
             User.objects.filter(
                 pk__in=chunk,
                 application_status__in=status_filter,
-            ).values_list("pk", "application_status")
+            ).filter(_application_search_query(application_search)).values_list(
+                "pk", "application_status"
+            )
         )
         for user_id in chunk:
             if user_id not in expected_statuses:

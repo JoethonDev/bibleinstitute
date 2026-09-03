@@ -53,6 +53,10 @@
             pendingAction = null;
             confirming = false;
             button.disabled = true;
+            // Remove focus before Bootstrap sets aria-hidden on the modal.
+            // This prevents a focused descendant from remaining inside a
+            // hidden dialog during the hide transition.
+            button.blur();
             var instance = bootstrap.Modal.getInstance(modal);
             if (instance) instance.hide();
             Promise.resolve(callback && callback()).finally(function () {
@@ -64,6 +68,9 @@
             if (confirming) {
                 confirming = false;
                 pendingAction = null;
+            }
+            if (modal.contains(document.activeElement) && document.activeElement.blur) {
+                document.activeElement.blur();
             }
             if (lastTrigger && typeof lastTrigger.focus === 'function') lastTrigger.focus();
             modal.removeEventListener('hidden.bs.modal', cancel);
