@@ -130,7 +130,13 @@
                             <td><span class="ad-pill {% if u.application_status == 'active' %}ad-pill--success{% elif u.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ u.get_application_status_display }}</span></td>
                             <td>
                                 <div class="ad-actions">
-                                    <a href="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}" class="ad-btn ad-btn--ghost ad-btn--sm">
+                                    <a href="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}"
+                                       class="ad-btn ad-btn--ghost ad-btn--sm"
+                                       hx-get="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}"
+                                       hx-target="#display-page"
+                                       hx-select="#content"
+                                       hx-swap="innerHTML"
+                                       hx-push-url="true">
                                         <i class="fas fa-eye"></i> {% translate "Review" %}
                                     </a>
                                     <form method="post"
