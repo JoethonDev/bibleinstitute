@@ -128,7 +128,7 @@
 
 .ad-rail-brand i { color: var(--ps-gold); }
 
-.ad-rail-group { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: rgba(244, 234, 214, .45); padding: .7rem .7rem .25rem; }
+.ad-rail-group { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: rgba(244, 234, 214, .65); padding: .7rem .7rem .25rem; }
 
 .ad-tab {
     display: flex;
@@ -508,8 +508,8 @@
 .ad-avatar {
     display: inline-grid;
     place-items: center;
-    width: 2rem;
-    height: 2rem;
+    width: 2.75rem;
+    height: 2.75rem;
     border-radius: 50%;
     background: var(--ps-teal);
     color: #fff;
@@ -618,8 +618,8 @@
 .ad-actions { display: inline-flex; align-items: center; gap: .25rem; z-index: 5; }
 
 .ad-action-btn {
-    width: 2rem;
-    height: 2rem;
+    width: 2.75rem;
+    height: 2.75rem;
     display: inline-grid;
     place-items: center;
     border-radius: .65rem;
@@ -659,8 +659,9 @@
 .ad-page-nav { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem; justify-content: center; list-style: none; padding-left: 0; }
 
 .ad-page-link {
-    min-width: 2.3rem;
-    height: 2.3rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    height: auto;
     display: inline-grid;
     place-items: center;
     padding: 0 .6rem;
@@ -909,13 +910,32 @@
     position: absolute;
     inset-block-start: .35rem;
     inset-inline-end: .35rem;
-    opacity: 0;
+    opacity: 1;
     z-index: 5;
     transition: opacity var(--ps-motion);
 }
 
 .ad-drive-item:hover .ad-actions,
 .ad-drive-item:focus-within .ad-actions { opacity: 1; }
+
+@media (hover: none) {
+    .ad-drive-item .ad-actions { opacity: 1; }
+}
+
+.ad-stepper-item {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .45rem .7rem;
+    border: 1px solid var(--ps-line);
+    border-radius: 999px;
+    color: var(--ps-muted);
+    background: var(--ps-surface);
+    font-size: .82rem;
+}
+.ad-stepper-item.is-active { color: var(--ps-teal-deep); border-color: var(--ps-teal); font-weight: 650; }
+.ad-stepper-number { display: inline-grid; place-items: center; width: 1.35rem; height: 1.35rem; border-radius: 50%; background: var(--ps-line); color: var(--ps-ink); font-size: .72rem; }
+.ad-stepper-item.is-active .ad-stepper-number { background: var(--ps-teal); color: #fff; }
 
 /* File-card body variant (centered flex column inside ad-drive-item) */
 .ad-drive-body {
@@ -1102,9 +1122,9 @@
 
 /* Holiday delete button */
 .ad-calendar-holiday .btn-close {
-    width: .55rem;
-    height: .55rem;
-    font-size: .55rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: .75rem;
     opacity: .55;
     transition: opacity var(--ps-motion);
 }
@@ -1161,9 +1181,9 @@
 
 /* Meeting delete button sizing */
 .ad-calmg-cell .ad-calendar-meeting .btn-close {
-    width: .5rem;
-    height: .5rem;
-    font-size: .45rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: .75rem;
     opacity: .5;
     transition: opacity var(--ps-motion);
 }
@@ -1191,9 +1211,9 @@
 
 /* Compact add action buttons inside cells */
 .ad-calmg-cell .ad-calendar-add-actions .ad-action-btn {
-    width: 1.45rem;
-    height: 1.45rem;
-    font-size: .6rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: .8rem;
     border-radius: .4rem;
 }
 
@@ -1461,14 +1481,14 @@
         gap: .05rem .2rem;
     }
     .ad-calmg-cell .ad-calendar-meeting .btn-close {
-        width: .4rem;
-        height: .4rem;
-        font-size: .4rem;
+        width: 2.75rem;
+        height: 2.75rem;
+        font-size: .75rem;
     }
     .ad-calmg-cell .ad-calendar-add-actions .ad-action-btn {
-        width: 1.3rem;
-        height: 1.3rem;
-        font-size: .55rem;
+        width: 2.75rem;
+        height: 2.75rem;
+        font-size: .8rem;
     }
     .ad-calendar-add-actions {
         opacity: 1; /* always visible on narrow mobile for touch access */
@@ -2692,7 +2712,7 @@
 /* Picker pagination */
 .tg-chat-linked-pagination { padding: .5rem 0 0; }
 
-.tg-chat-linked-pagination .ad-page-link { min-height: 30px; min-width: 30px; font-size: .78rem; }
+.tg-chat-linked-pagination .ad-page-link { min-height: 2.75rem; min-width: 2.75rem; font-size: .78rem; }
 
 .tg-chat-linked-pagination .ad-page-link:focus-visible {
     outline: 2px solid var(--ps-gold);

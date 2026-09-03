@@ -1,8 +1,7 @@
 {% load i18n %}
 
 <!-- Desktop & Tablet Sidebar -->
-<aside id="admin-sidebar" class="admin-sidebar ad-rail"
-       :class="{ 'sidebar-collapsed': $store.ui.sidebarCollapsed }">
+<aside id="admin-sidebar" class="admin-sidebar ad-rail">
     
     <!-- Sidebar Header -->
     <div class="sidebar-header ad-rail-brand">
@@ -15,7 +14,7 @@
         <button @click="$store.ui.toggleSidebar()" 
                 class="btn-sidebar-toggle ad-btn ad-btn--ghost ad-btn--sm"
                 :title="$store.ui.sidebarCollapsed ? '{% translate "Expand Sidebar" %}' : '{% translate "Collapse Sidebar" %}'"
-                :aria-expanded="String(!$store.ui.sidebarCollapsed)"
+                x-bind:aria-expanded="(!$store.ui.sidebarCollapsed).toString()"
                 aria-controls="admin-sidebar">
             <i :class="$store.ui.sidebarCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'"></i>
         </button>
@@ -55,7 +54,8 @@
         
         <!-- User Info -->
         <div class="mt-3 p-3 ad-card-body">
-            <small class="ps-muted-text d-flex align-items-center gap-2">
+            <small class="ps-muted-text d-flex align-items-center gap-2 text-truncate d-block"
+                   title="{{ request.user.get_full_name|default:request.user.username }}">
                 <i class="fas fa-user-circle"></i>
                 {{ request.user.get_full_name|default:request.user.username }}
             </small>

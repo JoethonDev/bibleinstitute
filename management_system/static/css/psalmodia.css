@@ -141,7 +141,7 @@ html::-webkit-scrollbar-thumb {
     gap: .6rem;
     padding: .9rem 1.15rem;
     background: linear-gradient(120deg, var(--ps-ink-deep), var(--ps-ink));
-    color: #fff;
+    color: var(--ps-paper);
     font-family: var(--ps-display);
     font-weight: 700;
     border-bottom: 0;
@@ -345,7 +345,7 @@ html::-webkit-scrollbar-thumb {
 .ps-toast-stack {
     position: fixed;
     z-index: 1080;
-    inset-block-start: 5.5rem;
+    inset-block-start: 1rem;
     inset-inline-end: 1.25rem;
     display: flex;
     flex-direction: column;
@@ -353,9 +353,9 @@ html::-webkit-scrollbar-thumb {
     max-width: 22rem;
 }
 
-/* Backend message stack sits clear of the dynamic notification stack */
+/* Backend messages sit below dynamic notifications in the shared stack. */
 .ps-toast-stack.ps-backend-messages {
-    inset-block-start: 11rem;
+    inset-block-start: 5.5rem;
 }
 
 .ps-toast {
@@ -365,7 +365,7 @@ html::-webkit-scrollbar-thumb {
     padding: .7rem .95rem;
     border-radius: var(--ps-radius);
     background: linear-gradient(120deg, var(--ps-ink-deep), var(--ps-ink));
-    color: #fff;
+    color: var(--ps-paper);
     box-shadow: 0 14px 34px rgba(11, 29, 35, .35);
     border: 1px solid rgba(180, 133, 58, .35);
     font-size: .86rem;
@@ -384,12 +384,12 @@ html::-webkit-scrollbar-thumb {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 2.75rem;
+    height: 2.75rem;
     border: 0;
     border-radius: 50%;
     background: rgba(255, 255, 255, .12);
-    color: #fff;
+    color: var(--ps-paper);
     cursor: pointer;
     transition: background-color var(--ps-motion);
 }

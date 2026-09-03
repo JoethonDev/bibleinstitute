@@ -27,10 +27,21 @@ def get_r2_client():
     )
 
 
-def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config: Optional[FileFilterConfig] = None, folders_only=False):
+def list_current_folder_page(
+    cloud_client,
+    bucket_name,
+    folder_name="",
+    filter_config: Optional[FileFilterConfig] = None,
+    folders_only=False,
+    continuation_token: Optional[str] = None,
+    page_size: int = 200,
+    search_query: str = "",
+):
     """
     List files and folders in R2 storage with optional filtering.
-    Uses a single ListObjectsV2 call (no brute-force pagination) for fast navigation.
+    Reads one bounded provider page. The continuation token is returned to the
+    caller so the UI/API can request the next page without materializing a
+    whole folder in memory.
     
     The ``folder_name`` param is an R2 key prefix — a slash-delimited path.
     (Previously it used ``-`` as a segment separator, which broke on any
@@ -42,9 +53,12 @@ def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config
         folder_name: Slash-delimited folder prefix from the URL
         filter_config: Optional FileFilterConfig for filtering results
         folders_only: If True, only return folders (no files)
+        continuation_token: Opaque provider token from the previous page
+        page_size: Maximum number of provider entries to inspect
+        search_query: Case-insensitive name filter applied to this page
     
     Returns:
-        Tuple of (contents list, parent_folder path)
+        Tuple of (contents list, parent_folder path, next continuation token)
     """
     if folder_name:
         folder_name = unquote(folder_name)
@@ -57,56 +71,51 @@ def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config
     if folder_name and not folder_name.endswith("/"):
         folder_name += "/"
     
-    response = cloud_client.list_objects_v2(
-        Bucket=bucket_name,
-        Prefix=folder_name,
-        Delimiter="/",
-        MaxKeys=1000,
-    )
-    
-    contents = []
-    
+    page_size = max(1, min(int(page_size), 1000))
+    params = {
+        "Bucket": bucket_name,
+        "Prefix": folder_name,
+        "Delimiter": "/",
+        "MaxKeys": page_size,
+    }
+    if continuation_token:
+        params["ContinuationToken"] = continuation_token
+    response = cloud_client.list_objects_v2(**params)
+    files = []
+    folders = []
     file_filter = R2FileFilter(filter_config) if filter_config else None
-    
-    # Files – only process when not folders_only
     if "Contents" in response and not folders_only:
         for obj in response["Contents"]:
             key = obj["Key"]
             rel_path = key[len(folder_name):] if folder_name else key
-            if rel_path and "/" not in rel_path.rstrip("/"):
-                file_name = key.split("/")[-1]
-                
-                file_obj = {
-                    "id": key,
-                    "name": file_name,
-                    "type": "file",
-                    "size": obj.get("Size", 0),
-                    "last_modified": obj.get("LastModified"),
-                }
-                
-                if file_filter:
-                    if file_filter.should_include_file(file_obj):
-                        contents.append(file_obj)
-                else:
-                    if not file_name.endswith(".ts"):
-                        contents.append(file_obj)
-    
-    # Folders — ID is the R2 prefix without trailing slash for clean URL reversal
-    if "CommonPrefixes" in response:
-        for folder in response["CommonPrefixes"]:
-            prefix = folder["Prefix"]
-            name = prefix.rstrip('/').rsplit('/', 1)[-1]
-            folder_id = prefix.rstrip('/')
-            if not folder_id:
+            file_name = key.split("/")[-1]
+            if not rel_path or "/" in rel_path.rstrip("/"):
                 continue
-            folder_obj = {
-                "id": folder_id,
-                "name": name,
-                "type": "folder"
-            }
-            if not file_filter or file_filter.should_include_file(folder_obj):
-                contents.insert(0, folder_obj)
-    
+            file_obj = {"id": key, "name": file_name, "type": "file", "size": obj.get("Size", 0), "last_modified": obj.get("LastModified")}
+            if search_query and search_query.casefold() not in file_name.casefold():
+                continue
+            if (file_filter and file_filter.should_include_file(file_obj)) or (not file_filter and not file_name.endswith(".ts")):
+                files.append(file_obj)
+
+    for folder in response.get("CommonPrefixes", []):
+        prefix = folder["Prefix"]
+        folder_id = prefix.rstrip("/")
+        name = folder_id.rsplit("/", 1)[-1]
+        if search_query and search_query.casefold() not in name.casefold():
+            continue
+        folder_obj = {"id": folder_id, "name": name, "type": "folder"}
+        if not file_filter or file_filter.should_include_file(folder_obj):
+            folders.append(folder_obj)
+
+    next_token = response.get("NextContinuationToken") if response.get("IsTruncated") else None
+    return folders + files, parent_folder, next_token
+
+
+def list_current_folder(cloud_client, bucket_name, folder_name="", filter_config: Optional[FileFilterConfig] = None, folders_only=False):
+    """Preserve the legacy 1,000-entry page contract for form-based callers."""
+    contents, parent_folder, _next_token = list_current_folder_page(
+        cloud_client, bucket_name, folder_name, filter_config, folders_only, page_size=1000
+    )
     return contents, parent_folder
 
 

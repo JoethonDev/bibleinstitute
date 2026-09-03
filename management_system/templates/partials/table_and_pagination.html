@@ -85,7 +85,7 @@
                     {% for col in columns %}
                     <th class="sortable-column" 
                         x-show="columns[{{ forloop.counter0 }}].visible"
-                        hx-get="?sort={{ col }}&order={% if request.GET.sort == col and request.GET.order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.name %}&name={{ request.GET.name }}{% endif %}{% if request.GET.filtering %}&filtering={{ request.GET.filtering }}{% endif %}{% if request.GET.academic_year %}&academic_year={{ request.GET.academic_year }}{% endif %}{% if request.GET.course %}&course={{ request.GET.course }}{% endif %}"
+                         hx-get="{{ url }}?{% if sort_query %}{{ sort_query }}&{% endif %}sort={{ col|urlencode }}&order={% if request.GET.sort == col and request.GET.order == 'asc' %}desc{% else %}asc{% endif %}"
                         hx-target="#table-container"
                         hx-indicator="#table-loading"
                         role="button"
@@ -219,7 +219,7 @@
                        hx-get="{{ url }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
                        aria-label="{% translate 'Previous' %}"
                        title="{% translate 'Previous page' %}">
-                        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                         <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                     </a>
                 </li>
@@ -228,7 +228,7 @@
                     <span class="ad-page-link is-disabled"
                           aria-disabled="true"
                           title="{% translate 'No previous page' %}">
-                        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                         <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                     </span>
                 </li>
@@ -272,7 +272,7 @@
                        aria-label="{% translate 'Next' %}"
                        title="{% translate 'Next page' %}">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                     </a>
                 </li>
                 {% else %}
@@ -281,7 +281,7 @@
                           aria-disabled="true"
                           title="{% translate 'No next page' %}">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                     </span>
                 </li>
                 {% endif %}

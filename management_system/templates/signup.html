@@ -25,7 +25,7 @@
                     </div>
 
                     <!-- ========== TERMS MODAL ========== -->
-                    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true" data-bs-backdrop="false">
+                    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true" data-bs-backdrop="static">
                         <div class="modal-dialog modal-dialog-scrollable">
                             <div class="modal-content">
                                 <div class="modal-header">
@@ -99,20 +99,6 @@ document.addEventListener('DOMContentLoaded', function () {
         updateIdentityDocuments();
     }
 
-    const checkbox = document.getElementById('id_agree_terms');
-    const modalElement = document.getElementById('termsModal');
-    if (!checkbox || !modalElement || !window.bootstrap) return;
-
-    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-    checkbox.addEventListener('click', function (event) {
-        if (checkbox.checked) {
-            event.preventDefault();
-            modal.show();
-        }
-    });
-    modalElement.addEventListener('hidden.bs.modal', function () {
-        checkbox.checked = true;
-    });
 });
 </script>
 {% endblock %}

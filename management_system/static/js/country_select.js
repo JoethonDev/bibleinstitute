@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function () {
+function enhanceCountrySelects() {
     document.querySelectorAll('[data-country-select="true"]').forEach(function (countrySelect) {
         if (countrySelect.dataset.countryEnhanced === 'true') return;
         countrySelect.dataset.countryEnhanced = 'true';
@@ -33,4 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     });
-});
+}
+
+document.addEventListener('DOMContentLoaded', enhanceCountrySelects);
+document.addEventListener('htmx:afterSwap', enhanceCountrySelects);

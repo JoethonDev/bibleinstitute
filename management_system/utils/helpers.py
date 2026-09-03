@@ -140,6 +140,11 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
     context["pagination_query"] = pagination_params.urlencode()
+    sort_params = request.GET.copy()
+    sort_params.pop("page", None)
+    sort_params.pop("sort", None)
+    sort_params.pop("order", None)
+    context["sort_query"] = sort_params.urlencode()
     year_filter = "academic_year_filter.html" if context.get("academic_year_filter") else "year_filter.html"
     filters = [year_filter, "naming_filter.html"]
     if "filters" in context:

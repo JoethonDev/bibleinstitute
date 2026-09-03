@@ -27,6 +27,13 @@
     <link rel="stylesheet" href="{% static 'css/psalmodia.css' %}?v={{ static_asset_version }}">
     <link rel="stylesheet" href="{% static 'css/app_admin.css' %}?v={{ static_asset_version }}">
 
+    <!-- Page modules are loaded from the shell so HTMX-selected fragments keep their behavior. -->
+    <script defer src="{% static 'js/applications.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'js/country_select.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'js/media_status.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'js/scanner.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'js/academic_setup.js' %}?v={{ static_asset_version }}"></script>
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
@@ -35,8 +42,6 @@
     {% endblock %}
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    {% include 'partials/components/backend_messages.html' %}
-    
     <!-- Toast Notifications -->
     {% include 'partials/components/toast_container.html' %}
     
@@ -51,7 +56,7 @@
         <main id="display-page" class="admin-main-content ad-panes">
             {% block breadcrumbs %}{% include 'partials/admin_breadcrumbs.html' %}{% endblock %}
             {% block body %}
-            <div class="container-fluid px-3 ad-dashboard-page">
+            <div class="container-fluid px-3 ad-dashboard-page" id="content">
 
                 <!-- ===== PAGE HEADER ===== -->
                 <div class="ad-page-header d-flex justify-content-between align-items-center">
@@ -114,7 +119,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{{ item.role__role|default:_("Unknown")|title }}</span>
                                 <div class="ad-bar-track">
-                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    {% widthratio item.count admin_metrics.users|default:1 100 as pct %}
                                     <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -130,7 +135,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{{ item.application_status|default:_("Unknown")|title }}</span>
                                 <div class="ad-bar-track">
-                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    {% widthratio item.count admin_metrics.users|default:1 100 as pct %}
                                     <div class="ad-bar-fill {% if item.application_status == 'active' %}ad-bar-fill--green{% elif item.application_status == 'pending' %}ad-bar-fill--warning{% elif item.application_status == 'declined' %}ad-bar-fill--danger{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -146,7 +151,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{{ item.study_mode|default:_("Not Set")|title }}</span>
                                 <div class="ad-bar-track">
-                                    {% widthratio item.count admin_metrics.users 100 as pct %}
+                                    {% widthratio item.count admin_metrics.users|default:1 100 as pct %}
                                     <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -178,7 +183,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label ad-bar-label--sm">{{ city.city }}</span>
                                 <div class="ad-bar-track ad-bar-track--sm">
-                                    {% widthratio city.count admin_metrics.users 100 as pct %}
+                                    {% widthratio city.count admin_metrics.users|default:1 100 as pct %}
                                     <div class="ad-bar-fill ad-bar-fill--slate ad-bar-fill--sm" style="width:{{ pct }}%">{{ city.count }}</div>
                                 </div>
                             </div>
@@ -198,7 +203,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{% translate "Level" %} {{ item.level }}</span>
                                 <div class="ad-bar-track">
-                                    {% widthratio item.count admin_metrics.courses 100 as pct %}
+                                    {% widthratio item.count admin_metrics.courses|default:1 100 as pct %}
                                     <div class="ad-bar-fill ad-bar-fill--teal" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -219,7 +224,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{{ item.status|title }}</span>
                                 <div class="ad-bar-track">
-                                    {% widthratio item.count admin_metrics.lessons 100 as pct %}
+                                    {% widthratio item.count admin_metrics.lessons|default:1 100 as pct %}
                                     <div class="ad-bar-fill {% if item.status == 'published' %}ad-bar-fill--green{% elif item.status == 'draft' %}ad-bar-fill--warning{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -245,7 +250,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{{ item.status|title }}</span>
                                 <div class="ad-bar-track">
-                                    {% widthratio item.count admin_metrics.quizzes 100 as pct %}
+                                    {% widthratio item.count admin_metrics.quizzes|default:1 100 as pct %}
                                     <div class="ad-bar-fill {% if item.status == 'published' %}ad-bar-fill--green{% elif item.status == 'draft' %}ad-bar-fill--warning{% else %}ad-bar-fill--slate{% endif %}" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -347,7 +352,7 @@
                             <div class="ad-bar">
                                 <span class="ad-bar-label">{% translate "Level" %} {{ item.level|default:"N/A" }}</span>
                                 <div class="ad-bar-track ad-bar-track--sm">
-                                    {% widthratio item.count enrollments_total 100 as pct %}
+                                    {% widthratio item.count enrollments_total|default:1 100 as pct %}
                                     <div class="ad-bar-fill ad-bar-fill--teal ad-bar-fill--sm" style="width:{{ pct }}%">{{ item.count }}</div>
                                 </div>
                             </div>
@@ -490,8 +495,6 @@
             {% endblock %}
         </main>
     </div>
-        </div>
-    </div>
     <!-- Bootstrap JS is loaded in <head> — no defer duplicate needed -->
     
     <!-- HTMX -->
@@ -551,12 +554,16 @@
     <!-- Offcanvas Auto-Close Script -->
     <script>
       document.addEventListener('DOMContentLoaded', () => {
-        const offcanvasLinks = document.querySelectorAll(".offcanvas .nav-link");
-        const closeButton = document.querySelector(".offcanvas .btn-close");
+        const offcanvas = document.getElementById("mobileAdminMenu");
+        const offcanvasLinks = offcanvas ? offcanvas.querySelectorAll(".nav-link") : [];
+        const closeMenu = () => {
+          if (!offcanvas || typeof bootstrap === "undefined" || !bootstrap.Offcanvas) return;
+          bootstrap.Offcanvas.getOrCreateInstance(offcanvas).hide();
+        };
         
         offcanvasLinks.forEach(link => {
           link.addEventListener("click", () => {
-            if (closeButton) closeButton.click();
+            closeMenu();
           });
         });
       });
@@ -566,11 +573,11 @@
     {% include 'partials/components/loading_overlay.html' %}
 
     <!-- Global Confirmation Modal (used by hx-confirm and bulk actions) -->
-    <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-labelledby="globalConfirmModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">
+                    <h5 class="modal-title" id="globalConfirmModalLabel">
                         <i class="fas fa-exclamation-triangle ad-icon--danger"></i>
                         {% translate "Confirm Action" %}
                     </h5>
@@ -584,7 +591,7 @@
                         <i class="fas fa-times me-1"></i>
                         {% translate "Cancel" %}
                     </button>
-                    <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" id="globalConfirmButton" data-bs-dismiss="modal">
+                    <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" id="globalConfirmButton">
                         <i class="fas fa-check me-1"></i>
                         {% translate "Confirm" %}
                     </button>
@@ -602,25 +609,42 @@
             if (!modal || !message || !confirmButton || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
 
             let pendingAction = null;
+            let confirming = false;
+            let lastTrigger = null;
 
             function showConfirmation(question, action) {
                 if (!question || typeof action !== 'function') return;
+                if (confirming) return false;
+                confirming = true;
                 pendingAction = action;
                 message.textContent = question;
+                lastTrigger = document.activeElement;
 
                 const currentButton = document.getElementById('globalConfirmButton');
                 const button = currentButton.cloneNode(true);
                 currentButton.replaceWith(button);
                 button.addEventListener('click', function () {
+                    if (!confirming) return;
                     const callback = pendingAction;
                     pendingAction = null;
+                    confirming = false;
+                    button.disabled = true;
                     const instance = bootstrap.Modal.getInstance(modal);
                     if (instance) instance.hide();
-                    if (callback) callback();
+                    Promise.resolve(callback && callback()).finally(function () {
+                        button.disabled = false;
+                    });
                 }, { once: true });
+
+                modal.addEventListener('hidden.bs.modal', function cancel() {
+                    if (confirming) { confirming = false; pendingAction = null; }
+                    if (lastTrigger && typeof lastTrigger.focus === 'function') lastTrigger.focus();
+                    modal.removeEventListener('hidden.bs.modal', cancel);
+                });
 
                 const instance = bootstrap.Modal.getOrCreateInstance(modal);
                 if (instance) instance.show();
+                return true;
             }
 
             window.appConfirm = showConfirmation;

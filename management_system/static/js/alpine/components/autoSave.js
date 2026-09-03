@@ -6,28 +6,48 @@ function autoSave(formKey) {
         lastSaved: null,
         isSaving: false,
         hasChanges: false,
+        autoSaveTimer: null,
+        inputHandler: null,
+        beforeUnloadHandler: null,
         
         init() {
             this.loadDraft();
             
             // Track changes
-            this.$el.addEventListener('input', () => {
+            this.inputHandler = () => {
                 this.hasChanges = true;
-            });
+            };
+            this.$el.addEventListener('input', this.inputHandler);
             
             // Auto-save every 10 seconds if there are changes
-            setInterval(() => {
+            this.autoSaveTimer = setInterval(() => {
                 if (this.hasChanges) {
                     this.saveDraft();
                 }
             }, 10000);
             
             // Save on page unload if there are changes
-            window.addEventListener('beforeunload', (e) => {
+            this.beforeUnloadHandler = () => {
                 if (this.hasChanges) {
                     this.saveDraft();
                 }
-            });
+            };
+            window.addEventListener('beforeunload', this.beforeUnloadHandler);
+        },
+
+        destroy() {
+            if (this.autoSaveTimer) {
+                clearInterval(this.autoSaveTimer);
+                this.autoSaveTimer = null;
+            }
+            if (this.inputHandler) {
+                this.$el.removeEventListener('input', this.inputHandler);
+                this.inputHandler = null;
+            }
+            if (this.beforeUnloadHandler) {
+                window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+                this.beforeUnloadHandler = null;
+            }
         },
         
         saveDraft() {

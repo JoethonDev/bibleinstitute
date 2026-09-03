@@ -396,54 +396,48 @@ class R2Manager:
         
         return stats
     
-    def search_files(self, query: str, prefix: str = "", extensions: List[str] = None) -> List[Dict[str, Any]]:
-        """
-        Search for files by name
-        
-        Args:
-            query: Search query (case-insensitive substring match)
-            prefix: Folder prefix to search in
-            extensions: Optional list of extensions to filter by
-        
-        Returns:
-            List of matching files
-        """
+    def search_files_page(
+        self,
+        query: str,
+        prefix: str = "",
+        extensions: List[str] = None,
+        continuation_token: Optional[str] = None,
+        page_size: int = 200,
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Search one bounded provider page and return its continuation token."""
         results = []
-        query_lower = query.lower()
-        
-        try:
-            paginator = self.client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
-            
-            for page in pages:
-                if 'Contents' in page:
-                    for obj in page['Contents']:
-                        key = obj['Key']
-                        filename = key.split('/')[-1].lower()
-                        
-                        # Skip folders
-                        if key.endswith('/'):
-                            continue
-                        
-                        # Check if query matches filename
-                        if query_lower not in filename:
-                            continue
-                        
-                        # Check extension if specified
-                        if extensions:
-                            if not any(key.lower().endswith(f'.{ext.lower()}') for ext in extensions):
-                                continue
-                        
-                        results.append({
-                            'key': key,
-                            'name': key.split('/')[-1],
-                            'size': obj.get('Size', 0),
-                            'last_modified': obj.get('LastModified'),
-                        })
-        
-        except Exception as e:
-            print(f"Error searching files: {e}")
-        
+        query_lower = query.casefold()
+        params = {
+            "Bucket": self.bucket_name,
+            "Prefix": prefix,
+            "MaxKeys": max(1, min(int(page_size), 200)),
+        }
+        if continuation_token:
+            params["ContinuationToken"] = continuation_token
+
+        response = self.client.list_objects_v2(**params)
+        for obj in response.get("Contents", []):
+            key = obj["Key"]
+            filename = key.rsplit("/", 1)[-1]
+            if key.endswith("/") or query_lower not in filename.casefold():
+                continue
+            if extensions and not any(
+                key.casefold().endswith(f".{extension.casefold()}")
+                for extension in extensions
+            ):
+                continue
+            results.append({
+                "key": key,
+                "name": filename,
+                "size": obj.get("Size", 0),
+                "last_modified": obj.get("LastModified"),
+            })
+        next_token = response.get("NextContinuationToken") if response.get("IsTruncated") else None
+        return results, next_token
+
+    def search_files(self, query: str, prefix: str = "", extensions: List[str] = None) -> List[Dict[str, Any]]:
+        """Return only the first bounded search page for legacy callers."""
+        results, _next_token = self.search_files_page(query, prefix, extensions)
         return results
     
     def format_file_size(self, bytes_size: int) -> str:

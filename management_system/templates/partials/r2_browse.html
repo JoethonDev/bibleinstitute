@@ -14,7 +14,7 @@
 {% if not is_root %}
 <div class="mb-3">
     <button class="ad-btn ad-btn--ghost"
-            hx-get="{% if parent_folder %}{% url 'r2-management-dashboard' %}?folder={{ parent_folder }}{% else %}{% url 'r2-management-dashboard' %}{% endif %}"
+            hx-get="{% if parent_folder %}{% url 'r2-management-dashboard' %}?folder={{ parent_folder|urlencode }}{% else %}{% url 'r2-management-dashboard' %}{% endif %}"
             hx-target="#file-list-container"
             hx-push-url="true">
         <i class="fas fa-arrow-left me-2"></i>
@@ -26,4 +26,12 @@
 <div id="drive-files">
     {% include 'partials/r2_file_list.html' %}
 </div>
+{% if next_page_url %}
+<div class="d-flex justify-content-center mt-3">
+    <a class="ad-btn ad-btn--ghost" href="{{ next_page_url }}"
+       hx-get="{{ next_page_url }}" hx-target="#file-list-container" hx-swap="innerHTML" hx-push-url="true">
+        <i class="fas fa-chevron-down me-1" aria-hidden="true"></i>{% translate "Next page" %}
+    </a>
+</div>
+{% endif %}
 </div>

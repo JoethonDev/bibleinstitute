@@ -39,7 +39,7 @@
                             </h4>
                             <p class="sd-quiz-meta mb-0">{% translate "Student" %}: {{ username }}</p>
                         </div>
-                        {% if total_grade %}
+                        {% if total_grade is not None %}
                         <div class="mt-2 mt-md-0 text-md-end">
                             <h5 class="mb-0 sd-quiz-grade-label">{% translate "Final Grade" %}</h5>
                             <span class="fw-bold sd-quiz-grade-value">{{ total_grade }}</span>
@@ -114,7 +114,7 @@
 
                 let timerEl = document.querySelector("#timer span");
                 const startTime = Math.floor(Date.now() / 1000);
-                const endTime = parseInt('{{ closing_date }}'.split(",")[0]);
+                const endTime = parseInt('{{ closing_date|escapejs }}'.split(",")[0]);
                 const form = document.querySelector("#quiz-form");
 
                 function formatRemainingTime(totalSeconds) {

@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block body %}
-<div class="sd-page">
+<div class="sd-page" id="content">
 <div class="container py-4 py-lg-5">
   <h1 class="mb-4 sd-title">{% translate "Attendance Scanner" %}</h1>
 
@@ -62,87 +62,4 @@
 </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  let mediaStream = null;
-  const video = document.getElementById('scanner-video');
-  const startBtn = document.getElementById('start-camera');
-  const stopBtn = document.getElementById('stop-camera');
-  const cameraError = document.getElementById('camera-error');
-  const scanResult = document.getElementById('scan-result');
-
-  function stopMedia() {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach(t => t.stop());
-      mediaStream = null;
-    }
-    video.pause();
-    video.srcObject = null;
-    video.classList.add('d-none');
-    startBtn.classList.remove('d-none');
-    stopBtn.classList.add('d-none');
-  }
-
-  startBtn.addEventListener('click', async function() {
-    cameraError.classList.add('d-none');
-    scanResult.innerHTML = '';
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('camera-unavailable');
-      }
-      mediaStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}}, audio: false});
-      video.srcObject = mediaStream;
-      video.classList.remove('d-none');
-      startBtn.classList.add('d-none');
-      stopBtn.classList.remove('d-none');
-      await video.play();
-      startScanning();
-    } catch (err) {
-      cameraError.textContent = '{% translate "Camera access denied or unavailable." %}';
-      cameraError.classList.remove('d-none');
-    }
-  });
-
-  stopBtn.addEventListener('click', stopMedia);
-
-  function startScanning() {
-    if (!('BarcodeDetector' in window)) {
-      scanResult.innerHTML = '<div class="alert alert-info">{% translate "BarcodeDetector not available. Type the QR token in the Find Student field as a fallback." %}</div>';
-      return;
-    }
-    const detector = new BarcodeDetector({formats: ['qr_code']});
-    let scanning = true;
-
-    async function detect() {
-      if (!scanning || !mediaStream) return;
-      try {
-        const barcodes = await detector.detect(video);
-        if (barcodes.length > 0) {
-          stopMedia();
-          scanning = false;
-          const scannedUrl = barcodes[0].rawValue;
-          try {
-            const parsed = new URL(scannedUrl);
-            if (parsed.origin !== window.location.origin) {
-              scanResult.innerHTML = '<div class="alert alert-danger">{% translate "Scanned QR is from a different origin. Rejected." %}</div>';
-              return;
-            }
-          } catch(e) {
-            scanResult.innerHTML = '<div class="alert alert-danger">{% translate "Invalid QR content." %}</div>';
-            return;
-          }
-          window.location.href = scannedUrl;
-          return;
-        }
-      } catch (e) {
-        // Detection error, keep trying
-      }
-      if (scanning) requestAnimationFrame(detect);
-    }
-    detect();
-  }
-
-  window.addEventListener('beforeunload', stopMedia);
-});
-</script>
 {% endblock %}

@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core import signing
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from django.utils import formats
@@ -70,7 +71,7 @@ from .utils.file_validator import (
     validate_hls_object_key,
     FileValidator,
 )
-from .utils.storage_operations import list_current_folder, download_from_bucket, generate_unique_url, get_r2_client
+from .utils.storage_operations import list_current_folder, list_current_folder_page, download_from_bucket, generate_unique_url, get_r2_client
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
@@ -85,6 +86,7 @@ from .academic_enrollment import (
     accept_application,
     decline_application,
     reopen_application,
+    bulk_set_application_status,
     set_application_status,
     set_user_normal_enrollment_scope,
     promote_evaluation_result,
@@ -2411,6 +2413,37 @@ def media_job_status(request, job_uuid):
 
 
 @_media_api_required
+def media_job_status_batch(request):
+    """Return a bounded batch of visible media-job statuses for polling."""
+    raw_ids = [value.strip() for value in request.GET.get("ids", "").split(",") if value.strip()]
+    if not raw_ids or len(raw_ids) > 100:
+        return JsonResponse({"message": _("Provide between one and 100 media job IDs.")}, status=400)
+    try:
+        job_ids = [uuid.UUID(value) for value in raw_ids]
+    except (ValueError, AttributeError):
+        return JsonResponse({"message": _("One or more media job IDs are invalid.")}, status=400)
+    jobs = MediaProcessingJob.objects.select_related("lesson", "created_by").filter(public_id__in=job_ids)
+    payload = {}
+    visible_jobs = [job for job in jobs if job_is_visible_to(request.user, job)]
+    live_values = []
+    if visible_jobs:
+        try:
+            redis_client = redis.Redis.from_url(
+                getattr(settings, "CELERY_BROKER_URL", "redis://redis:6379/0"),
+                decode_responses=True,
+            )
+            pipeline = redis_client.pipeline(transaction=False)
+            for job in visible_jobs:
+                pipeline.hgetall(f"media:job:{job.public_id}")
+            live_values = pipeline.execute()
+        except Exception:
+            live_values = [{} for _job in visible_jobs]
+    for job, live in zip(visible_jobs, live_values):
+        payload[str(job.public_id)] = _serialize_media_job(job, live)
+    return JsonResponse({"jobs": payload})
+
+
+@_media_api_required
 def media_job_list(request):
     try:
         page_number = max(1, int(request.GET.get("page", "1")))
@@ -3941,6 +3974,7 @@ def api_search_files(request):
     query = request.GET.get('q', '')
     prefix = request.GET.get('prefix', '')
     extensions = request.GET.get('extensions', '')
+    continuation_token = request.GET.get('continuation') or None
     
     if not query:
         return JsonResponse({'error': _('Search query required')}, status=400)
@@ -3948,7 +3982,13 @@ def api_search_files(request):
     try:
         ext_list = [e.strip() for e in extensions.split(',') if e.strip()] if extensions else None
         
-        results = R2_MANAGER.search_files(query, prefix, ext_list)
+        results, next_token = R2_MANAGER.search_files_page(
+            query,
+            prefix,
+            ext_list,
+            continuation_token=continuation_token,
+            page_size=200,
+        )
         
         # Format sizes and dates
         for file_data in results:
@@ -3959,7 +3999,8 @@ def api_search_files(request):
         return JsonResponse({
             'success': True,
             'results': results,
-            'count': len(results)
+            'count': len(results),
+            'next_continuation': next_token,
         })
     
     except Exception as e:
@@ -4002,6 +4043,8 @@ def api_list_files(request):
     API endpoint to list files with filtering
     """
     folder_name = request.GET.get('folder', '')
+    continuation_token = request.GET.get('continuation') or None
+    search_query = request.GET.get('search', '').strip()
     filter_preset = request.GET.get('filter', 'media')
     extensions = request.GET.get('extensions', '')
     
@@ -4018,7 +4061,10 @@ def api_list_files(request):
             filter_config = get_filter_preset(filter_preset)
         
         # List files with filter
-        contents, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_name, filter_config)
+        contents, parent_folder, next_token = list_current_folder_page(
+            CLOUD_CLIENT, bucket_name, folder_name, filter_config,
+            continuation_token=continuation_token, search_query=search_query,
+        )
         
         # Format sizes and dates
         for item in contents:
@@ -4031,7 +4077,8 @@ def api_list_files(request):
             'success': True,
             'contents': contents,
             'parent_folder': parent_folder,
-            'current_folder': folder_name
+            'current_folder': folder_name,
+            'next_continuation': next_token,
         })
     
     except Exception as e:
@@ -4071,19 +4118,22 @@ def r2_management_dashboard(request):
     folder_id = request.GET.get('folder', None)
     filter_preset = request.GET.get('filter', '') or 'media'
     search_query = request.GET.get('search', '').strip()
+    continuation_token = request.GET.get('continuation') or None
     
     # Get filter configuration
     filter_config = get_filter_preset(filter_preset)
     
     # List files with filter
     if folder_id and folder_id != "None":
-        contents, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_id, filter_config)
+        contents, parent_folder, next_token = list_current_folder_page(
+            CLOUD_CLIENT, bucket_name, folder_id, filter_config,
+            continuation_token=continuation_token, search_query=search_query,
+        )
     else:
-        contents, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, "", filter_config)
-    
-    # Apply search filter on the fetched contents
-    if search_query:
-        contents = [item for item in contents if search_query.lower() in item['name'].lower()]
+        contents, parent_folder, next_token = list_current_folder_page(
+            CLOUD_CLIENT, bucket_name, "", filter_config,
+            continuation_token=continuation_token, search_query=search_query,
+        )
     
     # Get storage statistics with error handling - ONLY if requested via AJAX
     # Skip initial page load to improve performance
@@ -4121,7 +4171,12 @@ def r2_management_dashboard(request):
         'storage_stats': stats,
         'total_size_formatted': R2_MANAGER.format_file_size(stats.get('total_size', 0)) if isinstance(stats.get('total_size'), int) else '...',
         'load_stats': load_stats,
+        'next_page_url': None,
     }
+    if next_token:
+        next_params = request.GET.copy()
+        next_params['continuation'] = next_token
+        context['next_page_url'] = f"{request.path}?{next_params.urlencode()}"
     
     # Return partial for HTMX folder navigation (breadcrumb + back + grid)
     hx_target = request.headers.get('HX-Target')
@@ -4195,8 +4250,7 @@ def signup(request):
         form = SignupForm()
     return render(request, "signup.html", {"form": form, "copy": copy})
 
-@capability_required(can_manage_applications)
-def applications_dashboard(request):
+def _applications_dashboard_context(request):
     status_filter = request.GET.get("status", "all")
     application_order = [
         Case(
@@ -4221,11 +4275,23 @@ def applications_dashboard(request):
     paginator = Paginator(users, 15)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
-    return render(request, "applications_dashboard.html", {
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+    return {
         "page_obj": page_obj,
         "current_status": status_filter,
+        "pagination_query": pagination_params.urlencode(),
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
-    })
+        "bulk_selection_token": signing.dumps(
+            {"status": status_filter, "actor": request.user.pk},
+            salt="bulk-application-selection",
+        ),
+    }
+
+
+@capability_required(can_manage_applications)
+def applications_dashboard(request):
+    return render(request, "applications_dashboard.html", _applications_dashboard_context(request))
 
 @capability_required(can_manage_applications)
 def application_review(request, user_id):
@@ -4274,7 +4340,9 @@ def application_review(request, user_id):
                     user.save()
 
                     if desired_status != original_status:
-                        user, _enrollment = set_application_status(user, request.user, desired_status)
+                        user, _enrollment = set_application_status(
+                            user, request.user, desired_status, original_status
+                        )
                 for old_key in set(old_keys):
                     try:
                         CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=old_key)
@@ -4316,12 +4384,15 @@ def application_review(request, user_id):
                 "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 "is_image": content_type.startswith("image/"),
             })
-    return render(request, "application_review.html", {
+    context = {
         "app_user": user,
         "edit_form": form,
         "documents": documents,
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
-    })
+    }
+    if request.headers.get("HX-Target") == "application-review-drawer-body":
+        return render(request, "partials/application_review_drawer.html", context)
+    return render(request, "application_review.html", context)
 
 
 def _delete_user_storage(document_keys: list[str], telegram_keys: list[str]) -> None:
@@ -4544,25 +4615,49 @@ def application_decision(request, user_id, decision):
     if request.method != "POST":
         return HttpResponse(_("Method not allowed"), status=405)
     user = get_object_or_404(User, pk=user_id)
+    expected_status = request.POST.get("expected_status") or None
+    is_hx_request = request.headers.get("HX-Request") == "true"
+    success_message = None
 
     try:
-        original_status = user.application_status
+        original_status = expected_status or user.application_status
         if decision == "activate":
-            user, _enrollment = accept_application(user, request.user)
+            user, _enrollment = accept_application(user, request.user, expected_status)
             if original_status != user.application_status:
                 send_application_activated(user)
-            messages.success(request, _("%(name)s activated.") % {"name": user.get_full_name() or user.username})
+            success_message = _("%(name)s activated.") % {"name": user.get_full_name() or user.username}
         elif decision == "decline":
-            user = decline_application(user, request.user)
+            user = decline_application(user, request.user, expected_status)
             if original_status != user.application_status:
                 send_application_declined(user)
-            messages.success(request, _("%(name)s declined.") % {"name": user.get_full_name() or user.username})
+            success_message = _("%(name)s declined.") % {"name": user.get_full_name() or user.username}
         else:
-            user = reopen_application(user, request.user)
-            messages.success(request, _("%(name)s returned to pending.") % {"name": user.get_full_name() or user.username})
+            user = reopen_application(user, request.user, expected_status)
+            success_message = _("%(name)s returned to pending.") % {"name": user.get_full_name() or user.username}
     except (ValidationError, PermissionDenied) as exc:
         message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)
+        if is_hx_request:
+            failed_user = User.objects.get(pk=user_id)
+            response = render(request, "partials/application_review_drawer.html", {
+                "app_user": failed_user,
+                "edit_form": ApplicationAdminForm(instance=failed_user),
+                "documents": [],
+                "decision_error": message,
+            }, status=422)
+            response["HX-Retarget"] = "#application-review-drawer-body"
+            return response
         messages.error(request, message)
+    if is_hx_request and success_message:
+        response = render(request, "applications_dashboard.html", _applications_dashboard_context(request))
+        response["HX-Trigger"] = json.dumps({
+            "applicationDecisionCompleted": {
+                "message": str(success_message),
+                "level": "success",
+            }
+        })
+        return response
+    if success_message:
+        messages.success(request, success_message)
     return redirect("applications-dashboard")
 
 @capability_required(can_manage_applications)
@@ -4575,43 +4670,116 @@ def bulk_application_decision(request):
         return JsonResponse({"error": _("Invalid JSON")}, status=400)
     decision = data.get("decision")
     user_ids = data.get("user_ids", [])
-    if data.get("select_all"):
-        status = data.get("status", "pending")
-        if status == "all":
-            status_filter = ["pending", "active", "declined"]
-        elif status in ("pending", "active", "declined"):
-            status_filter = [status]
-        else:
-            return JsonResponse({"error": _("Invalid application status")}, status=400)
-        user_ids = list(User.objects.filter(application_status__in=status_filter).values_list("id", flat=True)[:1000])
-    elif not isinstance(user_ids, list):
-        return JsonResponse({"error": _("user_ids must be a list.")}, status=400)
-    user_ids = user_ids[:1000]
+    excluded_ids = data.get("excluded_user_ids", [])
+    if not isinstance(user_ids, list) or not isinstance(excluded_ids, list):
+        return JsonResponse({"error": _("Selection fields have invalid types.")}, status=400)
     if decision not in ("activate", "decline", "pending"):
         return JsonResponse({"error": _("Invalid decision")}, status=400)
-    results = {"success": [], "errors": []}
-    for uid in user_ids:
+
+    try:
+        excluded_ids = [int(value) for value in excluded_ids]
+    except (TypeError, ValueError):
+        return JsonResponse({"error": _("excluded_user_ids must contain numeric IDs.")}, status=400)
+
+    try:
+        selection = signing.loads(
+            data.get("selection_token", ""),
+            salt="bulk-application-selection",
+            max_age=3600,
+        )
+    except signing.BadSignature:
+        return JsonResponse({"error": _("The selection has expired. Reload the applications list and try again.")}, status=409)
+    if selection.get("actor") != request.user.pk:
+        return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=403)
+    selected_status = selection.get("status")
+    status_filter = (
+        [selected_status]
+        if selected_status in ("pending", "active", "declined")
+        else ["pending", "active", "declined"]
+        if selected_status == "all"
+        else None
+    )
+    if status_filter is None:
+        return JsonResponse({"error": _("Invalid application status")}, status=400)
+
+    select_all = bool(data.get("select_all"))
+    if select_all:
+        selection_queryset = User.objects.filter(
+            application_status__in=status_filter,
+        ).exclude(pk__in=excluded_ids).order_by("pk")
+        selected_ids = selection_queryset.values_list("id", flat=True).iterator(chunk_size=100)
+        requested = selection_queryset.count()
+    else:
+        if len(user_ids) > 1000:
+            return JsonResponse({"error": _("Select all matching records for selections larger than 1,000.")}, status=400)
         try:
-            user = User.objects.get(pk=uid)
-            original_status = user.application_status
-            if decision == "activate":
-                user, _enrollment = accept_application(user, request.user)
-                if original_status != user.application_status:
-                    send_application_activated(user)
-            elif decision == "decline":
-                user = decline_application(user, request.user)
-                if original_status != user.application_status:
-                    send_application_declined(user)
-            else:
-                user = reopen_application(user, request.user)
-            results["success"].append(uid)
+            user_ids = list(dict.fromkeys(int(value) for value in user_ids))
+        except (TypeError, ValueError):
+            return JsonResponse({"error": _("user_ids must contain numeric IDs.")}, status=400)
+        user_ids = [user_id for user_id in user_ids if user_id not in set(excluded_ids)]
+        selected_ids = iter(user_ids)
+        requested = len(user_ids)
+
+    results = {"success": [], "stale": [], "errors": [], "notification_failures": []}
+    while True:
+        chunk = list(islice(selected_ids, 100))
+        if not chunk:
+            break
+        expected_statuses = dict(
+            User.objects.filter(
+                pk__in=chunk,
+                application_status__in=status_filter,
+            ).values_list("pk", "application_status")
+        )
+        for user_id in chunk:
+            if user_id not in expected_statuses:
+                results["stale"].append({
+                    "id": user_id,
+                    "error": str(_("The application is no longer in the selected status.")),
+                })
+        operation_ids = [user_id for user_id in chunk if user_id in expected_statuses]
+        if not operation_ids:
+            continue
+        target_status = "active" if decision == "activate" else "declined" if decision == "decline" else "pending"
+        try:
+            batch_results = bulk_set_application_status(
+                operation_ids, request.user, target_status, expected_statuses,
+            )
+            results["success"].extend(batch_results["success"])
+            results["stale"].extend(batch_results["stale"])
+            results["errors"].extend(batch_results["errors"])
+            for changed_user in batch_results["changed_users"]:
+                try:
+                    if decision == "activate":
+                        send_application_activated(changed_user)
+                    elif decision == "decline":
+                        send_application_declined(changed_user)
+                except Exception as exc:
+                    logger.exception(
+                        "Application decision notification failed for user %s",
+                        changed_user.pk,
+                    )
+                    results["notification_failures"].append({
+                        "id": changed_user.pk,
+                        "error": str(exc),
+                    })
         except (ValidationError, PermissionDenied) as exc:
-            message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)
-            results["errors"].append({"id": uid, "error": message})
+            message = exc.message if hasattr(exc, "message") else str(exc)
+            results["errors"].extend({"id": user_id, "error": message} for user_id in operation_ids)
         except Exception as exc:
-            logger.exception("Application decision failed for user %s", uid)
-            results["errors"].append({"id": uid, "error": str(exc)})
-    return JsonResponse(results)
+            logger.exception("Bulk application decision failed for batch")
+            results["errors"].extend({"id": user_id, "error": str(exc)} for user_id in operation_ids)
+    results["processed"] = len(results["success"])
+    results["stale_count"] = len(results["stale"])
+    results["failed"] = len(results["errors"])
+    results["notification_failed_count"] = len(results["notification_failures"])
+    results["requested"] = requested
+    return JsonResponse(
+        results,
+        status=207
+        if results["errors"] or results["stale"] or results["notification_failures"]
+        else 200,
+    )
 
 @require_POST
 @capability_required(can_manage_content)
@@ -4809,6 +4977,12 @@ def academic_setup(request):
         if selected_scope and selected_scope.academic_year.is_active
         else None,
     })
+    year_pagination_params = request.GET.copy()
+    year_pagination_params.pop("page", None)
+    year_pagination_params.pop("offering_page", None)
+    offering_pagination_params = request.GET.copy()
+    offering_pagination_params.pop("page", None)
+    offering_pagination_params.pop("offering_page", None)
     return render(request, "academic_setup.html", {
         "years": year_page_obj.object_list,
         "year_page_obj": year_page_obj,
@@ -4823,6 +4997,8 @@ def academic_setup(request):
         "active_filter": active_filter,
         "offering_search": offering_search,
         "offering_status": offering_status,
+        "year_pagination_query": year_pagination_params.urlencode(),
+        "offering_pagination_query": offering_pagination_params.urlencode(),
         "year_form": year_form,
         "offering_form": offering_form,
         "copy_form": copy_form,

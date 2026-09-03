@@ -124,11 +124,11 @@
         {% include 'partials/r2_browse.html' %}
     </div>
 
-    <div class="modal fade" id="createFolderModal" tabindex="-1" data-bs-backdrop="false">
+    <div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModalLabel" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
-                    <h5 class="modal-title">{% translate "Create New Folder" %}</h5>
+                    <h5 class="modal-title" id="createFolderModalLabel">{% translate "Create New Folder" %}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
@@ -153,11 +153,11 @@
         </div>
     </div>
 
-    <div class="modal fade" id="renameFileModal" tabindex="-1" data-bs-backdrop="false">
+    <div class="modal fade" id="renameFileModal" tabindex="-1" aria-labelledby="renameFileModalLabel" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
-                    <h5 class="modal-title" x-text="renameIsFolder ? '{% translate "Rename Folder" %}' : '{% translate "Rename File" %}'"></h5>
+                    <h5 class="modal-title" id="renameFileModalLabel" x-text="renameIsFolder ? '{% translate "Rename Folder" %}' : '{% translate "Rename File" %}'"></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
@@ -183,33 +183,12 @@
         </div>
     </div>
 
-    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" data-bs-backdrop="false">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">{% translate "Confirm Delete" %}</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="delete-confirm-message"></p>
-                    <p id="delete-hls-warning" class="text-danger fw-bold d-none">
-                        {% translate "This will also delete all related .ts segment files in the same directory." %}
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="ad-btn ad-btn--ghost" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="button" class="ad-btn ad-btn--danger" id="confirm-delete-btn">{% translate "Delete" %}</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="infoModal" tabindex="-1" data-bs-backdrop="false">
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header">
-                    <h5 class="modal-title">{% translate "File Information" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="infoModalLabel">{% translate "File Information" %}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body" id="info-modal-body">
                     <div class="d-flex justify-content-center">

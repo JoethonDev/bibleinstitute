@@ -5,7 +5,7 @@
 {% block breadcrumbs %}{% endblock %}
 
 {% block body %}
-<div class="ad-page">
+<div class="ad-page" id="content">
     <div class="container-fluid py-3">
     {# --- Breadcrumb --- #}
     <nav aria-label="{% translate 'Breadcrumb' %}" class="mb-3">
@@ -18,6 +18,16 @@
     <div class="ad-page-header d-flex justify-content-between align-items-center">
         <h4><i class="fas fa-calculator me-2 ad-page-header-icon"></i>{% translate "Promotion Formula Builder" %}</h4>
     </div>
+
+    <nav class="ad-stepper mb-4" aria-label="{% translate 'Promotion workflow' %}">
+        <ol class="d-flex flex-wrap gap-2 list-unstyled mb-0">
+            <li class="ad-stepper-item is-active"><span class="ad-stepper-number">1</span>{% translate "Scope" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">2</span>{% translate "Formula" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">3</span>{% translate "Preview results" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">4</span>{% translate "Overrides" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">5</span>{% translate "Promote" %}</li>
+        </ol>
+    </nav>
 
     {# --- Explanation card --- #}
     <div class="ad-card mb-4">
@@ -949,22 +959,29 @@
 
     /* --- Event listeners --- */
 
-    // Listen for input changes on weight fields to update summary
-    document.addEventListener('input', function(e) {
+    // Replace the previous page instance so HTMX navigation never accumulates listeners.
+    if (window.__promotionListenerCleanup) window.__promotionListenerCleanup();
+    var promotionInputListener = function(e) {
         if (e.target && e.target.name && e.target.name.indexOf('-weight_percent') !== -1) {
             updateWeightSummary();
         }
-    });
+    };
 
     // Listen for metric changes (delegated) to sync quiz type
-    document.addEventListener('change', function(e) {
+    var promotionChangeListener = function(e) {
         if (e.target && e.target.classList.contains('rule-metric')) {
             var row = e.target.closest('tr.rule-row');
             if (row) {
                 syncMetricQuizType(row);
             }
         }
-    });
+    };
+    document.addEventListener('input', promotionInputListener);
+    document.addEventListener('change', promotionChangeListener);
+    window.__promotionListenerCleanup = function() {
+        document.removeEventListener('input', promotionInputListener);
+        document.removeEventListener('change', promotionChangeListener);
+    };
 
     /* --- Initialization --- */
 

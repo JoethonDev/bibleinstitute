@@ -186,7 +186,7 @@
   {% endif %}
 
   {# Add Holiday Modal #}
-  <div class="modal fade" id="addHolidayModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+  <div class="modal fade" id="addHolidayModal" tabindex="-1" aria-labelledby="addHolidayModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
         <form method="post" action="{% url 'add-holiday' %}">
@@ -194,8 +194,8 @@
           <input type="hidden" name="academic_year_id" id="modal-year-id">
           <input type="hidden" name="date" id="modal-date">
           <div class="modal-header">
-            <h6 class="modal-title">{% translate "Add Holiday" %}</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <h6 class="modal-title" id="addHolidayModalLabel">{% translate "Add Holiday" %}</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
@@ -217,7 +217,7 @@
   </div>
 
   {# Add Meeting Modal #}
-  <div class="modal fade" id="addMeetingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+  <div class="modal fade" id="addMeetingModal" tabindex="-1" aria-labelledby="addMeetingModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
         <form method="post" action="{% url 'add-meeting' %}">
@@ -225,8 +225,8 @@
           <input type="hidden" name="academic_year_id" id="meeting-modal-year-id">
           <input type="hidden" name="date" id="meeting-modal-date">
           <div class="modal-header">
-            <h6 class="modal-title">{% translate "Add Meeting" %}</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <h6 class="modal-title" id="addMeetingModalLabel">{% translate "Add Meeting" %}</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
@@ -251,6 +251,8 @@
 
   <script>
   (function() {
+    if (window.__calendarModalListenerInstalled) return;
+    window.__calendarModalListenerInstalled = true;
     document.addEventListener('show.bs.modal', function(event) {
       if (event.target.id === 'addHolidayModal') {
         var button = event.relatedTarget;

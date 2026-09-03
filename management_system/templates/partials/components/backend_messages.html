@@ -1,6 +1,6 @@
 {% load i18n %}
 {% if messages %}
-<div class="ps-toast-stack ps-backend-messages" role="region" aria-live="polite">
+<div class="ps-toast-stack ps-backend-messages" role="region" aria-live="polite" x-cloak>
     {% for message in messages %}
     <div
         class="ps-toast"
@@ -13,9 +13,9 @@
         x-init="setTimeout(() => { open = false; }, 2500)"
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 transform translate-x-0"
-        x-transition:leave-end="opacity-0 transform translate-x-full"
+        x-transition:leave-end="opacity-0 transform {% if request.LANGUAGE_CODE == 'ar' %}-translate-x-full{% else %}translate-x-full{% endif %}"
     >
-        <i class="fas {% if 'error' in message.tags %}fa-times-circle{% elif 'success' in message.tags %}fa-check-circle{% elif 'warning' in message.tags %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}" aria-hidden="true"></i>
+        <i class="fas {% if message.level_tag == 'error' %}fa-times-circle{% elif message.level_tag == 'success' %}fa-check-circle{% elif message.level_tag == 'warning' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}" aria-hidden="true"></i>
         <span class="ps-toast-body">{{ message }}</span>
         <button
             type="button"

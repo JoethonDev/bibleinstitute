@@ -104,6 +104,7 @@ urlpatterns = [
     path('api/media/jobs/', media_jobs_collection, name="media-job-create"),
     path('api/media/jobs/<uuid:job_uuid>/source-complete/', media_job_source_complete, name="media-job-source-complete"),
     path('api/media/jobs/<uuid:job_uuid>/', media_job_status, name="media-job-status"),
+    path('api/media/jobs/status-batch/', media_job_status_batch, name="media-job-status-batch"),
     path('api/media/jobs/<uuid:job_uuid>/retry/', media_job_retry, name="media-job-retry"),
     path('api/media/jobs/<uuid:job_uuid>/attachment-retry/', media_job_attachment_retry, name="media-job-attachment-retry"),
     path('dashboard/media-processing/', media_processing_status, name="media-processing-status"),

@@ -83,14 +83,14 @@
         </div>
 
         {# --- Edit Name Modal --- #}
-        <div class="modal fade" id="editLevelModal{{ lvl.level }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal fade" id="editLevelModal{{ lvl.level }}" tabindex="-1" aria-labelledby="editLevelModalLabel{{ lvl.level }}" aria-hidden="true" data-bs-backdrop="static">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <form method="post" action="{% url 'level-edit' lvl.level %}">
                         {% csrf_token %}
                         <div class="modal-header">
-                            <h6 class="modal-title">{% translate "Edit Level Name" %} — {{ lvl.name }}</h6>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <h6 class="modal-title" id="editLevelModalLabel{{ lvl.level }}">{% translate "Edit Level Name" %} — {{ lvl.name }}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
@@ -113,14 +113,14 @@
         </div>
 
         {# --- Delete Confirmation Modal --- #}
-        <div class="modal fade" id="deleteLevelModal{{ lvl.level }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal fade" id="deleteLevelModal{{ lvl.level }}" tabindex="-1" aria-labelledby="deleteLevelModalLabel{{ lvl.level }}" aria-hidden="true" data-bs-backdrop="static">
             <div class="modal-dialog modal-dialog-centered modal-sm">
                 <div class="modal-content">
                     <form method="post" action="{% url 'level-delete' lvl.level %}">
                         {% csrf_token %}
                         <div class="modal-header">
-                            <h6 class="modal-title">{% translate "Delete Level" %}</h6>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <h6 class="modal-title" id="deleteLevelModalLabel{{ lvl.level }}">{% translate "Delete Level" %}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                         </div>
                         <div class="modal-body">
                             <p>{% translate "Are you sure you want to delete" %} <strong>{{ lvl.name }}</strong>?</p>
@@ -153,14 +153,14 @@
     </div>
 
     {# --- Create Level Modal --- #}
-    <div class="modal fade" id="levelCreateModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal fade" id="levelCreateModal" tabindex="-1" aria-labelledby="levelCreateModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content">
                 <form method="post" action="{% url 'level-create' %}">
                     {% csrf_token %}
                     <div class="modal-header">
-                        <h5 class="modal-title">{% translate "New Level" %}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <h5 class="modal-title" id="levelCreateModalLabel">{% translate "New Level" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">

@@ -1,10 +1,12 @@
 (function () {
     'use strict';
 
+    var timer = null;
+    var cleanup = null;
+    function init() {
     var root = document.getElementById('content');
-    if (!root) {
-        return;
-    }
+    if (!root || !root.hasAttribute('data-status-labels')) return;
+    if (cleanup) cleanup();
     function parseLabels(name) {
         try {
             return JSON.parse(root.getAttribute(name) || '{}');
@@ -14,10 +16,11 @@
     }
     var statusLabels = parseLabels('data-status-labels');
     var phaseLabels = parseLabels('data-phase-labels');
+    var batchStatusUrl = root.getAttribute('data-batch-status-url') || '';
     var retryFailed = root.getAttribute('data-trans-retry-failed') || gettext('Retry failed');
     var csrfInput = document.querySelector('#media-status-csrf input[name="csrfmiddlewaretoken"]');
     var csrf = csrfInput ? csrfInput.value : '';
-    document.querySelectorAll('[data-media-retry-url]').forEach(function (button) {
+    root.querySelectorAll('[data-media-retry-url]').forEach(function (button) {
         button.addEventListener('click', function () {
             var url = button.getAttribute('data-media-retry-url');
             if (!url || !csrf) {
@@ -55,19 +58,22 @@
         if (bar) bar.style.width = Math.max(0, Math.min(100, Number(job.progress) || 0)) + '%';
         if (value) value.textContent = (Number(job.progress) || 0) + '%';
         if (error) error.textContent = job.error_message || '';
+        var progress = row.querySelector('[role="progressbar"]');
+        if (progress) progress.setAttribute('aria-valuenow', String(Math.max(0, Math.min(100, Number(job.progress) || 0))));
     }
 
     function pollStatusRows() {
-        document.querySelectorAll('[data-media-status-url]').forEach(function (row) {
-            if (row.getAttribute('data-media-terminal') === '1') {
-                return;
-            }
-            var url = row.getAttribute('data-media-status-url');
-            if (!url) return;
-            fetch(url, { credentials: 'same-origin' })
-                .then(function (response) { return response.ok ? response.json() : null; })
-                .then(function (data) {
-                    var job = data && data.job;
+        var rows = Array.from(root.querySelectorAll('[data-media-status-url]')).filter(function (row) {
+            return row.getAttribute('data-media-terminal') !== '1' && row.getAttribute('data-media-job-id');
+        });
+        if (!rows.length || !batchStatusUrl) return;
+        var ids = rows.map(function (row) { return row.getAttribute('data-media-job-id'); });
+        fetch(batchStatusUrl + '?ids=' + encodeURIComponent(ids.join(',')), { credentials: 'same-origin' })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (data) {
+                var jobs = data && data.jobs || {};
+                rows.forEach(function (row) {
+                    var job = jobs[row.getAttribute('data-media-job-id')];
                     if (!job) return;
                     updateRow(row, job);
                     var attachmentPending = job.status === 'succeeded' && job.attachment_status === 'pending';
@@ -77,11 +83,16 @@
                             window.location.reload();
                         }
                     }
-                })
-                .catch(function () {
-                    // Durable PostgreSQL values remain visible when Redis/API polling is unavailable.
                 });
-        });
+            })
+            .catch(function () {
+                // Durable PostgreSQL values remain visible when Redis/API polling is unavailable.
+            });
     }
-    window.setInterval(pollStatusRows, 5000);
+    timer = window.setInterval(pollStatusRows, 5000);
+    cleanup = function () { window.clearInterval(timer); timer = null; };
+    }
+    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('htmx:afterSwap', init);
+    document.addEventListener('htmx:beforeSwap', function () { if (cleanup) cleanup(); });
 })();

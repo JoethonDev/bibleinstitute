@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Iterable, Mapping
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -21,7 +22,7 @@ from .models import (
     User,
     HistoricalAcademicSummary,
 )
-from .mobile_auth import revoke_user_mobile_access
+from .mobile_auth import revoke_user_mobile_access, revoke_users_mobile_access
 
 
 PROMOTABLE_HISTORICAL_OUTCOMES = frozenset({
@@ -137,12 +138,25 @@ def activate_academic_year(year: AcademicYear, actor: User) -> AcademicYear:
 
 
 @transaction.atomic
-def set_application_status(application: User, actor: User, status: str) -> tuple[User, Enrollment | None]:
+def set_application_status(
+    application: User,
+    actor: User,
+    status: str,
+    expected_status: str | None = None,
+) -> tuple[User, Enrollment | None]:
     """Set an application status with admin-only locking and enrollment rules."""
     _require_admin(actor)
     locked_user = User.objects.select_for_update().get(pk=application.pk)
     if status not in {"pending", "active", "declined"}:
         raise ValidationError(_("Invalid application status."))
+    if expected_status is not None:
+        if expected_status not in {"pending", "active", "declined"}:
+            raise ValidationError(_("Invalid expected application status."))
+        if locked_user.application_status != expected_status:
+            raise ValidationError(
+                _("The application status changed before this action was executed."),
+                code="stale_status",
+            )
 
     if status != "active":
         locked_user.application_status = status
@@ -181,7 +195,7 @@ def set_application_status(application: User, actor: User, status: str) -> tuple
     locked_user.decided_at = now()
     locked_user.save(update_fields=["application_status", "is_active", "role", "decided_by", "decided_at"])
 
-    enrollment, _ = Enrollment.objects.get_or_create(
+    enrollment, _created = Enrollment.objects.get_or_create(
         student=locked_user,
         academic_year_level=scope,
         course_offering=None,
@@ -197,23 +211,207 @@ def set_application_status(application: User, actor: User, status: str) -> tuple
 
 
 @transaction.atomic
-def accept_application(application: User, actor: User) -> tuple[User, Enrollment]:
+def bulk_set_application_status(
+    user_ids: Iterable[int],
+    actor: User,
+    status: str,
+    expected_statuses: Mapping[int, str],
+) -> dict:
+    """Apply one application decision to one bounded, server-selected batch.
+
+    User rows are locked once per batch and enrollment rows are reconciled with
+    bulk queries. ``expected_statuses`` must be derived by the caller from its
+    authoritative selection scope; browser payloads must never be passed here.
+    """
+    _require_admin(actor)
+    user_ids = list(dict.fromkeys(int(user_id) for user_id in user_ids))
+    if not user_ids or len(user_ids) > 100:
+        raise ValidationError(_("Bulk application batches must contain between one and 100 users."))
+    if status not in {"pending", "active", "declined"}:
+        raise ValidationError(_("Invalid application status."))
+
+    locked_users = list(
+        User.objects.select_for_update().filter(pk__in=user_ids).order_by("pk")
+    )
+    users_by_id = {user.pk: user for user in locked_users}
+    results = {"success": [], "stale": [], "errors": [], "changed_users": []}
+    eligible = []
+    for user_id in user_ids:
+        user = users_by_id.get(user_id)
+        if user is None:
+            results["errors"].append({"id": user_id, "error": str(_("User not found."))})
+            continue
+        expected_status = expected_statuses.get(user_id)
+        if expected_status not in {"pending", "active", "declined"}:
+            results["stale"].append({
+                "id": user_id,
+                "error": str(_("The application is no longer in the selected status.")),
+            })
+            continue
+        if user.application_status != expected_status:
+            results["stale"].append({
+                "id": user_id,
+                "error": str(_("The application status changed before this action was executed.")),
+            })
+            continue
+        eligible.append(user)
+
+    if status == "active" and eligible:
+        active_years = list(
+            AcademicYear.objects.select_for_update().filter(is_active=True).order_by("pk")
+        )
+        if len(active_years) != 1:
+            for user in eligible:
+                results["errors"].append({
+                    "id": user.pk,
+                    "error": str(_("Exactly one active academic year is required before acceptance.")),
+                })
+            eligible = []
+        else:
+            scope = (
+                AcademicYearLevel.objects.select_related("level")
+                .filter(academic_year=active_years[0])
+                .order_by("level__ordering", "pk")
+                .first()
+            )
+            if scope is None:
+                for user in eligible:
+                    results["errors"].append({
+                        "id": user.pk,
+                        "error": str(_("The active academic year has no opened level.")),
+                    })
+                eligible = []
+            else:
+                student_role = Role.objects.get(role="student")
+                eligible_ids = [user.pk for user in eligible]
+                enrollments = list(
+                    Enrollment.objects.select_for_update().filter(
+                        student_id__in=eligible_ids,
+                        academic_year_level_id=scope.pk,
+                        course_offering__isnull=True,
+                    )
+                )
+                enrollment_by_student = {enrollment.student_id: enrollment for enrollment in enrollments}
+                valid_users = []
+                for user in eligible:
+                    enrollment = enrollment_by_student.get(user.pk)
+                    if enrollment and (enrollment.enrollment_type != Enrollment.Type.NORMAL or enrollment.course_offering_id):
+                        results["errors"].append({
+                            "id": user.pk,
+                            "error": str(_("The application already has an incompatible enrollment.")),
+                        })
+                        continue
+                    valid_users.append(user)
+                eligible = valid_users
+                eligible_ids = [user.pk for user in eligible]
+                missing_enrollments = [
+                    Enrollment(
+                        student_id=user.pk,
+                        academic_year_level_id=scope.pk,
+                        course_offering_id=None,
+                        enrollment_type=Enrollment.Type.NORMAL,
+                        status=Enrollment.Status.ACTIVE,
+                        enrolled_by_id=actor.pk,
+                    )
+                    for user in eligible
+                    if user.pk not in enrollment_by_student
+                ]
+                if missing_enrollments:
+                    Enrollment.objects.bulk_create(missing_enrollments, ignore_conflicts=True)
+                    enrollments = list(
+                        Enrollment.objects.select_for_update().filter(
+                            student_id__in=eligible_ids,
+                            academic_year_level_id=scope.pk,
+                            course_offering__isnull=True,
+                        )
+                    )
+                    enrollment_by_student = {enrollment.student_id: enrollment for enrollment in enrollments}
+                enrollment_updates = []
+                for user in eligible:
+                    enrollment = enrollment_by_student.get(user.pk)
+                    if enrollment is None:
+                        results["errors"].append({
+                            "id": user.pk,
+                            "error": str(_("The normal enrollment could not be created.")),
+                        })
+                        continue
+                    enrollment.status = Enrollment.Status.ACTIVE
+                    enrollment.enrolled_by_id = enrollment.enrolled_by_id or actor.pk
+                    enrollment_updates.append(enrollment)
+                if enrollment_updates:
+                    Enrollment.objects.bulk_update(enrollment_updates, ["status", "enrolled_by"])
+                eligible = [user for user in eligible if user.pk in {enrollment.student_id for enrollment in enrollment_updates}]
+                decision_time = now()
+                if eligible:
+                    User.objects.filter(pk__in=[user.pk for user in eligible]).update(
+                        application_status="active",
+                        is_active=True,
+                        role_id=student_role.pk,
+                        decided_by_id=actor.pk,
+                        decided_at=decision_time,
+                    )
+                    for user in eligible:
+                        if user.application_status != "active":
+                            results["changed_users"].append(user)
+                        user.application_status = "active"
+                        user.is_active = True
+                        user.role_id = student_role.pk
+                        user.decided_by_id = actor.pk
+                        user.decided_at = decision_time
+
+    elif eligible:
+        decision_time = now()
+        eligible_ids = [user.pk for user in eligible]
+        User.objects.filter(pk__in=eligible_ids).update(
+            application_status=status,
+            is_active=False,
+            decided_by_id=actor.pk if status == "declined" else None,
+            decided_at=decision_time if status == "declined" else None,
+        )
+        if status in {"pending", "declined"}:
+            revoke_users_mobile_access(eligible_ids)
+        for user in eligible:
+            if user.application_status != status:
+                results["changed_users"].append(user)
+            user.application_status = status
+            user.is_active = False
+            user.decided_by_id = actor if status == "declined" else None
+            user.decided_at = decision_time if status == "declined" else None
+
+    results["success"] = [user.pk for user in eligible]
+    return results
+
+
+@transaction.atomic
+def accept_application(
+    application: User,
+    actor: User,
+    expected_status: str | None = None,
+) -> tuple[User, Enrollment]:
     """Accept or re-accept one application into the active year's lowest level."""
-    user, enrollment = set_application_status(application, actor, "active")
+    user, enrollment = set_application_status(application, actor, "active", expected_status)
     return user, enrollment
 
 
 @transaction.atomic
-def decline_application(application: User, actor: User) -> User:
+def decline_application(
+    application: User,
+    actor: User,
+    expected_status: str | None = None,
+) -> User:
     """Decline or re-decline an application with the same locking rules."""
-    user, _enrollment = set_application_status(application, actor, "declined")
+    user, _enrollment = set_application_status(application, actor, "declined", expected_status)
     return user
 
 
 @transaction.atomic
-def reopen_application(application: User, actor: User) -> User:
+def reopen_application(
+    application: User,
+    actor: User,
+    expected_status: str | None = None,
+) -> User:
     """Return an application to pending without deleting academic history."""
-    user, _enrollment = set_application_status(application, actor, "pending")
+    user, _enrollment = set_application_status(application, actor, "pending", expected_status)
     return user
 
 

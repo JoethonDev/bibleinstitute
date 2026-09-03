@@ -12,16 +12,29 @@ function dashboardManager() {
     return {
         showFilters: false,
         activeFiltersCount: 0,
+        afterSwapHandler: null,
+        filterCountTimer: null,
 
         init() {
             // Calculate active filters on init
             this.updateActiveFiltersCount();
 
             // Recalculate whenever HTMX refreshes the table section
-            document.body.addEventListener('htmx:afterSwap', () => {
+            this.afterSwapHandler = () => {
                 // Small delay to ensure the new DOM is fully settled
-                setTimeout(() => this.updateActiveFiltersCount(), 100);
-            });
+                clearTimeout(this.filterCountTimer);
+                this.filterCountTimer = setTimeout(() => this.updateActiveFiltersCount(), 100);
+            };
+            document.body.addEventListener('htmx:afterSwap', this.afterSwapHandler);
+        },
+
+        destroy() {
+            if (this.afterSwapHandler) {
+                document.body.removeEventListener('htmx:afterSwap', this.afterSwapHandler);
+                this.afterSwapHandler = null;
+            }
+            clearTimeout(this.filterCountTimer);
+            this.filterCountTimer = null;
         },
 
         updateActiveFiltersCount() {

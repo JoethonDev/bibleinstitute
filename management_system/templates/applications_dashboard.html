@@ -16,34 +16,55 @@
         <h4 class="ad-pane-title">{% translate "Student Applications" %}</h4>
     </div>
 
+    <div id="application-bulk-result"
+         class="ad-alert ad-alert--info d-none mb-3"
+         role="status"
+         aria-live="polite"
+         data-processed-label="{% translate 'Processed' %}"
+         data-stale-label="{% translate 'Skipped as stale' %}"
+         data-failed-label="{% translate 'Mutation failures' %}"
+         data-notification-failed-label="{% translate 'Notification failures' %}"></div>
+
+    <div id="applications-workspace">
     <div class="ad-filters mb-3">
         <a class="ad-filter-pill nav-link {% if current_status == 'all' %}is-on{% endif %}" href="?status=all"
+           {% if current_status == 'all' %}aria-current="page"{% endif %}
            hx-get="{% url 'applications-dashboard' %}?status=all"
-           hx-target="#app-table-section"
-           hx-select="#app-table-section"
+           hx-target="#applications-workspace"
+           hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "All" %}</a>
         <a class="ad-filter-pill nav-link {% if current_status == 'pending' %}is-on{% endif %}" href="?status=pending"
+           {% if current_status == 'pending' %}aria-current="page"{% endif %}
            hx-get="{% url 'applications-dashboard' %}?status=pending"
-           hx-target="#app-table-section"
-           hx-select="#app-table-section"
+           hx-target="#applications-workspace"
+           hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "Pending" %}</a>
         <a class="ad-filter-pill nav-link {% if current_status == 'active' %}is-on{% endif %}" href="?status=active"
+           {% if current_status == 'active' %}aria-current="page"{% endif %}
            hx-get="{% url 'applications-dashboard' %}?status=active"
-           hx-target="#app-table-section"
-           hx-select="#app-table-section"
+           hx-target="#applications-workspace"
+           hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "Active" %}</a>
         <a class="ad-filter-pill nav-link {% if current_status == 'declined' %}is-on{% endif %}" href="?status=declined"
+           {% if current_status == 'declined' %}aria-current="page"{% endif %}
            hx-get="{% url 'applications-dashboard' %}?status=declined"
-           hx-target="#app-table-section"
-           hx-select="#app-table-section"
+           hx-target="#applications-workspace"
+           hx-select="#applications-workspace"
            hx-swap="outerHTML"
            hx-push-url="true">{% translate "Declined" %}</a>
     </div>
 
-    <div id="app-table-section">
+    <div id="app-table-section"
+         data-bulk-url="{% url 'bulk-application-decision' %}"
+         data-csrf="{{ csrf_token }}"
+         data-selection-token="{{ bulk_selection_token }}"
+         data-selection-status="{{ current_status }}"
+         data-no-selection-message="{% translate 'Please select at least one application.' %}"
+         data-request-failed-message="{% translate 'The request failed. Please try again.' %}"
+         data-confirm-message="{% translate 'Are you sure?' %}">
 
     <div class="ad-card">
         <div class="ad-card-body p-0">
@@ -72,10 +93,10 @@
                 </small>
             </div>
             <div class="ad-table-wrap">
-                <table class="ad-table mb-0" x-data="{ selected: [], selectAll: false }">
+                        <table class="ad-table mb-0">
                     <thead>
                         <tr>
-                            <th class="column-checkbox"><input type="checkbox" id="select-all" @change="selected = $el.checked ? Array.from($el.closest('table').querySelectorAll('.user-checkbox')).map(cb => cb.value) : []; selectAll = $el.checked"></th>
+                            <th class="column-checkbox"><input type="checkbox" id="select-all" aria-label="{% translate 'Select all visible applications' %}"></th>
                             <th>{% translate "Name" %}</th>
                             <th>{% translate "Phone" %}</th>
                             <th>{% translate "City" %}</th>
@@ -86,14 +107,19 @@
                     <tbody>
                         {% for u in page_obj.object_list %}
                         <tr>
-                            <td><input type="checkbox" class="user-checkbox" value="{{ u.id }}" x-model="selected"></td>
+                            <td><input type="checkbox" class="user-checkbox" value="{{ u.id }}" aria-label="{% blocktranslate with name=u.get_full_name|default:u.username %}Select {{ name }}{% endblocktranslate %}"></td>
                             <td>{{ u.get_full_name|default:u.username }}</td>
                             <td>{{ u.phone|default:"—" }}</td>
                             <td>{{ u.city|default:"—" }}</td>
                             <td><span class="ad-pill {% if u.application_status == 'active' %}ad-pill--success{% elif u.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ u.get_application_status_display }}</span></td>
                             <td>
                                 <div class="ad-actions">
-                                    <a href="{% url 'application-review' u.id %}" class="ad-btn ad-btn--ghost ad-btn--sm">
+                                    <a href="{% url 'application-review' u.id %}" class="ad-btn ad-btn--ghost ad-btn--sm"
+                                       hx-get="{% url 'application-review' u.id %}?status={{ current_status }}&page={{ page_obj.number }}"
+                                       hx-target="#application-review-drawer-body"
+                                       hx-select="#application-review-drawer-body"
+                                       hx-swap="outerHTML"
+                                       hx-on::after-request="if (event.detail.successful) bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('applicationReviewDrawer')).show()">
                                         <i class="fas fa-eye"></i> {% translate "Review" %}
                                     </a>
                                     <form method="post"
@@ -118,7 +144,10 @@
                     <ul class="ad-page-nav">
                         {% if page_obj.has_previous %}
                         <li>
-                            <a class="ad-page-link" href="?status={{ current_status }}&page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}">
+                            <a class="ad-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                               hx-get="{% url 'applications-dashboard' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                               hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true"
+                               aria-label="{% translate 'Previous page' %}">
                                 <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                                 <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                             </a>
@@ -132,13 +161,22 @@
                         </li>
                         {% endif %}
                         {% for p in page_obj.paginator.page_range %}
-                        <li>
-                            <a class="ad-page-link {% if p == page_obj.number %}is-active{% endif %}" href="?status={{ current_status }}&page={{ p }}"{% if p == page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
-                        </li>
+                            {% if p == page_obj.number %}
+                            <li aria-current="page"><span class="ad-page-link is-active">{{ p }}</span></li>
+                            {% elif p > page_obj.number|add:'-3' and p < page_obj.number|add:'3' or forloop.counter == 1 or forloop.revcounter == 1 %}
+                            <li><a class="ad-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ p }}"
+                                   hx-get="{% url 'applications-dashboard' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ p }}"
+                                   hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true">{{ p }}</a></li>
+                            {% elif forloop.counter == 2 and page_obj.number > 4 or forloop.revcounter == 2 and page_obj.number < page_obj.paginator.num_pages|add:'-3' %}
+                            <li><span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span></li>
+                            {% endif %}
                         {% endfor %}
                         {% if page_obj.has_next %}
                         <li>
-                            <a class="ad-page-link" href="?status={{ current_status }}&page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}">
+                            <a class="ad-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}"
+                               hx-get="{% url 'applications-dashboard' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}"
+                               hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true"
+                               aria-label="{% translate 'Next page' %}">
                                 <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                                 <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                             </a>
@@ -169,91 +207,14 @@
         </div>
     </div>
 </div>
-
-<script>
-(function() {
-    'use strict';
-    var sectionId = 'app-table-section';
-    var selectAllRecordsBtn = '#select-all-records';
-    var bulkButtons = '#bulk-activate, #bulk-decline, #bulk-reopen';
-    var noSelectionMessage = '{% translate "Please select at least one application." %}';
-    var requestFailedMessage = '{% translate "The request failed. Please try again." %}';
-    var confirmMessage = '{% translate "Are you sure?" %}';
-
-    function currentSection() {
-        return document.getElementById(sectionId);
-    }
-
-    function showFeedback(message, isError) {
-        try {
-            if (window.Alpine && Alpine.store && Alpine.store('notifications')) {
-                Alpine.store('notifications').add(message, isError ? 'danger' : 'warning');
-                return;
-            }
-        } catch (e) { /* fall through to a safe alert */ }
-        window.alert(message);
-    }
-
-    // Delegated listener: survives HTMX replacement of #app-table-section.
-    document.addEventListener('change', function(e) {
-        var target = e.target;
-        if (!target || target.id !== 'select-all') return;
-        var section = currentSection();
-        if (!section) return;
-        section.querySelectorAll('.user-checkbox').forEach(function(cb) {
-            cb.checked = target.checked;
-        });
-        section.dataset.selectAllRecords = target.checked ? '0' : '';
-        var allButton = section.querySelector(selectAllRecordsBtn);
-        if (allButton) allButton.classList.toggle('d-none', !target.checked);
-    });
-
-    // Delegated click handler: covers both the select-all-records toggle and
-    // the bulk decision buttons for the currently rendered section.
-    document.addEventListener('click', function(e) {
-        var allButton = e.target.closest(selectAllRecordsBtn);
-        if (allButton) {
-            var section = currentSection();
-            if (section) section.dataset.selectAllRecords = '1';
-            allButton.classList.add('d-none');
-            return;
-        }
-        var btn = e.target.closest(bulkButtons);
-        if (!btn) return;
-        var current = currentSection();
-        if (!current) return;
-        var selected = Array.from(current.querySelectorAll('.user-checkbox:checked')).map(function(cb) { return parseInt(cb.value, 10); });
-        var selectAllRecords = current.dataset.selectAllRecords === '1';
-        if (selected.length === 0 && !selectAllRecords) {
-            showFeedback(noSelectionMessage, false);
-            return;
-        }
-        document.dispatchEvent(new CustomEvent('app:confirm', {
-            detail: {
-                message: confirmMessage,
-                onConfirm: function() {
-                    fetch('{% url "bulk-application-decision" %}', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-                        body: JSON.stringify({decision: btn.dataset.decision, user_ids: selected, select_all: selectAllRecords, status: '{{ current_status }}'})
-                    }).then(function(response) {
-                        return response.json().then(function(data) {
-                            return {ok: response.ok, data: data};
-                        });
-                    }).then(function(result) {
-                        if (result.ok) {
-                            location.reload();
-                        } else {
-                            var message = result.data && result.data.error ? result.data.error : requestFailedMessage;
-                            showFeedback(message, true);
-                        }
-                    }).catch(function() {
-                        showFeedback(requestFailedMessage, true);
-                    });
-                }
-            });
-        }));
-    });
-})();
-</script>
+    </div>
+<div class="offcanvas offcanvas-end" tabindex="-1" id="applicationReviewDrawer" aria-labelledby="applicationReviewDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="applicationReviewDrawerLabel">{% translate "Application Review" %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
+    </div>
+    <div class="offcanvas-body" id="application-review-drawer-body">
+        <p class="text-muted">{% translate "Select Review to load the authoritative application record." %}</p>
+    </div>
+</div>
 {% endblock %}

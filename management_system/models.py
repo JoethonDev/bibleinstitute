@@ -102,6 +102,14 @@ class Role(models.Model):
         return [str(_(role.get_role_display())) for role in Role.objects.all()] # Translate display values
 
 class User(AbstractUser):
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["application_status", "-date_joined", "-id"],
+                name="user_app_status_date_idx",
+            ),
+        ]
+
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
     joined_date = models.DateField(null=False, default=assign_academic_date)
     time_zone = models.CharField(max_length=64, default=settings.TIME_ZONE)

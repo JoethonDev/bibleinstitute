@@ -283,6 +283,27 @@ def revoke_user_mobile_access(user) -> None:
     ).update(revoked_at=now, updated_at=now)
 
 
+def revoke_users_mobile_access(user_ids) -> None:
+    """Revoke mobile access for a bounded set of users in bulk."""
+    user_ids = list(user_ids)
+    if not user_ids:
+        return
+    revoked_at = timezone.now()
+    StudentMobileSession.objects.filter(
+        user_id__in=user_ids,
+        revoked_at__isnull=True,
+    ).update(revoked_at=revoked_at)
+    MobilePushDevice.objects.filter(user_id__in=user_ids, is_active=True).update(
+        is_active=False,
+        disabled_at=revoked_at,
+        updated_at=revoked_at,
+    )
+    MobileBiometricCredential.objects.filter(
+        user_id__in=user_ids,
+        revoked_at__isnull=True,
+    ).update(revoked_at=revoked_at, updated_at=revoked_at)
+
+
 def get_mobile_session(request):
     authorization = request.headers.get("Authorization", "")
     scheme, _, raw_token = authorization.partition(" ")

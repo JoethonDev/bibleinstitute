@@ -23,7 +23,7 @@
             <li>
                 <a class="dropdown-item ad-action-link"
                    href="#"
-                   @click.prevent="downloadFile('{{ item.id }}', '{{ item.name }}')">
+                   @click.prevent="downloadFile('{{ item.id|escapejs }}', '{{ item.name|escapejs }}')">
                     <i class="fas fa-download me-2"></i>{% translate "Download" %}
                 </a>
             </li>
@@ -32,7 +32,7 @@
             <li>
                 <a class="dropdown-item ad-action-link"
                    href="#"
-                   @click.prevent="showRenameModal('{{ item.id }}', '{{ item.name }}')">
+                   @click.prevent="showRenameModal('{{ item.id|escapejs }}', '{{ item.name|escapejs }}')">
                     <i class="fas fa-edit me-2"></i>{% translate "Rename" %}
                 </a>
             </li>
@@ -41,7 +41,7 @@
             <li>
                 <a class="dropdown-item ad-action-link"
                    href="#"
-                   @click.prevent="getFileMetadata('{{ item.id }}')">
+                   @click.prevent="getFileMetadata('{{ item.id|escapejs }}')">
                     <i class="fas fa-info-circle me-2"></i>{% translate "Info" %}
                 </a>
             </li>
@@ -52,7 +52,7 @@
             <li>
                 <a class="dropdown-item ad-action-link ad-action-link--danger"
                    href="#"
-                   @click.prevent="deleteFile('{{ item.id }}', '{{ item.name }}', '{{ item.name|slice:"-5:" }}')">
+                   @click.prevent="deleteFile('{{ item.id|escapejs }}', '{{ item.name|escapejs }}', '{{ item.name|slice:"-5:"|escapejs }}')">
                     <i class="fas fa-trash me-2"></i>{% translate "Delete" %}
                 </a>
             </li>
@@ -61,7 +61,7 @@
             <li>
                 <a class="dropdown-item ad-action-link ad-action-link--danger"
                    href="#"
-                   @click.prevent="deleteFolder('{{ item.id }}')">
+                   @click.prevent="deleteFolder('{{ item.id|escapejs }}')">
                     <i class="fas fa-trash me-2"></i>{% translate "Delete Folder" %}
                 </a>
             </li>

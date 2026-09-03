@@ -1,6 +1,21 @@
 {% load i18n %}
 <!-- Toast Notifications Container (Psalmodia) -->
 <div x-data class="ps-toast-stack">
+    {% for message in messages %}
+    <div
+        class="ps-toast"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        x-data="{ open: true }"
+        x-show="open"
+        x-init="setTimeout(() => { open = false; }, 2500)"
+    >
+        <i class="fas {% if message.level_tag == 'error' %}fa-times-circle{% elif message.level_tag == 'success' %}fa-check-circle{% elif message.level_tag == 'warning' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}" aria-hidden="true"></i>
+        <span class="ps-toast-body">{{ message }}</span>
+        <button type="button" class="ps-toast-close" @click="open = false" aria-label="{% translate 'Close' %}"><i class="fas fa-times"></i></button>
+    </div>
+    {% endfor %}
     <template x-for="notification in $store.notifications.items" :key="notification.id">
         <div
             class="ps-toast"
@@ -8,11 +23,11 @@
             aria-live="assertive"
             aria-atomic="true"
             x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0 transform translate-x-full"
+            x-transition:enter-start="opacity-0 transform {% if request.LANGUAGE_CODE == 'ar' %}-translate-x-full{% else %}translate-x-full{% endif %}"
             x-transition:enter-end="opacity-100 transform translate-x-0"
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 transform translate-x-0"
-            x-transition:leave-end="opacity-0 transform translate-x-full"
+            x-transition:leave-end="opacity-0 transform {% if request.LANGUAGE_CODE == 'ar' %}-translate-x-full{% else %}translate-x-full{% endif %}"
         >
             <i class="fas"
                :class="{

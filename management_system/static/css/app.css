@@ -652,8 +652,8 @@ body,
 /* ===== Auto-save Indicator ===== */
 .auto-save-indicator {
     position: fixed;
-    bottom: var(--admin-spacing-lg);
-    right: var(--admin-spacing-lg);
+    bottom: calc(var(--admin-spacing-lg) + env(safe-area-inset-bottom));
+    right: calc(var(--admin-spacing-lg) + env(safe-area-inset-right));
     z-index: var(--z-fixed);
     max-width: 300px;
 }
@@ -941,8 +941,8 @@ body,
    ================================ */
 .mobile-menu-toggle {
     position: fixed;
-    bottom: var(--admin-spacing-lg);
-    right: var(--admin-spacing-lg);
+    bottom: calc(var(--admin-spacing-lg) + env(safe-area-inset-bottom));
+    right: calc(var(--admin-spacing-lg) + env(safe-area-inset-right));
     z-index: calc(var(--z-fixed) - 1);
     border-radius: var(--radius-full);
     width: 56px;
@@ -1025,7 +1025,8 @@ body,
 
 [dir="rtl"] .mobile-menu-toggle {
     right: auto;
-    left: var(--admin-spacing-lg);
+    bottom: calc(var(--admin-spacing-lg) + env(safe-area-inset-bottom));
+    left: calc(var(--admin-spacing-lg) + env(safe-area-inset-left));
 }
 
 @media (max-width: 991.98px) {
@@ -1088,7 +1089,7 @@ body,
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(var(--admin-bg-primary), 0.5);
+    background: rgba(23, 48, 58, 0.5);
     backdrop-filter: blur(2px);
     z-index: 10;
 }
@@ -1106,16 +1107,6 @@ body,
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
-}
-
-/* Focus styles */
-a:focus,
-button:focus,
-input:focus,
-select:focus,
-textarea:focus {
-    outline: 2px solid var(--admin-accent-primary);
-    outline-offset: 2px;
 }
 
 /* Reduced motion */

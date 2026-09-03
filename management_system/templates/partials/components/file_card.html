@@ -26,8 +26,8 @@
         <div class="position-absolute top-0 start-0 p-2">
             <input type="checkbox"
                    class="form-check-input"
-                   @click="toggleFileSelection('{{ item.id }}')"
-                   :checked="selectedFiles.includes('{{ item.id }}')">
+                   @click="toggleFileSelection('{{ item.id|escapejs }}')"
+                   :checked="selectedFiles.includes('{{ item.id|escapejs }}')">
         </div>
         {% endif %}
 
@@ -45,13 +45,16 @@
             <div class="ad-drive-ic ad-drive-folder w-100 is-clickable"
                  role="button"
                  tabindex="0"
+                 aria-label="{% blocktranslate with name=item.name %}Open folder {{ name }}{% endblocktranslate %}"
+                 @keydown.enter.prevent="$el.click()"
+                 @keydown.space.prevent="$el.click()"
                  {% if mode == 'simple' %}
                      hx-get="{% url 'navigate-folder' item.id %}"
                      hx-trigger="click"
                      hx-swap="innerHTML"
                      hx-target="#drive-files"
                  {% else %}
-                     onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ item.id }}'"
+                     onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ item.id|urlencode|escapejs }}'"
                  {% endif %}>
                 <i class="fas fa-folder fa-3x"></i>
             </div>

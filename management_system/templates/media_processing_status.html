@@ -5,6 +5,7 @@
 <div id="content" class="ad-page media-status-page"
      data-status-labels="{{ status_labels_json|escapejs }}"
      data-phase-labels="{{ phase_labels_json|escapejs }}"
+     data-batch-status-url="{% url 'media-job-status-batch' %}"
      data-trans-retry-failed="{% translate 'Retry failed' %}">
     <div class="ad-pane-head">
         <div>
@@ -60,7 +61,7 @@
             </thead>
             <tbody>
                 {% for job in jobs_page.object_list %}
-                <tr data-media-status-url="{% url 'media-job-status' job.public_id %}">
+                <tr data-media-status-url="{% url 'media-job-status' job.public_id %}" data-media-job-id="{{ job.public_id }}">
                     <td>
                         <strong>{{ job.original_filename }}</strong>
                         <small class="d-block text-muted">{{ job.source_kind|upper }} · {{ job.source_size|filesizeformat }}</small>
@@ -109,5 +110,4 @@
     </nav>
     {% endif %}
 </div>
-<script src="{% static 'js/media_status.js' %}?v={{ static_asset_version }}"></script>
 {% endblock %}

@@ -25,7 +25,8 @@
     <div class="ad-pane-head">
         <h5 class="ad-pane-title">{% translate "Academic Years" %}</h5>
     </div>
-    <form method="get" class="row g-2 mb-3 align-items-end" action="?{% if selected_scope_id %}scope={{ selected_scope_id }}{% elif selected_year %}academic_year={{ selected_year }}{% endif %}">
+    <form method="get" class="row g-2 mb-3 align-items-end" action="{% url 'academic-setup' %}">
+        {% if selected_scope_id %}<input type="hidden" name="scope" value="{{ selected_scope_id }}">{% elif selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
         <div class="col-auto">
             <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
             <input type="search" id="year-search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search years…" %}" value="{{ search }}">
@@ -103,7 +104,7 @@
             <ul class="ad-page-nav">
                 {% if year_page_obj.has_previous %}
                 <li>
-                    <a class="ad-page-link" href="?page={{ year_page_obj.previous_page_number }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}" aria-label="{% translate "Previous page" %}">
+                    <a class="ad-page-link" href="?{% if year_pagination_query %}{{ year_pagination_query }}&{% endif %}page={{ year_page_obj.previous_page_number }}" aria-label="{% translate "Previous page" %}">
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                         <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                     </a>
@@ -117,13 +118,17 @@
                 </li>
                 {% endif %}
                 {% for p in year_page_obj.paginator.page_range %}
-                <li>
-                    <a class="ad-page-link {% if p == year_page_obj.number %}is-active{% endif %}" href="?page={{ p }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}"{% if p == year_page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
-                </li>
+                    {% if p == year_page_obj.number %}
+                    <li aria-current="page"><span class="ad-page-link is-active">{{ p }}</span></li>
+                    {% elif p > year_page_obj.number|add:'-3' and p < year_page_obj.number|add:'3' or forloop.counter == 1 or forloop.revcounter == 1 %}
+                    <li><a class="ad-page-link" href="?{% if year_pagination_query %}{{ year_pagination_query }}&{% endif %}page={{ p }}">{{ p }}</a></li>
+                    {% elif forloop.counter == 2 and year_page_obj.number > 4 or forloop.revcounter == 2 and year_page_obj.number < year_page_obj.paginator.num_pages|add:'-3' %}
+                    <li><span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span></li>
+                    {% endif %}
                 {% endfor %}
                 {% if year_page_obj.has_next %}
                 <li>
-                    <a class="ad-page-link" href="?page={{ year_page_obj.next_page_number }}&q={{ search }}&active={{ active_filter }}{% if selected_scope_id %}&scope={{ selected_scope_id }}{% endif %}{% if selected_year and not selected_scope_id %}&academic_year={{ selected_year }}{% endif %}" aria-label="{% translate "Next page" %}">
+                    <a class="ad-page-link" href="?{% if year_pagination_query %}{{ year_pagination_query }}&{% endif %}page={{ year_page_obj.next_page_number }}" aria-label="{% translate "Next page" %}">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                     </a>
@@ -230,10 +235,10 @@
                     <tr>
                         <td>{{ o.course.name }}</td>
                         <td>{{ o.instructor|default:"—" }}</td>
-                        <td><span class="ad-pill ad-pill--muted">{{ o.get_status_display }}</span></td>
+                        <td><span class="ad-pill {% if o.status == 'draft' %}ad-pill--warning{% elif o.status == 'published' %}ad-pill--success{% elif o.status == 'archived' %}ad-pill--muted{% endif %}">{{ o.get_status_display }}</span></td>
                         <td>
                             <div class="ad-actions">
-                            <button type="button" class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringModal{{ o.id }}" title="{% translate "Edit" %}">
+                            <button type="button" class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringEditModal" data-offering-action="{% url 'course-offering-edit' o.id %}" data-offering-course="{{ o.course_id }}" data-offering-instructor="{{ o.instructor|default:''|escapejs }}" data-offering-status="{{ o.status }}" data-offering-name="{{ o.course.name|escapejs }}" title="{% translate "Edit" %}">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <form method="post" action="{% url 'course-offering-delete' o.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this offering?' %}">
@@ -258,7 +263,7 @@
             <ul class="ad-page-nav">
                 {% if offering_page_obj.has_previous %}
                 <li>
-                    <a class="ad-page-link" href="?scope={{ selected_scope_id }}&offering_page={{ offering_page_obj.previous_page_number }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}" aria-label="{% translate "Previous page" %}">
+                    <a class="ad-page-link" href="?{% if offering_pagination_query %}{{ offering_pagination_query }}&{% endif %}offering_page={{ offering_page_obj.previous_page_number }}" aria-label="{% translate "Previous page" %}">
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
                         <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
                     </a>
@@ -272,13 +277,17 @@
                 </li>
                 {% endif %}
                 {% for p in offering_page_obj.paginator.page_range %}
-                <li>
-                    <a class="ad-page-link {% if p == offering_page_obj.number %}is-active{% endif %}" href="?scope={{ selected_scope_id }}&offering_page={{ p }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}"{% if p == offering_page_obj.number %} aria-current="page"{% endif %}>{{ p }}</a>
-                </li>
+                    {% if p == offering_page_obj.number %}
+                    <li aria-current="page"><span class="ad-page-link is-active">{{ p }}</span></li>
+                    {% elif p > offering_page_obj.number|add:'-3' and p < offering_page_obj.number|add:'3' or forloop.counter == 1 or forloop.revcounter == 1 %}
+                    <li><a class="ad-page-link" href="?{% if offering_pagination_query %}{{ offering_pagination_query }}&{% endif %}offering_page={{ p }}">{{ p }}</a></li>
+                    {% elif forloop.counter == 2 and offering_page_obj.number > 4 or forloop.revcounter == 2 and offering_page_obj.number < offering_page_obj.paginator.num_pages|add:'-3' %}
+                    <li><span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span></li>
+                    {% endif %}
                 {% endfor %}
                 {% if offering_page_obj.has_next %}
                 <li>
-                    <a class="ad-page-link" href="?scope={{ selected_scope_id }}&offering_page={{ offering_page_obj.next_page_number }}&offering_q={{ offering_search }}&offering_status={{ offering_status }}" aria-label="{% translate "Next page" %}">
+                    <a class="ad-page-link" href="?{% if offering_pagination_query %}{{ offering_pagination_query }}&{% endif %}offering_page={{ offering_page_obj.next_page_number }}" aria-label="{% translate "Next page" %}">
                         <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
                         <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
                     </a>
@@ -300,13 +309,13 @@
     {% endif %}
 
     {# --- Create Offering Modal --- #}
-    <div class="modal fade" id="offeringModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal fade" id="offeringModal" tabindex="-1" aria-labelledby="offeringModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="post" action="{% url 'course-offering-create' %}">
                     {% csrf_token %}
                     <input type="hidden" name="academic_year_level" value="{{ selected_scope_id }}">
-                    <div class="modal-header"><h5>{% translate "New Course Offering" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5 id="offeringModalLabel">{% translate "New Course Offering" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label" for="create-offering-course">{% translate "Course" %}</label>
@@ -339,33 +348,32 @@
         </div>
     </div>
 
-    {# --- Edit Offering Modals --- #}
-    {% for o in offering_page_obj.object_list %}
-    <div class="modal fade" id="offeringModal{{ o.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    {# --- Reusable Edit Offering Modal --- #}
+    <div class="modal fade" id="offeringEditModal" tabindex="-1" aria-labelledby="offeringEditModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form method="post" action="{% url 'course-offering-edit' o.id %}">
+                <form method="post" action="" id="offeringEditForm">
                     {% csrf_token %}
-                    <div class="modal-header"><h5>{% translate "Edit Offering" %}: {{ o.course.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5 id="offeringEditModalLabel">{% translate "Edit Offering" %}<span id="offeringEditName"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label" for="edit-offering-course-{{ o.id }}">{% translate "Course" %}</label>
-                            <select name="course" id="edit-offering-course-{{ o.id }}" class="form-select" required>
+                            <label class="form-label" for="edit-offering-course">{% translate "Course" %}</label>
+                            <select name="course" id="edit-offering-course" class="form-select" required>
                                 {% for c in scope_courses %}
-                                <option value="{{ c.id }}" {% if c.id == o.course_id %}selected{% endif %}>{{ c.name }}</option>
+                                <option value="{{ c.id }}">{{ c.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label" for="edit-offering-instructor-{{ o.id }}">{% translate "Instructor" %}</label>
-                            <input type="text" name="instructor" id="edit-offering-instructor-{{ o.id }}" value="{{ o.instructor|default:'' }}" class="form-control">
+                            <label class="form-label" for="edit-offering-instructor">{% translate "Instructor" %}</label>
+                            <input type="text" name="instructor" id="edit-offering-instructor" class="form-control">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label" for="edit-offering-status-{{ o.id }}">{% translate "Status" %}</label>
-                            <select name="status" id="edit-offering-status-{{ o.id }}" class="form-select">
-                                <option value="draft" {% if o.status == 'draft' %}selected{% endif %}>{% translate "Draft" %}</option>
-                                <option value="published" {% if o.status == 'published' %}selected{% endif %}>{% translate "Published" %}</option>
-                                <option value="archived" {% if o.status == 'archived' %}selected{% endif %}>{% translate "Archived" %}</option>
+                            <label class="form-label" for="edit-offering-status">{% translate "Status" %}</label>
+                            <select name="status" id="edit-offering-status" class="form-select">
+                                <option value="draft">{% translate "Draft" %}</option>
+                                <option value="published">{% translate "Published" %}</option>
+                                <option value="archived">{% translate "Archived" %}</option>
                             </select>
                         </div>
                     </div>
@@ -377,17 +385,16 @@
             </div>
         </div>
     </div>
-    {% endfor %}
     {% endif %}
 
     {# --- Year edit modals --- #}
     {% for y in year_page_obj.object_list %}
-    <div class="modal fade" id="yearModal{{ y.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal fade" id="yearModal{{ y.id }}" tabindex="-1" aria-labelledby="yearModalLabel{{ y.id }}" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="post" action="{% url 'academic-year-edit' y.id %}">
                     {% csrf_token %}
-                    <div class="modal-header"><h5>{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5 id="yearModalLabel{{ y.id }}">{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label" for="edit-year-name-{{ y.id }}">{% translate "Name" %}</label>
@@ -421,12 +428,12 @@
     {% endfor %}
 
     {# --- Create Year Modal --- #}
-    <div class="modal fade" id="yearModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal fade" id="yearModal" tabindex="-1" aria-labelledby="yearModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="post" action="{% url 'academic-year-create' %}">
                     {% csrf_token %}
-                    <div class="modal-header"><h5>{% translate "New Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5 id="yearModalLabel">{% translate "New Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         {% for field in year_form %}
                         <div class="mb-3">
@@ -447,12 +454,12 @@
     </div>
 
     {# --- Copy Offerings Modal --- #}
-    <div class="modal fade" id="copyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal fade" id="copyModal" tabindex="-1" aria-labelledby="copyModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <form method="post" action="{% url 'copy-course-offerings' %}">
                     {% csrf_token %}
-                    <div class="modal-header"><h5>{% translate "Copy Course Offerings" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5 id="copyModalLabel">{% translate "Copy Course Offerings" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label" for="id_target_year_level">{% translate "Target Academic Scope" %}</label>

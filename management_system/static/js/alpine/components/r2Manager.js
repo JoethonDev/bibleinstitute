@@ -21,6 +21,7 @@ function r2Manager() {
         renameFileNewName: '',
         renameIsFolder: false,
         statsLoaded: false,
+        mutationPending: false,
         is_root: true, // Will be set by x-init in template
         routes: {},
         
@@ -171,25 +172,9 @@ function r2Manager() {
          */
         deleteFile(fileKey, fileName, fileExt) {
             const isM3u8 = fileExt === '.m3u8';
-            const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
-            
-            document.getElementById('delete-confirm-message').textContent = interpolate(
-                gettext('Are you sure you want to delete %(name)s?'),
-                { name: fileName },
-                true
-            );
-            
-            const warningEl = document.getElementById('delete-hls-warning');
-            isM3u8 ? warningEl.classList.remove('d-none') : warningEl.classList.add('d-none');
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.addEventListener('click', () => {
-                confirmModal.hide();
+            const run = () => {
                 const endpoint = isM3u8 ? this.routes.deleteM3u8 : this.routes.delete;
-                fetch(endpoint, {
+                return fetch(endpoint, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
                     body: JSON.stringify({ file_key: fileKey })
@@ -209,27 +194,16 @@ function r2Manager() {
                 .catch(() => {
                     if (window.Alpine) Alpine.store('notifications').add(gettext('Delete request failed'), 'danger');
                 });
-            });
-            
-            confirmModal.show();
+            };
+            this.confirmMutation(interpolate(gettext('Are you sure you want to delete %(name)s?'), { name: fileName }, true), run);
         },
         
         /**
          * Delete folder recursively
          */
         deleteFolder(folderId) {
-            const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
-            
-            document.getElementById('delete-confirm-message').textContent = gettext('Are you sure you want to delete this folder and all its contents?');
-            document.getElementById('delete-hls-warning').classList.add('d-none');
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.addEventListener('click', () => {
-                confirmModal.hide();
-                fetch(this.routes.deleteFolder, {
+            const run = () => {
+                return fetch(this.routes.deleteFolder, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
                     body: JSON.stringify({ folder_path: folderId, recursive: true })
@@ -247,9 +221,8 @@ function r2Manager() {
                 .catch(() => {
                     if (window.Alpine) Alpine.store('notifications').add(gettext('Delete request failed'), 'danger');
                 });
-            });
-            
-            confirmModal.show();
+            };
+            this.confirmMutation(gettext('Are you sure you want to delete this folder and all its contents?'), run);
         },
         
         /**
@@ -257,23 +230,9 @@ function r2Manager() {
          */
         deleteSelectedFiles() {
             if (this.selectedFiles.length === 0) return;
-            const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDeleteModal'));
-            document.getElementById('delete-confirm-message').textContent =
-                interpolate(
-                    gettext('Are you sure you want to delete %(count)s selected file(s)?'),
-                    { count: this.selectedFiles.length },
-                    true
-                );
-            document.getElementById('delete-hls-warning').classList.add('d-none');
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.addEventListener('click', () => {
-                confirmModal.hide();
+            const run = () => {
                 const filesToDelete = [...this.selectedFiles];
-                Promise.all(filesToDelete.map(fileKey =>
+                return Promise.all(filesToDelete.map(fileKey =>
                     fetch(this.routes.delete, {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
@@ -303,9 +262,18 @@ function r2Manager() {
                 .catch(() => {
                     if (window.Alpine) Alpine.store('notifications').add(gettext('Bulk delete failed'), 'danger');
                 });
-            });
-            
-            confirmModal.show();
+            };
+            this.confirmMutation(interpolate(gettext('Are you sure you want to delete %(count)s selected file(s)?'), { count: this.selectedFiles.length }, true), run);
+        },
+
+        confirmMutation(message, callback) {
+            const execute = () => {
+                if (this.mutationPending) return;
+                this.mutationPending = true;
+                return Promise.resolve(callback()).finally(() => { this.mutationPending = false; });
+            };
+            if (typeof window.appConfirm === 'function') window.appConfirm(message, execute);
+            else execute();
         },
         
         /**
@@ -315,13 +283,16 @@ function r2Manager() {
             const infoModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('infoModal'));
             const bodyEl = document.getElementById('info-modal-body');
             
-            bodyEl.innerHTML = `
-                <div class="d-flex justify-content-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">${gettext('Loading...')}</span>
-                    </div>
-                </div>
-            `;
+            bodyEl.replaceChildren();
+            const spinnerWrap = document.createElement('div');
+            spinnerWrap.className = 'd-flex justify-content-center';
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner-border text-primary';
+            spinner.setAttribute('role', 'status');
+            const spinnerLabel = document.createElement('span');
+            spinnerLabel.className = 'visually-hidden';
+            spinnerLabel.textContent = gettext('Loading...');
+            spinner.appendChild(spinnerLabel); spinnerWrap.appendChild(spinner); bodyEl.appendChild(spinnerWrap);
             
             infoModal.show();
             
@@ -332,22 +303,20 @@ function r2Manager() {
                 .then(data => {
                     if (data.success) {
                         const metadata = data.metadata;
-                        bodyEl.innerHTML = `
-                            <table class="table table-sm">
-                                <tr><th>${gettext('Name')}</th><td>${metadata.name}</td></tr>
-                                <tr><th>${gettext('Size')}</th><td>${metadata.size_formatted}</td></tr>
-                                <tr><th>${gettext('Type')}</th><td>${metadata.content_type}</td></tr>
-                                <tr><th>${gettext('Last Modified')}</th><td>${metadata.last_modified}</td></tr>
-                                <tr><th>${gettext('Path')}</th><td>${fileKey}</td></tr>
-                            </table>
-                        `;
+                        bodyEl.replaceChildren();
+                        const table = document.createElement('table'); table.className = 'table table-sm';
+                        [[gettext('Name'), metadata.name], [gettext('Size'), metadata.size_formatted], [gettext('Type'), metadata.content_type], [gettext('Last Modified'), metadata.last_modified], [gettext('Path'), fileKey]].forEach(([label, value]) => {
+                            const row = document.createElement('tr'); const heading = document.createElement('th'); const cell = document.createElement('td');
+                            heading.textContent = label; cell.textContent = value == null ? '' : String(value); row.append(heading, cell); table.appendChild(row);
+                        });
+                        bodyEl.appendChild(table);
                     } else {
-                        bodyEl.innerHTML = `<p class="text-danger">${gettext('Failed to load metadata')}</p>`;
+                        bodyEl.replaceChildren(); const error = document.createElement('p'); error.className = 'text-danger'; error.textContent = gettext('Failed to load metadata'); bodyEl.appendChild(error);
                     }
                 })
                 .catch(error => {
                     console.error('Metadata error:', error);
-                    bodyEl.innerHTML = `<p class="text-danger">${gettext('Error loading metadata')}</p>`;
+                    bodyEl.replaceChildren(); const errorMessage = document.createElement('p'); errorMessage.className = 'text-danger'; errorMessage.textContent = gettext('Error loading metadata'); bodyEl.appendChild(errorMessage);
                 });
         },
         

@@ -1,16 +1,20 @@
 {% load i18n %}
 {% with role=request.user.role.role %}
-{% with is_staff='admin staff' is_admin='admin' %}
 <!-- Admin Navigation Links -->
 <ul class="nav flex-column ad-rail-groups">
     <li class="nav-item">
-        <a class="ad-tab" href="{% url 'admin-panel' %}">
+        <a class="ad-tab" href="{% url 'admin-panel' %}"
+           hx-get="{% url 'admin-panel' %}"
+           hx-target="#display-page"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-select="#content">
             <i class="fas fa-home"></i>
             <span>{% translate "Home" %}</span>
         </a>
     </li>
     
-    {% if role in is_admin %}
+    {% if role == 'admin' %}
         <li class="nav-item">
             <a class="ad-tab"
                href="{% url 'applications-dashboard' %}"
@@ -25,7 +29,7 @@
             </a>
         </li>
     {% endif %}
-    {% if role in is_staff %}
+    {% if role == 'admin' or role == 'staff' %}
         <li class="nav-item">
             <a class="ad-tab"
                href="{% url 'user-dashboard' %}"
@@ -170,7 +174,13 @@
         </li>
 
         <li class="nav-item">
-            <a class="ad-tab" href="{% url 'calendar-management' %}">
+            <a class="ad-tab"
+               href="{% url 'calendar-management' %}"
+               hx-get="{% url 'calendar-management' %}"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
                 <i class="fas fa-calendar-days"></i>
                 <span>{% translate "Calendar" %}</span>
             </a>
@@ -192,7 +202,13 @@
 
         {% if request.user.role.role == "admin" %}
         <li class="nav-item">
-            <a class="ad-tab" href="{% url 'promotion-formula' %}">
+            <a class="ad-tab"
+               href="{% url 'promotion-formula' %}"
+               hx-get="{% url 'promotion-formula' %}"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
                 <i class="fas fa-calculator"></i>
                 <span>{% translate "Promotion Formula" %}</span>
             </a>
@@ -201,7 +217,13 @@
 
         {% if request.user.role.role == "admin" %}
         <li class="nav-item">
-            <a class="ad-tab" href="{% url 'telegram-config' %}">
+            <a class="ad-tab"
+               href="{% url 'telegram-config' %}"
+               hx-get="{% url 'telegram-config' %}"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
                 <i class="fas fa-paper-plane"></i>
                 <span>{% translate "Telegram Bot" %}</span>
             </a>
@@ -241,7 +263,13 @@
         {% endif %}
 
         <li class="nav-item">
-            <a class="ad-tab" href="{% url 'scanner' %}">
+            <a class="ad-tab"
+               href="{% url 'scanner' %}"
+               hx-get="{% url 'scanner' %}"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#content">
                 <i class="fas fa-qrcode"></i>
                 <span>{% translate "Scanner" %}</span>
             </a>
@@ -304,5 +332,4 @@
         </li>
     {% endif %}
 </ul>
-{% endwith %}
 {% endwith %}

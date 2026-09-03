@@ -56,31 +56,13 @@ function tableManager() {
                 return;
             }
 
-            // Use the global Bootstrap confirmation modal
-            const modal = document.getElementById('globalConfirmModal');
-            const message = document.getElementById('globalConfirmMessage');
-            const confirmBtn = document.getElementById('globalConfirmButton');
-
-            if (modal && window.bootstrap) {
-                message.textContent = interpolate(
-                    gettext('Delete %(count)s selected item(s)? This action cannot be undone.'),
-                    { count: this.selected.length },
-                    true
-                );
-
-                // Clone to remove previous listeners
-                const newBtn = confirmBtn.cloneNode(true);
-                confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
-
-                newBtn.addEventListener('click', () => {
-                    bootstrap.Modal.getInstance(modal)?.hide();
-                    this.confirmDelete();
-                });
-
-                bootstrap.Modal.getOrCreateInstance(modal).show();
-            } else {
-                this.confirmDelete();
-            }
+            const message = interpolate(
+                gettext('Delete %(count)s selected item(s)? This action cannot be undone.'),
+                { count: this.selected.length },
+                true
+            );
+            if (typeof window.appConfirm === 'function') window.appConfirm(message, () => this.confirmDelete());
+            else this.confirmDelete();
         },
 
         async confirmDelete() {
