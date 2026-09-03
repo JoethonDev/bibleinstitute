@@ -150,7 +150,7 @@
             });
         };
         if (typeof window.appConfirm === 'function') {
-            window.appConfirm(root.dataset.confirmMessage, run);
+            window.appConfirm(root.dataset.bulkConfirmMessage, run);
         } else {
             run();
         }
