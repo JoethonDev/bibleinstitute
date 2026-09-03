@@ -521,53 +521,13 @@
     <script defer src="{% static 'js/alpine/components/filterManager.js' %}?v={{ static_asset_version }}"></script>
     <script defer src="{% static 'js/alpine/components/tableManager.js' %}?v={{ static_asset_version }}"></script>
     <script defer src="{% static 'js/alpine/components/progressTracker.js' %}?v={{ static_asset_version }}"></script>
-    
-    <!-- 4. Alpine.js Global Component Registration (MUST be before Alpine Core) -->
-    <script defer>
-        document.addEventListener('alpine:init', () => {
-            // Register components globally so they're available after HTMX swaps
-            Alpine.data('r2Manager', r2Manager);
-            Alpine.data('lessonForm', lessonForm);
-            Alpine.data('autoSave', autoSave);
-            Alpine.data('columnManager', columnManager);
-            Alpine.data('bulkActions', bulkActions);
-            Alpine.data('quizForm', quizForm);
-            Alpine.data('formValidation', formValidation);
-            Alpine.data('dashboardManager', dashboardManager);
-            Alpine.data('filterManager', filterManager);
-            Alpine.data('tableManager', tableManager);
-            Alpine.data('progressTracker', progressTracker);
-        });
-
-        // NOTE: We do NOT manually call Alpine.initTree() after HTMX swaps.
-        // Alpine 3's built-in MutationObserver detects new x-data nodes automatically.
-        // All component factory functions are now loaded in static files (above), so
-        // they are defined before any swap happens — no timing race condition.
-    </script>
+    <script defer src="{% static 'js/admin_shell.js' %}?v={{ static_asset_version }}"></script>
     
     <!-- 5. Alpine.js Core (will fire alpine:init event AFTER components are defined) -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     
     <!-- Extra Scripts Block for Child Templates -->
     {% block extra_scripts %}{% endblock %}
-    
-    <!-- Offcanvas Auto-Close Script -->
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const offcanvas = document.getElementById("mobileAdminMenu");
-        const offcanvasLinks = offcanvas ? offcanvas.querySelectorAll(".nav-link") : [];
-        const closeMenu = () => {
-          if (!offcanvas || typeof bootstrap === "undefined" || !bootstrap.Offcanvas) return;
-          bootstrap.Offcanvas.getOrCreateInstance(offcanvas).hide();
-        };
-        
-        offcanvasLinks.forEach(link => {
-          link.addEventListener("click", () => {
-            closeMenu();
-          });
-        });
-      });
-    </script>
     
     <!-- Global Components -->
     {% include 'partials/components/loading_overlay.html' %}
@@ -600,119 +560,5 @@
         </div>
     </div>
 
-    <!-- Safe modal helpers — all destructive actions use this confirmation UI. -->
-    <script>
-        (function () {
-            const modal = document.getElementById('globalConfirmModal');
-            const message = document.getElementById('globalConfirmMessage');
-            const confirmButton = document.getElementById('globalConfirmButton');
-            if (!modal || !message || !confirmButton || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
-
-            let pendingAction = null;
-            let confirming = false;
-            let lastTrigger = null;
-
-            function showConfirmation(question, action) {
-                if (!question || typeof action !== 'function') return;
-                if (confirming) return false;
-                confirming = true;
-                pendingAction = action;
-                message.textContent = question;
-                lastTrigger = document.activeElement;
-
-                const currentButton = document.getElementById('globalConfirmButton');
-                const button = currentButton.cloneNode(true);
-                currentButton.replaceWith(button);
-                button.addEventListener('click', function () {
-                    if (!confirming) return;
-                    const callback = pendingAction;
-                    pendingAction = null;
-                    confirming = false;
-                    button.disabled = true;
-                    const instance = bootstrap.Modal.getInstance(modal);
-                    if (instance) instance.hide();
-                    Promise.resolve(callback && callback()).finally(function () {
-                        button.disabled = false;
-                    });
-                }, { once: true });
-
-                modal.addEventListener('hidden.bs.modal', function cancel() {
-                    if (confirming) { confirming = false; pendingAction = null; }
-                    if (lastTrigger && typeof lastTrigger.focus === 'function') lastTrigger.focus();
-                    modal.removeEventListener('hidden.bs.modal', cancel);
-                });
-
-                const instance = bootstrap.Modal.getOrCreateInstance(modal);
-                if (instance) instance.show();
-                return true;
-            }
-
-            window.appConfirm = showConfirmation;
-
-            // Normal forms, including deletion forms, opt in with
-            // data-confirm-message. requestSubmit preserves validation and CSRF.
-            document.addEventListener('submit', function (event) {
-                const form = event.target;
-                if (!form || !form.matches || !form.matches('form[data-confirm-message]')) return;
-                if (form.dataset.confirmed === 'true') {
-                    delete form.dataset.confirmed;
-                    return;
-                }
-                event.preventDefault();
-                const submitter = event.submitter;
-                showConfirmation(form.dataset.confirmMessage, function () {
-                    form.dataset.confirmed = 'true';
-                    if (form.requestSubmit) {
-                        submitter ? form.requestSubmit(submitter) : form.requestSubmit();
-                    } else {
-                        HTMLFormElement.prototype.submit.call(form);
-                    }
-                });
-            }, true);
-
-            // Destructive links (for example attendance deletion) use the same
-            // modal and navigate only after the user confirms.
-            document.addEventListener('click', function (event) {
-                const trigger = event.target.closest && event.target.closest('[data-confirm-message]');
-                if (!trigger || trigger.matches('form') || trigger.closest('form[data-confirm-message]')) return;
-                event.preventDefault();
-                event.stopImmediatePropagation();
-                showConfirmation(trigger.dataset.confirmMessage, function () {
-                    if (trigger.tagName === 'A' && trigger.href) window.location.assign(trigger.href);
-                });
-            }, true);
-
-            // Alpine components can request the shared modal without using a
-            // browser-native confirmation dialog.
-            document.addEventListener('app:confirm', function (event) {
-                const detail = event.detail || {};
-                showConfirmation(detail.message, detail.onConfirm);
-            });
-
-            document.addEventListener('htmx:confirm', function (event) {
-                if (!event.detail || !event.detail.question) return;
-                event.preventDefault();
-                showConfirmation(event.detail.question, function () {
-                    event.detail.issueRequest(true);
-                });
-            });
-        }());
-
-        // Patch Bootstrap Modal to suppress backdrop edge-case errors
-        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-            var OrigModal = bootstrap.Modal;
-            var origGetOrCreate = OrigModal.getOrCreateInstance;
-            OrigModal.getOrCreateInstance = function (el, config) {
-                try { return origGetOrCreate.call(this, el, config); } catch (_) { return null; }
-            };
-            // Also patch getInstance to never throw
-            var origGetInstance = OrigModal.getInstance;
-            if (origGetInstance) {
-                OrigModal.getInstance = function (el) {
-                    try { return origGetInstance.call(this, el); } catch (_) { return null; }
-                };
-            }
-        }
-    </script>
 </body>
 </html>
