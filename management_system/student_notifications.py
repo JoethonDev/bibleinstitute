@@ -14,6 +14,7 @@ from django.utils.translation import gettext as _
 
 from .academic_access import TARGETED_ENROLLMENT_TYPES
 from .models import (
+    CourseOffering,
     Enrollment,
     Lesson,
     PublicationStatus,
@@ -36,13 +37,17 @@ TELEGRAM_NOTIFICATION_TASK = "management_system.telegram_tasks.process_due_teleg
 def is_active_published_lesson(lesson: Lesson) -> Lesson | None:
     """Return a lesson eligible for a current publication event, or ``None``."""
     offering = lesson.course_offering
-    if (
-        lesson.status != PublicationStatus.PUBLISHED
-        or offering.status != PublicationStatus.PUBLISHED
-        or not offering.academic_year_level.academic_year.is_active
-    ):
+    if lesson.status != PublicationStatus.PUBLISHED or not is_active_published_offering(offering):
         return None
     return lesson
+
+
+def is_active_published_offering(offering: CourseOffering) -> bool:
+    """Return whether an offering is currently eligible for publication."""
+    return bool(
+        offering.status == PublicationStatus.PUBLISHED
+        and offering.academic_year_level.academic_year.is_active
+    )
 
 
 def is_active_published_quiz(quiz: Quiz) -> Quiz | None:

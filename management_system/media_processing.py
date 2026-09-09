@@ -36,6 +36,7 @@ from .models import (
     MediaProcessingStatus,
     PublicationStatus,
 )
+from .student_notifications import is_active_published_offering
 from .utils.decorators import can_manage_content
 
 
@@ -54,6 +55,20 @@ PUBLICATION_PENDING_ERROR = "publication_pending"
 PUBLICATION_FAILED_ERROR = "publish_failed"
 PUBLICATION_ERROR_CODES = frozenset({PUBLICATION_PENDING_ERROR, PUBLICATION_FAILED_ERROR})
 PUBLICATION_PENDING_MESSAGE = "Publication event is pending."
+NON_RETRYABLE_FAILURE_CODES = frozenset({
+    "invalid_pdf",
+    "invalid_media",
+    "invalid_probe",
+    "duration_limit",
+    "missing_video_stream",
+    "missing_audio_stream",
+    "invalid_playlist",
+    "empty_playlist",
+    "output_collision",
+    "staging_object_missing",
+    "staging_object_incomplete",
+    "staging_size_mismatch",
+})
 
 ALLOWED_TRANSITIONS = {
     MediaProcessingStatus.AWAITING_UPLOAD: frozenset({MediaProcessingStatus.QUEUED, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
@@ -225,16 +240,6 @@ def record_job_failure(job_id: int, error_code: str, error_message: str, *, phas
     return job
 
 
-@transaction.atomic
-def queue_job(public_id: Any, *, acknowledged_at=None) -> MediaProcessingJob:
-    """Lock an upload/retryable job, mark it queued, and return it.
-
-    The caller must enqueue the Celery task in ``transaction.on_commit``.
-    """
-    job = MediaProcessingJob.objects.select_for_update().get(public_id=public_id)
-    return _queue_locked_job(job, acknowledged_at=acknowledged_at)
-
-
 def _queue_locked_job(job: MediaProcessingJob, *, acknowledged_at=None) -> MediaProcessingJob:
     """Apply the queued transition to a job already locked by the caller."""
     if job.status == MediaProcessingStatus.AWAITING_UPLOAD:
@@ -364,6 +369,21 @@ def is_automation_job(job: MediaProcessingJob) -> bool:
     return bool(job.lesson_id and (job.part_id or "").startswith(AUTOMATION_PART_PREFIX))
 
 
+def is_retryable_media_failure(error_code: Any) -> bool:
+    """Return whether a failed source can be safely retried unchanged."""
+    return str(error_code or "") not in NON_RETRYABLE_FAILURE_CODES
+
+
+def is_retryable_failed_job(job: MediaProcessingJob) -> bool:
+    """Apply the shared retry gate for retained failed media jobs."""
+    return bool(
+        job.status == MediaProcessingStatus.FAILED
+        and job.source_acknowledged_at
+        and not job.staging_deleted_at
+        and is_retryable_media_failure(job.error_code)
+    )
+
+
 class MediaProcessingError(Exception):
     """Bounded processing failure with a stable operator-facing code."""
 
@@ -401,6 +421,12 @@ def publish_attached_lesson(job_id: Any) -> MediaProcessingJob:
         raise MediaProcessingError("Media job is not ready for publication.", PUBLICATION_FAILED_ERROR)
 
     lesson = Lesson.objects.select_for_update().get(pk=job.lesson_id)
+    offering = lesson.course_offering
+    if not is_active_published_offering(offering):
+        raise MediaProcessingError(
+            "The lesson offering is not active for publication.",
+            PUBLICATION_FAILED_ERROR,
+        )
     if lesson.status == PublicationStatus.DRAFT:
         if job.error_code not in PUBLICATION_ERROR_CODES:
             raise MediaProcessingError("Media job has no pending publication.", PUBLICATION_FAILED_ERROR)
@@ -928,6 +954,7 @@ __all__ = [
     "AUTOMATION_PART_PREFIX",
     "MediaProcessingPhase",
     "MediaProcessingStatus",
+    "NON_RETRYABLE_FAILURE_CODES",
     "PUBLICATION_ERROR_CODES",
     "PUBLICATION_FAILED_ERROR",
     "PUBLICATION_PENDING_ERROR",
@@ -939,12 +966,13 @@ __all__ = [
     "finish_lesson_publication",
     "initialize_deadlines",
     "is_automation_job",
+    "is_retryable_failed_job",
+    "is_retryable_media_failure",
     "job_is_visible_to",
     "mark_publication_failed",
     "media_limits",
     "publish_attached_lesson",
     "publish_automation_lesson",
-    "queue_job",
     "queue_verified_job",
     "requeue_stalled_job",
     "record_job_failure",

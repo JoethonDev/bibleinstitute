@@ -27,6 +27,7 @@ from .media_processing import (
     MediaProcessingError,
     claim_attachment_retry,
     is_automation_job,
+    is_retryable_failed_job,
     publish_automation_lesson,
     queue_verified_job,
     safe_output_base_name,
@@ -153,7 +154,7 @@ def automation_endpoint(method: str) -> Callable:
                         "exception_type": type(exc).__name__,
                     },
                 )
-                return _error("operator_review", 503)
+                return _error("operator_review", 409)
 
         return wrapper
 
@@ -214,6 +215,8 @@ def _meetings_for_date(meeting_date: dt.date):
     ).filter(
         meeting_date=meeting_date,
         course_offering__academic_year_level_id=F("academic_year_level_id"),
+        course_offering__status=PublicationStatus.PUBLISHED,
+        academic_year_level__academic_year__is_active=True,
     ).order_by(
         "course_offering__course__name",
         "academic_year_level__academic_year__name",
@@ -361,7 +364,7 @@ def _status_contract(lesson: Lesson, job: MediaProcessingJob, live: dict[str, st
         }
 
     if job.status == MediaProcessingStatus.FAILED:
-        if job.source_acknowledged_at and not job.staging_deleted_at:
+        if is_retryable_failed_job(job):
             return {
                 "status": status,
                 "phase": phase,
@@ -531,6 +534,31 @@ def media_start(request, job_id: uuid.UUID):
         return _error("processing_failed", 409)
 
 
+@automation_endpoint("POST")
+def media_upload_refresh(request, job_id: uuid.UUID):
+    """Authorize a replacement PUT for an automation job's same staging key."""
+    try:
+        payload = _parse_json(request, allow_empty=True)
+        if payload:
+            raise AutomationApiError("invalid_lecture", 400)
+        job = _automation_job(job_id)
+        if job.status != MediaProcessingStatus.AWAITING_UPLOAD:
+            raise AutomationApiError("media_not_ready", 409)
+        authorization = create_staging_upload_url(
+            job.source_key,
+            content_type=content_type_for_key(job.original_filename),
+            expires_in=3600,
+        )
+        return JsonResponse({
+            "upload_url": authorization["url"],
+            "content_type": authorization["headers"]["Content-Type"],
+        })
+    except AutomationApiError as exc:
+        return _error(exc.error_code, exc.status)
+    except MediaStorageError:
+        return _error("operator_review", 409)
+
+
 @automation_endpoint("GET")
 def lecture_status(request, lesson_id: int):
     try:
@@ -557,6 +585,9 @@ def media_retry(request, job_id: uuid.UUID):
             return JsonResponse({"status": "queued"}, status=202)
         if job.status != MediaProcessingStatus.FAILED or not job.source_acknowledged_at or job.staging_deleted_at:
             raise AutomationApiError("media_not_ready", 409)
+        if not is_retryable_failed_job(job):
+            error_code = "output_collision" if job.error_code == "output_collision" else NEXT_OPERATOR
+            raise AutomationApiError(error_code, 409)
         try:
             queued, transitioned = queue_verified_job(
                 job.public_id,
@@ -617,4 +648,5 @@ __all__ = [
     "lecture_upload",
     "media_retry",
     "media_start",
+    "media_upload_refresh",
 ]
