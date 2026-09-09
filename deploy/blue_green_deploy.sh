@@ -95,6 +95,21 @@ trap cleanup EXIT
 [[ -f ".env" ]] || die "Missing .env — deployment requires it for Compose."
 [[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE — run 'bash deploy/setup_env.sh' first."
 
+# The automation boundary is optional, but it can never be half-configured.
+# Keep this validation here because Compose passes the complete .env through
+# env_file while the safe interpolation file intentionally excludes secrets.
+AUTOMATION_KEY="$(read_env_setting AUTOMATION_API_KEY)"
+if [[ -n "$AUTOMATION_KEY" ]]; then
+    [[ ${#AUTOMATION_KEY} -ge 32 ]] || die "AUTOMATION_API_KEY must be at least 32 characters when automation is enabled."
+    for required_setting in R2_ENDPOINT_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME; do
+        [[ -n "$(read_env_setting "$required_setting")" ]] \
+            || die "$required_setting must be configured when media automation is enabled."
+    done
+    info "Automation media API configuration is present; production HTTPS enforcement is automatic."
+else
+    warn "Automation media API is disabled because AUTOMATION_API_KEY is blank."
+fi
+
 # Required commands
 for cmd in docker curl git flock; do
     command -v "$cmd" >/dev/null 2>&1 || die "Missing required command: $cmd"

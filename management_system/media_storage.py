@@ -65,7 +65,7 @@ _MAX_STAGING_FILENAME_LENGTH = 255
 _MAX_KEY_LENGTH = 1024
 _MAX_JOB_UUID_LENGTH = 128
 _DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024
-_DEFAULT_PUT_EXPIRES = 900  # seconds, short-lived direct PUT authorization
+_DEFAULT_PUT_EXPIRES = 3600  # seconds, one-hour direct PUT authorization
 _MIN_PUT_EXPIRES = 60
 _MAX_PUT_EXPIRES = 3600
 

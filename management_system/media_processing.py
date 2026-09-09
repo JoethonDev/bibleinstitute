@@ -23,8 +23,6 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from .media_storage import (
-    MediaStorageError,
-    content_type_for_key,
     delete_object_exact,
     download_staging_object,
     upload_output_file,
@@ -32,9 +30,11 @@ from .media_storage import (
 )
 from .models import (
     MediaAttachmentStatus,
+    Lesson,
     MediaProcessingJob,
     MediaProcessingPhase,
     MediaProcessingStatus,
+    PublicationStatus,
 )
 from .utils.decorators import can_manage_content
 
@@ -49,6 +49,11 @@ SOURCE_EXTENSIONS = {
 MAX_FAILURE_HISTORY = 20
 MAX_ERROR_MESSAGE_LENGTH = 4000
 MAX_STDERR_LENGTH = 8000
+AUTOMATION_PART_PREFIX = "automation-"
+PUBLICATION_PENDING_ERROR = "publication_pending"
+PUBLICATION_FAILED_ERROR = "publish_failed"
+PUBLICATION_ERROR_CODES = frozenset({PUBLICATION_PENDING_ERROR, PUBLICATION_FAILED_ERROR})
+PUBLICATION_PENDING_MESSAGE = "Publication event is pending."
 
 ALLOWED_TRANSITIONS = {
     MediaProcessingStatus.AWAITING_UPLOAD: frozenset({MediaProcessingStatus.QUEUED, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
@@ -227,6 +232,11 @@ def queue_job(public_id: Any, *, acknowledged_at=None) -> MediaProcessingJob:
     The caller must enqueue the Celery task in ``transaction.on_commit``.
     """
     job = MediaProcessingJob.objects.select_for_update().get(public_id=public_id)
+    return _queue_locked_job(job, acknowledged_at=acknowledged_at)
+
+
+def _queue_locked_job(job: MediaProcessingJob, *, acknowledged_at=None) -> MediaProcessingJob:
+    """Apply the queued transition to a job already locked by the caller."""
     if job.status == MediaProcessingStatus.AWAITING_UPLOAD:
         pass
     elif job.status == MediaProcessingStatus.FAILED and job.source_acknowledged_at:
@@ -246,6 +256,99 @@ def queue_job(public_id: Any, *, acknowledged_at=None) -> MediaProcessingJob:
     return job
 
 
+def queue_verified_job(
+    public_id: Any,
+    *,
+    expected_etag: str | None = None,
+    acknowledged_at=None,
+) -> tuple[MediaProcessingJob, bool]:
+    """Verify a staged source, then atomically acknowledge and queue its job.
+
+    Object verification intentionally happens before the database lock. The
+    locked transaction only rechecks the state and records the verified
+    metadata, so network storage work never extends a row-lock duration.
+    """
+    job = MediaProcessingJob.objects.filter(public_id=public_id).first()
+    if job is None:
+        raise MediaProcessingJob.DoesNotExist
+    if job.status in {
+        MediaProcessingStatus.QUEUED,
+        MediaProcessingStatus.PROCESSING,
+        MediaProcessingStatus.UPLOADING,
+        MediaProcessingStatus.VERIFYING,
+        MediaProcessingStatus.SUCCEEDED,
+    }:
+        return job, False
+    if job.status == MediaProcessingStatus.FAILED and not job.source_acknowledged_at:
+        raise ValidationError(_("This media job has no acknowledged source to retry."))
+    if job.status not in {MediaProcessingStatus.AWAITING_UPLOAD, MediaProcessingStatus.FAILED}:
+        raise ValidationError(_("This media job is not ready to be queued."))
+
+    metadata = verify_staging_object(
+        job.source_key,
+        expected_size=job.source_size,
+        expected_etag=expected_etag,
+    )
+    with transaction.atomic():
+        locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
+        if locked.status in {
+            MediaProcessingStatus.QUEUED,
+            MediaProcessingStatus.PROCESSING,
+            MediaProcessingStatus.UPLOADING,
+            MediaProcessingStatus.VERIFYING,
+            MediaProcessingStatus.SUCCEEDED,
+        }:
+            return locked, False
+        queued = _queue_locked_job(locked, acknowledged_at=acknowledged_at)
+        queued.source_etag = metadata.get("etag", "")
+        queued.last_dispatched_at = timezone.now()
+        queued.save(update_fields=["source_etag", "last_dispatched_at"])
+    return queued, True
+
+
+@transaction.atomic
+def requeue_stalled_job(public_id: Any, *, dispatched_at=None) -> MediaProcessingJob | None:
+    """Reset one stalled queued/processing job and return its locked row."""
+    job = MediaProcessingJob.objects.select_for_update().filter(public_id=public_id).first()
+    if job is None or job.status not in {
+        MediaProcessingStatus.QUEUED,
+        MediaProcessingStatus.PROCESSING,
+    }:
+        return None
+    job.status = MediaProcessingStatus.QUEUED
+    job.phase = MediaProcessingPhase.QUEUED
+    job.progress = 0
+    job.last_dispatched_at = dispatched_at or timezone.now()
+    job.save(update_fields=["status", "phase", "progress", "last_dispatched_at"])
+    return job
+
+
+def schedule_media_job_after_commit(public_id: Any) -> None:
+    """Dispatch one media job only after its queue transition commits."""
+    transaction.on_commit(
+        lambda public_id=public_id: _enqueue_media_job(public_id)
+    )
+
+
+def schedule_attachment_retry_after_commit(public_id: Any) -> None:
+    """Dispatch one attachment retry only after its claim commits."""
+    transaction.on_commit(
+        lambda public_id=public_id: _enqueue_attachment_retry(public_id)
+    )
+
+
+def _enqueue_media_job(public_id: Any) -> None:
+    from .media_tasks import enqueue_media_job
+
+    enqueue_media_job(public_id)
+
+
+def _enqueue_attachment_retry(public_id: Any) -> None:
+    from .media_tasks import enqueue_media_attachment_retry
+
+    enqueue_media_attachment_retry(public_id)
+
+
 def job_is_visible_to(user, job: MediaProcessingJob) -> bool:
     """Return whether a content manager may inspect/mutate this job."""
     role = getattr(getattr(user, "role", None), "role", None)
@@ -256,12 +359,107 @@ def attachment_requested(job: MediaProcessingJob) -> bool:
     return bool(job.lesson_id and job.part_id)
 
 
+def is_automation_job(job: MediaProcessingJob) -> bool:
+    """Return whether a lesson job belongs to the X-Key automation workflow."""
+    return bool(job.lesson_id and (job.part_id or "").startswith(AUTOMATION_PART_PREFIX))
+
+
 class MediaProcessingError(Exception):
     """Bounded processing failure with a stable operator-facing code."""
 
     def __init__(self, message: str, code: str = "processing_failed"):
         super().__init__(message)
         self.code = code
+
+
+def mark_publication_failed(job_id: Any) -> None:
+    """Persist a safe recovery marker without storing provider exception text."""
+    MediaProcessingJob.objects.filter(pk=job_id).update(
+        error_code=PUBLICATION_FAILED_ERROR,
+        error_message="Automatic publication failed; retry is required.",
+    )
+
+
+@transaction.atomic
+def publish_attached_lesson(job_id: Any) -> MediaProcessingJob:
+    """Publish an attached automation lesson and persist its notification state.
+
+    The lesson/job transition is committed before notification fan-out. The
+    durable pending marker makes a worker crash recoverable without holding
+    row locks while thousands of student events are inserted.
+    """
+    job = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
+    if not job.lesson_id:
+        return job
+    if not is_automation_job(job):
+        raise MediaProcessingError("Media job is not owned by automation.", PUBLICATION_FAILED_ERROR)
+    if (
+        job.status != MediaProcessingStatus.SUCCEEDED
+        or job.attachment_status != MediaAttachmentStatus.ATTACHED
+        or not job.staging_deleted_at
+    ):
+        raise MediaProcessingError("Media job is not ready for publication.", PUBLICATION_FAILED_ERROR)
+
+    lesson = Lesson.objects.select_for_update().get(pk=job.lesson_id)
+    if lesson.status == PublicationStatus.DRAFT:
+        if job.error_code not in PUBLICATION_ERROR_CODES:
+            raise MediaProcessingError("Media job has no pending publication.", PUBLICATION_FAILED_ERROR)
+        lesson.status = PublicationStatus.PUBLISHED
+        lesson.publication_event_version += 1
+        lesson.save(update_fields=["status", "updated_date", "publication_event_version"])
+        job.error_code = PUBLICATION_PENDING_ERROR
+        job.error_message = PUBLICATION_PENDING_MESSAGE
+        job.save(update_fields=["error_code", "error_message"])
+    elif lesson.status != PublicationStatus.PUBLISHED:
+        raise MediaProcessingError("The lesson is not an editable draft.", PUBLICATION_FAILED_ERROR)
+    elif job.error_code not in PUBLICATION_ERROR_CODES:
+        return job
+
+    # The transaction decorator commits before this function returns. The
+    # caller performs notification fan-out after that commit.
+    return job
+
+
+def finish_lesson_publication(job_id: Any) -> MediaProcessingJob:
+    """Fan out idempotent publication events, then clear the recovery marker."""
+    job = MediaProcessingJob.objects.get(pk=job_id)
+    if not job.lesson_id:
+        return job
+    lesson = Lesson.objects.get(pk=job.lesson_id)
+    try:
+        from .student_notifications import create_lesson_publication_event
+
+        create_lesson_publication_event(lesson)
+    except Exception:
+        mark_publication_failed(job_id)
+        raise
+    with transaction.atomic():
+        locked = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
+        if locked.error_code in PUBLICATION_ERROR_CODES:
+            locked.error_code = ""
+            locked.error_message = ""
+            locked.save(update_fields=["error_code", "error_message"])
+        return locked
+
+
+def publish_automation_lesson(job_id: Any) -> MediaProcessingJob:
+    """Run the short publication transition followed by idempotent fan-out."""
+    try:
+        prepared = publish_attached_lesson(job_id)
+        if prepared.error_code not in PUBLICATION_ERROR_CODES:
+            return prepared
+        return finish_lesson_publication(job_id)
+    except Exception:
+        mark_publication_failed(job_id)
+        raise
+
+
+def validate_browser_part_id(part_id: Any) -> str:
+    """Validate a browser part while keeping the automation namespace reserved."""
+    value = validate_part_id(part_id)
+    if value.startswith(AUTOMATION_PART_PREFIX):
+        raise ValidationError(_("This media part identifier is reserved."))
+    return value
 
 
 @dataclass(frozen=True)
@@ -727,20 +925,35 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
 
 __all__ = [
     "ALLOWED_TRANSITIONS",
+    "AUTOMATION_PART_PREFIX",
     "MediaProcessingPhase",
     "MediaProcessingStatus",
+    "PUBLICATION_ERROR_CODES",
+    "PUBLICATION_FAILED_ERROR",
+    "PUBLICATION_PENDING_ERROR",
+    "PUBLICATION_PENDING_MESSAGE",
     "attachment_requested",
     "claim_queued_job",
     "claim_attachment_retry",
     "finish_attachment_retry",
+    "finish_lesson_publication",
     "initialize_deadlines",
+    "is_automation_job",
     "job_is_visible_to",
+    "mark_publication_failed",
     "media_limits",
+    "publish_attached_lesson",
+    "publish_automation_lesson",
     "queue_job",
+    "queue_verified_job",
+    "requeue_stalled_job",
     "record_job_failure",
     "safe_output_base_name",
+    "schedule_attachment_retry_after_commit",
+    "schedule_media_job_after_commit",
     "source_kind_for_filename",
     "transition_job",
+    "validate_browser_part_id",
     "validate_part_id",
     "validate_requested_folder",
     "validate_source_descriptor",

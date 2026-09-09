@@ -35,6 +35,7 @@ urlpatterns = [
         "api/mobile/v1/",
         include(("management_system.mobile_urls", "mobile-v1"), namespace="mobile-v1"),
     ),
+    path("api/automation/", include("management_system.automation_urls")),
     path("api/telegram/webhook/", telegram_webhook, name="telegram-webhook"),
     
 ]

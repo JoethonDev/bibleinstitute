@@ -118,9 +118,11 @@ from .media_processing import (
     claim_attachment_retry,
     initialize_deadlines,
     job_is_visible_to,
-    queue_job,
+    queue_verified_job,
     safe_output_base_name,
-    validate_part_id,
+    schedule_attachment_retry_after_commit,
+    schedule_media_job_after_commit,
+    validate_browser_part_id,
     validate_requested_folder,
     validate_source_descriptor,
 )
@@ -129,9 +131,7 @@ from .media_storage import (
     build_staging_key,
     content_type_for_key,
     create_staging_upload_url,
-    verify_staging_object,
 )
-from .media_tasks import enqueue_media_attachment_retry, enqueue_media_job
 from .telegram.linking import TelegramLinkError, current_telegram_link
 from .student_notifications import (
     cancel_future_quiz_opening_events,
@@ -2337,7 +2337,7 @@ def _media_job_lesson_target(lesson_id, part_id):
     lesson = get_object_or_404(Lesson.objects.select_related("course_offering"), pk=lesson_pk)
     if not lesson.can_edit:
         raise ValidationError(_("Only an editable draft lesson can receive new media."))
-    return lesson, validate_part_id(part_id) or f"p{uuid.uuid4().hex[:32]}"
+    return lesson, validate_browser_part_id(part_id) or f"p{uuid.uuid4().hex[:32]}"
 
 
 def _media_api_required(view_func):
@@ -2436,6 +2436,7 @@ def media_job_create(request):
                 authorization = create_staging_upload_url(
                     source_key,
                     content_type=content_type_for_key(filename),
+                    expires_in=3600,
                 )
                 jobs.append({
                     "id": str(job.public_id),
@@ -2481,16 +2482,12 @@ def media_job_source_complete(request, job_uuid):
         client_size = payload.get("size")
         if client_size is not None and client_size != job.source_size:
             raise ValidationError(_("The uploaded source size does not match the media job."))
-        metadata = verify_staging_object(
-            job.source_key,
-            expected_size=job.source_size,
+        queued, _ = queue_verified_job(
+            job.public_id,
             expected_etag=payload.get("etag") or None,
+            acknowledged_at=timezone.now(),
         )
-        with transaction.atomic():
-            queued = queue_job(job.public_id, acknowledged_at=timezone.now())
-            queued.source_etag = metadata.get("etag", "")
-            queued.save(update_fields=["source_etag"])
-            transaction.on_commit(lambda public_id=queued.public_id: enqueue_media_job(public_id))
+        schedule_media_job_after_commit(queued.public_id)
     except (json.JSONDecodeError, TypeError, ValueError, ValidationError, MediaStorageError) as exc:
         message = "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))
         return JsonResponse({"message": message}, status=400)
@@ -2586,12 +2583,11 @@ def media_job_retry(request, job_uuid):
     if job.status != MediaProcessingStatus.FAILED or not job.source_acknowledged_at:
         return JsonResponse({"message": _("Only failed jobs with a retained source can be retried.")}, status=409)
     try:
-        metadata = verify_staging_object(job.source_key, expected_size=job.source_size)
-        with transaction.atomic():
-            queued = queue_job(job.public_id, acknowledged_at=job.source_acknowledged_at)
-            queued.source_etag = metadata.get("etag", "")
-            queued.save(update_fields=["source_etag"])
-            transaction.on_commit(lambda public_id=queued.public_id: enqueue_media_job(public_id))
+        queued, _ = queue_verified_job(
+            job.public_id,
+            acknowledged_at=job.source_acknowledged_at,
+        )
+        schedule_media_job_after_commit(queued.public_id)
     except (ValidationError, MediaStorageError) as exc:
         return JsonResponse({"message": "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))}, status=400)
     return JsonResponse({"job": _serialize_media_job(queued)}, status=202)
@@ -2607,7 +2603,7 @@ def media_job_attachment_retry(request, job_uuid):
         return denied
     try:
         pending = claim_attachment_retry(job.public_id)
-        transaction.on_commit(lambda public_id=pending.public_id: enqueue_media_attachment_retry(public_id))
+        schedule_attachment_retry_after_commit(pending.public_id)
     except ValidationError as exc:
         return JsonResponse({"message": "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))}, status=409)
     return JsonResponse({"job": _serialize_media_job(pending)}, status=202)

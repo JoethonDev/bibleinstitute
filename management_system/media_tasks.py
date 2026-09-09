@@ -9,22 +9,29 @@ from datetime import timedelta
 import redis
 from celery import shared_task
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
 from .media_processing import (
-    MediaProcessingError,
     MediaProcessingPhase,
     MediaProcessingStatus,
     _attach_outputs,
     claim_attachment_retry,
     claim_queued_job,
     finish_attachment_retry,
+    is_automation_job,
+    publish_automation_lesson,
+    PUBLICATION_PENDING_ERROR,
+    PUBLICATION_PENDING_MESSAGE,
     record_job_failure,
+    requeue_stalled_job,
     run_media_job,
+    queue_verified_job,
+    schedule_media_job_after_commit,
     transition_job,
 )
-from .media_storage import MediaStorageError, delete_object_exact, verify_staging_object
+from .media_storage import MediaStorageError, delete_object_exact
 from .models import MediaAttachmentStatus, MediaProcessingJob
 
 logger = logging.getLogger(__name__)
@@ -160,10 +167,11 @@ def process_media_job(self, public_id: str):
                 attachment_error = exc
 
         staging_error = None
-        try:
-            delete_object_exact(job.source_key)
-        except Exception as exc:
-            staging_error = exc
+        if attachment_error is None:
+            try:
+                delete_object_exact(job.source_key)
+            except Exception as exc:
+                staging_error = exc
 
         with transaction.atomic():
             locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
@@ -182,11 +190,35 @@ def process_media_job(self, public_id: str):
                 locked.error_message = locked.error_message or str(staging_error)[:4000]
             else:
                 locked.staging_deleted_at = now
+                if is_automation_job(locked) and not attachment_error:
+                    # This marker makes publication recovery safe if the
+                    # worker exits after finalization and before publication.
+                    locked.error_code = PUBLICATION_PENDING_ERROR
+                    locked.error_message = PUBLICATION_PENDING_MESSAGE
             locked.save(update_fields=[
                 "status", "phase", "progress", "finished_at", "attachment_status",
                 "error_code", "error_message", "staging_deleted_at",
             ])
-        return {"status": "succeeded", "public_id": str(public_id), "attachment_error": bool(attachment_error)}
+        publication_ok = True
+        if (
+            attachment_error is None
+            and staging_error is None
+            and is_automation_job(job)
+        ):
+            try:
+                publish_automation_lesson(job.pk)
+            except Exception as exc:
+                logger.error(
+                    "automation_publication_failed",
+                    extra={"exception_type": type(exc).__name__},
+                )
+                publication_ok = False
+        return {
+            "status": "succeeded",
+            "public_id": str(public_id),
+            "attachment_error": bool(attachment_error),
+            "publication_error": not publication_ok,
+        }
     except Exception as exc:
         code = getattr(exc, "code", "media_processing_failed")
         record_job_failure(job.pk, code, str(exc))
@@ -206,7 +238,27 @@ def retry_media_attachment(public_id: str):
     except Exception as exc:
         finish_attachment_retry(public_id, error=exc)
         return {"status": "failed", "public_id": str(public_id)}
-    finish_attachment_retry(public_id)
+    try:
+        delete_object_exact(job.source_key)
+    except Exception as exc:
+        finish_attachment_retry(public_id, error=exc)
+        return {"status": "failed", "public_id": str(public_id)}
+    now = timezone.now()
+    with transaction.atomic():
+        finished = finish_attachment_retry(public_id)
+        finished.staging_deleted_at = now
+        if is_automation_job(finished):
+            finished.error_code = PUBLICATION_PENDING_ERROR
+            finished.error_message = PUBLICATION_PENDING_MESSAGE
+        finished.save(update_fields=["staging_deleted_at", "error_code", "error_message"])
+    if is_automation_job(finished):
+        try:
+            publish_automation_lesson(finished.pk)
+        except Exception as exc:
+            logger.error(
+                "automation_publication_failed",
+                extra={"exception_type": type(exc).__name__},
+            )
     return {"status": "attached", "public_id": str(public_id)}
 
 
@@ -256,30 +308,22 @@ def recover_pending_media_jobs(limit: int = 100):
         MediaProcessingJob.objects.filter(
             status=MediaProcessingStatus.AWAITING_UPLOAD,
             upload_ack_deadline_at__lte=now,
-        ).order_by("pk").values_list("pk", flat=True)[:limit]
+        ).order_by("pk").values_list("public_id", flat=True)[:limit]
     )
     for job_id in candidate_ids:
-        with transaction.atomic():
-            job = MediaProcessingJob.objects.select_for_update().filter(pk=job_id).first()
-            if job is None or job.status != MediaProcessingStatus.AWAITING_UPLOAD:
-                continue
-            try:
-                metadata = verify_staging_object(job.source_key, expected_size=job.source_size)
-            except MediaStorageError as exc:
-                _mark_recovery_failure(job, exc.code, str(exc), now)
-                failed_count += 1
-                continue
-            job.status = MediaProcessingStatus.QUEUED
-            job.phase = MediaProcessingPhase.QUEUED
-            job.progress = 0
-            job.source_etag = metadata.get("etag", "")
-            job.source_acknowledged_at = now
-            job.last_dispatched_at = now
-            job.save(update_fields=[
-                "status", "phase", "progress", "source_etag",
-                "source_acknowledged_at", "last_dispatched_at",
-            ])
-            transaction.on_commit(lambda public_id=job.public_id: enqueue_media_job(public_id))
+        try:
+            queued, transitioned = queue_verified_job(job_id, acknowledged_at=now)
+        except MediaStorageError as exc:
+            with transaction.atomic():
+                job = MediaProcessingJob.objects.select_for_update().filter(public_id=job_id).first()
+                if job is not None and job.status == MediaProcessingStatus.AWAITING_UPLOAD:
+                    _mark_recovery_failure(job, exc.code, str(exc), now)
+            failed_count += 1
+            continue
+        except MediaProcessingJob.DoesNotExist:
+            continue
+        if transitioned:
+            schedule_media_job_after_commit(queued.public_id)
             queued_count += 1
 
     grace = timedelta(seconds=60)
@@ -290,24 +334,21 @@ def recover_pending_media_jobs(limit: int = 100):
         ).order_by("pk").values_list("pk", flat=True)[:limit]
     )
     for job_id in pending_ids:
-        with transaction.atomic():
-            job = MediaProcessingJob.objects.select_for_update().filter(pk=job_id).first()
-            if job is None or job.status not in {MediaProcessingStatus.QUEUED, MediaProcessingStatus.PROCESSING}:
+        job = MediaProcessingJob.objects.filter(pk=job_id).first()
+        if job is None:
+            continue
+        live = _has_live_progress(client, job.public_id)
+        if live:
+            continue
+        if job.status == MediaProcessingStatus.QUEUED:
+            if job.last_dispatched_at and now - job.last_dispatched_at < grace:
                 continue
-            live = _has_live_progress(client, job.public_id)
-            if live:
+        elif job.status == MediaProcessingStatus.PROCESSING:
+            if job.last_heartbeat_at and now - job.last_heartbeat_at < heartbeat_grace:
                 continue
-            if job.status == MediaProcessingStatus.QUEUED:
-                if job.last_dispatched_at and now - job.last_dispatched_at < grace:
-                    continue
-            elif job.last_heartbeat_at and now - job.last_heartbeat_at < heartbeat_grace:
-                continue
-            job.status = MediaProcessingStatus.QUEUED
-            job.phase = MediaProcessingPhase.QUEUED
-            job.progress = 0
-            job.last_dispatched_at = now
-            job.save(update_fields=["status", "phase", "progress", "last_dispatched_at"])
-            transaction.on_commit(lambda public_id=job.public_id: enqueue_media_job(public_id))
+        stalled = requeue_stalled_job(job.public_id, dispatched_at=now)
+        if stalled is not None:
+            schedule_media_job_after_commit(stalled.public_id)
             queued_count += 1
     return {"queued": queued_count, "failed": failed_count}
 
@@ -321,30 +362,16 @@ def retry_failed_media_jobs(limit: int = 100):
         MediaProcessingJob.objects.filter(
             status=MediaProcessingStatus.FAILED,
             source_acknowledged_at__isnull=False,
-        ).order_by("finished_at", "pk").values_list("pk", flat=True)[:limit]
+        ).order_by("finished_at", "pk").values_list("public_id", flat=True)[:limit]
     )
     for job_id in job_ids:
-        with transaction.atomic():
-            job = MediaProcessingJob.objects.select_for_update().filter(pk=job_id).first()
-            if job is None or job.status != MediaProcessingStatus.FAILED:
-                continue
-            try:
-                metadata = verify_staging_object(job.source_key, expected_size=job.source_size)
-            except MediaStorageError:
-                rejected += 1
-                continue
-            job.status = MediaProcessingStatus.QUEUED
-            job.phase = MediaProcessingPhase.QUEUED
-            job.progress = 0
-            job.source_etag = metadata.get("etag", "")
-            job.last_dispatched_at = timezone.now()
-            job.error_code = ""
-            job.error_message = ""
-            job.save(update_fields=[
-                "status", "phase", "progress", "source_etag", "last_dispatched_at",
-                "error_code", "error_message",
-            ])
-            transaction.on_commit(lambda public_id=job.public_id: enqueue_media_job(public_id))
+        try:
+            queued_job, transitioned = queue_verified_job(job_id)
+        except (MediaStorageError, ValidationError, MediaProcessingJob.DoesNotExist):
+            rejected += 1
+            continue
+        if transitioned:
+            schedule_media_job_after_commit(queued_job.public_id)
             queued += 1
     return {"queued": queued, "rejected": rejected}
 

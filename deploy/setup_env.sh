@@ -226,7 +226,24 @@ write_value TELEGRAM_ENCRYPTION_KEY "$enc"
 write_value TELEGRAM_R2_BUCKET_NAME "$(read_value TELEGRAM_R2_BUCKET_NAME "Dedicated private Telegram media bucket (blank = disabled)" "")"
 echo ""
 
-# ── 6. Mobile push and media Worker ────────────────────────────────────
+# ── 6. Media automation API ───────────────────────────────────────────
+# The API is disabled when either value is blank. The key is server-only and
+# is never printed; the client sends it later as the X-Key request header.
+automation_key="$(read_secret_value AUTOMATION_API_KEY "Automation API key (blank = disabled; at least 32 characters if set)")"
+if [[ -n "$automation_key" && ${#automation_key} -lt 32 ]]; then
+    die "AUTOMATION_API_KEY must be at least 32 characters when set"
+fi
+write_value AUTOMATION_API_KEY "$automation_key"
+
+if [[ -n "$automation_key" ]]; then
+    for required_setting in R2_ENDPOINT_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME; do
+        [[ -n "$(value_from_tmp "$required_setting" "")" ]] \
+            || die "$required_setting must be configured before enabling media automation"
+    done
+fi
+echo ""
+
+# ── 7. Mobile push and media Worker ────────────────────────────────────
 # Expo access tokens and Worker shared secrets are server-only. They are
 # hidden during input, preserved on Enter, and never copied to .compose.env.
 write_value EXPO_PUSH_ACCESS_TOKEN "$(read_secret_value EXPO_PUSH_ACCESS_TOKEN "Expo Push access token (blank = disabled)")"

@@ -115,6 +115,10 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG and _env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS')
 TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
 DJANGO_SITE_DOMAIN = os.getenv('DJANGO_SITE_DOMAIN', '').rstrip('/')
 
+# The automation media API is intentionally disabled until the shared secret
+# is configured. Its existing content-manager user is resolved from the DB.
+AUTOMATION_API_KEY = os.getenv("AUTOMATION_API_KEY", "").strip()
+
 # Application definition
 
 INSTALLED_APPS = [
