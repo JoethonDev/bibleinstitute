@@ -1,18 +1,10 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
 <div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
-
-    <nav aria-label="{% translate 'Breadcrumb' %}">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item"><a href="{{ broadcast_list_url }}">{% translate "Telegram Broadcasts" %}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{% translate "Compose Broadcast" %}</li>
-        </ol>
-    </nav>
 
     <div class="tg-broadcast-header">
         <div>
@@ -42,7 +34,7 @@
             {% translate "Broadcast Details" %}
         </div>
         <div class="ad-card-body">
-            <form method="post" action="{{ compose_url }}" enctype="multipart/form-data" class="tg-broadcast-form">
+            <form method="post" action="{{ compose_url }}" hx-post="{{ compose_url }}" hx-encoding="multipart/form-data" hx-target="#display-page" hx-swap="innerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data" class="tg-broadcast-form">
                 {% csrf_token %}
                 {% if broadcast_form.non_field_errors %}
                 <div class="ad-alert ad-alert--danger mb-3" role="alert">

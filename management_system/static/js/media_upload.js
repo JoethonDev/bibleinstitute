@@ -93,9 +93,9 @@
         return output;
     }
 
-    // ---- CSRF (existing admin body hx-headers contract) ----
+    // ---- CSRF (admin body hx-headers contract; HTMX 4 renames it with :inherited) ----
     function getCSRFToken() {
-        var raw = document.body.getAttribute('hx-headers');
+        var raw = document.body.getAttribute('hx-headers:inherited') || document.body.getAttribute('hx-headers');
         if (!raw) {
             return null;
         }

@@ -7,7 +7,7 @@
             <img class="tg-chat-avatar-img"
                  src="{% url 'application-document' conversation.user.pk 'profile' %}"
                  alt=""
-                 loading="lazy"
+                 loading="lazy" decoding="async"
                  referrerpolicy="no-referrer">
             {% else %}
             <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>

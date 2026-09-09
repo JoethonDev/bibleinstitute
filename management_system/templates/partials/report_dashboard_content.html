@@ -1,0 +1,151 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+  <div class="row">
+    <div class="col-12">
+      <div class="ad-pane-head">
+        <h3 class="ad-pane-title mb-0">{% translate "Combined Report" %}</h3>
+        <span id="report-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+        <p class="ad-pane-desc">{% translate "Grades and attendance by level and academic year." %}</p>
+        <div class="d-flex gap-2">
+          {% if selected_year %}
+            <a href="{% url 'export-report-csv' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="ad-btn ad-btn--ghost ad-btn--sm">
+              <i class="fas fa-file-csv"></i>
+              {% translate "Export CSV" %}
+            </a>
+            <a href="{% url 'export-report-xlsx' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="ad-btn ad-btn--teal ad-btn--sm">
+              <i class="fas fa-file-excel"></i>
+              {% translate "Export XLSX" %}
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="ad-card mb-4">
+        <div class="ad-card-body">
+          <form method="get" class="row g-3 align-items-end" hx-get="{% url 'report-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#report-loading">
+            <div class="col-12 col-md-2">
+              <label class="form-label fw-semibold" for="level-select">{% translate "Level" %}</label>
+              <select name="level" class="form-select" id="level-select"
+                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+                <option value="">{% translate "All levels" %}</option>
+                {% for lvl in levels %}
+                  <option value="{{ lvl.ordering }}" {% if selected_level|add:0 == lvl.ordering %}selected{% endif %}>{% translate "Level" %} {{ lvl.ordering }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label fw-semibold" for="academic-year-select">{% translate "Academic Year" %}</label>
+              <select name="academic_year" class="form-select" id="academic-year-select"
+                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+                <option value="">{% translate "Select year" %}</option>
+                {% for ay in academic_years %}
+                    <option value="{{ ay.id }}" data-level="{{ ay.level.ordering }}"
+                    {% if selected_year and ay.id == selected_year.id %}selected{% endif %}
+                    {% if selected_level and ay.level.ordering != selected_level|add:0 %}class="d-none"{% endif %}>
+                    {{ ay.academic_year.name }} — {{ ay.level.display_name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label fw-semibold" for="student-search">{% translate "Student" %}</label>
+              <input type="text" name="student" id="student-search" class="form-control"
+                value="{{ selected_student }}" placeholder="{% translate 'Search by name or username' %}"
+                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:400ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label fw-semibold" for="study-mode-select">{% translate "Study Mode" %}</label>
+              <select name="study_mode" class="form-select" id="study-mode-select"
+                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+                <option value="">{% translate "All modes" %}</option>
+                <option value="online" {% if selected_study_mode == 'online' %}selected{% endif %}>{% translate "Online" %}</option>
+                <option value="offline" {% if selected_study_mode == 'offline' %}selected{% endif %}>{% translate "Offline" %}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label fw-semibold" for="course-select">{% translate "Course" %}</label>
+              <select name="course_offering" class="form-select" id="course-select"
+                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+                <option value="">{% translate "All courses" %}</option>
+                {% for co in course_offerings %}
+                  <option value="{{ co.id }}" {% if selected_course_offering|add:0 == co.id %}selected{% endif %}>{{ co.course.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-1 d-grid">
+              <button type="submit" class="ad-btn ad-btn--ghost">{% translate "Filter" %}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {% if selected_year %}
+        <div class="ad-stats mb-4">
+          <div class="ad-stat">
+            <div class="ad-stat-ic"><i class="fas fa-users"></i></div>
+            <div><b>{{ row_count }}</b><span>{% translate "Students" %}</span></div>
+          </div>
+        </div>
+
+        <div class="ad-card">
+          <div class="ad-table-wrap">
+            <table class="ad-table">
+              <thead>
+                <tr>
+                  <th scope="col">{% translate "Student" %}</th>
+                  <th scope="col">{% translate "Mode" %}</th>
+                  <th scope="col">{% translate "Grade" %}</th>
+                  <th scope="col">{% translate "Grade %" %}</th>
+                  <th scope="col">{% translate "Expected" %}</th>
+                  <th scope="col">{% translate "Valid" %}</th>
+                  <th scope="col">{% translate "Invalid" %}</th>
+                  <th scope="col">{% translate "Absent" %}</th>
+                  <th scope="col">{% translate "Attendance %" %}</th>
+                  <th scope="col">{% translate "Absence %" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                  <tr>
+                    <td>{{ row.first_name }} {{ row.last_name }}<br><small class="ad-muted-text">{{ row.username }}</small></td>
+                    <td>{{ row.study_mode }}</td>
+                    <td>{{ row.grade_earned }}/{{ row.grade_available }}</td>
+                    <td>{{ row.grade_percent }}%</td>
+                    <td>{{ row.expected }}</td>
+                    <td>{{ row.valid }}</td>
+                    <td>{{ row.invalid }}</td>
+                    <td>{{ row.absent }}</td>
+                    <td>{{ row.attendance_rate }}%</td>
+                    <td>{{ row.absence_rate }}%</td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="10" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% translate "Report pagination" as pagination_aria_label %}
+          {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#report-loading" %}
+        </div>
+      {% else %}
+        {% translate "Select an academic year above to view the report." as report_empty_desc %}
+        <div class="ad-card">
+          <div class="ad-empty">
+            {% include "partials/empty_state.html" with icon="fa-filter" description=report_empty_desc %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+<script>
+document.getElementById('level-select').addEventListener('change', function() {
+  var level = this.value;
+  document.querySelectorAll('#academic-year-select option').forEach(function(opt) {
+    if (opt.value === '') return;
+    opt.style.display = (!level || opt.dataset.level == level) ? '' : 'none';
+  });
+});
+</script>
+</div>

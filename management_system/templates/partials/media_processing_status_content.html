@@ -1,0 +1,138 @@
+{% load i18n %}
+<div id="content" class="ad-page media-status-page"
+     data-status-labels="{{ status_labels_json|escapejs }}"
+     data-phase-labels="{{ phase_labels_json|escapejs }}"
+     data-batch-status-url="{% url 'media-job-status-batch' %}"
+     data-trans-retry-failed="{% translate 'Retry failed' %}">
+    <div class="ad-pane-head">
+        <div>
+            <h1 class="ad-page-title">{% translate "Media processing" %}</h1>
+            <span id="media-status-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+            <p class="ad-page-subtitle">{% translate "Each selected source file is processed independently." %}</p>
+        </div>
+        <a class="ad-btn ad-btn--teal" href="{% url 'upload-files' %}">
+            <i class="fas fa-upload me-1" aria-hidden="true"></i>{% translate "Upload files" %}
+        </a>
+    </div>
+
+    <div class="ad-card ad-card-body media-status-filters mb-3">
+        <form method="get" class="row g-3 align-items-end" role="search"
+              hx-get="{% url 'media-processing-status' %}"
+              hx-target="#content"
+              hx-select="#content"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              hx-sync="this:abort"
+              hx-indicator="#media-status-loading">
+            <div class="col-12 col-md-6 col-lg-5">
+                <label for="media-status-search" class="form-label">{% translate "Search media jobs" %}</label>
+                <div class="media-status-search">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}"
+                           hx-get="{% url 'media-processing-status' %}"
+                           hx-include="closest form"
+                           hx-trigger="keyup changed delay:400ms, search"
+                           hx-target="#content"
+                           hx-select="#content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true"
+                           hx-indicator="#media-status-loading">
+                </div>
+            </div>
+            <div class="col-12 col-md-4 col-lg-3">
+                <label for="media-status-filter" class="form-label">{% translate "Filter by status" %}</label>
+                <select id="media-status-filter" class="form-select" name="status"
+                        hx-get="{% url 'media-processing-status' %}"
+                        hx-include="closest form"
+                        hx-trigger="change"
+                        hx-target="#content"
+                        hx-select="#content"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        hx-indicator="#media-status-loading">
+                    <option value="">{% translate "All statuses" %}</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
+                <button class="ad-btn ad-btn--teal ad-btn--sm" type="submit">{% translate "Filter" %}</button>
+                {% if search or status_filter %}
+                <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{% url 'media-processing-status' %}"
+                   hx-get="{% url 'media-processing-status' %}"
+                   hx-target="#content"
+                   hx-select="#content"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">{% translate "Clear" %}</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <form id="media-status-csrf" class="d-none">{% csrf_token %}</form>
+    <div class="ad-card ad-table-wrap">
+        {% if jobs_page.object_list %}
+        <table class="ad-table">
+            <caption class="visually-hidden">{% translate "Media processing jobs" %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{% translate "File" %}</th>
+                    <th scope="col">{% translate "Destination" %}</th>
+                    <th scope="col">{% translate "Lesson" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Progress" %}</th>
+                    <th scope="col">{% translate "Created" %}</th>
+                    <th scope="col"><span class="visually-hidden">{% translate "Actions" %}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs_page.object_list %}
+                <tr data-media-status-url="{% url 'media-job-status' job.public_id %}" data-media-job-id="{{ job.public_id }}">
+                    <td>
+                        <strong>{{ job.original_filename }}</strong>
+                        <small class="d-block text-muted">{{ job.source_kind|upper }} · {{ job.source_size|filesizeformat }}</small>
+                    </td>
+                    <td dir="ltr">{{ job.requested_folder|default:"/" }}</td>
+                    <td>
+                        {% if job.lesson %}{{ job.lesson.name }}{% else %}<span class="text-muted">{% translate "Standalone output" %}</span>{% endif %}
+                        {% if job.part_id %}<small class="d-block text-muted" dir="ltr">{{ job.part_id }}</small>{% endif %}
+                    </td>
+                    <td>
+                        <span class="ad-pill ad-pill--muted" data-media-status-value>{{ job.get_status_display }}</span>
+                        <small class="d-block text-muted" data-media-phase-value>{{ job.get_phase_display }}</small>
+                        {% if job.attachment_status == 'failed' %}<small class="d-block text-danger">{% translate "Lesson attachment failed" %}</small>{% endif %}
+                    </td>
+                    <td class="media-status-progress">
+                        <div class="progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ job.progress }}">
+                            <div class="progress-bar" data-media-progress-bar style="width: {{ job.progress }}%"></div>
+                        </div>
+                        <small data-media-progress-value>{{ job.progress }}%</small>
+                    </td>
+                    <td>{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    <td>
+                        <div class="ad-actions">
+                            {% if job.status == 'failed' and job.source_acknowledged_at %}
+                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-url="{% url 'media-job-retry' job.public_id %}">{% translate "Retry" %}</button>
+                            {% endif %}
+                            {% if job.status == 'succeeded' and job.attachment_status == 'failed' %}
+                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-url="{% url 'media-job-attachment-retry' job.public_id %}">{% translate "Retry lesson attachment" %}</button>
+                            {% endif %}
+                        </div>
+                        <small class="d-block text-danger mt-1" data-media-error>{% if job.error_message %}{{ job.error_message }}{% endif %}</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        {% translate "No media processing jobs found." as media_empty_desc %}
+        <div class="ad-empty">
+            {% include "partials/empty_state.html" with icon="fa-inbox" description=media_empty_desc %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% translate "Media job pages" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=jobs_page pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#media-status-loading" %}
+</div>

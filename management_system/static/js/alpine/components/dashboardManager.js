@@ -25,12 +25,12 @@ function dashboardManager() {
                 clearTimeout(this.filterCountTimer);
                 this.filterCountTimer = setTimeout(() => this.updateActiveFiltersCount(), 100);
             };
-            document.body.addEventListener('htmx:afterSwap', this.afterSwapHandler);
+            document.body.addEventListener('htmx:after:swap', this.afterSwapHandler);
         },
 
         destroy() {
             if (this.afterSwapHandler) {
-                document.body.removeEventListener('htmx:afterSwap', this.afterSwapHandler);
+                document.body.removeEventListener('htmx:after:swap', this.afterSwapHandler);
                 this.afterSwapHandler = null;
             }
             clearTimeout(this.filterCountTimer);
@@ -55,6 +55,25 @@ function dashboardManager() {
             });
 
             this.activeFiltersCount = count;
+        },
+
+        clearFilters() {
+            const filterInputs = this.$el.querySelectorAll('.filters-fields');
+
+            filterInputs.forEach(input => {
+                if (input.tagName === 'SELECT') {
+                    input.selectedIndex = 0;
+                } else if (input.tagName === 'INPUT') {
+                    input.value = '';
+                }
+            });
+
+            const firstFilter = filterInputs[0];
+            if (firstFilter && firstFilter.hasAttribute('hx-get') && window.htmx) {
+                window.htmx.trigger(firstFilter, 'change');
+            } else {
+                window.location.href = this.$el.dataset.baseUrl || window.location.pathname;
+            }
         }
     };
 }

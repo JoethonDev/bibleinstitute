@@ -64,7 +64,7 @@ urlpatterns = [
     # Courses Dashboard
     path('dashboard/courses/', course_dashboard, name="course-dashboard"),
     path('dashboard/courses/create/', CreateCourse.as_view(), name="course-create"),
-    path('dashboard/courses/<int:course_id>/', index, name="course-view"),
+    path('dashboard/courses/<int:course_id>/', view_courses, name="course-view"),
     path('dashboard/courses/<int:course_id>/delete/', DeleteCourse.as_view(), name="course-delete"),
     path('dashboard/courses/<int:course_id>/update/', UpdateCourse.as_view(), name="course-update"),
     path('dashboard/courses/<int:course_id>/duplicate/', duplicate_course, name="course-duplicate"),

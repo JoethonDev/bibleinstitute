@@ -1,0 +1,429 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>{% translate "Academic Setup" %}<span id="setup-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h4>
+        <div class="d-flex gap-2">
+            <button class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#yearModal">
+                <i class="fas fa-plus me-1"></i>{% translate "New Academic Year" %}
+            </button>
+        </div>
+    </div>
+
+    {# --- Academic Years Section --- #}
+    <div class="ad-pane-head">
+        <h5 class="ad-pane-title">{% translate "Academic Years" %}</h5>
+    </div>
+    <form method="get" class="row g-2 mb-3 align-items-end" action="{% url 'academic-setup' %}"
+          hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#setup-loading">
+        {% if selected_scope_id %}<input type="hidden" name="scope" value="{{ selected_scope_id }}">{% elif selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
+        <div class="col-auto">
+            <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
+            <input type="search" id="year-search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search years…" %}" value="{{ search }}"
+                   hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+        </div>
+        <div class="col-auto">
+            <label for="year-filter" class="visually-hidden">{% translate "Filter by status" %}</label>
+            <select name="active" id="year-filter" class="form-select form-select-sm"
+                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                <option value="all" {% if active_filter == "all" %}selected{% endif %}>{% translate "All" %}</option>
+                <option value="active" {% if active_filter == "active" %}selected{% endif %}>{% translate "Active" %}</option>
+                <option value="inactive" {% if active_filter == "inactive" %}selected{% endif %}>{% translate "Inactive" %}</option>
+            </select>
+        </div>
+    </form>
+
+    <div class="ad-card mb-4">
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th>{% translate "Name" %}</th>
+                        <th>{% translate "Levels" %}</th>
+                        <th>{% translate "Start" %}</th>
+                        <th>{% translate "End" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for y in year_page_obj.object_list %}
+                    <tr{% if selected_year == y.pk %} class="table-active"{% endif %}>
+                        <td>{{ y.name }}</td>
+                        <td>{{ y.level_display }}</td>
+                        <td>{{ y.starts_on }}</td>
+                        <td>{{ y.ends_on }}</td>
+                        <td>
+                            {% if y.is_active %}
+                            <span class="ad-pill ad-pill--success">{% translate "Active" %}</span>
+                            {% else %}
+                            <span class="ad-pill ad-pill--muted">{% translate "Historical" %}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="ad-actions">
+                            {% if not y.is_active %}
+                            <form method="post" action="{% url 'academic-year-activate' y.id %}" hx-post="{% url 'academic-year-activate' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Activate this academic year?' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-action-btn" title="{% translate "Activate" %}"><i class="fas fa-check"></i></button>
+                            </form>
+                            {% endif %}
+                            <a href="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" class="ad-action-btn" title="{% translate "View levels and offerings" %}"
+                               hx-get="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                                <i class="fas fa-layer-group"></i>
+                            </a>
+                            <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}" title="{% translate "Edit" %}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form method="post" action="{% url 'academic-year-delete' y.id %}" hx-post="{% url 'academic-year-delete' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this year?' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-action-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
+                            </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="ad-empty">{% translate "No academic years yet." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# --- Year pagination --- #}
+    {% translate "Year pagination" as year_pagination_aria %}
+    {% include "partials/pagination.html" with page_obj=year_page_obj pagination_query=year_pagination_query aria_label=year_pagination_aria wrapper_class="mb-4" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#setup-loading" %}
+
+    {# --- Year-Level Links Section --- #}
+    {% if year_level_links %}
+    <div class="ad-card mb-4">
+        <div class="ad-card-head d-flex justify-content-between align-items-center">
+            <span>{% translate "Year Levels" %} — {{ year_level_links.0.academic_year.name }}</span>
+        </div>
+        <div class="ad-card-body">
+            {% for ayl in year_level_links %}
+            <div class="border rounded p-3 mb-3{% if selected_scope_id == ayl.pk %} border-primary{% endif %}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">{{ ayl.level.display_name }}</h6>
+                    <div class="d-flex gap-2">
+                        <a href="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" class="ad-btn ad-btn--ghost ad-btn--sm"
+                           hx-get="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                            <i class="fas fa-book me-1"></i>{% translate "Offerings" %}
+                        </a>
+                        <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" hx-post="{% url 'academic-year-level-delete' ayl.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this level from the academic year?' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="ad-action-btn is-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                {# --- Weekday checkboxes --- #}
+                <form method="post" action="{% url 'academic-year-level-weekdays' ayl.pk %}" hx-post="{% url 'academic-year-level-weekdays' ayl.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-2 align-items-center">
+                    {% csrf_token %}
+                    <div class="col-12">
+                        <label class="form-label small mb-1">{% translate "Meeting Weekdays" %}</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for day_val, day_name in meeting_weekday_choices %}
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="meeting_weekdays" value="{{ day_val }}" id="wd-{{ ayl.pk }}-{{ day_val }}"{% if day_val in ayl.meeting_weekdays %} checked{% endif %}>
+                                <label class="form-check-label small" for="wd-{{ ayl.pk }}-{{ day_val }}">{{ day_name }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">{% translate "Save Weekdays" %}</button>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# --- Course Offerings Section --- #}
+    {% if selected_scope %}
+    <div class="ad-pane-head">
+        <h5 class="ad-pane-title">{% translate "Course Offerings" %} — {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h5>
+    </div>
+    <div class="ad-filters mb-3">
+        <form method="get" action="{% url 'academic-setup' %}" class="d-flex align-items-end gap-2 flex-wrap"
+              hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#setup-loading">
+            <input type="hidden" name="scope" value="{{ selected_scope_id }}">
+            <label for="offering-search" class="visually-hidden">{% translate "Search offerings" %}</label>
+            <input type="search" id="offering-search" name="offering_q" class="form-control form-control-sm" placeholder="{% translate "Search offerings…" %}" value="{{ offering_search }}"
+                   hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+            <select name="offering_status" id="offering-status" class="form-select form-select-sm ad-width-auto"
+                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                <option value="all" {% if offering_status == "all" %}selected{% endif %}>{% translate "All" %}</option>
+                <option value="draft" {% if offering_status == "draft" %}selected{% endif %}>{% translate "Draft" %}</option>
+                <option value="published" {% if offering_status == "published" %}selected{% endif %}>{% translate "Published" %}</option>
+                <option value="archived" {% if offering_status == "archived" %}selected{% endif %}>{% translate "Archived" %}</option>
+            </select>
+        <button type="button" class="ad-btn ad-btn--teal ad-btn--sm" data-bs-toggle="modal" data-bs-target="#offeringModal">
+            <i class="fas fa-plus me-1"></i>{% translate "New Offering" %}
+        </button>
+        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-toggle="modal" data-bs-target="#copyModal">
+            <i class="fas fa-copy me-1"></i>{% translate "Copy Offerings" %}
+        </button>
+        </form>
+    </div>
+
+    <div class="ad-card mb-4">
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th>{% translate "Course" %}</th>
+                        <th>{% translate "Instructor" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in offering_page_obj.object_list %}
+                    <tr>
+                        <td>{{ o.course.name }}</td>
+                        <td>{{ o.instructor|default:"—" }}</td>
+                        <td><span class="ad-pill {% if o.status == 'draft' %}ad-pill--warning{% elif o.status == 'published' %}ad-pill--success{% elif o.status == 'archived' %}ad-pill--muted{% endif %}">{{ o.get_status_display }}</span></td>
+                        <td>
+                            <div class="ad-actions">
+                            <button type="button" class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#offeringEditModal" data-offering-action="{% url 'course-offering-edit' o.id %}" data-offering-course="{{ o.course_id }}" data-offering-instructor="{{ o.instructor|default:''|escapejs }}" data-offering-status="{{ o.status }}" data-offering-name="{{ o.course.name|escapejs }}" title="{% translate "Edit" %}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form method="post" action="{% url 'course-offering-delete' o.id %}" hx-post="{% url 'course-offering-delete' o.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this offering?' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-action-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash"></i></button>
+                            </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="ad-empty">{% translate "No offerings for this scope." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# --- Offering pagination --- #}
+    {% translate "Offering pagination" as offering_pagination_aria %}
+    {% include "partials/pagination.html" with page_obj=offering_page_obj pagination_query=offering_pagination_query page_param="offering_page" aria_label=offering_pagination_aria wrapper_class="mb-4" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#setup-loading" %}
+
+    {# --- Create Offering Modal --- #}
+    <div class="modal fade" id="offeringModal" tabindex="-1" aria-labelledby="offeringModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'course-offering-create' %}" hx-post="{% url 'course-offering-create' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <input type="hidden" name="academic_year_level" value="{{ selected_scope_id }}">
+                    <div class="modal-header"><h5 id="offeringModalLabel">{% translate "New Course Offering" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="create-offering-course">{% translate "Course" %}</label>
+                            <select name="course" id="create-offering-course" class="form-select" required>
+                                <option value="">{% translate "Select course…" %}</option>
+                                {% for c in scope_courses %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="create-offering-instructor">{% translate "Instructor" %}</label>
+                            <input type="text" name="instructor" id="create-offering-instructor" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="create-offering-status">{% translate "Status" %}</label>
+                            <select name="status" id="create-offering-status" class="form-select">
+                                <option value="draft">{% translate "Draft" %}</option>
+                                <option value="published">{% translate "Published" %}</option>
+                                <option value="archived">{% translate "Archived" %}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Create" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# --- Reusable Edit Offering Modal --- #}
+    <div class="modal fade" id="offeringEditModal" tabindex="-1" aria-labelledby="offeringEditModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="" id="offeringEditForm" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 id="offeringEditModalLabel">{% translate "Edit Offering" %}<span id="offeringEditName"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-offering-course">{% translate "Course" %}</label>
+                            <select name="course" id="edit-offering-course" class="form-select" required>
+                                {% for c in scope_courses %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-offering-instructor">{% translate "Instructor" %}</label>
+                            <input type="text" name="instructor" id="edit-offering-instructor" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-offering-status">{% translate "Status" %}</label>
+                            <select name="status" id="edit-offering-status" class="form-select">
+                                <option value="draft">{% translate "Draft" %}</option>
+                                <option value="published">{% translate "Published" %}</option>
+                                <option value="archived">{% translate "Archived" %}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# --- Year edit modals --- #}
+    {% for y in year_page_obj.object_list %}
+    <div class="modal fade" id="yearModal{{ y.id }}" tabindex="-1" aria-labelledby="yearModalLabel{{ y.id }}" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'academic-year-edit' y.id %}" hx-post="{% url 'academic-year-edit' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 id="yearModalLabel{{ y.id }}">{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-year-name-{{ y.id }}">{% translate "Name" %}</label>
+                            <input type="text" name="name" id="edit-year-name-{{ y.id }}" value="{{ y.name }}" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-year-levels-{{ y.id }}">{% translate "Levels" %}</label>
+                            <select name="levels" id="edit-year-levels-{{ y.id }}" class="form-select" multiple required size="5">
+                                {% for level in COURSE_LEVELS %}
+                                <option value="{{ level.id }}" {% if level in y.levels.all %}selected{% endif %}>{{ level.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-year-start-{{ y.id }}">{% translate "Start Date" %}</label>
+                            <input type="date" name="starts_on" id="edit-year-start-{{ y.id }}" value="{{ y.starts_on|date:'Y-m-d' }}" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-year-end-{{ y.id }}">{% translate "End Date" %}</label>
+                            <input type="date" name="ends_on" id="edit-year-end-{{ y.id }}" value="{{ y.ends_on|date:'Y-m-d' }}" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {# --- Create Year Modal --- #}
+    <div class="modal fade" id="yearModal" tabindex="-1" aria-labelledby="yearModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'academic-year-create' %}" hx-post="{% url 'academic-year-create' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 id="yearModalLabel">{% translate "New Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
+                    <div class="modal-body">
+                        {% for field in year_form %}
+                        <div class="mb-3">
+                            <label class="form-label" for="id_{{ field.name }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Create" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# --- Copy Offerings Modal --- #}
+    <div class="modal fade" id="copyModal" tabindex="-1" aria-labelledby="copyModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="post" action="{% url 'copy-course-offerings' %}" hx-post="{% url 'copy-course-offerings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 id="copyModalLabel">{% translate "Copy Course Offerings" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="id_target_year_level">{% translate "Target Academic Scope" %}</label>
+                            {{ copy_form.target_year_level }}
+                            <div class="form-text">{% translate "Select the active scope into which offerings will be copied." %}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="id_source_year_level">{% translate "Source Academic Scope" %}</label>
+                            {{ copy_form.source_year_level }}
+                            <div class="form-text">{% translate "Select the scope that contains the source offerings to copy from." %}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="id_offerings">{% translate "Offerings to Copy" %}</label>
+                            {{ copy_form.offerings }}
+                            <div class="form-text">{% translate "Select the offerings to copy from the source scope." %}</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ copy_form.copy_lessons }}
+                                <label class="form-check-label" for="id_copy_lessons">{% translate "Copy Lessons" %}</label>
+                            </div>
+                            <div class="form-check">
+                                {{ copy_form.copy_quizzes }}
+                                <label class="form-check-label" for="id_copy_quizzes">{% translate "Copy Quizzes" %}</label>
+                            </div>
+                            <div class="form-text">{% translate "Copied content is created as draft." %}</div>
+                        </div>
+                        {% if copy_form.non_field_errors %}
+                        <div class="text-danger">{{ copy_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Copy" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var source = document.getElementById('id_source_year_level');
+        var offerings = document.getElementById('id_offerings');
+        if (!source || !offerings) return;
+        source.addEventListener('change', function() {
+            offerings.innerHTML = '<option>{% translate "Loading…" %}</option>';
+            var url = '{% url "academic-offerings-by-scope" 0 %}'.replace('/0/', '/' + source.value + '/');
+            fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    offerings.innerHTML = '';
+                    data.offerings.forEach(function(offering) {
+                        var option = document.createElement('option');
+                        option.value = offering.id;
+                        option.textContent = offering.name;
+                        offerings.appendChild(option);
+                    });
+                })
+                .catch(function() {
+                    offerings.innerHTML = '<option>{% translate "Unable to load offerings" %}</option>';
+                });
+        });
+    })();
+    </script>
+</div>

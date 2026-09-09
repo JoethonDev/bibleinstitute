@@ -1,0 +1,91 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+
+    <div class="ad-pane-head">
+        <h4 class="ad-pane-title mb-0">{% translate "Lecture Progress" %}</h4>
+        <span id="progress-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+    </div>
+
+    <form method="get" class="row g-2 mb-3" hx-get="{% url 'progress-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#progress-loading">
+        <div class="col-auto">
+            <select name="academic_year" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading" aria-label="{% translate 'Academic year and level' %}">
+                <option value="">{% translate "Academic year..." %}</option>
+                {% for scope in scopes %}
+                <option value="{{ scope.id }}" {% if selected_year == scope.id %}selected{% endif %}>{{ scope.academic_year.name }} — {{ scope.level.display_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <select name="course_offering" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading" aria-label="{% translate 'Course offering' %}">
+                <option value="">{% translate "Course offering..." %}</option>
+                {% for o in offerings %}
+                <option value="{{ o.id }}" {% if selected_offering == o.id %}selected{% endif %}>{{ o.course.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <select name="lesson" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading" aria-label="{% translate 'Lesson' %}">
+                <option value="">{% translate "Lesson..." %}</option>
+                {% for l in lessons %}
+                <option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="visually-hidden" for="progress-student-search">{% translate "Student" %}</label>
+            <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Student search...' %}" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
+        </div>
+    </form>
+
+    <div class="ad-card">
+        <div class="ad-table-wrap">
+            <table class="ad-table">
+                <thead>
+                    <tr>
+                        <th scope="col">{% translate "Student" %}</th>
+                        <th scope="col">{% translate "Lesson" %}</th>
+                        <th scope="col">{% translate "Part" %}</th>
+                        <th scope="col">{% translate "Progress" %}</th>
+                        <th scope="col">{% translate "Completed" context "progress" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in progress %}
+                    <tr>
+                        <td>{{ p.student.get_full_name|default:p.student.username }}</td>
+                        <td>{{ p.lesson.name }}</td>
+                        <td><code>{{ p.part_id }}</code></td>
+                        <td>
+                            <div class="ad-meter ad-meter--progress" role="progressbar" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">
+                                <span style="width:{{ p.percent }}%"></span>
+                            </div>
+                            <small class="ps-muted-text">{{ p.percent }}%</small>
+                        </td>
+                        <td>
+                            {% if p.completed_at %}
+                            <span class="ad-pill ad-pill--success">{% translate "Yes" %}</span>
+                            {% else %}
+                            <span class="ad-pill ad-pill--muted">{% translate "No" %}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="ad-empty">
+                            {% translate "No progress records for this selection." as progress_empty_desc %}
+                            {% translate "Select an academic year to load progress data." as progress_filter_desc %}
+                            {% if selected_year %}
+                            {% include "partials/empty_state.html" with icon="fa-inbox" description=progress_empty_desc %}
+                            {% else %}
+                            {% include "partials/empty_state.html" with icon="fa-filter" description=progress_filter_desc %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% translate "Progress pagination" as pagination_aria_label %}
+        {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#progress-loading" %}
+    </div>
+</div>

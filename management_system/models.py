@@ -1,8 +1,9 @@
 from django.db import models
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.urls import reverse_lazy
-from django.db.models import Sum, Prefetch, Q, prefetch_related_objects
+from django.db.models import Case, F, Sum, Prefetch, Q, Value, When, prefetch_related_objects
 from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, timedelta
@@ -13,6 +14,7 @@ from django.utils import translation
 from django.db.models import Max
 from django.conf import settings
 from .utils.timezones import format_application_datetime
+from .utils.search import SearchNormalize
 
 # Constants
 MANAGEMENT_ROLES = ["admin", "staff"]
@@ -108,6 +110,23 @@ class User(AbstractUser):
                 fields=["application_status", "-date_joined", "-id"],
                 name="user_app_status_date_idx",
             ),
+            models.Index(
+                Case(
+                    When(application_status="pending", then=Value(0)),
+                    default=Value(1),
+                    output_field=models.IntegerField(),
+                ),
+                F("date_joined").desc(),
+                F("id").desc(),
+                name="user_app_order_idx",
+            ),
+            GinIndex(OpClass(SearchNormalize("username"), name="gin_trgm_ops"), name="user_username_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("email"), name="gin_trgm_ops"), name="user_email_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("first_name"), name="gin_trgm_ops"), name="user_first_name_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("last_name"), name="gin_trgm_ops"), name="user_last_name_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("priest_name"), name="gin_trgm_ops"), name="user_priest_name_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("phone"), name="gin_trgm_ops"), name="user_phone_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("identity_number"), name="gin_trgm_ops"), name="user_identity_trgm_idx"),
         ]
 
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
@@ -985,6 +1004,7 @@ class TelegramBroadcastRecipient(models.Model):
         indexes = [
             models.Index(fields=["broadcast", "status", "scheduled_for"], name="tg_broadcast_due_idx"),
             models.Index(fields=["broadcast", "status"], name="tg_bcast_recipient_status_idx"),
+            GinIndex(OpClass(SearchNormalize("user_display_name"), name="gin_trgm_ops"), name="tg_recipient_name_trgm_idx"),
         ]
 
     def __str__(self):
@@ -994,6 +1014,11 @@ class TelegramBroadcastRecipient(models.Model):
 class OfflineCity(models.Model):
     name = models.CharField(max_length=255, unique=True)
     is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name"), name="gin_trgm_ops"), name="offline_city_name_trgm_idx"),
+        ]
 
     def __str__(self):
         return self.name
@@ -1008,6 +1033,10 @@ class Level(models.Model):
         ordering = ["ordering"]
         verbose_name = _("Level")
         verbose_name_plural = _("Levels")
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name_en"), name="gin_trgm_ops"), name="level_name_en_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("name_ar"), name="gin_trgm_ops"), name="level_name_ar_trgm_idx"),
+        ]
 
     def __str__(self):
         lang = translation.get_language()
@@ -1043,6 +1072,10 @@ class Course(models.Model):
                 fields=["name", "level"],
                 name="course_unique_name_level",
             ),
+        ]
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name"), name="gin_trgm_ops"), name="course_name_trgm_idx"),
+            GinIndex(OpClass(SearchNormalize("instructor"), name="gin_trgm_ops"), name="course_instr_trgm_idx"),
         ]
 
     def __str__(self):
@@ -1184,6 +1217,9 @@ class AcademicYear(models.Model):
                 name="academic_year_one_active",
             ),
         ]
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name"), name="gin_trgm_ops"), name="academic_year_name_trgm_idx"),
+        ]
 
     def __str__(self):
         return f"{self.name}"
@@ -1224,6 +1260,9 @@ class CourseOffering(models.Model):
                 fields=["course", "academic_year_level"],
                 name="course_offering_unique_course_year_level",
             ),
+        ]
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("instructor"), name="gin_trgm_ops"), name="offering_instr_trgm_idx"),
         ]
 
     def __str__(self):
@@ -1331,6 +1370,12 @@ class QuizType(models.Model):
     code = models.SlugField(unique=True)
     name_en = models.CharField(max_length=255)
     name_ar = models.CharField(max_length=255)
+
+    class Meta:
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name_en"), name="gin_trgm_ops"), name="quiz_type_name_en_idx"),
+            GinIndex(OpClass(SearchNormalize("name_ar"), name="gin_trgm_ops"), name="quiz_type_name_ar_idx"),
+        ]
 
     def clean(self):
         super().clean()
@@ -1563,6 +1608,7 @@ class HistoricalAcademicSummary(models.Model):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     certificate_eligible = models.BooleanField(default=False)
+
     promoted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1578,6 +1624,7 @@ class HistoricalAcademicSummary(models.Model):
         indexes = [
             models.Index(fields=["academic_year_level", "outcome"], name="hist_summary_scope_outcome_idx"),
             models.Index(fields=["outcome", "promoted_at"], name="hist_summary_outcome_idx"),
+            GinIndex(OpClass(SearchNormalize("source_name"), name="gin_trgm_ops"), name="hist_source_name_trgm_idx"),
         ]
 
     def __str__(self):
@@ -1685,6 +1732,9 @@ class AcademicHoliday(models.Model):
 
     class Meta:
         unique_together = [("academic_year", "date")]
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name"), name="gin_trgm_ops"), name="holiday_name_trgm_idx"),
+        ]
 
     def __str__(self):
         return f"{self.name} - {self.date}"
@@ -1838,6 +1888,10 @@ class Lesson(models.Model):
     updated_date = models.DateField(null=False, auto_now=True)
     publication_event_version = models.PositiveIntegerField(default=0, editable=False)
 
+    class Meta:
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name"), name="gin_trgm_ops"), name="lesson_name_trgm_idx"),
+        ]
 
     def __str__(self):
         return f"{self.name} for course : {self.course_offering.course.name}"
@@ -2012,6 +2066,11 @@ class Quiz(models.Model):
     opening_date = models.DateTimeField(default=now)
     closing_date = models.DateTimeField(default=now)
     created_date = models.DateField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(OpClass(SearchNormalize("name"), name="gin_trgm_ops"), name="quiz_name_trgm_idx"),
+        ]
 
     def __str__(self):
         return f"Quiz {self.name}"

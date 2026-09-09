@@ -1,16 +1,9 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 {% block body %}
 <div id="content" class="container-fluid px-3 ad-page">
-
-    <nav aria-label="{% translate 'Breadcrumb' %}">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{% translate "Telegram Bot" %}</li>
-        </ol>
-    </nav>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0"><i class="fas fa-paper-plane me-2"></i>{% translate "Telegram Bot Configuration" %}</h4>
@@ -57,7 +50,7 @@
             {% translate "Bot Token" %}
         </div>
         <div class="ad-card-body">
-            <form method="post" action="{% url 'telegram-config' %}">
+            <form method="post" action="{% url 'telegram-config' %}" hx-post="{% url 'telegram-config' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                 {% csrf_token %}
                 {% if config_form.non_field_errors %}
                 <div class="ad-alert ad-alert--danger mb-3" role="alert">
@@ -84,7 +77,7 @@
                     <button type="submit" name="action" value="rotate" class="ad-btn ad-btn--teal">
                         <i class="fas fa-sync-alt me-2"></i>{% translate "Rotate Token" %}
                     </button>
-                    <button type="submit" name="action" value="deactivate" class="ad-btn ad-btn--danger">
+                    <button type="submit" name="action" value="deactivate" class="ad-btn ad-btn--danger" hx-confirm="{% translate 'Are you sure?' %}">
                         <i class="fas fa-power-off me-2"></i>{% translate "Deactivate Bot" %}
                     </button>
                     {% else %}

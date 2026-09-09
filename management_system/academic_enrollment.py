@@ -768,16 +768,21 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
     last_level = Level.objects.order_by("-ordering").first()
     if last_level is None:
         return 0
-    candidates = EvaluationResult.objects.select_for_update().select_related(
+    # Lock base rows only: the __isnull filters force LEFT JOINs, which
+    # PostgreSQL rejects under FOR UPDATE across nullable join sides.
+    candidate_pks = list(
+        EvaluationResult.objects.filter(
+            course_offering__isnull=True,
+            promotion_history__isnull=True,
+            formula__course_offering__isnull=True,
+            formula__academic_year_level__level=last_level,
+            formula__academic_year_level__academic_year__ordering__lt=destination_year.ordering,
+            enrollment__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+        ).order_by("pk").values_list("pk", flat=True)
+    )
+    candidates = EvaluationResult.objects.select_for_update(of=("self",)).select_related(
         "formula", "enrollment", "enrollment__student", "enrollment__academic_year_level"
-    ).filter(
-        course_offering__isnull=True,
-        promotion_history__isnull=True,
-        formula__course_offering__isnull=True,
-        formula__academic_year_level__level=last_level,
-        formula__academic_year_level__academic_year__ordering__lt=destination_year.ordering,
-        enrollment__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
-    ).order_by("pk")
+    ).filter(pk__in=candidate_pks).order_by("pk")
     created_count = 0
     target_scope = AcademicYearLevel.objects.filter(
         academic_year=destination_year,

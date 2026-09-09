@@ -2,26 +2,20 @@
 {% load i18n %}
 {% load static %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 {% block body %}
 <div class="container-fluid py-3 ad-page" id="content">
-    <nav aria-label="{% translate 'Breadcrumb' %}">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item active">{% translate "Applications" %}</li>
-        </ol>
-    </nav>
 
     <div class="ad-pane-head">
         <h4 class="ad-pane-title">{% translate "Student Applications" %}</h4>
-        <form class="ad-search" method="get" action="{% url 'applications-dashboard' %}" role="search">
+        <form class="ad-search" method="get" action="{% url 'applications-dashboard' %}" role="search" hx-get="{% url 'applications-dashboard' %}" hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#applications-loading" hx-sync="this:abort">
             <i class="fas fa-search" aria-hidden="true"></i>
             <input type="search"
                    name="name"
                    value="{{ application_search }}"
                    placeholder="{% translate 'Search username, email, name, phone, or national ID' %}"
                    aria-label="{% translate 'Search applications' %}"
-                   hx-get="{% url 'applications-dashboard' %}?status={{ current_status }}"
+                   hx-get="{% url 'applications-dashboard' %}"
                    hx-include="closest form"
                    hx-trigger="keyup changed delay:500ms, search"
                    hx-target="#applications-workspace"
@@ -78,9 +72,16 @@
          data-csrf="{{ csrf_token }}"
          data-selection-token="{{ bulk_selection_token }}"
          data-selection-status="{{ current_status }}"
+         data-selection-scope="{{ current_status }}|{{ application_search }}"
          data-no-selection-message="{% translate 'Please select at least one application.' %}"
          data-request-failed-message="{% translate 'The request failed. Please try again.' %}"
          data-bulk-confirm-message="{% translate 'Are you sure?' %}">
+
+    <div class="htmx-indicator table-loading" id="applications-loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{% translate "Loading..." %}</span>
+        </div>
+    </div>
 
     <div class="ad-card">
         <div class="ad-card-body p-0">
@@ -102,125 +103,9 @@
                         {% translate "Select all matching records" %}
                     </button>
                 </div>
-                <small class="ps-muted-text">
-                    {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
-                    Showing {{ start }}–{{ end }} of {{ total }}
-                    {% endblocktranslate %}
-                </small>
-            </div>
-            <div class="ad-table-wrap">
-                        <table class="ad-table mb-0">
-                    <thead>
-                        <tr>
-                            <th class="column-checkbox"><input type="checkbox" id="select-all" aria-label="{% translate 'Select all visible applications' %}"></th>
-                            <th>{% translate "Name" %}</th>
-                            <th>{% translate "Phone" %}</th>
-                            <th>{% translate "City" %}</th>
-                            <th>{% translate "Status" %}</th>
-                            <th class="column-actions">{% translate "Actions" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for u in page_obj.object_list %}
-                        <tr>
-                            <td><input type="checkbox" class="user-checkbox" value="{{ u.id }}" aria-label="{% blocktranslate with name=u.get_full_name|default:u.username %}Select {{ name }}{% endblocktranslate %}"></td>
-                            <td>{{ u.get_full_name|default:u.username }}</td>
-                            <td>{{ u.phone|default:"—" }}</td>
-                            <td>{{ u.city|default:"—" }}</td>
-                            <td><span class="ad-pill {% if u.application_status == 'active' %}ad-pill--success{% elif u.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ u.get_application_status_display }}</span></td>
-                            <td>
-                                <div class="ad-actions">
-                                    <a href="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}"
-                                       class="ad-btn ad-btn--ghost ad-btn--sm"
-                                       hx-get="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}"
-                                       hx-target="#display-page"
-                                       hx-select="#content"
-                                       hx-swap="innerHTML"
-                                       hx-push-url="true">
-                                        <i class="fas fa-eye"></i> {% translate "Review" %}
-                                    </a>
-                                    <form method="post"
-                                          action="{% url 'application-delete' u.id %}"
-                                          class="ps-inline-form"
-                                          data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
-                                            <i class="fas fa-trash"></i> {% translate "Delete" %}
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% if page_obj.paginator.num_pages > 1 %}
-            <div class="ad-page-wrapper">
-                <nav aria-label="{% translate 'Applications pagination' %}">
-                    <ul class="ad-page-nav">
-                        {% if page_obj.has_previous %}
-                        <li>
-                            <a class="ad-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
-                               hx-get="{% url 'applications-dashboard' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
-                               hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true"
-                               aria-label="{% translate 'Previous page' %}">
-                                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                                <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                            </a>
-                        </li>
-                        {% else %}
-                        <li>
-                            <span class="ad-page-link is-disabled" aria-disabled="true">
-                                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                                <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                            </span>
-                        </li>
-                        {% endif %}
-                        {% for p in page_obj.paginator.page_range %}
-                            {% if p == page_obj.number %}
-                            <li aria-current="page"><span class="ad-page-link is-active">{{ p }}</span></li>
-                            {% elif p > page_obj.number|add:'-3' and p < page_obj.number|add:'3' or forloop.counter == 1 or forloop.revcounter == 1 %}
-                            <li><a class="ad-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ p }}"
-                                   hx-get="{% url 'applications-dashboard' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ p }}"
-                                   hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true">{{ p }}</a></li>
-                            {% elif forloop.counter == 2 and page_obj.number > 4 or forloop.revcounter == 2 and page_obj.number < page_obj.paginator.num_pages|add:'-3' %}
-                            <li><span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span></li>
-                            {% endif %}
-                        {% endfor %}
-                        {% if page_obj.has_next %}
-                        <li>
-                            <a class="ad-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}"
-                               hx-get="{% url 'applications-dashboard' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}"
-                               hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true"
-                               aria-label="{% translate 'Next page' %}">
-                                <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                            </a>
-                        </li>
-                        {% else %}
-                        <li>
-                            <span class="ad-page-link is-disabled" aria-disabled="true">
-                                <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                            </span>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-                <div class="ad-page-info">
-                    {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
-                    Showing {{ start }}–{{ end }} of {{ total }}
-                    {% endblocktranslate %}
-                </div>
             </div>
             {% endif %}
-            {% else %}
-            <div class="ad-empty">
-                <i class="fas fa-inbox"></i>
-                <p>{% translate "No applications found." %}</p>
-            </div>
-            {% endif %}
+            {% include "partials/table_and_pagination.html" with view="application" %}
         </div>
     </div>
 </div>

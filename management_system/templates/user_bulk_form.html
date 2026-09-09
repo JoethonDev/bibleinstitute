@@ -42,6 +42,9 @@
           <form
             action="{% url 'user-bulk-create' %}"
             method="post"
+            hx-post="{% url 'user-bulk-create' %}"
+            hx-encoding="multipart/form-data"
+            hx-target="#display-page" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true"
             enctype="multipart/form-data"
             class="needs-validation"
             novalidate

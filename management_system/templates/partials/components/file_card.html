@@ -42,22 +42,34 @@
         {# Icon and Name #}
         {% if item.type == 'folder' and item.id %}
             {# Folder Icon #}
+            {% if mode == 'simple' %}
             <div class="ad-drive-ic ad-drive-folder w-100 is-clickable"
                  role="button"
                  tabindex="0"
                  aria-label="{% blocktranslate with name=item.name %}Open folder {{ name }}{% endblocktranslate %}"
                  @keydown.enter.prevent="$el.click()"
                  @keydown.space.prevent="$el.click()"
-                 {% if mode == 'simple' %}
-                     hx-get="{% url 'navigate-folder' item.id %}"
-                     hx-trigger="click"
-                     hx-swap="innerHTML"
-                     hx-target="#drive-files"
-                 {% else %}
-                     onclick="window.location.href='{% url 'r2-management-dashboard' %}?folder={{ item.id|urlencode|escapejs }}'"
-                 {% endif %}>
+                 hx-get="{% url 'navigate-folder' item.id %}"
+                 hx-trigger="click"
+                 hx-swap="innerHTML"
+                 hx-target="#drive-files">
                 <i class="fas fa-folder fa-3x"></i>
             </div>
+            {% else %}
+            <a class="ad-drive-ic ad-drive-folder w-100 is-clickable"
+               role="button"
+               tabindex="0"
+               aria-label="{% blocktranslate with name=item.name %}Open folder {{ name }}{% endblocktranslate %}"
+               @keydown.enter.prevent="$el.click()"
+               @keydown.space.prevent="$el.click()"
+               href="{% url 'r2-management-dashboard' %}?folder={{ item.id|urlencode|escapejs }}"
+               hx-get="{% url 'r2-management-dashboard' %}?folder={{ item.id|urlencode|escapejs }}"
+               hx-trigger="click"
+               hx-target="#file-list-container"
+               hx-push-url="true">
+                <i class="fas fa-folder fa-3x"></i>
+            </a>
+            {% endif %}
 
             <div class="ad-drive-name {% if mode == 'advanced' %}ad-drive-name-sm{% else %}ad-drive-name-md{% endif %} mt-2 w-100"
                  title="{{ item.name }}">

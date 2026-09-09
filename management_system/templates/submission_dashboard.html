@@ -32,7 +32,7 @@
     <div class="ad-card">
         <div class="ad-card-body">
             <!-- Filter Bar -->
-            <div class="submission-filters mb-3" hx-include=".filters-fields">
+            <div class="submission-filters mb-3" hx-include:inherited=".filters-fields">
                 {% if submission_user %}
                 <div class="submission-filter-field">
                     <label for="submission-min-grade">{% translate "Minimum Grade" %}</label>

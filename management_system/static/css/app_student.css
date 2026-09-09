@@ -1210,6 +1210,52 @@ main:has(.sd-page) {
     box-shadow: 0 0 0 3px rgba(180, 133, 58, .18);
 }
 
+/* Read-only student month-grid cells (shared canonical grid partial). */
+.sd-calendar-page .sd-day { cursor: default; }
+.sd-calendar-page .sd-day:hover { transform: none; box-shadow: none; }
+.sd-day.is-out { background: var(--ps-mist); color: #a9b6bc; border-style: dashed; }
+
+.sd-day-body {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.sd-day-number { font-weight: 700; }
+
+.sd-day-holiday {
+    color: var(--ps-gold-deep);
+    font-size: .68rem;
+    font-weight: 650;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.sd-day-meeting {
+    background: rgba(47, 93, 115, .12);
+    color: var(--ps-teal-deep, var(--ps-teal));
+    font-size: .68rem;
+    font-weight: 650;
+    line-height: 1.3;
+    padding: .1rem .4rem;
+    border-radius: .4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+@media (max-width: 575.98px) {
+    .sd-calendar-page .sd-day { min-height: 3rem; padding: .35rem .4rem; }
+    .sd-day-holiday,
+    .sd-day-meeting { font-size: .6rem; }
+}
+
 .sd-legend {
     display: flex;
     flex-wrap: wrap;

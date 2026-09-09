@@ -1,7 +1,7 @@
 {% load i18n %}
 <div id="telegram-conversation-list"
      class="tg-chat-list"
-     data-poll-url="{{ conversation_list_url }}?fragment=1{% if search %}&amp;search={{ search|urlencode }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}"
+     data-poll-url="{{ conversation_list_url }}?fragment=1{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
      x-data="{
          autoRefresh: true,
          _timer: null,
@@ -14,8 +14,9 @@
          _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
          _poll() {
              const el = this.$el;
+             if (document.hidden) return;
              if (!el.dataset.pollUrl) return;
-             htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerHTML' }).catch(() => {});
+             htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerMorph' }).catch(() => {});
          }
      }">
 
@@ -31,8 +32,8 @@
         {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
         <li class="tg-chat-row">
             <a class="tg-chat-row-link"
-               href="{% url 'telegram-conversation-detail' conversation.pk %}{% if search or status %}?{% if search %}search={{ search|urlencode }}{% endif %}{% if search and status %}&amp;{% endif %}{% if status %}status={{ status }}{% endif %}{% endif %}"
-               hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel{% if search %}&amp;search={{ search|urlencode }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}"
+               href="{% url 'telegram-conversation-detail' conversation.pk %}{% if pagination_query %}?{{ pagination_query }}{% endif %}"
+               hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
                hx-target="#telegram-chat-panel"
                hx-swap="innerHTML"
                aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
@@ -41,7 +42,7 @@
                     <img class="tg-chat-avatar-img"
                          src="{% url 'application-document' conversation.user.pk 'profile' %}"
                          alt=""
-                         loading="lazy"
+                         loading="lazy" decoding="async"
                          referrerpolicy="no-referrer">
                     {% else %}
                     <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
@@ -92,67 +93,14 @@
         {% endwith %}
         {% empty %}
         <li class="ad-empty">
-            <i class="fas fa-inbox" aria-hidden="true"></i>
-            <h5>{% translate "No conversations found" %}</h5>
-            <p>{% translate "There are no support conversations matching the current filters." %}</p>
+            {% translate "No conversations found" as conversations_empty_title %}
+            {% translate "There are no support conversations matching the current filters." as conversations_empty_desc %}
+            {% include "partials/empty_state.html" with icon="fa-inbox" title=conversations_empty_title description=conversations_empty_desc %}
         </li>
         {% endfor %}
     </ul>
 
-    {% if page_obj.has_other_pages %}
-    <div class="ad-page-wrapper">
-        <nav aria-label="{% translate 'Conversation list pagination' %}">
-            <ul class="ad-page-nav">
-                {% if page_obj.has_previous %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ conversation_list_url }}?{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}page={{ page_obj.previous_page_number }}"
-                       aria-label="{% translate 'Previous page' %}"
-                       title="{% translate 'Previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </span>
-                </li>
-                {% endif %}
-                {% for number in page_obj.paginator.page_range %}
-                <li>
-                    <a class="ad-page-link {% if number == page_obj.number %}is-active{% endif %}"
-                       href="{{ conversation_list_url }}?{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}page={{ number }}"
-                       {% if number == page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
-                </li>
-                {% endfor %}
-                {% if page_obj.has_next %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ conversation_list_url }}?{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}page={{ page_obj.next_page_number }}"
-                       aria-label="{% translate 'Next page' %}"
-                       title="{% translate 'Next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </span>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        <div class="ad-page-info">
-            {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
-                Showing {{ start }}–{{ end }} of {{ total }} conversations
-            {% endblocktranslate %}
-        </div>
-    </div>
-    {% endif %}
+    {% translate "conversations" as conversations_label %}
+    {% translate "Conversation list pagination" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query base_url=conversation_list_url item_label=conversations_label aria_label=pagination_aria_label %}
 </div>

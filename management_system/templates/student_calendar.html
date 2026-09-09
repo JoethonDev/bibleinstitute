@@ -17,6 +17,29 @@
         <span class="sd-panel-sub">{{ scope.academic_year.starts_on }} – {{ scope.academic_year.ends_on }}</span>
       </div>
       <div class="sd-screen">
+        {% if month_grid %}
+        <div class="sd-cal-top">
+          <h5 class="sd-cal-title">{{ month_name }}</h5>
+          <span class="sd-cal-nav" role="group" aria-label="{% translate 'Month navigation' %}">
+            {% if prev_month %}
+            <a href="?{{ prev_month }}" aria-label="{% translate 'Previous month' %}">
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i>
+            </a>
+            {% endif %}
+            {% if next_month %}
+            <a href="?{{ next_month }}" aria-label="{% translate 'Next month' %}">
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
+            </a>
+            {% endif %}
+          </span>
+        </div>
+        {% include "partials/calendar_month_grid.html" with cell_variant="student" %}
+        <div class="sd-legend">
+          <span><i class="lg-meet"></i> {% translate "Meeting day" %}</span>
+          <span><i class="lg-hol"></i> {% translate "Holiday" %}</span>
+          <span><i class="lg-today"></i> {% translate "Today" %}</span>
+        </div>
+        {% endif %}
         {% with holidays=scope.calendar_holidays %}
           {% if holidays %}
             <h6 class="sd-chip sd-calendar-subtitle">

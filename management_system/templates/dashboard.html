@@ -3,7 +3,7 @@
 {% load i18n %}
 
 {% block body %}
-<div class="ad-pane is-active" id="content" x-data="dashboardManager()">
+<div class="ad-pane is-active" id="content" x-data="dashboardManager()" data-base-url="{{ url }}">
     <!-- Dashboard Toolbar -->
     <div class="ad-toolbar">
         <!-- Left: Title & Primary Actions -->
@@ -54,9 +54,9 @@
                     class="ad-btn ad-btn--ghost ad-btn--sm d-lg-none position-relative">
                 <i class="fas fa-filter me-1"></i>
                 <span>{% translate "Filters" %}</span>
-                <span class="badge bg-primary ms-1"
-                      x-show="activeFiltersCount > 0"
-                      x-text="activeFiltersCount"
+                    <span class="badge bg-primary ms-1"
+                      x-show="typeof activeFiltersCount !== 'undefined' && activeFiltersCount > 0"
+                      x-text="typeof activeFiltersCount !== 'undefined' ? activeFiltersCount : 0"
                       x-transition></span>
             </button>
         </div>
@@ -67,10 +67,9 @@
         <div class="ad-card-body">
             <!-- Filter Bar -->
             <div class="ad-filters"
-                 :class="{ 'show': showFilters }"
-                 x-show="showFilters || window.innerWidth >= 992"
-                 x-transition
-                 x-data="{ ...filterManager(), baseUrl: '{{ url }}' }">
+                 :class="{ 'show': typeof showFilters !== 'undefined' && showFilters }"
+                 x-show="typeof showFilters !== 'undefined' && (showFilters || window.innerWidth >= 992)"
+                 x-transition>
                 {% for filter in filters %}
                 <div class="filter-item">{% include filter %}</div>
                 {% endfor %}
@@ -78,7 +77,7 @@
                 <!-- Clear Filters -->
                 <button @click="clearFilters()"
                         class="ad-btn ad-btn--danger ad-btn--sm"
-                        x-show="activeFiltersCount > 0"
+                        x-show="typeof activeFiltersCount !== 'undefined' && activeFiltersCount > 0"
                         x-transition
                         type="button">
                     <i class="fas fa-times-circle me-1"></i>

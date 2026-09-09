@@ -24,7 +24,7 @@
                         <a href="{% url 'telegram-broadcast-confirm-page' broadcast_id=broadcast.pk %}" class="ad-btn ad-btn--ghost ad-btn--sm">
                             <i class="fas fa-clipboard-check me-1" aria-hidden="true"></i>{% translate "Review" %}
                         </a>
-                        <form method="post" action="{% url 'telegram-broadcast-cancel' broadcast_id=broadcast.pk %}" class="d-inline tg-broadcast-delete-form" data-confirm-message="{% translate 'Delete this draft?' %}">
+                        <form method="post" action="{% url 'telegram-broadcast-cancel' broadcast_id=broadcast.pk %}" hx-post="{% url 'telegram-broadcast-cancel' broadcast_id=broadcast.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="d-inline tg-broadcast-delete-form" data-confirm-message="{% translate 'Delete this draft?' %}">
                             {% csrf_token %}
                             <button type="submit" class="ad-btn ad-btn--ghost ad-btn--sm ad-action-btn is-danger" title="{% translate 'Delete Draft' %}" aria-label="{% translate 'Delete Draft' %}">
                                 <i class="fas fa-trash" aria-hidden="true"></i>
@@ -69,9 +69,9 @@
                 {% empty %}
                 <tr>
                     <td colspan="5" class="ad-empty">
-                        <i class="fas fa-bullhorn" aria-hidden="true"></i>
-                        <h5>{% translate "No broadcasts yet" %}</h5>
-                        <p>{% translate "Compose the first broadcast to announce news to students of the active academic year." %}</p>
+                        {% translate "No broadcasts yet" as broadcast_empty_title %}
+                        {% translate "Compose the first broadcast to announce news to students of the active academic year." as broadcast_empty_desc %}
+                        {% include "partials/empty_state.html" with icon="fa-bullhorn" title=broadcast_empty_title description=broadcast_empty_desc %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -79,60 +79,7 @@
         </table>
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="ad-page-wrapper">
-        <nav aria-label="{% translate 'Broadcast list pagination' %}">
-            <ul class="ad-page-nav">
-                {% if page_obj.has_previous %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ broadcast_list_url }}?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-                       aria-label="{% translate 'Previous page' %}"
-                       title="{% translate 'Previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </span>
-                </li>
-                {% endif %}
-                {% for number in page_obj.paginator.page_range %}
-                <li>
-                    <a class="ad-page-link {% if number == page_obj.number %}is-active{% endif %}"
-                       href="{{ broadcast_list_url }}?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ number }}"
-                       {% if number == page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
-                </li>
-                {% endfor %}
-                {% if page_obj.has_next %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ broadcast_list_url }}?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-                       aria-label="{% translate 'Next page' %}"
-                       title="{% translate 'Next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </span>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        <div class="ad-page-info">
-            {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
-                Showing {{ start }}–{{ end }} of {{ total }} broadcasts
-            {% endblocktranslate %}
-        </div>
-    </div>
-    {% endif %}
+    {% translate "broadcasts" as broadcasts_label %}
+    {% translate "Broadcast list pagination" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query base_url=broadcast_list_url item_label=broadcasts_label aria_label=pagination_aria_label %}
 </div>

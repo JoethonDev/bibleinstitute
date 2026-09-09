@@ -1,0 +1,24 @@
+{% load i18n %}
+{# Canonical calendar month grid shared by the admin and student calendars. #}
+{# Consumes: month_grid (list of weeks, each a list of day dicts from the shared view builder), #}
+{# weekday_names (locale-aware Mon..Sun labels from _calendar_weekday_abbreviations), #}
+{# and cell_variant ("admin" renders interactive cells, "student" renders read-only cells). #}
+{# Cell state-class contract: is-out / is-holiday / is-meeting / is-today. #}
+{% if cell_variant == "admin" %}
+<div class="ad-calmg-grid" role="grid">
+{% else %}
+<div class="sd-cal-grid" role="grid">
+{% endif %}
+  {% for weekday in weekday_names %}
+  <div class="{% if cell_variant == "admin" %}ad-calmg-wd{% else %}sd-cal-wd{% endif %}" role="columnheader">{{ weekday }}</div>
+  {% endfor %}
+  {% for week in month_grid %}
+    {% for day in week %}
+      {% if cell_variant == "admin" %}
+        {% include "partials/calendar_cell_admin.html" %}
+      {% else %}
+        {% include "partials/calendar_cell_student.html" %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+</div>

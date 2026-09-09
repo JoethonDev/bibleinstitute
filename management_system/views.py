@@ -72,13 +72,14 @@ from .utils.file_validator import (
     FileValidator,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, download_from_bucket, generate_unique_url, get_r2_client
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
 from .utils.r2_references import rewrite_lesson_r2_references
 from .utils.attendance import is_expected_date, get_expected_dates, get_student_attendance_context, assign_unassigned_attendance
 from .utils.timezones import ensure_aware, format_user_datetime
+from .utils.search import normalize_search_text, normalized_contains_q
 from .utils.quiz_access import grant_quiz_openings, quiz_window
 from .public_content import get_institute_copy
 from .academic_enrollment import (
@@ -985,7 +986,7 @@ class ProfileDetail(LoginProtection, DetailView):
 
 # Course Routes
 @login_required(login_url=LOGIN_URL)
-def view_courses(request):
+def view_courses(request, course_id=None):
     user = User.objects.get(pk=request.user.pk)
     management_preview = user_has_management_role(user)
     offerings_queryset = accessible_offerings(user, include_management=management_preview).order_by(
@@ -993,6 +994,9 @@ def view_courses(request):
         "-academic_year_level__level__ordering",
         "course__name",
     )
+    if course_id is not None:
+        get_object_or_404(Course, pk=course_id)
+        offerings_queryset = offerings_queryset.filter(course_id=course_id)
     offerings = list(offerings_queryset)
     normal_scopes = set()
     targeted_offerings = set()
@@ -1458,13 +1462,10 @@ def user_dashboard(request):
 
     query = Q()
     if name:
-        query &= (
-            Q(username__icontains=name)
-            | Q(email__icontains=name)
-            | Q(first_name__icontains=name)
-            | Q(last_name__icontains=name)
-            | Q(phone__icontains=name)
-            | Q(identity_number__icontains=name)
+        name = normalize_search_text(name)
+        query &= normalized_contains_q(
+            ("username", "email", "first_name", "last_name", "phone", "identity_number"),
+            name,
         )
     if role_value:
         role_name = Role.get_by_readable_value(role_value)
@@ -1567,6 +1568,11 @@ def user_profile(request, user_id):
         "profile_user": user,
         "edit_form": form,
         "active_enrollment": active_enrollment,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Users"), reverse("user-dashboard")),
+            (user.get_full_name() or user.username, None),
+        ]),
         "can_view_application_data": can_view_application_data,
         "application_documents": application_documents,
     })
@@ -1682,12 +1688,13 @@ def historical_intake(request):
         "student", "academic_year_level__academic_year", "academic_year_level__level", "promotion_history__actor"
     ).order_by("-created_at")
     summary_page_obj = Paginator(summaries, 25).get_page(request.GET.get("page", 1))
-    return render(request, "historical_intake.html", {
+    return render_page(request, "historical_intake.html", "partials/historical_intake_content.html", {
         "form": form,
         "exceptional_form": exceptional_form,
         "bulk_form": bulk_form,
         "summaries": summary_page_obj.object_list,
         "summary_page_obj": summary_page_obj,
+        "pagination_query": pagination_query_string(request),
         "preview": preview,
         "upload_digest": upload_digest,
         "intake_columns": INTAKE_COLUMNS,
@@ -1899,7 +1906,8 @@ def course_dashboard(request):
     view = "course"
     query = Q()
     if name:
-        query &= Q(name__icontains=name)
+        name = normalize_search_text(name)
+        query &= normalized_contains_q(("name",), name)
     if year:
         for level_obj in Level.objects.order_by("ordering"):
             if level_obj.display_name == year:
@@ -2002,6 +2010,11 @@ def lesson_detail(request, lesson_id):
         "questions": (),
         "back_url": reverse("lesson-dashboard"),
         "edit_url": reverse("lesson-update", args=[lesson.pk]),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Lessons"), reverse("lesson-dashboard")),
+            (lesson.name or _("(untitled)"), None),
+        ]),
     })
 
 
@@ -2037,6 +2050,11 @@ def quiz_detail(request, quiz_id):
         "edit_url": reverse("quiz-update", args=[quiz.pk]),
         "exception_form": exception_form,
         "exceptional_openings": getattr(quiz, "exceptional_openings", []),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Quizzes"), reverse("quiz-dashboard")),
+            (quiz.name or _("(untitled)"), None),
+        ]),
     })
 
 
@@ -2047,7 +2065,9 @@ def quiz_exceptional_opening(request, quiz_id):
     try:
         with transaction.atomic():
             quiz = get_object_or_404(
-                Quiz.objects.select_for_update().select_related(
+                # of=("self",): quiz_type is a nullable FK, and PostgreSQL
+                # rejects FOR UPDATE across a nullable LEFT JOIN side.
+                Quiz.objects.select_for_update(of=("self",)).select_related(
                     "course_offering__course",
                     "course_offering__academic_year_level__level",
                     "course_offering__academic_year_level__academic_year",
@@ -2091,7 +2111,8 @@ def lesson_dashboard(request):
 
     query = Q(course_offering__academic_year_level__academic_year_id=selected_year.pk)
     if name:
-        query &= Q(name__icontains=name)
+        name = normalize_search_text(name)
+        query &= normalized_contains_q(("name",), name)
     if course:
         if course.isdigit() and CourseOffering.objects.filter(
             pk=int(course), academic_year_level__academic_year_id=selected_year.pk
@@ -2196,7 +2217,7 @@ def navigate_folder(request, folder_id=None):
     
     # Redirect raw (non-HTMX) requests to the parent page rather than rendering a fragment
     if not request.headers.get("HX-Request"):
-        return redirect("r2-management")
+        return redirect("r2-management-dashboard")
 
     root = True
     parent_folder = None
@@ -2636,7 +2657,7 @@ def upload_file(request):
 def media_processing_status(request):
     """Render the SQL-paginated operational media-job status page."""
     status_filter = request.GET.get("status", "").strip()
-    search = request.GET.get("q", "").strip()[:100]
+    search = normalize_search_text(request.GET.get("q", "").strip()[:100])
     valid_statuses = {value for value, _label in MediaProcessingStatus.choices}
     if status_filter not in valid_statuses:
         status_filter = ""
@@ -2647,14 +2668,16 @@ def media_processing_status(request):
         queryset = queryset.filter(status=status_filter)
     if search:
         queryset = queryset.filter(
-            Q(original_filename__icontains=search)
-            | Q(lesson__name__icontains=search)
-            | Q(created_by__username__icontains=search)
+            normalized_contains_q(
+                ("original_filename", "lesson__name", "created_by__username"),
+                search,
+            )
         )
     paginator = Paginator(queryset, 25)
     jobs_page = paginator.get_page(request.GET.get("page", "1"))
-    return render(request, "media_processing_status.html", {
+    return render_page(request, "media_processing_status.html", "partials/media_processing_status_content.html", {
         "jobs_page": jobs_page,
+        "pagination_query": pagination_query_string(request),
         "status_choices": MediaProcessingStatus.choices,
         "status_labels_json": json.dumps(
             {value: str(label) for value, label in MediaProcessingStatus.choices},
@@ -2802,13 +2825,13 @@ def promotion_formula(request):
     preview_page_obj = None
     preview_grading_errors = ()
     results_page_obj = None
-    result_search = request.GET.get("result_search", "").strip()
+    result_search = normalize_search_text(request.GET.get("result_search", "").strip()[:100])
     result_computed_status = request.GET.get("computed_status", "")
     result_final_status = request.GET.get("final_status", "")
     result_override = request.GET.get("override", "")
     result_study_mode = request.GET.get("study_mode", "")
     result_grading_errors = request.GET.get("grading_errors", "")
-    preview_search = request.GET.get("search", "").strip()
+    preview_search = normalize_search_text(request.GET.get("search", "").strip()[:100])
     preview_offering_id = request.GET.get("preview_offering") or offering_id
     preview_offering = None
     if preview_formula:
@@ -2829,10 +2852,10 @@ def promotion_formula(request):
         enrollments = evaluation_enrollments(plan) if plan else Enrollment.objects.none()
         if preview_search:
             enrollments = enrollments.filter(
-                Q(student__username__icontains=preview_search)
-                | Q(student__first_name__icontains=preview_search)
-                | Q(student__last_name__icontains=preview_search)
-                | Q(student__email__icontains=preview_search)
+                normalized_contains_q(
+                    ("student__username", "student__first_name", "student__last_name", "student__email"),
+                    preview_search,
+                )
             )
         enrollments = enrollments.order_by("student__last_name", "student__first_name", "student__username")
         preview_page_obj = Paginator(enrollments, 25).get_page(request.GET.get("page", 1))
@@ -2846,10 +2869,15 @@ def promotion_formula(request):
         ).order_by("enrollment__student__last_name", "enrollment__student__first_name", "enrollment__student__username")
         if result_search:
             saved_results = saved_results.filter(
-                Q(enrollment__student__username__icontains=result_search)
-                | Q(enrollment__student__first_name__icontains=result_search)
-                | Q(enrollment__student__last_name__icontains=result_search)
-                | Q(enrollment__student__email__icontains=result_search)
+                normalized_contains_q(
+                    (
+                        "enrollment__student__username",
+                        "enrollment__student__first_name",
+                        "enrollment__student__last_name",
+                        "enrollment__student__email",
+                    ),
+                    result_search,
+                )
             )
         if result_computed_status in EvaluationResult.Status.values:
             saved_results = saved_results.filter(computed_status=result_computed_status)
@@ -2870,7 +2898,7 @@ def promotion_formula(request):
             if formula else None
         )
 
-    return render(request, "promotion_evaluation.html", {
+    return render_page(request, "promotion_evaluation.html", "partials/promotion_evaluation_content.html", {
         "formula_form": formula_form,
         "rule_formset": rule_formset,
         "selected_scope": selected_scope,
@@ -2892,6 +2920,12 @@ def promotion_formula(request):
         "preview_offering_id": preview_offering.pk if preview_offering else None,
         "preview_grading_errors": preview_grading_errors,
         "results_page_obj": results_page_obj,
+        "results_pagination_query": pagination_query_string(request, exclude=("result_page",)),
+        "preview_pagination_query": pagination_query_string(request),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Promotion Formula"), None),
+        ]),
         "result_search": result_search,
         "result_computed_status": result_computed_status,
         "result_final_status": result_final_status,
@@ -2966,20 +3000,25 @@ def promotion_history(request):
         "destination_year_level__level",
         "actor",
     ).order_by("-created_at", "-pk")
-    search = request.GET.get("search", "").strip()
+    search = normalize_search_text(request.GET.get("search", "").strip()[:100])
     outcome = request.GET.get("outcome", "")
     if search:
         history = history.filter(
-            Q(student__username__icontains=search)
-            | Q(student__first_name__icontains=search)
-            | Q(student__last_name__icontains=search)
-            | Q(student__email__icontains=search)
+            normalized_contains_q(
+                ("student__username", "student__first_name", "student__last_name", "student__email"),
+                search,
+            )
         )
     if outcome in {"passed", "passed_with_exceptions", "repeated", "graduated", "last_level_exceptional"}:
         history = history.filter(outcome=outcome)
     page_obj = Paginator(history, 25).get_page(request.GET.get("page", 1))
-    return render(request, "promotion_history.html", {
+    return render_page(request, "promotion_history.html", "partials/promotion_history_content.html", {
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Promotion History"), None),
+        ]),
         "search": search,
         "outcome": outcome,
     })
@@ -3001,7 +3040,8 @@ def quiz_dashboard(request):
         course_offering__academic_year_level__academic_year_id=selected_year.pk,
     )
     if name:
-        query &= Q(name__icontains=name)
+        name = normalize_search_text(name)
+        query &= normalized_contains_q(("name",), name)
     if course:
         if course.isdigit() and CourseOffering.objects.filter(
             pk=int(course), academic_year_level__academic_year_id=selected_year.pk
@@ -3397,12 +3437,13 @@ def grades_matrix_dashboard(request):
         "matrix_courses": matrix_courses,
         "matrix_rows": matrix_rows,
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
         "student_count": page_obj.paginator.count,
         "quiz_count": sum(len(course["quizzes"]) for course in matrix_courses),
         "total_matrix_columns": 1 + sum(course["detail_span"] for course in matrix_courses),
         "active_year": state["selected_year"].is_active,
     }
-    return render(request, "yearly_transcript_dashboard.html", context)
+    return render_page(request, "yearly_transcript_dashboard.html", "partials/grade_matrix_content.html", context)
 
 
 @capability_required(can_view_reports)
@@ -3460,12 +3501,13 @@ def payments_matrix_dashboard(request):
         "status": status,
         "payment_rows": payment_rows,
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
         "student_count": page_obj.paginator.count,
         "all_count": all_students.count(),
         "paid_count": all_students.filter(payment_uploaded=True).count(),
         "unpaid_count": all_students.filter(payment_uploaded=False).count(),
     }
-    return render(request, "payment_matrix.html", context)
+    return render_page(request, "payment_matrix.html", "partials/payment_matrix_content.html", context)
 
 
 @login_required(login_url=LOGIN_URL)
@@ -3493,11 +3535,7 @@ def academic_payment_document(request, payment_id):
 
 @capability_required(can_grade)
 def submission_dashboard(request, quiz_id):
-    try:
-        quiz = get_object_or_404(Quiz, pk=quiz_id)
-    except:
-        logger.error(f"Quiz : {quiz_id} is not found to get submissions!")
-        return quiz
+    quiz = get_object_or_404(Quiz, pk=quiz_id)
 
     # User
     name = request.GET.get("name", None)
@@ -3513,7 +3551,8 @@ def submission_dashboard(request, quiz_id):
 
     # Dynamically add conditions if filters are present
     if name:
-        query &= Q(user__first_name__icontains=name) | Q(user__last_name__icontains=name)
+        name = normalize_search_text(name)
+        query &= normalized_contains_q(("user__first_name", "user__last_name"), name)
     
     query &= Q(submitted_at__contains=year)
     query &= Q(total_grade__gte=min_grade)
@@ -3544,11 +3583,7 @@ def submission_dashboard(request, quiz_id):
 def submission_user(request, quiz_id, user_id):
     submissions = Submission.objects.filter(question__quiz_id=quiz_id, user_id=user_id)
     grade = Grade.objects.filter(quiz_id=quiz_id, user_id=user_id).first()
-    try:
-        quiz = get_object_or_404(Quiz, pk=quiz_id)
-    except Exception as e:
-        logger.error(f"Quiz : {quiz_id} is not found! there is not submission page!")
-        return quiz
+    quiz = get_object_or_404(Quiz, pk=quiz_id)
 
     if not submissions:
         logger.error(f"Submission for quiz id : {quiz_id} with user id : {user_id} is not found to get submissions!")
@@ -4260,7 +4295,7 @@ def r2_management_dashboard(request):
         context['next_page_url'] = f"{request.path}?{next_params.urlencode()}"
     
     # Return partial for HTMX folder navigation (breadcrumb + back + grid)
-    hx_target = request.headers.get('HX-Target')
+    hx_target = hx_target_id(request)
     if hx_target == 'file-list-container':
         return render(request, 'partials/r2_browse.html', context)
     if hx_target == 'drive-files':
@@ -4332,21 +4367,15 @@ def signup(request):
     return render(request, "signup.html", {"form": form, "copy": copy})
 
 def _application_search_query(value):
-    if not value:
-        return Q()
-    return (
-        Q(username__icontains=value)
-        | Q(email__icontains=value)
-        | Q(first_name__icontains=value)
-        | Q(last_name__icontains=value)
-        | Q(phone__icontains=value)
-        | Q(identity_number__icontains=value)
+    return normalized_contains_q(
+        ("username", "email", "first_name", "last_name", "phone", "identity_number"),
+        value,
     )
 
 
 def _applications_dashboard_context(request):
     status_filter = request.GET.get("status", "all")
-    application_search = request.GET.get("name", "").strip()[:100]
+    application_search = normalize_search_text(request.GET.get("name", "").strip()[:100])
     application_order = [
         Case(
             When(application_status="pending", then=0),
@@ -4359,14 +4388,23 @@ def _applications_dashboard_context(request):
     if status_filter == "all":
         users = User.objects.filter(
             Q(application_status__in=["pending", "active", "declined"])
-        ).select_related("role").order_by(*application_order)
+        ).only(
+            "id", "username", "first_name", "last_name", "phone", "city",
+            "application_status", "date_joined",
+        ).order_by(*application_order)
     elif status_filter in ("pending", "active", "declined"):
-        users = User.objects.filter(application_status=status_filter).select_related("role").order_by(*application_order)
+        users = User.objects.filter(application_status=status_filter).only(
+            "id", "username", "first_name", "last_name", "phone", "city",
+            "application_status", "date_joined",
+        ).order_by(*application_order)
     else:
         status_filter = "all"
         users = User.objects.filter(
             Q(application_status__in=["pending", "active", "declined"])
-        ).select_related("role").order_by(*application_order)
+        ).only(
+            "id", "username", "first_name", "last_name", "phone", "city",
+            "application_status", "date_joined",
+        ).order_by(*application_order)
     if application_search:
         users = users.filter(_application_search_query(application_search))
     paginator = Paginator(users, 15)
@@ -4379,6 +4417,10 @@ def _applications_dashboard_context(request):
         "current_status": status_filter,
         "application_search": application_search,
         "pagination_query": pagination_params.urlencode(),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Applications"), None),
+        ]),
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
         "bulk_selection_token": signing.dumps(
             {
@@ -4490,10 +4532,13 @@ def application_review(request, user_id):
         "app_user": user,
         "edit_form": form,
         "documents": documents,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Applications"), reverse("applications-dashboard")),
+            (user.get_full_name() or user.username, None),
+        ]),
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
     }
-    if request.headers.get("HX-Target") == "application-review-drawer-body":
-        return render(request, "partials/application_review_drawer.html", context)
     return render(request, "application_review.html", context)
 
 
@@ -4584,6 +4629,10 @@ def application_document(request, user_id, document_type):
         )
         if storage_response.get("ContentLength") is not None:
             response["Content-Length"] = str(storage_response["ContentLength"])
+        # Avatars/documents are polled repeatedly by live pages (Telegram chat,
+        # dashboards); let the browser reuse a fresh copy instead of re-downloading.
+        if request.GET.get("download") != "1":
+            response["Cache-Control"] = "private, max-age=300"
         return response
     except Exception as exc:
         logger.warning("Application document unavailable for user=%s type=%s: %s", user_id, document_type, exc)
@@ -4718,7 +4767,6 @@ def application_decision(request, user_id, decision):
         return HttpResponse(_("Method not allowed"), status=405)
     user = get_object_or_404(User, pk=user_id)
     expected_status = request.POST.get("expected_status") or None
-    is_hx_request = request.headers.get("HX-Request") == "true"
     success_message = None
 
     try:
@@ -4738,28 +4786,9 @@ def application_decision(request, user_id, decision):
             success_message = _("%(name)s returned to pending.") % {"name": user.get_full_name() or user.username}
     except (ValidationError, PermissionDenied) as exc:
         message = exc.message if isinstance(exc, ValidationError) and hasattr(exc, "message") else str(exc)
-        if is_hx_request:
-            failed_user = User.objects.get(pk=user_id)
-            response = render(request, "partials/application_review_drawer.html", {
-                "app_user": failed_user,
-                "edit_form": ApplicationAdminForm(instance=failed_user),
-                "documents": [],
-                "decision_error": message,
-            }, status=422)
-            response["HX-Retarget"] = "#application-review-drawer-body"
-            return response
         messages.error(request, message)
-    if is_hx_request and success_message:
-        response = render(request, "applications_dashboard.html", _applications_dashboard_context(request))
-        response["HX-Trigger"] = json.dumps({
-            "applicationDecisionCompleted": {
-                "message": str(success_message),
-                "level": "success",
-            }
-        })
-        return response
-    if success_message:
-        messages.success(request, success_message)
+        return redirect("applications-dashboard")
+    messages.success(request, success_message)
     return redirect("applications-dashboard")
 
 @capability_required(can_manage_applications)
@@ -4831,13 +4860,16 @@ def bulk_application_decision(request):
         chunk = list(islice(selected_ids, 100))
         if not chunk:
             break
-        expected_statuses = dict(
-            User.objects.filter(
-                pk__in=chunk,
-                application_status__in=status_filter,
-            ).filter(_application_search_query(application_search)).values_list(
-                "pk", "application_status"
+        expected_queryset = User.objects.filter(
+            pk__in=chunk,
+            application_status__in=status_filter,
+        )
+        if application_search:
+            expected_queryset = expected_queryset.filter(
+                _application_search_query(application_search)
             )
+        expected_statuses = dict(
+            expected_queryset.values_list("pk", "application_status")
         )
         for user_id in chunk:
             if user_id not in expected_statuses:
@@ -4971,6 +5003,10 @@ def levels_dashboard(request):
         })
     return render(request, "levels.html", {
         "levels": level_list,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Academic Levels"), None),
+        ]),
     })
 
 @require_POST
@@ -5037,7 +5073,7 @@ def academic_setup(request):
     active_filter = request.GET.get("active", "all")
     years = AcademicYear.objects.all().prefetch_related("levels").order_by("ordering")
     if search:
-        years = years.filter(name__icontains=search)
+        years = years.filter(normalized_contains_q(("name",), search))
     if active_filter == "active":
         years = years.filter(is_active=True)
     elif active_filter == "inactive":
@@ -5065,13 +5101,15 @@ def academic_setup(request):
     if selected_year:
         year_level_links = AcademicYearLevel.objects.filter(academic_year=selected_year).select_related("level").order_by("level__ordering")
 
-    offering_search = request.GET.get("offering_q", "").strip()
+    offering_search = normalize_search_text(request.GET.get("offering_q", "").strip()[:100])
     offering_status = request.GET.get("offering_status", "all")
     offerings = CourseOffering.objects.none()
     if selected_scope:
         offerings = CourseOffering.objects.filter(academic_year_level=selected_scope).select_related("course", "academic_year_level__academic_year", "academic_year_level__level")
         if offering_search:
-            offerings = offerings.filter(Q(course__name__icontains=offering_search) | Q(instructor__icontains=offering_search))
+            offerings = offerings.filter(
+                normalized_contains_q(("course__name", "instructor"), offering_search)
+            )
         if offering_status in dict(PublicationStatus.choices):
             offerings = offerings.filter(status=offering_status)
         else:
@@ -5091,10 +5129,14 @@ def academic_setup(request):
     offering_pagination_params = request.GET.copy()
     offering_pagination_params.pop("page", None)
     offering_pagination_params.pop("offering_page", None)
-    return render(request, "academic_setup.html", {
+    return render_page(request, "academic_setup.html", "partials/academic_setup_content.html", {
         "years": year_page_obj.object_list,
         "year_page_obj": year_page_obj,
         "year_level_links": year_level_links,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Academic Setup"), None),
+        ]),
         "selected_year": selected_year.pk if selected_year else None,
         "selected_scope": selected_scope,
         "selected_scope_id": selected_scope.pk if selected_scope else None,
@@ -5151,6 +5193,7 @@ def academic_offerings_by_scope(request, scope_id):
         "offerings": [{"id": offering.pk, "name": offering.course.name} for offering in offerings]
     })
 
+@require_POST
 @capability_required(can_manage_academic_setup)
 def academic_year_create(request):
     if request.method == "POST":
@@ -5169,6 +5212,7 @@ def academic_year_create(request):
                     messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
         return redirect("academic-setup")
 
+@require_POST
 @capability_required(can_manage_academic_setup)
 def academic_year_edit(request, year_id):
     year = get_object_or_404(AcademicYear, pk=year_id)
@@ -5219,6 +5263,7 @@ def academic_year_delete(request, year_id):
             messages.error(request, _("Cannot delete an academic year referenced by historical records."))
     return redirect("academic-setup")
 
+@require_POST
 @capability_required(can_manage_academic_setup)
 def course_offering_create(request):
     if request.method == "POST":
@@ -5238,6 +5283,7 @@ def course_offering_create(request):
                     messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
         return redirect(f"{reverse('academic-setup')}?scope={scope_id}" if scope_id else "academic-setup")
 
+@require_POST
 @capability_required(can_manage_academic_setup)
 def course_offering_edit(request, offering_id):
     offering = get_object_or_404(CourseOffering, pk=offering_id)
@@ -5317,6 +5363,11 @@ def _calendar_weekday_labels():
     ]
 
 
+def _calendar_weekday_abbreviations():
+    """Locale-aware Mon..Sun labels for the shared month-grid weekday header."""
+    return [formats.date_format(date(2000, 1, day), "D") for day in range(3, 10)]
+
+
 def _calendar_meeting_row(meeting):
     return {
         "id": meeting.pk,
@@ -5325,6 +5376,89 @@ def _calendar_meeting_row(meeting):
         "level_name": meeting.academic_year_level.level.display_name,
         "course_name": meeting.course_offering.course.name,
     }
+
+
+def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
+                      holidays, meetings_by_date, locked_weekdays,
+                      meeting_offerings_by_weekday=None):
+    """Shared month-grid builder: one canonical day-dict shape consumed by
+    partials/calendar_month_grid.html for both admin and student calendars."""
+    cal = py_calendar.Calendar()
+    month_days = cal.monthdatescalendar(cur_year, cur_month)
+    month_grid = []
+    for week in month_days:
+        week_data = []
+        for d in week:
+            in_year = year_start <= d <= year_end
+            day_meetings = meetings_by_date.get(d, [])
+            is_meeting = d.weekday() in locked_weekdays
+            is_holiday = d in holidays
+            week_data.append({
+                "day": d.day,
+                "date": d.isoformat(),
+                "in_year": in_year,
+                "is_meeting": is_meeting,
+                "is_today": d == today,
+                "is_holiday": is_holiday,
+                "holiday_name": holidays[d].name if is_holiday else "",
+                "holiday_id": holidays[d].id if is_holiday else None,
+                "meetings": day_meetings,
+                "meeting_offerings": (meeting_offerings_by_weekday or {}).get(d.weekday(), []),
+                "disabled": not in_year,
+                "outside_month": d.month != cur_month,
+            })
+        month_grid.append(week_data)
+    return month_grid
+
+
+def _resolve_calendar_month(year, request):
+    """Parse and clamp the requested display month within an academic year.
+    Returns (cur_year, cur_month, prev_query, next_query)."""
+    year_start, year_end = year.starts_on, year.ends_on
+    today = timezone.localdate()
+    if year_start <= today <= year_end:
+        cur_month, cur_year = today.month, today.year
+    else:
+        cur_month, cur_year = year_start.month, year_start.year
+    year_param = request.GET.get("year")
+    month_param = request.GET.get("month")
+    if year_param:
+        try:
+            cur_year = int(year_param)
+        except (ValueError, TypeError):
+            pass
+    if month_param:
+        try:
+            cur_month = int(month_param)
+        except (ValueError, TypeError):
+            try:
+                cur_year, cur_month = [int(x) for x in month_param.split("-")]
+            except (ValueError, IndexError):
+                pass
+    if cur_month < 1 or cur_month > 12:
+        cur_month = 1
+
+    first_month = year_start.year * 12 + year_start.month
+    last_month = year_end.year * 12 + year_end.month
+    current_cell = cur_year * 12 + cur_month
+    if current_cell < first_month:
+        cur_year = year_start.year
+        cur_month = year_start.month
+        current_cell = cur_year * 12 + cur_month
+    elif current_cell > last_month:
+        cur_year = year_end.year
+        cur_month = year_end.month
+        current_cell = cur_year * 12 + cur_month
+
+    prev_month = None
+    next_month = None
+    if current_cell > first_month:
+        pm = current_cell - 1
+        prev_month = f"year={((pm - 1) // 12)}&month={((pm - 1) % 12) + 1}"
+    if current_cell < last_month:
+        nm = current_cell + 1
+        next_month = f"year={((nm - 1) // 12)}&month={((nm - 1) % 12) + 1}"
+    return cur_year, cur_month, prev_month, next_month
 
 
 @capability_required(can_manage_content)
@@ -5345,55 +5479,7 @@ def calendar_management(request):
         year_id = year.id
         year_start = year.starts_on
         year_end = year.ends_on
-        cur_month = today.month
-        cur_year = today.year
-        if today < year_start or today > year_end:
-            cur_month = year_start.month
-            cur_year = year_start.year
-        else:
-            cur_month = today.month
-            cur_year = today.year
-
-        year_param = request.GET.get("year")
-        month_param = request.GET.get("month")
-        if year_param:
-            try:
-                cur_year = int(year_param)
-            except (ValueError, TypeError):
-                pass
-        if month_param:
-            try:
-                cur_month = int(month_param)
-            except (ValueError, TypeError):
-                try:
-                    cur_year, cur_month = [int(x) for x in month_param.split("-")]
-                except (ValueError, IndexError):
-                    pass
-        if cur_month < 1 or cur_month > 12:
-            cur_month = 1
-
-        # Clamp to academic year bounds
-        first_month = year_start.year * 12 + year_start.month
-        last_month = year_end.year * 12 + year_end.month
-        current_cell = cur_year * 12 + cur_month
-        if current_cell < first_month:
-            cur_year = year_start.year
-            cur_month = year_start.month
-            current_cell = cur_year * 12 + cur_month
-        elif current_cell > last_month:
-            cur_year = year_end.year
-            cur_month = year_end.month
-            current_cell = cur_year * 12 + cur_month
-
-        if current_cell > first_month:
-            pm = current_cell - 1
-            prev_month = f"year={((pm - 1) // 12)}&month={((pm - 1) % 12) + 1}"
-        if current_cell < last_month:
-            nm = current_cell + 1
-            next_month = f"year={((nm - 1) // 12)}&month={((nm - 1) % 12) + 1}"
-
-        cal = py_calendar.Calendar()
-        month_days = cal.monthdatescalendar(cur_year, cur_month)
+        cur_year, cur_month, prev_month, next_month = _resolve_calendar_month(year, request)
 
         holidays = {
             h.date: h
@@ -5430,30 +5516,17 @@ def calendar_management(request):
             for weekday in offering.academic_year_level.meeting_weekdays or []:
                 offerings_by_weekday[weekday].append(offering)
 
-        month_grid = []
-        for week in month_days:
-            week_data = []
-            for d in week:
-                in_year = year_start <= d <= year_end
-                day_meetings = meetings_by_date.get(d, [])
-                is_meeting = d.weekday() in locked_weekdays
-                is_today = d == today
-                is_holiday = d in holidays
-                week_data.append({
-                    "day": d.day,
-                    "date": d.isoformat(),
-                    "in_year": in_year,
-                    "is_meeting": is_meeting,
-                    "is_today": is_today,
-                    "is_holiday": is_holiday,
-                    "holiday_name": holidays[d].name if is_holiday else "",
-                    "holiday_id": holidays[d].id if is_holiday else None,
-                    "meetings": day_meetings,
-                    "meeting_offerings": offerings_by_weekday.get(d.weekday(), []),
-                    "disabled": not in_year,
-                    "outside_month": d.month != cur_month,
-                })
-            month_grid.append(week_data)
+        month_grid = _build_month_grid(
+            year_start=year_start,
+            year_end=year_end,
+            cur_year=cur_year,
+            cur_month=cur_month,
+            today=today,
+            holidays=holidays,
+            meetings_by_date=meetings_by_date,
+            locked_weekdays=locked_weekdays,
+            meeting_offerings_by_weekday=offerings_by_weekday,
+        )
     else:
         year_id = None
 
@@ -5475,6 +5548,11 @@ def calendar_management(request):
         "years": years,
         "year": year,
         "year_id": year_id,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Calendar"), None),
+        ]),
+        "weekday_names": _calendar_weekday_abbreviations(),
         "month_grid": month_grid,
         "prev_month": prev_month,
         "next_month": next_month,
@@ -5611,6 +5689,10 @@ def student_calendar(request):
         ).first()
 
     scopes = []
+    month_grid = None
+    prev_month = None
+    next_month = None
+    month_name = ""
     if selected_enrollment:
         scope = selected_enrollment.academic_year_level
         weekday_labels = _calendar_weekday_labels()
@@ -5630,7 +5712,43 @@ def student_calendar(request):
         ]
         scope.calendar_holidays = list(scope.academic_year.holidays.order_by("date"))
         scopes.append(scope)
-    return render(request, "student_calendar.html", {"scopes": scopes})
+
+        year = scope.academic_year
+        today = timezone.localdate()
+        cur_year, cur_month, prev_month, next_month = _resolve_calendar_month(year, request)
+        holidays = {
+            h.date: h
+            for h in year.holidays.filter(date__year=cur_year, date__month=cur_month)
+        }
+        meetings_by_date = defaultdict(list)
+        for meeting in AcademicYearLevelMeeting.objects.filter(
+            academic_year_level=scope,
+            meeting_date__year=cur_year,
+            meeting_date__month=cur_month,
+        ).select_related(
+            "academic_year_level__level",
+            "course_offering__course",
+        ).order_by("meeting_date", "course_offering__course__name"):
+            meetings_by_date[meeting.meeting_date].append(_calendar_meeting_row(meeting))
+        month_grid = _build_month_grid(
+            year_start=year.starts_on,
+            year_end=year.ends_on,
+            cur_year=cur_year,
+            cur_month=cur_month,
+            today=today,
+            holidays=holidays,
+            meetings_by_date=meetings_by_date,
+            locked_weekdays=set(scope.meeting_weekdays or []),
+        )
+        month_name = formats.date_format(date(cur_year, cur_month, 1), "F Y")
+    return render(request, "student_calendar.html", {
+        "scopes": scopes,
+        "weekday_names": _calendar_weekday_abbreviations(),
+        "month_grid": month_grid,
+        "prev_month": prev_month,
+        "next_month": next_month,
+        "month_name": month_name,
+    })
 
 @login_required
 def download_qr(request):
@@ -5767,7 +5885,7 @@ def attendance_management(request):
     action = request.GET.get("action")
     offering_id = request.GET.get("course_offering")
     attendance_date = request.GET.get("date", "")
-    student_search = request.GET.get("student", "").strip()
+    student_search = normalize_search_text(request.GET.get("student", "").strip()[:100])
     years = AcademicYear.objects.all()
     levels = Level.objects.filter(
         year_links__academic_year_id=year_id
@@ -5810,18 +5928,19 @@ def attendance_management(request):
                 records = records.none()
         if student_search:
             records = records.filter(
-                Q(student__username__icontains=student_search)
-                | Q(student__first_name__icontains=student_search)
-                | Q(student__last_name__icontains=student_search)
-                | Q(student__email__icontains=student_search)
+                normalized_contains_q(
+                    ("student__username", "student__first_name", "student__last_name", "student__email"),
+                    student_search,
+                )
             )
         records = records.order_by("-attendance_date", "-scanned_at")
     else:
         records = AttendanceRecord.objects.none()
     page_obj = Paginator(records, 25).get_page(request.GET.get("page", 1))
-    return render(request, "attendance_management.html", {
+    return render_page(request, "attendance_management.html", "partials/attendance_management_content.html", {
         "records": page_obj,
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
         "years": years,
         "levels": levels,
         "course_offerings": course_offerings,
@@ -5844,25 +5963,25 @@ def attendance_correction(request, record_id):
         new_date = request.POST.get("attendance_date")
         new_action = request.POST.get("action")
         if new_action and new_action not in ("entrance", "exit"):
-            return HttpResponse(_("Invalid action."), status=400)
+            messages.error(request, _("Invalid action."))
         academic_year_level = record.course_offering.academic_year_level
         academic_year = academic_year_level.academic_year
         if new_date:
             try:
                 new_date = datetime.strptime(new_date, "%Y-%m-%d").date()
             except (ValueError, TypeError):
-                return HttpResponse(_("Invalid date format."), status=400)
+                messages.error(request, _("Invalid date format."))
             if new_date < academic_year.starts_on or new_date > academic_year.ends_on:
-                return HttpResponse(_("Date outside academic year bounds."), status=400)
+                messages.error(request, _("Date outside academic year bounds."))
         final_date = new_date or record.attendance_date
         final_action = new_action or record.action
         if not is_expected_date(academic_year_level, final_date):
-            return HttpResponse(_("Date is not a scheduled day or is a holiday."), status=400)
+            messages.error(request, _("Date is not a scheduled day or is a holiday."))
         if AttendanceRecord.objects.filter(
             student=record.student, course_offering=record.course_offering,
             attendance_date=final_date, action=final_action,
         ).exclude(pk=record.pk).exists():
-            return HttpResponse(_("A record already exists for this student, date, and action."), status=400)
+            messages.error(request, _("A record already exists for this student, date, and action."))
         record.attendance_date = final_date
         record.action = final_action
         record.corrected_by = request.user
@@ -5870,7 +5989,13 @@ def attendance_correction(request, record_id):
         record.save()
         messages.success(request, _("Attendance record corrected."))
         return redirect("attendance-management")
-    return render(request, "attendance_correction.html", {"record": record})
+    return render(request, "attendance_correction.html", {
+        "record": record,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Attendance"), reverse("attendance-management")),
+            (_("Correct Attendance Record"), None),
+        ]),
+    })
 
 @require_POST
 @capability_required(can_correct_attendance)
@@ -6298,7 +6423,7 @@ def progress_dashboard(request):
     academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
     offering_id = request.GET.get("course_offering")
     lesson_id = request.GET.get("lesson")
-    student_search = request.GET.get("student", "").strip()
+    student_search = normalize_search_text(request.GET.get("student", "").strip()[:100])
 
     scopes = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by(
         "-academic_year__ordering", "level__ordering"
@@ -6331,10 +6456,10 @@ def progress_dashboard(request):
 
     if student_search:
         student_filter = (
-            Q(student__username__icontains=student_search)
-            | Q(student__first_name__icontains=student_search)
-            | Q(student__last_name__icontains=student_search)
-            | Q(student__email__icontains=student_search)
+            normalized_contains_q(
+                ("student__username", "student__first_name", "student__last_name", "student__email"),
+                student_search,
+            )
         )
         if student_search.isdigit():
             student_filter |= Q(student_id=int(student_search))
@@ -6343,9 +6468,14 @@ def progress_dashboard(request):
     progress = progress.select_related("student", "lesson").order_by("-lesson__name", "student__username")
     page_obj = Paginator(progress, 25).get_page(request.GET.get("page", 1))
 
-    return render(request, "progress_dashboard.html", {
+    return render_page(request, "progress_dashboard.html", "partials/progress_dashboard_content.html", {
         "progress": page_obj,
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Progress"), None),
+        ]),
         "academic_years": scopes,
         "scopes": scopes,
         "offerings": offerings,
@@ -6360,7 +6490,7 @@ def progress_dashboard(request):
 @capability_required(can_view_reports)
 def report_dashboard(request):
     academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
-    student_search = request.GET.get("student", "").strip()
+    student_search = normalize_search_text(request.GET.get("student", "").strip()[:100])
     study_mode = request.GET.get("study_mode") or None
     course_offering_id = request.GET.get("course_offering") or None
 
@@ -6408,8 +6538,9 @@ def report_dashboard(request):
         "rows": rows,
         "row_count": page_obj.paginator.count if page_obj else 0,
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
     }
-    return render(request, "report_dashboard.html", context)
+    return render_page(request, "report_dashboard.html", "partials/report_dashboard_content.html", context)
 
 @capability_required(can_view_reports)
 def export_report_csv(request):

@@ -1,6 +1,6 @@
 {% load i18n %}
 <!-- Toast Notifications Container (Psalmodia) -->
-<div x-data class="ps-toast-stack">
+<div x-data class="ps-toast-stack" id="toast-stack">
     {% for message in messages %}
     <div
         class="ps-toast"

@@ -1,22 +1,10 @@
 {% extends "admin_panel.html" %}
 {% load i18n %}
 
-{% block breadcrumbs %}
-<nav aria-label="{% translate 'Content breadcrumb' %}">
-  <ol class="breadcrumb bg-transparent px-0 pt-2 mb-2 small">
-    <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}"><i class="fas fa-tachometer-alt me-1"></i>{% translate "Dashboard" %}</a></li>
-    {% if is_quiz %}
-    <li class="breadcrumb-item"><a href="{% url 'quiz-dashboard' %}">{% translate "Quizzes" %}</a></li>
-    {% else %}
-    <li class="breadcrumb-item"><a href="{% url 'lesson-dashboard' %}">{% translate "Lessons" %}</a></li>
-    {% endif %}
-    <li class="breadcrumb-item active" aria-current="page">{{ content.name|default:_("(untitled)") }}</li>
-  </ol>
-</nav>
-{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
-<div class="container-fluid px-3 ad-page">
+<div id="content" class="container-fluid px-3 ad-page">
 
   {% if back_url %}
   <a href="{{ back_url }}" class="ad-btn ad-btn--ghost ad-btn--sm mb-3">
@@ -34,18 +22,18 @@
       <h4 class="ad-detail-title mb-0">{{ content.name|default:_("(untitled)") }}</h4>
       <p class="ad-detail-sub mb-0">{% if is_quiz %}{% translate "Quiz" %}{% else %}{% translate "Lesson" %}{% endif %}</p>
     </div>
-    <div class="ad-detail-badges">
+    <div class="ad-pill--on-darks">
       {% if content.status == "published" %}
-      <span class="ad-detail-badge ad-pill--success">{{ content.get_status_display }}</span>
+      <span class="ad-pill--on-dark ad-pill--success">{{ content.get_status_display }}</span>
       {% elif content.status == "draft" %}
-      <span class="ad-detail-badge ad-pill--warning">{{ content.get_status_display }}</span>
+      <span class="ad-pill--on-dark ad-pill--warning">{{ content.get_status_display }}</span>
       {% elif content.status == "archived" %}
-      <span class="ad-detail-badge ad-pill--muted">{{ content.get_status_display }}</span>
+      <span class="ad-pill--on-dark ad-pill--muted">{{ content.get_status_display }}</span>
       {% else %}
-      <span class="ad-detail-badge">{{ content.get_status_display|default:"—" }}</span>
+      <span class="ad-pill--on-dark">{{ content.get_status_display|default:"—" }}</span>
       {% endif %}
       {% if edit_url %}
-      <a href="{{ edit_url }}" class="ad-detail-badge ad-detail-badge--action">
+      <a href="{{ edit_url }}" class="ad-pill--on-dark ad-pill--on-dark-action">
         <i class="fas fa-edit me-1"></i>{% translate "Edit" %}
       </a>
       {% endif %}
@@ -136,7 +124,7 @@
       </div>
       <div class="ad-card-body">
         <p class="ps-muted-text">{% translate "Select enrolled students and a local opening window. This does not change the normal quiz window." %}</p>
-        <form method="post" action="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}">
+        <form method="post" action="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}" hx-post="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Are you sure?' %}">
           {% csrf_token %}
           <div class="mb-3">
             <label for="{{ exception_form.students.id_for_label }}" class="form-label">{{ exception_form.students.label }}</label>
@@ -263,9 +251,9 @@
         </table>
       </div>
       {% else %}
+      {% translate "No questions have been added to this quiz yet." as quiz_empty_desc %}
       <div class="ad-empty">
-        <i class="fas fa-inbox"></i>
-        <p>{% translate "No questions have been added to this quiz yet." %}</p>
+        {% include "partials/empty_state.html" with icon="fa-inbox" description=quiz_empty_desc %}
       </div>
       {% endif %}
     </div>
@@ -303,9 +291,9 @@
         </table>
       </div>
       {% else %}
+      {% translate "No file links have been added to this lesson yet." as links_empty_desc %}
       <div class="ad-empty">
-        <i class="fas fa-link"></i>
-        <p>{% translate "No file links have been added to this lesson yet." %}</p>
+        {% include "partials/empty_state.html" with icon="fa-link" description=links_empty_desc %}
       </div>
       {% endif %}
     </div>

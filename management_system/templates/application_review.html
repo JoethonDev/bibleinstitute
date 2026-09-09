@@ -7,17 +7,11 @@
 {% block body %}
 <div class="container-fluid py-3 ad-page" id="content" x-data="{ applicationEditing: false }">
     <div class="ad-detail-head">
-        <nav aria-label="{% translate 'Breadcrumb' %}">
-            <ol class="breadcrumb mb-0">
-                <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'applications-dashboard' %}">{% translate "Applications" %}</a></li>
-                <li class="breadcrumb-item active">{{ app_user.get_full_name|default:app_user.username }}</li>
-            </ol>
-        </nav>
+        {% include "partials/breadcrumbs.html" with breadcrumb_items=breadcrumb_items variant="detail" %}
         <div class="d-flex justify-content-between align-items-center ad-detail-content">
             <h4 class="ad-detail-title mb-0">{% translate "Application Review" %}</h4>
-            <div class="ad-detail-badges d-flex align-items-center gap-2">
-                <span class="ad-detail-badge {% if app_user.application_status == 'active' %}ad-pill--success{% elif app_user.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">
+            <div class="ad-pill--on-darks d-flex align-items-center gap-2">
+                <span class="ad-pill--on-dark {% if app_user.application_status == 'active' %}ad-pill--success{% elif app_user.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">
                     {{ app_user.get_application_status_display }}
                 </span>
                 <button type="button"
@@ -36,7 +30,7 @@
     <div id="application-edit-form" class="ad-card mb-3" x-show="applicationEditing" x-cloak>
         <div class="ad-card-head"><strong>{% translate "Edit student and application" %}</strong></div>
         <div class="ad-card-body">
-            <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}">
+            <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}" hx-post="{% url 'application-review' app_user.id %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                 {% csrf_token %}
                 {{ edit_form|crispy }}
                 <div class="d-flex gap-2 mt-3">
@@ -132,7 +126,7 @@
 
     <div class="d-flex gap-2 align-items-end flex-wrap">
         {% if app_user.application_status != "active" %}
-        <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Activate this application?' %}">
+        <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" hx-post="{% url 'application-decision' app_user.id 'activate' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Activate this application?' %}">
             {% csrf_token %}
             <input type="hidden" name="expected_status" value="{{ app_user.application_status }}">
             <button type="submit" class="ad-btn ad-btn--teal">
@@ -141,7 +135,7 @@
         </form>
         {% endif %}
         {% if app_user.application_status != "declined" %}
-        <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Decline this application?' %}">
+        <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" hx-post="{% url 'application-decision' app_user.id 'decline' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Decline this application?' %}">
             {% csrf_token %}
             <input type="hidden" name="expected_status" value="{{ app_user.application_status }}">
             <button type="submit" class="ad-btn ad-btn--danger">
@@ -150,7 +144,7 @@
         </form>
         {% endif %}
         {% if app_user.application_status != "pending" %}
-        <form method="post" action="{% url 'application-decision' app_user.id 'pending' %}" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Reopen this application?' %}">
+        <form method="post" action="{% url 'application-decision' app_user.id 'pending' %}" hx-post="{% url 'application-decision' app_user.id 'pending' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Reopen this application?' %}">
             {% csrf_token %}
             <input type="hidden" name="expected_status" value="{{ app_user.application_status }}">
             <button type="submit" class="ad-btn ad-btn--outline-gold">
@@ -161,6 +155,12 @@
         <form method="post"
               action="{% url 'application-delete' app_user.id %}"
               class="ps-inline-form"
+              hx-post="{% url 'application-delete' app_user.id %}"
+              hx-target="#display-page"
+              hx-swap="innerHTML"
+              hx-select="#content"
+              hx-select-oob="#toast-stack"
+              hx-push-url="true"
               data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--danger">

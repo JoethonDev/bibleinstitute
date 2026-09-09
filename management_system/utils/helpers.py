@@ -5,14 +5,17 @@ Provides reusable utilities for common operations.
 import json
 import re
 from datetime import date, datetime, timedelta
+from django.contrib import messages as django_messages
 from django.core.paginator import Paginator
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.timezone import now
 from django.http import HttpResponse
 from django.core.exceptions import ValidationError
 from logging import getLogger
+from urllib.parse import unquote
 from management_system.utils.decorators import check_role_permission
 from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade
 from management_system.academic_access import user_can_write_offering_activity
@@ -20,6 +23,20 @@ from .timezones import ensure_aware, parse_application_datetime
 from .quiz_access import quiz_window
 
 logger = getLogger(__name__)
+
+
+def hx_target_id(request):
+    """Return the target element id from the HTMX HX-Target header.
+
+    HTMX 4 serializes the header as ``tag#id`` (with an URI-encoded id);
+    older bare-id values are accepted as-is so the comparison stays a
+    single canonical point for every HTMX partial branch."""
+    target = request.headers.get("HX-Target", "")
+    if not target:
+        return ""
+    if "#" in target:
+        return unquote(target.rsplit("#", 1)[1])
+    return target
 
 
 def get_datetime(datetime_string):
@@ -83,6 +100,17 @@ def is_quiz_open(quiz, current_time=None, user=None) -> bool:
     opening_date, closing_date = quiz_window(quiz, user)
     current_time = ensure_aware(current_time or now())
     return ensure_aware(opening_date) <= current_time <= ensure_aware(closing_date) + timedelta(minutes=30)
+
+
+def pagination_query_string(request, exclude=("page",)):
+    """
+    Build the URL-encoded filter query preserved by canonical pagination links.
+    The named page parameters are excluded so links can append their own page value.
+    """
+    params = request.GET.copy()
+    for key in exclude:
+        params.pop(key, None)
+    return params.urlencode()
 
 
 def paginate_obj(request, obj, page_size=15):
@@ -155,7 +183,7 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     logger.info(f"User: {user} accesses page {page_obj.number} in {view} dashboard")
     
     # Handle HTMX partial rendering
-    if request.headers.get("HX-Target") == "table-container":
+    if hx_target_id(request) == "table-container":
         return render(request, "partials/table_and_pagination.html", {
             "page_obj": page_obj,
             "header": _(view.capitalize()),
@@ -326,3 +354,28 @@ def is_htmx(request):
         Boolean indicating if request is HTMX
     """
     return request.headers.get('HX-Request') == 'true'
+
+
+def render_page(request, full_template, partial_template, context):
+    """
+    Render the content partial for HTMX requests, the full shell otherwise.
+    The partial must render the page's root #content element so the client
+    fragment swap is identical in both modes.
+
+    HTMX partial responses cannot render the shell toast stack, so any
+    pending Django messages are appended as an out-of-band swap of the
+    shell's #toast-stack element.
+    """
+    if is_htmx(request):
+        response = render(request, partial_template, context)
+        storage = django_messages.get_messages(request)
+        toast_html = ""
+        if storage:
+            toast_html = render_to_string(
+                "partials/toast_oob.html", request=request
+            )
+        if toast_html:
+            encoding = response.charset or "utf-8"
+            response.content += toast_html.encode(encoding)
+        return response
+    return render(request, full_template, context)

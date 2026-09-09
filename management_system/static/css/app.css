@@ -1171,14 +1171,14 @@ body,
 /* ================================================================================
    BIBLE INSTITUTE LMS - USER/STUDENT THEME
    ================================================================================
-   Adapted from admin-theme.css  â€“ same colour palette, lighter feel for students.
+   Adapted from admin-theme.css  — same colour palette, lighter feel for students.
    Included in user-facing templates (home, courses, profile, quiz).
    ================================================================================ */
 
 :root {
-    --user-accent:          #6B705C;   /* Olive Slate â€“ primary interactive colour  */
+    --user-accent:          #6B705C;   /* Olive Slate — primary interactive colour  */
     --user-accent-hover:    #5A5E4F;   /* Darker Olive on hover                     */
-    --user-accent-light:    #A5A58D;   /* Muted Sage â€“ secondary text / badges      */
+    --user-accent-light:    #A5A58D;   /* Muted Sage — secondary text / badges      */
     --user-accent-soft:     #DDDDC8;   /* Very light sage for backgrounds           */
     --user-bg:              #F8F7F2;   /* Warm Bone background                      */
     --user-surface:         #FFFFFF;   /* Card surface                              */

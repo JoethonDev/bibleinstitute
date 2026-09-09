@@ -1,15 +1,9 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 {% block body %}
 <div class="container-fluid py-3 ad-page ad-calendar-page" id="content">
-  <nav aria-label="{% translate 'Breadcrumb' %}">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-      <li class="breadcrumb-item active">{% translate "Calendar" %}</li>
-    </ol>
-  </nav>
 
   <div class="ad-pane-head">
     <h4 class="ad-pane-title">{% translate "Calendar Management" %}</h4>
@@ -45,6 +39,7 @@
               hx-select="#calendar-content"
               hx-swap="outerHTML"
               hx-push-url="true"
+              hx-sync="this:abort"
               class="d-flex align-items-center gap-2">
           <input type="hidden" name="academic_year" value="{{ year_id }}">
           <label for="nav-year-select" class="form-label mb-0 visually-hidden">{% translate "Year" %}</label>
@@ -95,77 +90,8 @@
     </div>
   </div>
 
-  {# Calendar grid #}
-  <div class="ad-calmg-grid">
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Mon" %}</div>
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Tue" %}</div>
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Wed" %}</div>
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Thu" %}</div>
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Fri" %}</div>
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Sat" %}</div>
-    <div class="ad-calmg-wd ad-calendar-weekday">{% translate "Sun" %}</div>
-    {% for week in month_grid %}
-      {% for day in week %}
-      <div class="ad-calmg-cell
-        {% if day.outside_month %} is-out{% endif %}
-        {% if day.is_holiday %} is-holiday{% endif %}
-        {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
-        {% if day.is_today %} is-today{% endif %}
-      ">
-        {% if day.in_year and not day.outside_month %}
-        <div class="ad-calendar-cell-content">
-        <div class="ad-calendar-day-number">{{ day.day }}</div>
-         {% if day.is_holiday %}
-            <div class="ad-calendar-holiday">
-              <small>{{ day.holiday_name }}</small>
-            <form method="post" action="{% url 'delete-holiday' day.holiday_id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this holiday?' %}">
-              {% csrf_token %}
-              <button type="submit" class="btn-close btn-sm holiday-delete" aria-label="{% translate 'Delete' %}"></button>
-            </form>
-           </div>
-          {% endif %}
-          {% for meeting in day.meetings %}
-          <div class="ad-calendar-meeting" title="{{ meeting.course_name }}">
-            <strong class="ad-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="ad-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
-            {% if can_edit_meetings %}
-            <form method="post" action="{% url 'delete-meeting' meeting.id %}" class="ps-inline-form" data-confirm-message="{% translate 'Delete this meeting?' %}">
-              {% csrf_token %}
-              <button type="submit" class="btn-close btn-sm" aria-label="{% translate 'Delete meeting' %}"></button>
-            </form>
-            {% endif %}
-          </div>
-          {% endfor %}
-          {% if can_edit_meetings and day.meeting_offerings %}
-            <template id="meeting-offerings-{{ day.date }}">
-              <option value="">{% translate "Select offering..." %}</option>
-              {% for offering in day.meeting_offerings %}
-              <option value="{{ offering.pk }}">{{ offering.academic_year_level.level.display_name }} — {{ offering.course.name }}</option>
-              {% endfor %}
-            </template>
-            <div class="d-flex gap-1 mt-1 ad-calendar-add-actions">
-              <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
-                      data-date="{{ day.date }}" data-year="{{ year_id }}"
-                      data-offerings-template="meeting-offerings-{{ day.date }}"
-                      aria-label="{% translate 'Add meeting' %}">
-                <i class="fas fa-church"></i>
-              </button>
-              {% if not day.is_holiday %}
-              <button class="ad-action-btn" data-bs-toggle="modal" data-bs-target="#addHolidayModal"
-                      data-date="{{ day.date }}" data-year="{{ year_id }}"
-                      aria-label="{% translate 'Add holiday' %}">
-                <i class="fas fa-plus"></i>
-              </button>
-              {% endif %}
-            </div>
-          {% endif %}
-        </div>
-        {% else %}
-        <div class="ps-muted-text ad-calendar-day-number">{{ day.day }}</div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    {% endfor %}
-  </div>
+  {# Calendar grid — canonical shared partial (read-only variant is used on the student calendar) #}
+  {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
 
   {# Legend #}
   <div class="d-flex gap-3 mt-2 small ad-card-body ad-calendar-legend">
@@ -189,7 +115,7 @@
   <div class="modal fade" id="addHolidayModal" tabindex="-1" aria-labelledby="addHolidayModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
-        <form method="post" action="{% url 'add-holiday' %}">
+        <form method="post" action="{% url 'add-holiday' %}" hx-post="{% url 'add-holiday' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
           {% csrf_token %}
           <input type="hidden" name="academic_year_id" id="modal-year-id">
           <input type="hidden" name="date" id="modal-date">
@@ -220,7 +146,7 @@
   <div class="modal fade" id="addMeetingModal" tabindex="-1" aria-labelledby="addMeetingModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
-        <form method="post" action="{% url 'add-meeting' %}">
+        <form method="post" action="{% url 'add-meeting' %}" hx-post="{% url 'add-meeting' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
           {% csrf_token %}
           <input type="hidden" name="academic_year_id" id="meeting-modal-year-id">
           <input type="hidden" name="date" id="meeting-modal-date">

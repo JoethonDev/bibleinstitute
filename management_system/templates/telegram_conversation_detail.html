@@ -1,18 +1,10 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
 <div id="content" class="container-fluid py-3 ad-page tg-chat-page">
-
-    <nav aria-label="{% translate 'Breadcrumb' %}">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item"><a href="{{ conversation_list_url }}">{% translate "Telegram Support Chat" %}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ conversation.user.get_full_name|default:conversation.user.username }}</li>
-        </ol>
-    </nav>
 
     <div id="telegram-chat-panel" class="tg-chat-panel">
         {% include 'partials/telegram_chat_panel.html' %}

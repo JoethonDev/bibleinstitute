@@ -1,17 +1,10 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
 <div id="content" class="container-fluid py-3 ad-page tg-chat-page">
-
-    <nav aria-label="{% translate 'Breadcrumb' %}">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{% translate "Telegram Support Chat" %}</li>
-        </ol>
-    </nav>
 
     <div class="tg-chat-header">
         <div>
@@ -60,23 +53,45 @@
             <div class="modal-body">
                 <p class="tg-chat-start-desc">{% translate "Find a linked student to open or start their conversation." %}</p>
 
-                <form method="get" action="{{ conversation_list_url }}" class="tg-chat-start-form">
+                <form method="get" action="{{ conversation_list_url }}"
+                      class="tg-chat-start-form"
+                      hx-get="{{ conversation_list_url }}"
+                      hx-target="#telegram-linked-user-list"
+                      hx-select="#telegram-linked-user-list"
+                      hx-swap="outerHTML"
+                      hx-push-url="true"
+                      hx-sync="this:abort">
                     <input type="hidden" name="search" value="{{ search }}">
                     <input type="hidden" name="status" value="{{ status }}">
                     <label class="form-label" for="telegram-linked-user-search">{% translate "Search linked users" %}</label>
+                    <span id="telegram-start-loading" class="htmx-indicator ms-1" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
                     <input id="telegram-linked-user-search"
                            class="form-control"
                            type="search"
                            name="start_search"
                            value="{{ start_search }}"
                            placeholder="{% translate 'Search by name or username' %}"
-                           autocomplete="off">
+                           autocomplete="off"
+                           hx-get="{{ conversation_list_url }}"
+                           hx-include="closest form"
+                           hx-trigger="keyup changed delay:400ms, search"
+                           hx-target="#telegram-linked-user-list"
+                           hx-select="#telegram-linked-user-list"
+                           hx-swap="outerHTML"
+                           hx-push-url="true"
+                           hx-indicator="#telegram-start-loading">
                     <div class="tg-chat-start-actions">
                         <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
                             <i class="fas fa-search me-1" aria-hidden="true"></i>{% translate "Search" %}
                         </button>
                         {% if start_search %}
-                        <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ conversation_list_url }}">
+                        <a class="ad-btn ad-btn--ghost ad-btn--sm"
+                           href="{{ conversation_list_url }}"
+                           hx-get="{{ conversation_list_url }}"
+                           hx-target="#telegram-linked-user-list"
+                           hx-select="#telegram-linked-user-list"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
                             <i class="fas fa-times me-1" aria-hidden="true"></i>{% translate "Clear" %}
                         </a>
                         {% endif %}

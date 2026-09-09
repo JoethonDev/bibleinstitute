@@ -49,7 +49,17 @@
         const key = `media-session-reload:${window.location.pathname}`;
         if (sessionStorage.getItem(key)) return;
         sessionStorage.setItem(key, '1');
-        window.location.reload();
+        // Media authorization expired: refresh the page content region so all
+        // signed media URLs are re-issued without a full document reload.
+        if (window.htmx) {
+            htmx.ajax('GET', window.location.pathname + window.location.search, {
+                target: '#content',
+                select: '#content',
+                swap: 'outerHTML',
+            });
+        } else {
+            window.location.reload();
+        }
     }
 
     function initializeHlsAudio(audio) {
@@ -172,15 +182,30 @@
         attachMediaSource(event.detail?.element, event.detail?.url);
     });
 
-    document.body.addEventListener('htmx:beforeSwap', event => {
-        if (event.detail.target.id === 'display-page') {
-            disposeVideoJsPlayers(event.detail.target);
+    function swapTarget(event) {
+        // The vendored HTMX 4 runtime dispatches lifecycle events with the
+        // request context: detail.ctx.target holds the swap target element.
+        return event.detail?.ctx?.target || event.detail?.target || null;
+    }
+
+    function isMediaSwapTarget(target) {
+        return Boolean(target) && (target.id === 'display-page' || target.id === 'content');
+    }
+
+    document.body.addEventListener('htmx:before:swap', event => {
+        const target = swapTarget(event);
+        if (isMediaSwapTarget(target)) {
+            disposeVideoJsPlayers(target);
         }
     });
 
-    document.body.addEventListener('htmx:afterSwap', event => {
-        if (event.detail.target.id === 'display-page') {
-            initializeAllElements(event.detail.target);
+    document.body.addEventListener('htmx:after:swap', event => {
+        const target = swapTarget(event);
+        if (isMediaSwapTarget(target)) {
+            // A fresh content region carries newly signed media URLs, so any
+            // one-shot expired-media reload guard can be released.
+            sessionStorage.removeItem(`media-session-reload:${window.location.pathname}`);
+            initializeAllElements(target);
         }
     });
 

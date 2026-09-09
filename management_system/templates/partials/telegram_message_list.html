@@ -14,8 +14,9 @@
          destroy() { this._stop(); },
          _start() { if (!this._timer) this._timer = setInterval(() => this._poll(), 10000); },
          _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
-         _poll() {
-             const el = this.$el.querySelector('#telegram-message-items');
+          _poll() {
+              if (document.hidden) return;
+              const el = this.$el.querySelector('#telegram-message-items');
              if (!el || !el.dataset.pollUrl) return;
              const url = el.dataset.pollUrl + '&after=' + (el.dataset.lastId || '0');
              htmx.ajax('GET', url, { target: el, swap: 'beforeend' })
@@ -44,62 +45,9 @@
         {% include 'partials/telegram_message_items.html' with message_items=messages_page_obj show_empty=True %}
     </ol>
 
-    {% if messages_page_obj.has_other_pages %}
-    <div class="ad-page-wrapper">
-        <nav aria-label="{% translate 'Message history pagination' %}">
-            <ul class="ad-page-nav">
-                {% if messages_page_obj.has_previous %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ detail_url }}?page={{ messages_page_obj.previous_page_number }}"
-                       aria-label="{% translate 'Previous page' %}"
-                       title="{% translate 'Previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </span>
-                </li>
-                {% endif %}
-                {% for number in messages_page_obj.paginator.page_range %}
-                <li>
-                    <a class="ad-page-link {% if number == messages_page_obj.number %}is-active{% endif %}"
-                       href="{{ detail_url }}?page={{ number }}"
-                       {% if number == messages_page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
-                </li>
-                {% endfor %}
-                {% if messages_page_obj.has_next %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ detail_url }}?page={{ messages_page_obj.next_page_number }}"
-                       aria-label="{% translate 'Next page' %}"
-                       title="{% translate 'Next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </span>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        <div class="ad-page-info">
-            {% blocktranslate with start=messages_page_obj.start_index end=messages_page_obj.end_index total=messages_page_obj.paginator.count %}
-                Showing {{ start }}–{{ end }} of {{ total }} messages
-            {% endblocktranslate %}
-        </div>
-    </div>
-    {% endif %}
+    {% translate "messages" as messages_label %}
+    {% translate "Message history pagination" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=messages_page_obj base_url=detail_url item_label=messages_label aria_label=pagination_aria_label %}
 
     <form method="post"
           action="{{ reply_url }}"

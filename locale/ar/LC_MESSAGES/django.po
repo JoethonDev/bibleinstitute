@@ -10259,6 +10259,33 @@ msgstr "نسخ الرمز"
 msgid "Too many time ranges."
 msgstr "عدد نطاقات الوقت كبير جدًا."
 
+msgid "Saved results pagination"
+msgstr "التنقل بين صفحات النتائج المحفوظة"
+
+msgid "Evaluation preview pagination"
+msgstr "ترقيم معاينة التقييم"
+
+msgid "broadcasts"
+msgstr "رسائل جماعية"
+
+msgid "conversations"
+msgstr "محادثات"
+
+msgid "linked users"
+msgstr "مستخدمين مرتبطين"
+
+msgid "results"
+msgstr "نتائج"
+
+msgid "messages"
+msgstr "رسائل"
+
+msgid "Load more files"
+msgstr "تحميل المزيد من الملفات"
+
+msgid "Loading more files…"
+msgstr "جارٍ تحميل المزيد من الملفات…"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 
@@ -10346,9 +10373,6 @@ msgstr "عدد نطاقات الوقت كبير جدًا."
 
 #~ msgid "Attendance records"
 #~ msgstr "سجلات الحضور"
-
-#~ msgid "Saved results pagination"
-#~ msgstr "التنقل بين صفحات النتائج المحفوظة"
 
 #~ msgid ""
 #~ "Date when the evaluation is performed. Must fall within the academic year."

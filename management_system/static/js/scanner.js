@@ -61,7 +61,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', init);
-    document.addEventListener('htmx:afterSwap', init);
-    document.addEventListener('htmx:beforeSwap', stop);
+    document.addEventListener('htmx:after:swap', init);
+    document.addEventListener('htmx:before:swap', stop);
     window.addEventListener('beforeunload', stop);
 }());

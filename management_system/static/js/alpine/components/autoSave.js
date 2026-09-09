@@ -202,6 +202,13 @@ function formValidation() {
                 }
             } catch (e) { /* clearDraft is optional */ }
 
+            // HTMX forms swap the response fragment into the page region; htmx
+            // issues the request and Django remains the validation authority.
+            // Native document submit remains the no-HTMX fallback.
+            if (window.htmx && form.hasAttribute('hx-post')) {
+                return;
+            }
+
             // Native form submit — includes the csrfmiddlewaretoken hidden input.
             form.submit();
         }

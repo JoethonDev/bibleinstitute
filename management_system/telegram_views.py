@@ -43,10 +43,12 @@ from .telegram.configuration import (
     stored_token,
     webhook_secret,
 )
+from .utils.search import normalized_contains_q, normalize_search_text
 from .telegram.linking import unlink_own_telegram_account
 from .telegram.support import SupportReplyError, reply_to_conversation, start_conversation
 from .telegram_tasks import process_telegram_update
 from .telegram.policy import webhook_url
+from .utils.helpers import generate_breadcrumb, pagination_query_string
 from .telegram.broadcasts import (
     ALL_LEVEL_VALUE,
     BroadcastError,
@@ -75,6 +77,10 @@ def _configuration_context(config, form, config_error=""):
         "config": config,
         "config_form": form,
         "webhook_url": target_webhook_url,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Telegram Bot"), None),
+        ]),
         "status_label": _("Active") if config.is_active else _("Inactive"),
         "config_error": config_error or config.last_error,
     }
@@ -351,11 +357,12 @@ def _representative_conversations():
 def _conversation_search_queryset(search: str):
     queryset = _representative_conversations()
     if search:
+        search = normalize_search_text(search)
         queryset = queryset.filter(
-            Q(user__username__icontains=search)
-            | Q(user__first_name__icontains=search)
-            | Q(user__last_name__icontains=search)
-            | Q(user__email__icontains=search)
+            normalized_contains_q(
+                ("user__username", "user__first_name", "user__last_name", "user__email"),
+                search,
+            )
             | Q(user__telegram_conversations__messages__text__icontains=search)
         ).distinct()
     return queryset
@@ -371,7 +378,7 @@ def _conversation_status_counts(queryset):
 
 
 def _conversation_list_context(request):
-    search = request.GET.get("search", "").strip()[:120]
+    search = normalize_search_text(request.GET.get("search", "").strip()[:120])
     status = request.GET.get("status", "").strip()
     if status not in TELEGRAM_CONVERSATION_STATUSES:
         status = ""
@@ -400,6 +407,11 @@ def _conversation_list_context(request):
     page_obj = Paginator(conversations, 25).get_page(request.GET.get("page", 1))
     return {
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request, exclude=("page", "start_page")),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Telegram Support Chat"), None),
+        ]),
         "search": search,
         "status": status,
         "status_counts": status_counts,
@@ -414,16 +426,16 @@ def telegram_conversations(request):
     if request.GET.get("fragment") == "1":
         return render(request, "partials/telegram_conversation_list.html", context)
 
-    start_search = request.GET.get("start_search", "").strip()[:120]
+    start_search = normalize_search_text(request.GET.get("start_search", "").strip()[:120])
     linked_users = TelegramAccount.objects.filter(
         is_active=True,
     ).select_related("user", "user__role")
     if start_search:
         linked_users = linked_users.filter(
-            Q(user__username__icontains=start_search)
-            | Q(user__first_name__icontains=start_search)
-            | Q(user__last_name__icontains=start_search)
-            | Q(user__email__icontains=start_search)
+            normalized_contains_q(
+                ("user__username", "user__first_name", "user__last_name", "user__email"),
+                start_search,
+            )
         )
     active_conversation = TelegramConversation.objects.filter(
         user_id=OuterRef("user_id"),
@@ -500,6 +512,11 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "panel_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "conversation_list_url": reverse("telegram-conversations"),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Telegram Support Chat"), reverse("telegram-conversations")),
+            (conversation.user.get_full_name() or conversation.user.username, None),
+        ]),
         "search": request.GET.get("search", "").strip()[:120],
         "status": request.GET.get("status", "").strip(),
         "reply_to_message_id": reply_to_message_id,
@@ -611,7 +628,9 @@ def telegram_start_conversation(request, user_id):
         conversation = start_conversation(admin=request.user, user_id=user_id)
     except SupportReplyError as exc:
         messages.error(request, str(exc))
-        return redirect("user-profile", user_id=user_id)
+        # Return to the conversations page: the HTMX transition contract
+        # selects #content, which the user profile does not contain.
+        return redirect("telegram-conversations")
     return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
 
 
@@ -666,6 +685,11 @@ def telegram_broadcasts(request):
     page_obj = Paginator(broadcasts, 25).get_page(request.GET.get("page", 1))
     context = {
         "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Telegram Broadcasts"), None),
+        ]),
         "broadcast_list_url": reverse("telegram-broadcasts"),
         "compose_url": reverse("telegram-broadcast-create"),
     }
@@ -688,6 +712,11 @@ def telegram_broadcast_create(request):
         "levels": links,
         "compose_url": reverse("telegram-broadcast-create"),
         "broadcast_list_url": reverse("telegram-broadcasts"),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Telegram Broadcasts"), reverse("telegram-broadcasts")),
+            (_("Compose Broadcast"), None),
+        ]),
         "max_attachment_bytes": MAX_BROADCAST_ATTACHMENT_BYTES,
     }
     if request.method != "POST":
@@ -744,6 +773,11 @@ def telegram_broadcast_confirm_page(request, broadcast_id):
             "confirm_url": reverse("telegram-broadcast-confirm", kwargs={"broadcast_id": broadcast.pk}),
             "cancel_url": reverse("telegram-broadcast-cancel", kwargs={"broadcast_id": broadcast.pk}),
             "broadcast_list_url": reverse("telegram-broadcasts"),
+            "breadcrumb_items": generate_breadcrumb([
+                (_("Admin"), reverse("admin-panel")),
+                (_("Telegram Broadcasts"), reverse("telegram-broadcasts")),
+                (_("Confirm Broadcast"), None),
+            ]),
         },
     )
 
@@ -793,6 +827,11 @@ def telegram_broadcast_detail(request, broadcast_id):
             "retry_url": reverse("telegram-broadcast-retry", kwargs={"broadcast_id": broadcast.pk}),
             "confirm_url": reverse("telegram-broadcast-confirm-page", kwargs={"broadcast_id": broadcast.pk}),
             "cancel_url": reverse("telegram-broadcast-cancel", kwargs={"broadcast_id": broadcast.pk}),
+            "breadcrumb_items": generate_breadcrumb([
+                (_("Admin"), reverse("admin-panel")),
+                (_("Telegram Broadcasts"), reverse("telegram-broadcasts")),
+                (_("Broadcast Details"), None),
+            ]),
         },
     )
 

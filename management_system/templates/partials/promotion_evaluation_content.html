@@ -1,0 +1,911 @@
+{% load i18n %}
+
+<div class="ad-page" id="content">
+    <div class="container-fluid py-3">
+
+    <div class="ad-pane-head ad-pane-head--bordered">
+        <h4 class="ad-pane-title mb-0"><i class="fas fa-calculator me-2 ad-page-header-icon"></i>{% translate "Promotion Formula Builder" %}</h4>
+        <span id="promotion-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+    </div>
+
+    <nav class="ad-stepper mb-4" aria-label="{% translate 'Promotion workflow' %}">
+        <ol class="d-flex flex-wrap gap-2 list-unstyled mb-0">
+            <li class="ad-stepper-item is-active"><span class="ad-stepper-number">1</span>{% translate "Scope" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">2</span>{% translate "Formula" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">3</span>{% translate "Preview results" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">4</span>{% translate "Overrides" %}</li>
+            <li class="ad-stepper-item"><span class="ad-stepper-number">5</span>{% translate "Promote" %}</li>
+        </ol>
+    </nav>
+
+    {# --- Explanation card --- #}
+    <div class="ad-card mb-4">
+        <div class="ad-card-body">
+            <p class="mb-0 text-muted">
+                {% translate "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering." %}
+            </p>
+        </div>
+    </div>
+
+    {# --- Scope selector --- #}
+    <div class="ad-card mb-4">
+        <div class="ad-card-head">
+            <h6 class="mb-0"><i class="fas fa-layer-group me-2"></i>{% translate "Select Academic Scope" %}</h6>
+        </div>
+        <div class="ad-card-body">
+            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end">
+                <div class="ad-form-field col-md-5 col-lg-4">
+                    <label for="scope-selector" class="form-label">{% translate "Academic Year / Level" %}</label>
+                    <select name="scope" id="scope-selector" class="form-select" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "Select a scope…" %}</option>
+                        {% for s in scopes %}
+                        <option value="{{ s.pk }}" {% if selected_scope and selected_scope.pk == s.pk %}selected{% endif %}>
+                            {{ s.academic_year.name }} — {{ s.level.display_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if selected_scope %}
+                <div class="ad-form-field col-md-5 col-lg-4">
+                    <label for="course-offering-selector" class="form-label">{% translate "Course Offering" %}</label>
+                    <select name="course_offering" id="course-offering-selector" class="form-select" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "All courses" %}</option>
+                        {% for co in course_offerings %}
+                        <option value="{{ co.pk }}" {% if selected_offering and selected_offering.pk == co.pk %}selected{% endif %}>
+                            {{ co.course.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">{% translate "Leave empty for an all-courses formula, or select a specific course to configure a course-specific override." %}</div>
+                </div>
+                {% endif %}
+                <div class="ad-form-actions col-md-auto">
+                    <button type="submit" class="ad-btn ad-btn--teal">
+                        <i class="fas fa-search me-1"></i>{% translate "Load" %}
+                    </button>
+                </div>
+            </form>
+            {% if selected_scope %}
+            <div class="mt-3">
+                <span class="ad-pill ad-pill--teal">
+                    <i class="fas fa-calendar-alt me-1"></i>{{ selected_scope.academic_year.name }}
+                    &mdash;
+                    <i class="fas fa-graduation-cap me-1"></i>{{ selected_scope.level.display_name }}
+                </span>
+    </div>
+
+    {# --- Saved Evaluation Results (read-only with admin override) --- #}
+    {% if results_page_obj is not None %}
+    <div class="ad-card mb-4">
+        <div class="ad-card-head">
+            <h6 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>{% translate "Saved Evaluation Results" %}</h6>
+        </div>
+        <div class="ad-card-body">
+            <p class="text-muted small mb-3">
+                {% translate "These are persisted evaluation results. Scores and statuses were calculated when the formula was last saved. Only administrators may override the final status of an individual result." %}
+            </p>
+
+            {# Filter form — GET to promotion-formula, preserves scope #}
+            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
+                <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
+                <div class="ad-form-field col-md-3">
+                    <label for="result-search" class="form-label">{% translate "Student" %}</label>
+                    <input type="text" name="result_search" id="result-search" class="form-control form-control-sm"
+                           value="{{ result_search|default:'' }}" placeholder="{% translate "Name or email…" %}"
+                           hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:400ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                </div>
+                <div class="ad-form-field col-md-2">
+                    <label for="result-computed-status" class="form-label">{% translate "Computed" %}</label>
+                    <select name="computed_status" id="result-computed-status" class="form-select form-select-sm" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="pass" {% if result_computed_status == 'pass' %}selected{% endif %}>{% translate "Pass" %}</option>
+                        <option value="fail" {% if result_computed_status == 'fail' %}selected{% endif %}>{% translate "Fail" %}</option>
+                        <option value="unevaluable" {% if result_computed_status == 'unevaluable' %}selected{% endif %}>{% translate "Unevaluable" %}</option>
+                    </select>
+                </div>
+                <div class="ad-form-field col-md-2">
+                    <label for="result-final-status" class="form-label">{% translate "Final" %}</label>
+                    <select name="final_status" id="result-final-status" class="form-select form-select-sm" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="pass" {% if result_final_status == 'pass' %}selected{% endif %}>{% translate "Pass" %}</option>
+                        <option value="fail" {% if result_final_status == 'fail' %}selected{% endif %}>{% translate "Fail" %}</option>
+                        <option value="unevaluable" {% if result_final_status == 'unevaluable' %}selected{% endif %}>{% translate "Unevaluable" %}</option>
+                    </select>
+                </div>
+                <div class="ad-form-field col-md-2">
+                    <label for="result-override" class="form-label">{% translate "Override" %}</label>
+                    <select name="override" id="result-override" class="form-select form-select-sm" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="overridden" {% if result_override == 'overridden' %}selected{% endif %}>{% translate "Overridden" %}</option>
+                        <option value="not_overridden" {% if result_override == 'not_overridden' %}selected{% endif %}>{% translate "Not overridden" %}</option>
+                    </select>
+                </div>
+                <div class="ad-form-field col-md-2">
+                    <label for="result-study-mode" class="form-label">{% translate "Mode" %}</label>
+                    <select name="study_mode" id="result-study-mode" class="form-select form-select-sm" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="online" {% if result_study_mode == 'online' %}selected{% endif %}>{% translate "Online" %}</option>
+                        <option value="offline" {% if result_study_mode == 'offline' %}selected{% endif %}>{% translate "Offline" %}</option>
+                    </select>
+                </div>
+                <div class="ad-form-field col-md-2">
+                    <label for="result-grading-errors" class="form-label">{% translate "Grading Errors" %}</label>
+                    <select name="grading_errors" id="result-grading-errors" class="form-select form-select-sm" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="yes" {% if result_grading_errors == 'yes' %}selected{% endif %}>{% translate "Has errors" %}</option>
+                        <option value="no" {% if result_grading_errors == 'no' %}selected{% endif %}>{% translate "No errors" %}</option>
+                    </select>
+                </div>
+                <div class="ad-form-actions col-md-auto d-flex gap-2">
+                    <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                        <i class="fas fa-filter me-1"></i>{% translate "Filter" %}
+                    </button>
+                    <a href="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-get="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost ad-btn--sm">
+                        <i class="fas fa-times me-1"></i>{% translate "Clear" %}
+                    </a>
+                </div>
+            </form>
+
+            {% if results_page_obj.object_list %}
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                {% if is_formula_admin and is_aggregate_formula %}
+                <form method="post" action="{% url 'bulk-promotion-results' %}" hx-post="{% url 'bulk-promotion-results' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" id="bulk-promotion-form" class="mb-0" data-confirm-message="{% translate 'Are you sure?' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
+                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                        <i class="fas fa-graduation-cap me-1"></i>{% translate "Promote selected students" %}
+                    </button>
+                </form>
+                {% endif %}
+                <a href="{% url 'export-evaluation-xlsx' %}?scope={{ selected_scope.pk }}{% if selected_offering_id %}&amp;course_offering={{ selected_offering_id }}{% endif %}"
+                   class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                    <i class="fas fa-file-excel me-1"></i>{% translate "Export XLSX" %}
+                </a>
+                <span class="text-muted small">{% translate "Only saved, unconsumed results may be promoted." %}</span>
+            </div>
+            <div class="ad-table-wrap">
+                <table class="ad-table mb-0">
+                    <caption class="visually-hidden">{% translate "Saved evaluation results" %}</caption>
+                    <thead>
+                        <tr>
+                            {% if is_formula_admin and is_aggregate_formula %}<th scope="col" class="text-center"><span class="visually-hidden">{% translate "Select" %}</span></th>{% endif %}
+                            <th scope="col" class="text-center">{% translate "Student" %}</th>
+                            <th scope="col" class="text-center">{% translate "Score" %}</th>
+                            <th scope="col" class="text-center">{% translate "Computed" %}</th>
+                            <th scope="col" class="text-center">{% translate "Final" %}</th>
+                            <th scope="col" class="text-center">{% translate "Override" %}</th>
+                            <th scope="col" class="text-center">{% translate "Issues" %}</th>
+                            <th scope="col" class="text-center">{% translate "Failed Courses" %}</th>
+                            {% if is_formula_admin %}
+                            <th scope="col" class="text-center">{% translate "Actions" %}</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results_page_obj %}
+                        <tr>
+                            {% if is_formula_admin and is_aggregate_formula %}<td><input type="checkbox" name="result_ids" value="{{ result.pk }}" form="bulk-promotion-form" aria-label="{% translate 'Select result for promotion' %}"></td>{% endif %}
+                            <td>{{ result.enrollment.student.get_full_name|default:result.enrollment.student.username }}</td>
+                            <td>{{ result.computed_score|floatformat:1 }}%</td>
+                            <td>
+                                {% if result.computed_status == "pass" %}
+                                <span class="ad-pill ad-pill--success">{% translate "Pass" %}</span>
+                                {% elif result.computed_status == "fail" %}
+                                <span class="ad-pill ad-pill--danger">{% translate "Fail" %}</span>
+                                {% elif result.computed_status == "unevaluable" %}
+                                <span class="ad-pill ad-pill--warning">{% translate "Unevaluable" %}</span>
+                                {% else %}
+                                <span class="ad-pill ad-pill--muted">{{ result.computed_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.final_status == "pass" %}
+                                <span class="ad-pill ad-pill--success">{% translate "Pass" %}</span>
+                                {% elif result.final_status == "fail" %}
+                                <span class="ad-pill ad-pill--danger">{% translate "Fail" %}</span>
+                                {% elif result.final_status == "unevaluable" %}
+                                <span class="ad-pill ad-pill--warning">{% translate "Unevaluable" %}</span>
+                                {% else %}
+                                <span class="ad-pill ad-pill--muted">{{ result.final_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">
+                                {% if result.overridden_by %}
+                                <span title="{% translate "Overridden by" %} {{ result.overridden_by.get_full_name|default:result.overridden_by.username }}">
+                                    <i class="fas fa-user-edit me-1 text-info"></i>
+                                    {{ result.overridden_by.get_full_name|default:result.overridden_by.username }}
+                                </span>
+                                {% if result.overridden_at %}
+                                <br><span class="text-muted">{{ result.overridden_at|date:"SHORT_DATE_FORMAT" }}</span>
+                                {% endif %}
+                                {% if result.override_note %}
+                                <br><span class="fst-italic text-muted">"{{ result.override_note }}"</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">
+                                {% with snapshot=result.metric_snapshot %}
+                                {% if snapshot %}
+                                    {% if snapshot.grading_errors %}
+                                    <ul class="list-unstyled mb-0 text-danger">
+                                        {% for error in snapshot.grading_errors %}
+                                        <li><i class="fas fa-exclamation-triangle me-1"></i>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% endif %}
+                                    {% if snapshot.unresolved_question_count %}
+                                    <span class="ad-pill ad-pill--warning mt-1"
+                                          title="{% translate "Unresolved manually graded questions excluded from score" %}">
+                                        <i class="fas fa-flag me-1"></i>{{ snapshot.unresolved_question_count }}
+                                        ({{ snapshot.unresolved_question_points|floatformat:1 }} pts)
+                                    </span>
+                                    {% endif %}
+                                    {% if not snapshot.grading_errors and not snapshot.unresolved_question_count %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td class="small">
+                                {% with snapshot=result.metric_snapshot %}
+                                {% if snapshot.courses %}
+                                    {% with failed_count=snapshot.failed_course_count threshold=snapshot.repeat_threshold %}
+                                    <div class="mb-1">
+                                        <strong>{% translate "Failed:" %}</strong>
+                                        <span class="ad-pill {% if failed_count >= threshold %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">
+                                            {{ failed_count|default:"0" }}
+                                        </span>
+                                        <span class="text-muted">/ {{ threshold|default:"—" }} {% translate "threshold" %}</span>
+                                    </div>
+                                    {% endwith %}
+                                    <ul class="list-unstyled mb-0 small">
+                                        {% for course in snapshot.courses %}
+                                        <li class="mb-1">
+                                            <span>{% if course.course_name %}{{ course.course_name }}{% else %}{% translate "Course" %}{% endif %}</span>
+                                            {% if course.computed_status == "pass" %}
+                                            <span class="ad-pill ad-pill--success" style="font-size:0.75em;">{% translate "Pass" %}</span>
+                                            {% elif course.computed_status == "fail" %}
+                                            <span class="ad-pill ad-pill--danger" style="font-size:0.75em;">{% translate "Fail" %}</span>
+                                            {% elif course.computed_status == "unevaluable" %}
+                                            <span class="ad-pill ad-pill--warning" style="font-size:0.75em;">{% translate "Unevaluable" %}</span>
+                                            {% endif %}
+                                            {% if course.score is not None %}
+                                            <span class="text-muted">{{ course.score|floatformat:1 }}%</span>
+                                            {% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
+                            {% if is_formula_admin %}
+                            <td>
+                                {% if result.overridden_by %}
+                                <span class="text-muted small">
+                                    <i class="fas fa-check-circle me-1 text-info"></i>{% translate "Overridden" %}
+                                </span>
+                                {% else %}
+                                <form method="post" action="{% url 'evaluation-result-override' result.pk %}" hx-post="{% url 'evaluation-result-override' result.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Are you sure?' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
+                                    <div class="d-flex flex-column gap-1">
+                                        <select name="final_status" class="form-select form-select-sm" required aria-label="{% translate "Override status" %}">
+                                            <option value="">{% translate "Select…" %}</option>
+                                            <option value="pass">{% translate "Pass" %}</option>
+                                            <option value="fail">{% translate "Fail" %}</option>
+                                        </select>
+                                        <input type="text" name="override_note" class="form-control form-control-sm"
+                                               placeholder="{% translate "Note (optional)" %}" aria-label="{% translate "Override note" %}">
+                                        <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                                            <i class="fas fa-edit me-1"></i>{% translate "Override" %}
+                                        </button>
+                                    </div>
+                                </form>
+                                {% endif %}
+                                {% if not is_aggregate_formula %}
+                                <span class="text-muted small mt-1 d-block">{% translate "Course result only" %}</span>
+                                {% elif result.computed_status == "unevaluable" or result.final_status == "unevaluable" %}
+                                <span class="text-muted small mt-1 d-block">
+                                    <i class="fas fa-ban me-1"></i>{% translate "Cannot promote" %}
+                                </span>
+                                {% elif not result.promotion_history %}
+                                <form method="post" action="{% url 'promotion-result' result.pk %}" hx-post="{% url 'promotion-result' result.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="mt-1" data-confirm-message="{% translate 'Are you sure?' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                                        <i class="fas fa-arrow-up me-1"></i>{% translate "Promote" %}
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted small"><i class="fas fa-lock me-1"></i>{% translate "Consumed" %}</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {# Pagination — preserves every saved-results filter, uses separate result_page param #}
+            {% translate "results" as results_label %}
+            {% translate "Saved results pagination" as results_aria_label %}
+            {% include "partials/pagination.html" with page_obj=results_page_obj pagination_query=results_pagination_query page_param="result_page" item_label=results_label aria_label=results_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#promotion-loading" %}
+
+            {% else %}
+            {% translate "No saved results match the current filter criteria." as results_filtered_empty %}
+            {% translate "No saved evaluation results yet. Save the formula with evaluation results to populate this section." as results_empty %}
+            <div class="ad-empty">
+                <i class="fas fa-info-circle"></i>
+                {% if result_search or result_computed_status or result_final_status or result_override or result_study_mode or result_grading_errors %}
+                {% include "partials/empty_state.html" with description=results_filtered_empty %}
+                {% else %}
+                {% include "partials/empty_state.html" with description=results_empty %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+    </div>
+
+    {% if selected_scope %}
+    {# --- Formula form (POST) --- #}
+    <form method="post" action="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-post="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" id="promotion-formula-form">
+        {% csrf_token %}
+
+        <div class="ad-card mb-4">
+            <div class="ad-card-head">
+                <h6 class="mb-0"><i class="fas fa-sliders-h me-2"></i>{% translate "Formula Settings" %}</h6>
+            </div>
+            <div class="ad-card-body">
+                {% if formula_form.non_field_errors %}
+                <div class="ad-alert ad-alert--danger">
+                    {{ formula_form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                {# Scope hidden field + non-editable display when scope is selected #}
+                <div class="mb-3" style="display:none">
+                    <label class="form-label" for="{{ formula_form.academic_year_level.id_for_label }}">{{ formula_form.academic_year_level.label }}</label>
+                    {{ formula_form.academic_year_level }}
+                    {% if formula_form.academic_year_level.errors %}
+                    <div class="text-danger">{{ formula_form.academic_year_level.errors }}</div>
+                    {% endif %}
+                </div>
+
+                {# Show scope as read-only display so admin knows which scope is targeted #}
+                <div class="ad-form-field mb-3">
+                    <label class="form-label">{% translate "Academic Scope" %}</label>
+                    <input type="text" class="form-control" value="{{ selected_scope.academic_year.name }} — {{ selected_scope.level.display_name }}" readonly>
+                </div>
+
+                {# Course offering — hidden when all-courses, selectable for override #}
+                <div class="ad-form-field mb-3">
+                    <label class="form-label" for="{{ formula_form.course_offering.id_for_label }}">
+                        {{ formula_form.course_offering.label }}
+                    </label>
+                    {{ formula_form.course_offering }}
+                    {% if formula_form.course_offering.errors %}
+                    <div class="text-danger">{{ formula_form.course_offering.errors }}</div>
+                    {% endif %}
+                    <div class="form-text">{% translate "Select a specific course to override the all-courses formula for that offering. Leave as All courses for the aggregate formula." %}</div>
+                </div>
+
+                <div class="ad-form-grid row g-3">
+                    <div class="ad-form-field col-md-4">
+                        <label class="form-label" for="{{ formula_form.overall_pass_percent.id_for_label }}">
+                            {{ formula_form.overall_pass_percent.label }} <span class="text-muted">(%)</span>
+                        </label>
+                        {{ formula_form.overall_pass_percent }}
+                        {% if formula_form.overall_pass_percent.errors %}
+                        <div class="text-danger">{{ formula_form.overall_pass_percent.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">{% translate "The minimum overall percentage a student must achieve to pass." %}</div>
+                    </div>
+                    <div class="ad-form-field col-md-4">
+                        <label class="form-label" for="{{ formula_form.evaluation_starts_on.id_for_label }}">
+                            {{ formula_form.evaluation_starts_on.label }}
+                        </label>
+                        {{ formula_form.evaluation_starts_on }}
+                        {% if formula_form.evaluation_starts_on.errors %}
+                        <div class="text-danger">{{ formula_form.evaluation_starts_on.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">{% translate "Inclusive start date for the evaluation period. All quizzes, lessons, and attendance within this range are considered." %}</div>
+                    </div>
+                    <div class="ad-form-field col-md-4">
+                        <label class="form-label" for="{{ formula_form.evaluation_ends_on.id_for_label }}">
+                            {{ formula_form.evaluation_ends_on.label }}
+                        </label>
+                        {{ formula_form.evaluation_ends_on }}
+                        {% if formula_form.evaluation_ends_on.errors %}
+                        <div class="text-danger">{{ formula_form.evaluation_ends_on.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">{% translate "Inclusive end date for the evaluation period. Cannot be a future date." %}</div>
+                    </div>
+                </div>
+
+                <div class="ad-form-grid row g-3 mt-2">
+                    <div class="ad-form-field col-md-6">
+                        <label class="form-label" for="{{ formula_form.failed_courses_repeat_threshold.id_for_label }}">
+                            {{ formula_form.failed_courses_repeat_threshold.label }}
+                        </label>
+                        {{ formula_form.failed_courses_repeat_threshold }}
+                        {% if formula_form.failed_courses_repeat_threshold.errors %}
+                        <div class="text-danger">{{ formula_form.failed_courses_repeat_threshold.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">{% translate "If a student fails fewer courses than this threshold, they are promoted with exceptional enrollments for the failed courses. If they fail at or above this threshold, they repeat the entire level." %}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# --- Rules formset --- #}
+        <div class="ad-card mb-4">
+            <div class="ad-card-head d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-list-ol me-2"></i>{% translate "Promotion Rules" %}</h6>
+                <div>
+                    <span class="text-muted small me-2" id="weight-summary">{% translate "Total weight: 0%" %}</span>
+                    <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" onclick="addRule()" id="add-rule-btn">
+                        <i class="fas fa-plus me-1"></i>{% translate "Add Rule" %}
+                    </button>
+                </div>
+            </div>
+            <div class="ad-card-body">
+                {# Management form #}
+                {{ rule_formset.management_form }}
+
+                {% if rule_formset.non_form_errors %}
+                <div class="ad-alert ad-alert--danger">
+                    {{ rule_formset.non_form_errors }}
+                </div>
+                {% endif %}
+
+                <div class="ad-table-wrap">
+                    <table class="ad-rules-table ad-table mb-0" id="rules-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="text-center">{% translate "Metric" %}</th>
+                                <th scope="col" class="text-center">{% translate "Quiz Type" %}</th>
+                                <th scope="col" class="text-center">{% translate "Weight (%)" %}</th>
+                                <th scope="col" class="text-center">{% translate "Min. Pass (%)" %}</th>
+                                <th scope="col" class="text-center">{% translate "Delete" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rules-tbody">
+                            {% for rule_form in rule_formset %}
+                            <tr class="rule-row" data-form-index="{{ forloop.counter0 }}">
+                                {% for hidden in rule_form.hidden_fields %}
+                                {{ hidden }}
+                                {% endfor %}
+                                <td>
+                                    {{ rule_form.metric }}
+                                    {% if rule_form.metric.errors %}
+                                    <div class="text-danger small">{{ rule_form.metric.errors }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ rule_form.quiz_type }}
+                                    {% if rule_form.quiz_type.errors %}
+                                    <div class="text-danger small">{{ rule_form.quiz_type.errors }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ rule_form.weight_percent }}
+                                    {% if rule_form.weight_percent.errors %}
+                                    <div class="text-danger small">{{ rule_form.weight_percent.errors }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ rule_form.minimum_percent }}
+                                    {% if rule_form.minimum_percent.errors %}
+                                    <div class="text-danger small">{{ rule_form.minimum_percent.errors }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {{ rule_form.DELETE.as_hidden }}
+                                    <button type="button" class="ad-btn ad-btn--danger ad-btn--sm btn-remove-rule" onclick="removeRule(this)" title="{% translate "Remove rule" %}" aria-label="{% translate "Remove rule" %}">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr id="no-rules-row">
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    {% translate "No rules defined. Add a rule to begin building the promotion formula." %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <p class="small text-muted mb-1">
+                        <i class="fas fa-info-circle me-1"></i>
+                        {% translate "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%." %}
+                    </p>
+                    <p class="small text-muted mb-0">
+                        <i class="fas fa-check-circle me-1"></i>
+                        {% translate "Minimum Pass is the minimum percentage required for that individual metric. Every applicable rule must meet its minimum, and the overall weighted score must also meet the overall pass threshold. Online students omit attendance; applicable quiz weights are normalized automatically." %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {# --- Submit / Preview / Reset --- #}
+        <div class="d-flex gap-2 mb-4">
+            <button type="submit" name="action" value="save" class="ad-btn ad-btn--teal">
+                <i class="fas fa-save me-1"></i>{% translate "Save Formula" %}
+            </button>
+            <button type="submit" name="action" value="preview" class="ad-btn ad-btn--ghost">
+                <i class="fas fa-eye me-1"></i>{% translate "Preview Without Saving" %}
+            </button>
+            <a href="{% url 'promotion-formula' %}" class="ad-btn ad-btn--ghost">
+                <i class="fas fa-times me-1"></i>{% translate "Reset" %}
+            </a>
+        </div>
+    </form>
+
+    {# --- Evaluation Preview (read-only, supplied by academic_evaluation.py) --- #}
+    {% if preview_rows is not None %}
+    <div class="ad-card mb-4">
+        <div class="ad-card-head">
+            <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>{% translate "Evaluation Preview" %}</h6>
+        </div>
+        <div class="ad-card-body">
+            {% translate "This preview shows calculated scores based on the saved formula. No results have been saved. Students with unresolved manual grading are excluded from their computed scores." as preview_help_text %}
+            <p class="text-muted small mb-3">{{ preview_help_text }}</p>
+
+            {# Plan-level grading errors #}
+            {% if preview_grading_errors %}
+            <div class="ad-alert ad-alert--warning">
+                <div>
+                    <b><i class="fas fa-exclamation-triangle me-1"></i>{% translate "Grading Configuration Issues" %}</b>
+                </div>
+                <ul class="mb-0 mt-1">
+                    {% for error in preview_grading_errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {# Search form — preserves scope via GET #}
+            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
+                <input type="hidden" name="scope" value="{{ preview_scope_id }}">
+                {% if not selected_offering_id %}
+                <div class="ad-form-field col-md-5 col-lg-4">
+                    <label for="preview-offering" class="form-label">{% translate "Preview course" %}</label>
+                    <select name="preview_offering" id="preview-offering" class="form-select" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                        <option value="">{% translate "Select a course to preview" %}</option>
+                        {% for co in course_offerings %}
+                        <option value="{{ co.pk }}" {% if preview_offering_id == co.pk %}selected{% endif %}>{{ co.course.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="ad-form-field col-md-6 col-lg-4">
+                    <label for="preview-search" class="form-label">{% translate "Search Students" %}</label>
+                    <input type="text" name="search" id="preview-search" class="form-control"
+                           value="{{ preview_search|default:'' }}" placeholder="{% translate "Name or email…" %}"
+                           hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:400ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                </div>
+                <div class="ad-form-actions col-md-auto d-flex gap-2">
+                    <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                        <i class="fas fa-search me-1"></i>{% translate "Search" %}
+                    </button>
+                    {% if preview_search %}
+                    <a href="{% url 'promotion-formula' %}?scope={{ preview_scope_id }}{% if preview_offering_id %}&amp;preview_offering={{ preview_offering_id }}{% endif %}" hx-get="{% url 'promotion-formula' %}?scope={{ preview_scope_id }}{% if preview_offering_id %}&amp;preview_offering={{ preview_offering_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost ad-btn--sm">
+                        <i class="fas fa-times me-1"></i>{% translate "Clear" %}
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+
+            {% if preview_rows %}
+            <div class="ad-table-wrap">
+                <table class="ad-table mb-0">
+                    <caption class="visually-hidden">{% translate "Evaluation preview results" %}</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="text-center">{% translate "Course" %}</th>
+                            <th scope="col" class="text-center">{% translate "Published Lectures" %}</th>
+                            <th scope="col" class="text-center">{% translate "Student" %}</th>
+                            <th scope="col" class="text-center">{% translate "Score" %}</th>
+                            <th scope="col" class="text-center">{% translate "Status" %}</th>
+                            <th scope="col" class="text-center">{% translate "Metrics" %}</th>
+                            <th scope="col" class="text-center">{% translate "Issues" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_rows %}
+                        <tr>
+                            <td>{{ row.course_offering.course.name|default:"—" }}</td>
+                            <td class="text-center">{{ row.published_lesson_count|default:"—" }}</td>
+                            <td>{{ row.student.get_full_name|default:row.student.username }}</td>
+                            <td>{{ row.computed_score|floatformat:1 }}%</td>
+                            <td>
+                                {% if row.computed_status == "pass" %}
+                                <span class="ad-pill ad-pill--success">{% translate "Pass" %}</span>
+                                {% elif row.computed_status == "fail" %}
+                                <span class="ad-pill ad-pill--danger">{% translate "Fail" %}</span>
+                                {% else %}
+                                <span class="ad-pill ad-pill--muted">{{ row.computed_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">
+                                {% if row.metrics %}
+                                <ul class="list-unstyled mb-0">
+                                    {% for metric in row.metrics %}
+                                    <li>
+                                        <strong>{{ metric.metric }}:</strong>
+                                        {{ metric.earned }}/{{ metric.denominator }} ({{ metric.percent|floatformat:1 }}%)
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">
+                                {% if row.grading_errors %}
+                                <ul class="list-unstyled mb-0 text-danger">
+                                    {% for error in row.grading_errors %}
+                                    <li><i class="fas fa-exclamation-triangle me-1"></i>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                                {% if row.unresolved_question_count %}
+                                <span class="ad-pill ad-pill--warning mt-1"
+                                      title="{% translate "Unresolved manually graded questions excluded from score" %}">
+                                    <i class="fas fa-flag me-1"></i>{{ row.unresolved_question_count }}
+                                    ({{ row.unresolved_question_points|floatformat:1 }} pts)
+                                </span>
+                                {% endif %}
+                                {% if not row.grading_errors and not row.unresolved_question_count %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {# Pagination — preserves scope and search #}
+            {% translate "students" as students_label %}
+            {% translate "Evaluation preview pagination" as preview_aria_label %}
+            {% include "partials/pagination.html" with page_obj=preview_page_obj pagination_query=preview_pagination_query item_label=students_label aria_label=preview_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#promotion-loading" %}
+
+            {% else %}
+            {% translate "No students match the current search criteria." as preview_filtered_empty %}
+            {% translate "No evaluation data available. Ensure the formula is saved and the scope has enrolled students with quiz submissions or attendance records." as preview_empty %}
+            <div class="ad-empty">
+                <i class="fas fa-info-circle"></i>
+                {% if preview_search %}
+                {% include "partials/empty_state.html" with description=preview_filtered_empty %}
+                {% else %}
+                {% include "partials/empty_state.html" with description=preview_empty %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+
+{# --- Empty form template for JS cloning --- #}
+<template id="rule-empty-form-template">
+    <tr class="rule-row" data-form-index="__prefix__">
+        {% for hidden in rule_formset.empty_form.hidden_fields %}
+        {{ hidden }}
+        {% endfor %}
+        <td>
+            {{ rule_formset.empty_form.metric }}
+            <div class="text-danger small"></div>
+        </td>
+        <td>
+            {{ rule_formset.empty_form.quiz_type }}
+            <div class="text-danger small"></div>
+        </td>
+        <td>
+            {{ rule_formset.empty_form.weight_percent }}
+            <div class="text-danger small"></div>
+        </td>
+        <td>
+            {{ rule_formset.empty_form.minimum_percent }}
+            <div class="text-danger small"></div>
+        </td>
+        <td class="text-center">
+            {{ rule_formset.empty_form.DELETE.as_hidden }}
+            <button type="button" class="ad-btn ad-btn--danger ad-btn--sm btn-remove-rule" onclick="removeRule(this)" title="{% translate "Remove rule" %}" aria-label="{% translate "Remove rule" %}">
+                <i class="fas fa-times"></i>
+            </button>
+        </td>
+    </tr>
+</template>
+
+<script>
+(function() {
+    'use strict';
+
+    var MANAGEMENT_PREFIX = 'rules';
+    var tbody = document.getElementById('rules-tbody');
+    var noRulesRow = document.getElementById('no-rules-row');
+    var template = document.getElementById('rule-empty-form-template');
+    var totalFormsInput = document.getElementById('id_' + MANAGEMENT_PREFIX + '-TOTAL_FORMS');
+    var weightSummary = document.getElementById('weight-summary');
+
+    if (!tbody || !template || !totalFormsInput) return;
+
+    /* --- Visible rule helpers --- */
+
+    function visibleRuleRows() {
+        var rows = tbody.querySelectorAll('tr.rule-row');
+        var visible = [];
+        rows.forEach(function(row) {
+            if (row.style.display !== 'none') {
+                visible.push(row);
+            }
+        });
+        return visible;
+    }
+
+    function updateRemoveButtons() {
+        var visible = visibleRuleRows();
+        var btns = tbody.querySelectorAll('.btn-remove-rule');
+        var isOnlyOne = visible.length <= 1;
+        btns.forEach(function(btn) {
+            if (isOnlyOne) {
+                btn.disabled = true;
+                btn.title = '{% translate "At least one rule is required." %}';
+                btn.setAttribute('aria-label', '{% translate "Cannot remove the last rule." %}');
+            } else {
+                btn.disabled = false;
+                btn.title = '{% translate "Remove rule" %}';
+                btn.setAttribute('aria-label', '{% translate "Remove rule" %}');
+            }
+        });
+    }
+
+    /* --- Metric / quiz-type synchronization --- */
+
+    function syncMetricQuizType(row) {
+        var metricSelect = row.querySelector('.rule-metric');
+        var quizTypeSelect = row.querySelector('.rule-quiz-type');
+        if (!metricSelect || !quizTypeSelect) return;
+        if (metricSelect.value === 'attendance') {
+            quizTypeSelect.disabled = true;
+            quizTypeSelect.value = '';
+        } else {
+            quizTypeSelect.disabled = false;
+        }
+    }
+
+    function syncAllMetricQuizTypes() {
+        var rows = tbody.querySelectorAll('tr.rule-row');
+        rows.forEach(function(row) {
+            syncMetricQuizType(row);
+        });
+    }
+
+    /* --- Add / Remove --- */
+
+    window.addRule = function() {
+        var currentCount = parseInt(totalFormsInput.value, 10);
+        var templateHtml = template.innerHTML;
+        var newHtml = templateHtml.replace(/__prefix__/g, currentCount);
+        var tempWrapper = document.createElement('tbody');
+        tempWrapper.innerHTML = newHtml;
+        var newRow = tempWrapper.querySelector('tr');
+
+        if (noRulesRow) {
+            noRulesRow.remove();
+            noRulesRow = null;
+        }
+
+        tbody.appendChild(newRow);
+        totalFormsInput.value = currentCount + 1;
+
+        /* Attach metric change listener and sync the new row */
+        var metricSelect = newRow.querySelector('.rule-metric');
+        if (metricSelect) {
+            metricSelect.addEventListener('change', function() {
+                syncMetricQuizType(newRow);
+            });
+        }
+        syncMetricQuizType(newRow);
+
+        updateWeightSummary();
+        updateRemoveButtons();
+    };
+
+    window.removeRule = function(btn) {
+        var visible = visibleRuleRows();
+        if (visible.length <= 1) {
+            /* Cannot remove the last visible rule */
+            return;
+        }
+        var row = btn.closest('tr.rule-row');
+        if (!row) return;
+        var deleteInput = row.querySelector('input[name$="-DELETE"]');
+        if (deleteInput) {
+            deleteInput.value = 'on';
+        }
+        row.style.display = 'none';
+        updateWeightSummary();
+        updateRemoveButtons();
+    };
+
+    /* --- Weight summary --- */
+
+    function updateWeightSummary() {
+        if (!weightSummary) return;
+        var inputs = tbody ? tbody.querySelectorAll('input[name$="-weight_percent"]') : [];
+        var total = 0;
+        inputs.forEach(function(input) {
+            var row = input.closest('tr.rule-row');
+            if (row && row.style.display !== 'none') {
+                var val = parseFloat(input.value);
+                if (!isNaN(val)) total += val;
+            }
+        });
+        weightSummary.textContent = '{% translate "Total weight:" %} ' + total.toFixed(2) + '%';
+    }
+
+    /* --- Event listeners --- */
+
+    // Replace the previous page instance so HTMX navigation never accumulates listeners.
+    if (window.__promotionListenerCleanup) window.__promotionListenerCleanup();
+    var promotionInputListener = function(e) {
+        if (e.target && e.target.name && e.target.name.indexOf('-weight_percent') !== -1) {
+            updateWeightSummary();
+        }
+    };
+
+    // Listen for metric changes (delegated) to sync quiz type
+    var promotionChangeListener = function(e) {
+        if (e.target && e.target.classList.contains('rule-metric')) {
+            var row = e.target.closest('tr.rule-row');
+            if (row) {
+                syncMetricQuizType(row);
+            }
+        }
+    };
+    document.addEventListener('input', promotionInputListener);
+    document.addEventListener('change', promotionChangeListener);
+    window.__promotionListenerCleanup = function() {
+        document.removeEventListener('input', promotionInputListener);
+        document.removeEventListener('change', promotionChangeListener);
+    };
+
+    /* --- Initialization --- */
+
+    updateWeightSummary();
+    syncAllMetricQuizTypes();
+
+    // Mark existing DELETE-flagged rows as hidden on load
+    (function hideDeletedRows() {
+        var rows = tbody ? tbody.querySelectorAll('tr.rule-row') : [];
+        rows.forEach(function(row) {
+            var deleteInput = row.querySelector('input[name$="-DELETE"]');
+            if (deleteInput && deleteInput.value === 'on') {
+                row.style.display = 'none';
+            }
+        });
+    })();
+
+    updateRemoveButtons();
+
+})();
+</script>
+</div>

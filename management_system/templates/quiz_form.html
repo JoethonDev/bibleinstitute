@@ -79,11 +79,7 @@
         </div>
         <div class="ad-card-body">
 
-            <form action="" method="post"
-                  class="admin-form"
-                  x-data="formValidation()"
-                  @submit="handleSubmit($event)"
-                  novalidate>
+            <form action="" method="post" class="admin-form" x-data="formValidation()" @submit="handleSubmit($event)" @htmx:finally:request.window="submitting = false" novalidate hx-post="" hx-target="#display-page" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                 {% csrf_token %}
                 
                 <!-- Quiz Details -->

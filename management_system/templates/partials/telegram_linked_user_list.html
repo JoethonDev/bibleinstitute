@@ -9,7 +9,7 @@
                 <img class="tg-chat-avatar-img"
                      src="{% url 'application-document' account.user.pk 'profile' %}"
                      alt=""
-                     loading="lazy"
+                     loading="lazy" decoding="async"
                      referrerpolicy="no-referrer">
                 {% else %}
                 <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
@@ -29,7 +29,7 @@
                     {% translate "Open" %}
                 </a>
                 {% else %}
-                <form method="post" action="{% url 'telegram-start-conversation' account.user.pk %}">
+                <form method="post" action="{% url 'telegram-start-conversation' account.user.pk %}" hx-post="{% url 'telegram-start-conversation' account.user.pk %}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
                     <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
                         {% translate "Start Telegram conversation" %}
@@ -48,60 +48,7 @@
         {% endfor %}
     </ul>
 
-    {% if linked_user_page_obj.has_other_pages %}
-    <div class="ad-page-wrapper tg-chat-linked-pagination">
-        <nav aria-label="{% translate 'Linked user pagination' %}">
-            <ul class="ad-page-nav">
-                {% if linked_user_page_obj.has_previous %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ conversation_list_url }}?{% if start_search %}start_search={{ start_search|urlencode }}&amp;{% endif %}{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}start_page={{ linked_user_page_obj.previous_page_number }}"
-                       aria-label="{% translate 'Previous page' %}"
-                       title="{% translate 'Previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-                        <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
-                    </span>
-                </li>
-                {% endif %}
-                {% for number in linked_user_page_obj.paginator.page_range %}
-                <li>
-                    <a class="ad-page-link {% if number == linked_user_page_obj.number %}is-active{% endif %}"
-                       href="{{ conversation_list_url }}?{% if start_search %}start_search={{ start_search|urlencode }}&amp;{% endif %}{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}start_page={{ number }}"
-                       {% if number == linked_user_page_obj.number %}aria-current="page"{% endif %}>{{ number }}</a>
-                </li>
-                {% endfor %}
-                {% if linked_user_page_obj.has_next %}
-                <li>
-                    <a class="ad-page-link"
-                       href="{{ conversation_list_url }}?{% if start_search %}start_search={{ start_search|urlencode }}&amp;{% endif %}{% if search %}search={{ search|urlencode }}&amp;{% endif %}{% if status %}status={{ status }}&amp;{% endif %}start_page={{ linked_user_page_obj.next_page_number }}"
-                       aria-label="{% translate 'Next page' %}"
-                       title="{% translate 'Next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li>
-                    <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
-                        <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
-                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-                    </span>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        <div class="ad-page-info">
-            {% blocktranslate with start=linked_user_page_obj.start_index end=linked_user_page_obj.end_index total=linked_user_page_obj.paginator.count %}
-                Showing {{ start }}–{{ end }} of {{ total }} linked users
-            {% endblocktranslate %}
-        </div>
-    </div>
-    {% endif %}
+    {% translate "linked users" as linked_users_label %}
+    {% translate "Linked user pagination" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=linked_user_page_obj pagination_query=pagination_query page_param="start_page" base_url=conversation_list_url item_label=linked_users_label aria_label=pagination_aria_label wrapper_class="tg-chat-linked-pagination" %}
 </div>

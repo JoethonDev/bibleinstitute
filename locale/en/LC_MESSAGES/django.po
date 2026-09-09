@@ -9694,6 +9694,33 @@ msgstr "Only missing signup documents can be uploaded."
 msgid "Missing signup documents uploaded successfully."
 msgstr "Missing signup documents uploaded successfully."
 
+msgid "Saved results pagination"
+msgstr "Saved results pagination"
+
+msgid "Evaluation preview pagination"
+msgstr "Evaluation preview pagination"
+
+msgid "broadcasts"
+msgstr "broadcasts"
+
+msgid "conversations"
+msgstr "conversations"
+
+msgid "linked users"
+msgstr "linked users"
+
+msgid "results"
+msgstr "results"
+
+msgid "messages"
+msgstr "messages"
+
+msgid "Load more files"
+msgstr "Load more files"
+
+msgid "Loading more files…"
+msgstr "Loading more files…"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 
@@ -9774,9 +9801,6 @@ msgstr "Payment Receipt"
 
 #~ msgid "Attendance records"
 #~ msgstr "Attendance records"
-
-#~ msgid "Saved results pagination"
-#~ msgstr "Saved results pagination"
 
 #~ msgid "Date when the evaluation is performed. Must fall within the academic year."
 #~ msgstr "Date when the evaluation is performed. Must fall within the academic year."

@@ -17,14 +17,84 @@
     });
 
     document.addEventListener('DOMContentLoaded', function () {
+        // HTMX 4 does not use localStorage for history snapshots by default.
+        // Alpine owns client state, so every restored URL is authoritative.
         var offcanvas = document.getElementById('mobileAdminMenu');
-        var offcanvasLinks = offcanvas ? offcanvas.querySelectorAll('.nav-link') : [];
         function closeMenu() {
             if (!offcanvas || typeof bootstrap === 'undefined' || !bootstrap.Offcanvas) return;
             bootstrap.Offcanvas.getOrCreateInstance(offcanvas).hide();
         }
-        offcanvasLinks.forEach(function (link) {
-            link.addEventListener('click', closeMenu);
+        if (offcanvas) {
+            // The shared admin links use .ad-tab, not Bootstrap's .nav-link.
+            // Delegation also covers links added by an HTMX fragment.
+            offcanvas.addEventListener('click', function (event) {
+                if (event.target.closest && event.target.closest('a.ad-tab')) closeMenu();
+            });
+        }
+        document.addEventListener('htmx:before:request', function (event) {
+            if (offcanvas && event.target && offcanvas.contains(event.target)) closeMenu();
+        });
+    });
+
+    // Scroll-triggered pagination for the R2/Drive browser. The server renders
+    // a #drive-next-sentinel carrying the next-page URL; when it approaches the
+    // viewport, the next page replaces #file-list-container (innerHTML) exactly
+    // like the former Next button, and the new sentinel is observed. No URL is
+    // pushed to history: scrolling must not spam browser history.
+    var driveSentinelObserver = null;
+
+    function loadDriveNextPage(sentinel) {
+        if (!sentinel || !sentinel.dataset.nextUrl) return;
+        if (sentinel.dataset.loading) return;
+        sentinel.classList.add('is-loading');
+        sentinel.dataset.loading = '1';
+        var request = htmx.ajax('GET', sentinel.dataset.nextUrl, {
+            target: '#file-list-container',
+            swap: 'innerHTML'
+        });
+        var settle = function () {
+            sentinel.classList.remove('is-loading');
+            delete sentinel.dataset.loading;
+            if (driveSentinelObserver && !sentinel.isConnected) {
+                driveSentinelObserver.unobserve(sentinel);
+            }
+        };
+        request.then(settle).catch(settle);
+    }
+
+    function scanDriveSentinels() {
+        if (typeof IntersectionObserver === 'undefined') return;
+        if (!driveSentinelObserver) {
+            driveSentinelObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) loadDriveNextPage(entry.target);
+                });
+            }, { rootMargin: '300px 0px' });
+        }
+        var sentinels = document.querySelectorAll('#drive-next-sentinel[data-next-url]');
+        for (var i = 0; i < sentinels.length; i++) {
+            var sentinel = sentinels[i];
+            if (!sentinel.dataset.observed) {
+                sentinel.dataset.observed = '1';
+                driveSentinelObserver.observe(sentinel);
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        scanDriveSentinels();
+        document.addEventListener('htmx:after:swap', scanDriveSentinels);
+        document.addEventListener('click', function (event) {
+            var sentinel = event.target.closest && event.target.closest('#drive-next-sentinel[data-next-url]');
+            if (sentinel) loadDriveNextPage(sentinel);
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            var sentinel = event.target.closest && event.target.closest('#drive-next-sentinel[data-next-url]');
+            if (sentinel) {
+                event.preventDefault();
+                loadDriveNextPage(sentinel);
+            }
         });
     });
 
@@ -34,13 +104,15 @@
     if (!modal || !message || !confirmButton || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
 
     var pendingAction = null;
+    var pendingCancel = null;
     var confirming = false;
     var lastTrigger = null;
 
-    function showConfirmation(question, action) {
+    function showConfirmation(question, action, onCancel) {
         if (!question || typeof action !== 'function' || confirming) return false;
         confirming = true;
         pendingAction = action;
+        pendingCancel = typeof onCancel === 'function' ? onCancel : null;
         message.textContent = question;
         lastTrigger = document.activeElement;
 
@@ -51,6 +123,7 @@
             if (!confirming) return;
             var callback = pendingAction;
             pendingAction = null;
+            pendingCancel = null;
             confirming = false;
             button.disabled = true;
             // Remove focus before Bootstrap sets aria-hidden on the modal.
@@ -68,6 +141,7 @@
             if (confirming) {
                 confirming = false;
                 pendingAction = null;
+                if (pendingCancel) { var drop = pendingCancel; pendingCancel = null; drop(); }
             }
             if (modal.contains(document.activeElement) && document.activeElement.blur) {
                 document.activeElement.blur();
@@ -90,7 +164,11 @@
             delete form.dataset.confirmed;
             return;
         }
+        // Capture phase + stopPropagation: the vendored HTMX runtime never
+        // checks defaultPrevented, so without this the hx-post request would
+        // fire immediately, before the user confirms.
         event.preventDefault();
+        event.stopPropagation();
         var submitter = event.submitter;
         showConfirmation(form.dataset.confirmMessage, function () {
             form.dataset.confirmed = 'true';
@@ -118,11 +196,18 @@
     });
 
     document.addEventListener('htmx:confirm', function (event) {
-        if (!event.detail || !event.detail.question) return;
+        if (!event.detail || typeof event.detail.issueRequest !== 'function') return;
+        // The vendored HTMX 4 runtime exposes the question on the request
+        // context (ctx.confirm), not as detail.question.
+        var question = event.detail.question
+            || (event.detail.ctx && event.detail.ctx.confirm)
+            || '';
+        if (!question) return;
         event.preventDefault();
-        showConfirmation(event.detail.question, function () {
+        var dropRequest = event.detail.dropRequest;
+        showConfirmation(String(question), function () {
             event.detail.issueRequest(true);
-        });
+        }, dropRequest);
     });
 
     if (typeof bootstrap.Modal !== 'undefined') {

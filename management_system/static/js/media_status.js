@@ -7,6 +7,13 @@
     var root = document.getElementById('content');
     if (!root || !root.hasAttribute('data-status-labels')) return;
     if (cleanup) cleanup();
+    function refreshStatusRegion() {
+        if (window.htmx) {
+            htmx.ajax('GET', window.location.pathname + window.location.search, { target: '#content', select: '#content', swap: 'outerHTML' });
+        } else {
+            window.location.reload();
+        }
+    }
     function parseLabels(name) {
         try {
             return JSON.parse(root.getAttribute(name) || '{}');
@@ -38,7 +45,7 @@
                         throw new Error((data && data.message) || retryFailed);
                     });
                 }
-                window.location.reload();
+                refreshStatusRegion();
             }).catch(function (error) {
                 button.disabled = false;
                 button.setAttribute('aria-label', error.message);
@@ -80,7 +87,7 @@
                     if ((job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') && !attachmentPending) {
                         row.setAttribute('data-media-terminal', '1');
                         if (job.status === 'failed' || (job.status === 'succeeded' && job.attachment_status === 'failed')) {
-                            window.location.reload();
+                            refreshStatusRegion();
                         }
                     }
                 });
@@ -93,6 +100,6 @@
     cleanup = function () { window.clearInterval(timer); timer = null; };
     }
     document.addEventListener('DOMContentLoaded', init);
-    document.addEventListener('htmx:afterSwap', init);
-    document.addEventListener('htmx:beforeSwap', function () { if (cleanup) cleanup(); });
+    document.addEventListener('htmx:after:swap', init);
+    document.addEventListener('htmx:before:swap', function () { if (cleanup) cleanup(); });
 })();

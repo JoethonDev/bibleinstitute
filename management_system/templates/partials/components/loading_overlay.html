@@ -1,9 +1,9 @@
 {% load i18n %}
 <!-- Global Loading Overlay (Psalmodia) -->
 <div 
-    x-data="{ loading: false, pending: 0, timeoutId: null, isMajor(event) { return !event.detail || !event.detail.target || event.detail.target.id === 'display-page'; }, start(event) { if (!this.isMajor(event)) return; this.pending++; this.loading = true; clearTimeout(this.timeoutId); this.timeoutId = setTimeout(() => { this.pending = 0; this.loading = false; }, 12000); }, stop(event) { if (!this.isMajor(event)) return; this.pending = Math.max(0, this.pending - 1); if (!this.pending) { clearTimeout(this.timeoutId); this.timeoutId = null; this.loading = false; } } }"
-    @htmx:before-request.window="start($event)"
-    @htmx:after-request.window="stop($event)"
+    x-data="{ loading: false, pending: 0, timeoutId: null, target(event) { return event.detail?.ctx?.target || event.detail?.target || null; }, isMajor(event) { const target = this.target(event); return !target || target.id === 'display-page'; }, start(event) { if (!this.isMajor(event)) return; this.pending++; this.loading = true; clearTimeout(this.timeoutId); this.timeoutId = setTimeout(() => { this.pending = 0; this.loading = false; this.timeoutId = null; }, 12000); }, stop(event) { if (!this.isMajor(event)) return; this.pending = Math.max(0, this.pending - 1); if (!this.pending) { clearTimeout(this.timeoutId); this.timeoutId = null; this.loading = false; } } }"
+    @htmx:before:request.window="start($event)"
+    @htmx:finally:request.window="stop($event)"
     x-show="loading"
     x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0"

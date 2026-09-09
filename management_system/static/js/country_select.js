@@ -36,4 +36,4 @@ function enhanceCountrySelects() {
 }
 
 document.addEventListener('DOMContentLoaded', enhanceCountrySelects);
-document.addEventListener('htmx:afterSwap', enhanceCountrySelects);
+document.addEventListener('htmx:after:swap', enhanceCountrySelects);

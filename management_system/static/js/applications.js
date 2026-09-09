@@ -17,23 +17,33 @@
     }
 
     function stateOwner() {
-        return document.getElementById('content') || document;
+        // The applications workspace is replaced during HTMX filter and
+        // pagination requests. Keep the selection controller outside that
+        // fragment so all-matching selection and exclusions survive swaps.
+        return window;
     }
 
     function getState(root) {
         var owner = stateOwner();
         var status = root.dataset.selectionStatus || 'all';
+        var scope = root.dataset.selectionScope || status;
         var token = root.dataset.selectionToken || '';
         if (!owner._applicationBulkState
-            || owner._applicationBulkState.status !== status
-            || owner._applicationBulkState.token !== token) {
+            || owner._applicationBulkState.scope !== scope) {
             owner._applicationBulkState = {
+                scope: scope,
                 status: status,
                 token: token,
                 all: false,
                 selected: new Set(),
                 excluded: new Set()
             };
+        } else {
+            // Tokens are reissued for each paginated response. Keep the
+            // selection for the stable filter scope, but always submit the
+            // most recent signed token to the server.
+            owner._applicationBulkState.status = status;
+            owner._applicationBulkState.token = token;
         }
         return owner._applicationBulkState;
     }
@@ -133,7 +143,7 @@
                         target: '#applications-workspace',
                         select: '#applications-workspace',
                         swap: 'outerHTML',
-                        pushUrl: false
+                        push: false
                     });
                     if (refresh && typeof refresh.catch === 'function') {
                         refresh.catch(function (error) {
@@ -199,15 +209,6 @@
     if (!initialized) {
         initialized = true;
         document.addEventListener('DOMContentLoaded', boot);
-        document.addEventListener('htmx:afterSwap', boot);
-        document.addEventListener('htmx:afterSettle', boot);
-        document.addEventListener('applicationDecisionCompleted', function (event) {
-            var drawer = document.getElementById('applicationReviewDrawer');
-            if (drawer && window.bootstrap && bootstrap.Offcanvas) {
-                bootstrap.Offcanvas.getOrCreateInstance(drawer).hide();
-            }
-            var detail = event.detail || {};
-            if (detail.message) notify(detail.message, detail.level || 'success');
-        });
+        document.addEventListener('htmx:after:swap', boot);
     }
 }());

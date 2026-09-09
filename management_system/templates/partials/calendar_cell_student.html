@@ -1,0 +1,24 @@
+{% load i18n %}
+{# Student calendar cell: strictly read-only — no action buttons, forms, or controls. #}
+{# Consumes: day (shared month-grid day dict scoped to the student's enrollment). #}
+{# Reuses the approved .sd-day skin; state classes follow the canonical is-out/is-holiday/is-meeting/is-today contract. #}
+<div class="sd-day
+  {% if day.outside_month %} is-out{% endif %}
+  {% if day.is_holiday %} is-holiday{% endif %}
+  {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
+  {% if day.is_today %} is-today{% endif %}
+">
+  {% if day.in_year and not day.outside_month %}
+  <div class="sd-day-body">
+    <div class="sd-day-number">{{ day.day }}</div>
+    {% if day.is_holiday %}
+    <div class="sd-day-holiday" title="{{ day.holiday_name }}">{{ day.holiday_name }}</div>
+    {% endif %}
+    {% for meeting in day.meetings %}
+    <div class="sd-day-meeting" title="{{ meeting.course_name }}">{{ meeting.course_name }}</div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="ps-muted-text sd-day-number">{{ day.day }}</div>
+  {% endif %}
+</div>

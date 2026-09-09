@@ -4,12 +4,7 @@
 {% block body %}
 <div id="content" class="container-fluid py-3 ad-page">
   <div class="ad-detail-head">
-    <nav aria-label="{% translate 'Breadcrumb' %}">
-      <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="{% url 'attendance-management' %}">{% translate "Attendance" %}</a></li>
-        <li class="breadcrumb-item active">{% translate "Correct Attendance Record" %}</li>
-      </ol>
-    </nav>
+    {% include "partials/breadcrumbs.html" with breadcrumb_items=breadcrumb_items variant="detail" %}
     <div class="ad-detail-content">
       <h4 class="ad-detail-title mb-0">{% translate "Correct Attendance Record" %}</h4>
     </div>
@@ -44,7 +39,7 @@
         </div>
       </div>
 
-      <form method="post">
+      <form method="post" hx-post="" hx-target="#display-page" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
         {% csrf_token %}
         <div class="mb-3">
           <label for="attendance_date" class="form-label">{% translate "New Date" %}</label>

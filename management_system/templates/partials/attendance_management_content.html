@@ -1,0 +1,119 @@
+{% load i18n %}
+<div id="content" class="container-fluid py-3 ad-page">
+  <div class="ad-pane-head mb-4">
+    <h3 class="ad-pane-title mb-0">{% translate "Attendance Records" %}<span id="attendance-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h3>
+    <p class="ad-pane-desc">{% translate "Attendance" %}</p>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'scanner' %}" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-qrcode me-1"></i>{% translate "Scanner" %}</a>
+      <a href="{% url 'calendar-management' %}" class="ad-btn ad-btn--ghost ad-btn--sm"><i class="fas fa-calendar-days me-1"></i>{% translate "Calendar" %}</a>
+    </div>
+  </div>
+
+  <div class="ad-card">
+    <div class="ad-card-body">
+      <form method="get" class="row g-3 align-items-end mb-4" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#attendance-loading">
+        <div class="col-12 col-md-5 col-lg-4">
+          <label for="academic-year" class="form-label">{% translate "Academic year" %}</label>
+          <select id="academic-year" name="academic_year" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+            <option value="">{% translate "All years" %}</option>
+            {% for y in years %}
+              <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-lg-3">
+          <label for="level" class="form-label">{% translate "Level" %}</label>
+          <select id="level" name="level" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+            <option value="">{% translate "All levels" %}</option>
+            {% for level in levels %}
+              <option value="{{ level.id }}" {% if selected_level == level.id %}selected{% endif %}>{{ level.display_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-lg-2">
+          <label for="date" class="form-label">{% translate "Date" %}</label>
+          <input id="date" name="date" type="date" value="{{ selected_date }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+        </div>
+        <div class="col-12 col-md-4 col-lg-2">
+          <label for="action" class="form-label">{% translate "Action" %}</label>
+          <select id="action" name="action" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+            <option value="">{% translate "All actions" %}</option>
+            <option value="entrance" {% if selected_action == "entrance" %}selected{% endif %}>{% translate "Entrance" %}</option>
+            <option value="exit" {% if selected_action == "exit" %}selected{% endif %}>{% translate "Exit" %}</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-5 col-lg-3">
+          <label for="course-offering" class="form-label">{% translate "Course" %}</label>
+          <select id="course-offering" name="course_offering" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+            <option value="">{% translate "All courses" %}</option>
+            {% for co in course_offerings %}
+              <option value="{{ co.id }}" {% if selected_offering == co.id %}selected{% endif %}>
+                {{ co.course.name }} — {{ co.academic_year_level.level.display_name }} — {{ co.academic_year_level.academic_year }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-5 col-lg-3">
+          <label for="student" class="form-label">{% translate "Student" %}</label>
+          <input id="student" name="student" type="search" value="{{ student_search }}" class="form-control" placeholder="{% translate 'Name, username, or email' %}" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="keyup changed delay:400ms, search">
+        </div>
+        <div class="col-12 col-md-auto">
+          <button type="submit" class="ad-btn ad-btn--teal">{% translate "Filter" %}</button>
+        </div>
+      </form>
+
+      {% if has_filter %}
+      <div class="ad-table-wrap">
+        <table class="ad-table">
+          <thead>
+            <tr>
+              <th>{% translate "Student" %}</th>
+              <th>{% translate "Course" %}</th>
+              <th>{% translate "Year" %}</th>
+              <th>{% translate "Date" %}</th>
+              <th>{% translate "Action" %}</th>
+              <th>{% translate "Scanned by" %}</th>
+              <th>{% translate "Scanned at" %}</th>
+              <th>{% translate "Corrected" %}</th>
+              <th class="text-end">{% translate "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+              <tr>
+                <td class="fw-semibold">{{ r.student.get_full_name|default:r.student.username }}</td>
+                <td>{{ r.course_offering.course.name|default:"—" }}</td>
+                <td>{{ r.course_offering.academic_year_level.academic_year|default:"—" }}</td>
+                <td>{{ r.attendance_date }}</td>
+                <td>{{ r.get_action_display }}</td>
+                <td>{{ r.scanned_by.get_full_name|default:r.scanned_by.username|default:"—" }}</td>
+                <td>{{ r.scanned_at|date:"Y-m-d H:i" }}</td>
+                <td>{% if r.corrected_at %}{{ r.corrected_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
+                <td class="text-end text-nowrap">
+                  <div class="ad-actions">
+                    <a href="{% url 'attendance-correction' r.id %}" class="ad-action-btn" title="{% translate 'Edit' %}"><i class="fas fa-pen"></i></a>
+                    <form method="post" action="{% url 'attendance-delete' r.id %}" hx-post="{% url 'attendance-delete' r.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash"></i></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="ad-empty">{% translate "No attendance records found." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% translate "Attendance pagination" as pagination_aria_label %}
+      {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
+      {% else %}
+      {% translate "Choose a filter to load results" as attendance_empty_title %}
+      {% translate "Select an academic year to view attendance records." as attendance_empty_desc %}
+      <div class="ad-empty">
+        {% include "partials/empty_state.html" with icon="fa-filter" title=attendance_empty_title description=attendance_empty_desc %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

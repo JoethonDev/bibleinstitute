@@ -1,17 +1,10 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
-{% block breadcrumbs %}{% endblock %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
 <div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
-
-            <nav aria-label="{% translate 'Breadcrumb' %}">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'admin-panel' %}">{% translate "Admin" %}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{% translate "Telegram Broadcasts" %}</li>
-        </ol>
-    </nav>
 
     <div class="tg-broadcast-header">
         <div>

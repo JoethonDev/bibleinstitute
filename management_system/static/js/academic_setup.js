@@ -13,7 +13,11 @@
             var instructor = document.getElementById('edit-offering-instructor');
             var status = document.getElementById('edit-offering-status');
             var name = document.getElementById('offeringEditName');
-            if (form) form.action = trigger.dataset.offeringAction || '';
+            if (form) {
+                form.action = trigger.dataset.offeringAction || '';
+                // Keep the HTMX submit target in sync with the per-offering action.
+                if (form.hasAttribute('hx-post')) form.setAttribute('hx-post', form.action);
+            }
             if (course) course.value = trigger.dataset.offeringCourse || '';
             if (instructor) instructor.value = trigger.dataset.offeringInstructor || '';
             if (status) status.value = trigger.dataset.offeringStatus || 'draft';
@@ -22,5 +26,5 @@
     }
 
     document.addEventListener('DOMContentLoaded', init);
-    document.addEventListener('htmx:afterSwap', init);
+    document.addEventListener('htmx:after:swap', init);
 }());

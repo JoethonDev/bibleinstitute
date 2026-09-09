@@ -1,0 +1,70 @@
+{% load i18n %}
+{# Canonical application pagination component. #}
+{# Required: page_obj. Optional: pagination_query (preserved filters), page_param (default "page"), #}
+{# base_url (default: current page), item_label (already-translated noun), aria_label, wrapper_class. #}
+{# Optional HTMX behavior: hx_target (+ hx_select, hx_swap, hx_push_url, hx_indicator, hx_url). #}
+{% if page_obj and page_obj.has_other_pages %}
+{# aria_label and item_label must be passed pre-translated (e.g. {% translate "X" as aria_label %}) so catalogs keep the msgids. #}
+<div class="ad-page-wrapper{% if wrapper_class %} {{ wrapper_class }}{% endif %}">
+    <nav{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}>
+        <ul class="ad-page-nav"
+            {% if hx_target %}hx-target:inherited="{{ hx_target }}"{% if hx_select %} hx-select:inherited="{{ hx_select }}"{% endif %} hx-swap:inherited="{{ hx_swap|default:'innerHTML' }}" hx-push-url:inherited="{{ hx_push_url|default:'true' }}"{% if hx_indicator %} hx-indicator:inherited="{{ hx_indicator }}"{% endif %}{% endif %}>
+            {% if page_obj.has_previous %}
+            <li>
+                <a class="ad-page-link"
+                   href="{{ base_url|default:'' }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}{{ page_param|default:'page' }}={{ page_obj.previous_page_number }}"
+                   {% if hx_target %}hx-get="{% if hx_url %}{{ hx_url }}?{% else %}?{% endif %}{% if pagination_query %}{{ pagination_query }}&{% endif %}{{ page_param|default:'page' }}={{ page_obj.previous_page_number }}"{% endif %}
+                   aria-label="{% translate 'Previous page' %}">
+                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                    <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                </a>
+            </li>
+            {% else %}
+            <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No previous page' %}">
+                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+                    <span class="d-none d-md-inline ms-1">{% translate "Previous" %}</span>
+                </span>
+            </li>
+            {% endif %}
+
+            {% for i in page_obj.paginator.page_range %}
+                {% if page_obj.number == i %}
+                <li aria-current="page"><span class="ad-page-link is-active">{{ i }}</span></li>
+                {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' or forloop.counter == 1 or forloop.revcounter == 1 %}
+                <li>
+                    <a class="ad-page-link"
+                       href="{{ base_url|default:'' }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}{{ page_param|default:'page' }}={{ i }}"
+                       {% if hx_target %}hx-get="{% if hx_url %}{{ hx_url }}?{% else %}?{% endif %}{% if pagination_query %}{{ pagination_query }}&{% endif %}{{ page_param|default:'page' }}={{ i }}"{% endif %}
+                       >{{ i }}</a>
+                </li>
+                {% elif forloop.counter == 2 and page_obj.number > 4 or forloop.revcounter == 2 and page_obj.number < page_obj.paginator.num_pages|add:'-3' %}
+                <li><span class="ad-page-link is-disabled" aria-disabled="true">&hellip;</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li>
+                <a class="ad-page-link"
+                   href="{{ base_url|default:'' }}?{% if pagination_query %}{{ pagination_query }}&{% endif %}{{ page_param|default:'page' }}={{ page_obj.next_page_number }}"
+                   {% if hx_target %}hx-get="{% if hx_url %}{{ hx_url }}?{% else %}?{% endif %}{% if pagination_query %}{{ pagination_query }}&{% endif %}{{ page_param|default:'page' }}={{ page_obj.next_page_number }}"{% endif %}
+                   aria-label="{% translate 'Next page' %}">
+                    <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </a>
+            </li>
+            {% else %}
+            <li>
+                <span class="ad-page-link is-disabled" aria-disabled="true" title="{% translate 'No next page' %}">
+                    <span class="d-none d-md-inline me-1">{% translate "Next" %}</span>
+                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                </span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    <div class="ad-page-info">
+        {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}{% if item_label %} {{ item_label }}{% endif %}
+    </div>
+</div>
+{% endif %}

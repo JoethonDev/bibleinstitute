@@ -835,6 +835,56 @@
 .ad-drive-crumb a { color: var(--ps-teal); text-decoration: none; font-weight: 700; }
 .ad-drive-crumb a:hover { color: var(--ps-gold-deep); }
 
+/* Scroll-triggered next-page sentinel (auto-load on approach, click fallback). */
+.drive-next-sentinel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    min-height: 2.75rem;
+    padding: .55rem 1rem;
+    cursor: pointer;
+    color: var(--ps-muted);
+    font-size: .8rem;
+    font-weight: 650;
+    border: 1px dashed var(--ps-line);
+    border-radius: 8px;
+    transition: color .15s ease, border-color .15s ease;
+}
+
+.drive-next-sentinel:hover,
+.drive-next-sentinel:focus-visible {
+    color: var(--ps-teal);
+    border-color: var(--ps-teal);
+}
+
+.drive-next-sentinel:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
+.drive-next-sentinel .drive-next-idle { display: inline-flex; align-items: center; }
+.drive-next-sentinel .drive-next-loading { display: none; align-items: center; gap: .5rem; }
+.drive-next-sentinel.is-loading { pointer-events: none; color: var(--ps-teal); }
+.drive-next-sentinel.is-loading .drive-next-idle { display: none; }
+.drive-next-sentinel.is-loading .drive-next-loading { display: inline-flex; }
+
+.drive-next-spinner {
+    display: inline-block;
+    width: .95rem;
+    height: .95rem;
+    border: 2px solid var(--ps-line);
+    border-top-color: var(--ps-teal);
+    border-radius: 50%;
+    animation: drive-next-spin .8s linear infinite;
+}
+
+@keyframes drive-next-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .drive-next-spinner { animation: none; }
+}
+
 .ad-drive-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
@@ -1193,10 +1243,12 @@
     opacity: 1;
 }
 
-/* Add-action button row per cell */
+/* Add-action button row per cell. The two controls are color-coded (teal =
+   meeting, gold = holiday) and spaced apart so touch input cannot stray
+   between them. */
 .ad-calendar-add-actions {
     display: flex;
-    gap: .2rem;
+    gap: .55rem;
     flex-wrap: wrap;
     margin-top: auto;
     padding-block-start: .2rem;
@@ -1215,6 +1267,24 @@
     height: 2.75rem;
     font-size: .8rem;
     border-radius: .4rem;
+    border-color: var(--ps-line);
+    background: var(--ps-paper);
+}
+
+.ad-calmg-cell .ad-calendar-add-actions .is-add-meeting { color: var(--ps-teal); }
+.ad-calmg-cell .ad-calendar-add-actions .is-add-meeting:hover,
+.ad-calmg-cell .ad-calendar-add-actions .is-add-meeting:focus-visible {
+    background: var(--ps-teal-soft);
+    color: var(--ps-teal);
+    border-color: var(--ps-teal);
+}
+
+.ad-calmg-cell .ad-calendar-add-actions .is-add-holiday { color: var(--ps-gold-deep); }
+.ad-calmg-cell .ad-calendar-add-actions .is-add-holiday:hover,
+.ad-calmg-cell .ad-calendar-add-actions .is-add-holiday:focus-visible {
+    background: var(--ps-gold-soft);
+    color: var(--ps-gold-deep);
+    border-color: var(--ps-gold);
 }
 
 /* Legend section */
@@ -1284,7 +1354,7 @@
 
 .ad-detail-badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-inline-start: auto; }
 
-.ad-detail-badge {
+.ad-pill--on-dark {
     font-size: .72rem;
     font-weight: 700;
     padding: .22rem .7rem;
@@ -1294,7 +1364,7 @@
     color: var(--ps-gold-soft);
 }
 
-.ad-detail-badge--action {
+.ad-pill--on-dark-action {
     background: rgba(255, 255, 255, .18);
     border-color: transparent;
     color: #fff;
@@ -1399,12 +1469,16 @@
         max-width: 100%;
         overflow-x: clip;
     }
-    .ad-page-header,
+    .ad-pane-head--bordered,
     .ad-toolbar { flex-wrap: wrap; }
-    .ad-page-header > *,
+    .ad-pane-head--bordered > *,
     .ad-toolbar > * { min-width: 0; }
     .ad-toolbar > :last-child { flex-wrap: wrap; }
     .ad-search { flex: 1 1 16rem; max-width: none; }
+    .ad-pane-head { align-items: stretch; gap: .65rem; }
+    .ad-pane-head .ad-search,
+    .ad-pane-head form[role="search"] { flex: 1 1 100%; width: 100%; max-width: none; min-height: 2.75rem; }
+    .ad-search input { min-height: 2.25rem; }
     .ad-rail,
     .admin-sidebar.ad-rail,
     .ad-shell.is-sidebar-collapsed .ad-rail,
@@ -1445,17 +1519,30 @@
     }
 }
 
+/* Comfortable tablet density: keep the rail usable without squeezing the
+   primary content pane at 10- to 12-inch CSS widths. */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+    .admin-layout.ad-shell { grid-template-columns: 14rem minmax(0, 1fr); }
+    .admin-main-content.ad-panes { padding-inline: 1rem; }
+    .ad-pane-title { font-size: 1.35rem; }
+    .ad-toolbar { padding-inline: .8rem; }
+    .ad-toolbar .ad-search { flex-basis: 15rem; }
+}
+
 @media (max-width: 575.98px) {
     .admin-main-content.ad-panes { padding: .75rem .7rem 1.5rem; }
     .ad-stats { grid-template-columns: 1fr; }
     .ad-card-body { padding: .8rem; }
-    .ad-page-header { align-items: flex-start !important; gap: .4rem; }
-    .ad-page-header > * { flex: 1 1 100%; }
+    .ad-pane-head--bordered { align-items: flex-start !important; gap: .4rem; }
+    .ad-pane-head--bordered > * { flex: 1 1 100%; }
     .ad-page-date { text-align: start; }
     .ad-toolbar { align-items: stretch; padding: .65rem 0; }
     .ad-toolbar > * { flex: 1 1 100%; }
     .ad-toolbar > :last-child { width: 100%; }
     .ad-toolbar .ad-btn { flex: 1 1 auto; }
+    .ad-pane-head .ad-pane-title { font-size: 1.25rem; }
+    .ad-pane-head .ad-search,
+    .ad-pane-head form[role="search"] { min-width: 0; }
     .ad-calmg-cell { min-height: 2.5rem; padding: .25rem .35rem; font-size: .72rem; border-radius: .5rem; }
     .ad-calmg-grid { gap: .22rem; }
     /* Calendar compact mode */
@@ -1508,6 +1595,28 @@
     display: none !important;
     background: linear-gradient(180deg, var(--ps-ink-deep), var(--ps-ink-black));
     color: #fff;
+}
+
+.offcanvas#mobileAdminMenu .offcanvas-body {
+    padding: 1rem max(1rem, env(safe-area-inset-right)) 1.25rem max(1rem, env(safe-area-inset-left));
+    overflow-y: auto;
+}
+
+.offcanvas#mobileAdminMenu .ad-tab {
+    min-height: 2.75rem;
+}
+
+@media (max-width: 991.98px) {
+    .mobile-menu-toggle {
+        bottom: calc(1rem + env(safe-area-inset-bottom));
+        right: calc(1rem + env(safe-area-inset-right));
+        min-width: 3.5rem;
+        min-height: 3.5rem;
+    }
+    [dir="rtl"] .mobile-menu-toggle {
+        right: auto;
+        left: calc(1rem + env(safe-area-inset-left));
+    }
 }
 
 .offcanvas#mobileAdminMenu .offcanvas-header {
@@ -1705,13 +1814,13 @@
 }
 
 /* ── Page header (replaces .page-header) ── */
-.ad-page-header {
+.ad-pane-head--bordered {
     margin-bottom: 1.5rem;
     padding-bottom: 0.8rem;
     border-bottom: 2px solid var(--ps-line);
 }
 
-.ad-page-header h4 {
+.ad-pane-head--bordered h4 {
     font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -1976,7 +2085,7 @@
 /* ── Responsive fine-tune for dashboard ── */
 @media (max-width: 575.98px) {
     .ad-bar-label { min-width: 56px; font-size: 0.72rem; }
-    .ad-page-header h4 { font-size: 1.1rem; }
+    .ad-pane-head--bordered h4 { font-size: 1.1rem; }
 }
 
 /* ================================================================================
@@ -2962,3 +3071,6 @@
 @media (prefers-reduced-motion: reduce) {
     .tg-broadcast-attachment { transition: none; }
 }
+
+/* Applications workspace pagination loading indicator */
+#app-table-section { position: relative; min-height: 140px; }

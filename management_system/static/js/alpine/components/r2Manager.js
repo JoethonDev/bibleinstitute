@@ -64,7 +64,7 @@ function r2Manager() {
         applyFilter() {
             const url = new URL(window.location.href);
             url.searchParams.set('filter', this.currentFilter);
-            htmx.ajax('GET', url.toString(), { target: '#file-list-container', pushUrl: true });
+            htmx.ajax('GET', url.toString(), { target: '#file-list-container', push: url.pathname + url.search });
         },
         
         /**
@@ -77,7 +77,7 @@ function r2Manager() {
             } else {
                 url.searchParams.delete('search');
             }
-            htmx.ajax('GET', url.toString(), { target: '#file-list-container', pushUrl: true });
+            htmx.ajax('GET', url.toString(), { target: '#file-list-container', push: url.pathname + url.search });
         },
         
         /**
@@ -89,6 +89,23 @@ function r2Manager() {
             window.open(url.toString(), '_blank');
         },
         
+        /**
+         * Refresh the file list region without a full page reload.
+         * The GET request carries the current ?folder=&filter=&search= params so
+         * the refreshed list matches the current view; Django returns the
+         * r2_browse partial for the file-list-container HX-Target. innerHTML is
+         * used so the #file-list-container card is preserved (the partial's
+         * .ad-card-body becomes its content), matching the existing browse and
+         * admin_shell patterns.
+         */
+        refreshFileList() {
+            if (window.htmx) {
+                htmx.ajax('GET', window.location.href, { target: '#file-list-container', swap: 'innerHTML' });
+            } else {
+                window.location.reload();
+            }
+        },
+
         /**
          * Hide a modal and fire ``onHidden`` after the fade animation ends.
          * Prevents a ``location.reload()`` from interrupting the hide transition
@@ -154,7 +171,7 @@ function r2Manager() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    this._hideModal(document.getElementById('renameFileModal'), () => location.reload());
+                    this._hideModal(document.getElementById('renameFileModal'), () => this.refreshFileList());
                 } else {
                     const errorEl = document.getElementById('rename-file-error');
                     if (errorEl) { errorEl.textContent = data.error || gettext('Rename failed'); errorEl.classList.remove('d-none'); }
@@ -353,7 +370,7 @@ function r2Manager() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    this._hideModal(document.getElementById('createFolderModal'), () => location.reload());
+                    this._hideModal(document.getElementById('createFolderModal'), () => this.refreshFileList());
                 } else {
                     const errorEl = document.getElementById('create-folder-error');
                     errorEl.textContent = data.error;
@@ -418,7 +435,9 @@ function r2Manager() {
          */
         getCSRFToken() {
             const body = document.querySelector("body");
-            const headers = JSON.parse(body.getAttribute("hx-headers"));
+            // HTMX 4 renames inherited body attributes to hx-headers:inherited.
+            const raw = body.getAttribute("hx-headers:inherited") || body.getAttribute("hx-headers");
+            const headers = JSON.parse(raw || "{}");
             return headers['X-CSRFToken'];
         }
     };

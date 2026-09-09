@@ -1,0 +1,170 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page grade-matrix-page" id="content">
+  <div class="grade-matrix-header">
+    <div>
+      <div class="ad-kicker"><i class="fas fa-chart-line"></i> {% translate "Academic performance" %}</div>
+      <h3 class="ad-title mb-2">{% translate "Grades matrix" %}</h3>
+      <p class="ad-lede mb-0">{% translate "Review student results across quizzes, weekly totals, and final assessments." %}</p>
+    </div>
+    <div class="grade-matrix-actions">
+      <a href="{% url 'export-grades-matrix-xlsx' %}?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}" class="ad-btn ad-btn--teal ad-btn--sm">
+        <i class="fas fa-file-excel"></i> {% translate "Export XLSX" %}
+      </a>
+      <span id="grades-loading" class="htmx-indicator me-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+    </div>
+  </div>
+
+  <nav class="grade-matrix-level-tabs ad-card" role="tablist" aria-label="{% translate 'Academic level' %}">
+    {% for tab in level_tabs %}
+      <a class="grade-matrix-level-tab{% if tab.selected %} is-active{% endif %}"
+         role="tab"
+         aria-selected="{{ tab.selected|yesno:'true,false' }}"
+         href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}"
+         hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}"
+         hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+        <span>{{ tab.name }}</span>
+        <small>{{ tab.student_count }} {% translate "Students" %}</small>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Grades filters' %}">
+    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'grades-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#grades-loading">
+      <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
+      <div class="grade-matrix-filter-field">
+        <label for="grade-matrix-search">{% translate "Search student" %}</label>
+        <div class="grade-matrix-input-wrap">
+          <i class="fas fa-search" aria-hidden="true"></i>
+          <input id="grade-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
+        </div>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="grade-matrix-course">{% translate "Course offering" %}</label>
+        <select id="grade-matrix-course" name="course" class="form-select" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
+          <option value="">{% translate "All courses" %}</option>
+          {% for course in course_options %}
+            <option value="{{ course.id }}"{% if selected_course_id == course.id %} selected{% endif %}>{{ course.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="grade-matrix-year">{% translate "Academic year" %}</label>
+        <select id="grade-matrix-year" name="academic_year" class="form-select" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
+          {% for year in years %}
+            <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} · {% translate "Active" %}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grade-matrix-filter-actions">
+        <button type="submit" class="ad-btn ad-btn--teal">{% translate "Apply" %}</button>
+        <a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a>
+      </div>
+    </form>
+    <div class="grade-matrix-filter-summary">
+      <span>{% translate "Showing" %}:</span>
+      <span class="ad-pill ad-pill--teal">{{ selected_scope.level.display_name }}</span>
+      <span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if active_year %} · {% translate "Active year" %}{% else %} · {% translate "Historical year" %}{% endif %}</span>
+      {% if selected_course_id %}<span class="ad-pill ad-pill--muted">{% translate "Course filtered" %}</span>{% endif %}
+      <span class="grade-matrix-summary-spacer"></span>
+      <span>{{ student_count }} {% translate "Students" %} · {{ quiz_count }} {% translate "Quizzes" %}</span>
+    </div>
+  </section>
+
+  <section class="ad-card grade-matrix-card" aria-labelledby="grade-matrix-heading">
+    <div class="grade-matrix-card-head">
+      <div>
+        <h4 id="grade-matrix-heading" class="mb-1">{{ selected_scope.level.display_name }} · {{ selected_year.name }}</h4>
+        <p class="mb-0">{% translate "Weekly and final quiz results grouped by course offering." %}</p>
+      </div>
+      <div class="grade-matrix-card-actions">
+        <span class="ad-pill ad-pill--success"><i class="fas fa-circle"></i> {% if active_year %}{% translate "Active year" %}{% else %}{% translate "Historical year" %}{% endif %}</span>
+        <button id="grade-matrix-detail-toggle" type="button" class="ad-btn ad-btn--ghost ad-btn--sm" aria-pressed="true" data-detail-label="{% translate 'Quiz detail' %}" data-total-label="{% translate 'Course totals only' %}">
+          <i class="fas fa-table-columns" aria-hidden="true"></i>
+          <span id="grade-matrix-detail-label">{% translate "Quiz detail" %}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="grade-matrix-table-wrap">
+      <table class="ad-table grade-matrix-table">
+        <thead>
+          <tr class="grade-matrix-course-row">
+            <th class="grade-matrix-identity" rowspan="2" scope="col">{% translate "Student name" %}</th>
+            {% for course in matrix_courses %}
+              <th scope="col" colspan="{{ course.detail_span }}" class="grade-matrix-course-group" data-detail-span="{{ course.detail_span }}">
+                {{ course.name }}
+                {% if course.instructor %}<span>{{ course.instructor }}</span>{% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+          <tr class="grade-matrix-quiz-row">
+            {% for course in matrix_courses %}
+              {% for quiz in course.quizzes %}
+                <th scope="col" class="{% if quiz.type == 'final' %}grade-matrix-final-head{% else %}grade-matrix-weekly-head{% endif %}" data-detail-col="true">
+                  {{ quiz.name }}<span>{{ quiz.type_label }}</span>
+                </th>
+              {% endfor %}
+              <th scope="col" class="grade-matrix-weekly-total">{% translate "Weekly total" %}</th>
+              <th scope="col" class="grade-matrix-final-total">{% translate "Final total" %}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matrix_rows %}
+            <tr>
+              <th scope="row" class="grade-matrix-identity">
+                <span class="grade-matrix-student-name">{{ row.name }}</span>
+                <span class="grade-matrix-student-meta">{{ row.username }} · #{{ row.id }}</span>
+              </th>
+              {% for course in row.courses %}
+                {% for cell in course.quiz_cells %}
+                  <td data-detail-cell="true">
+                    {% if cell.submitted %}<span class="grade-matrix-score">{{ cell.grade }}/{{ cell.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                  </td>
+                {% endfor %}
+                <td class="grade-matrix-weekly-total">
+                  {% if course.weekly.has_grade %}<span class="grade-matrix-score">{{ course.weekly.earned }}/{{ course.weekly.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                </td>
+                <td class="grade-matrix-final-total">
+                  {% if course.final.has_grade %}<span class="grade-matrix-score">{{ course.final.earned }}/{{ course.final.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{{ total_matrix_columns }}" class="ad-empty">{% translate "No enrolled students or quiz results match the selected filters." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="grade-matrix-legend">
+      <span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Weekly assessment" %}</span>
+      <span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Final assessment" %}</span>
+      <span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Not submitted" %}</span>
+      <span class="grade-matrix-legend-note">{% translate "The student name column stays fixed while the matrix scrolls." %}</span>
+    </div>
+  </section>
+
+  {% translate "Grades matrix pagination" as pagination_aria_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#grades-loading" %}
+
+<script>
+  (() => {
+    const toggle = document.getElementById('grade-matrix-detail-toggle');
+    const label = document.getElementById('grade-matrix-detail-label');
+    const table = document.querySelector('.grade-matrix-table');
+    if (!toggle || !label || !table) return;
+    let detail = true;
+    toggle.addEventListener('click', () => {
+      detail = !detail;
+      table.querySelectorAll('[data-detail-col], [data-detail-cell]').forEach((cell) => {
+        cell.hidden = !detail;
+      });
+      table.querySelectorAll('.grade-matrix-course-group').forEach((group) => {
+        group.colSpan = detail ? Number(group.dataset.detailSpan) : 2;
+      });
+      toggle.setAttribute('aria-pressed', String(detail));
+      label.textContent = detail ? toggle.dataset.detailLabel : toggle.dataset.totalLabel;
+    });
+  })();
+</script>
+</div>

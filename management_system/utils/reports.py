@@ -5,6 +5,7 @@ from django.db.models.functions import Coalesce
 
 from ..models import AttendanceRecord, Enrollment, Grade, Lesson, PublicationStatus
 from .attendance import get_expected_dates
+from .search import normalized_contains_q
 
 
 def _grade_scope_filter(academic_year_level, course_offering_id=None) -> Q:
@@ -31,11 +32,9 @@ def report_enrollments(academic_year_level, student_search=None, study_mode=None
         grade_available=Coalesce(Sum("student__submitted_quizzes__quiz__total_grade", filter=grade_filter), Value(0)),
     )
     if student_search:
-        search_filter = (
-            Q(student__username__icontains=student_search)
-            | Q(student__first_name__icontains=student_search)
-            | Q(student__last_name__icontains=student_search)
-            | Q(student__email__icontains=student_search)
+        search_filter = normalized_contains_q(
+            ("student__username", "student__first_name", "student__last_name", "student__email"),
+            student_search,
         )
         if str(student_search).isdigit():
             search_filter |= Q(student_id=int(student_search))

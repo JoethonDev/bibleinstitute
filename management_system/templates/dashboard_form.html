@@ -49,9 +49,14 @@
 
         <div class="ad-card-body">
             <!-- Form with validation -->
-            <div x-data="formValidation()">
+            <div x-data="formValidation()" @htmx:finally:request.window="submitting = false">
                 <form action=""
                       method="post"
+                      hx-post=""
+                      hx-target="#display-page"
+                      hx-select="#content"
+                      hx-select-oob="#toast-stack"
+                      hx-push-url="true"
                       class="admin-form"
                       @submit="handleSubmit($event)"
                       novalidate>

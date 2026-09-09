@@ -17,7 +17,7 @@ function lessonForm() {
             this.initializeDriveFiles();
             
             // Listen for HTMX afterSwap events
-            this.$el.addEventListener('htmx:afterSwap', () => {
+            this.$el.addEventListener('htmx:after:swap', () => {
                 this.initializeDriveFiles();
             });
         },

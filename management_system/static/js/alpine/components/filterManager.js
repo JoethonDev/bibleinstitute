@@ -50,7 +50,7 @@ function filterManager() {
 
             // Trigger an HTMX reload if possible, otherwise fall back to URL navigation
             const firstFilter = filterInputs[0];
-            if (firstFilter && firstFilter.hasAttribute('hx-get')) {
+            if (firstFilter && firstFilter.hasAttribute('hx-get') && window.htmx) {
                 htmx.trigger(firstFilter, 'change');
             } else {
                 window.location.href = this.baseUrl || window.location.pathname;

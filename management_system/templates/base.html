@@ -43,7 +43,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
     <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="{% static 'vendor/htmx/htmx-4.0.0.min.js' %}?v={{ static_asset_version }}"></script>
 
     <!-- Django JavaScript translations, loaded before page scripts. -->
     <script src="{% url 'javascript-catalog' %}"></script>

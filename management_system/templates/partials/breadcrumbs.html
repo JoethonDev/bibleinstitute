@@ -1,0 +1,18 @@
+{% load i18n %}
+{# Canonical application breadcrumb renderer. #}
+{# Consumes breadcrumb_items: a list of {title, url} dicts from utils.helpers.generate_breadcrumb(). #}
+{# The last item (url=None) renders as the active, aria-current crumb. #}
+{# variant="detail" renders the compact in-header form used inside .ad-detail-head. #}
+{% if breadcrumb_items %}
+<nav{% if variant == "detail" %} class="mb-2"{% else %} class="ad-breadcrumb container-fluid pt-3"{% endif %} aria-label="{% translate 'Breadcrumb' %}">
+    <ol class="breadcrumb mb-0">
+        {% for item in breadcrumb_items %}
+        {% if item.url %}
+        <li class="breadcrumb-item"><a href="{{ item.url }}">{{ item.title }}</a></li>
+        {% else %}
+        <li class="breadcrumb-item active" aria-current="page">{{ item.title }}</li>
+        {% endif %}
+        {% endfor %}
+    </ol>
+</nav>
+{% endif %}

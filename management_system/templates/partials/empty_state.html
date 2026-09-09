@@ -1,0 +1,7 @@
+{% load i18n %}
+{# Canonical empty-state inner content. Renders inside an .ad-empty container #}
+{# (a div for block states or a td colspan for table rows). #}
+{# Optional: icon (Font Awesome class), title, description (already-translated strings). #}
+{% if icon %}<i class="fas {{ icon }}" aria-hidden="true"></i>{% endif %}
+{% if title %}<h5>{{ title }}</h5>{% endif %}
+{% if description %}<p>{{ description }}</p>{% endif %}

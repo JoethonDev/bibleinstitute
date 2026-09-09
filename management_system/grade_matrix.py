@@ -17,6 +17,7 @@ from django.utils.translation import get_language, gettext as _
 
 from .academic_access import READABLE_ENROLLMENT_STATUSES
 from .models import AcademicYear, AcademicYearLevel, CourseOffering, Enrollment, Grade, Quiz, User
+from .utils.search import normalized_contains_q, normalize_search_text
 
 
 GRADE_MATRIX_PAGE_SIZE = 50
@@ -83,6 +84,7 @@ def grade_matrix_student_queryset(
 
     queryset = User.objects.filter(role__role="student").filter(enrollment_scope)
     if name:
+        name = normalize_search_text(name)
         queryset = queryset.annotate(
             matrix_full_name=Concat(
                 "first_name", Value(" "), "last_name", output_field=CharField()
@@ -92,11 +94,10 @@ def grade_matrix_student_queryset(
             ),
         )
         queryset = queryset.filter(
-            Q(first_name__icontains=name)
-            | Q(last_name__icontains=name)
-            | Q(username__icontains=name)
-            | Q(matrix_full_name__icontains=name)
-            | Q(matrix_reverse_name__icontains=name)
+            normalized_contains_q(
+                ("first_name", "last_name", "username", "matrix_full_name", "matrix_reverse_name"),
+                name,
+            )
         )
     return queryset.distinct().order_by("last_name", "first_name", "username", "pk")
 
