@@ -8,6 +8,7 @@
          ...autoSave('quiz-form-{{ request.resolver_match.kwargs.quiz_id|default:'new' }}'),
          ...quizForm()
       }"
+     x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
     <script id="quiz-form-translations" type="application/json">
         {

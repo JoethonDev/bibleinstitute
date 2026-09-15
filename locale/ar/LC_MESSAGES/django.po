@@ -5081,6 +5081,10 @@ msgstr "سجل الدخول للمتابعة"
 msgid "Search"
 msgstr "بحث"
 
+#: .\management_system\views.py:1502
+msgid "Search username, email, name, phone, or national ID"
+msgstr "ابحث باسم المستخدم أو البريد الإلكتروني أو الاسم أو الهاتف أو الرقم القومي"
+
 #: .\management_system\templates\partials\components\admin_nav_links.html:39
 #: .\management_system\templates\theme_showcase\admin_proposal.html:40
 #: .\management_system\templates\theme_showcase\admin_proposal.html:74

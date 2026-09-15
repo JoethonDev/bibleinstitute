@@ -1,4 +1,13 @@
 // Auto-save functionality for forms
+
+// Draft fields that must never be written to localStorage or restored from it:
+// CSRF tokens can go stale and password fields are secrets. Non-string values
+// (File objects) cannot be serialized into a draft either.
+function isSensitiveDraftField(name) {
+    const normalized = String(name).toLowerCase();
+    return normalized === 'csrfmiddlewaretoken' || normalized.includes('password');
+}
+
 function autoSave(formKey) {
     return {
         formData: {},
@@ -10,7 +19,7 @@ function autoSave(formKey) {
         inputHandler: null,
         beforeUnloadHandler: null,
         
-        init() {
+        initAutoSave() {
             this.loadDraft();
             
             // Track changes
@@ -48,9 +57,15 @@ function autoSave(formKey) {
                 window.removeEventListener('beforeunload', this.beforeUnloadHandler);
                 this.beforeUnloadHandler = null;
             }
+            this.clearDraft();
         },
         
         saveDraft() {
+            // A debounced input save can still run after an HTMX swap removed
+            // the form; never resurrect a draft that destroy() just cleared.
+            if (!this.$el || !this.$el.isConnected) {
+                return;
+            }
             this.isSaving = true;
             const data = {};
             const form = this.$el.querySelector('form');
@@ -58,6 +73,9 @@ function autoSave(formKey) {
             if (form) {
                 const formData = new FormData(form);
                 for (let [key, value] of formData.entries()) {
+                    if (isSensitiveDraftField(key) || typeof value !== 'string') {
+                        continue;
+                    }
                     data[key] = value;
                 }
                 
@@ -108,7 +126,10 @@ function autoSave(formKey) {
             const form = this.$el.querySelector('form');
             if (form && this.formData) {
                 Object.keys(this.formData).forEach(key => {
-                    const field = form.querySelector(`[name="${key}"]`);
+                    if (isSensitiveDraftField(key)) {
+                        return;
+                    }
+                    const field = form.querySelector(`[name="${CSS.escape(key)}"]`);
                     if (field) {
                         field.value = this.formData[key];
                         

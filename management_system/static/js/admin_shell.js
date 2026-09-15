@@ -10,8 +10,6 @@
         Alpine.data('bulkActions', bulkActions);
         Alpine.data('quizForm', quizForm);
         Alpine.data('formValidation', formValidation);
-        Alpine.data('dashboardManager', dashboardManager);
-        Alpine.data('filterManager', filterManager);
         Alpine.data('tableManager', tableManager);
         Alpine.data('progressTracker', progressTracker);
     });

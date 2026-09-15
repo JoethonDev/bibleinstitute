@@ -5,6 +5,7 @@
 {% block body %}
 <div id="content" class="ad-pane is-active"
      x-data="autoSave('{{ view_name }}-form-{{ object_id }}')"
+     x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
 
     <!-- Auto-save Indicator: Draft Saved -->
@@ -87,7 +88,7 @@
 
                         <button type="button"
                                 class="ad-btn ad-btn--ghost"
-                                @click="$el.closest('form').reset(); $dispatch('form-reset')"
+                                @click="$el.closest('form').reset(); clearDraft(); $dispatch('form-reset')"
                                 :disabled="submitting">
                             <i class="fas fa-redo me-2"></i>
                             {% translate "Reset" %}

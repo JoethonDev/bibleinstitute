@@ -3,7 +3,7 @@
 {% load i18n %}
 
 {% block body %}
-<div class="ad-pane is-active" id="content" x-data="dashboardManager()" data-base-url="{{ url }}">
+<div class="ad-pane is-active" id="content">
     <!-- Dashboard Toolbar -->
     <div class="ad-toolbar">
         <!-- Left: Title & Primary Actions -->
@@ -26,7 +26,7 @@
             {% endif %}
         </div>
 
-        <!-- Right: Action buttons + Mobile filter toggle -->
+        <!-- Right: Action buttons -->
         <div class="d-flex align-items-center gap-2">
             {% if view == 'user' %}
             <button class="ad-btn ad-btn--outline-gold ad-btn--sm"
@@ -48,17 +48,6 @@
                 <span>{% translate "Export Quiz Data" %}</span>
             </a>
             {% endif %}
-
-            <!-- Mobile Filter Toggle -->
-            <button @click="showFilters = !showFilters"
-                    class="ad-btn ad-btn--ghost ad-btn--sm d-lg-none position-relative">
-                <i class="fas fa-filter me-1"></i>
-                <span>{% translate "Filters" %}</span>
-                    <span class="badge bg-primary ms-1"
-                      x-show="typeof activeFiltersCount !== 'undefined' && activeFiltersCount > 0"
-                      x-text="typeof activeFiltersCount !== 'undefined' ? activeFiltersCount : 0"
-                      x-transition></span>
-            </button>
         </div>
     </div>
 
@@ -66,23 +55,21 @@
     <div class="ad-card">
         <div class="ad-card-body">
             <!-- Filter Bar -->
-            <div class="ad-filters"
-                 :class="{ 'show': typeof showFilters !== 'undefined' && showFilters }"
-                 x-show="typeof showFilters !== 'undefined' && (showFilters || window.innerWidth >= 992)"
-                 x-transition>
+            <div class="ad-filters">
                 {% for filter in filters %}
                 <div class="filter-item">{% include filter %}</div>
                 {% endfor %}
 
-                <!-- Clear Filters -->
-                <button @click="clearFilters()"
-                        class="ad-btn ad-btn--danger ad-btn--sm"
-                        x-show="typeof activeFiltersCount !== 'undefined' && activeFiltersCount > 0"
-                        x-transition
-                        type="button">
+                <a href="{{ url }}"
+                   class="ad-btn ad-btn--danger ad-btn--sm"
+                   hx-get="{{ url }}"
+                   hx-target="#display-page"
+                   hx-select="#content"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <i class="fas fa-times-circle me-1"></i>
                     <span>{% translate "Clear" %}</span>
-                </button>
+                </a>
             </div>
 
             <!-- Table Loading Indicator -->
@@ -101,6 +88,4 @@
         </div>
     </div>
 </div>
-
-{# dashboardManager() and filterManager() are now in static JS files loaded by admin_panel.html #}
 {% endblock %}
