@@ -6,7 +6,8 @@
 <div id="content" class="admin-form-page ad-page"
      x-data="{
          ...autoSave('quiz-form-{{ request.resolver_match.kwargs.quiz_id|default:'new' }}'),
-         ...quizForm()
+         ...quizForm(),
+         ...quizJsonImport()
       }"
      x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
@@ -67,6 +68,70 @@
             {% translate "Back to quizzes" %}
         </a>
     </div>
+
+    <!-- JSON Import Panel -->
+    {% if quiz_editable %}
+    <div id="quiz-import-panel" class="ad-card quiz-import-card" x-init="initQuizImport({{ request.GET.import|yesno:'true,false' }})" @click="handleQuizImportClick($event)">
+        <div class="ad-card-head">
+            <i class="fas fa-file-import me-2"></i>
+            {% translate "Import Quiz from JSON" %}
+            <button type="button"
+                    class="ad-btn ad-btn--ghost ad-btn--sm ms-auto"
+                    @click="toggleImportPanel()"
+                    :aria-expanded="importOpen ? 'true' : 'false'"
+                    aria-controls="quiz-import-body">
+                <i class="fas" :class="importOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                <span class="visually-hidden">{% translate "Toggle import panel" %}</span>
+            </button>
+        </div>
+        <div class="ad-card-body" id="quiz-import-body" x-show="importOpen" x-cloak>
+            <p class="quiz-import-help mb-2">{% translate "Paste a JSON payload or open a .json file, then preview it." %}</p>
+            <p class="quiz-import-help mb-3">{% translate "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft." %}</p>
+            <textarea id="quiz-import-payload"
+                      name="payload"
+                      rows="10"
+                      class="form-control quiz-import-payload"
+                      x-model="importPayload"
+                      @input="clearImportResult()"
+                      {% translate "Paste quiz JSON here..." as import_placeholder %}
+                      placeholder="{{ import_placeholder }}"
+                      aria-label="{{ import_placeholder }}"
+                      autocomplete="off"
+                      spellcheck="false"></textarea>
+            <div class="quiz-import-file-row">
+                <label for="quiz-import-file" class="form-label mb-1">{% translate "Open a JSON file" %}</label>
+                <input type="file" id="quiz-import-file" class="form-control form-control-sm" accept=".json,application/json" @change="loadImportFile($event)">
+            </div>
+            <input type="hidden" id="quiz-import-mode" name="mode" value="{{ quiz_mode }}">
+            <div class="quiz-import-actions-row">
+                <button type="button"
+                        class="ad-btn ad-btn--teal ad-btn--sm"
+                        hx-post="{% url 'quiz-json-preview' %}"
+                        hx-include="#quiz-import-payload, #quiz-import-mode"
+                        hx-target="#quiz-import-result"
+                        hx-swap="outerHTML"
+                        hx-sync="this:abort"
+                        hx-disable="this"
+                        hx-indicator="#quiz-import-loading">
+                    <i class="fas fa-eye me-1"></i>
+                    {% translate "Preview" %}
+                </button>
+                <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" @click="insertImportExample()">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    {% translate "Insert example" %}
+                </button>
+                <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" @click="clearImport()">
+                    <i class="fas fa-eraser me-1"></i>
+                    {% translate "Clear" %}
+                </button>
+                <span id="quiz-import-loading" class="htmx-indicator quiz-import-loading">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                </span>
+            </div>
+            <div id="quiz-import-result"></div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Form Container -->
     <div class="ad-card">

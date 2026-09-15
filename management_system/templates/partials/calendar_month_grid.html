@@ -3,7 +3,8 @@
 {# Consumes: month_grid (list of weeks, each a list of day dicts from the shared view builder), #}
 {# weekday_names (locale-aware Mon..Sun labels from _calendar_weekday_abbreviations), #}
 {# and cell_variant ("admin" renders interactive cells, "student" renders read-only cells). #}
-{# Cell state-class contract: is-out / is-holiday / is-meeting / is-today. #}
+{# Cell state-class contract: is-out / is-holiday / is-meeting / has-meeting / is-today. #}
+{# has-meeting = a course meeting is scheduled on that day; is-meeting = configured meeting weekday. #}
 {% if cell_variant == "admin" %}
 <div class="ad-calmg-grid" role="grid">
 {% else %}

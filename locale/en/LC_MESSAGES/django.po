@@ -9776,6 +9776,254 @@ msgstr "The selection has invalid types."
 msgid "Some selected records are referenced by other data and cannot be deleted."
 msgstr "Some selected records are referenced by other data and cannot be deleted."
 
+msgid "Support message from %(name)s"
+msgstr "Support message from %(name)s"
+
+msgid "This message was already answered by another admin."
+msgstr "This message was already answered by another admin."
+
+msgid "Answered by another admin."
+msgstr "Answered by another admin."
+
+msgid "Via Telegram"
+msgstr "Via Telegram"
+
+msgid "Via Web"
+msgstr "Via Web"
+
+msgid "Deleted"
+msgstr "Deleted"
+
+msgid "Edited"
+msgstr "Edited"
+msgid "Import Quiz from JSON"
+msgstr "Import Quiz from JSON"
+
+msgid "Toggle import panel"
+msgstr "Toggle import panel"
+
+msgid "Paste a JSON payload or open a .json file, then preview it."
+msgstr "Paste a JSON payload or open a .json file, then preview it."
+
+msgid "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft."
+msgstr "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft."
+
+msgid "Paste quiz JSON here..."
+msgstr "Paste quiz JSON here..."
+
+msgid "Open a JSON file"
+msgstr "Open a JSON file"
+
+msgid "Insert example"
+msgstr "Insert example"
+
+msgid "Import JSON"
+msgstr "Import JSON"
+
+msgid "Import failed. Fix the following and try again:"
+msgstr "Import failed. Fix the following and try again:"
+
+msgid "Import warnings"
+msgstr "Import warnings"
+
+msgid "JSON is valid."
+msgstr "JSON is valid."
+
+msgid "Quiz name"
+msgstr "Quiz name"
+
+msgid "Quiz preview"
+msgstr "Quiz preview"
+
+msgid "Load into quiz form"
+msgstr "Load into quiz form"
+
+msgid "Review the loaded fields, then submit to save the quiz."
+msgstr "Review the loaded fields, then submit to save the quiz."
+
+msgid "The selected file is too large to import."
+msgstr "The selected file is too large to import."
+
+msgid "Could not read the selected file."
+msgstr "Could not read the selected file."
+
+msgid "Quiz data loaded into the form. Review it, then submit to save the draft."
+msgstr "Quiz data loaded into the form. Review it, then submit to save the draft."
+
+msgid "Some quiz data could not be loaded into the form."
+msgstr "Some quiz data could not be loaded into the form."
+
+msgid "The JSON payload is empty."
+msgstr "The JSON payload is empty."
+
+msgid "The JSON payload is larger than the %(limit)s KB limit."
+msgstr "The JSON payload is larger than the %(limit)s KB limit."
+
+msgid "The payload is not valid JSON: %(error)s at line %(line)s."
+msgstr "The payload is not valid JSON: %(error)s at line %(line)s."
+
+msgid "The payload is not valid JSON."
+msgstr "The payload is not valid JSON."
+
+msgid "\"quiz\" must be an object."
+msgstr "\"quiz\" must be an object."
+
+msgid "\"questions\" must be a list of question objects."
+msgstr "\"questions\" must be a list of question objects."
+
+msgid "The JSON root must be an object or a list of questions."
+msgstr "The JSON root must be an object or a list of questions."
+
+msgid "Unknown field \"%(field)s\" was ignored."
+msgstr "Unknown field \"%(field)s\" was ignored."
+
+msgid "At least one question is required."
+msgstr "At least one question is required."
+
+msgid "Too many questions: the maximum is %(limit)s."
+msgstr "Too many questions: the maximum is %(limit)s."
+
+msgid "The quiz name cannot be empty."
+msgstr "The quiz name cannot be empty."
+
+msgid "The quiz name must be at most %(limit)s characters."
+msgstr "The quiz name must be at most %(limit)s characters."
+
+msgid "Unknown status \"%(value)s\". Use one of: %(allowed)s."
+msgstr "Unknown status \"%(value)s\". Use one of: %(allowed)s."
+
+msgid "Unknown course offering \"%(value)s\". Use an offering id or the exact label from the form."
+msgstr "Unknown course offering \"%(value)s\". Use an offering id or the exact label from the form."
+
+msgid "The selected course offering is not available in the active academic year."
+msgstr "The selected course offering is not available in the active academic year."
+
+msgid "More than one course offering matches \"%(value)s\". Use the offering id instead."
+msgstr "More than one course offering matches \"%(value)s\". Use the offering id instead."
+
+msgid "Unknown quiz type \"%(value)s\". Use %(codes)s or a quiz type id."
+msgstr "Unknown quiz type \"%(value)s\". Use %(codes)s or a quiz type id."
+
+msgid "Invalid date \"%(value)s\" for %(field)s. Use ISO format like 2026-09-20T10:00."
+msgstr "Invalid date \"%(value)s\" for %(field)s. Use ISO format like 2026-09-20T10:00."
+
+msgid "opening date"
+msgstr "opening date"
+
+msgid "closing date"
+msgstr "closing date"
+
+msgid "Question %(number)s must be an object."
+msgstr "Question %(number)s must be an object."
+
+msgid "Question %(number)s: unknown field \"%(field)s\" was ignored."
+msgstr "Question %(number)s: unknown field \"%(field)s\" was ignored."
+
+msgid "Question %(number)s: unsupported or missing question type \"%(type)s\". Allowed types: %(allowed)s."
+msgstr "Question %(number)s: unsupported or missing question type \"%(type)s\". Allowed types: %(allowed)s."
+
+msgid "Question %(number)s: the question text is required."
+msgstr "Question %(number)s: the question text is required."
+
+msgid "Question %(number)s: the question text must be at most %(limit)s characters."
+msgstr "Question %(number)s: the question text must be at most %(limit)s characters."
+
+msgid "Question %(number)s: the grade must be an integer between 0 and %(limit)s."
+msgstr "Question %(number)s: the grade must be an integer between 0 and %(limit)s."
+
+msgid "Question %(number)s: %(label)s are required."
+msgstr "Question %(number)s: %(label)s are required."
+
+msgid "Question %(number)s: %(label)s must be a list of text values."
+msgstr "Question %(number)s: %(label)s must be a list of text values."
+
+msgid "Question %(number)s: %(label)s must contain text values only."
+msgstr "Question %(number)s: %(label)s must contain text values only."
+
+msgid "choices"
+msgstr "choices"
+
+msgid "order event items"
+msgstr "order event items"
+
+msgid "Question %(number)s: multiple choice questions need at least 2 choices."
+msgstr "Question %(number)s: multiple choice questions need at least 2 choices."
+
+msgid "Question %(number)s: no correct answer was provided, so it will be graded manually."
+msgstr "Question %(number)s: no correct answer was provided, so it will be graded manually."
+
+msgid "Question %(number)s: order events need at least 2 items."
+msgstr "Question %(number)s: order events need at least 2 items."
+
+msgid "Question %(number)s: match related questions need at least 2 pairs."
+msgstr "Question %(number)s: match related questions need at least 2 pairs."
+
+msgid "Question %(number)s: the correct answer \"%(answer)s\" is not one of the choices."
+msgstr "Question %(number)s: the correct answer \"%(answer)s\" is not one of the choices."
+
+msgid "Question %(number)s: match related pairs are required."
+msgstr "Question %(number)s: match related pairs are required."
+
+msgid "Question %(number)s: pairs must be a list of left/right pairs."
+msgstr "Question %(number)s: pairs must be a list of left/right pairs."
+
+msgid "Question %(number)s: %(message)s"
+msgstr "Question %(number)s: %(message)s"
+
+msgid "The total grade %(total)s exceeds the maximum %(limit)s."
+msgstr "The total grade %(total)s exceeds the maximum %(limit)s."
+
+#: .\management_system\views.py
+msgid "Select at least one course offering."
+msgstr "Select at least one course offering."
+
+#: .\management_system\views.py
+#, python-format
+msgid "Too many offerings selected at once (maximum %(max)s)."
+msgstr "Too many offerings selected at once (maximum %(max)s)."
+
+#: .\management_system\views.py
+#, python-format
+msgid "Meetings added: %(count)s."
+msgstr "Meetings added: %(count)s."
+
+#: .\management_system\views.py
+#, python-format
+msgid "Pending attendance records assigned: %(count)s."
+msgstr "Pending attendance records assigned: %(count)s."
+
+#: .\management_system\views.py
+msgid "Some selected offerings were skipped because their level already has a meeting on this date."
+msgstr "Some selected offerings were skipped because their level already has a meeting on this date."
+
+#: .\management_system\views.py
+msgid "Some selected offerings do not meet on the selected weekday."
+msgstr "Some selected offerings do not meet on the selected weekday."
+
+#: .\management_system\templates\calendar_management.html
+#: .\management_system\templates\student_calendar.html
+msgid "Meetings"
+msgstr "Meetings"
+
+#: .\management_system\templates\calendar_management.html
+#: .\management_system\templates\student_calendar.html
+msgid "Scheduled meeting"
+msgstr "Scheduled meeting"
+
+#: .\management_system\templates\calendar_management.html
+#: .\management_system\templates\student_calendar.html
+msgid "Choose a month"
+msgstr "Choose a month"
+
+#: .\management_system\templates\calendar_management.html
+msgid "No academic years are configured."
+msgstr "No academic years are configured."
+
+#: .\management_system\templates\calendar_management.html
+msgid "Select one or more offerings. Each level can have one meeting per date."
+msgstr "Select one or more offerings. Each level can have one meeting per date."
+
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 
@@ -9889,9 +10137,6 @@ msgstr "Payment Receipt"
 
 #~ msgid "selected"
 #~ msgstr "selected"
-
-#~ msgid "Deleted"
-#~ msgstr "Deleted"
 
 #~ msgid "items (Frontend Only)"
 #~ msgstr "items (Frontend Only)"

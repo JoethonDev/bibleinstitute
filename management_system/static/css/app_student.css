@@ -2003,3 +2003,80 @@ main:has(.sd-page) {
         transition: none;
     }
 }
+
+/* ============ Calendar selection + navigator overhaul (student) ============ */
+.sd-cal-scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem .75rem;
+    margin-bottom: 1rem;
+}
+.sd-cal-scope .form-label { margin-bottom: 0; font-weight: 650; color: var(--ps-ink); }
+.sd-cal-scope .form-select { max-width: 22rem; }
+.sd-cal-nav { margin-inline-start: 0; }
+.sd-cal-arrow {
+    width: 2.2rem;
+    height: 2.2rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid var(--ps-line);
+    background: #fff;
+    color: var(--ps-teal);
+    text-decoration: none;
+    transition: background-color var(--ps-motion), color var(--ps-motion);
+}
+.sd-cal-arrow:hover { background: var(--ps-teal); color: #fff; }
+.sd-cal-arrow.is-disabled { opacity: .35; pointer-events: none; }
+.sd-cal-month-form { display: inline-flex; align-items: center; margin: 0; }
+.sd-cal-month-select {
+    font-family: var(--ps-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ps-ink);
+    border: 0;
+    background-color: transparent;
+    padding-inline: .25rem 1.6rem;
+    cursor: pointer;
+}
+.sd-cal-month-select:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+    border-radius: .4rem;
+}
+.sd-cal-today {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border: 1px solid var(--ps-gold);
+    background: var(--ps-gold-soft);
+    color: var(--ps-gold-deep);
+    border-radius: 999px;
+    padding: .3rem .8rem;
+    font-size: .8rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+.sd-cal-today:hover { background: var(--ps-gold); color: #fff; }
+.sd-cal-stats {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .4rem .9rem;
+    margin-inline-start: auto;
+    font-size: .8rem;
+    color: var(--ps-muted);
+}
+.sd-cal-stat { display: inline-flex; align-items: center; gap: .3rem; }
+.sd-cal-stat strong { color: var(--ps-ink); font-size: .9rem; }
+.sd-day.has-meeting:not(.is-holiday) {
+    background: rgba(47, 93, 115, .18);
+    border-inline-start: 4px solid var(--ps-teal);
+}
+.sd-legend .lg-scheduled { background: var(--ps-teal-deep, var(--ps-teal)); }
+@media (max-width: 575.98px) {
+    .sd-cal-top { align-items: stretch; }
+    .sd-cal-stats { margin-inline-start: 0; }
+    .sd-cal-month-form { flex: 1 1 auto; }
+    .sd-cal-month-select { font-size: 1rem; width: 100%; }
+}

@@ -9,6 +9,7 @@
         Alpine.data('columnManager', columnManager);
         Alpine.data('bulkActions', bulkActions);
         Alpine.data('quizForm', quizForm);
+        Alpine.data('quizJsonImport', quizJsonImport);
         Alpine.data('formValidation', formValidation);
         Alpine.data('tableManager', tableManager);
         Alpine.data('progressTracker', progressTracker);
@@ -79,9 +80,25 @@
         }
     }
 
+    // An HTMX swap can replace an open Bootstrap modal before its hide
+    // transition completes, so Bootstrap's _hideModal never runs and leaves
+    // a stranded .modal-backdrop plus body.modal-open. Remove stray backdrops
+    // whenever no modal is shown; keep the body scroll state while the shared
+    // confirmation modal or the mobile offcanvas is open.
+    function cleanupOrphanedModalBackdrop() {
+        if (document.querySelector('.modal.show')) return;
+        var backdrops = document.querySelectorAll('.modal-backdrop');
+        for (var i = 0; i < backdrops.length; i++) backdrops[i].remove();
+        if (document.querySelector('.offcanvas.show')) return;
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         scanDriveSentinels();
         document.addEventListener('htmx:after:swap', scanDriveSentinels);
+        document.addEventListener('htmx:after:swap', cleanupOrphanedModalBackdrop);
         document.addEventListener('click', function (event) {
             var sentinel = event.target.closest && event.target.closest('#drive-next-sentinel[data-next-url]');
             if (sentinel) loadDriveNextPage(sentinel);

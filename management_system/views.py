@@ -72,7 +72,7 @@ from .utils.file_validator import (
     FileValidator,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, download_from_bucket, generate_unique_url, get_r2_client
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, parse_json_value, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
+from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
@@ -91,6 +91,8 @@ from .admin_tables import (
     user_scope,
 )
 from .utils.quiz_access import grant_quiz_openings, quiz_window
+from .quiz_questions import build_question_instance
+from .quiz_import import parse_quiz_import
 from .public_content import get_institute_copy
 from .academic_enrollment import (
     activate_academic_year,
@@ -215,111 +217,6 @@ R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name, cloudflare_client)
 
 # Helper functions moved to utils/storage_operations.py and utils/helpers.py
 # Google Drive legacy code moved to utils/google_drive_manager.py
-
-def build_question_instance(question_data, quiz):
-    """Build a Question instance from parsed form data."""
-    title = question_data.get("name", "")
-    question_type = question_data.get("type", "")
-    grade = int(question_data.get("grade", 1) or 1)
-    config = parse_json_value(question_data.get("config", {}), {}) or {}
-    choices = question_data.get("choices", [])
-    correct_answer = (question_data.get("answer", "") or "").strip()
-    auto_grade = False
-
-    if question_type in Question.STRUCTURED_QUESTION_TYPES and not isinstance(config, dict):
-        raise ValueError(_("Structured question config is invalid for question: %(title)s") % {"title": title})
-
-    def _unique_values(values, label):
-        normalized = []
-        seen = set()
-
-        for value in values:
-            text = str(value).strip()
-            if not text:
-                continue
-
-            if text in seen:
-                raise ValueError(_("Each %(label)s must be unique for question: %(title)s") % {"label": label, "title": title})
-
-            seen.add(text)
-            normalized.append(text)
-
-        if not normalized:
-            raise ValueError(_("%(label)s are required for question: %(title)s") % {"label": label.capitalize(), "title": title})
-
-        return normalized
-
-    if question_type == "mcq":
-        choices = [choice.strip() for choice in choices if str(choice).strip()]
-        if correct_answer and correct_answer not in choices:
-            raise ValueError(_("Correct answer is not in choices for question : %(title)s") % {'title': title})
-        choices = json.dumps(choices)
-        auto_grade = bool(correct_answer)
-
-    elif question_type == "written":
-        correct_answer = ""
-        choices = json.dumps([])
-        auto_grade = False
-
-    elif question_type == "complete":
-        choices = json.dumps([])
-        auto_grade = bool(correct_answer)
-
-    elif question_type == "order_events":
-        items = config.get("items") or choices or []
-        items = _unique_values(items, _("order event item"))
-        config = {"items": items}
-        choices = json.dumps(items)
-        correct_answer = ""
-        auto_grade = True
-
-    elif question_type == "match_related":
-        pairs = config.get("pairs") or []
-        normalized_pairs = []
-        seen_left_values = set()
-        seen_right_values = set()
-
-        for pair in pairs:
-            left = right = ""
-            if isinstance(pair, dict):
-                left = str(pair.get("left", "")).strip()
-                right = str(pair.get("right", "")).strip()
-            elif isinstance(pair, (list, tuple)) and len(pair) >= 2:
-                left = str(pair[0]).strip()
-                right = str(pair[1]).strip()
-
-            if left and right:
-                if left in seen_left_values:
-                    raise ValueError(_("Each match related left item must be unique for question: %(title)s") % {"title": title})
-                if right in seen_right_values:
-                    raise ValueError(_("Each match related right item must be unique for question: %(title)s") % {"title": title})
-
-                seen_left_values.add(left)
-                seen_right_values.add(right)
-                normalized_pairs.append({"left": left, "right": right})
-
-        if not normalized_pairs:
-            raise ValueError(_("Match Related questions need at least one pair"))
-
-        config = {"pairs": normalized_pairs}
-        choices = json.dumps([pair["left"] for pair in normalized_pairs])
-        correct_answer = ""
-        auto_grade = True
-
-    else:
-        choices = json.dumps([choice.strip() for choice in choices]) if choices else json.dumps([])
-        auto_grade = bool(correct_answer) and question_type != "written"
-
-    return Question(
-        title=title,
-        quiz=quiz,
-        correct_answer=correct_answer,
-        question_type=question_type,
-        choices=choices,
-        config=config,
-        grade=grade,
-        auto_grade=auto_grade,
-    )
 
 def prepare_exam_question(question_data):
     """Attach randomized display payloads for exam mode without mutating answer keys."""
@@ -3063,6 +2960,32 @@ def quiz_dashboard(request):
     return render_dashboard(request, quizzes, view, context)
 
 @capability_required(can_manage_content)
+@require_POST
+def quiz_json_preview(request):
+    """Validate an admin quiz JSON payload and render the import preview fragment.
+
+    The payload fills the existing quiz form through the returned fragment; it
+    never creates or changes database rows.
+    """
+    mode = request.POST.get("mode")
+    if mode not in {"create", "update"}:
+        mode = "create"
+    result = parse_quiz_import(request.POST.get("payload", ""), mode=mode)
+    return render(request, "partials/quiz_import_result.html", {
+        "import_errors": result.errors,
+        "import_warnings": result.warnings,
+        "import_questions": result.questions,
+        "import_summary": result.summary,
+        "import_payload": {
+            "quiz": result.quiz,
+            "total_grade": result.total_grade,
+            "questions_count": len(result.questions),
+        },
+        "question_types": Question.QUESTION_TYPES,
+    })
+
+
+@capability_required(can_manage_content)
 def create_quiz(request):
     if request.method == "GET":
         course_offerings = CourseOffering.objects.filter(
@@ -3078,6 +3001,8 @@ def create_quiz(request):
             "content_status" : PublicationStatus.DRAFT,
             "content_status_display" : PublicationStatus.DRAFT.label,
             "publication_statuses" : PublicationStatus.choices,
+            "quiz_editable" : True,
+            "quiz_mode" : "create",
         })
     elif request.method == "POST":
         publication_status = _requested_publication_status(request)
@@ -3175,6 +3100,8 @@ def update_quiz(request, quiz_id):
                 "content_status" : quiz.status,
                 "content_status_display" : quiz.get_status_display(),
                 "publication_statuses" : PublicationStatus.choices,
+                "quiz_editable" : quiz.can_edit,
+                "quiz_mode" : "update",
             })
         except Http404:
             logger.error(f"Quiz with id : {quiz_id} is not found!")
@@ -5326,7 +5253,12 @@ def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
 
 def _resolve_calendar_month(year, request):
     """Parse and clamp the requested display month within an academic year.
-    Returns (cur_year, cur_month, prev_query, next_query)."""
+
+    The canonical query shape is ``month=YYYY-M``; the optional ``year``
+    parameter is honored for deep links. Returns
+    ``(cur_year, cur_month, prev_query, next_query)`` where the query
+    fragments are canonical ``month=YYYY-M`` strings, or None at the edges.
+    """
     year_start, year_end = year.starts_on, year.ends_on
     today = timezone.localdate()
     if year_start <= today <= year_end:
@@ -5367,11 +5299,35 @@ def _resolve_calendar_month(year, request):
     next_month = None
     if current_cell > first_month:
         pm = current_cell - 1
-        prev_month = f"year={((pm - 1) // 12)}&month={((pm - 1) % 12) + 1}"
+        prev_month = f"month={((pm - 1) // 12)}-{((pm - 1) % 12) + 1}"
     if current_cell < last_month:
         nm = current_cell + 1
-        next_month = f"year={((nm - 1) // 12)}&month={((nm - 1) % 12) + 1}"
+        next_month = f"month={((nm - 1) // 12)}-{((nm - 1) % 12) + 1}"
     return cur_year, cur_month, prev_month, next_month
+
+
+def _calendar_month_options(year, cur_year, cur_month):
+    """Valid month choices for one academic year as canonical YYYY-M values."""
+    first_cell = year.starts_on.year * 12 + year.starts_on.month
+    last_cell = year.ends_on.year * 12 + year.ends_on.month
+    options = []
+    for cell in range(first_cell, last_cell + 1):
+        cell_year, cell_month = divmod(cell - 1, 12)
+        cell_month += 1
+        options.append({
+            "value": f"{cell_year}-{cell_month}",
+            "label": formats.date_format(date(cell_year, cell_month, 1), "F Y"),
+            "is_current": cell_year == cur_year and cell_month == cur_month,
+        })
+    return options
+
+
+def _calendar_today_query(year):
+    """Canonical month fragment for today's month, or None when out of year."""
+    today = timezone.localdate()
+    if year.starts_on <= today <= year.ends_on:
+        return f"month={today.year}-{today.month}"
+    return None
 
 
 @capability_required(can_manage_content)
@@ -5380,30 +5336,50 @@ def calendar_management(request):
     selected_year_id = request.GET.get("academic_year")
     if selected_year_id and not selected_year_id.isdigit():
         selected_year_id = None
+    if not selected_year_id:
+        default_year = years.filter(is_active=True).first() or years.first()
+        if default_year is not None:
+            params = request.GET.copy()
+            params["academic_year"] = default_year.pk
+            return redirect(f"{reverse('calendar-management')}?{params.urlencode()}")
     year = get_object_or_404(AcademicYear, pk=selected_year_id) if selected_year_id else None
+
+    today = timezone.localdate()
+    year_id = None
     month_grid = None
     prev_month = None
     next_month = None
-    today = timezone.localdate()
-    cur_month = today.month
+    month_options = []
+    today_query = None
     cur_year = today.year
+    cur_month = today.month
+    year_weekday_names = []
+    year_scope_count = 0
+    year_offering_count = 0
+    month_meeting_count = 0
+    month_course_count = 0
+    month_holiday_count = 0
 
     if year:
-        year_id = year.id
-        year_start = year.starts_on
-        year_end = year.ends_on
+        year_id = year.pk
         cur_year, cur_month, prev_month, next_month = _resolve_calendar_month(year, request)
+        month_options = _calendar_month_options(year, cur_year, cur_month)
+        today_query = _calendar_today_query(year)
 
         holidays = {
             h.date: h
             for h in AcademicHoliday.objects.filter(academic_year=year, date__year=cur_year, date__month=cur_month)
         }
         scope_links = list(year.level_links.select_related("level").order_by("level__ordering"))
-        locked_weekdays = {
+        weekday_labels = _calendar_weekday_labels()
+        weekday_numbers = sorted({
             weekday
             for scope in scope_links
             for weekday in (scope.meeting_weekdays or [])
-        }
+            if 0 <= weekday <= 6
+        })
+        year_weekday_names = [weekday_labels[weekday] for weekday in weekday_numbers]
+        year_scope_count = len(scope_links)
 
         meetings = list(
             AcademicYearLevelMeeting.objects.filter(
@@ -5424,59 +5400,54 @@ def calendar_management(request):
             "course",
             "academic_year_level__level",
         ).order_by("academic_year_level__level__ordering", "course__name", "pk"))
+        year_offering_count = len(meeting_offerings)
         offerings_by_weekday = defaultdict(list)
         for offering in meeting_offerings:
             for weekday in offering.academic_year_level.meeting_weekdays or []:
                 offerings_by_weekday[weekday].append(offering)
 
         month_grid = _build_month_grid(
-            year_start=year_start,
-            year_end=year_end,
+            year_start=year.starts_on,
+            year_end=year.ends_on,
             cur_year=cur_year,
             cur_month=cur_month,
             today=today,
             holidays=holidays,
             meetings_by_date=meetings_by_date,
-            locked_weekdays=locked_weekdays,
+            locked_weekdays=set(weekday_numbers),
             meeting_offerings_by_weekday=offerings_by_weekday,
         )
-    else:
-        year_id = None
-
-    months_list = []
-    for i in range(1, 13):
-        d = date(2000, i, 1)
-        months_list.append({
-            "value": i,
-            "name": formats.date_format(d, "F"),
-        })
-
-    # Generate year options within the academic year range
-    year_options = []
-    if year:
-        for y in range(year.starts_on.year, year.ends_on.year + 1):
-            year_options.append(y)
+        month_meeting_count = len(meetings)
+        month_course_count = len({meeting.course_offering_id for meeting in meetings})
+        month_holiday_count = len(holidays)
 
     return render(request, "calendar_management.html", {
         "years": years,
         "year": year,
         "year_id": year_id,
+        "year_weekday_names": year_weekday_names,
+        "year_scope_count": year_scope_count,
+        "year_offering_count": year_offering_count,
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Calendar"), None),
         ]),
         "weekday_names": _calendar_weekday_abbreviations(),
         "month_grid": month_grid,
+        "month_options": month_options,
         "prev_month": prev_month,
         "next_month": next_month,
+        "today_query": today_query,
         "cur_month": cur_month,
-        "cur_year": cur_year,
-        "today": today,
-        "month_name": formats.date_format(date(cur_year, cur_month, 1), "F Y") if month_grid else "",
-        "months": months_list,
-        "year_options": year_options,
+        "month_meeting_count": month_meeting_count,
+        "month_course_count": month_course_count,
+        "month_holiday_count": month_holiday_count,
         "can_edit_meetings": can_manage_academic_setup(request.user),
+        "can_manage_holidays": can_manage_content(request.user),
     })
+
+
+MAX_MEETINGS_PER_REQUEST = 20
 
 
 @require_POST
@@ -5484,7 +5455,7 @@ def calendar_management(request):
 def add_meeting(request):
     year_id = request.POST.get("academic_year_id")
     date_value = request.POST.get("date", "")
-    offering_id = request.POST.get("course_offering_id")
+    offering_ids = [value for value in request.POST.getlist("course_offering_id") if value]
     year = AcademicYear.objects.filter(pk=year_id).first() if year_id else None
     if not year:
         messages.error(request, _("Invalid academic year."))
@@ -5497,29 +5468,77 @@ def add_meeting(request):
     if not year.starts_on <= meeting_date <= year.ends_on:
         messages.error(request, _("Date is outside the academic year range."))
         return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
-    offering = CourseOffering.objects.filter(
-        pk=offering_id,
-        academic_year_level__academic_year=year,
-    ).select_related("academic_year_level").first()
-    if not offering:
-        messages.error(request, _("Invalid course offering."))
-        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
-    if meeting_date.weekday() not in (offering.academic_year_level.meeting_weekdays or []):
-        messages.error(request, _("The selected course does not meet on this weekday."))
-        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
-    try:
-        with transaction.atomic():
-            meeting = AcademicYearLevelMeeting.objects.create(
-                academic_year_level=offering.academic_year_level,
+    month_query = f"month={meeting_date.year}-{meeting_date.month}"
+    if not offering_ids:
+        messages.error(request, _("Select at least one course offering."))
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}&{month_query}")
+    if len(offering_ids) > MAX_MEETINGS_PER_REQUEST:
+        messages.error(
+            request,
+            _("Too many offerings selected at once (maximum %(max)s).") % {"max": MAX_MEETINGS_PER_REQUEST},
+        )
+        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}&{month_query}")
+
+    offerings = {
+        str(offering.pk): offering
+        for offering in CourseOffering.objects.filter(
+            pk__in=offering_ids,
+            academic_year_level__academic_year=year,
+        ).select_related("academic_year_level")
+    }
+
+    added_count = 0
+    assigned_count = 0
+    skipped_existing = 0
+    skipped_invalid = 0
+    with transaction.atomic():
+        existing_level_ids = set(
+            AcademicYearLevelMeeting.objects.filter(
+                academic_year_level__academic_year=year,
                 meeting_date=meeting_date,
-                course_offering=offering,
+            ).values_list("academic_year_level_id", flat=True)
+        )
+        for offering_id in offering_ids:
+            offering = offerings.get(offering_id)
+            if offering is None:
+                skipped_invalid += 1
+                continue
+            academic_year_level = offering.academic_year_level
+            if meeting_date.weekday() not in (academic_year_level.meeting_weekdays or []):
+                skipped_invalid += 1
+                continue
+            if academic_year_level.pk in existing_level_ids:
+                skipped_existing += 1
+                continue
+            try:
+                with transaction.atomic():
+                    meeting = AcademicYearLevelMeeting.objects.create(
+                        academic_year_level=academic_year_level,
+                        meeting_date=meeting_date,
+                        course_offering=offering,
+                    )
+            except (IntegrityError, ValidationError):
+                skipped_existing += 1
+                continue
+            existing_level_ids.add(academic_year_level.pk)
+            added_count += 1
+            assigned_count += assign_unassigned_attendance(meeting)
+
+    if added_count:
+        messages.success(request, _("Meetings added: %(count)s.") % {"count": added_count})
+        if assigned_count:
+            messages.success(
+                request,
+                _("Pending attendance records assigned: %(count)s.") % {"count": assigned_count},
             )
-            assigned_count = assign_unassigned_attendance(meeting)
-    except IntegrityError:
-        messages.error(request, _("A meeting already exists for this level and date."))
-        return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}")
-    messages.success(request, _("Meeting added. %(count)s pending attendance record(s) assigned.") % {"count": assigned_count})
-    return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}&year={meeting_date.year}&month={meeting_date.month}")
+    if skipped_existing:
+        messages.warning(
+            request,
+            _("Some selected offerings were skipped because their level already has a meeting on this date."),
+        )
+    if skipped_invalid:
+        messages.warning(request, _("Some selected offerings do not meet on the selected weekday."))
+    return redirect(f"{reverse('calendar-management')}?academic_year={year.pk}&{month_query}")
 
 
 @require_POST
@@ -5530,9 +5549,10 @@ def delete_meeting(request, meeting_id):
         pk=meeting_id,
     )
     year_id = meeting.academic_year_level.academic_year_id
+    meeting_date = meeting.meeting_date
     meeting.delete()
     messages.success(request, _("Meeting deleted."))
-    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}&year={meeting.meeting_date.year}&month={meeting.meeting_date.month}")
+    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}&month={meeting_date.year}-{meeting_date.month}")
 
 @require_POST
 @capability_required(can_manage_content)
@@ -5571,41 +5591,74 @@ def add_holiday(request):
 
     AcademicHoliday.objects.create(academic_year=year, date=holiday_date, name=name)
     messages.success(request, _("Holiday added."))
-    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}&month={holiday_date.year}-{holiday_date.month}")
 
 @require_POST
 @capability_required(can_manage_content)
 def delete_holiday(request, holiday_id):
     holiday = get_object_or_404(AcademicHoliday, pk=holiday_id)
     year_id = holiday.academic_year_id
+    holiday_date = holiday.date
     holiday.delete()
     messages.success(request, _("Holiday deleted."))
-    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}")
+    return redirect(f"{reverse('calendar-management')}?academic_year={year_id}&month={holiday_date.year}-{holiday_date.month}")
 
 @login_required
 def student_calendar(request):
-    enrollments = Enrollment.objects.filter(
-        student=request.user,
-        status__in=["active", "completed"],
-        enrollment_type="normal",
-    ).select_related("academic_year_level__academic_year", "academic_year_level__level")
-    active_year = AcademicYear.objects.filter(is_active=True).first()
-    selected_enrollment = (
-        enrollments.filter(academic_year_level__academic_year=active_year)
-        .order_by("-enrolled_at")
-        .first()
-        if active_year else None
+    enrollments = list(
+        Enrollment.objects.filter(
+            student=request.user,
+            status__in=["active", "completed"],
+            enrollment_type="normal",
+        ).select_related(
+            "academic_year_level__academic_year",
+            "academic_year_level__level",
+        ).order_by(
+            "-academic_year_level__academic_year__ordering",
+            "-enrolled_at",
+        )
     )
+    selected_enrollment = None
+    scope_param = request.GET.get("scope")
+    if scope_param and scope_param.isdigit():
+        selected_enrollment = next(
+            (enrollment for enrollment in enrollments if enrollment.pk == int(scope_param)),
+            None,
+        )
     if selected_enrollment is None:
-        selected_enrollment = enrollments.order_by(
-            "-academic_year_level__academic_year__ordering", "-enrolled_at"
-        ).first()
+        active_year = AcademicYear.objects.filter(is_active=True).first()
+        if active_year is not None:
+            selected_enrollment = next(
+                (e for e in enrollments if e.academic_year_level.academic_year_id == active_year.pk),
+                None,
+            )
+        if selected_enrollment is None and enrollments:
+            selected_enrollment = enrollments[0]
+
+    scope_options = [
+        {
+            "value": enrollment.pk,
+            "label": (
+                f"{enrollment.academic_year_level.academic_year.name} — "
+                f"{enrollment.academic_year_level.level.display_name}"
+            ),
+            "is_current": selected_enrollment is not None and enrollment.pk == selected_enrollment.pk,
+        }
+        for enrollment in enrollments
+    ]
 
     scopes = []
     month_grid = None
     prev_month = None
     next_month = None
-    month_name = ""
+    month_options = []
+    today_query = None
+    cur_year = None
+    cur_month = None
+    month_meeting_count = 0
+    month_course_count = 0
+    month_holiday_count = 0
+
     if selected_enrollment:
         scope = selected_enrollment.academic_year_level
         weekday_labels = _calendar_weekday_labels()
@@ -5629,19 +5682,24 @@ def student_calendar(request):
         year = scope.academic_year
         today = timezone.localdate()
         cur_year, cur_month, prev_month, next_month = _resolve_calendar_month(year, request)
+        month_options = _calendar_month_options(year, cur_year, cur_month)
+        today_query = _calendar_today_query(year)
         holidays = {
             h.date: h
             for h in year.holidays.filter(date__year=cur_year, date__month=cur_month)
         }
+        month_meetings = list(
+            AcademicYearLevelMeeting.objects.filter(
+                academic_year_level=scope,
+                meeting_date__year=cur_year,
+                meeting_date__month=cur_month,
+            ).select_related(
+                "academic_year_level__level",
+                "course_offering__course",
+            ).order_by("meeting_date", "course_offering__course__name")
+        )
         meetings_by_date = defaultdict(list)
-        for meeting in AcademicYearLevelMeeting.objects.filter(
-            academic_year_level=scope,
-            meeting_date__year=cur_year,
-            meeting_date__month=cur_month,
-        ).select_related(
-            "academic_year_level__level",
-            "course_offering__course",
-        ).order_by("meeting_date", "course_offering__course__name"):
+        for meeting in month_meetings:
             meetings_by_date[meeting.meeting_date].append(_calendar_meeting_row(meeting))
         month_grid = _build_month_grid(
             year_start=year.starts_on,
@@ -5653,14 +5711,24 @@ def student_calendar(request):
             meetings_by_date=meetings_by_date,
             locked_weekdays=set(scope.meeting_weekdays or []),
         )
-        month_name = formats.date_format(date(cur_year, cur_month, 1), "F Y")
+        month_meeting_count = len(month_meetings)
+        month_course_count = len({meeting.course_offering_id for meeting in month_meetings})
+        month_holiday_count = len(holidays)
+
     return render(request, "student_calendar.html", {
         "scopes": scopes,
+        "scope_id": selected_enrollment.pk if selected_enrollment else None,
+        "scope_options": scope_options,
         "weekday_names": _calendar_weekday_abbreviations(),
         "month_grid": month_grid,
+        "month_options": month_options,
         "prev_month": prev_month,
         "next_month": next_month,
-        "month_name": month_name,
+        "today_query": today_query,
+        "cur_month": cur_month,
+        "month_meeting_count": month_meeting_count,
+        "month_course_count": month_course_count,
+        "month_holiday_count": month_holiday_count,
     })
 
 @login_required

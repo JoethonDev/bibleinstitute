@@ -172,7 +172,15 @@ class User(AbstractUser):
             except Role.DoesNotExist:
                 pass
         super().save(*args, **kwargs)
-    
+
+    @property
+    def telegram_display_identity(self) -> str:
+        """Canonical "Full Name (@username)" identity label for Telegram support."""
+        name = self.get_full_name().strip() or self.username
+        if self.username and self.username != name:
+            return f"{name} (@{self.username})"
+        return name
+
     def serialize_pagination(self):
         return {
             "id" : self.pk,
@@ -788,6 +796,15 @@ class TelegramMessage(models.Model):
         SENT = "sent", _("Sent")
         FAILED = "failed", _("Failed")
 
+    class Origin(models.TextChoices):
+        TELEGRAM = "telegram", _("Via Telegram")
+        WEB = "web", _("Via Web")
+
+    class Resolution(models.TextChoices):
+        DELETED = "deleted", _("Deleted")
+        EDITED = "edited", _("Edited")
+        FAILED = "failed", _("Failed")
+
     conversation = models.ForeignKey(TelegramConversation, on_delete=models.CASCADE, related_name="messages")
     direction = models.CharField(max_length=16, choices=Direction.choices)
     sender_user = models.ForeignKey(
@@ -801,10 +818,21 @@ class TelegramMessage(models.Model):
     telegram_message_id = models.BigIntegerField(null=True, blank=True)
     telegram_update_id = models.BigIntegerField(null=True, blank=True)
     reply_to_telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    source_message = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="linked_messages",
+        help_text="For digest rows: the student message announced. For replies: the student message answered.",
+    )
     content_type = models.CharField(max_length=16, choices=ContentType.choices)
+    origin = models.CharField(max_length=16, choices=Origin.choices, blank=True, default="")
     text = models.TextField(blank=True, default="")
     delivery_status = models.CharField(max_length=16, choices=DeliveryStatus.choices, default=DeliveryStatus.RECEIVED)
     delivery_error = models.CharField(max_length=500, blank=True, default="")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution = models.CharField(max_length=16, choices=Resolution.choices, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
 

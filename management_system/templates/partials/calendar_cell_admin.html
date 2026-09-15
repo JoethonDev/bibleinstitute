@@ -1,11 +1,13 @@
 {% load i18n %}
 {# Admin calendar cell: meetings, holidays, and add-meeting/add-holiday controls. #}
-{# Consumes: day (shared month-grid day dict), year_id, can_edit_meetings. #}
+{# Consumes: day (shared month-grid day dict), year_id, can_edit_meetings, can_manage_holidays. #}
+{# State classes: is-out / is-holiday / is-meeting / has-meeting / is-today. #}
 {# Frozen contracts: data-date/data-year, data-offerings-template, #addMeetingModal, #addHolidayModal. #}
 <div class="ad-calmg-cell
   {% if day.outside_month %} is-out{% endif %}
   {% if day.is_holiday %} is-holiday{% endif %}
   {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
+  {% if day.in_year and day.meetings and not day.outside_month %} has-meeting{% endif %}
   {% if day.is_today %} is-today{% endif %}
 ">
   {% if day.in_year and not day.outside_month %}
@@ -14,10 +16,12 @@
    {% if day.is_holiday %}
       <div class="ad-calendar-holiday">
         <small>{{ day.holiday_name }}</small>
+      {% if can_manage_holidays %}
       <form method="post" action="{% url 'delete-holiday' day.holiday_id %}" hx-post="{% url 'delete-holiday' day.holiday_id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this holiday?' %}">
         {% csrf_token %}
         <button type="submit" class="btn-close btn-sm holiday-delete" aria-label="{% translate 'Delete' %}"></button>
       </form>
+      {% endif %}
      </div>
      {% endif %}
      {% for meeting in day.meetings %}
@@ -33,25 +37,28 @@
      {% endfor %}
      {% if can_edit_meetings and day.meeting_offerings %}
        <template id="meeting-offerings-{{ day.date }}">
-         <option value="">{% translate "Select offering..." %}</option>
          {% for offering in day.meeting_offerings %}
          <option value="{{ offering.pk }}">{{ offering.academic_year_level.level.display_name }} — {{ offering.course.name }}</option>
          {% endfor %}
        </template>
+     {% endif %}
+     {% if can_edit_meetings and day.meeting_offerings or can_manage_holidays and not day.is_holiday %}
        <div class="d-flex gap-1 mt-1 ad-calendar-add-actions">
-         <button class="ad-action-btn is-add-meeting" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
+         {% if can_edit_meetings and day.meeting_offerings %}
+         <button type="button" class="ad-action-btn is-add-meeting" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
                  data-date="{{ day.date }}" data-year="{{ year_id }}"
                  data-offerings-template="meeting-offerings-{{ day.date }}"
                  title="{% translate 'Add meeting' %}"
                  aria-label="{% translate 'Add meeting' %}">
-           <i class="fas fa-church"></i>
+           <i class="fas fa-church" aria-hidden="true"></i>
          </button>
-         {% if not day.is_holiday %}
-         <button class="ad-action-btn is-add-holiday" data-bs-toggle="modal" data-bs-target="#addHolidayModal"
+         {% endif %}
+         {% if can_manage_holidays and not day.is_holiday %}
+         <button type="button" class="ad-action-btn is-add-holiday" data-bs-toggle="modal" data-bs-target="#addHolidayModal"
                  data-date="{{ day.date }}" data-year="{{ year_id }}"
                  title="{% translate 'Add holiday' %}"
                  aria-label="{% translate 'Add holiday' %}">
-           <i class="fas fa-plus"></i>
+           <i class="fas fa-plus" aria-hidden="true"></i>
          </button>
          {% endif %}
        </div>

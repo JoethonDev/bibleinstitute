@@ -9,33 +9,71 @@
 <div class="sd-page sd-calendar-page">
 <div class="container py-4">
   <h1 class="sd-calendar-title">{% translate "My Academic Calendar" %}</h1>
+  {% if scope_options|length > 1 %}
+  <form class="sd-cal-scope" method="get" action="{% url 'student-calendar' %}">
+    <input type="hidden" name="month" value="{{ cur_month }}">
+    <label for="scope-select" class="form-label">{% translate "Academic Scope" %}</label>
+    <select id="scope-select" name="scope" class="form-select" onchange="this.form.submit()">
+      {% for option in scope_options %}
+      <option value="{{ option.value }}"{% if option.is_current %} selected{% endif %}>{{ option.label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
   {% for scope in scopes %}
     <div class="sd-panel-card mb-4">
       <div class="sd-panel-head">
         <i class="fas fa-calendar-alt"></i>
         <strong>{{ scope.academic_year }} — {{ scope.level.display_name }}</strong>
-        <span class="sd-panel-sub">{{ scope.academic_year.starts_on }} – {{ scope.academic_year.ends_on }}</span>
+        <span class="sd-panel-sub">{{ scope.academic_year.starts_on|date }} – {{ scope.academic_year.ends_on|date }}</span>
       </div>
       <div class="sd-screen">
         {% if month_grid %}
         <div class="sd-cal-top">
-          <h5 class="sd-cal-title">{{ month_name }}</h5>
-          <span class="sd-cal-nav" role="group" aria-label="{% translate 'Month navigation' %}">
+          <div class="sd-cal-nav" role="group" aria-label="{% translate 'Month navigation' %}">
             {% if prev_month %}
-            <a href="?{{ prev_month }}" aria-label="{% translate 'Previous month' %}">
+            <a class="sd-cal-arrow" href="?{{ prev_month }}&scope={{ scope_id }}" aria-label="{% translate 'Previous month' %}">
               <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i>
             </a>
+            {% else %}
+            <span class="sd-cal-arrow is-disabled" aria-disabled="true" aria-label="{% translate 'Previous month' %}">
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i>
+            </span>
             {% endif %}
+            <form class="sd-cal-month-form" method="get" action="{% url 'student-calendar' %}">
+              <input type="hidden" name="scope" value="{{ scope_id }}">
+              <label for="student-month-select" class="visually-hidden">{% translate "Choose a month" %}</label>
+              <select id="student-month-select" name="month" class="sd-cal-month-select" aria-label="{% translate 'Choose a month' %}" onchange="this.form.submit()">
+                {% for option in month_options %}
+                <option value="{{ option.value }}"{% if option.is_current %} selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </form>
             {% if next_month %}
-            <a href="?{{ next_month }}" aria-label="{% translate 'Next month' %}">
+            <a class="sd-cal-arrow" href="?{{ next_month }}&scope={{ scope_id }}" aria-label="{% translate 'Next month' %}">
               <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
             </a>
+            {% else %}
+            <span class="sd-cal-arrow is-disabled" aria-disabled="true" aria-label="{% translate 'Next month' %}">
+              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
+            </span>
             {% endif %}
-          </span>
+          </div>
+          {% if today_query %}
+          <a class="sd-cal-today" href="?{{ today_query }}&scope={{ scope_id }}">
+            <i class="fas fa-calendar-day" aria-hidden="true"></i>{% translate "Today" %}
+          </a>
+          {% endif %}
+          <div class="sd-cal-stats">
+            <span class="sd-cal-stat"><strong>{{ month_meeting_count }}</strong> {% translate "Meetings" %}</span>
+            <span class="sd-cal-stat"><strong>{{ month_course_count }}</strong> {% translate "Courses" %}</span>
+            <span class="sd-cal-stat"><strong>{{ month_holiday_count }}</strong> {% translate "Holidays" %}</span>
+          </div>
         </div>
         {% include "partials/calendar_month_grid.html" with cell_variant="student" %}
         <div class="sd-legend">
           <span><i class="lg-meet"></i> {% translate "Meeting day" %}</span>
+          <span><i class="lg-scheduled"></i> {% translate "Scheduled meeting" %}</span>
           <span><i class="lg-hol"></i> {% translate "Holiday" %}</span>
           <span><i class="lg-today"></i> {% translate "Today" %}</span>
         </div>

@@ -1,0 +1,86 @@
+{% load i18n %}
+<div id="quiz-import-result" class="quiz-import-result">
+    {% if import_errors %}
+        <div class="ad-alert ad-alert--danger" role="alert">
+            <p class="fw-semibold mb-2">
+                <i class="fas fa-triangle-exclamation me-2"></i>
+                {% translate "Import failed. Fix the following and try again:" %}
+            </p>
+            <ul class="mb-0">
+                {% for import_error in import_errors %}
+                    <li>{{ import_error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% else %}
+        <div class="ad-alert ad-alert--success" role="status">
+            <i class="fas fa-check-circle me-2"></i>
+            {% translate "JSON is valid." %}
+        </div>
+        {% if import_warnings %}
+            <div class="ad-alert ad-alert--warning" role="status">
+                <p class="fw-semibold mb-2">
+                    <i class="fas fa-circle-exclamation me-2"></i>
+                    {% translate "Import warnings" %}
+                </p>
+                <ul class="mb-0">
+                    {% for import_warning in import_warnings %}
+                        <li>{{ import_warning }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <div class="quiz-import-summary">
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Quiz name" %}:</span>
+                <strong>{{ import_summary.name|default:"—" }}</strong>
+            </div>
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Course offering" %}:</span>
+                {{ import_summary.offering_label|default:"—" }}
+            </div>
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Quiz Type" %}:</span>
+                {{ import_summary.quiz_type_label|default:"—" }}
+            </div>
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Status" %}:</span>
+                {{ import_summary.status_label|default:"—" }}
+            </div>
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Opening Date" %}:</span>
+                {{ import_summary.opening_display|default:"—" }}
+            </div>
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Closing Date" %}:</span>
+                {{ import_summary.closing_display|default:"—" }}
+            </div>
+            <div class="mb-1">
+                <span class="text-muted">{% translate "Total Grade" %}:</span>
+                <strong>{{ import_summary.total_grade }}</strong>
+            </div>
+            <div>
+                <span class="text-muted">{% translate "Questions" %}:</span>
+                <strong>{{ import_summary.questions_count }}</strong>
+            </div>
+        </div>
+
+        {{ import_payload|json_script:"quiz-import-data" }}
+
+        <div class="quiz-import-preview-wrap" role="region" tabindex="0" aria-label="{% translate "Quiz preview" %}">
+            <div class="quiz-import-preview" id="quiz-import-preview" inert>
+                <h6 class="quiz-import-preview-title">{% translate "Quiz preview" %}</h6>
+                {% include 'questions_rendering.html' with is_student=False mode="edit" questions=import_questions question_types=question_types %}
+            </div>
+        </div>
+
+        <div class="quiz-import-actions">
+            <button type="button" class="ad-btn ad-btn--teal" data-action="quiz-import-load">
+                <i class="fas fa-file-import me-2"></i>
+                {% translate "Load into quiz form" %}
+            </button>
+            <span class="text-muted small">{% translate "Review the loaded fields, then submit to save the quiz." %}</span>
+        </div>
+    {% endif %}
+</div>

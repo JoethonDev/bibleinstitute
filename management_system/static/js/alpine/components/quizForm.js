@@ -57,7 +57,7 @@ function quizForm() {
          * Get question index from card
          */
         getQuestionIndex(questionCard) {
-            return [...this.$el.querySelectorAll('.question-card')].indexOf(questionCard);
+            return this.getQuestionCards().indexOf(questionCard);
         },
 
         /**
@@ -68,7 +68,10 @@ function quizForm() {
         },
 
         getQuestionCards() {
-            return [...this.$el.querySelectorAll('.question-card')];
+            // Scope to the real questions container: the JSON import panel may
+            // render a read-only preview with the same .question-card markup.
+            const container = this.getQuestionContainer();
+            return container ? [...container.querySelectorAll('.question-card')] : [];
         },
 
         getQuestionContainer() {

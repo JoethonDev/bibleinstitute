@@ -1085,38 +1085,9 @@
     min-height: 0; /* let content drive height */
 }
 
-/* Year picker control group */
-.ad-calendar-year-picker .form-select {
-    min-width: 14rem;
-}
-
 /* Toolbar: month navigation and title — dual-classed with .ad-card */
 .ad-card.ad-calendar-toolbar {
     margin-bottom: .75rem;
-}
-
-/* Month title in toolbar */
-.ad-calendar-month-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--ps-ink);
-    text-align: center;
-    min-width: 10rem;
-}
-
-/* Month nav button group */
-.ad-calendar-nav {
-    flex-shrink: 0;
-}
-
-/* Weekday header labels (dual-classed with .ad-calmg-wd) */
-.ad-calendar-weekday {
-    font-size: .73rem;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    padding-block-end: .35rem;
-    border-bottom: 2px solid var(--ps-line);
-    margin-bottom: .15rem;
 }
 
 /* Cell content column — day number, holidays, meetings, add actions */
@@ -1499,24 +1470,6 @@
     .ad-tab .ad-tab-count { display: none; }
     .mobile-menu-toggle { display: flex !important; }
     .ad-grid-2 { grid-template-columns: 1fr; }
-    /* Calendar responsive */
-    .ad-card.ad-calendar-toolbar .ad-card-body > div {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .ad-card.ad-calendar-toolbar .ad-card-body > div > form {
-        justify-content: center;
-    }
-    .ad-calendar-month-title {
-        order: -1;
-        margin-bottom: .25rem;
-    }
-    .ad-calendar-nav {
-        justify-content: center;
-    }
-    .ad-calendar-year-picker .form-select {
-        min-width: 12rem;
-    }
 }
 
 /* Comfortable tablet density: keep the rail usable without squeezing the
@@ -1583,9 +1536,6 @@
     .ad-calendar-legend {
         gap: .3rem .8rem;
         font-size: .72rem;
-    }
-    .ad-calendar-year-picker .form-select {
-        min-width: 10rem;
     }
 }
 
@@ -2415,6 +2365,12 @@
     font-size: .7rem;
 }
 
+/* Inbound carries a person's name; keep its natural casing. */
+.tg-chat-msg--inbound .tg-chat-msg-role {
+    text-transform: none;
+    letter-spacing: 0;
+}
+
 .tg-chat-msg-type { font-size: .72rem; }
 
 .tg-chat-msg-body {
@@ -2467,6 +2423,13 @@
     margin-top: .5rem;
     font-size: .74rem;
     color: var(--ps-muted);
+}
+
+.tg-chat-msg-sender {
+    font-size: .72rem;
+    color: var(--ps-muted);
+    direction: ltr;
+    unicode-bidi: embed;
 }
 
 .tg-chat-msg-error {
@@ -3087,4 +3050,197 @@
 .ad-form-page .form-actions .ad-btn { min-width: 8.5rem; }
 @media (max-width: 767.98px) {
     .ad-form-page textarea.form-control { height: 7rem; }
+}
+
+/* ---------------- Quiz JSON import panel (quiz_form.html) ---------------- */
+.quiz-import-card .ad-card-head {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+}
+
+.quiz-import-help {
+    font-size: .85rem;
+    color: var(--ps-muted);
+}
+
+.quiz-import-payload {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .82rem;
+    line-height: 1.5;
+    min-height: 12rem;
+    direction: ltr;
+    text-align: left;
+    background: var(--ps-paper);
+    border-color: var(--ps-line);
+    color: var(--ps-ink);
+}
+
+.quiz-import-file-row {
+    margin-top: .8rem;
+    margin-bottom: .8rem;
+    max-width: 26rem;
+}
+
+.quiz-import-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+}
+
+.quiz-import-loading {
+    display: inline-flex;
+    align-items: center;
+}
+
+.quiz-import-result {
+    margin-top: 1rem;
+}
+
+.quiz-import-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    padding: .6rem .8rem;
+    background: var(--ps-mist);
+    border: 1px solid var(--ps-line-cool);
+    border-radius: calc(var(--ps-radius) - .4rem);
+}
+
+.quiz-import-preview-wrap {
+    max-height: 30rem;
+    overflow: auto;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: calc(var(--ps-radius) - .4rem);
+    background: var(--ps-paper);
+}
+
+.quiz-import-preview-wrap:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 2px;
+}
+
+.quiz-import-preview {
+    padding: 1rem;
+    pointer-events: none;
+}
+
+/* ============ Calendar selection + navigator overhaul (admin) ============ */
+.ad-calendar-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem .9rem;
+    align-items: center;
+}
+.ad-calendar-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .82rem;
+    color: var(--ps-muted);
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-line-cool);
+    border-radius: 999px;
+    padding: .2rem .7rem;
+}
+.ad-calendar-stat i { color: var(--ps-gold-deep); font-size: .78rem; }
+.ad-calendar-stat strong { font-size: .95rem; color: var(--ps-ink); }
+.ad-calendar-context .ad-calendar-context-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .75rem 1.25rem;
+}
+.ad-calendar-year-field { min-width: 15rem; }
+.ad-calendar-year-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4rem .75rem;
+    font-size: .82rem;
+    color: var(--ps-muted);
+    padding-block-end: .15rem;
+}
+.ad-calendar-year-range { font-weight: 600; color: var(--ps-ink); }
+.ad-calendar-year-counts,
+.ad-calendar-weekday-chips { display: inline-flex; flex-wrap: wrap; gap: .3rem .6rem; }
+.ad-calendar-weekday-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--ps-teal);
+    background: var(--ps-teal-soft);
+    color: var(--ps-teal);
+    border-radius: 999px;
+    padding: .1rem .55rem;
+    font-size: .74rem;
+    font-weight: 650;
+}
+.ad-card.ad-calendar-toolbar .ad-calendar-toolbar-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem .75rem;
+}
+.ad-calendar-nav { display: inline-flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+.ad-calendar-month-form { display: inline-flex; align-items: center; margin: 0; }
+.ad-calendar-month-select {
+    min-width: 11rem;
+    font-family: var(--ps-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ps-ink);
+}
+.ad-calendar-nav-btn { min-width: 2.4rem; justify-content: center; }
+.ad-calendar-nav-btn.is-disabled {
+    opacity: .4;
+    pointer-events: none;
+    cursor: default;
+}
+.ad-calendar-toolbar-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4rem .75rem;
+    margin-inline-start: auto;
+}
+.ad-calmg-cell.has-meeting:not(.is-holiday) {
+    background: rgba(47, 93, 115, .18);
+    border-inline-start: 4px solid var(--ps-teal);
+}
+.ad-calendar-legend .ad-pill.has-meeting {
+    background: rgba(47, 93, 115, .18);
+    border-color: var(--ps-teal);
+}
+.ad-calendar-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .6rem;
+    padding: .45rem .6rem;
+    background: #fff;
+}
+.ad-calendar-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+    font-size: .86rem;
+    cursor: pointer;
+    padding: .2rem .15rem;
+    border-radius: .4rem;
+}
+.ad-calendar-choice:hover { background: var(--ps-mist); }
+.ad-calendar-choice input { flex-shrink: 0; margin-top: .15rem; }
+.ad-calendar-choice-text { line-height: 1.35; }
+@media (max-width: 767.98px) {
+    .ad-calendar-context .ad-calendar-context-body { flex-direction: column; align-items: stretch; }
+    .ad-calendar-year-field { min-width: 0; }
+    .ad-card.ad-calendar-toolbar .ad-calendar-toolbar-body { flex-direction: column; align-items: stretch; }
+    .ad-calendar-nav { justify-content: center; }
+    .ad-calendar-toolbar-actions { margin-inline-start: 0; justify-content: center; }
+    .ad-calendar-month-select { width: 100%; }
 }

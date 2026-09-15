@@ -41,7 +41,7 @@ from .telegram.navigation import (
 )
 from .telegram.broadcasts import process_due_broadcast
 from .telegram.notifications import process_due_notifications
-from .telegram.support import handle_admin_message, handle_student_message, handle_support_callback, is_support_callback
+from .telegram.support import handle_admin_message, handle_student_message
 from .utils.quiz_access import quiz_window
 from .utils.storage_operations import get_r2_client
 
@@ -545,10 +545,7 @@ def process_telegram_update(update_id: int) -> None:
         try:
             bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
             if isinstance(callback, dict):
-                if is_support_callback(callback.get("data")):
-                    handle_support_callback(bot, callback)
-                else:
-                    _handle_callback(bot, callback)
+                _handle_callback(bot, callback)
             elif isinstance(message, dict):
                 _message_reply(bot, message, sender_id, chat_id, update_id)
         except Exception:

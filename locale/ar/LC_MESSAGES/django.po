@@ -10341,6 +10341,254 @@ msgstr "نوع بيانات التحديد غير صالح."
 msgid "Some selected records are referenced by other data and cannot be deleted."
 msgstr "بعض السجلات المحددة مرتبطة ببيانات أخرى ولا يمكن حذفها."
 
+msgid "Support message from %(name)s"
+msgstr "رسالة دعم من %(name)s"
+
+msgid "This message was already answered by another admin."
+msgstr "تم الرد على هذه الرسالة بالفعل بواسطة مسؤول آخر."
+
+msgid "Answered by another admin."
+msgstr "تم الرد بواسطة مسؤول آخر."
+
+msgid "Via Telegram"
+msgstr "عبر تيليجرام"
+
+msgid "Via Web"
+msgstr "عبر الويب"
+
+msgid "Deleted"
+msgstr "محذوف"
+
+msgid "Edited"
+msgstr "معدّل"
+msgid "Import Quiz from JSON"
+msgstr "استيراد اختبار من JSON"
+
+msgid "Toggle import panel"
+msgstr "إظهار/إخفاء لوحة الاستيراد"
+
+msgid "Paste a JSON payload or open a .json file, then preview it."
+msgstr "الصق محتوى JSON أو افتح ملف ‎.json ثم اضغط معاينة."
+
+msgid "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft."
+msgstr "تتحقق المعاينة من المحتوى وتعرض الأسئلة ثم تُحمّلها في هذا النموذج. أرسل النموذج لحفظ الاختبار كمسودة."
+
+msgid "Paste quiz JSON here..."
+msgstr "الصق JSON الاختبار هنا..."
+
+msgid "Open a JSON file"
+msgstr "فتح ملف JSON"
+
+msgid "Insert example"
+msgstr "إدراج مثال"
+
+msgid "Import JSON"
+msgstr "استيراد JSON"
+
+msgid "Import failed. Fix the following and try again:"
+msgstr "فشل الاستيراد. صحّح ما يلي ثم حاول مرة أخرى:"
+
+msgid "Import warnings"
+msgstr "تنبيهات الاستيراد"
+
+msgid "JSON is valid."
+msgstr "محتوى JSON صالح."
+
+msgid "Quiz name"
+msgstr "اسم الاختبار"
+
+msgid "Quiz preview"
+msgstr "معاينة الاختبار"
+
+msgid "Load into quiz form"
+msgstr "تحميل في نموذج الاختبار"
+
+msgid "Review the loaded fields, then submit to save the quiz."
+msgstr "راجع الحقول المحمّلة ثم أرسل النموذج لحفظ الاختبار."
+
+msgid "The selected file is too large to import."
+msgstr "الملف المحدد كبير جدًا للاستيراد."
+
+msgid "Could not read the selected file."
+msgstr "تعذّرت قراءة الملف المحدد."
+
+msgid "Quiz data loaded into the form. Review it, then submit to save the draft."
+msgstr "تم تحميل بيانات الاختبار في النموذج. راجعها ثم أرسل النموذج لحفظ المسودة."
+
+msgid "Some quiz data could not be loaded into the form."
+msgstr "تعذّر تحميل بعض بيانات الاختبار في النموذج."
+
+msgid "The JSON payload is empty."
+msgstr "محتوى JSON فارغ."
+
+msgid "The JSON payload is larger than the %(limit)s KB limit."
+msgstr "حجم محتوى JSON أكبر من الحد الأقصى %(limit)s ك.ب."
+
+msgid "The payload is not valid JSON: %(error)s at line %(line)s."
+msgstr "المحتوى ليس JSON صالحًا: %(error)s عند السطر %(line)s."
+
+msgid "The payload is not valid JSON."
+msgstr "المحتوى ليس JSON صالحًا."
+
+msgid "\"quiz\" must be an object."
+msgstr "يجب أن يكون \"quiz\" كائنًا."
+
+msgid "\"questions\" must be a list of question objects."
+msgstr "يجب أن تكون \"questions\" قائمة من كائنات الأسئلة."
+
+msgid "The JSON root must be an object or a list of questions."
+msgstr "يجب أن يكون جذر JSON كائنًا أو قائمة أسئلة."
+
+msgid "Unknown field \"%(field)s\" was ignored."
+msgstr "تم تجاهل الحقل غير المعروف \"%(field)s\"."
+
+msgid "At least one question is required."
+msgstr "مطلوب سؤال واحد على الأقل."
+
+msgid "Too many questions: the maximum is %(limit)s."
+msgstr "عدد الأسئلة كبير جدًا: الحد الأقصى %(limit)s."
+
+msgid "The quiz name cannot be empty."
+msgstr "لا يمكن أن يكون اسم الاختبار فارغًا."
+
+msgid "The quiz name must be at most %(limit)s characters."
+msgstr "يجب ألا يزيد اسم الاختبار عن %(limit)s حرفًا."
+
+msgid "Unknown status \"%(value)s\". Use one of: %(allowed)s."
+msgstr "حالة غير معروفة \"%(value)s\". استخدم إحدى القيم: %(allowed)s."
+
+msgid "Unknown course offering \"%(value)s\". Use an offering id or the exact label from the form."
+msgstr "مقرر غير معروف \"%(value)s\". استخدم معرّف المقرر أو النص الظاهر في النموذج."
+
+msgid "The selected course offering is not available in the active academic year."
+msgstr "المقرر المحدد غير متاح في العام الدراسي النشط."
+
+msgid "More than one course offering matches \"%(value)s\". Use the offering id instead."
+msgstr "يوجد أكثر من مقرر مطابق لـ \"%(value)s\". استخدم معرّف المقرر بدلًا من ذلك."
+
+msgid "Unknown quiz type \"%(value)s\". Use %(codes)s or a quiz type id."
+msgstr "نوع اختبار غير معروف \"%(value)s\". استخدم %(codes)s أو معرّف نوع الاختبار."
+
+msgid "Invalid date \"%(value)s\" for %(field)s. Use ISO format like 2026-09-20T10:00."
+msgstr "تاريخ غير صالح \"%(value)s\" في %(field)s. استخدم صيغة ISO مثل 2026-09-20T10:00."
+
+msgid "opening date"
+msgstr "تاريخ الفتح"
+
+msgid "closing date"
+msgstr "تاريخ الإغلاق"
+
+msgid "Question %(number)s must be an object."
+msgstr "يجب أن يكون السؤال %(number)s كائنًا."
+
+msgid "Question %(number)s: unknown field \"%(field)s\" was ignored."
+msgstr "السؤال %(number)s: تم تجاهل الحقل غير المعروف \"%(field)s\"."
+
+msgid "Question %(number)s: unsupported or missing question type \"%(type)s\". Allowed types: %(allowed)s."
+msgstr "السؤال %(number)s: نوع سؤال غير مدعوم أو مفقود \"%(type)s\". الأنواع المسموحة: %(allowed)s."
+
+msgid "Question %(number)s: the question text is required."
+msgstr "السؤال %(number)s: نص السؤال مطلوب."
+
+msgid "Question %(number)s: the question text must be at most %(limit)s characters."
+msgstr "السؤال %(number)s: يجب ألا يزيد نص السؤال عن %(limit)s حرفًا."
+
+msgid "Question %(number)s: the grade must be an integer between 0 and %(limit)s."
+msgstr "السؤال %(number)s: يجب أن تكون الدرجة عددًا صحيحًا بين 0 و%(limit)s."
+
+msgid "Question %(number)s: %(label)s are required."
+msgstr "السؤال %(number)s: %(label)s مطلوبة."
+
+msgid "Question %(number)s: %(label)s must be a list of text values."
+msgstr "السؤال %(number)s: يجب أن تكون %(label)s قائمة قيم نصية."
+
+msgid "Question %(number)s: %(label)s must contain text values only."
+msgstr "السؤال %(number)s: يجب أن تحتوي %(label)s على قيم نصية فقط."
+
+msgid "choices"
+msgstr "الاختيارات"
+
+msgid "order event items"
+msgstr "عناصر ترتيب الأحداث"
+
+msgid "Question %(number)s: multiple choice questions need at least 2 choices."
+msgstr "السؤال %(number)s: أسئلة الاختيار من متعدد تحتاج إلى اختيارين على الأقل."
+
+msgid "Question %(number)s: no correct answer was provided, so it will be graded manually."
+msgstr "السؤال %(number)s: لم تُحدَّد إجابة صحيحة، لذا سيُقيَّم يدويًا."
+
+msgid "Question %(number)s: order events need at least 2 items."
+msgstr "السؤال %(number)s: أسئلة ترتيب الأحداث تحتاج إلى عنصرين على الأقل."
+
+msgid "Question %(number)s: match related questions need at least 2 pairs."
+msgstr "السؤال %(number)s: أسئلة الوصل تحتاج إلى زوجين على الأقل."
+
+msgid "Question %(number)s: the correct answer \"%(answer)s\" is not one of the choices."
+msgstr "السؤال %(number)s: الإجابة الصحيحة \"%(answer)s\" ليست ضمن الاختيارات."
+
+msgid "Question %(number)s: match related pairs are required."
+msgstr "السؤال %(number)s: أزواج الوصل مطلوبة."
+
+msgid "Question %(number)s: pairs must be a list of left/right pairs."
+msgstr "السؤال %(number)s: يجب أن تكون الأزواج قائمة من أزواج (يسار/يمين)."
+
+msgid "Question %(number)s: %(message)s"
+msgstr "السؤال %(number)s: %(message)s"
+
+msgid "The total grade %(total)s exceeds the maximum %(limit)s."
+msgstr "مجموع الدرجات %(total)s يتجاوز الحد الأقصى %(limit)s."
+
+#: .\management_system\views.py
+msgid "Select at least one course offering."
+msgstr "اختر مادة دراسية واحدة على الأقل."
+
+#: .\management_system\views.py
+#, python-format
+msgid "Too many offerings selected at once (maximum %(max)s)."
+msgstr "تم اختيار عدد كبير من المواد دفعة واحدة (الحد الأقصى %(max)s)."
+
+#: .\management_system\views.py
+#, python-format
+msgid "Meetings added: %(count)s."
+msgstr "تمت إضافة %(count)s اجتماعًا."
+
+#: .\management_system\views.py
+#, python-format
+msgid "Pending attendance records assigned: %(count)s."
+msgstr "تم إسناد %(count)s سجل حضور معلّق."
+
+#: .\management_system\views.py
+msgid "Some selected offerings were skipped because their level already has a meeting on this date."
+msgstr "تم تجاهل بعض المواد المختارة لأن المستوى الخاص بها لديه اجتماع بالفعل في هذا التاريخ."
+
+#: .\management_system\views.py
+msgid "Some selected offerings do not meet on the selected weekday."
+msgstr "بعض المواد المختارة لا تنعقد في اليوم المحدد."
+
+#: .\management_system\templates\calendar_management.html
+#: .\management_system\templates\student_calendar.html
+msgid "Meetings"
+msgstr "الاجتماعات"
+
+#: .\management_system\templates\calendar_management.html
+#: .\management_system\templates\student_calendar.html
+msgid "Scheduled meeting"
+msgstr "اجتماع مجدول"
+
+#: .\management_system\templates\calendar_management.html
+#: .\management_system\templates\student_calendar.html
+msgid "Choose a month"
+msgstr "اختر الشهر"
+
+#: .\management_system\templates\calendar_management.html
+msgid "No academic years are configured."
+msgstr "لا توجد أعوام دراسية مُعدّة بعد."
+
+#: .\management_system\templates\calendar_management.html
+msgid "Select one or more offerings. Each level can have one meeting per date."
+msgstr "اختر مادة أو أكثر. يمكن أن يكون لكل مستوى اجتماع واحد في نفس التاريخ."
+
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 
@@ -10470,9 +10718,6 @@ msgstr "بعض السجلات المحددة مرتبطة ببيانات أخر�
 
 #~ msgid "selected"
 #~ msgstr "محدد"
-
-#~ msgid "Deleted"
-#~ msgstr "تم الحذف"
 
 #~ msgid "items (Frontend Only)"
 #~ msgstr "عناصر (واجهة فقط)"

@@ -1,11 +1,12 @@
 {% load i18n %}
 {# Student calendar cell: strictly read-only — no action buttons, forms, or controls. #}
 {# Consumes: day (shared month-grid day dict scoped to the student's enrollment). #}
-{# Reuses the approved .sd-day skin; state classes follow the canonical is-out/is-holiday/is-meeting/is-today contract. #}
+{# Reuses the approved .sd-day skin; state classes follow the canonical is-out/is-holiday/is-meeting/has-meeting/is-today contract. #}
 <div class="sd-day
   {% if day.outside_month %} is-out{% endif %}
   {% if day.is_holiday %} is-holiday{% endif %}
   {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
+  {% if day.in_year and day.meetings and not day.outside_month %} has-meeting{% endif %}
   {% if day.is_today %} is-today{% endif %}
 ">
   {% if day.in_year and not day.outside_month %}

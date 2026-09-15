@@ -5,110 +5,152 @@
 {% block body %}
 <div class="container-fluid py-3 ad-page ad-calendar-page" id="content">
 
-  <div class="ad-pane-head">
-    <h4 class="ad-pane-title">{% translate "Calendar Management" %}</h4>
+  <div class="ad-pane-head ad-pane-head--bordered">
+    <h4 class="ad-pane-title mb-0">
+      <i class="fas fa-calendar-days me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Calendar Management" %}<span id="calendar-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+    </h4>
   </div>
 
   <div id="calendar-content">
-  {# Academic year selector — level selection is not required for the calendar entry page #}
-  <div class="row g-2 mb-3 align-items-end ad-calendar-year-picker">
-    <div class="col-auto">
-      <label for="year-select" class="form-label fw-semibold mb-1">{% translate "Academic Year" %}</label>
-      <select id="year-select" name="academic_year" class="form-select"
-              hx-get="{% url 'calendar-management' %}"
-              hx-target="#calendar-content"
-              hx-select="#calendar-content"
-              hx-swap="outerHTML"
-              hx-push-url="true">
-        <option value="">{% translate "Select academic year..." %}</option>
-        {% for y in years %}
-              <option value="{{ y.id }}" {% if year_id == y.id %}selected{% endif %}>{{ y.name }}</option>
-        {% endfor %}
-      </select>
+  {% if year %}
+    {# Academic-year selection and scope context #}
+    <div class="ad-card ad-calendar-context mb-3">
+      <div class="ad-card-body ad-calendar-context-body">
+        <div class="ad-calendar-year-field">
+          <label for="year-select" class="form-label fw-semibold mb-1">{% translate "Academic Year" %}</label>
+          <form id="year-form" method="get" action="{% url 'calendar-management' %}"
+                hx-get="{% url 'calendar-management' %}"
+                hx-target="#calendar-content"
+                hx-select="#calendar-content"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-sync="#calendar-content:abort"
+                hx-indicator="#calendar-loading">
+            <input type="hidden" name="month" value="{{ cur_month }}">
+            <select id="year-select" name="academic_year" class="form-select"
+                    onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
+              {% for y in years %}
+              <option value="{{ y.id }}" {% if y.id == year_id %}selected{% endif %}>{{ y.name }}{% if y.is_active %} · {% translate "Active" %}{% endif %}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+        <div class="ad-calendar-year-meta">
+          {% if year.is_active %}<span class="ad-pill ad-pill--success">{% translate "Active" %}</span>{% endif %}
+          <span class="ad-calendar-year-range">{{ year.starts_on|date }} – {{ year.ends_on|date }}</span>
+          <span class="ad-calendar-year-counts">
+            <span>{{ year_scope_count }} {% translate "Levels" %}</span>
+            <span>{{ year_offering_count }} {% translate "Offerings" %}</span>
+          </span>
+          {% if year_weekday_names %}
+          <span class="ad-calendar-weekday-chips">
+            {% for weekday_name in year_weekday_names %}<span class="ad-calendar-weekday-chip">{{ weekday_name }}</span>{% endfor %}
+          </span>
+          {% endif %}
+        </div>
+      </div>
     </div>
-  </div>
 
-  {% if month_grid %}
-  {# Month/year picker with navigation — level selector is not required #}
-  <div class="ad-card mb-3 ad-calendar-toolbar">
-    <div class="ad-card-body py-2 px-3">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <form id="month-year-form" method="get" action="{% url 'calendar-management' %}"
-              hx-get="{% url 'calendar-management' %}"
-              hx-target="#calendar-content"
-              hx-select="#calendar-content"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-              hx-sync="this:abort"
-              class="d-flex align-items-center gap-2">
-          <input type="hidden" name="academic_year" value="{{ year_id }}">
-          <label for="nav-year-select" class="form-label mb-0 visually-hidden">{% translate "Year" %}</label>
-          <select id="nav-year-select" name="year" class="form-select form-select-sm ad-width-auto"
-                  aria-label="{% translate 'Select year' %}"
-                  onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
-            {% for y in year_options %}
-            <option value="{{ y }}" {% if y == cur_year %}selected{% endif %}>{{ y }}</option>
-            {% endfor %}
-          </select>
-          <label for="nav-month-select" class="form-label mb-0 visually-hidden">{% translate "Month" %}</label>
-          <select id="nav-month-select" name="month" class="form-select form-select-sm ad-width-auto"
-                  aria-label="{% translate 'Select month' %}"
-                  onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
-            {% for m in months %}
-            <option value="{{ m.value }}" {% if m.value == cur_month %}selected{% endif %}>{{ m.name }}</option>
-            {% endfor %}
-          </select>
-        </form>
-        <h5 class="mb-0 fw-semibold ad-calendar-month-title">{{ month_name }}</h5>
-        <div class="d-flex gap-1 ad-calendar-nav" role="group" aria-label="{% translate 'Month navigation' %}">
-             {% if prev_month %}
-          <a href="?academic_year={{ year_id }}&{{ prev_month }}"
-             class="ad-btn ad-btn--ghost ad-btn--sm"
+    {# Month navigator #}
+    <div class="ad-card ad-calendar-toolbar mb-3">
+      <div class="ad-card-body ad-calendar-toolbar-body">
+        <div class="ad-calendar-nav" role="group" aria-label="{% translate 'Month navigation' %}">
+          {% if prev_month %}
+          <a class="ad-btn ad-btn--ghost ad-btn--sm ad-calendar-nav-btn"
+             href="?academic_year={{ year_id }}&{{ prev_month }}"
              hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ prev_month }}"
              hx-target="#calendar-content"
              hx-select="#calendar-content"
              hx-swap="outerHTML"
              hx-push-url="true"
+             hx-indicator="#calendar-loading"
              aria-label="{% translate 'Previous month' %}">
-            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i>
+            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
           </a>
+          {% else %}
+          <span class="ad-btn ad-btn--ghost ad-btn--sm ad-calendar-nav-btn is-disabled" aria-disabled="true" aria-label="{% translate 'Previous month' %}">
+            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+          </span>
           {% endif %}
+
+          <form id="month-year-form" method="get" action="{% url 'calendar-management' %}" class="ad-calendar-month-form"
+                hx-get="{% url 'calendar-management' %}"
+                hx-target="#calendar-content"
+                hx-select="#calendar-content"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-sync="#calendar-content:abort"
+                hx-indicator="#calendar-loading">
+            <input type="hidden" name="academic_year" value="{{ year_id }}">
+            <label for="month-select" class="visually-hidden">{% translate "Choose a month" %}</label>
+            <select id="month-select" name="month" class="form-select form-select-sm ad-calendar-month-select"
+                    aria-label="{% translate 'Choose a month' %}"
+                    onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
+              {% for option in month_options %}
+              <option value="{{ option.value }}" {% if option.is_current %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </form>
+
           {% if next_month %}
-          <a href="?academic_year={{ year_id }}&{{ next_month }}"
-             class="ad-btn ad-btn--ghost ad-btn--sm"
+          <a class="ad-btn ad-btn--ghost ad-btn--sm ad-calendar-nav-btn"
+             href="?academic_year={{ year_id }}&{{ next_month }}"
              hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ next_month }}"
              hx-target="#calendar-content"
              hx-select="#calendar-content"
              hx-swap="outerHTML"
              hx-push-url="true"
+             hx-indicator="#calendar-loading"
              aria-label="{% translate 'Next month' %}">
-            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
+            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+          </a>
+          {% else %}
+          <span class="ad-btn ad-btn--ghost ad-btn--sm ad-calendar-nav-btn is-disabled" aria-disabled="true" aria-label="{% translate 'Next month' %}">
+            <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+          </span>
+          {% endif %}
+        </div>
+
+        <div class="ad-calendar-toolbar-actions">
+          <div class="ad-calendar-stats" aria-live="polite">
+            <span class="ad-calendar-stat"><i class="fas fa-chalkboard-user" aria-hidden="true"></i><strong>{{ month_meeting_count }}</strong> {% translate "Meetings" %}</span>
+            <span class="ad-calendar-stat"><i class="fas fa-book-open" aria-hidden="true"></i><strong>{{ month_course_count }}</strong> {% translate "Courses" %}</span>
+            <span class="ad-calendar-stat"><i class="fas fa-star" aria-hidden="true"></i><strong>{{ month_holiday_count }}</strong> {% translate "Holidays" %}</span>
+          </div>
+          {% if today_query %}
+          <a class="ad-btn ad-btn--outline-gold ad-btn--sm"
+             href="?academic_year={{ year_id }}&{{ today_query }}"
+             hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ today_query }}"
+             hx-target="#calendar-content"
+             hx-select="#calendar-content"
+             hx-swap="outerHTML"
+             hx-push-url="true"
+             hx-indicator="#calendar-loading">
+            <i class="fas fa-calendar-day me-1" aria-hidden="true"></i>{% translate "Today" %}
           </a>
           {% endif %}
         </div>
       </div>
     </div>
-  </div>
 
-  {# Calendar grid — canonical shared partial (read-only variant is used on the student calendar) #}
-  {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
+    {# Calendar grid — canonical shared partial (read-only variant is used on the student calendar) #}
+    {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
 
-  {# Legend #}
-  <div class="d-flex gap-3 mt-2 small ad-card-body ad-calendar-legend">
-    <span><span class="ad-pill is-meeting ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Meeting day" %}</span>
-    <span><span class="ad-pill is-holiday ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Holiday" %}</span>
-    <span><span class="ad-pill is-today ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Today" %}</span>
-    <span><span class="ad-pill ad-pill--muted ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Out of year" %}</span>
-  </div>
+    {# Legend #}
+    <div class="d-flex gap-3 mt-2 small ad-card-body ad-calendar-legend">
+      <span><span class="ad-pill is-meeting ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Meeting day" %}</span>
+      <span><span class="ad-pill has-meeting ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Scheduled meeting" %}</span>
+      <span><span class="ad-pill is-holiday ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Holiday" %}</span>
+      <span><span class="ad-pill is-today ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Today" %}</span>
+      <span><span class="ad-pill ad-pill--muted ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Out of year" %}</span>
+    </div>
 
-  {% elif year_id %}
-  <div class="ad-alert ad-alert--info">{% translate "No calendar data for this year." %}</div>
   {% else %}
-  {# No academic year selected — prompt the user #}
-  <div class="ad-empty py-5">
-    <i class="fas fa-calendar-alt fa-3x mb-3"></i>
-    <p class="fs-5">{% translate "Select an academic year above to view the calendar." %}</p>
-  </div>
+    {# No academic year exists yet #}
+    <div class="ad-empty py-5">
+      <i class="fas fa-calendar-alt fa-3x mb-3" aria-hidden="true"></i>
+      <p class="fs-5">{% translate "No academic years are configured." %}</p>
+    </div>
   {% endif %}
 
   {# Add Holiday Modal #}
@@ -160,10 +202,9 @@
               <p class="form-control-plaintext" id="meeting-modal-date-display"></p>
             </div>
             <div class="mb-3">
-              <label for="meeting-course-offering" class="form-label">{% translate "Course Offering" %}</label>
-              <select name="course_offering_id" id="meeting-course-offering" class="form-select" required>
-                <option value="">{% translate "Select offering..." %}</option>
-              </select>
+              <span class="form-label d-block" id="meeting-offering-label">{% translate "Course Offering" %}</span>
+              <p class="form-text mt-0" id="meeting-offering-hint">{% translate "Select one or more offerings. Each level can have one meeting per date." %}</p>
+              <div id="meeting-course-offering" class="ad-calendar-choice-list" role="group" aria-labelledby="meeting-offering-label" aria-describedby="meeting-offering-hint"></div>
             </div>
           </div>
           <div class="modal-footer">
@@ -198,10 +239,29 @@
         document.getElementById('meeting-modal-date').value = date;
         document.getElementById('meeting-modal-year-id').value = yearId;
         document.getElementById('meeting-modal-date-display').textContent = date;
-        var offeringsTemplate = document.getElementById(button.getAttribute('data-offerings-template'));
-        var offeringSelect = document.getElementById('meeting-course-offering');
-        offeringSelect.innerHTML = offeringsTemplate ? offeringsTemplate.innerHTML : '<option value="">{% translate "Select offering..." %}</option>';
-        offeringSelect.selectedIndex = 0;
+        var list = document.getElementById('meeting-course-offering');
+        if (!list) return;
+        list.innerHTML = '';
+        var template = document.getElementById(button.getAttribute('data-offerings-template'));
+        if (!template) return;
+        var options = template.content.querySelectorAll('option');
+        for (var i = 0; i < options.length; i++) {
+          var option = options[i];
+          if (!option.value) continue;
+          var label = document.createElement('label');
+          label.className = 'ad-calendar-choice';
+          var input = document.createElement('input');
+          input.type = 'checkbox';
+          input.className = 'form-check-input';
+          input.name = 'course_offering_id';
+          input.value = option.value;
+          var text = document.createElement('span');
+          text.className = 'ad-calendar-choice-text';
+          text.textContent = option.textContent;
+          label.appendChild(input);
+          label.appendChild(text);
+          list.appendChild(label);
+        }
       }
     });
   })();

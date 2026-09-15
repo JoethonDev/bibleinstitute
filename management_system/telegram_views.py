@@ -517,7 +517,7 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         conversation__user_id=conversation.user_id,
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
-    ).prefetch_related("attachments").order_by("created_at", "pk")
+    ).select_related("sender_user").prefetch_related("attachments").order_by("created_at", "pk")
     after_raw = request.GET.get("after")
     message_items = None
     messages_page_obj = None
@@ -613,6 +613,7 @@ def telegram_conversation_reply(request, conversation_id):
             conversation_id=conversation.pk,
             text=form.cleaned_data["message"],
             reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
+            origin=TelegramMessage.Origin.WEB,
         )
     except SupportReplyError as exc:
         form.add_error(None, str(exc))
