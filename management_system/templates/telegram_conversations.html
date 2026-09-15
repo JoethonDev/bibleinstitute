@@ -11,14 +11,30 @@
             <h4 class="mb-1"><i class="fas fa-comments me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Telegram Support Chat" %}</h4>
             <p class="tg-chat-head-desc mb-0">{% translate "View and reply to student support conversations received through Telegram." %}</p>
         </div>
-        <button type="button"
-                class="ad-btn ad-btn--teal"
-                data-bs-toggle="modal"
-                data-bs-target="#telegramStartConversationModal"
-                aria-controls="telegramStartConversationModal"
-                aria-label="{% translate 'Start Telegram conversation' %}">
-            <i class="fas fa-user-plus me-1" aria-hidden="true"></i>{% translate "Start Telegram conversation" %}
-        </button>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <form method="post"
+                  action="{{ mark_all_read_url }}"
+                  hx-post="{{ mark_all_read_url }}"
+                  hx-target="#telegram-conversation-list"
+                  hx-select="#telegram-conversation-list"
+                  hx-swap="outerHTML"
+                  hx-select-oob="#toast-stack"
+                  hx-push-url="false"
+                  class="ps-inline-form">
+                {% csrf_token %}
+                <button type="submit" class="ad-btn ad-btn--outline-gold" {% if not unread_count %}disabled{% endif %}>
+                    <i class="fas fa-envelope-open-text me-1" aria-hidden="true"></i>{% translate "Mark all as read" %}
+                </button>
+            </form>
+            <button type="button"
+                    class="ad-btn ad-btn--teal"
+                    data-bs-toggle="modal"
+                    data-bs-target="#telegramStartConversationModal"
+                    aria-controls="telegramStartConversationModal"
+                    aria-label="{% translate 'Start Telegram conversation' %}">
+                <i class="fas fa-user-plus me-1" aria-hidden="true"></i>{% translate "Start Telegram conversation" %}
+            </button>
+        </div>
     </div>
 
     <div class="tg-chat-workspace">

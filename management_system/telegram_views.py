@@ -32,6 +32,7 @@ from .models import (
     TelegramConversation,
     TelegramMessage,
     TelegramWebhookUpdate,
+    User,
 )
 from .telegram.configuration import (
     TelegramConfigurationError,
@@ -44,11 +45,18 @@ from .telegram.configuration import (
     webhook_secret,
 )
 from .utils.search import normalized_contains_q, normalize_search_text
-from .telegram.linking import unlink_own_telegram_account
-from .telegram.support import SupportReplyError, reply_to_conversation, start_conversation
+from .telegram.linking import unlink_telegram_account
+from .telegram.support import (
+    SupportReplyError,
+    count_unread_conversations,
+    mark_all_conversations_read,
+    mark_conversation_read,
+    reply_to_conversation,
+    start_conversation,
+)
 from .telegram_tasks import process_telegram_update
 from .telegram.policy import webhook_url
-from .utils.helpers import generate_breadcrumb, pagination_query_string
+from .utils.helpers import append_message_toasts, generate_breadcrumb, is_htmx, pagination_query_string
 from .telegram.broadcasts import (
     ALL_LEVEL_VALUE,
     BroadcastError,
@@ -320,7 +328,7 @@ def telegram_webhook(request):
 def telegram_unlink(request):
     if getattr(getattr(request.user, "role", None), "role", None) != "admin":
         return JsonResponse({"error": _("Only administrators may unlink a Telegram account.")}, status=403)
-    unlink_own_telegram_account(request.user)
+    unlink_telegram_account(request.user)
     messages.success(request, _("Your Telegram account was unlinked."))
     return redirect("view-profile")
 
@@ -339,6 +347,34 @@ def _latest_user_message_queryset():
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
     ).order_by("-created_at", "-pk")
+
+
+def _latest_inbound_message_queryset():
+    return TelegramMessage.objects.filter(
+        conversation__user_id=OuterRef("user_id"),
+        direction=TelegramMessage.Direction.INBOUND,
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
+    ).order_by("-created_at", "-pk")
+
+
+def _conversation_queryset():
+    """Conversation rows with the annotations every chat surface depends on."""
+    return TelegramConversation.objects.select_related("user", "claimed_by").annotate(
+        latest_user_message_direction=Subquery(
+            _latest_user_message_queryset().values("direction")[:1],
+        ),
+        latest_inbound_at=Subquery(
+            _latest_inbound_message_queryset().values("created_at")[:1],
+        ),
+    )
+
+
+def _conversation_has_unread(conversation) -> bool:
+    latest_inbound_at = getattr(conversation, "latest_inbound_at", None)
+    if latest_inbound_at is None:
+        return False
+    return conversation.admin_read_at is None or latest_inbound_at > conversation.admin_read_at
 
 
 def _representative_conversations():
@@ -387,11 +423,15 @@ def _conversation_list_context(request):
         latest_user_message_text=Subquery(_latest_user_message_queryset().values("text")[:1]),
         latest_user_message_content_type=Subquery(_latest_user_message_queryset().values("content_type")[:1]),
         latest_user_message_direction=Subquery(_latest_user_message_queryset().values("direction")[:1]),
+        latest_inbound_at=Subquery(_latest_inbound_message_queryset().values("created_at")[:1]),
         message_count=Count(
             "user__telegram_conversations__messages",
             filter=~Q(user__telegram_conversations__messages__content_type=TelegramMessage.ContentType.DIGEST),
             distinct=True,
         ),
+    ).annotate(
+        is_unread=Q(admin_read_at__isnull=True, latest_inbound_at__isnull=False)
+        | Q(latest_inbound_at__gt=F("admin_read_at")),
     )
     status_counts = _conversation_status_counts(searched)
     conversations = searched
@@ -416,6 +456,8 @@ def _conversation_list_context(request):
         "status": status,
         "status_counts": status_counts,
         "conversation_list_url": reverse("telegram-conversations"),
+        "mark_all_read_url": reverse("telegram-conversations-mark-all-read"),
+        "unread_count": count_unread_conversations(),
     }
 
 
@@ -511,6 +553,8 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         "reply_url": reverse("telegram-conversation-reply", kwargs={"conversation_id": conversation.pk}),
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "panel_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
+        "mark_read_url": reverse("telegram-conversation-mark-read", kwargs={"conversation_id": conversation.pk}),
+        "has_unread": _conversation_has_unread(conversation),
         "conversation_list_url": reverse("telegram-conversations"),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
@@ -527,14 +571,7 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
 @capability_required(can_manage_academic_setup)
 @require_GET
 def telegram_conversation_detail(request, conversation_id):
-    conversation = get_object_or_404(
-        TelegramConversation.objects.select_related("user", "claimed_by").annotate(
-            latest_user_message_direction=Subquery(
-                _latest_user_message_queryset().values("direction")[:1],
-            ),
-        ),
-        pk=conversation_id,
-    )
+    conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
     context = _conversation_detail_context(request, conversation)
     if request.GET.get("fragment") == "panel":
         return render(request, "partials/telegram_chat_panel.html", context)
@@ -548,14 +585,7 @@ def telegram_conversation_detail(request, conversation_id):
 @capability_required(can_manage_academic_setup)
 @require_POST
 def telegram_conversation_reply(request, conversation_id):
-    conversation = get_object_or_404(
-        TelegramConversation.objects.select_related("user", "claimed_by").annotate(
-            latest_user_message_direction=Subquery(
-                _latest_user_message_queryset().values("direction")[:1],
-            ),
-        ),
-        pk=conversation_id,
-    )
+    conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
     form = TelegramSupportReplyForm(request.POST)
     panel_request = request.GET.get("fragment") == "panel"
     if not form.is_valid():
@@ -600,14 +630,7 @@ def telegram_conversation_reply(request, conversation_id):
         if not panel_request:
             messages.success(request, _("Reply sent successfully."))
     if panel_request:
-        refreshed = get_object_or_404(
-            TelegramConversation.objects.select_related("user", "claimed_by").annotate(
-                latest_user_message_direction=Subquery(
-                    _latest_user_message_queryset().values("direction")[:1],
-                ),
-            ),
-            pk=conversation.pk,
-        )
+        refreshed = get_object_or_404(_conversation_queryset(), pk=conversation.pk)
         return render(
             request,
             "partials/telegram_chat_panel.html",
@@ -632,6 +655,63 @@ def telegram_start_conversation(request, user_id):
         # selects #content, which the user profile does not contain.
         return redirect("telegram-conversations")
     return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_conversation_mark_read(request, conversation_id):
+    """Record one conversation as read; the panel then hides its unread action."""
+    try:
+        mark_conversation_read(conversation_id=conversation_id, admin=request.user)
+    except SupportReplyError as exc:
+        messages.error(request, str(exc))
+        return redirect("telegram-conversations")
+    if request.GET.get("fragment") == "panel":
+        conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
+        return render(
+            request,
+            "partials/telegram_chat_panel.html",
+            _conversation_detail_context(
+                request,
+                conversation,
+                panel_notice=_("Conversation marked as read."),
+            ),
+        )
+    messages.success(request, _("Conversation marked as read."))
+    return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_conversations_mark_all_read(request):
+    """Record every unseen inbound conversation as read for the current operator."""
+    try:
+        marked_count = mark_all_conversations_read(admin=request.user)
+    except SupportReplyError as exc:
+        messages.error(request, str(exc))
+        return redirect("telegram-conversations")
+    messages.success(request, _("Marked %(count)s conversation(s) as read.") % {"count": marked_count})
+    if is_htmx(request) or request.GET.get("fragment") == "1":
+        context = _conversation_list_context(request)
+        return append_message_toasts(
+            request,
+            render(request, "partials/telegram_conversation_list.html", context),
+        )
+    return redirect("telegram-conversations")
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_admin_unlink(request, user_id):
+    """Unlink the Telegram account of one user from the admin user page."""
+    user = get_object_or_404(User, pk=user_id)
+    unlink_telegram_account(user)
+    messages.success(
+        request,
+        _("%(name)s's Telegram account was unlinked.")
+        % {"name": user.get_full_name() or user.username},
+    )
+    return redirect("user-profile", user_id=user.pk)
 
 
 @capability_required(can_manage_academic_setup)

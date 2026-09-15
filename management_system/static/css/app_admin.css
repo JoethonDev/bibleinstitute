@@ -3074,3 +3074,17 @@
 
 /* Applications workspace pagination loading indicator */
 #app-table-section { position: relative; min-height: 140px; }
+
+/* ---------------- Generic management form page (dashboard_form.html) ---------------- */
+.ad-form-page { max-width: 56rem; margin-inline: auto; }
+.ad-form-page .ad-card-head { justify-content: flex-start; }
+.ad-form-page .ad-form-field { min-width: 0; }
+/* The shared .ad-form-grid hook bottom-aligns filter rows; form cells must
+   keep their natural top alignment when one field carries help text. */
+.ad-form-page .ad-form-grid { align-items: stretch; }
+.ad-form-page textarea.form-control { height: 9rem; min-height: 6rem; }
+.ad-form-page .form-actions { border-top: 1px solid var(--ps-line); margin-top: 1.25rem; }
+.ad-form-page .form-actions .ad-btn { min-width: 8.5rem; }
+@media (max-width: 767.98px) {
+    .ad-form-page textarea.form-control { height: 7rem; }
+}

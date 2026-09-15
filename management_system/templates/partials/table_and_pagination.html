@@ -16,6 +16,8 @@
         columns: [{% for col in columns %}{ name: '{{ col|escapejs }}', visible: true }{% if not forloop.last %},{% endif %}{% endfor %}],
         viewKey: '{{ view|default:'default'|escapejs }}',
          bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}',
+        selectionToken: '{{ bulk_selection_token|default:''|escapejs }}',
+        tableTotal: {{ page_obj.paginator.count|default:0 }},
         pageSize: {{ page_obj.paginator.per_page|default:15 }}
      }" class="ad-table-shell">
 
@@ -25,7 +27,7 @@
         <div class="bulk-actions" x-show="selected.length > 0" x-transition x-cloak>
             <span class="bulk-count">
                 <i class="fas fa-check-circle me-1"></i>
-                <span x-text="selectionLabel"></span>
+                <span x-text="selectionLabel()"></span>
             </span>
             <button class="ad-btn ad-btn--danger ad-btn--sm"
                     @click="deleteSelected()"
@@ -34,7 +36,7 @@
                 <span>{% translate "Delete Selected" %}</span>
             </button>
             <button class="ad-btn ad-btn--ghost ad-btn--sm"
-                    @click="selected = []; selectAll = false">
+                    @click="clearSelection()">
                 <i class="fas fa-times me-1"></i>
                 <span>{% translate "Clear" %}</span>
             </button>
@@ -72,6 +74,15 @@
                 </ul>
             </div>
         </div>
+    </div>
+
+    <!-- Select-all-matching hint (non-application branch) -->
+    <div class="ad-alert ad-alert--info" x-show="showSelectAllHint()" x-cloak role="status">
+        <i class="fas fa-check-double me-2" aria-hidden="true"></i>
+        <span>{% translate "All rows on this page are selected." %}</span>
+        <button type="button" class="ad-btn ad-btn--teal ad-btn--sm ms-2" @click="selectAllMatching()">
+            <span x-text="selectAllMatchingLabel()"></span>
+        </button>
     </div>
 {% endif %}
 
@@ -162,11 +173,11 @@
                 {% endfor %}
                 {% else %}
                 {% for values in page_obj %}
-                <tr data-id="{{ values.url }}">
+                <tr data-id="{{ values.id }}">
                     <td class="column-checkbox">
                         <input type="checkbox"
                                class="form-check-input row-checkbox"
-                               :value="'{{ values.url }}'"
+                               :value="'{{ values.id }}'"
                                x-model="selected"
                                @change="updateSelectAll()">
                     </td>

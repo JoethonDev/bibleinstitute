@@ -9725,6 +9725,57 @@ msgstr "Load more files"
 msgid "Loading more files…"
 msgstr "Loading more files…"
 
+msgid "Unread"
+msgstr "Unread"
+
+msgid "Mark as read"
+msgstr "Mark as read"
+
+msgid "Mark all as read"
+msgstr "Mark all as read"
+
+msgid "Linked"
+msgstr "Linked"
+
+msgid "Not linked"
+msgstr "Not linked"
+
+msgid "Unlink this Telegram account?"
+msgstr "Unlink this Telegram account?"
+
+msgid "Conversation marked as read."
+msgstr "Conversation marked as read."
+
+msgid "Marked %(count)s conversation(s) as read."
+msgstr "Marked %(count)s conversation(s) as read."
+
+msgid "%(name)s's Telegram account was unlinked."
+msgstr "%(name)s's Telegram account was unlinked."
+
+msgid "All rows on this page are selected."
+msgstr "All rows on this page are selected."
+
+msgid "Select all %(total)s matching records"
+msgstr "Select all %(total)s matching records"
+
+msgid "%(count)s matching records selected"
+msgstr "%(count)s matching records selected"
+
+msgid "The selection has expired. Reload the list and try again."
+msgstr "The selection has expired. Reload the list and try again."
+
+msgid "Select all matching records for selections larger than 1,000."
+msgstr "Select all matching records for selections larger than 1,000."
+
+msgid "The selection does not match this list."
+msgstr "The selection does not match this list."
+
+msgid "The selection has invalid types."
+msgstr "The selection has invalid types."
+
+msgid "Some selected records are referenced by other data and cannot be deleted."
+msgstr "Some selected records are referenced by other data and cannot be deleted."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

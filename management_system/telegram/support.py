@@ -12,7 +12,7 @@ from datetime import datetime
 import telebot
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import F, OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -71,6 +71,55 @@ def start_conversation(*, admin: User, user_id: int) -> TelegramConversation:
         user=target,
         status=TelegramConversation.Status.OPEN,
     )
+
+
+def latest_inbound_message_queryset():
+    """Return inbound support messages ordered newest-first for read-state checks."""
+    return TelegramMessage.objects.filter(
+        direction=TelegramMessage.Direction.INBOUND,
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
+    ).order_by("-created_at", "-pk")
+
+
+def unread_conversations_queryset():
+    """Conversations whose newest inbound message is newer than the read marker."""
+    latest_inbound = latest_inbound_message_queryset().filter(
+        conversation=OuterRef("pk"),
+    )
+    return TelegramConversation.objects.annotate(
+        latest_inbound_at=Subquery(latest_inbound.values("created_at")[:1]),
+    ).filter(
+        Q(admin_read_at__isnull=True, latest_inbound_at__isnull=False)
+        | Q(latest_inbound_at__gt=F("admin_read_at"))
+    )
+
+
+def count_unread_conversations() -> int:
+    """Return the number of conversations still awaiting an admin read marker."""
+    return unread_conversations_queryset().count()
+
+
+@transaction.atomic
+def mark_conversation_read(*, conversation_id: int, admin: User) -> TelegramConversation:
+    """Record that an admin has read one support conversation."""
+    _require_admin(admin)
+    try:
+        conversation = TelegramConversation.objects.select_for_update().get(pk=conversation_id)
+    except TelegramConversation.DoesNotExist as exc:
+        raise SupportReplyError(_("This conversation is no longer available.")) from exc
+    conversation.admin_read_at = timezone.now()
+    conversation.save(update_fields=["admin_read_at", "updated_at"])
+    return conversation
+
+
+def mark_all_conversations_read(*, admin: User) -> int:
+    """Record the read marker for every conversation with unseen inbound messages."""
+    _require_admin(admin)
+    now = timezone.now()
+    return TelegramConversation.objects.filter(
+        pk__in=unread_conversations_queryset().values("pk"),
+    ).update(admin_read_at=now, updated_at=now)
 
 
 def _support_callback(action: str, conversation_id: int) -> str:
@@ -406,6 +455,7 @@ def reply_to_conversation(
         claimed_at=None,
         handled_at=timezone.now(),
         last_message_at=outbound.created_at,
+        admin_read_at=timezone.now(),
         version=F("version") + 1,
         updated_at=timezone.now(),
     )

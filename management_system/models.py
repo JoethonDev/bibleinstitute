@@ -175,6 +175,7 @@ class User(AbstractUser):
     
     def serialize_pagination(self):
         return {
+            "id" : self.pk,
             "rows" : [self.username, f"{self.first_name} {self.last_name}", str(_(self.role.get_role_display())), self.joined_date.strftime("%d/%m/%Y"), self.last_login],
             "url" : reverse_lazy("user-profile", args=[self.pk,])
         }
@@ -744,6 +745,7 @@ class TelegramConversation(models.Model):
     claimed_at = models.DateTimeField(null=True, blank=True)
     handled_at = models.DateTimeField(null=True, blank=True)
     last_message_at = models.DateTimeField(null=True, blank=True)
+    admin_read_at = models.DateTimeField(null=True, blank=True)
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1084,6 +1086,7 @@ class Course(models.Model):
     # ── Instance methods ───────────────────────────────────────────
     def serialize_pagination(self):
         return {
+            "id" : self.pk,
             "rows" : [self.name, self.description, self.level.display_name, self.instructor],
             "url" : reverse_lazy("course-view", args=[self.pk,])
         }
@@ -1905,6 +1908,7 @@ class Lesson(models.Model):
     def serialize_pagination(self):
         offering = self.course_offering
         return {
+            "id" : self.pk,
             "rows" : [
                 self.name,
                 offering.course.name,
@@ -2101,6 +2105,7 @@ class Quiz(models.Model):
     def serialize_pagination(self):
         offering = self.course_offering
         return {
+            "id" : self.pk,
             "rows" : [
                 self.name,
                 offering.course.name,
@@ -2384,6 +2389,7 @@ class Grade(models.Model):
 
     def serialize_pagination(self):
         return {
+            "id" : self.pk,
             "rows" : [self.user.username, self.total_grade, self.submitted_at.strftime("%H:%M:%S, %d/%m/%Y")],
             "url" : reverse_lazy("submission-user", args=[self.quiz.pk, self.user.pk]),
             "submission_id" : self.pk  # Add submission_id for CSV export

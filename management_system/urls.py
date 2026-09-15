@@ -3,6 +3,7 @@ from management_system.views import *
 from management_system.forms import UserLoginForm
 from management_system.telegram_views import (
     telegram_attachment,
+    telegram_admin_unlink,
     telegram_broadcast_confirm,
     telegram_broadcast_confirm_page,
     telegram_broadcast_cancel,
@@ -12,8 +13,10 @@ from management_system.telegram_views import (
     telegram_broadcasts,
     telegram_config,
     telegram_conversation_detail,
+    telegram_conversation_mark_read,
     telegram_conversation_reply,
     telegram_conversations,
+    telegram_conversations_mark_all_read,
     telegram_start_conversation,
     telegram_unlink,
 )
@@ -60,6 +63,7 @@ urlpatterns = [
     path('dashboard/users/historical-intake/', historical_intake, name="historical-intake"),
     path('dashboard/users/historical-intake/<int:summary_id>/promote/', historical_promote, name="historical-promote"),
     path('dashboard/users/<int:user_id>/exceptional-courses/', exceptional_course_assign, name="exceptional-course-assign"),
+    path('dashboard/users/<int:user_id>/telegram/unlink/', telegram_admin_unlink, name="telegram-admin-unlink"),
     
     # Courses Dashboard
     path('dashboard/courses/', course_dashboard, name="course-dashboard"),
@@ -155,8 +159,10 @@ urlpatterns = [
     path('dashboard/academic/promotion-history/', promotion_history, name="promotion-history"),
     path('dashboard/telegram/', telegram_config, name="telegram-config"),
     path('dashboard/telegram/conversations/', telegram_conversations, name="telegram-conversations"),
+    path('dashboard/telegram/conversations/read-all/', telegram_conversations_mark_all_read, name="telegram-conversations-mark-all-read"),
     path('dashboard/telegram/conversations/<int:conversation_id>/', telegram_conversation_detail, name="telegram-conversation-detail"),
     path('dashboard/telegram/conversations/<int:conversation_id>/reply/', telegram_conversation_reply, name="telegram-conversation-reply"),
+    path('dashboard/telegram/conversations/<int:conversation_id>/read/', telegram_conversation_mark_read, name="telegram-conversation-mark-read"),
     path('dashboard/telegram/conversations/start/<int:user_id>/', telegram_start_conversation, name="telegram-start-conversation"),
     path('dashboard/telegram/attachments/<int:attachment_id>/', telegram_attachment, name="telegram-attachment"),
     path('dashboard/telegram/broadcasts/', telegram_broadcasts, name="telegram-broadcasts"),

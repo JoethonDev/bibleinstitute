@@ -80,6 +80,16 @@ from .utils.r2_references import rewrite_lesson_r2_references
 from .utils.attendance import is_expected_date, get_expected_dates, get_student_attendance_context, assign_unassigned_attendance
 from .utils.timezones import ensure_aware, format_user_datetime
 from .utils.search import normalize_search_text, normalized_contains_q
+from .admin_tables import (
+    bulk_delete_records,
+    content_scope,
+    course_queryset,
+    course_scope,
+    lesson_queryset,
+    quiz_queryset,
+    user_queryset,
+    user_scope,
+)
 from .utils.quiz_access import grant_quiz_openings, quiz_window
 from .public_content import get_institute_copy
 from .academic_enrollment import (
@@ -377,6 +387,7 @@ class FormBase(AdminPermissionView, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["view_name"] = self.view_name  # Example shared context
+        context["action"] = self.action
         context["object_id"] = self.object.pk if self.object else 'new'
         return context
 
@@ -1455,24 +1466,17 @@ def export_users_csv(request):
 @capability_required(can_manage_content)
 def user_dashboard(request):
     view = "user"
-    
-    name = request.GET.get("name", None)
-    role_value = request.GET.get("filtering", None)
     user = request.user
 
-    query = Q()
-    if name:
-        name = normalize_search_text(name)
-        query &= normalized_contains_q(
-            ("username", "email", "first_name", "last_name", "phone", "identity_number"),
-            name,
-        )
-    if role_value:
-        role_name = Role.get_by_readable_value(role_value)
-        query &= Q(role=role_name)
-    users = User.objects.filter(query)
-    
-    logger.info(f"User : {user} filters {view}s using {name} name and {role_value} role")
+    scope = user_scope(request)
+    users = user_queryset(scope)
+
+    logger.info(
+        "User : %s filters users using %s name and %s role",
+        user,
+        scope["search"],
+        scope["role"],
+    )
 
     # Apply sorting
     sort_by = request.GET.get('sort', 'joined_date')
@@ -1495,11 +1499,12 @@ def user_dashboard(request):
         users = users.order_by(model_sort_by)
 
     context = {
-        "name_value" : name or "",
-        "filtering" : role_value or "",
+        "name_value" : scope["search"],
+        "filtering" : scope["role_value"],
         "columns" : User.get_columns(),
         "options" : [_('Choose Role'), *Role.get_readable_values()],
         "search_placeholder": _("Search username, email, name, phone, or national ID"),
+        "table_scope": scope,
     }
 
     return render_dashboard(request, users, view, context)
@@ -1564,6 +1569,7 @@ def user_profile(request, user_id):
                     "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 })
 
+    telegram_account = TelegramAccount.objects.filter(user=user, is_active=True).first()
     return render(request, "user_detail.html", {
         "profile_user": user,
         "edit_form": form,
@@ -1575,6 +1581,12 @@ def user_profile(request, user_id):
         ]),
         "can_view_application_data": can_view_application_data,
         "application_documents": application_documents,
+        "telegram_account": telegram_account,
+        "telegram_can_unlink": bool(
+            telegram_account
+            and getattr(getattr(request.user, "role", None), "role", None) == "admin"
+        ),
+        "telegram_unlink_url": reverse("telegram-admin-unlink", args=[user.pk]),
     })
 
 
@@ -1900,29 +1912,27 @@ class DeleteUser(UserBaseView, DeleteView):
 # Course Dashboard
 @capability_required(can_manage_content)
 def course_dashboard(request):   
-    name = request.GET.get("name", None)
-    year = request.GET.get("filtering", None)
     user = request.user
     view = "course"
-    query = Q()
-    if name:
-        name = normalize_search_text(name)
-        query &= normalized_contains_q(("name",), name)
-    if year:
-        for level_obj in Level.objects.order_by("ordering"):
-            if level_obj.display_name == year:
-                query &= Q(level__ordering=level_obj.ordering)
-    courses = Course.objects.filter(query)
+
+    scope = course_scope(request)
+    courses = course_queryset(scope)
     
-    logger.info(f"User : {user} filters users using {name} name and {year} level")
+    logger.info(
+        "User : %s filters courses using %s name and %s level",
+        user,
+        scope["search"],
+        scope["level_value"],
+    )
 
     courses = courses.order_by("name")
 
     context = {
-        "name_value" : name or "",
-        "filtering" : year or "",
+        "name_value" : scope["search"],
+        "filtering" : scope["level_value"],
         "columns" : Course.get_columns(),
         "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
+        "table_scope": scope,
     }
 
     return render_dashboard(request, courses, view, context)
@@ -2100,8 +2110,6 @@ def quiz_exceptional_opening(request, quiz_id):
 # Lesson Dashboard
 @capability_required(can_manage_content)
 def lesson_dashboard(request):   
-    name = request.GET.get("name", None)
-    course = request.GET.get("course", None)
     user = request.user
     view = "lesson"
     try:
@@ -2109,18 +2117,8 @@ def lesson_dashboard(request):
     except ValidationError as exc:
         return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
 
-    query = Q(course_offering__academic_year_level__academic_year_id=selected_year.pk)
-    if name:
-        name = normalize_search_text(name)
-        query &= normalized_contains_q(("name",), name)
-    if course:
-        if course.isdigit() and CourseOffering.objects.filter(
-            pk=int(course), academic_year_level__academic_year_id=selected_year.pk
-        ).exists():
-            query &= Q(course_offering_id=int(course))
-        else:
-            course = None
-    lessons = Lesson.objects.filter(query).select_related(
+    scope = content_scope(request, year_id=selected_year.pk)
+    lessons = lesson_queryset(scope).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
         "course_offering__academic_year_level__academic_year",
@@ -2129,22 +2127,23 @@ def lesson_dashboard(request):
     logger.info(
         "User %s filters lessons using %s name, academic year %s, and %s course",
         user,
-        name,
+        scope["search"],
         selected_year.pk,
-        course,
+        scope["offering"],
     )
 
     lessons = lessons.order_by("name")
 
     context = {
-        "name_value" : name or "",
-        "course_value" : course or "",
+        "name_value" : scope["search"],
+        "course_value" : str(scope["offering"]) if scope["offering"] else "",
         "columns" : Lesson.get_columns(),
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
         "subjects" : _content_offering_filter_options(selected_year.pk),
         "filters" : ["course_filter.html"],
+        "table_scope": scope,
     }
 
     return render_dashboard(request, lessons, view, context)
@@ -3022,8 +3021,6 @@ def promotion_history(request):
 
 @capability_required(can_manage_content)
 def quiz_dashboard(request):   
-    name = request.GET.get("name", None)
-    course = request.GET.get("course", None)
     user = request.user
     view = "quiz"
     try:
@@ -3031,21 +3028,8 @@ def quiz_dashboard(request):
     except ValidationError as exc:
         return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
 
-    query = Q(
-        course_offering__isnull=False,
-        course_offering__academic_year_level__academic_year_id=selected_year.pk,
-    )
-    if name:
-        name = normalize_search_text(name)
-        query &= normalized_contains_q(("name",), name)
-    if course:
-        if course.isdigit() and CourseOffering.objects.filter(
-            pk=int(course), academic_year_level__academic_year_id=selected_year.pk
-        ).exists():
-            query &= Q(course_offering_id=int(course))
-        else:
-            course = None
-    quizzes = Quiz.objects.filter(query).select_related(
+    scope = content_scope(request, year_id=selected_year.pk)
+    quizzes = quiz_queryset(scope).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
         "course_offering__academic_year_level__academic_year",
@@ -3055,16 +3039,16 @@ def quiz_dashboard(request):
     logger.info(
         "User %s filters quizzes using %s name, academic year %s, and %s course",
         user,
-        name,
+        scope["search"],
         selected_year.pk,
-        course,
+        scope["offering"],
     )
 
     quizzes = quizzes.order_by("name")
 
     context = {
-        "name_value" : name or "",
-        "course_value" : course or "",
+        "name_value" : scope["search"],
+        "course_value" : str(scope["offering"]) if scope["offering"] else "",
         "columns" : Quiz.get_columns(),
         "academic_year_filter": True,
         "academic_years": academic_years,
@@ -3073,6 +3057,7 @@ def quiz_dashboard(request):
         "filters" : ["course_filter.html"],
         "submission_view" : True,
         "page_size" : 10,
+        "table_scope": scope,
     }
 
     return render_dashboard(request, quizzes, view, context)
@@ -3685,91 +3670,23 @@ def generate_audio_download(request, offering_id, lesson_id):
 # Bulk Operations
 @capability_required(can_delete_content)
 def bulk_delete_users(request):
-    """Bulk delete users endpoint for HTMX"""
-    if request.method != 'DELETE':
-        return HttpResponse(_("Method not allowed"), status=405)
-    
-    try:
-
-        data = json.loads(request.body)
-        ids = data.get('ids', [])
-        
-        if not ids:
-            return JsonResponse({'error': _('No IDs provided')}, status=400)
-        
-        deleted_count = User.objects.filter(id__in=ids).delete()[0]
-        logger.info(f"User {request.user} deleted {deleted_count} users")
-        
-        return JsonResponse({'success': True, 'deleted': deleted_count})
-    except Exception as e:
-        logger.error(f"Bulk delete error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+    """Delete the signed selection scope for the users table."""
+    return bulk_delete_records(request, "user")
 
 @capability_required(can_delete_content)
 def bulk_delete_courses(request):
-    """Bulk delete courses endpoint for HTMX"""
-    if request.method != 'DELETE':
-        return HttpResponse(_("Method not allowed"), status=405)
-    
-    try:
-
-        data = json.loads(request.body)
-        ids = data.get('ids', [])
-        
-        if not ids:
-            return JsonResponse({'error': _('No IDs provided')}, status=400)
-        
-        deleted_count = Course.objects.filter(id__in=ids).delete()[0]
-        logger.info(f"User {request.user} deleted {deleted_count} courses")
-        
-        return JsonResponse({'success': True, 'deleted': deleted_count})
-    except Exception as e:
-        logger.error(f"Bulk delete error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+    """Delete the signed selection scope for the courses table."""
+    return bulk_delete_records(request, "course")
 
 @capability_required(can_delete_content)
 def bulk_delete_lessons(request):
-    """Bulk delete lessons endpoint for HTMX"""
-    if request.method != 'DELETE':
-        return HttpResponse(_("Method not allowed"), status=405)
-    
-    try:
-
-        data = json.loads(request.body)
-        ids = data.get('ids', [])
-        
-        if not ids:
-            return JsonResponse({'error': _('No IDs provided')}, status=400)
-        
-        deleted_count = Lesson.objects.filter(id__in=ids).delete()[0]
-        logger.info(f"User {request.user} deleted {deleted_count} lessons")
-        
-        return JsonResponse({'success': True, 'deleted': deleted_count})
-    except Exception as e:
-        logger.error(f"Bulk delete error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+    """Delete the signed selection scope for the lessons table."""
+    return bulk_delete_records(request, "lesson")
 
 @capability_required(can_delete_content)
 def bulk_delete_quizzes(request):
-    """Bulk delete quizzes endpoint for HTMX"""
-    if request.method != 'DELETE':
-        return HttpResponse(_("Method not allowed"), status=405)
-    
-    try:
-
-        data = json.loads(request.body)
-        ids = data.get('ids', [])
-        
-        if not ids:
-            return JsonResponse({'error': _('No IDs provided')}, status=400)
-        
-        deleted_count = Quiz.objects.filter(id__in=ids).delete()[0]
-        logger.info(f"User {request.user} deleted {deleted_count} quizzes")
-        
-        return JsonResponse({'success': True, 'deleted': deleted_count})
-    except Exception as e:
-        logger.error(f"Bulk delete error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+    """Delete the signed selection scope for the quizzes table."""
+    return bulk_delete_records(request, "quiz")
 
 # ============================================================================
 # R2 FILE MANAGEMENT API ENDPOINTS

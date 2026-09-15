@@ -10290,6 +10290,57 @@ msgstr "تحميل المزيد من الملفات"
 msgid "Loading more files…"
 msgstr "جارٍ تحميل المزيد من الملفات…"
 
+msgid "Unread"
+msgstr "غير مقروء"
+
+msgid "Mark as read"
+msgstr "تحديد كمقروء"
+
+msgid "Mark all as read"
+msgstr "تحديد الكل كمقروء"
+
+msgid "Linked"
+msgstr "مرتبط"
+
+msgid "Not linked"
+msgstr "غير مرتبط"
+
+msgid "Unlink this Telegram account?"
+msgstr "هل تريد إلغاء ربط حساب تيليجرام هذا؟"
+
+msgid "Conversation marked as read."
+msgstr "تم تحديد المحادثة كمقروءة."
+
+msgid "Marked %(count)s conversation(s) as read."
+msgstr "تم تحديد %(count)s محادثة كمقروءة."
+
+msgid "%(name)s's Telegram account was unlinked."
+msgstr "تم إلغاء ربط حساب تيليجرام الخاص بـ %(name)s."
+
+msgid "All rows on this page are selected."
+msgstr "تم تحديد كل الصفوف في هذه الصفحة."
+
+msgid "Select all %(total)s matching records"
+msgstr "تحديد كل السجلات المطابقة (%(total)s)"
+
+msgid "%(count)s matching records selected"
+msgstr "تم تحديد %(count)s سجلًا مطابقًا"
+
+msgid "The selection has expired. Reload the list and try again."
+msgstr "انتهت صلاحية التحديد. أعد تحميل القائمة وحاول مرة أخرى."
+
+msgid "Select all matching records for selections larger than 1,000."
+msgstr "استخدم تحديد كل السجلات المطابقة عند تجاوز 1000 سجل."
+
+msgid "The selection does not match this list."
+msgstr "التحديد لا يطابق هذه القائمة."
+
+msgid "The selection has invalid types."
+msgstr "نوع بيانات التحديد غير صالح."
+
+msgid "Some selected records are referenced by other data and cannot be deleted."
+msgstr "بعض السجلات المحددة مرتبطة ببيانات أخرى ولا يمكن حذفها."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

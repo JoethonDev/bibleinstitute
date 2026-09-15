@@ -3,7 +3,7 @@
 {% load i18n %}
 
 {% block body %}
-<div id="content" class="ad-pane is-active"
+<div id="content" class="ad-pane is-active ad-form-page"
      x-data="autoSave('{{ view_name }}-form-{{ object_id }}')"
      x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
@@ -45,7 +45,7 @@
     <div class="ad-card">
         <div class="ad-card-head">
             <i class="fas fa-edit"></i>
-            <span>{{ header|default:"Form Entry" }}</span>
+            <span>{{ action|capfirst }} {{ view_name|capfirst }}</span>
         </div>
 
         <div class="ad-card-body">
@@ -64,11 +64,23 @@
 
                     {% csrf_token %}
 
-                    <!-- Form Fields -->
-                    <div class="form-fields"
-                         @focusout="validateField($event.target)">
-                        {{ form|crispy }}
+                    <!-- Non-field Errors -->
+                    {% if form.non_field_errors %}
+                    <div class="ad-alert ad-alert--danger mb-3" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
+                        <span>{{ form.non_field_errors }}</span>
                     </div>
+                    {% endif %}
+
+                    <!-- Form Fields -->
+                    <div class="ad-form-grid row g-3" @focusout="validateField($event.target)">
+                        {% for field in form.visible_fields %}
+                        <div class="ad-form-field {% if field.field.widget.input_type == 'textarea' or field.field.widget.input_type == 'file' or field.field.widget.input_type == 'checkbox' or field.field.widget.allow_multiple_selected %}col-12{% else %}col-md-6{% endif %}">
+                            {{ field|as_crispy_field }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
 
                     <!-- Form Actions -->
                     <div class="form-actions">

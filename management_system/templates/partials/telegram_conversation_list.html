@@ -76,6 +76,9 @@
                             {% else %}
                             <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
                             {% endif %}
+                            {% if conversation.is_unread %}
+                            <span class="ad-pill ad-pill--teal">{% translate "Unread" %}</span>
+                            {% endif %}
                         </span>
                         {% if conversation.message_count %}
                         <span class="tg-chat-row-count" title="{% blocktranslate count counter=conversation.message_count %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktranslate %}">

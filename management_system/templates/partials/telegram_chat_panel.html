@@ -29,6 +29,20 @@
         <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
         {% endif %}
 
+        {% if has_unread %}
+        <form method="post"
+              action="{{ mark_read_url }}"
+              hx-post="{{ mark_read_url }}?fragment=panel"
+              hx-target="#telegram-chat-panel"
+              hx-swap="innerHTML"
+              class="ps-inline-form">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                <i class="fas fa-envelope-open-text me-1" aria-hidden="true"></i>{% translate "Mark as read" %}
+            </button>
+        </form>
+        {% endif %}
+
         <a class="ad-btn ad-btn--ghost ad-btn--sm"
            href="{{ detail_url }}{% if messages_page_obj.number != 1 %}?page={{ messages_page_obj.number }}{% endif %}"
            hx-get="{{ panel_url }}?fragment=panel{% if messages_page_obj.number != 1 %}&amp;page={{ messages_page_obj.number }}{% endif %}"

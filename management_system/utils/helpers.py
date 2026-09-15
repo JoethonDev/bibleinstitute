@@ -19,6 +19,7 @@ from urllib.parse import unquote
 from management_system.utils.decorators import check_role_permission
 from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade
 from management_system.academic_access import user_can_write_offering_activity
+from management_system.admin_tables import TABLE_VIEWS, create_selection_token
 from .timezones import ensure_aware, parse_application_datetime
 from .quiz_access import quiz_window
 
@@ -163,6 +164,17 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     
     # Paginate objects
     page_obj = paginate_obj(request, obj, context.get("page_size", 15))
+
+    # Sign the dashboard filter scope so the table can offer "select all
+    # matching records" without trusting browser-supplied filters.
+    table_scope = context.get("table_scope")
+    if table_scope and view in TABLE_VIEWS:
+        context["bulk_selection_token"] = create_selection_token(
+            view=view,
+            scope=table_scope,
+            actor_id=user.pk,
+        )
+
     
     # Prepare filters
     pagination_params = request.GET.copy()
@@ -356,6 +368,22 @@ def is_htmx(request):
     return request.headers.get('HX-Request') == 'true'
 
 
+def append_message_toasts(request, response):
+    """Append pending Django messages to an HTMX fragment as OOB toasts.
+
+    Fragment responses cannot render the shell toast stack, so each pending
+    message is appended exactly like the full-page include would render it.
+    """
+    storage = django_messages.get_messages(request)
+    if not storage:
+        return response
+    toast_html = render_to_string("partials/toast_oob.html", request=request)
+    if toast_html:
+        encoding = response.charset or "utf-8"
+        response.content += toast_html.encode(encoding)
+    return response
+
+
 def render_page(request, full_template, partial_template, context):
     """
     Render the content partial for HTMX requests, the full shell otherwise.
@@ -367,15 +395,5 @@ def render_page(request, full_template, partial_template, context):
     shell's #toast-stack element.
     """
     if is_htmx(request):
-        response = render(request, partial_template, context)
-        storage = django_messages.get_messages(request)
-        toast_html = ""
-        if storage:
-            toast_html = render_to_string(
-                "partials/toast_oob.html", request=request
-            )
-        if toast_html:
-            encoding = response.charset or "utf-8"
-            response.content += toast_html.encode(encoding)
-        return response
+        return append_message_toasts(request, render(request, partial_template, context))
     return render(request, full_template, context)

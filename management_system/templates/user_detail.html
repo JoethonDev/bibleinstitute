@@ -85,6 +85,33 @@
                         </dl>
                     </div>
                 </div>
+                <div class="ad-card mb-3">
+                    <div class="ad-card-head"><strong>{% translate "Telegram Account" %}</strong></div>
+                    <div class="ad-card-body">
+                        {% if telegram_account %}
+                        <p class="mb-2"><span class="ad-pill ad-pill--success">{% translate "Linked" %}</span></p>
+                        {% if telegram_can_unlink %}
+                        <form method="post"
+                              action="{{ telegram_unlink_url }}"
+                              hx-post="{{ telegram_unlink_url }}"
+                              hx-target="#content"
+                              hx-select="#content"
+                              hx-swap="outerHTML"
+                              hx-select-oob="#toast-stack"
+                              hx-push-url="true"
+                              class="ps-inline-form"
+                              data-confirm-message="{% translate 'Unlink this Telegram account?' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
+                                <i class="fas fa-unlink me-1" aria-hidden="true"></i>{% translate "Unlink Telegram" %}
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% else %}
+                        <p class="mb-0"><span class="ad-pill ad-pill--muted">{% translate "Not linked" %}</span></p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
 

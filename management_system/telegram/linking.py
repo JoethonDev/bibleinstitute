@@ -190,7 +190,8 @@ def link_with_phone(phone: str, telegram_user_id: int, telegram_chat_id: int) ->
 
 
 @transaction.atomic
-def unlink_own_telegram_account(user: User) -> None:
+def unlink_telegram_account(user: User) -> None:
+    """Deactivate one user's linked Telegram account under a short row lock."""
     locked_user = User.objects.select_for_update().get(pk=user.pk)
     account = TelegramAccount.objects.select_for_update().filter(user=locked_user, is_active=True).first()
     if account:
