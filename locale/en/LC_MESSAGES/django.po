@@ -10023,6 +10023,10 @@ msgstr "No academic years are configured."
 msgid "Select one or more offerings. Each level can have one meeting per date."
 msgstr "Select one or more offerings. Each level can have one meeting per date."
 
+#: .\management_system\templates\partials\calendar_cell_admin.html
+msgid "No meeting"
+msgstr "No meeting"
+
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."

@@ -71,13 +71,10 @@
                             {% endif %}
                         </span>
                         <span class="tg-chat-row-status">
-                            {% if conversation.latest_user_message_direction == "outbound" %}
-                            <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
-                            {% else %}
-                            <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
-                            {% endif %}
                             {% if conversation.is_unread %}
-                            <span class="ad-pill ad-pill--teal">{% translate "Unread" %}</span>
+                            <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
+                            {% else %}
+                            <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
                             {% endif %}
                         </span>
                         {% if conversation.message_count %}

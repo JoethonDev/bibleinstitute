@@ -10588,6 +10588,10 @@ msgstr "لا توجد أعوام دراسية مُعدّة بعد."
 msgid "Select one or more offerings. Each level can have one meeting per date."
 msgstr "اختر مادة أو أكثر. يمكن أن يكون لكل مستوى اجتماع واحد في نفس التاريخ."
 
+#: .\management_system\templates\partials\calendar_cell_admin.html
+msgid "No meeting"
+msgstr "لا يوجد اجتماع"
+
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."

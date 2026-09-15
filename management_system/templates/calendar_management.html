@@ -241,27 +241,10 @@
         document.getElementById('meeting-modal-date-display').textContent = date;
         var list = document.getElementById('meeting-course-offering');
         if (!list) return;
-        list.innerHTML = '';
         var template = document.getElementById(button.getAttribute('data-offerings-template'));
         if (!template) return;
-        var options = template.content.querySelectorAll('option');
-        for (var i = 0; i < options.length; i++) {
-          var option = options[i];
-          if (!option.value) continue;
-          var label = document.createElement('label');
-          label.className = 'ad-calendar-choice';
-          var input = document.createElement('input');
-          input.type = 'checkbox';
-          input.className = 'form-check-input';
-          input.name = 'course_offering_id';
-          input.value = option.value;
-          var text = document.createElement('span');
-          text.className = 'ad-calendar-choice-text';
-          text.textContent = option.textContent;
-          label.appendChild(input);
-          label.appendChild(text);
-          list.appendChild(label);
-        }
+        list.innerHTML = '';
+        list.appendChild(template.content.cloneNode(true));
       }
     });
   })();

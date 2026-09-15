@@ -23,13 +23,13 @@
         </div>
     </div>
     <div class="tg-chat-detail-actions">
-        {% if conversation.latest_user_message_direction == "outbound" %}
-        <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
-        {% else %}
+        {% if conversation.is_unread %}
         <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
+        {% else %}
+        <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
         {% endif %}
 
-        {% if has_unread %}
+        {% if conversation.is_unread %}
         <form method="post"
               action="{{ mark_read_url }}"
               hx-post="{{ mark_read_url }}?fragment=panel"

@@ -1175,26 +1175,35 @@
     line-height: 1.25;
 }
 
-/* Compact meeting rows inside calendar cells — override the standalone .ad-calendar-meeting column layout */
+/* Compact meeting rows inside calendar cells: one row per level with the
+   delete action pinned to the row end so it never wraps away from its meeting. */
 .ad-calmg-cell .ad-calendar-meeting {
     flex-direction: row;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: .1rem .3rem;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: .3rem;
     margin-top: 0;
     padding: .12rem .3rem;
     border-inline-start-width: 2px;
     min-width: 0;
 }
 
+.ad-calmg-cell .ad-calendar-meeting-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 .3rem;
+}
+
 .ad-calmg-cell .ad-calendar-meeting-course {
-    flex: 1 1 4rem;
     min-width: 0;
 }
 
-/* Meeting delete form — push to the right within the flex row */
+/* Meeting delete form — pinned to the row end */
 .ad-calmg-cell .ad-calendar-meeting .ps-inline-form {
-    margin-inline-start: auto;
+    margin-inline-start: 0;
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
@@ -1518,12 +1527,12 @@
     }
     .ad-calmg-cell .ad-calendar-meeting {
         padding: .08rem .2rem;
-        gap: .05rem .2rem;
+        gap: .05rem .15rem;
     }
     .ad-calmg-cell .ad-calendar-meeting .btn-close {
-        width: 2.75rem;
-        height: 2.75rem;
-        font-size: .75rem;
+        width: 2rem;
+        height: 2rem;
+        font-size: .68rem;
     }
     .ad-calmg-cell .ad-calendar-add-actions .ad-action-btn {
         width: 2.75rem;
@@ -3224,18 +3233,21 @@
     padding: .45rem .6rem;
     background: #fff;
 }
-.ad-calendar-choice {
+.ad-calendar-choice-group {
     display: flex;
-    align-items: flex-start;
-    gap: .5rem;
-    font-size: .86rem;
-    cursor: pointer;
-    padding: .2rem .15rem;
-    border-radius: .4rem;
+    flex-direction: column;
+    gap: .2rem;
+    padding: .3rem .1rem;
 }
-.ad-calendar-choice:hover { background: var(--ps-mist); }
-.ad-calendar-choice input { flex-shrink: 0; margin-top: .15rem; }
-.ad-calendar-choice-text { line-height: 1.35; }
+.ad-calendar-choice-group + .ad-calendar-choice-group {
+    border-top: 1px dashed var(--ps-line);
+}
+.ad-calendar-choice-label {
+    font-size: .76rem;
+    font-weight: 700;
+    color: var(--ps-teal);
+}
+.ad-calendar-choice-select { width: 100%; }
 @media (max-width: 767.98px) {
     .ad-calendar-context .ad-calendar-context-body { flex-direction: column; align-items: stretch; }
     .ad-calendar-year-field { min-width: 0; }

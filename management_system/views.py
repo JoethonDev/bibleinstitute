@@ -5222,7 +5222,10 @@ def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
                       holidays, meetings_by_date, locked_weekdays,
                       meeting_offerings_by_weekday=None):
     """Shared month-grid builder: one canonical day-dict shape consumed by
-    partials/calendar_month_grid.html for both admin and student calendars."""
+    partials/calendar_month_grid.html for both admin and student calendars.
+
+    ``meeting_offering_groups`` groups the day's offerings by level because a
+    level can hold at most one meeting per date."""
     cal = py_calendar.Calendar()
     month_days = cal.monthdatescalendar(cur_year, cur_month)
     month_grid = []
@@ -5233,6 +5236,15 @@ def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
             day_meetings = meetings_by_date.get(d, [])
             is_meeting = d.weekday() in locked_weekdays
             is_holiday = d in holidays
+            offering_groups = {}
+            for offering in (meeting_offerings_by_weekday or {}).get(d.weekday(), []):
+                academic_year_level = offering.academic_year_level
+                level = academic_year_level.level
+                group = offering_groups.setdefault(
+                    level.pk,
+                    {"level_id": level.pk, "level_name": level.display_name, "offerings": []},
+                )
+                group["offerings"].append(offering)
             week_data.append({
                 "day": d.day,
                 "date": d.isoformat(),
@@ -5243,7 +5255,7 @@ def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
                 "holiday_name": holidays[d].name if is_holiday else "",
                 "holiday_id": holidays[d].id if is_holiday else None,
                 "meetings": day_meetings,
-                "meeting_offerings": (meeting_offerings_by_weekday or {}).get(d.weekday(), []),
+                "meeting_offering_groups": list(offering_groups.values()),
                 "disabled": not in_year,
                 "outside_month": d.month != cur_month,
             })

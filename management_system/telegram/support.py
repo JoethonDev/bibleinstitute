@@ -85,6 +85,30 @@ def latest_inbound_message_queryset():
     ).order_by("-created_at", "-pk")
 
 
+def unread_conversation_filter() -> Q:
+    """Canonical unread predicate; requires the ``latest_inbound_at`` annotation.
+
+    A conversation is unread while its newest inbound message is newer than the
+    admin read marker. It is the single source of truth for the unread badge,
+    the "Processed" status, and the unread count.
+    """
+    return Q(latest_inbound_at__isnull=False) & (
+        Q(admin_read_at__isnull=True) | Q(latest_inbound_at__gt=F("admin_read_at"))
+    )
+
+
+def processed_conversation_filter() -> Q:
+    """Canonical processed predicate; requires the ``latest_inbound_at`` annotation.
+
+    A conversation is processed once nothing is pending to read: either it has
+    no inbound message at all, or the read marker is at/after the newest one.
+    """
+    return Q(latest_inbound_at__isnull=True) | Q(
+        admin_read_at__isnull=False,
+        latest_inbound_at__lte=F("admin_read_at"),
+    )
+
+
 def unread_conversations_queryset():
     """Conversations whose newest inbound message is newer than the read marker."""
     latest_inbound = latest_inbound_message_queryset().filter(
@@ -92,10 +116,7 @@ def unread_conversations_queryset():
     )
     return TelegramConversation.objects.annotate(
         latest_inbound_at=Subquery(latest_inbound.values("created_at")[:1]),
-    ).filter(
-        Q(admin_read_at__isnull=True, latest_inbound_at__isnull=False)
-        | Q(latest_inbound_at__gt=F("admin_read_at"))
-    )
+    ).filter(unread_conversation_filter())
 
 
 def count_unread_conversations() -> int:

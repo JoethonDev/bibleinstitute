@@ -1,6 +1,8 @@
 {% load i18n %}
 {# Admin calendar cell: meetings, holidays, and add-meeting/add-holiday controls. #}
 {# Consumes: day (shared month-grid day dict), year_id, can_edit_meetings, can_manage_holidays. #}
+{# day.meeting_offering_groups groups the day's offerings by level: a level can #}
+{# hold at most one meeting per date, so the picker renders one select per level. #}
 {# State classes: is-out / is-holiday / is-meeting / has-meeting / is-today. #}
 {# Frozen contracts: data-date/data-year, data-offerings-template, #addMeetingModal, #addHolidayModal. #}
 <div class="ad-calmg-cell
@@ -26,7 +28,9 @@
      {% endif %}
      {% for meeting in day.meetings %}
      <div class="ad-calendar-meeting" title="{{ meeting.course_name }}">
-       <strong class="ad-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="ad-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
+       <span class="ad-calendar-meeting-text">
+         <strong class="ad-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="ad-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
+       </span>
        {% if can_edit_meetings %}
        <form method="post" action="{% url 'delete-meeting' meeting.id %}" hx-post="{% url 'delete-meeting' meeting.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this meeting?' %}">
          {% csrf_token %}
@@ -35,16 +39,24 @@
        {% endif %}
      </div>
      {% endfor %}
-     {% if can_edit_meetings and day.meeting_offerings %}
+     {% if can_edit_meetings and day.meeting_offering_groups %}
        <template id="meeting-offerings-{{ day.date }}">
-         {% for offering in day.meeting_offerings %}
-         <option value="{{ offering.pk }}">{{ offering.academic_year_level.level.display_name }} — {{ offering.course.name }}</option>
+         {% for group in day.meeting_offering_groups %}
+         <div class="ad-calendar-choice-group">
+           <label class="ad-calendar-choice-label" for="meeting-offering-{{ day.date }}-{{ group.level_id }}">{{ group.level_name }}</label>
+           <select id="meeting-offering-{{ day.date }}-{{ group.level_id }}" name="course_offering_id" class="form-select form-select-sm ad-calendar-choice-select">
+             <option value="">{% translate "No meeting" %}</option>
+             {% for offering in group.offerings %}
+             <option value="{{ offering.pk }}">{{ offering.course.name }}</option>
+             {% endfor %}
+           </select>
+         </div>
          {% endfor %}
        </template>
      {% endif %}
-     {% if can_edit_meetings and day.meeting_offerings or can_manage_holidays and not day.is_holiday %}
+     {% if can_edit_meetings and day.meeting_offering_groups or can_manage_holidays and not day.is_holiday %}
        <div class="d-flex gap-1 mt-1 ad-calendar-add-actions">
-         {% if can_edit_meetings and day.meeting_offerings %}
+         {% if can_edit_meetings and day.meeting_offering_groups %}
          <button type="button" class="ad-action-btn is-add-meeting" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
                  data-date="{{ day.date }}" data-year="{{ year_id }}"
                  data-offerings-template="meeting-offerings-{{ day.date }}"

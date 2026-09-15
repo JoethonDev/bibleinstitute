@@ -51,8 +51,10 @@ from .telegram.support import (
     count_unread_conversations,
     mark_all_conversations_read,
     mark_conversation_read,
+    processed_conversation_filter,
     reply_to_conversation,
     start_conversation,
+    unread_conversation_filter,
 )
 from .telegram_tasks import process_telegram_update
 from .telegram.policy import webhook_url
@@ -361,20 +363,11 @@ def _latest_inbound_message_queryset():
 def _conversation_queryset():
     """Conversation rows with the annotations every chat surface depends on."""
     return TelegramConversation.objects.select_related("user", "claimed_by").annotate(
-        latest_user_message_direction=Subquery(
-            _latest_user_message_queryset().values("direction")[:1],
-        ),
         latest_inbound_at=Subquery(
             _latest_inbound_message_queryset().values("created_at")[:1],
         ),
+        is_unread=unread_conversation_filter(),
     )
-
-
-def _conversation_has_unread(conversation) -> bool:
-    latest_inbound_at = getattr(conversation, "latest_inbound_at", None)
-    if latest_inbound_at is None:
-        return False
-    return conversation.admin_read_at is None or latest_inbound_at > conversation.admin_read_at
 
 
 def _representative_conversations():
@@ -404,15 +397,6 @@ def _conversation_search_queryset(search: str):
     return queryset
 
 
-def _conversation_status_counts(queryset):
-    counts = queryset.aggregate(
-        all=Count("pk"),
-        pending=Count("pk", filter=~Q(latest_user_message_direction=TelegramMessage.Direction.OUTBOUND)),
-        processed=Count("pk", filter=Q(latest_user_message_direction=TelegramMessage.Direction.OUTBOUND)),
-    )
-    return counts
-
-
 def _conversation_list_context(request):
     search = normalize_search_text(request.GET.get("search", "").strip()[:120])
     status = request.GET.get("status", "").strip()
@@ -422,7 +406,6 @@ def _conversation_list_context(request):
         latest_user_message_at=Subquery(_latest_user_message_queryset().values("created_at")[:1]),
         latest_user_message_text=Subquery(_latest_user_message_queryset().values("text")[:1]),
         latest_user_message_content_type=Subquery(_latest_user_message_queryset().values("content_type")[:1]),
-        latest_user_message_direction=Subquery(_latest_user_message_queryset().values("direction")[:1]),
         latest_inbound_at=Subquery(_latest_inbound_message_queryset().values("created_at")[:1]),
         message_count=Count(
             "user__telegram_conversations__messages",
@@ -430,19 +413,13 @@ def _conversation_list_context(request):
             distinct=True,
         ),
     ).annotate(
-        is_unread=Q(admin_read_at__isnull=True, latest_inbound_at__isnull=False)
-        | Q(latest_inbound_at__gt=F("admin_read_at")),
+        is_unread=unread_conversation_filter(),
     )
-    status_counts = _conversation_status_counts(searched)
     conversations = searched
     if status == "pending":
-        conversations = conversations.filter(
-            ~Q(latest_user_message_direction=TelegramMessage.Direction.OUTBOUND),
-        )
+        conversations = conversations.filter(unread_conversation_filter())
     elif status == "processed":
-        conversations = conversations.filter(
-            latest_user_message_direction=TelegramMessage.Direction.OUTBOUND,
-        )
+        conversations = conversations.filter(processed_conversation_filter())
     conversations = conversations.order_by("-latest_user_message_at", "-pk")
     page_obj = Paginator(conversations, 25).get_page(request.GET.get("page", 1))
     return {
@@ -454,7 +431,6 @@ def _conversation_list_context(request):
         ]),
         "search": search,
         "status": status,
-        "status_counts": status_counts,
         "conversation_list_url": reverse("telegram-conversations"),
         "mark_all_read_url": reverse("telegram-conversations-mark-all-read"),
         "unread_count": count_unread_conversations(),
@@ -554,7 +530,6 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "panel_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "mark_read_url": reverse("telegram-conversation-mark-read", kwargs={"conversation_id": conversation.pk}),
-        "has_unread": _conversation_has_unread(conversation),
         "conversation_list_url": reverse("telegram-conversations"),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
