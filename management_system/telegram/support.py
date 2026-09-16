@@ -85,27 +85,37 @@ def latest_inbound_message_queryset():
     ).order_by("-created_at", "-pk")
 
 
-def unread_conversation_filter() -> Q:
-    """Canonical unread predicate; requires the ``latest_inbound_at`` annotation.
+def latest_message_queryset():
+    """Non-digest support messages ordered newest-first for read-state checks."""
+    return TelegramMessage.objects.exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
+    ).order_by("-created_at", "-pk")
 
-    A conversation is unread while its newest inbound message is newer than the
-    admin read marker. It is the single source of truth for the unread badge,
-    the "Processed" status, and the unread count.
+
+def unread_conversation_filter() -> Q:
+    """Canonical unread predicate.
+
+    Requires the ``latest_inbound_at`` and ``latest_message_direction``
+    annotations (both exclude digest rows). A conversation is unread while the
+    student wrote last and that message is newer than the read marker; an admin
+    message last always counts as handled.
     """
-    return Q(latest_inbound_at__isnull=False) & (
+    return Q(latest_message_direction=TelegramMessage.Direction.INBOUND) & (
         Q(admin_read_at__isnull=True) | Q(latest_inbound_at__gt=F("admin_read_at"))
     )
 
 
 def processed_conversation_filter() -> Q:
-    """Canonical processed predicate; requires the ``latest_inbound_at`` annotation.
+    """Canonical processed predicate.
 
-    A conversation is processed once nothing is pending to read: either it has
-    no inbound message at all, or the read marker is at/after the newest one.
+    Requires the same annotations. A conversation is processed when the admin
+    wrote last, has no inbound message at all, or the read marker is at/after
+    the newest inbound message.
     """
-    return Q(latest_inbound_at__isnull=True) | Q(
-        admin_read_at__isnull=False,
-        latest_inbound_at__lte=F("admin_read_at"),
+    return (
+        Q(latest_message_direction=TelegramMessage.Direction.OUTBOUND)
+        | Q(latest_inbound_at__isnull=True)
+        | Q(admin_read_at__isnull=False, latest_inbound_at__lte=F("admin_read_at"))
     )
 
 
@@ -114,8 +124,12 @@ def unread_conversations_queryset():
     latest_inbound = latest_inbound_message_queryset().filter(
         conversation=OuterRef("pk"),
     )
+    latest_message = latest_message_queryset().filter(
+        conversation=OuterRef("pk"),
+    )
     return TelegramConversation.objects.annotate(
         latest_inbound_at=Subquery(latest_inbound.values("created_at")[:1]),
+        latest_message_direction=Subquery(latest_message.values("direction")[:1]),
     ).filter(unread_conversation_filter())
 
 

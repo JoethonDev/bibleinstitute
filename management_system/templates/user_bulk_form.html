@@ -7,7 +7,7 @@
     <div class="mb-4 col-12 col-md-8 col-lg-7">
       <a
         hx-get="{% url 'user-dashboard' %}"
-        hx-select="#content"
+        hx-select="#page-region"
         hx-push-url="true"
         hx-trigger="click"
         hx-target="#display-page"
@@ -44,7 +44,7 @@
             method="post"
             hx-post="{% url 'user-bulk-create' %}"
             hx-encoding="multipart/form-data"
-            hx-target="#display-page" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true"
+            hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true"
             enctype="multipart/form-data"
             class="needs-validation"
             novalidate

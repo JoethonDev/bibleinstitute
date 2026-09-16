@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <form method="post" hx-post="" hx-target="#display-page" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+      <form method="post" hx-post="" hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
         {% csrf_token %}
         <div class="mb-3">
           <label for="attendance_date" class="form-label">{% translate "New Date" %}</label>

@@ -1,0 +1,12 @@
+{% load i18n %}
+{# Canonical HTMX page-navigation region for render_page() responses.
+   It carries the breadcrumbs together with the page content so the
+   #display-page innerHTML swap keeps them in sync. #}
+<div id="page-region">
+    {% if breadcrumb_items %}
+    {% include "partials/breadcrumbs.html" %}
+    {% else %}
+    {% include "partials/admin_breadcrumbs.html" %}
+    {% endif %}
+    {% include page_region_partial %}
+</div>

@@ -390,10 +390,16 @@ def render_page(request, full_template, partial_template, context):
     The partial must render the page's root #content element so the client
     fragment swap is identical in both modes.
 
-    HTMX partial responses cannot render the shell toast stack, so any
-    pending Django messages are appended as an out-of-band swap of the
-    shell's #toast-stack element.
+    HTMX page navigation swaps #display-page with the response's #page-region,
+    so the partial is wrapped in partials/page_region.html together with the
+    page breadcrumbs. HTMX partial responses cannot render the shell toast
+    stack, so any pending Django messages are appended as an out-of-band swap
+    of the shell's #toast-stack element.
     """
     if is_htmx(request):
-        return append_message_toasts(request, render(request, partial_template, context))
+        wrapped_context = {**context, "page_region_partial": partial_template}
+        return append_message_toasts(
+            request,
+            render(request, "partials/page_region.html", wrapped_context),
+        )
     return render(request, full_template, context)

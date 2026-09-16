@@ -7,6 +7,7 @@ import logging
 import mimetypes
 import os
 import secrets
+from urllib.parse import urlencode
 
 import telebot
 from django.contrib import messages
@@ -57,8 +58,15 @@ from .telegram.support import (
     unread_conversation_filter,
 )
 from .telegram_tasks import process_telegram_update
-from .telegram.policy import webhook_url
-from .utils.helpers import append_message_toasts, generate_breadcrumb, is_htmx, pagination_query_string
+from .telegram.policy import TELEGRAM_LINKABLE_ROLES, webhook_url
+from .utils.validators import normalize_phone
+from .utils.helpers import (
+    append_message_toasts,
+    generate_breadcrumb,
+    is_htmx,
+    pagination_query_string,
+    render_page,
+)
 from .telegram.broadcasts import (
     ALL_LEVEL_VALUE,
     BroadcastError,
@@ -366,6 +374,9 @@ def _conversation_queryset():
         latest_inbound_at=Subquery(
             _latest_inbound_message_queryset().values("created_at")[:1],
         ),
+        latest_message_direction=Subquery(
+            _latest_user_message_queryset().values("direction")[:1],
+        ),
         is_unread=unread_conversation_filter(),
     )
 
@@ -406,6 +417,7 @@ def _conversation_list_context(request):
         latest_user_message_at=Subquery(_latest_user_message_queryset().values("created_at")[:1]),
         latest_user_message_text=Subquery(_latest_user_message_queryset().values("text")[:1]),
         latest_user_message_content_type=Subquery(_latest_user_message_queryset().values("content_type")[:1]),
+        latest_message_direction=Subquery(_latest_user_message_queryset().values("direction")[:1]),
         latest_inbound_at=Subquery(_latest_inbound_message_queryset().values("created_at")[:1]),
         message_count=Count(
             "user__telegram_conversations__messages",
@@ -902,3 +914,153 @@ def telegram_broadcast_retry(request, broadcast_id):
         return redirect("telegram-broadcast-detail", broadcast_id=broadcast_id)
     messages.success(request, _("Failed broadcast deliveries were queued again."))
     return redirect("telegram-broadcast-detail", broadcast_id=broadcast.pk)
+
+
+TELEGRAM_ACCOUNTS_PAGE_SIZE = 25
+TELEGRAM_ACCOUNT_STATUS_VALUES = frozenset({"all", "linked", "unlinked", "mismatch"})
+
+
+def _telegram_account_clip(value: str, limit: int = 120) -> str:
+    return value.strip()[:limit]
+
+
+def telegram_accounts_queryset(search: str = ""):
+    """Eligible LMS accounts with their Telegram link state joined in."""
+    users = (
+        User.objects.filter(
+            is_active=True,
+            application_status="active",
+            role__role__in=TELEGRAM_LINKABLE_ROLES,
+        )
+        .select_related("role", "telegram_account")
+        .order_by("first_name", "last_name", "username", "pk")
+    )
+    if search:
+        query = normalized_contains_q(
+            ("username", "first_name", "last_name", "email"),
+            search,
+        )
+        query |= Q(phone__icontains=search) | Q(telegram_account__phone__icontains=search)
+        digits = "".join(character for character in search if character.isdigit())
+        if digits and len(digits) <= 18:
+            query |= Q(telegram_account__telegram_user_id=int(digits))
+        users = users.filter(query)
+    return users
+
+
+def _telegram_account_status_queryset(status: str, search: str = ""):
+    users = telegram_accounts_queryset(search)
+    if status == "linked":
+        return users.filter(telegram_account__is_active=True)
+    if status == "unlinked":
+        return users.exclude(telegram_account__is_active=True)
+    if status == "mismatch":
+        return users.filter(
+            telegram_account__is_active=True,
+            telegram_account__phone__isnull=False,
+        ).exclude(telegram_account__phone=F("phone"))
+    return users
+
+
+def _telegram_account_match_state(
+    is_linked: bool,
+    user: User,
+    linked_phone: str | None,
+) -> str:
+    if not is_linked:
+        return ""
+    if not linked_phone:
+        return "not_shared"
+    if not user.phone:
+        return "no_website_phone"
+    return "matched" if normalize_phone(user.phone) == linked_phone else "different"
+
+
+_TELEGRAM_ACCOUNT_MATCH_LABELS = {
+    "matched": (_("Matched"), "success"),
+    "different": (_("Not matched"), "danger"),
+    "no_website_phone": (_("No website phone"), "warning"),
+    "not_shared": (_("Not shared"), "muted"),
+}
+
+
+def _telegram_account_rows(page_obj):
+    rows = []
+    for user in page_obj:
+        account = getattr(user, "telegram_account", None)
+        is_linked = bool(account and account.is_active)
+        linked_phone = account.phone if is_linked else None
+        match_state = _telegram_account_match_state(is_linked, user, linked_phone)
+        label, tone = _TELEGRAM_ACCOUNT_MATCH_LABELS.get(match_state, ("", ""))
+        rows.append({
+            "user": user,
+            "account": account if is_linked else None,
+            "is_linked": is_linked,
+            "role_name": user.role.get_role_display() if user.role else "",
+            "telegram_phone": linked_phone,
+            "match_state": match_state,
+            "match_label": label,
+            "match_tone": tone,
+        })
+    return rows
+
+
+@capability_required(can_manage_academic_setup)
+@require_GET
+def telegram_accounts(request):
+    """Report of eligible accounts and their Telegram link/phone match state."""
+    search = _telegram_account_clip(request.GET.get("search", ""))
+    status = request.GET.get("status", "all").strip()
+    if status not in TELEGRAM_ACCOUNT_STATUS_VALUES:
+        status = "all"
+    scoped = telegram_accounts_queryset(search)
+    page_obj = Paginator(
+        _telegram_account_status_queryset(status, search),
+        TELEGRAM_ACCOUNTS_PAGE_SIZE,
+    ).get_page(request.GET.get("page", 1))
+    return render_page(
+        request,
+        "telegram_accounts.html",
+        "partials/telegram_accounts_content.html",
+        {
+            "title": _("Telegram Accounts"),
+            "rows": _telegram_account_rows(page_obj),
+            "page_obj": page_obj,
+            "pagination_query": pagination_query_string(request),
+            "search": search,
+            "status": status,
+            "all_count": scoped.count(),
+            "linked_count": scoped.filter(telegram_account__is_active=True).count(),
+            "unlinked_count": scoped.exclude(telegram_account__is_active=True).count(),
+            "mismatch_count": scoped.filter(
+                telegram_account__is_active=True,
+                telegram_account__phone__isnull=False,
+            ).exclude(telegram_account__phone=F("phone")).count(),
+            "breadcrumb_items": generate_breadcrumb([
+                (_("Admin"), reverse("admin-panel")),
+                (_("Telegram Accounts"), None),
+            ]),
+        },
+    )
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_account_unlink(request, user_id):
+    """Unlink one Telegram account from the accounts report and stay on it."""
+    user = get_object_or_404(User, pk=user_id)
+    unlink_telegram_account(user)
+    messages.success(
+        request,
+        _("%(name)s's Telegram account was unlinked.")
+        % {"name": user.get_full_name() or user.username},
+    )
+    params = {
+        key: _telegram_account_clip(request.POST.get(key, ""))
+        for key in ("search", "status", "page")
+        if request.POST.get(key, "").strip()
+    }
+    url = reverse("telegram-accounts")
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    return redirect(url)

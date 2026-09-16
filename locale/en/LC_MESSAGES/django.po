@@ -10027,6 +10027,76 @@ msgstr "Select one or more offerings. Each level can have one meeting per date."
 msgid "No meeting"
 msgstr "No meeting"
 
+msgid "Telegram Accounts"
+msgstr "Telegram Accounts"
+
+msgid "Telegram accounts overview"
+msgstr "Telegram accounts overview"
+
+msgid "Telegram account filters"
+msgstr "Telegram account filters"
+
+msgid "Name, username, or phone"
+msgstr "Name, username, or phone"
+
+msgid "Link status"
+msgstr "Link status"
+
+msgid "All accounts"
+msgstr "All accounts"
+
+msgid "Phone mismatch"
+msgstr "Phone mismatch"
+
+msgid "Accounts"
+msgstr "Accounts"
+
+msgid "Website phone"
+msgstr "Website phone"
+
+msgid "Telegram status"
+msgstr "Telegram status"
+
+msgid "Telegram phone"
+msgstr "Telegram phone"
+
+msgid "Phone match"
+msgstr "Phone match"
+
+msgid "Linked at"
+msgstr "Linked at"
+
+msgid "Matched"
+msgstr "Matched"
+
+msgid "Not matched"
+msgstr "Not matched"
+
+msgid "No website phone"
+msgstr "No website phone"
+
+msgid "Not shared"
+msgstr "Not shared"
+
+msgid "Telegram link status by account"
+msgstr "Telegram link status by account"
+
+#, python-format
+msgid "%(count)s Accounts shown"
+msgstr "%(count)s Accounts shown"
+
+msgid "No accounts match the selected filters."
+msgstr "No accounts match the selected filters."
+
+msgid "Telegram accounts pagination"
+msgstr "Telegram accounts pagination"
+
+msgid "accounts"
+msgstr "accounts"
+
+msgid "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
+msgstr "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
+
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."

@@ -34,7 +34,7 @@
             {% translate "Broadcast Details" %}
         </div>
         <div class="ad-card-body">
-            <form method="post" action="{{ compose_url }}" hx-post="{{ compose_url }}" hx-encoding="multipart/form-data" hx-target="#display-page" hx-swap="innerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data" class="tg-broadcast-form">
+            <form method="post" action="{{ compose_url }}" hx-post="{{ compose_url }}" hx-encoding="multipart/form-data" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data" class="tg-broadcast-form">
                 {% csrf_token %}
                 {% if broadcast_form.non_field_errors %}
                 <div class="ad-alert ad-alert--danger mb-3" role="alert">

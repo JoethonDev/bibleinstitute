@@ -19,7 +19,7 @@
                     hx-push-url="true"
                     hx-trigger="click"
                     hx-target="#display-page"
-                    hx-select="#content">
+                    hx-select="#page-region">
                 <i class="fas fa-plus me-1"></i>
                 <span>{% translate "Create" %} {{ view|title }}</span>
             </button>
@@ -34,7 +34,7 @@
                     hx-push-url="true"
                     hx-trigger="click"
                     hx-target="#display-page"
-                    hx-select="#content">
+                    hx-select="#page-region">
                 <i class="fas fa-upload me-1"></i>
                 <span>{% translate "Bulk Import" %}</span>
             </button>
@@ -53,7 +53,7 @@
                     hx-push-url="true"
                     hx-trigger="click"
                     hx-target="#display-page"
-                    hx-select="#content">
+                    hx-select="#page-region">
                 <i class="fas fa-file-import me-1"></i>
                 <span>{% translate "Import JSON" %}</span>
             </button>
@@ -74,7 +74,7 @@
                    class="ad-btn ad-btn--danger ad-btn--sm"
                    hx-get="{{ url }}"
                    hx-target="#display-page"
-                   hx-select="#content"
+                   hx-select="#page-region"
                    hx-swap="innerHTML"
                    hx-push-url="true">
                     <i class="fas fa-times-circle me-1"></i>

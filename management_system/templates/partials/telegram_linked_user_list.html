@@ -29,7 +29,7 @@
                     {% translate "Open" %}
                 </a>
                 {% else %}
-                <form method="post" action="{% url 'telegram-start-conversation' account.user.pk %}" hx-post="{% url 'telegram-start-conversation' account.user.pk %}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                <form method="post" action="{% url 'telegram-start-conversation' account.user.pk %}" hx-post="{% url 'telegram-start-conversation' account.user.pk %}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
                     <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
                         {% translate "Start Telegram conversation" %}

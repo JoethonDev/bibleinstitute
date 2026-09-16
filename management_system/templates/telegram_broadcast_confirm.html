@@ -79,13 +79,13 @@
     </div>
 
     <div class="d-flex flex-wrap gap-2 tg-broadcast-confirm-form">
-        <form method="post" action="{{ confirm_url }}" hx-post="{{ confirm_url }}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+        <form method="post" action="{{ confirm_url }}" hx-post="{{ confirm_url }}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--teal">
                 <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>{% translate "Confirm and Send" %}
             </button>
         </form>
-        <form method="post" action="{{ cancel_url }}" hx-post="{{ cancel_url }}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="tg-broadcast-delete-form" data-confirm-message="{% translate 'Delete this draft?' %}">
+        <form method="post" action="{{ cancel_url }}" hx-post="{{ cancel_url }}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true" class="tg-broadcast-delete-form" data-confirm-message="{% translate 'Delete this draft?' %}">
             {% csrf_token %}
             <button type="submit" class="ad-btn ad-btn--ghost">
                 <i class="fas fa-trash me-2" aria-hidden="true"></i>{% translate "Delete Draft" %}

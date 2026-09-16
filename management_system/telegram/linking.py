@@ -106,7 +106,14 @@ def _account_conflict(user_id: int, telegram_user_id: int, telegram_chat_id: int
 
 
 @transaction.atomic
-def link_with_token(token: str, telegram_user_id: int, telegram_chat_id: int) -> TelegramAccount:
+def link_with_token(
+    token: str,
+    telegram_user_id: int,
+    telegram_chat_id: int,
+    phone: str | None = None,
+) -> TelegramAccount:
+    """Link one LMS account. ``phone`` carries the normalized contact phone
+    when linking happened through Telegram contact sharing."""
     if not isinstance(token, str) or not token or len(token) > 256:
         raise TelegramLinkError(_("This Telegram link is invalid. Please request a new link from your profile."))
     token_digest = _token_digest(token)
@@ -135,16 +142,27 @@ def link_with_token(token: str, telegram_user_id: int, telegram_chat_id: int) ->
         raise TelegramLinkError(_("This LMS account is already linked to Telegram. Contact support."))
     try:
         if account:
+            previous_telegram_user_id = account.telegram_user_id
             account.telegram_user_id = telegram_user_id
             account.telegram_chat_id = telegram_chat_id
             account.is_active = True
             account.last_inbound_at = timezone.now()
-            account.save(update_fields=["telegram_user_id", "telegram_chat_id", "is_active", "last_inbound_at"])
+            update_fields = ["telegram_user_id", "telegram_chat_id", "is_active", "last_inbound_at"]
+            if phone:
+                account.phone = phone
+                update_fields.append("phone")
+            elif previous_telegram_user_id != telegram_user_id:
+                # Re-binding the row to another Telegram identity cannot keep
+                # the previous identity's shared phone.
+                account.phone = None
+                update_fields.append("phone")
+            account.save(update_fields=update_fields)
         else:
             account = TelegramAccount.objects.create(
                 user=user,
                 telegram_user_id=telegram_user_id,
                 telegram_chat_id=telegram_chat_id,
+                phone=phone,
                 last_inbound_at=timezone.now(),
             )
     except IntegrityError as exc:
@@ -186,7 +204,12 @@ def link_with_phone(phone: str, telegram_user_id: int, telegram_chat_id: int) ->
         raise TelegramLinkError(_("More than one LMS account matches this phone number. Contact support."))
     user = matches[0]
     token, _raw = ensure_current_link_token(user)
-    return link_with_token(_raw, telegram_user_id, telegram_chat_id)
+    return link_with_token(
+        _raw,
+        telegram_user_id,
+        telegram_chat_id,
+        phone=normalize_phone(phone),
+    )
 
 
 @transaction.atomic

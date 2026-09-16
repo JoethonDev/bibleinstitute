@@ -10592,6 +10592,76 @@ msgstr "اختر مادة أو أكثر. يمكن أن يكون لكل مستو�
 msgid "No meeting"
 msgstr "لا يوجد اجتماع"
 
+msgid "Telegram Accounts"
+msgstr "حسابات تيليجرام"
+
+msgid "Telegram accounts overview"
+msgstr "نظرة عامة على حسابات تيليجرام"
+
+msgid "Telegram account filters"
+msgstr "مرشحات حسابات تيليجرام"
+
+msgid "Name, username, or phone"
+msgstr "الاسم أو اسم المستخدم أو الهاتف"
+
+msgid "Link status"
+msgstr "حالة الربط"
+
+msgid "All accounts"
+msgstr "كل الحسابات"
+
+msgid "Phone mismatch"
+msgstr "رقم الهاتف غير مطابق"
+
+msgid "Accounts"
+msgstr "الحسابات"
+
+msgid "Website phone"
+msgstr "هاتف الموقع"
+
+msgid "Telegram status"
+msgstr "حالة تيليجرام"
+
+msgid "Telegram phone"
+msgstr "هاتف تيليجرام"
+
+msgid "Phone match"
+msgstr "تطابق الهاتف"
+
+msgid "Linked at"
+msgstr "تاريخ الربط"
+
+msgid "Matched"
+msgstr "مطابق"
+
+msgid "Not matched"
+msgstr "غير مطابق"
+
+msgid "No website phone"
+msgstr "لا يوجد هاتف في الموقع"
+
+msgid "Not shared"
+msgstr "لم يُشارَك"
+
+msgid "Telegram link status by account"
+msgstr "حالة الربط بتيليجرام لكل حساب"
+
+#, python-format
+msgid "%(count)s Accounts shown"
+msgstr "عرض %(count)s حساب"
+
+msgid "No accounts match the selected filters."
+msgstr "لا توجد حسابات مطابقة للمرشحات المحددة."
+
+msgid "Telegram accounts pagination"
+msgstr "ترقيم صفحات حسابات تيليجرام"
+
+msgid "accounts"
+msgstr "حسابات"
+
+msgid "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
+msgstr "اطّلع على الحسابات التي ربطت حسابها بتيليجرام والحسابات التي لم تربط بعد، وما إذا كان رقم الهاتف المُشارَك على تيليجرام مطابقًا لهاتف الموقع."
+
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."

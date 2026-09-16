@@ -2,6 +2,8 @@ from django.urls import path
 from management_system.views import *
 from management_system.forms import UserLoginForm
 from management_system.telegram_views import (
+    telegram_account_unlink,
+    telegram_accounts,
     telegram_attachment,
     telegram_admin_unlink,
     telegram_broadcast_confirm,
@@ -159,6 +161,8 @@ urlpatterns = [
     path('dashboard/academic/promotion-formula/promote/', bulk_promotion_results, name="bulk-promotion-results"),
     path('dashboard/academic/promotion-history/', promotion_history, name="promotion-history"),
     path('dashboard/telegram/', telegram_config, name="telegram-config"),
+    path('dashboard/telegram/accounts/', telegram_accounts, name="telegram-accounts"),
+    path('dashboard/telegram/accounts/<int:user_id>/unlink/', telegram_account_unlink, name="telegram-account-unlink"),
     path('dashboard/telegram/conversations/', telegram_conversations, name="telegram-conversations"),
     path('dashboard/telegram/conversations/read-all/', telegram_conversations_mark_all_read, name="telegram-conversations-mark-all-read"),
     path('dashboard/telegram/conversations/<int:conversation_id>/', telegram_conversation_detail, name="telegram-conversation-detail"),

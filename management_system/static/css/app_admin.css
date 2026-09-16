@@ -1012,7 +1012,7 @@
 /* ---------------- Calendar management grid ---------------- */
 .ad-calmg-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: .35rem;
 }
 
@@ -1020,6 +1020,7 @@
 
 .ad-calmg-cell {
     position: relative;
+    min-width: 0;
     min-height: 3.2rem;
     padding: .4rem .5rem;
     border: 1px solid var(--ps-line-cool);
@@ -1096,6 +1097,7 @@
     flex-direction: column;
     gap: .15rem;
     min-height: 5rem;
+    min-width: 0;
 }
 
 /* Day number */
@@ -1479,6 +1481,15 @@
     .ad-tab .ad-tab-count { display: none; }
     .mobile-menu-toggle { display: flex !important; }
     .ad-grid-2 { grid-template-columns: 1fr; }
+    /* Tablet/phone calendar cells are too narrow to hold the meeting or holiday
+       delete control beside the text without squeezing the text to one
+       character per line, so the control wraps onto its own line below it. */
+    .ad-calmg-cell .ad-calendar-meeting,
+    .ad-calendar-holiday { flex-wrap: wrap; }
+    .ad-calmg-cell .ad-calendar-meeting-text,
+    .ad-calendar-holiday small { flex: 1 1 100%; }
+    .ad-calmg-cell .ad-calendar-meeting .ps-inline-form,
+    .ad-calendar-holiday .ps-inline-form { margin-inline-start: auto; }
 }
 
 /* Comfortable tablet density: keep the rail usable without squeezing the
@@ -1505,8 +1516,8 @@
     .ad-pane-head .ad-pane-title { font-size: 1.25rem; }
     .ad-pane-head .ad-search,
     .ad-pane-head form[role="search"] { min-width: 0; }
-    .ad-calmg-cell { min-height: 2.5rem; padding: .25rem .35rem; font-size: .72rem; border-radius: .5rem; }
-    .ad-calmg-grid { gap: .22rem; }
+    .ad-calmg-cell { min-height: 2.5rem; padding: .25rem .2rem; font-size: .72rem; border-radius: .5rem; }
+    .ad-calmg-grid { gap: .15rem; }
     /* Calendar compact mode */
     .ad-calendar-cell-content {
         min-height: 3.5rem;
@@ -1519,25 +1530,39 @@
         font-size: .6rem;
         padding: .05rem .2rem;
     }
+    .ad-calendar-holiday .btn-close {
+        width: 1.75rem;
+        height: 1.75rem;
+        font-size: .68rem;
+    }
     .ad-calendar-meeting-level {
         font-size: .58rem;
     }
     .ad-calendar-meeting-course {
         font-size: .62rem;
     }
+    /* Phone cells stack the level above the course name (the delete control
+       already wraps onto its own line at this breakpoint). */
     .ad-calmg-cell .ad-calendar-meeting {
         padding: .08rem .2rem;
         gap: .05rem .15rem;
     }
+    .ad-calmg-cell .ad-calendar-meeting-text {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .05rem;
+    }
     .ad-calmg-cell .ad-calendar-meeting .btn-close {
-        width: 2rem;
-        height: 2rem;
+        width: 1.75rem;
+        height: 1.75rem;
         font-size: .68rem;
     }
+    /* Add-action buttons scale down with very narrow viewports so a seven-column
+       month grid can never force horizontal overflow. */
     .ad-calmg-cell .ad-calendar-add-actions .ad-action-btn {
-        width: 2.75rem;
-        height: 2.75rem;
-        font-size: .8rem;
+        width: clamp(2rem, 10.5vw, 2.75rem);
+        height: clamp(2rem, 10.5vw, 2.75rem);
+        font-size: .78rem;
     }
     .ad-calendar-add-actions {
         opacity: 1; /* always visible on narrow mobile for touch access */

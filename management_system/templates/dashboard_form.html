@@ -28,7 +28,7 @@
     <div class="ad-toolbar">
         {% with dynamic_view=view_name %}
         <a hx-get="{% url dynamic_view|add:'-dashboard' %}"
-           hx-select="#content"
+           hx-select="#page-region"
            hx-push-url="true"
            hx-trigger="click"
            hx-target="#display-page"
@@ -55,7 +55,7 @@
                       method="post"
                       hx-post=""
                       hx-target="#display-page"
-                      hx-select="#content"
+                      hx-select="#page-region"
                       hx-select-oob="#toast-stack"
                       hx-push-url="true"
                       class="admin-form"

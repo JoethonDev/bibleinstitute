@@ -11,8 +11,13 @@
     <link rel="icon" type="image/png" href="{% static 'login-logo.png' %}?v={{ static_asset_version }}">
     <title>{% translate "Bible Institute - Admin" %}</title>
 
-    <!-- HTMX Configuration -->
-    <meta name="htmx-config" content='{"defaultTimeout":10000,"defaultSwap":"innerHTML","includeIndicatorCSS":false,"history":true}'>
+    <!-- HTMX Configuration.
+         morphIgnore protects Alpine directives (x-*, @*, :*) and app data-*
+         attributes from HTMX 4 attribute preservation: same-ID elements
+         between the old and the new #content have their attributes synced,
+         which would otherwise strip x-data and the data-* URL attributes from
+         the swapped page root before Alpine/JS components read them. -->
+    <meta name="htmx-config" content='{"defaultTimeout":10000,"defaultSwap":"innerHTML","includeIndicatorCSS":false,"history":true,"morphIgnore":["data-","x-","@",":"]}'>
     <!-- CDN -->
     {% if request.LANGUAGE_CODE == 'ar' %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb" crossorigin="anonymous">
@@ -70,8 +75,12 @@
         <!-- Sidebar Component -->
         {% include 'partials/components/admin_sidebar.html' %}
         
-        <!-- Main Content Area -->
+        <!-- Main Content Area.
+             #page-region wraps the breadcrumbs together with the page body so
+             every HTMX page navigation swaps them as one fragment; #content
+             alone is not enough because the breadcrumbs live outside it. -->
         <main id="display-page" class="admin-main-content ad-panes">
+            <div id="page-region">
             {% block breadcrumbs %}{% include 'partials/admin_breadcrumbs.html' %}{% endblock %}
             {% block body %}
             <div class="container-fluid px-3 ad-dashboard-page" id="content">
@@ -511,6 +520,7 @@
 
             </div>
             {% endblock %}
+            </div>
         </main>
     </div>
     <!-- Bootstrap JS is loaded in <head> — no defer duplicate needed -->

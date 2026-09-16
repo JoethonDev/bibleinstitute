@@ -42,6 +42,10 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
+    <!-- HTMX configuration. morphIgnore protects Alpine directives (x-*, @*, :*)
+         and data-* component attributes from HTMX 4 attribute preservation
+         during innerHTML/outerHTML swaps. -->
+    <meta name="htmx-config" content='{"morphIgnore":["data-","x-","@",":"]}'>
     <!-- HTMX -->
     <script src="{% static 'vendor/htmx/htmx-4.0.0.min.js' %}?v={{ static_asset_version }}"></script>
 

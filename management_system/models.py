@@ -249,6 +249,9 @@ class TelegramAccount(models.Model):
     )
     telegram_user_id = models.BigIntegerField(unique=True)
     telegram_chat_id = models.BigIntegerField(unique=True)
+    # Normalized phone from the Telegram contact a student shared when linking.
+    # Token-based links do not share a phone, so this stays NULL for them.
+    phone = models.CharField(max_length=32, null=True, blank=True)
     linked_at = models.DateTimeField(auto_now_add=True)
     last_inbound_at = models.DateTimeField(null=True, blank=True)
     last_outbound_at = models.DateTimeField(null=True, blank=True)

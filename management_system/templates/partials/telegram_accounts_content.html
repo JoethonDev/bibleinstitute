@@ -1,0 +1,127 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page telegram-accounts-page" id="content">
+  <div class="grade-matrix-header">
+    <div>
+      <div class="ad-kicker"><i class="fab fa-telegram"></i> {% translate "Telegram accounts overview" %}</div>
+      <h3 class="ad-title mb-2">{% translate "Telegram Accounts" %}</h3>
+      <p class="ad-lede mb-0">{% translate "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone." %}</p>
+    </div>
+    <span id="telegram-accounts-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+  </div>
+
+  <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Telegram account filters' %}">
+    <form method="get" action="{% url 'telegram-accounts' %}" class="grade-matrix-filter-grid" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#telegram-accounts-loading">
+      <div class="grade-matrix-filter-field">
+        <label for="telegram-accounts-search">{% translate "Search" %}</label>
+        <div class="grade-matrix-input-wrap">
+          <i class="fas fa-search" aria-hidden="true"></i>
+          <input id="telegram-accounts-search" type="search" name="search" value="{{ search }}" maxlength="120" placeholder="{% translate 'Name, username, or phone' %}" class="form-control" hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#telegram-accounts-loading">
+        </div>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="telegram-accounts-status">{% translate "Link status" %}</label>
+        <select id="telegram-accounts-status" name="status" class="form-select" hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#telegram-accounts-loading">
+          <option value="all"{% if status == "all" %} selected{% endif %}>{% translate "All accounts" %}</option>
+          <option value="linked"{% if status == "linked" %} selected{% endif %}>{% translate "Linked" %}</option>
+          <option value="unlinked"{% if status == "unlinked" %} selected{% endif %}>{% translate "Not linked" %}</option>
+          <option value="mismatch"{% if status == "mismatch" %} selected{% endif %}>{% translate "Phone mismatch" %}</option>
+        </select>
+      </div>
+      <div class="grade-matrix-filter-actions">
+        <button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-filter"></i> {% translate "Filter" %}</button>
+        <a href="{% url 'telegram-accounts' %}" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a>
+      </div>
+    </form>
+  </section>
+
+  <div class="ad-stat-grid ad-card mb-3">
+    <div class="ad-stat-grid-item"><div class="ad-stat-value">{{ all_count }}</div><div class="ad-stat-label">{% translate "Accounts" %}</div></div>
+    <div class="ad-stat-grid-item"><div class="ad-stat-value ad-stat-value--success">{{ linked_count }}</div><div class="ad-stat-label">{% translate "Linked" %}</div></div>
+    <div class="ad-stat-grid-item"><div class="ad-stat-value ad-stat-value--danger">{{ unlinked_count }}</div><div class="ad-stat-label">{% translate "Not linked" %}</div></div>
+    <div class="ad-stat-grid-item"><div class="ad-stat-value ad-stat-value--gold">{{ mismatch_count }}</div><div class="ad-stat-label">{% translate "Phone mismatch" %}</div></div>
+  </div>
+
+  <section class="ad-card">
+    <div class="ad-card-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <strong>{% translate "Telegram link status by account" %}</strong>
+      <span class="ad-pill ad-pill--muted">{% blocktranslate with count=page_obj.paginator.count %}{{ count }} Accounts shown{% endblocktranslate %}</span>
+    </div>
+    <div class="ad-table-wrap">
+      <table class="ad-table">
+        <caption class="visually-hidden">{% translate "Telegram link status by account" %}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Account" %}</th>
+            <th scope="col">{% translate "Role" %}</th>
+            <th scope="col">{% translate "Website phone" %}</th>
+            <th scope="col">{% translate "Telegram status" %}</th>
+            <th scope="col">{% translate "Telegram phone" %}</th>
+            <th scope="col">{% translate "Phone match" %}</th>
+            <th scope="col">{% translate "Linked at" %}</th>
+            <th scope="col" class="column-actions">{% translate "Actions" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <span class="cell-content">{{ row.user.get_full_name|default:row.user.username }}</span>
+              <span class="ps-muted-text d-block">{{ row.user.username }}</span>
+            </td>
+            <td>{{ row.role_name|default:"—" }}</td>
+            <td dir="ltr">{{ row.user.phone|default:"—" }}</td>
+            <td>
+              {% if row.is_linked %}
+              <span class="ad-pill ad-pill--success"><i class="fas fa-link" aria-hidden="true"></i> {% translate "Linked" %}</span>
+              {% else %}
+              <span class="ad-pill ad-pill--muted">{% translate "Not linked" %}</span>
+              {% endif %}
+            </td>
+            <td dir="ltr">
+              {% if row.is_linked %}
+                {% if row.telegram_phone %}{{ row.telegram_phone }}{% else %}<span class="ps-muted-text">{% translate "Not shared" %}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if row.match_label %}
+              <span class="ad-pill ad-pill--{{ row.match_tone }}">{{ row.match_label }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>{% if row.account %}{{ row.account.linked_at|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+            <td class="column-actions">
+              {% if row.is_linked %}
+              <form method="post"
+                    action="{% url 'telegram-account-unlink' row.user.pk %}"
+                    hx-post="{% url 'telegram-account-unlink' row.user.pk %}"
+                    hx-target="#content"
+                    hx-select="#content"
+                    hx-swap="outerHTML"
+                    hx-select-oob="#toast-stack"
+                    hx-push-url="true"
+                    class="ps-inline-form"
+                    data-confirm-message="{% translate 'Unlink this Telegram account?' %}">
+                {% csrf_token %}
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status" value="{{ status }}">
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
+                  <i class="fas fa-unlink me-1" aria-hidden="true"></i>{% translate "Unlink Telegram" %}
+                </button>
+              </form>
+              {% else %}<span class="ps-muted-text">—</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="ad-empty">{% translate "No accounts match the selected filters." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% translate "Telegram accounts pagination" as pagination_aria_label %}
+  {% translate "accounts" as telegram_accounts_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label item_label=telegram_accounts_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#telegram-accounts-loading" %}
+</div>
