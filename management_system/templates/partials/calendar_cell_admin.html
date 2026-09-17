@@ -4,6 +4,8 @@
 {# day.meeting_offering_groups groups the day's offerings by level: a level can #}
 {# hold at most one meeting per date, so the picker renders one select per level. #}
 {# State classes: is-out / is-holiday / is-meeting / has-meeting / is-today. #}
+{# Phone contract: data-cal-day/data-cal-label feed the shared day sheet; #}
+{# .cal-day-dots is the phone-only summary of the hidden in-cell rows. #}
 {# Frozen contracts: data-date/data-year, data-offerings-template, #addMeetingModal, #addHolidayModal. #}
 <div class="ad-calmg-cell
   {% if day.outside_month %} is-out{% endif %}
@@ -11,10 +13,15 @@
   {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
   {% if day.in_year and day.meetings and not day.outside_month %} has-meeting{% endif %}
   {% if day.is_today %} is-today{% endif %}
-">
+"{% if day.in_year and not day.outside_month %} data-cal-day="{{ day.date }}" data-cal-label="{{ day.date_label }}"{% endif %}>
   {% if day.in_year and not day.outside_month %}
   <div class="ad-calendar-cell-content">
   <div class="ad-calendar-day-number">{{ day.day }}</div>
+  <div class="cal-day-dots" aria-hidden="true">
+    {% for meeting in day.meetings|slice:":3" %}<span class="cal-dot"></span>{% endfor %}
+    {% if day.is_holiday %}<span class="cal-dot is-holiday"></span>{% endif %}
+    {% if day.meetings|length > 3 %}<span class="cal-dot-more">+{{ day.meetings|length|add:"-3" }}</span>{% endif %}
+  </div>
    {% if day.is_holiday %}
       <div class="ad-calendar-holiday">
         <small>{{ day.holiday_name }}</small>

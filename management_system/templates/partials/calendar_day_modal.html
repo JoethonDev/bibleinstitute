@@ -1,0 +1,15 @@
+{% load i18n %}
+{# Canonical phone day sheet shared by the admin and student calendars. #}
+{# calendar_day_sheet.js clones the tapped day's server-rendered cell content #}
+{# into #calendar-day-body, so all meeting/holiday actions stay server-owned. #}
+<div class="modal fade cal-day-modal" id="calendar-day-modal" tabindex="-1" aria-labelledby="calendar-day-label" aria-hidden="true">
+  <div class="modal-dialog cal-day-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" id="calendar-day-label"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+      </div>
+      <div class="modal-body" id="calendar-day-body"></div>
+    </div>
+  </div>
+</div>

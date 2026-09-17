@@ -13,6 +13,8 @@ import os
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
+from management_system.utils.r2_filters import file_kind
+
 
 class R2Manager:
     """Comprehensive R2 storage management"""
@@ -365,6 +367,7 @@ class R2Manager:
             'total_files': 0,
             'total_size': 0,
             'by_extension': {},
+            'by_kind': {},
             'largest_files': [],
             'approximate': False,
         }
@@ -374,7 +377,7 @@ class R2Manager:
         if usage:
             stats['total_files'] = int(usage.get('objectCount', 0))
             stats['total_size'] = int(usage.get('payloadSize', 0))
-            # Still sample one page via boto3 for extension breakdown
+            # Still sample one page via boto3 for extension/kind breakdown
             try:
                 sample = self.client.list_objects_v2(
                     Bucket=self.bucket_name, MaxKeys=1000
@@ -390,55 +393,16 @@ class R2Manager:
                                 stats['by_extension'][ext] = {'count': 0, 'size': 0}
                             stats['by_extension'][ext]['count'] += 1
                             stats['by_extension'][ext]['size'] += obj.get('Size', 0)
+                        kind = file_kind(key)
+                        if kind not in stats['by_kind']:
+                            stats['by_kind'][kind] = {'count': 0, 'size': 0}
+                        stats['by_kind'][kind]['count'] += 1
+                        stats['by_kind'][kind]['size'] += obj.get('Size', 0)
             except Exception:
                 pass
         
         
         return stats
-    
-    def search_files_page(
-        self,
-        query: str,
-        prefix: str = "",
-        extensions: List[str] = None,
-        continuation_token: Optional[str] = None,
-        page_size: int = 200,
-    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-        """Search one bounded provider page and return its continuation token."""
-        results = []
-        query_lower = query.casefold()
-        params = {
-            "Bucket": self.bucket_name,
-            "Prefix": prefix,
-            "MaxKeys": max(1, min(int(page_size), 200)),
-        }
-        if continuation_token:
-            params["ContinuationToken"] = continuation_token
-
-        response = self.client.list_objects_v2(**params)
-        for obj in response.get("Contents", []):
-            key = obj["Key"]
-            filename = key.rsplit("/", 1)[-1]
-            if key.endswith("/") or query_lower not in filename.casefold():
-                continue
-            if extensions and not any(
-                key.casefold().endswith(f".{extension.casefold()}")
-                for extension in extensions
-            ):
-                continue
-            results.append({
-                "key": key,
-                "name": filename,
-                "size": obj.get("Size", 0),
-                "last_modified": obj.get("LastModified"),
-            })
-        next_token = response.get("NextContinuationToken") if response.get("IsTruncated") else None
-        return results, next_token
-
-    def search_files(self, query: str, prefix: str = "", extensions: List[str] = None) -> List[Dict[str, Any]]:
-        """Return only the first bounded search page for legacy callers."""
-        results, _next_token = self.search_files_page(query, prefix, extensions)
-        return results
     
     def format_file_size(self, bytes_size: int) -> str:
         """

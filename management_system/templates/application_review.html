@@ -109,6 +109,12 @@
                             <th>{{ document.label }}</th>
                             <td>
                                 {% if document.is_image %}<img src="{{ document.url }}" alt="{{ document.label }}" style="max-width: 180px; max-height: 120px; object-fit: contain;" class="d-block mb-2 rounded border">{% endif %}
+                                {% if document.is_pdf %}
+                                <details class="ad-doc-preview mb-2">
+                                  <summary>{% translate "Preview" %}</summary>
+                                  <iframe src="{{ document.url }}" title="{{ document.label }}" loading="lazy"></iframe>
+                                </details>
+                                {% endif %}
                                 <a href="{{ document.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
                                 <a href="{{ document.download_url }}" class="ms-2">{% translate "Download" %}</a>
                             </td>

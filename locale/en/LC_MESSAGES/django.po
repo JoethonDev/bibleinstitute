@@ -10097,6 +10097,15 @@ msgstr "accounts"
 msgid "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
 msgstr "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
 
+msgid "Media"
+msgstr "Media"
+
+msgid "Image"
+msgstr "Image"
+
+msgid "All files"
+msgstr "All files"
+
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."

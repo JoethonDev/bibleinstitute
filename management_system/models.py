@@ -384,13 +384,11 @@ class TelegramNotificationDelivery(models.Model):
                 condition=(
                     models.Q(
                         notification_type="lesson_published",
-                        lesson__isnull=False,
                         quiz__isnull=True,
                     )
                     | models.Q(
                         notification_type="quiz_opening",
                         lesson__isnull=True,
-                        quiz__isnull=False,
                     )
                 ),
                 name="telegram_delivery_source_matches_type",

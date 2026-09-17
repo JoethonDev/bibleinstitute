@@ -280,6 +280,15 @@ MEDIA_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_SOURCE_RETENTION_HOURS", "24
 MEDIA_FAILED_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_FAILED_SOURCE_RETENTION_HOURS", "72"))
 MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS = int(os.getenv("MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS", "90"))
 MEDIA_WORKER_CONCURRENCY = int(os.getenv("MEDIA_WORKER_CONCURRENCY", "1"))
+# Encoding profile for the always-compressed HLS outputs. Video is re-encoded
+# with H.264 High profile at this CRF (lower = higher quality and larger files;
+# 23 is the x264 default and visually close to the source), using this x264
+# preset (slower presets compress more at the cost of processing time), and
+# audio is re-encoded to AAC/MP3 at this bitrate. The video HLS carries the
+# muxed audio track, and the extracted audio HLS/MP3 are produced separately.
+MEDIA_VIDEO_CRF = int(os.getenv("MEDIA_VIDEO_CRF", "23"))
+MEDIA_VIDEO_PRESET = os.getenv("MEDIA_VIDEO_PRESET", "fast")
+MEDIA_AUDIO_BITRATE = os.getenv("MEDIA_AUDIO_BITRATE", "128k")
 
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
 # Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by

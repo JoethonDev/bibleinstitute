@@ -14,6 +14,8 @@ function r2Manager() {
     return {
         currentFilter: '',
         searchQuery: '',
+        searchPending: false,
+        searchQueued: false,
         selectedFiles: [],
         newFolderName: '',
         renameFileKey: '',
@@ -68,16 +70,35 @@ function r2Manager() {
         },
         
         /**
-         * Search files — HTMX partial swap, no full page reload
+         * Search files — HTMX partial swap, no full page reload.
+         * A search can scan several provider pages server-side, so requests are
+         * serialized: while one search runs, only the latest query is queued
+         * and issued after it settles.
          */
         searchFiles() {
+            if (this.searchPending) {
+                this.searchQueued = true;
+                return;
+            }
             const url = new URL(window.location.href);
             if (this.searchQuery.trim()) {
                 url.searchParams.set('search', this.searchQuery);
             } else {
                 url.searchParams.delete('search');
             }
-            htmx.ajax('GET', url.toString(), { target: '#file-list-container', push: url.pathname + url.search });
+            if (!window.htmx) {
+                window.location.href = url.toString();
+                return;
+            }
+            this.searchPending = true;
+            const request = htmx.ajax('GET', url.toString(), { target: '#file-list-container', push: url.pathname + url.search });
+            Promise.resolve(request).catch(() => {}).finally(() => {
+                this.searchPending = false;
+                if (this.searchQueued) {
+                    this.searchQueued = false;
+                    this.searchFiles();
+                }
+            });
         },
         
         /**
@@ -421,8 +442,8 @@ function r2Manager() {
             
             if (totalFilesEl) totalFilesEl.textContent = stats.total_files || 0;
             if (totalStorageEl) totalStorageEl.textContent = stats.total_size_formatted || '0 B';
-            if (videoFilesEl) videoFilesEl.textContent = stats.by_extension?.mp4?.count || 0;
-            if (pdfFilesEl) pdfFilesEl.textContent = stats.by_extension?.pdf?.count || 0;
+            if (videoFilesEl) videoFilesEl.textContent = stats.by_kind?.video?.count || 0;
+            if (pdfFilesEl) pdfFilesEl.textContent = stats.by_kind?.document?.count || stats.by_extension?.pdf?.count || 0;
             
             // Toggle approximate badges
             const show = stats.approximate ? 'block' : 'none';

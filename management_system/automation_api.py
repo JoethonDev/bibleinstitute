@@ -1,4 +1,8 @@
-"""Small X-Key API for driving the existing one-file media pipeline."""
+"""Small X-Key API for driving the existing media pipeline.
+
+One create call owns one draft lecture and one media job per source file, so a
+lecture may be uploaded as one or two video parts through the same flow.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +29,7 @@ from .media_processing import (
     MediaProcessingPhase,
     MediaProcessingStatus,
     MediaProcessingError,
+    automation_part_id,
     claim_attachment_retry,
     is_automation_job,
     is_retryable_failed_job,
@@ -61,6 +66,7 @@ from .utils.decorators import can_manage_content
 
 MAX_JSON_BYTES = 64 * 1024
 MAX_TEXT_LENGTH = 255
+MAX_LECTURE_FILES = 2
 NEXT_POLL = "poll"
 NEXT_RETRY = "retry"
 NEXT_RETRY_ATTACHMENT = "retry_attachment"
@@ -294,12 +300,21 @@ def _safe_storage_error(exc: MediaStorageError, *, start: bool = False) -> Autom
     return AutomationApiError("operator_review" if start else "processing_failed", 409)
 
 
-def _live_progress(public_id: uuid.UUID) -> dict[str, str]:
+def _live_progress_client():
     try:
-        client = redis.Redis.from_url(
+        return redis.Redis.from_url(
             getattr(settings, "CELERY_BROKER_URL", "redis://redis:6379/0"),
             decode_responses=True,
         )
+    except Exception:
+        return None
+
+
+def _live_progress(public_id: uuid.UUID, client=None) -> dict[str, str]:
+    try:
+        client = client or _live_progress_client()
+        if client is None:
+            return {}
         return client.hgetall(f"media:job:{public_id}")
     except Exception:
         return {}
@@ -400,14 +415,66 @@ def _automation_job(job_id: uuid.UUID) -> MediaProcessingJob:
     return job
 
 
-def _lesson_job(lesson_id: int) -> tuple[Lesson, MediaProcessingJob]:
+def _lesson_jobs(lesson_id: int) -> tuple[Lesson, list[MediaProcessingJob]]:
     lesson = Lesson.objects.select_related("course_offering").filter(pk=lesson_id).first()
     if lesson is None:
         raise AutomationApiError(NEXT_OPERATOR, 404)
-    jobs = list(MediaProcessingJob.objects.filter(lesson_id=lesson.pk).order_by("pk")[:2])
-    if len(jobs) != 1 or not is_automation_job(jobs[0]):
+    jobs = list(MediaProcessingJob.objects.filter(lesson_id=lesson.pk).order_by("part_id", "pk"))
+    if not jobs or not all(is_automation_job(job) for job in jobs):
         raise AutomationApiError(NEXT_OPERATOR, 409)
-    return lesson, jobs[0]
+    return lesson, jobs
+
+
+def _lesson_status_contract(lesson: Lesson, jobs: list[MediaProcessingJob]) -> dict[str, Any]:
+    """Aggregate one lecture's per-file status plus a lesson-level action.
+
+    The client deletes each local source only when that file reports
+    ``delete_local_source``; the top-level action is safe to delete only when
+    every file of the lecture is published.
+    """
+    entries = []
+    live_client = _live_progress_client()
+    for job in jobs:
+        entries.append({
+            "job_id": str(job.public_id),
+            "filename": job.original_filename,
+            **_status_contract(lesson, job, _live_progress(job.public_id, live_client)),
+        })
+    actions = [entry["next_action"] for entry in entries]
+    if NEXT_OPERATOR in actions:
+        action = NEXT_OPERATOR
+    elif NEXT_RETRY_ATTACHMENT in actions:
+        action = NEXT_RETRY_ATTACHMENT
+    elif NEXT_RETRY in actions:
+        action = NEXT_RETRY
+    elif all(item == NEXT_DELETE for item in actions):
+        action = NEXT_DELETE
+    elif lesson.status == PublicationStatus.DRAFT and all(
+        item in {NEXT_PUBLISH, NEXT_DELETE} for item in actions
+    ):
+        action = NEXT_PUBLISH
+    else:
+        action = NEXT_POLL
+    if action in {NEXT_OPERATOR, NEXT_RETRY, NEXT_RETRY_ATTACHMENT}:
+        representative = next(entry for entry in entries if entry["next_action"] == action)
+    else:
+        representative = min(entries, key=lambda entry: entry["progress"])
+    if action == NEXT_PUBLISH:
+        status, phase, progress = "publish_failed", "publication", 100
+    elif action == NEXT_DELETE:
+        status, phase, progress = "published", MediaProcessingPhase.COMPLETE, 100
+    else:
+        status = representative["status"]
+        phase = representative["phase"]
+        progress = min(entry["progress"] for entry in entries)
+    return {
+        "status": status,
+        "phase": phase,
+        "progress": progress,
+        "next_action": action,
+        "safe_to_delete_local": action == NEXT_DELETE,
+        "jobs": entries,
+    }
 
 
 @automation_endpoint("GET")
@@ -424,22 +491,50 @@ def lecture_upload(request):
     try:
         payload = _parse_json(request)
         if set(payload) - {
-            "date", "course", "academic_year", "level", "lecture_name",
-            "filename", "size",
+            "date", "course", "academic_year", "level", "lecture_name", "files",
         }:
             raise AutomationApiError("invalid_lecture", 400)
+        files = payload.get("files")
+        if not isinstance(files, list) or not 1 <= len(files) <= MAX_LECTURE_FILES:
+            raise AutomationApiError("invalid_lecture", 400)
+        descriptors = []
+        seen_filenames = set()
+        seen_output_names = set()
+        for item in files:
+            if not isinstance(item, dict) or set(item) != {"filename", "size"}:
+                raise AutomationApiError("invalid_lecture", 400)
+            filename, source_kind, source_size = validate_source_descriptor(item.get("filename"), item.get("size"))
+            output_name = safe_output_base_name(filename)
+            if filename.lower() in seen_filenames or output_name in seen_output_names:
+                # Two sources must never produce the same destination basename.
+                raise AutomationApiError("invalid_lecture", 400)
+            seen_filenames.add(filename.lower())
+            seen_output_names.add(output_name)
+            descriptors.append((filename, source_kind, source_size, output_name))
         meeting = _resolve_event(payload)
         lecture_name = _text(payload, "lecture_name")
-        filename, source_kind, source_size = validate_source_descriptor(payload.get("filename"), payload.get("size"))
-        public_id = uuid.uuid4()
-        source_key = build_staging_key(str(public_id), filename)
         folder = _canonical_folder(meeting)
         user = _automation_user()
-        authorization = create_staging_upload_url(
-            source_key,
-            content_type=content_type_for_key(filename),
-            expires_in=3600,
-        )
+        lesson_token = uuid.uuid4().hex[:12]
+        prepared = []
+        for filename, source_kind, source_size, output_name in descriptors:
+            public_id = uuid.uuid4()
+            source_key = build_staging_key(str(public_id), filename)
+            authorization = create_staging_upload_url(
+                source_key,
+                content_type=content_type_for_key(filename),
+                expires_in=3600,
+            )
+            prepared.append({
+                "public_id": public_id,
+                "filename": filename,
+                "source_kind": source_kind,
+                "source_size": source_size,
+                "output_name": output_name,
+                "source_key": source_key,
+                "upload_url": authorization["url"],
+                "content_type": authorization["headers"]["Content-Type"],
+            })
         with transaction.atomic():
             lesson = Lesson.objects.create(
                 name=lecture_name,
@@ -448,30 +543,39 @@ def lecture_upload(request):
                 course_offering=meeting.course_offering,
                 status=PublicationStatus.DRAFT,
             )
-            job = MediaProcessingJob.objects.create(
-                public_id=public_id,
-                created_by=user,
-                requested_folder=folder,
-                original_filename=filename,
-                output_base_name=safe_output_base_name(filename),
-                source_kind=source_kind,
-                source_key=source_key,
-                source_size=source_size,
-                lesson=lesson,
-                # Existing part_id is the durable per-lesson media identity;
-                # this namespace also lets the worker distinguish the new
-                # automation-owned draft from the browser's existing-lesson
-                # upload flow without a schema change.
-                part_id=f"automation-{uuid.uuid4().hex[:32]}",
-                attachment_status=MediaAttachmentStatus.PENDING,
-                upload_ack_deadline_at=timezone.now() + dt.timedelta(minutes=30),
-                staging_expires_at=timezone.now() + dt.timedelta(hours=24),
-            )
+            jobs = []
+            for position, item in enumerate(prepared, start=1):
+                jobs.append(MediaProcessingJob.objects.create(
+                    public_id=item["public_id"],
+                    created_by=user,
+                    requested_folder=folder,
+                    original_filename=item["filename"],
+                    output_base_name=item["output_name"],
+                    source_kind=item["source_kind"],
+                    source_key=item["source_key"],
+                    source_size=item["source_size"],
+                    lesson=lesson,
+                    # Existing part_id is the durable per-lesson media identity;
+                    # this namespace also lets the worker distinguish the new
+                    # automation-owned draft from the browser's existing-lesson
+                    # upload flow without a schema change. The zero-padded
+                    # position keeps the uploaded file order stable.
+                    part_id=automation_part_id(lesson_token, position),
+                    attachment_status=MediaAttachmentStatus.PENDING,
+                    upload_ack_deadline_at=timezone.now() + dt.timedelta(minutes=30),
+                    staging_expires_at=timezone.now() + dt.timedelta(hours=24),
+                ))
         return JsonResponse({
             "lesson_id": lesson.pk,
-            "job_id": str(job.public_id),
-            "upload_url": authorization["url"],
-            "content_type": authorization["headers"]["Content-Type"],
+            "jobs": [
+                {
+                    "job_id": str(job.public_id),
+                    "filename": job.original_filename,
+                    "upload_url": prepared[index]["upload_url"],
+                    "content_type": prepared[index]["content_type"],
+                }
+                for index, job in enumerate(jobs)
+            ],
         }, status=201)
     except AutomationApiError as exc:
         return _error(exc.error_code, exc.status)
@@ -562,8 +666,8 @@ def media_upload_refresh(request, job_id: uuid.UUID):
 @automation_endpoint("GET")
 def lecture_status(request, lesson_id: int):
     try:
-        lesson, job = _lesson_job(lesson_id)
-        return JsonResponse(_status_contract(lesson, job, _live_progress(job.public_id)))
+        lesson, jobs = _lesson_jobs(lesson_id)
+        return JsonResponse(_lesson_status_contract(lesson, jobs))
     except AutomationApiError as exc:
         return _error(exc.error_code, exc.status)
 
@@ -611,8 +715,8 @@ def lecture_publish(request, lesson_id: int):
         payload = _parse_json(request, allow_empty=True)
         if payload:
             raise AutomationApiError("invalid_lecture", 400)
-        lesson, job = _lesson_job(lesson_id)
-        current = _status_contract(lesson, job)
+        lesson, jobs = _lesson_jobs(lesson_id)
+        current = _lesson_status_contract(lesson, jobs)
         if current["status"] == "published" and current["safe_to_delete_local"]:
             return JsonResponse(
                 {
@@ -623,8 +727,14 @@ def lecture_publish(request, lesson_id: int):
             )
         if current["next_action"] != NEXT_PUBLISH:
             raise AutomationApiError("media_not_ready", 409)
+        publisher = next(
+            (job for job in jobs if job.error_code in PUBLICATION_ERROR_CODES),
+            None,
+        )
+        if publisher is None:
+            raise AutomationApiError("media_not_ready", 409)
         try:
-            publish_automation_lesson(job.pk)
+            publish_automation_lesson(publisher.pk)
         except MediaProcessingError as exc:
             raise AutomationApiError("media_not_ready", 409) from exc
         except Exception as exc:

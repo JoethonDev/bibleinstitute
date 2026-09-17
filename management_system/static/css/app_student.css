@@ -1256,18 +1256,21 @@ main:has(.sd-page) {
     .sd-day-holiday,
     .sd-day-meeting { font-size: .6rem; }
     /* Narrow phone cells: clamp the meeting/holiday text to two wrapped lines
-       instead of a single clipped line. */
-    .sd-day-meeting,
-    .sd-day-holiday {
+       instead of a single clipped line. Scoped to the grid cell so the cloned
+       day-sheet content stays readable. */
+    .sd-day .sd-day-meeting,
+    .sd-day .sd-day-holiday {
         white-space: normal;
         overflow-wrap: break-word;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
     }
-    .sd-day-meeting {
+    .sd-day .sd-day-meeting {
         padding: .1rem .2rem;
     }
+    .sd-calendar-page .sd-day .sd-day-holiday,
+    .sd-calendar-page .sd-day .sd-day-meeting { display: none; }
 }
 
 .sd-legend {

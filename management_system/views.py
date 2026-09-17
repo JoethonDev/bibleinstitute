@@ -62,7 +62,7 @@ from .grade_matrix import (
     grade_matrix_workbook,
 )
 from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
-from .utils.r2_filters import R2FileFilter, FileFilterConfig, get_filter_preset, FILTER_PRESETS
+from .utils.r2_filters import FileFilterConfig, filter_preset_choices, get_filter_preset
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
 from .utils.file_validator import (
@@ -71,7 +71,7 @@ from .utils.file_validator import (
     validate_hls_object_key,
     FileValidator,
 )
-from .utils.storage_operations import list_current_folder, list_current_folder_page, download_from_bucket, generate_unique_url, get_r2_client
+from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, download_from_bucket, generate_unique_url, get_r2_client
 from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
@@ -3909,6 +3909,10 @@ def api_get_storage_stats(request):
         # Format extension stats
         for ext, data in stats['by_extension'].items():
             data['size_formatted'] = R2_MANAGER.format_file_size(data['size'])
+
+        # Format kind stats (canonical video/audio/image/document groups)
+        for kind, data in stats.get('by_kind', {}).items():
+            data['size_formatted'] = R2_MANAGER.format_file_size(data['size'])
         
         # Format largest files
         for file_data in stats['largest_files']:
@@ -3925,7 +3929,7 @@ def api_get_storage_stats(request):
 @capability_required(can_manage_content)
 def api_search_files(request):
     """
-    API endpoint to search for files
+    API endpoint to search for files (recursive under the given prefix)
     """
     query = request.GET.get('q', '')
     prefix = request.GET.get('prefix', '')
@@ -3936,14 +3940,22 @@ def api_search_files(request):
         return JsonResponse({'error': _('Search query required')}, status=400)
     
     try:
-        ext_list = [e.strip() for e in extensions.split(',') if e.strip()] if extensions else None
-        
-        results, next_token = R2_MANAGER.search_files_page(
-            query,
+        filter_config = None
+        if extensions:
+            ext_list = [e.strip() for e in extensions.split(',') if e.strip()]
+            filter_config = FileFilterConfig(
+                allowed_extensions=set(ext_list),
+                exclude_extensions={'ts'},
+                include_folders=True,
+            )
+
+        results, next_token = search_files_page(
+            CLOUD_CLIENT,
+            bucket_name,
             prefix,
-            ext_list,
+            query,
+            filter_config,
             continuation_token=continuation_token,
-            page_size=200,
         )
         
         # Format sizes and dates
@@ -4123,7 +4135,7 @@ def r2_management_dashboard(request):
         'is_root': not folder_id or folder_id == "None",
         'current_filter': filter_preset,
         'search_query': search_query,
-        'filter_presets': list(FILTER_PRESETS.keys()),
+        'filter_presets': filter_preset_choices(),
         'storage_stats': stats,
         'total_size_formatted': R2_MANAGER.format_file_size(stats.get('total_size', 0)) if isinstance(stats.get('total_size'), int) else '...',
         'load_stats': load_stats,
@@ -4367,6 +4379,7 @@ def application_review(request, user_id):
                 "url": reverse("application-document", args=[user.pk, document_type]),
                 "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 "is_image": content_type.startswith("image/"),
+                "is_pdf": content_type == "application/pdf" or key.lower().endswith(".pdf"),
             })
     context = {
         "app_user": user,
@@ -5248,6 +5261,7 @@ def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
             week_data.append({
                 "day": d.day,
                 "date": d.isoformat(),
+                "date_label": formats.date_format(d, "l, j F"),
                 "in_year": in_year,
                 "is_meeting": is_meeting,
                 "is_today": d == today,
@@ -5261,6 +5275,22 @@ def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
             })
         month_grid.append(week_data)
     return month_grid
+
+
+def _build_month_agenda(month_grid):
+    """In-year, in-month days that carry a meeting or holiday, in date order.
+
+    Shared by the admin and student phone agendas; each entry is the canonical
+    month-grid day dict so the agenda and the grid always agree.
+    """
+    if not month_grid:
+        return []
+    return [
+        day
+        for week in month_grid
+        for day in week
+        if day["in_year"] and not day["outside_month"] and (day["meetings"] or day["is_holiday"])
+    ]
 
 
 def _resolve_calendar_month(year, request):
@@ -5446,6 +5476,7 @@ def calendar_management(request):
         ]),
         "weekday_names": _calendar_weekday_abbreviations(),
         "month_grid": month_grid,
+        "month_agenda": _build_month_agenda(month_grid),
         "month_options": month_options,
         "prev_month": prev_month,
         "next_month": next_month,
@@ -5733,6 +5764,7 @@ def student_calendar(request):
         "scope_options": scope_options,
         "weekday_names": _calendar_weekday_abbreviations(),
         "month_grid": month_grid,
+        "month_agenda": _build_month_agenda(month_grid),
         "month_options": month_options,
         "prev_month": prev_month,
         "next_month": next_month,

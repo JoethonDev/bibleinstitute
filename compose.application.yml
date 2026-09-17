@@ -108,7 +108,9 @@ services:
   # not attach the shared lms_static_data volume. The environment block below
   # repeats x-app-base because a service-level `environment` key replaces the
   # anchored mapping in Compose YAML merge semantics; values are identical to
-  # the anchor plus the MEDIA_* settings.
+  # the anchor plus the MEDIA_* settings. The worker now always re-encodes the
+  # HLS video (CRF quality target), so it is CPU-bound and needs a real CPU
+  # allowance; the quota only applies while FFmpeg runs.
   media-worker:
     <<: *app-base
     command:
@@ -144,10 +146,13 @@ services:
       MEDIA_FAILED_SOURCE_RETENTION_HOURS: ${MEDIA_FAILED_SOURCE_RETENTION_HOURS:-72}
       MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS: ${MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS:-90}
       MEDIA_WORKER_CONCURRENCY: ${MEDIA_WORKER_CONCURRENCY:-1}
+      MEDIA_VIDEO_CRF: ${MEDIA_VIDEO_CRF:-23}
+      MEDIA_VIDEO_PRESET: ${MEDIA_VIDEO_PRESET:-fast}
+      MEDIA_AUDIO_BITRATE: ${MEDIA_AUDIO_BITRATE:-128k}
     volumes:
       - media_processing_data:${MEDIA_WORK_DIR:-/var/lib/lms-media-processing}
-    cpus: 0.25
-    mem_limit: 1G
+    cpus: 2.0
+    mem_limit: 2G
 
   # ── Celery beat (bounded media recovery schedule) ──────────────
   celery-beat:

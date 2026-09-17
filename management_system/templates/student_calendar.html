@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block head_meta %}
 <title>{% translate "My Calendar" %}</title>
@@ -71,6 +71,7 @@
           </div>
         </div>
         {% include "partials/calendar_month_grid.html" with cell_variant="student" %}
+        {% include "partials/calendar_month_agenda.html" %}
         <div class="sd-legend">
           <span><i class="lg-meet"></i> {% translate "Meeting day" %}</span>
           <span><i class="lg-scheduled"></i> {% translate "Scheduled meeting" %}</span>
@@ -117,6 +118,9 @@
   {% empty %}
     <p class="ps-muted-text">{% translate "No academic calendar available." %}</p>
   {% endfor %}
+
+  {% include "partials/calendar_day_modal.html" %}
+  <script src="{% static 'js/calendar_day_sheet.js' %}?v={{ static_asset_version }}"></script>
 </div>
 </div>
 {% endblock %}

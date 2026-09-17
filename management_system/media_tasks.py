@@ -17,6 +17,7 @@ from .media_processing import (
     MediaProcessingPhase,
     MediaProcessingStatus,
     _attach_outputs,
+    automation_lesson_media_complete,
     claim_attachment_retry,
     claim_queued_job,
     finish_attachment_retry,
@@ -204,7 +205,9 @@ def process_media_job(self, public_id: str):
             attachment_error is None
             and staging_error is None
             and is_automation_job(job)
+            and automation_lesson_media_complete(job.lesson_id, exclude_job_id=job.pk)
         ):
+            # Multi-file lectures publish once, when the last file is ready.
             try:
                 publish_automation_lesson(job.pk)
             except Exception as exc:
@@ -251,7 +254,9 @@ def retry_media_attachment(public_id: str):
             finished.error_code = PUBLICATION_PENDING_ERROR
             finished.error_message = PUBLICATION_PENDING_MESSAGE
         finished.save(update_fields=["staging_deleted_at", "error_code", "error_message"])
-    if is_automation_job(finished):
+    if is_automation_job(finished) and automation_lesson_media_complete(
+        finished.lesson_id, exclude_job_id=finished.pk
+    ):
         try:
             publish_automation_lesson(finished.pk)
         except Exception as exc:

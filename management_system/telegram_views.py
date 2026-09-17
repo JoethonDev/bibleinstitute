@@ -25,6 +25,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .models import (
     AcademicYear,
+    Enrollment,
+    Level,
     TelegramAttachment,
     TelegramAccount,
     TelegramBotConfig,
@@ -918,23 +920,58 @@ def telegram_broadcast_retry(request, broadcast_id):
 
 TELEGRAM_ACCOUNTS_PAGE_SIZE = 25
 TELEGRAM_ACCOUNT_STATUS_VALUES = frozenset({"all", "linked", "unlinked", "mismatch"})
+TELEGRAM_ACCOUNT_LEVEL_ALL = "all"
 
 
 def _telegram_account_clip(value: str, limit: int = 120) -> str:
     return value.strip()[:limit]
 
 
-def telegram_accounts_queryset(search: str = ""):
-    """Eligible LMS accounts with their Telegram link state joined in."""
+def _telegram_account_level_id(value: str) -> int | None:
+    """Return a positive Level primary key, or None for the unfiltered value."""
+    try:
+        level_id = int(value)
+    except (TypeError, ValueError):
+        return None
+    if level_id < 1 or not Level.objects.filter(pk=level_id).exists():
+        return None
+    return level_id
+
+
+def telegram_accounts_queryset(search: str = "", level_id: int | None = None):
+    """Eligible LMS accounts with their Telegram link state and current level.
+
+    The current level is the level of the student's active normal enrollment in
+    the active academic year. Accounts without one (cadre or no active-year
+    enrollment) carry no level and only appear under "All levels".
+    """
+    active_year_id = (
+        AcademicYear.objects.filter(is_active=True)
+        .values_list("pk", flat=True)
+        .first()
+    )
+    current_level = Subquery(
+        Enrollment.objects.filter(
+            student=OuterRef("pk"),
+            enrollment_type=Enrollment.Type.NORMAL,
+            status=Enrollment.Status.ACTIVE,
+            academic_year_level__academic_year_id=active_year_id,
+        )
+        .order_by("-pk")
+        .values("academic_year_level__level_id")[:1]
+    )
     users = (
         User.objects.filter(
             is_active=True,
             application_status="active",
             role__role__in=TELEGRAM_LINKABLE_ROLES,
         )
+        .annotate(current_level_id=current_level)
         .select_related("role", "telegram_account")
         .order_by("first_name", "last_name", "username", "pk")
     )
+    if level_id is not None:
+        users = users.filter(current_level_id=level_id)
     if search:
         query = normalized_contains_q(
             ("username", "first_name", "last_name", "email"),
@@ -948,8 +985,12 @@ def telegram_accounts_queryset(search: str = ""):
     return users
 
 
-def _telegram_account_status_queryset(status: str, search: str = ""):
-    users = telegram_accounts_queryset(search)
+def _telegram_account_status_queryset(
+    status: str,
+    search: str = "",
+    level_id: int | None = None,
+):
+    users = telegram_accounts_queryset(search, level_id)
     if status == "linked":
         return users.filter(telegram_account__is_active=True)
     if status == "unlinked":
@@ -985,6 +1026,8 @@ _TELEGRAM_ACCOUNT_MATCH_LABELS = {
 
 
 def _telegram_account_rows(page_obj):
+    level_ids = {user.current_level_id for user in page_obj if user.current_level_id}
+    level_names = {level.pk: str(level) for level in Level.objects.filter(pk__in=level_ids)}
     rows = []
     for user in page_obj:
         account = getattr(user, "telegram_account", None)
@@ -997,6 +1040,7 @@ def _telegram_account_rows(page_obj):
             "account": account if is_linked else None,
             "is_linked": is_linked,
             "role_name": user.role.get_role_display() if user.role else "",
+            "level_name": level_names.get(user.current_level_id, ""),
             "telegram_phone": linked_phone,
             "match_state": match_state,
             "match_label": label,
@@ -1013,11 +1057,26 @@ def telegram_accounts(request):
     status = request.GET.get("status", "all").strip()
     if status not in TELEGRAM_ACCOUNT_STATUS_VALUES:
         status = "all"
-    scoped = telegram_accounts_queryset(search)
+    level_id = _telegram_account_level_id(request.GET.get("level", TELEGRAM_ACCOUNT_LEVEL_ALL).strip())
+    level = str(level_id) if level_id is not None else TELEGRAM_ACCOUNT_LEVEL_ALL
+    scoped = telegram_accounts_queryset(search, level_id)
     page_obj = Paginator(
-        _telegram_account_status_queryset(status, search),
+        _telegram_account_status_queryset(status, search, level_id),
         TELEGRAM_ACCOUNTS_PAGE_SIZE,
     ).get_page(request.GET.get("page", 1))
+    # One aggregate for every stat card instead of four separate counts.
+    account_counts = scoped.aggregate(
+        total=Count("pk"),
+        linked=Count("pk", filter=Q(telegram_account__is_active=True)),
+        mismatch=Count(
+            "pk",
+            filter=Q(
+                telegram_account__is_active=True,
+                telegram_account__phone__isnull=False,
+            )
+            & ~Q(telegram_account__phone=F("phone")),
+        ),
+    )
     return render_page(
         request,
         "telegram_accounts.html",
@@ -1029,13 +1088,12 @@ def telegram_accounts(request):
             "pagination_query": pagination_query_string(request),
             "search": search,
             "status": status,
-            "all_count": scoped.count(),
-            "linked_count": scoped.filter(telegram_account__is_active=True).count(),
-            "unlinked_count": scoped.exclude(telegram_account__is_active=True).count(),
-            "mismatch_count": scoped.filter(
-                telegram_account__is_active=True,
-                telegram_account__phone__isnull=False,
-            ).exclude(telegram_account__phone=F("phone")).count(),
+            "level": level,
+            "levels": Level.objects.order_by("ordering"),
+            "all_count": account_counts["total"],
+            "linked_count": account_counts["linked"],
+            "unlinked_count": account_counts["total"] - account_counts["linked"],
+            "mismatch_count": account_counts["mismatch"],
             "breadcrumb_items": generate_breadcrumb([
                 (_("Admin"), reverse("admin-panel")),
                 (_("Telegram Accounts"), None),
@@ -1057,7 +1115,7 @@ def telegram_account_unlink(request, user_id):
     )
     params = {
         key: _telegram_account_clip(request.POST.get(key, ""))
-        for key in ("search", "status", "page")
+        for key in ("search", "status", "level", "page")
         if request.POST.get(key, "").strip()
     }
     url = reverse("telegram-accounts")

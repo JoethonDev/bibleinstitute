@@ -11,9 +11,107 @@ from logging import getLogger
 import boto3
 from django.conf import settings
 
-from management_system.utils.r2_filters import R2FileFilter, FileFilterConfig
+from management_system.utils.r2_filters import R2FileFilter, FileFilterConfig, file_extension, file_kind
 
 logger = getLogger(__name__)
+
+# Search scan budget: the provider has no server-side name filter, so one
+# request may inspect at most this many provider entries before returning the
+# matches found so far (plus a continuation token to keep scanning).
+SEARCH_PROVIDER_PAGE_SIZE = 1000
+SEARCH_SCAN_PAGES = 5
+SEARCH_RESULT_LIMIT = 200
+
+
+def _file_item(key: str, *, prefix: str, size: int, last_modified) -> dict:
+    """Build one canonical file item shared by browse, search, and the API."""
+    rel_path = key[len(prefix):] if prefix else key
+    file_name = key.rsplit("/", 1)[-1]
+    extension = file_extension(file_name)
+    return {
+        "id": key,
+        "name": file_name,
+        "type": "file",
+        "size": size,
+        "last_modified": last_modified,
+        "kind": file_kind(file_name),
+        "extension": extension,
+        "stem": file_name[: -len(extension)] if extension else file_name,
+        "rel_path": rel_path,
+        "is_pdf": extension == ".pdf",
+    }
+
+
+def search_files_page(
+    cloud_client,
+    bucket_name,
+    folder_name="",
+    search_query="",
+    filter_config: Optional[FileFilterConfig] = None,
+    continuation_token: Optional[str] = None,
+    page_size: int = SEARCH_PROVIDER_PAGE_SIZE,
+    max_pages: int = SEARCH_SCAN_PAGES,
+):
+    """Recursively search a bounded provider window under a folder prefix.
+
+    Search is intentionally recursive: a query must be able to find a file
+    inside nested lecture/semester folders, not only direct children. Because
+    the provider has no server-side name filter, the scan continues through
+    provider pages until the first matches appear (or the page budget is
+    reached). Returning early once matches exist keeps the first response fast;
+    the continuation token resumes the scan for "load more".
+
+    When the whole budget is scanned without a single match, no continuation
+    token is returned so the UI cannot chain unbounded provider scans.
+
+    Returns:
+        Tuple of (matching file items, next continuation token)
+    """
+    if folder_name:
+        folder_name = unquote(folder_name)
+    if folder_name and not folder_name.endswith("/"):
+        folder_name += "/"
+
+    provider_page_size = max(1, min(int(page_size), 1000))
+    scan_pages = max(1, min(int(max_pages), 20))
+    query = (search_query or "").casefold()
+    file_filter = R2FileFilter(filter_config) if filter_config else None
+    results = []
+    token = continuation_token
+    for _ in range(scan_pages):
+        params = {
+            "Bucket": bucket_name,
+            "Prefix": folder_name,
+            "MaxKeys": provider_page_size,
+        }
+        if token:
+            params["ContinuationToken"] = token
+        response = cloud_client.list_objects_v2(**params)
+        for obj in response.get("Contents", []):
+            key = obj["Key"]
+            if key.endswith("/"):
+                continue
+            if file_extension(key) == ".ts":
+                # HLS segments are media plumbing, never search results.
+                continue
+            item = _file_item(
+                key,
+                prefix=folder_name,
+                size=obj.get("Size", 0),
+                last_modified=obj.get("LastModified"),
+            )
+            if query and query not in item["rel_path"].casefold():
+                continue
+            if file_filter and not file_filter.should_include_file(item):
+                continue
+            results.append(item)
+            if len(results) >= SEARCH_RESULT_LIMIT:
+                break
+        token = response.get("NextContinuationToken") if response.get("IsTruncated") else None
+        if results or token is None:
+            break
+
+    return results, (token if results else None)
 
 
 def get_r2_client():
@@ -55,14 +153,29 @@ def list_current_folder_page(
         folders_only: If True, only return folders (no files)
         continuation_token: Opaque provider token from the previous page
         page_size: Maximum number of provider entries to inspect
-        search_query: Case-insensitive name filter applied to this page
+        search_query: When set, search recursively under the prefix (see
+            ``search_files_page``) instead of listing one folder level.
     
     Returns:
         Tuple of (contents list, parent_folder path, next continuation token)
     """
     if folder_name:
         folder_name = unquote(folder_name)
-    
+
+    if search_query:
+        results, next_token = search_files_page(
+            cloud_client,
+            bucket_name,
+            folder_name,
+            search_query,
+            filter_config,
+            continuation_token=continuation_token,
+        )
+        parent_folder = None
+        if folder_name and '/' in folder_name.rstrip('/'):
+            parent_folder = folder_name.rstrip('/').rsplit('/', 1)[0]
+        return results, parent_folder, next_token
+
     parent_folder = None
     if folder_name and '/' in folder_name.rstrip('/'):
         parent_folder = folder_name.rstrip('/').rsplit('/', 1)[0]
@@ -91,9 +204,12 @@ def list_current_folder_page(
             file_name = key.split("/")[-1]
             if not rel_path or "/" in rel_path.rstrip("/"):
                 continue
-            file_obj = {"id": key, "name": file_name, "type": "file", "size": obj.get("Size", 0), "last_modified": obj.get("LastModified")}
-            if search_query and search_query.casefold() not in file_name.casefold():
-                continue
+            file_obj = _file_item(
+                key,
+                prefix=folder_name,
+                size=obj.get("Size", 0),
+                last_modified=obj.get("LastModified"),
+            )
             if (file_filter and file_filter.should_include_file(file_obj)) or (not file_filter and not file_name.endswith(".ts")):
                 files.append(file_obj)
 
@@ -101,8 +217,6 @@ def list_current_folder_page(
         prefix = folder["Prefix"]
         folder_id = prefix.rstrip("/")
         name = folder_id.rsplit("/", 1)[-1]
-        if search_query and search_query.casefold() not in name.casefold():
-            continue
         folder_obj = {"id": folder_id, "name": name, "type": "folder"}
         if not file_filter or file_filter.should_include_file(folder_obj):
             folders.append(folder_obj)

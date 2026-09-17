@@ -3,7 +3,7 @@
 <div class="ad-drive-grid">
     {% for item in drive %}
     <div class="col">
-    <div class="ad-drive-item{% if item.type == 'folder' %} is-folder{% elif '_video' in item.name or item.name|slice:'-5:' == '.m3u8' or item.name|slice:'-4:' == '.mp4' %} is-video{% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %} is-audio{% endif %}"
+    <div class="ad-drive-item{% if item.type == 'folder' %} is-folder{% elif item.kind == 'video' %} is-video{% elif item.kind == 'audio' %} is-audio{% endif %}"
          {% if item.type == 'file' %}data-file-key="{{ item.id }}"
          {% else %}data-folder-id="{{ item.id }}"
          {% endif %}
@@ -86,40 +86,36 @@
             </div>
         {% else %}
             <div class="ad-drive-ic w-100">
-                {% if '_video' in item.name or item.name|slice:'-5:' == '.m3u8' or item.name|slice:'-4:' == '.mp4' %}
+                {% if item.kind == 'video' %}
                     <i class="fas fa-file-video fa-2x"></i>
-                {% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %}
+                {% elif item.kind == 'audio' %}
                     <i class="fas fa-file-audio fa-2x"></i>
-                {% elif item.name|slice:'-4:' == '.pdf' %}
-                    <i class="fas fa-file-pdf fa-2x"></i>
+                {% elif item.kind == 'image' %}
+                    <i class="fas fa-file-image fa-2x"></i>
+                {% elif item.kind == 'document' %}
+                    {% if item.is_pdf %}<i class="fas fa-file-pdf fa-2x"></i>{% else %}<i class="fas fa-file-lines fa-2x"></i>{% endif %}
                 {% else %}
                     <i class="fas fa-file-alt fa-2x"></i>
                 {% endif %}
             </div>
 
             <div class="ad-drive-name mt-1 w-100" title="{{ item.name }}">
-            {% if '_video' in item.name or item.name|slice:'-4:' == '.mp4' %}
-                {% if item.name|slice:'-5:' == '.m3u8' %}
-                    {{ item.name|slice:':-5' }}
-                {% elif item.name|slice:'-4:' == '.mp4' %}
-                    {{ item.name|slice:':-4' }}
-                {% else %}
-                    {{ item.name }}
-                {% endif %}
+            {% if item.kind != 'other' %}
+                {{ item.stem }}
+                {% if item.kind == 'video' %}
                 <span class="ad-pill ad-pill--danger">{% translate "Video" %}</span>
-            {% elif '_audio' in item.name or item.name|slice:'-4:' == '.mp3' %}
-                {% if item.name|slice:'-4:' == '.mp3' %}
-                    {{ item.name|slice:':-4' }}
-                {% else %}
-                    {{ item.name }}
-                {% endif %}
+                {% elif item.kind == 'audio' %}
                 <span class="ad-pill ad-pill--success">{% translate "Audio" %}</span>
-            {% elif item.name|slice:'-4:' == '.pdf' %}
-                {{ item.name|slice:':-4' }}
-                <span class="ad-pill ad-pill--warning">{% translate "PDF" %}</span>
+                {% elif item.kind == 'image' %}
+                <span class="ad-pill ad-pill--info">{% translate "Image" %}</span>
+                {% elif item.kind == 'document' %}
+                <span class="ad-pill ad-pill--warning">{% translate "Document" %}</span>
+                {% endif %}
             {% else %}
                 {{ item.name }}
-                <span class="ad-pill ad-pill--muted">{% translate "Document" %}</span>
+            {% endif %}
+            {% if item.rel_path != item.name %}
+            <div class="ad-drive-meta" title="{{ item.rel_path }}">{{ item.rel_path }}</div>
             {% endif %}
             </div>
 

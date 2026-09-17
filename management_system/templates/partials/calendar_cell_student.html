@@ -8,10 +8,15 @@
   {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
   {% if day.in_year and day.meetings and not day.outside_month %} has-meeting{% endif %}
   {% if day.is_today %} is-today{% endif %}
-">
+"{% if day.in_year and not day.outside_month %} data-cal-day="{{ day.date }}" data-cal-label="{{ day.date_label }}"{% endif %}>
   {% if day.in_year and not day.outside_month %}
   <div class="sd-day-body">
     <div class="sd-day-number">{{ day.day }}</div>
+    <div class="cal-day-dots" aria-hidden="true">
+      {% for meeting in day.meetings|slice:":3" %}<span class="cal-dot"></span>{% endfor %}
+      {% if day.is_holiday %}<span class="cal-dot is-holiday"></span>{% endif %}
+      {% if day.meetings|length > 3 %}<span class="cal-dot-more">+{{ day.meetings|length|add:"-3" }}</span>{% endif %}
+    </div>
     {% if day.is_holiday %}
     <div class="sd-day-holiday" title="{{ day.holiday_name }}">{{ day.holiday_name }}</div>
     {% endif %}

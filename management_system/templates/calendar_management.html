@@ -1,5 +1,5 @@
 {% extends 'admin_panel.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 {% block body %}
@@ -136,6 +136,9 @@
     {# Calendar grid — canonical shared partial (read-only variant is used on the student calendar) #}
     {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
 
+    {# Phone-only agenda of the days that carry a meeting or holiday #}
+    {% include "partials/calendar_month_agenda.html" %}
+
     {# Legend #}
     <div class="d-flex gap-3 mt-2 small ad-card-body ad-calendar-legend">
       <span><span class="ad-pill is-meeting ad-legend-swatch">&nbsp;&nbsp;&nbsp;</span> {% translate "Meeting day" %}</span>
@@ -215,6 +218,10 @@
       </div>
     </div>
   </div>
+
+  {# Shared phone day sheet + its canonical script #}
+  {% include "partials/calendar_day_modal.html" %}
+  <script src="{% static 'js/calendar_day_sheet.js' %}?v={{ static_asset_version }}"></script>
 
   <script>
   (function() {

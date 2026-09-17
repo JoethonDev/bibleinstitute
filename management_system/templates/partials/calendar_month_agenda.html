@@ -1,0 +1,25 @@
+{% load i18n %}
+{# Canonical phone-only agenda: one row per in-month day that carries a meeting #}
+{# or holiday. Rows clone the matching grid cell into the shared day sheet. #}
+{# Consumes: month_agenda (canonical month-grid day dicts from _build_month_agenda). #}
+<section class="cal-agenda" aria-label="{% translate 'Meetings' %}">
+  {% if month_agenda %}
+  <ul class="cal-agenda-list">
+    {% for day in month_agenda %}
+    <li class="cal-agenda-item">
+      <button type="button" class="cal-agenda-row" data-cal-day="{{ day.date }}" data-cal-label="{{ day.date_label }}">
+        <span class="cal-agenda-date">{{ day.date_label }}</span>
+        {% if day.is_holiday %}
+        <span class="cal-agenda-holiday"><i class="fas fa-star" aria-hidden="true"></i> {{ day.holiday_name }}</span>
+        {% endif %}
+        {% for meeting in day.meetings %}
+        <span class="cal-agenda-meeting"><strong>{{ meeting.level_name }}</strong><span>{{ meeting.course_name }}</span></span>
+        {% endfor %}
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="cal-agenda-empty">{% translate "No scheduled meetings." %}</p>
+  {% endif %}
+</section>

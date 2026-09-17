@@ -27,6 +27,15 @@
           <option value="mismatch"{% if status == "mismatch" %} selected{% endif %}>{% translate "Phone mismatch" %}</option>
         </select>
       </div>
+      <div class="grade-matrix-filter-field">
+        <label for="telegram-accounts-level">{% translate "Level" %}</label>
+        <select id="telegram-accounts-level" name="level" class="form-select" hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#telegram-accounts-loading">
+          <option value="all"{% if level == "all" %} selected{% endif %}>{% translate "All levels" %}</option>
+          {% for level_option in levels %}
+          <option value="{{ level_option.pk }}"{% if level == level_option.pk|stringformat:"s" %} selected{% endif %}>{{ level_option }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="grade-matrix-filter-actions">
         <button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-filter"></i> {% translate "Filter" %}</button>
         <a href="{% url 'telegram-accounts' %}" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a>
@@ -53,6 +62,7 @@
           <tr>
             <th scope="col">{% translate "Account" %}</th>
             <th scope="col">{% translate "Role" %}</th>
+            <th scope="col">{% translate "Level" %}</th>
             <th scope="col">{% translate "Website phone" %}</th>
             <th scope="col">{% translate "Telegram status" %}</th>
             <th scope="col">{% translate "Telegram phone" %}</th>
@@ -69,6 +79,7 @@
               <span class="ps-muted-text d-block">{{ row.user.username }}</span>
             </td>
             <td>{{ row.role_name|default:"—" }}</td>
+            <td>{{ row.level_name|default:"—" }}</td>
             <td dir="ltr">{{ row.user.phone|default:"—" }}</td>
             <td>
               {% if row.is_linked %}
@@ -103,6 +114,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="search" value="{{ search }}">
                 <input type="hidden" name="status" value="{{ status }}">
+                <input type="hidden" name="level" value="{{ level }}">
                 <input type="hidden" name="page" value="{{ page_obj.number }}">
                 <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
                   <i class="fas fa-unlink me-1" aria-hidden="true"></i>{% translate "Unlink Telegram" %}
@@ -113,7 +125,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="ad-empty">{% translate "No accounts match the selected filters." %}</td>
+            <td colspan="9" class="ad-empty">{% translate "No accounts match the selected filters." %}</td>
           </tr>
           {% endfor %}
         </tbody>

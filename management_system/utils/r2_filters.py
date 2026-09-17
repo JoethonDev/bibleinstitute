@@ -1,12 +1,74 @@
 """
 R2 File Filtering Utilities
 
-This module provides filtering utilities for Cloudflare R2 file listings
-to optimize performance by filtering files based on extension and other criteria.
+This module provides the canonical file-kind classification and filtering
+utilities for Cloudflare R2 listings so the drive page, its search, its stats,
+and the file-card template all agree on what a file is.
+
+Canonical kinds (matched by name and extension, never by a second rule set):
+
+- ``video``: HLS manifest (``.m3u8``) or a video extension whose name does not
+  contain "audio";
+- ``audio``: any file whose name contains "audio" (for example the paired
+  ``_audio.m3u8`` manifest and ``_audio.mp3`` download) or an audio extension;
+- ``image``: common image extensions;
+- ``document``: PDFs (plus legacy office/text documents);
+- ``other``: everything else, including HLS ``.ts`` segments.
 """
 
-from typing import List, Set, Optional, Dict, Any
+from pathlib import PurePosixPath
+from typing import Any, Dict, List, Optional, Set
+
 from dataclasses import dataclass, field
+from django.utils.translation import gettext_lazy as _
+
+IMAGE_EXTENSIONS = frozenset({
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".avif", ".heic", ".tif", ".tiff",
+})
+VIDEO_EXTENSIONS = frozenset({
+    ".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi", ".wmv", ".mpeg", ".mpg",
+})
+AUDIO_EXTENSIONS = frozenset({
+    ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".flac",
+})
+DOCUMENT_EXTENSIONS = frozenset({".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt"})
+MANIFEST_EXTENSION = ".m3u8"
+
+KIND_VIDEO = "video"
+KIND_AUDIO = "audio"
+KIND_IMAGE = "image"
+KIND_DOCUMENT = "document"
+KIND_OTHER = "other"
+
+
+def file_extension(file_name: str) -> str:
+    """Return the lowercase extension including the leading dot."""
+    if not isinstance(file_name, str) or not file_name:
+        return ""
+    return PurePosixPath(file_name).suffix.lower()
+
+
+def file_kind(file_name: str) -> str:
+    """Classify one file name into the canonical R2 kind.
+
+    The "audio" name marker wins over the video/manifest extension so an
+    ``..._audio.m3u8`` file is audio, while a plain ``..._0001.m3u8`` is video.
+    """
+    if not isinstance(file_name, str) or not file_name:
+        return KIND_OTHER
+    name = file_name.casefold()
+    extension = file_extension(file_name)
+    if extension == ".pdf":
+        return KIND_DOCUMENT
+    if extension in IMAGE_EXTENSIONS:
+        return KIND_IMAGE
+    if extension == MANIFEST_EXTENSION or extension in VIDEO_EXTENSIONS:
+        return KIND_AUDIO if "audio" in name else KIND_VIDEO
+    if extension in AUDIO_EXTENSIONS:
+        return KIND_AUDIO
+    if extension in DOCUMENT_EXTENSIONS:
+        return KIND_DOCUMENT
+    return KIND_OTHER
 
 
 @dataclass
@@ -14,6 +76,7 @@ class FileFilterConfig:
     """Configuration for file filtering"""
     allowed_extensions: Set[str] = field(default_factory=set)
     exclude_extensions: Set[str] = field(default_factory=set)
+    kinds: Optional[Set[str]] = None
     include_folders: bool = True
     case_sensitive: bool = False
     include_hidden: bool = False
@@ -25,6 +88,8 @@ class FileFilterConfig:
         if not self.case_sensitive:
             self.allowed_extensions = {ext.lower() for ext in self.allowed_extensions}
             self.exclude_extensions = {ext.lower() for ext in self.exclude_extensions}
+        if self.kinds is not None:
+            self.kinds = {kind.lower() for kind in self.kinds}
 
 
 class R2FileFilter:
@@ -70,7 +135,11 @@ class R2FileFilter:
         # Check exclusions first
         if extension in self.config.exclude_extensions:
             return False
-        
+
+        # Kind presets use the canonical classifier only.
+        if self.config.kinds is not None:
+            return file_kind(file_name) in self.config.kinds
+
         # If allowed_extensions is empty, allow all (except excluded)
         if not self.config.allowed_extensions:
             return True
@@ -141,24 +210,23 @@ class R2FileFilter:
         return stats
 
 
-# Preset filter configurations
+# Canonical filter presets — one kind-based rule set shared by the drive page,
+# its search, and its stats.
 FILTER_PRESETS = {
     'media': FileFilterConfig(
-        allowed_extensions={'mp4', 'mp3', 'm3u8', 'pdf'},
-        exclude_extensions={'ts'},  # Exclude HLS segments
+        kinds={KIND_VIDEO, KIND_AUDIO, KIND_IMAGE},
         include_folders=True,
     ),
     'video': FileFilterConfig(
-        allowed_extensions={'mp4', 'm3u8'},
-        exclude_extensions={'ts'},
+        kinds={KIND_VIDEO},
         include_folders=True,
     ),
     'audio': FileFilterConfig(
-        allowed_extensions={'mp3', 'wav', 'ogg', 'm4a'},
+        kinds={KIND_AUDIO},
         include_folders=True,
     ),
-    'documents': FileFilterConfig(
-        allowed_extensions={'pdf', 'doc', 'docx', 'txt'},
+    'document': FileFilterConfig(
+        kinds={KIND_DOCUMENT},
         include_folders=True,
     ),
     'all': FileFilterConfig(
@@ -168,13 +236,29 @@ FILTER_PRESETS = {
     ),
 }
 
+FILTER_PRESET_LABELS = {
+    'media': _("Media"),
+    'video': _("Video"),
+    'audio': _("Audio"),
+    'document': _("Documents"),
+    'all': _("All files"),
+}
+
+
+def filter_preset_choices() -> List[Dict[str, str]]:
+    """Ordered ``value``/``label`` options for the drive filter select."""
+    return [
+        {"value": preset, "label": str(FILTER_PRESET_LABELS[preset])}
+        for preset in FILTER_PRESETS
+    ]
+
 
 def get_filter_preset(preset_name: str) -> FileFilterConfig:
     """
     Get a preset filter configuration
     
     Args:
-        preset_name: Name of the preset ('media', 'video', 'audio', 'documents', 'all')
+        preset_name: Name of the preset ('media', 'video', 'audio', 'document', 'all')
     
     Returns:
         FileFilterConfig object

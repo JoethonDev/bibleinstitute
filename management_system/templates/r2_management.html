@@ -97,10 +97,11 @@
             <div class="ms-auto ad-filters">
                 <select class="form-select ad-width-auto"
                         x-model="currentFilter"
-                        @change="applyFilter()">
+                        @change="applyFilter()"
+                        aria-label="{% translate 'Filter' %}">
                     {% for preset in filter_presets %}
-                    <option value="{{ preset }}" {% if preset == current_filter %}selected{% endif %}>
-                        {{ preset|title }}
+                    <option value="{{ preset.value }}" {% if preset.value == current_filter %}selected{% endif %}>
+                        {{ preset.label }}
                     </option>
                     {% endfor %}
                 </select>
@@ -110,7 +111,8 @@
                     <input type="text"
                            x-model="searchQuery"
                            @keyup.debounce.500ms="searchFiles()"
-                           placeholder="{% translate 'Search files...' %}">
+                           placeholder="{% translate 'Search files...' %}"
+                           aria-label="{% translate 'Search files...' %}">
                     <button class="ad-btn ad-btn--sm" type="button" @click="searchFiles()">
                         <i class="fas fa-search"></i>
                     </button>

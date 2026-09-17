@@ -42,6 +42,18 @@ from .utils.decorators import can_manage_content
 
 MEDIA_FILENAME_RE = re.compile(r"[^A-Za-z0-9_-]+")
 PART_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
+AUDIO_BITRATE_RE = re.compile(r"^[1-9]\d{0,2}k$")
+X264_PRESETS = frozenset({
+    "ultrafast",
+    "superfast",
+    "veryfast",
+    "faster",
+    "fast",
+    "medium",
+    "slow",
+    "slower",
+    "veryslow",
+})
 SOURCE_EXTENSIONS = {
     ".mp4": "video",
     ".mp3": "audio",
@@ -82,8 +94,21 @@ ALLOWED_TRANSITIONS = {
 }
 
 
-def media_limits() -> dict[str, int]:
-    """Return the bounded media limits from Django settings."""
+def media_limits() -> dict[str, Any]:
+    """Return the bounded media limits from Django settings.
+
+    Encoding values are validated here so a malformed environment value can
+    never reach the FFmpeg command line: an unknown x264 preset falls back to
+    ``fast``, a malformed audio bitrate to ``128k``, and the CRF is clamped to
+    the valid H.264 range.
+    """
+    preset = str(getattr(settings, "MEDIA_VIDEO_PRESET", "fast")).strip().lower()
+    if preset not in X264_PRESETS:
+        preset = "fast"
+    bitrate = str(getattr(settings, "MEDIA_AUDIO_BITRATE", "128k")).strip().lower()
+    if not AUDIO_BITRATE_RE.fullmatch(bitrate):
+        bitrate = "128k"
+    crf = int(getattr(settings, "MEDIA_VIDEO_CRF", 23))
     return {
         "max_source_size": int(getattr(settings, "MEDIA_MAX_SOURCE_SIZE", 2 * 1024**3)),
         "max_duration": int(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60)),
@@ -91,6 +116,9 @@ def media_limits() -> dict[str, int]:
         "segment_seconds": int(getattr(settings, "MEDIA_SEGMENT_SECONDS", 12)),
         "source_retention_hours": int(getattr(settings, "MEDIA_SOURCE_RETENTION_HOURS", 24)),
         "failed_retention_hours": int(getattr(settings, "MEDIA_FAILED_SOURCE_RETENTION_HOURS", 72)),
+        "video_crf": max(0, min(51, crf)),
+        "video_preset": preset,
+        "audio_bitrate": bitrate,
     }
 
 
@@ -365,8 +393,38 @@ def attachment_requested(job: MediaProcessingJob) -> bool:
 
 
 def is_automation_job(job: MediaProcessingJob) -> bool:
-    """Return whether a lesson job belongs to the X-Key automation workflow."""
+    """Return whether the job belongs to the automation-owned media namespace."""
     return bool(job.lesson_id and (job.part_id or "").startswith(AUTOMATION_PART_PREFIX))
+
+
+def automation_part_id(lesson_token: str, position: int) -> str:
+    """Deterministic automation part identity: token plus zero-padded position.
+
+    The zero padding keeps link ordering stable when several source files of one
+    lecture finish in a different order than they were uploaded in.
+    """
+    if not isinstance(lesson_token, str) or not lesson_token or not PART_ID_RE.fullmatch(lesson_token):
+        raise ValidationError(_("Media part identifier is invalid."))
+    if not isinstance(position, int) or isinstance(position, bool) or position < 1:
+        raise ValidationError(_("Media part identifier is invalid."))
+    return validate_part_id(f"{AUTOMATION_PART_PREFIX}{lesson_token}-p{position:02d}")
+
+
+def automation_lesson_media_complete(lesson_id: Any, *, exclude_job_id: Any = None) -> bool:
+    """True when every media job of a lesson has verified attached outputs.
+
+    Publication is a lesson-level transition, so a multi-file lesson may only be
+    published after the last source file has been processed, attached, and had
+    its staging object removed.
+    """
+    pending = MediaProcessingJob.objects.filter(lesson_id=lesson_id)
+    if exclude_job_id is not None:
+        pending = pending.exclude(pk=exclude_job_id)
+    return not pending.exclude(
+        status=MediaProcessingStatus.SUCCEEDED,
+        attachment_status=MediaAttachmentStatus.ATTACHED,
+        staging_deleted_at__isnull=False,
+    ).exists()
 
 
 def is_retryable_media_failure(error_code: Any) -> bool:
@@ -419,6 +477,9 @@ def publish_attached_lesson(job_id: Any) -> MediaProcessingJob:
         or not job.staging_deleted_at
     ):
         raise MediaProcessingError("Media job is not ready for publication.", PUBLICATION_FAILED_ERROR)
+    if not automation_lesson_media_complete(job.lesson_id, exclude_job_id=job.pk):
+        # A multi-file lecture publishes once, after every source file is ready.
+        raise MediaProcessingError("Media files are still processing.", PUBLICATION_FAILED_ERROR)
 
     lesson = Lesson.objects.select_for_update().get(pk=job.lesson_id)
     offering = lesson.course_offering
@@ -447,7 +508,7 @@ def publish_attached_lesson(job_id: Any) -> MediaProcessingJob:
 
 
 def finish_lesson_publication(job_id: Any) -> MediaProcessingJob:
-    """Fan out idempotent publication events, then clear the recovery marker."""
+    """Fan out idempotent publication events, then clear the recovery markers."""
     job = MediaProcessingJob.objects.get(pk=job_id)
     if not job.lesson_id:
         return job
@@ -460,12 +521,13 @@ def finish_lesson_publication(job_id: Any) -> MediaProcessingJob:
         mark_publication_failed(job_id)
         raise
     with transaction.atomic():
-        locked = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
-        if locked.error_code in PUBLICATION_ERROR_CODES:
-            locked.error_code = ""
-            locked.error_message = ""
-            locked.save(update_fields=["error_code", "error_message"])
-        return locked
+        # Every file of the lesson shares one publication event; clear the
+        # pending marker on all of them, not only on the job that published.
+        MediaProcessingJob.objects.filter(
+            lesson_id=job.lesson_id,
+            error_code__in=PUBLICATION_ERROR_CODES,
+        ).update(error_code="", error_message="")
+        return MediaProcessingJob.objects.select_for_update().get(pk=job_id)
 
 
 def publish_automation_lesson(job_id: Any) -> MediaProcessingJob:
@@ -692,79 +754,62 @@ def _write_rewritten_playlist(playlist_path: str, segment_folder: str) -> str:
     return rewritten_path
 
 
-def _run_hls(input_path: str, output_dir: str, base_name: str, stream: str, duration: float, progress_callback=None) -> tuple[str, list[str], bool]:
+def _run_hls(input_path: str, output_dir: str, base_name: str, stream: str, duration: float, progress_callback=None) -> tuple[str, list[str]]:
+    """Encode one HLS rendition from a local source.
+
+    Video output is always re-encoded (H.264 High profile with a CRF quality
+    target and a forced keyframe on every segment boundary) and keeps the
+    source audio muxed, so the video player carries sound. The extracted audio
+    intermediate is segmented separately for the audio player and MP3.
+    """
     os.makedirs(output_dir, exist_ok=True)
+    limits = media_limits()
     playlist = os.path.join(output_dir, f"{base_name}.m3u8")
     segment_pattern = os.path.join(output_dir, f"{base_name}_%03d.ts")
-    common = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input_path,
-        "-map", f"0:{stream}", "-f", "hls", "-hls_time", str(media_limits()["segment_seconds"]),
+    muxer = [
+        "-f", "hls", "-hls_time", str(limits["segment_seconds"]),
         "-hls_list_size", "0", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments",
         "-hls_segment_filename", segment_pattern, "-progress", "pipe:1", "-nostats",
+        playlist,
     ]
     if stream == "v:0":
-        copy_command = [*common, "-an", "-c:v", "copy", playlist]
-        try:
-            _run_command(copy_command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
-            used_fallback = False
-        except MediaProcessingError as exc:
-            if exc.code != "ffmpeg_failed":
-                raise
-            for path in (playlist, *[os.path.join(output_dir, name) for name in os.listdir(output_dir)]):
-                if os.path.isfile(path):
-                    try:
-                        os.remove(path)
-                    except OSError:
-                        pass
-            fallback_command = [
-                *common, "-an", "-c:v", "libx264", "-crf", "27", "-b:v", "900k",
-                "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-threads", "1", playlist,
-            ]
-            _run_command(fallback_command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
-            used_fallback = True
+        command = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input_path,
+            "-map", "0:v:0", "-map", "0:a:0?",
+            "-c:v", "libx264", "-crf", str(limits["video_crf"]), "-preset", limits["video_preset"],
+            "-profile:v", "high", "-pix_fmt", "yuv420p",
+            "-force_key_frames", f"expr:gte(t,n_forced*{limits['segment_seconds']})",
+            "-c:a", "aac", "-b:a", limits["audio_bitrate"],
+            *muxer,
+        ]
     else:
-        copy_command = [*common, "-vn", "-c:a", "copy", playlist]
-        try:
-            _run_command(copy_command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
-            used_fallback = False
-        except MediaProcessingError as exc:
-            if exc.code != "ffmpeg_failed":
-                raise
-            for name in os.listdir(output_dir):
-                try:
-                    os.remove(os.path.join(output_dir, name))
-                except OSError:
-                    pass
-            fallback_command = [*common, "-vn", "-c:a", "aac", "-b:a", "96k", "-threads", "1", playlist]
-            _run_command(fallback_command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
-            used_fallback = True
+        command = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input_path,
+            "-map", "0:a:0", "-vn", "-c:a", "copy",
+            *muxer,
+        ]
+    _run_command(command, timeout=limits["job_timeout"], progress_callback=progress_callback, duration=duration)
     names = _hls_segment_names(playlist)
-    return playlist, names, used_fallback
+    return playlist, names
 
 
-def _prepare_audio(source_path: str, probe: MediaProbe, work_dir: str, duration: float, progress_callback=None) -> tuple[str, bool]:
+def _prepare_audio(source_path: str, probe: MediaProbe, work_dir: str, duration: float, progress_callback=None) -> str:
+    """Return the AAC audio source used for the audio HLS and MP3 outputs.
+
+    Video sources are always re-encoded to the configured AAC bitrate so the
+    extracted track is compressed independently of the video container. An MP3
+    source is already a compressed deliverable and is reused unchanged.
+    """
     if probe.source_kind == "audio" and source_path.lower().endswith(".mp3") and probe.audio_codec == "mp3":
-        return source_path, True
+        return source_path
     output = os.path.join(work_dir, "audio-intermediate.m4a")
-    codec = "copy" if probe.audio_codec == "aac" else "aac"
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", source_path,
-        "-map", "0:a:0", "-vn", "-c:a", codec,
+        "-map", "0:a:0", "-vn", "-c:a", "aac", "-b:a", media_limits()["audio_bitrate"],
+        "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output,
     ]
-    if codec == "aac":
-        command += ["-b:a", "96k"]
-    command += ["-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output]
-    try:
-        _run_command(command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
-    except MediaProcessingError as exc:
-        if exc.code != "ffmpeg_failed":
-            raise
-        if codec != "copy":
-            raise
-        command[command.index("copy")] = "aac"
-        command += ["-b:a", "96k"]
-        _run_command(command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
-    return output, False
+    _run_command(command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
+    return output
 
 
 def _make_mp3(audio_path: str, source_path: str, source_kind: str, work_dir: str, duration: float, progress_callback=None) -> str:
@@ -773,7 +818,7 @@ def _make_mp3(audio_path: str, source_path: str, source_kind: str, work_dir: str
         shutil.copyfile(source_path, output)
         return output
     _run_command(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", audio_path, "-vn", "-c:a", "libmp3lame", "-b:a", "96k", "-progress", "pipe:1", "-nostats", output],
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", audio_path, "-vn", "-c:a", "libmp3lame", "-b:a", media_limits()["audio_bitrate"], "-progress", "pipe:1", "-nostats", output],
         timeout=media_limits()["job_timeout"],
         progress_callback=progress_callback,
         duration=duration,
@@ -813,8 +858,12 @@ def _attach_outputs(job: MediaProcessingJob, manifest_key: str, audio_manifest_k
             raise MediaProcessingError(_("The lesson media links are invalid."), "attachment_invalid_links") from exc
         if not isinstance(links, list):
             raise MediaProcessingError(_("The lesson media links are invalid."), "attachment_invalid_links")
-        existing_ids = {link.get("id") for link in links if isinstance(link, dict)}
-        existing_downloads = {link.get("download_id") for link in links if isinstance(link, dict)}
+        existing_ids = {link.get("id") for link in links if isinstance(link, dict) and link.get("id")}
+        existing_downloads = {
+            link.get("download_id")
+            for link in links
+            if isinstance(link, dict) and link.get("download_id")
+        }
         generated = []
         if manifest_key:
             generated.append({
@@ -838,9 +887,25 @@ def _attach_outputs(job: MediaProcessingJob, manifest_key: str, audio_manifest_k
                 "id": _destination_key(job.requested_folder, f"{job.output_base_name}.pdf"),
                 "part_id": job.part_id,
             })
-        if any(link["id"] in existing_ids or link.get("download_id") in existing_downloads for link in generated):
+        if any(
+            link["id"] in existing_ids
+            or (link.get("download_id") and link["download_id"] in existing_downloads)
+            for link in generated
+        ):
             raise MediaProcessingError(_("The lesson already contains one of these media files."), "attachment_collision")
-        links.extend(generated)
+        if is_automation_job(job):
+            # Automation part ids are zero-padded, so inserting each finished
+            # file in part order keeps the lecture parts stable no matter which
+            # upload finishes first.
+            position = 0
+            for index, link in enumerate(links):
+                existing_part = link.get("part_id", "") if isinstance(link, dict) else ""
+                if existing_part.startswith(AUTOMATION_PART_PREFIX) and existing_part > job.part_id:
+                    break
+                position = index + 1
+            links[position:position] = generated
+        else:
+            links.extend(generated)
         lesson.links = json.dumps(links, ensure_ascii=False)
         lesson.save(update_fields=["links", "updated_date"])
 
@@ -905,7 +970,7 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
             else:
                 video_output_dir = os.path.join(work_dir, "video-hls")
                 audio_output_dir = os.path.join(work_dir, "audio-hls")
-                manifest_path, video_names, _ = _run_hls(source_path, video_output_dir, job.output_base_name, "v:0", probe.duration, progress_callback) if probe.has_video else (None, [], False)
+                manifest_path, video_names = _run_hls(source_path, video_output_dir, job.output_base_name, "v:0", probe.duration, progress_callback) if probe.has_video else (None, [])
                 if manifest_path:
                     if heartbeat_callback:
                         heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
@@ -919,8 +984,8 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
                 audio_manifest_key = ""
                 download_key = ""
                 if probe.has_audio:
-                    audio_path, _ = _prepare_audio(source_path, probe, work_dir, probe.duration, progress_callback)
-                    audio_playlist, audio_names, _ = _run_hls(audio_path, audio_output_dir, f"{job.output_base_name}_audio", "a:0", probe.duration, progress_callback)
+                    audio_path = _prepare_audio(source_path, probe, work_dir, probe.duration, progress_callback)
+                    audio_playlist, audio_names = _run_hls(audio_path, audio_output_dir, f"{job.output_base_name}_audio", "a:0", probe.duration, progress_callback)
                     if heartbeat_callback:
                         heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
                     audio_manifest_key, _ = _upload_hls_outputs(

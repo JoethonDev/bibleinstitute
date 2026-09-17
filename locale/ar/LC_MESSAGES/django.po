@@ -10662,6 +10662,15 @@ msgstr "حسابات"
 msgid "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
 msgstr "اطّلع على الحسابات التي ربطت حسابها بتيليجرام والحسابات التي لم تربط بعد، وما إذا كان رقم الهاتف المُشارَك على تيليجرام مطابقًا لهاتف الموقع."
 
+msgid "Media"
+msgstr "الوسائط"
+
+msgid "Image"
+msgstr "صورة"
+
+msgid "All files"
+msgstr "كل الملفات"
+
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
