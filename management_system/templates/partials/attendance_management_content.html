@@ -6,8 +6,46 @@
     <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'scanner' %}" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-qrcode me-1"></i>{% translate "Scanner" %}</a>
       <a href="{% url 'calendar-management' %}" class="ad-btn ad-btn--ghost ad-btn--sm"><i class="fas fa-calendar-days me-1"></i>{% translate "Calendar" %}</a>
+      {% if can_manage_policy %}
+      <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-policy-panel" aria-expanded="false" aria-controls="attendance-policy-panel"><i class="fas fa-sliders me-1"></i>{% translate "Attendance settings" %}</button>
+      <form method="post" action="{% url 'attendance-reconcile' %}" hx-post="{% url 'attendance-reconcile' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Reconcile missing exits for this date?' %}">
+        {% csrf_token %}
+        <input type="hidden" name="date" value="{% if selected_date %}{{ selected_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
+        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-clock-rotate-left me-1"></i>{% translate "Reconcile missing exits" %}</button>
+      </form>
+      {% endif %}
     </div>
   </div>
+
+  {% if can_manage_policy %}
+  <div class="collapse" id="attendance-policy-panel">
+    <div class="ad-card mb-4">
+      <div class="ad-card-body">
+        <form method="post" action="{% url 'attendance-policy-save' %}" hx-post="{% url 'attendance-policy-save' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true">
+          {% csrf_token %}
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+              <label class="form-label" for="{{ policy_form.entrance_deadline.id_for_label }}">{{ policy_form.entrance_deadline.label }}</label>
+              {{ policy_form.entrance_deadline }}
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label" for="{{ policy_form.exit_time.id_for_label }}">{{ policy_form.exit_time.label }}</label>
+              {{ policy_form.exit_time }}
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label" for="{{ policy_form.buffer_minutes.id_for_label }}">{{ policy_form.buffer_minutes.label }}</label>
+              {{ policy_form.buffer_minutes }}
+            </div>
+          </div>
+          <p class="form-text mt-3 mb-0">{% blocktranslate with limit=policy.entrance_limit|time:"H:i" earliest=policy.exit_earliest|time:"H:i" buffer=policy.buffer_minutes %}Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits.{% endblocktranslate %}</p>
+          <div class="mt-3">
+            <button type="submit" class="ad-btn ad-btn--teal">{% translate "Save settings" %}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="ad-card">
     <div class="ad-card-body">
@@ -73,7 +111,9 @@
               <th>{% translate "Date" %}</th>
               <th>{% translate "Action" %}</th>
               <th>{% translate "Scanned by" %}</th>
+              <th>{% translate "Source" %}</th>
               <th>{% translate "Scanned at" %}</th>
+              <th>{% translate "Day status" %}</th>
               <th>{% translate "Corrected" %}</th>
               <th class="text-end">{% translate "Actions" %}</th>
             </tr>
@@ -86,8 +126,10 @@
                 <td>{{ r.course_offering.academic_year_level.academic_year|default:"—" }}</td>
                 <td>{{ r.attendance_date }}</td>
                 <td>{{ r.get_action_display }}</td>
-                <td>{{ r.scanned_by.get_full_name|default:r.scanned_by.username|default:"—" }}</td>
-                <td>{{ r.scanned_at|date:"Y-m-d H:i" }}</td>
+                <td>{% if r.scanned_by %}{{ r.scanned_by.get_full_name|default:r.scanned_by.username }}{% else %}—{% endif %}</td>
+                <td>{% if r.source == "scan" %}<span class="ad-pill ad-pill--muted">{{ r.get_source_display }}</span>{% else %}<span class="ad-pill ad-pill--warning">{{ r.get_source_display }}</span>{% endif %}</td>
+                <td>{{ r.scanned_at|date:"Y-m-d H:i:s" }}</td>
+                <td><span class="ad-pill {% if r.day_grade == 1 %}ad-pill--success{% elif r.day_grade > 0 %}ad-pill--warning{% else %}ad-pill--danger{% endif %}">{{ r.day_grade }}</span> {{ r.day_status_label }}</td>
                 <td>{% if r.corrected_at %}{{ r.corrected_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
                 <td class="text-end text-nowrap">
                   <div class="ad-actions">
@@ -100,7 +142,7 @@
                 </td>
               </tr>
             {% empty %}
-              <tr><td colspan="9" class="ad-empty">{% translate "No attendance records found." %}</td></tr>
+              <tr><td colspan="11" class="ad-empty">{% translate "No attendance records found." %}</td></tr>
             {% endfor %}
           </tbody>
         </table>

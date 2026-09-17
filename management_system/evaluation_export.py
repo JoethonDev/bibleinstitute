@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import re
 from collections import defaultdict
+from decimal import Decimal
 import openpyxl
 
 from django.utils.translation import gettext as _
@@ -16,11 +17,24 @@ _FORMULA_CELL = re.compile(r"^[\s]*[=+\-@]")
 _SHEET_MAX = 31
 
 
-def _safe_cell(value):
+def xlsx_safe_cell(value):
+    """Return an Excel-supported, formula-safe primitive for one export cell.
+
+    Lazy translation proxies and ``Decimal`` values are rejected by openpyxl;
+    strings that look like formulas are prefixed to stay inert in the sheet.
+    """
     if value is None:
         return ""
+    if isinstance(value, bool) or isinstance(value, (int, float)):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
     text = str(value)
-    return f"'{text}" if _FORMULA_CELL.match(text) else value
+    return f"'{text}" if _FORMULA_CELL.match(text) else text
+
+
+def _safe_cell(value):
+    return xlsx_safe_cell(value)
 
 
 def _sheet_title(raw: str, seen: set[str]) -> str:
@@ -117,19 +131,19 @@ def build_evaluation_workbook(formula: PromotionFormula) -> io.BytesIO:
 
     if not offering_ids:
         sheet = workbook.create_sheet(_sheet_title(str(_("No Results")), seen_titles))
-        sheet.append([_("No course-level evaluation results found for this formula.")])
+        sheet.append([xlsx_safe_cell(_("No course-level evaluation results found for this formula."))])
         result = io.BytesIO()
         workbook.save(result)
         result.seek(0)
         return result
 
     summary = workbook.create_sheet(_sheet_title(str(_("Summary")), seen_titles))
-    summary.append([
+    summary.append([xlsx_safe_cell(cell) for cell in [
         _("Course Offering"), _("Course"), _("Student ID"), _("Student Name"),
         _("Score"), _("Status"), _("Published Lectures"),
-        _("Valid Attendance Records"), _("Attendance %"),
+        _("Attendance Score"), _("Attendance %"),
         _("Repeat Threshold"), _("Evaluation Start"), _("Evaluation End"),
-    ])
+    ]])
     for result_row in _results(formula).iterator(chunk_size=500):
         snapshot = result_row.metric_snapshot or {}
         attendance = next(
@@ -160,13 +174,13 @@ def build_evaluation_workbook(formula: PromotionFormula) -> io.BytesIO:
         scope = offering.academic_year_level
         sheet = workbook.create_sheet(_sheet_title(f"{course.name} - {scope.level.display_name}", seen_titles))
         schema = _metric_schema(formula, offering_id, quiz_types)
-        sheet.append([
+        sheet.append([xlsx_safe_cell(cell) for cell in [
             _("Student ID"), _("Student Name"), _("Username"), _("Academic Year"),
             _("Level"), _("Course"), _("Evaluation Start"), _("Evaluation End"),
             _("Published Lectures"), *_metric_headers(schema, quiz_types),
             _("Weighted Score"), _("Computed Status"), _("Final Status"),
             _("Override Note"), _("Evaluation Errors"),
-        ])
+        ]])
         for result_row in _results(formula, offering_id).iterator(chunk_size=500):
             snapshot = result_row.metric_snapshot or {}
             metrics = {

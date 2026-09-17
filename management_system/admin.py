@@ -160,10 +160,21 @@ class AcademicHolidayAdmin(AdminOnlyModelAdmin):
     search_fields = ["name"]
 
 
+@admin.register(AttendancePolicy)
+class AttendancePolicyAdmin(AdminOnlyModelAdmin):
+    list_display = ["entrance_deadline", "exit_time", "buffer_minutes", "updated_at", "updated_by"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(AttendanceRecord)
 class AttendanceRecordAdmin(AdminOnlyModelAdmin):
-    list_display = ["student", "course_offering", "attendance_date", "action", "scanned_at", "scanned_by"]
-    list_filter = ["action", "course_offering"]
+    list_display = ["student", "course_offering", "attendance_date", "action", "source", "scanned_at", "scanned_by"]
+    list_filter = ["action", "source", "course_offering"]
     search_fields = ["student__username"]
     raw_id_fields = ["student", "scanned_by"]
 

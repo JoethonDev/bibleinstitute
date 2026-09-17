@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import re
 import json
+import logging
 import os
 import shutil
 import signal
 import subprocess
 import threading
 import unicodedata
+from contextlib import suppress
 from datetime import timedelta
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -43,6 +45,7 @@ from .utils.decorators import can_manage_content
 MEDIA_FILENAME_RE = re.compile(r"[^A-Za-z0-9_-]+")
 PART_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 AUDIO_BITRATE_RE = re.compile(r"^[1-9]\d{0,2}k$")
+logger = logging.getLogger(__name__)
 X264_PRESETS = frozenset({
     "ultrafast",
     "superfast",
@@ -77,6 +80,7 @@ NON_RETRYABLE_FAILURE_CODES = frozenset({
     "invalid_playlist",
     "empty_playlist",
     "output_collision",
+    "segment_size_exceeded",
     "staging_object_missing",
     "staging_object_incomplete",
     "staging_size_mismatch",
@@ -99,27 +103,84 @@ def media_limits() -> dict[str, Any]:
 
     Encoding values are validated here so a malformed environment value can
     never reach the FFmpeg command line: an unknown x264 preset falls back to
-    ``fast``, a malformed audio bitrate to ``128k``, and the CRF is clamped to
+    ``fast``, malformed bitrates to their defaults, and the CRF is clamped to
     the valid H.264 range.
     """
     preset = str(getattr(settings, "MEDIA_VIDEO_PRESET", "fast")).strip().lower()
     if preset not in X264_PRESETS:
         preset = "fast"
-    bitrate = str(getattr(settings, "MEDIA_AUDIO_BITRATE", "128k")).strip().lower()
-    if not AUDIO_BITRATE_RE.fullmatch(bitrate):
-        bitrate = "128k"
+
+    def bitrate_setting(name: str, default: str) -> str:
+        value = str(getattr(settings, name, default)).strip().lower()
+        return value if AUDIO_BITRATE_RE.fullmatch(value) else default
+
+    bitrate = bitrate_setting("MEDIA_AUDIO_BITRATE", "96k")
     crf = int(getattr(settings, "MEDIA_VIDEO_CRF", 23))
+    max_width = int(getattr(settings, "MEDIA_VIDEO_MAX_WIDTH", 854))
     return {
         "max_source_size": int(getattr(settings, "MEDIA_MAX_SOURCE_SIZE", 2 * 1024**3)),
         "max_duration": int(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60)),
         "job_timeout": int(getattr(settings, "MEDIA_JOB_TIMEOUT_SECONDS", 2 * 60 * 60)),
-        "segment_seconds": int(getattr(settings, "MEDIA_SEGMENT_SECONDS", 12)),
+        "segment_seconds": max(2, int(getattr(settings, "MEDIA_SEGMENT_SECONDS", 6))),
         "source_retention_hours": int(getattr(settings, "MEDIA_SOURCE_RETENTION_HOURS", 24)),
         "failed_retention_hours": int(getattr(settings, "MEDIA_FAILED_SOURCE_RETENTION_HOURS", 72)),
         "video_crf": max(0, min(51, crf)),
         "video_preset": preset,
+        "video_maxrate": bitrate_setting("MEDIA_VIDEO_MAXRATE", "448k"),
+        "video_bufsize": bitrate_setting("MEDIA_VIDEO_BUFSIZE", "448k"),
+        "video_max_width": 0 if max_width <= 0 else min(max_width, 3840),
         "audio_bitrate": bitrate,
+        "audio_mono_bitrate": bitrate_setting("MEDIA_AUDIO_MONO_BITRATE", "64k"),
+        "mp3_bitrate": bitrate_setting("MEDIA_MP3_BITRATE", "128k"),
+        "max_segment_bytes": max(0, int(getattr(settings, "MEDIA_MAX_SEGMENT_BYTES", 512000))),
     }
+
+
+def _scaled_bitrate(value: str, factor: float) -> str:
+    """Return a bitrate like ``448k`` scaled by ``factor`` (min 16k)."""
+    digits = int(value[:-1])
+    scaled = max(16, round(digits * factor))
+    return f"{scaled}k"
+
+
+def video_scale_filter(max_width: int) -> str:
+    """Downscale the long side to ``max_width`` without upscaling or squashing.
+
+    Landscape sources cap their width, portrait sources cap their height, and
+    ``-2`` keeps the other dimension even for H.264.
+    """
+    return (
+        f"scale='if(gt(iw,ih),min({max_width},iw),-2)':"
+        f"'if(gt(iw,ih),-2,min({max_width},ih))'"
+    )
+
+
+def audio_encode_args(probe: MediaProbe, limits: dict[str, Any]) -> list[str]:
+    """AAC args tuned for the smallest file at the highest perceivable quality.
+
+    Mono sources are encoded mono (same quality, one third fewer bytes) and
+    stereo sources use the configured AAC-LC bitrate, which is transparent for
+    speech and good for music at 96k.
+    """
+    mono = (probe.channels or 2) <= 1
+    bitrate = limits["audio_mono_bitrate"] if mono else limits["audio_bitrate"]
+    return [
+        "-c:a", "aac", "-profile:a", "aac_low", "-b:a", bitrate,
+        "-ac", "1" if mono else "2",
+    ]
+
+
+def _oversized_segments(output_dir: str, segment_names: list[str], max_bytes: int) -> list[str]:
+    """Return the generated segments that exceed the per-file size cap."""
+    if max_bytes <= 0:
+        return []
+    oversized = []
+    for name in segment_names:
+        path = os.path.join(output_dir, name)
+        with suppress(OSError):
+            if os.path.getsize(path) > max_bytes:
+                oversized.append(name)
+    return oversized
 
 
 def validate_requested_folder(folder: Any) -> str:
@@ -754,12 +815,23 @@ def _write_rewritten_playlist(playlist_path: str, segment_folder: str) -> str:
     return rewritten_path
 
 
-def _run_hls(input_path: str, output_dir: str, base_name: str, stream: str, duration: float, progress_callback=None) -> tuple[str, list[str]]:
+def _run_hls(
+    input_path: str,
+    output_dir: str,
+    base_name: str,
+    stream: str,
+    duration: float,
+    progress_callback=None,
+    *,
+    probe: MediaProbe | None = None,
+    rate_scale: float = 1.0,
+) -> tuple[str, list[str]]:
     """Encode one HLS rendition from a local source.
 
-    Video output is always re-encoded (H.264 High profile with a CRF quality
-    target and a forced keyframe on every segment boundary) and keeps the
-    source audio muxed, so the video player carries sound. The extracted audio
+    Video output is always re-encoded (H.264 High profile with a capped-CRF
+    rate window and a forced keyframe on every segment boundary) and keeps the
+    source audio muxed as AAC-LC, so the video player carries sound and every
+    segment stays inside the configured size cap. The extracted audio
     intermediate is segmented separately for the audio player and MP3.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -777,9 +849,15 @@ def _run_hls(input_path: str, output_dir: str, base_name: str, stream: str, dura
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input_path,
             "-map", "0:v:0", "-map", "0:a:0?",
             "-c:v", "libx264", "-crf", str(limits["video_crf"]), "-preset", limits["video_preset"],
+            "-maxrate", _scaled_bitrate(limits["video_maxrate"], rate_scale),
+            "-bufsize", _scaled_bitrate(limits["video_bufsize"], rate_scale),
             "-profile:v", "high", "-pix_fmt", "yuv420p",
+        ]
+        if limits["video_max_width"]:
+            command += ["-vf", video_scale_filter(limits["video_max_width"])]
+        command += [
             "-force_key_frames", f"expr:gte(t,n_forced*{limits['segment_seconds']})",
-            "-c:a", "aac", "-b:a", limits["audio_bitrate"],
+            *audio_encode_args(probe or MediaProbe(source_kind="video", duration=0.0, channels=2), limits),
             *muxer,
         ]
     else:
@@ -790,6 +868,48 @@ def _run_hls(input_path: str, output_dir: str, base_name: str, stream: str, dura
         ]
     _run_command(command, timeout=limits["job_timeout"], progress_callback=progress_callback, duration=duration)
     names = _hls_segment_names(playlist)
+    return playlist, names
+
+
+def _encode_hls_with_size_cap(
+    input_path: str,
+    output_dir: str,
+    base_name: str,
+    stream: str,
+    duration: float,
+    progress_callback=None,
+    *,
+    probe: MediaProbe | None = None,
+) -> tuple[str, list[str]]:
+    """Encode HLS and guarantee every segment is inside the size cap.
+
+    Capped-CRF already makes an oversized segment unlikely; if one still
+    appears (unusual source or a misconfigured rate), the encode is retried
+    once with the rate window reduced by 20% before the job fails for
+    operator review.
+    """
+    limits = media_limits()
+    playlist, names = _run_hls(
+        input_path, output_dir, base_name, stream, duration, progress_callback, probe=probe,
+    )
+    oversized = _oversized_segments(output_dir, names, limits["max_segment_bytes"])
+    if not oversized:
+        return playlist, names
+    logger.warning(
+        "media_segment_over_cap retrying_lower_rate oversized=%s base=%s",
+        len(oversized),
+        base_name,
+    )
+    playlist, names = _run_hls(
+        input_path, output_dir, base_name, stream, duration, progress_callback,
+        probe=probe, rate_scale=0.8,
+    )
+    oversized = _oversized_segments(output_dir, names, limits["max_segment_bytes"])
+    if oversized:
+        raise MediaProcessingError(
+            _("A generated media segment exceeds the maximum allowed size."),
+            "segment_size_exceeded",
+        )
     return playlist, names
 
 
@@ -805,7 +925,8 @@ def _prepare_audio(source_path: str, probe: MediaProbe, work_dir: str, duration:
     output = os.path.join(work_dir, "audio-intermediate.m4a")
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", source_path,
-        "-map", "0:a:0", "-vn", "-c:a", "aac", "-b:a", media_limits()["audio_bitrate"],
+        "-map", "0:a:0", "-vn",
+        *audio_encode_args(probe, media_limits()),
         "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output,
     ]
     _run_command(command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
@@ -818,7 +939,7 @@ def _make_mp3(audio_path: str, source_path: str, source_kind: str, work_dir: str
         shutil.copyfile(source_path, output)
         return output
     _run_command(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", audio_path, "-vn", "-c:a", "libmp3lame", "-b:a", media_limits()["audio_bitrate"], "-progress", "pipe:1", "-nostats", output],
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", audio_path, "-vn", "-c:a", "libmp3lame", "-b:a", media_limits()["mp3_bitrate"], "-progress", "pipe:1", "-nostats", output],
         timeout=media_limits()["job_timeout"],
         progress_callback=progress_callback,
         duration=duration,
@@ -970,7 +1091,10 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
             else:
                 video_output_dir = os.path.join(work_dir, "video-hls")
                 audio_output_dir = os.path.join(work_dir, "audio-hls")
-                manifest_path, video_names = _run_hls(source_path, video_output_dir, job.output_base_name, "v:0", probe.duration, progress_callback) if probe.has_video else (None, [])
+                manifest_path, video_names = _encode_hls_with_size_cap(
+                    source_path, video_output_dir, job.output_base_name, "v:0",
+                    probe.duration, progress_callback, probe=probe,
+                ) if probe.has_video else (None, [])
                 if manifest_path:
                     if heartbeat_callback:
                         heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
@@ -985,7 +1109,10 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
                 download_key = ""
                 if probe.has_audio:
                     audio_path = _prepare_audio(source_path, probe, work_dir, probe.duration, progress_callback)
-                    audio_playlist, audio_names = _run_hls(audio_path, audio_output_dir, f"{job.output_base_name}_audio", "a:0", probe.duration, progress_callback)
+                    audio_playlist, audio_names = _encode_hls_with_size_cap(
+                        audio_path, audio_output_dir, f"{job.output_base_name}_audio",
+                        "a:0", probe.duration, progress_callback, probe=probe,
+                    )
                     if heartbeat_callback:
                         heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
                     audio_manifest_key, _ = _upload_hls_outputs(

@@ -1,10 +1,18 @@
 from collections import defaultdict
+from decimal import Decimal
 
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
 
-from ..models import AttendanceRecord, Enrollment, Grade, Lesson, PublicationStatus
-from .attendance import get_expected_dates
+from ..models import AttendancePolicy, AttendanceRecord, Enrollment, Grade, Lesson, PublicationStatus
+from .attendance import (
+    DAY_GRADE_FULL,
+    DAY_GRADE_PARTIAL,
+    get_expected_dates,
+    grade_attendance_day,
+    merge_attendance_pairs,
+    pair_attendance_records,
+)
 from .search import normalized_contains_q
 
 
@@ -107,12 +115,9 @@ def build_report_page_rows(enrollments, academic_year_level, course_offering_id=
     )
     if course_offering_id:
         records = records.filter(course_offering_id=course_offering_id)
-    records = records.values("student_id", "course_offering_id", "attendance_date", "action")
-    attendance_by_student = defaultdict(lambda: {"entrance": set(), "exit": set()})
-    for record in records:
-        attendance_by_student[record["student_id"]][record["action"]].add(
-            (record["course_offering_id"], record["attendance_date"])
-        )
+    records = records.values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
+    policy = AttendancePolicy.load()
+    attendance_by_student = merge_attendance_pairs(pair_attendance_records(records))
 
     lesson_counts = Lesson.objects.filter(
         course_offering__academic_year_level=academic_year_level,
@@ -129,17 +134,22 @@ def build_report_page_rows(enrollments, academic_year_level, course_offering_id=
         available = sum(detail["total"] for detail in details)
         if student.study_mode == "online":
             expected = valid = invalid = absent = 0
+            attendance_score = Decimal("0")
         else:
-            attendance = attendance_by_student[student.pk]
-            entrance = attendance["entrance"]
-            exits = attendance["exit"]
-            valid_dates = entrance & exits
-            invalid_dates = (entrance - valid_dates) | (exits - valid_dates)
-            absent_dates = max(expected_count - len(valid_dates), 0)
+            days = attendance_by_student.get(student.pk, {})
+            full = partial = 0
+            attendance_score = Decimal("0")
+            for pair in days.values():
+                day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
+                attendance_score += day.grade
+                if day.grade == DAY_GRADE_FULL:
+                    full += 1
+                elif day.grade == DAY_GRADE_PARTIAL:
+                    partial += 1
             expected = expected_count
-            valid = len(valid_dates)
-            invalid = len(invalid_dates)
-            absent = absent_dates
+            valid = full
+            invalid = partial
+            absent = max(expected_count - full - partial, 0)
         rows.append({
             "student_id": student.pk,
             "username": student.username,
@@ -155,7 +165,8 @@ def build_report_page_rows(enrollments, academic_year_level, course_offering_id=
             "valid": valid,
             "invalid": invalid,
             "absent": absent,
-            "attendance_rate": round(valid / expected * 100, 1) if expected else 0,
+            "attendance_score": attendance_score,
+            "attendance_rate": round(float(attendance_score) / expected * 100, 1) if expected else 0,
             "absence_rate": round(absent / expected * 100, 1) if expected else 0,
             "grade_details": details,
         })

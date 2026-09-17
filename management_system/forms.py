@@ -3,7 +3,7 @@ from django import forms
 import secrets
 
 from django.core.exceptions import ValidationError
-from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
+from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
 from .utils.validators import normalize_phone, validate_identity_by_type
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -361,6 +361,34 @@ class AcademicYearLevelWeekdayForm(forms.ModelForm):
 
     def clean_meeting_weekdays(self):
         return sorted({int(day) for day in self.cleaned_data["meeting_weekdays"]})
+
+
+class AttendancePolicyForm(forms.ModelForm):
+    class Meta:
+        model = AttendancePolicy
+        fields = ["entrance_deadline", "exit_time", "buffer_minutes"]
+        labels = {
+            "entrance_deadline": _("Entrance deadline"),
+            "exit_time": _("Meeting exit time"),
+            "buffer_minutes": _("Buffer (minutes)"),
+        }
+        widgets = {
+            "entrance_deadline": forms.TimeInput(
+                attrs={"type": "time", "class": "form-control"}, format="%H:%M"
+            ),
+            "exit_time": forms.TimeInput(
+                attrs={"type": "time", "class": "form-control"}, format="%H:%M"
+            ),
+            "buffer_minutes": forms.NumberInput(
+                attrs={"class": "form-control", "min": 0, "max": 120}
+            ),
+        }
+
+    def clean_buffer_minutes(self):
+        minutes = self.cleaned_data["buffer_minutes"]
+        if minutes > 120:
+            raise ValidationError(_("The buffer cannot exceed 120 minutes."))
+        return minutes
 
 
 class HistoricalIntakeForm(forms.Form):

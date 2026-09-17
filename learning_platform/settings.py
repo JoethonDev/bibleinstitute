@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 from urllib.parse import urlsplit
 import os
+from celery.schedules import crontab
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
@@ -211,6 +212,7 @@ CACHES = {
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_IMPORTS = (
+    "management_system.attendance_tasks",
     "management_system.telegram_tasks",
     "management_system.media_tasks",
     "management_system.mobile_push_tasks",
@@ -234,6 +236,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "management_system.mobile_push_tasks.process_mobile_push_receipts",
         "schedule": 30.0,
         "kwargs": {"limit": 1000},
+    },
+    "reconcile-daily-attendance": {
+        "task": "management_system.attendance_tasks.reconcile_daily_attendance",
+        "schedule": crontab(hour=22, minute=0),
     },
 }
 
@@ -275,7 +281,7 @@ MEDIA_WORK_DIR = os.getenv("MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
 MEDIA_MAX_SOURCE_SIZE = int(os.getenv("MEDIA_MAX_SOURCE_SIZE", str(2 * 1024 ** 3)))
 MEDIA_MAX_DURATION_SECONDS = int(os.getenv("MEDIA_MAX_DURATION_SECONDS", str(3 * 60 * 60)))
 MEDIA_JOB_TIMEOUT_SECONDS = int(os.getenv("MEDIA_JOB_TIMEOUT_SECONDS", str(2 * 60 * 60)))
-MEDIA_SEGMENT_SECONDS = int(os.getenv("MEDIA_SEGMENT_SECONDS", "12"))
+MEDIA_SEGMENT_SECONDS = int(os.getenv("MEDIA_SEGMENT_SECONDS", "6"))
 MEDIA_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_SOURCE_RETENTION_HOURS", "24"))
 MEDIA_FAILED_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_FAILED_SOURCE_RETENTION_HOURS", "72"))
 MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS = int(os.getenv("MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS", "90"))
@@ -288,7 +294,17 @@ MEDIA_WORKER_CONCURRENCY = int(os.getenv("MEDIA_WORKER_CONCURRENCY", "1"))
 # muxed audio track, and the extracted audio HLS/MP3 are produced separately.
 MEDIA_VIDEO_CRF = int(os.getenv("MEDIA_VIDEO_CRF", "23"))
 MEDIA_VIDEO_PRESET = os.getenv("MEDIA_VIDEO_PRESET", "fast")
-MEDIA_AUDIO_BITRATE = os.getenv("MEDIA_AUDIO_BITRATE", "128k")
+# Capped CRF keeps every HLS segment under MEDIA_MAX_SEGMENT_BYTES: worst case
+# is about (maxrate + audio) x segment seconds plus the VBV burst of one
+# bufsize window.
+MEDIA_VIDEO_MAXRATE = os.getenv("MEDIA_VIDEO_MAXRATE", "448k")
+MEDIA_VIDEO_BUFSIZE = os.getenv("MEDIA_VIDEO_BUFSIZE", "448k")
+MEDIA_VIDEO_MAX_WIDTH = int(os.getenv("MEDIA_VIDEO_MAX_WIDTH", "854"))
+MEDIA_AUDIO_BITRATE = os.getenv("MEDIA_AUDIO_BITRATE", "96k")
+MEDIA_AUDIO_MONO_BITRATE = os.getenv("MEDIA_AUDIO_MONO_BITRATE", "64k")
+MEDIA_MP3_BITRATE = os.getenv("MEDIA_MP3_BITRATE", "128k")
+# 0 disables the worker-side segment size verification.
+MEDIA_MAX_SEGMENT_BYTES = int(os.getenv("MEDIA_MAX_SEGMENT_BYTES", str(512 * 1000)))
 
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
 # Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by

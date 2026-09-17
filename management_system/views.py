@@ -49,7 +49,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
@@ -77,7 +77,19 @@ from .utils.decorators import capability_required, can_manage_content, can_delet
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
 from .utils.r2_references import rewrite_lesson_r2_references
-from .utils.attendance import is_expected_date, get_expected_dates, get_student_attendance_context, assign_unassigned_attendance
+from .utils.attendance import (
+    DAY_GRADE_NONE,
+    AttendanceDayStatus,
+    assign_unassigned_attendance,
+    get_expected_dates,
+    get_student_attendance_context,
+    grade_attendance_day,
+    is_expected_date,
+    local_scan_time,
+    merge_attendance_pairs,
+    pair_attendance_records,
+    reconcile_missing_exits,
+)
 from .utils.timezones import ensure_aware, format_user_datetime
 from .utils.search import normalize_search_text, normalized_contains_q
 from .admin_tables import (
@@ -118,11 +130,11 @@ from .academic_formula import normalize_formula_rules, save_promotion_formula
 from .academic_evaluation import (
     build_evaluation_plan,
     evaluation_enrollments,
-    evaluate_enrollment,
+    evaluate_enrollment_page,
     override_evaluation_result,
     save_formula_and_results,
 )
-from .evaluation_export import build_evaluation_workbook
+from .evaluation_export import build_evaluation_workbook, xlsx_safe_cell
 from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
@@ -751,20 +763,28 @@ class ProfileDetail(LoginProtection, DetailView):
             ).values("course_offering_id", "meeting_date"):
                 meeting_dates[row["course_offering_id"]].add(row["meeting_date"])
 
-            scanned_dates = defaultdict(lambda: {"entrance": set(), "exit": set()})
+            attendance_days = defaultdict(dict)
+            attendance_policy = None
             if user.study_mode != "online":
-                for row in AttendanceRecord.objects.filter(
-                    student=user,
-                    course_offering_id__in=offering_ids,
-                ).values("course_offering_id", "attendance_date", "action"):
-                    scanned_dates[row["course_offering_id"]][row["action"]].add(row["attendance_date"])
+                attendance_policy = AttendancePolicy.load()
+                for (_student_id, attendance_offering_id, attendance_day), pair in pair_attendance_records(
+                    AttendanceRecord.objects.filter(
+                        student=user,
+                        course_offering_id__in=offering_ids,
+                    ).values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
+                ).items():
+                    attendance_days[attendance_offering_id][attendance_day] = pair
 
             for offering_id, dates in meeting_dates.items():
-                attendance = scanned_dates[offering_id]
                 course_progress[offering_id]["attendance_total"] = len(dates)
-                course_progress[offering_id]["attendance_scanned"] = len(
-                    attendance["entrance"] & attendance["exit"]
-                )
+                if attendance_policy is None:
+                    continue
+                graded_points = DAY_GRADE_NONE
+                for pair in attendance_days.get(offering_id, {}).values():
+                    graded_points += grade_attendance_day(
+                        pair.get("entrance"), pair.get("exit"), attendance_policy
+                    ).grade
+                course_progress[offering_id]["attendance_scanned"] = graded_points
 
             quiz_filter = {} if user_has_management_role(user) else {"status": PublicationStatus.PUBLISHED}
             quizzes = list(
@@ -2751,7 +2771,7 @@ def promotion_formula(request):
             )
         enrollments = enrollments.order_by("student__last_name", "student__first_name", "student__username")
         preview_page_obj = Paginator(enrollments, 25).get_page(request.GET.get("page", 1))
-        preview_rows = [evaluate_enrollment(enrollment, plan) for enrollment in preview_page_obj] if plan else []
+        preview_rows = evaluate_enrollment_page(preview_page_obj, plan) if plan else []
         preview_grading_errors = plan.grading_errors if plan else ()
         saved_results = EvaluationResult.objects.filter(
             formula=formula,
@@ -5870,6 +5890,7 @@ def scan_preview(request, token):
         "already_recorded_actions": already_recorded_actions,
         "can_record": can_record,
         "token": token,
+        "policy": AttendancePolicy.load(),
     })
 
 @require_POST
@@ -5895,11 +5916,14 @@ def record_attendance(request, token, action):
             course_offering=offering,
             attendance_date=today,
             action=action,
-            defaults={"scanned_by": request.user},
+            defaults={"scanned_by": request.user, "source": AttendanceRecord.Source.SCAN},
         )
-    if created:
-        return JsonResponse({"status": "recorded", "action": action})
-    return JsonResponse({"status": "already_recorded", "action": action})
+    return JsonResponse({
+        "status": "recorded" if created else "already_recorded",
+        "action": action,
+        "source": rec.source,
+        "scanned_at": timezone.localtime(rec.scanned_at).strftime("%H:%M:%S"),
+    })
 
 @capability_required(can_scan_attendance)
 def attendance_management(request):
@@ -5961,7 +5985,24 @@ def attendance_management(request):
         records = records.order_by("-attendance_date", "-scanned_at")
     else:
         records = AttendanceRecord.objects.none()
+    policy = AttendancePolicy.load()
     page_obj = Paginator(records, 25).get_page(request.GET.get("page", 1))
+    page_records = list(page_obj)
+    if page_records:
+        pair_records = AttendanceRecord.objects.filter(
+            student_id__in={record.student_id for record in page_records},
+            attendance_date__in={record.attendance_date for record in page_records},
+        ).values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
+        day_pairs = pair_attendance_records(pair_records)
+    else:
+        day_pairs = {}
+    for record in page_records:
+        pair = day_pairs.get(
+            (record.student_id, record.course_offering_id, record.attendance_date), {}
+        )
+        day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
+        record.day_grade = day.grade
+        record.day_status_label = AttendanceDayStatus(day.status).label
     return render_page(request, "attendance_management.html", "partials/attendance_management_content.html", {
         "records": page_obj,
         "page_obj": page_obj,
@@ -5976,7 +6017,49 @@ def attendance_management(request):
         "selected_date": attendance_date,
         "student_search": student_search,
         "has_filter": bool(year_id),
+        "policy": policy,
+        "policy_form": AttendancePolicyForm(instance=policy),
+        "today": timezone.localdate(),
+        "can_manage_policy": can_correct_attendance(request.user),
     })
+
+@require_POST
+@capability_required(can_correct_attendance)
+def attendance_policy_save(request):
+    policy = AttendancePolicy.load()
+    form = AttendancePolicyForm(request.POST, instance=policy)
+    if form.is_valid():
+        policy = form.save(commit=False)
+        policy.updated_by = request.user
+        policy.save()
+        messages.success(request, _("Attendance settings updated."))
+    else:
+        for error in form.errors.values():
+            for message in error:
+                messages.error(request, message)
+    return redirect("attendance-management")
+
+@require_POST
+@capability_required(can_correct_attendance)
+def attendance_reconcile(request):
+    raw_date = request.POST.get("date", "")
+    target_date = None
+    if raw_date:
+        try:
+            target_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            messages.error(request, _("Invalid date format."))
+            return redirect("attendance-management")
+    target_date = target_date or timezone.localdate()
+    reconciled = reconcile_missing_exits(target_date, actor=request.user)
+    if reconciled:
+        messages.success(request, _("%(count)s missing exit(s) were recorded for %(date)s.") % {
+            "count": reconciled,
+            "date": target_date,
+        })
+    else:
+        messages.info(request, _("No missing exits were found for %(date)s.") % {"date": target_date})
+    return redirect("attendance-management")
 
 @capability_required(can_correct_attendance)
 def attendance_correction(request, record_id):
@@ -6587,7 +6670,8 @@ def export_report_csv(request):
         writer.writerow([
             _("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Study Mode"),
             _("Level"), _("Academic Year"), _("Grade Earned"), _("Grade Available"), _("Grade %"),
-            _("Expected"), _("Valid"), _("Invalid"), _("Absent"), _("Attendance %"), _("Absence %"),
+            _("Expected"), _("Full days"), _("Partial"), _("Absent"), _("Attendance Score"),
+            _("Attendance %"), _("Absence %"),
         ])
         yield output.getvalue()
         for row in row_iterator:
@@ -6600,7 +6684,7 @@ def export_report_csv(request):
                 row["level"],
                 _csv_safe_cell(row["year_name"]), row["grade_earned"], row["grade_available"],
                 row["grade_percent"], row["expected"], row["valid"], row["invalid"], row["absent"],
-                row["attendance_rate"], row["absence_rate"],
+                row["attendance_score"], row["attendance_rate"], row["absence_rate"],
             ])
             yield output.getvalue()
 
@@ -6624,60 +6708,67 @@ def export_report_xlsx(request):
 
     wb = openpyxl.Workbook(write_only=True)
 
-    ws1 = wb.create_sheet(_("Grades Summary"))
+    ws1 = wb.create_sheet(str(_("Grades Summary")))
     headers = [_("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Course"), _("Quiz"),
                _("Grade"), _("Total"), _("Percent")]
-    ws1.append(headers)
+    ws1.append([xlsx_safe_cell(cell) for cell in headers])
     for row in iter_report_data(scope, **report_kwargs):
         for detail in row["grade_details"]:
             pct = round(detail["grade"] / detail["total"] * 100, 1) if detail["total"] else 0
-            ws1.append([
+            ws1.append([xlsx_safe_cell(cell) for cell in [
                 row["student_id"], row["username"], row["first_name"], row["last_name"],
                 detail["course_name"], detail["quiz_name"],
                 detail["grade"], detail["total"], pct,
-            ])
+            ]])
 
-    ws2 = wb.create_sheet(_("Attendance Summary"))
-    ws2.append([_("Student ID"), _("Username"), _("First Name"), _("Last Name"),
-                _("Expected"), _("Valid"), _("Invalid"), _("Absent"),
-                _("Attendance %"), _("Absence %")])
+    ws2 = wb.create_sheet(str(_("Attendance Summary")))
+    ws2.append([xlsx_safe_cell(cell) for cell in [
+        _("Student ID"), _("Username"), _("First Name"), _("Last Name"),
+        _("Expected"), _("Full days"), _("Partial"), _("Absent"), _("Attendance Score"),
+        _("Attendance %"), _("Absence %"),
+    ]])
     for row in iter_report_data(scope, **report_kwargs):
-        ws2.append([
+        ws2.append([xlsx_safe_cell(cell) for cell in [
             row["student_id"], row["username"], row["first_name"], row["last_name"],
-            row["expected"], row["valid"], row["invalid"], row["absent"],
+            row["expected"], row["valid"], row["invalid"], row["absent"], row["attendance_score"],
             row["attendance_rate"], row["absence_rate"],
-        ])
+        ]])
 
-    ws3 = wb.create_sheet(_("Attendance Daily"))
-    ws3.append([_("Student ID"), _("Username"), _("First Name"), _("Last Name"),
-                _("Date"), _("Day"), _("Entrance"), _("Exit"), _("Status")])
+    ws3 = wb.create_sheet(str(_("Attendance Daily")))
+    ws3.append([xlsx_safe_cell(cell) for cell in [
+        _("Student ID"), _("Username"), _("First Name"), _("Last Name"),
+        _("Date"), _("Day"), _("Entrance"), _("Exit"), _("Status"), _("Grade"),
+    ]])
     expected = get_expected_dates(scope)
+    policy = AttendancePolicy.load()
     report_rows = iter_report_data(scope, **report_kwargs)
     while True:
         batch = list(islice(report_rows, 500))
         if not batch:
             break
         student_ids = [row["student_id"] for row in batch]
-        records_by_student = defaultdict(list)
         attendance_queryset = AttendanceRecord.objects.filter(
             course_offering__academic_year_level=scope, student_id__in=student_ids
         )
         if report_kwargs["course_offering_id"]:
             attendance_queryset = attendance_queryset.filter(course_offering_id=report_kwargs["course_offering_id"])
-        for rec in attendance_queryset.order_by("student_id", "attendance_date"):
-            records_by_student[rec.student_id].append(rec)
+        pairs = merge_attendance_pairs(pair_attendance_records(
+            attendance_queryset.values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
+        ))
         for row in batch:
-            entrance_by_date = {rec.attendance_date for rec in records_by_student[row["student_id"]] if rec.action == "entrance"}
-            exit_by_date = {rec.attendance_date for rec in records_by_student[row["student_id"]] if rec.action == "exit"}
+            days = pairs.get(row["student_id"], {})
             for day in expected:
-                has_entrance = day in entrance_by_date
-                has_exit = day in exit_by_date
-                status = _("Valid") if has_entrance and has_exit else (_("Invalid") if has_entrance or has_exit else _("Absent"))
-                ws3.append([
+                pair = days.get(day, {})
+                entrance = pair.get("entrance")
+                exit_record = pair.get("exit")
+                attendance = grade_attendance_day(entrance, exit_record, policy)
+                ws3.append([xlsx_safe_cell(cell) for cell in [
                     row["student_id"], row["username"], row["first_name"], row["last_name"],
                     day.isoformat(), formats.date_format(day, "l"),
-                    day.isoformat() if has_entrance else "", day.isoformat() if has_exit else "", status,
-                ])
+                    local_scan_time(entrance).strftime("%H:%M:%S") if entrance else "",
+                    local_scan_time(exit_record).strftime("%H:%M:%S") if exit_record else "",
+                    AttendanceDayStatus(attendance.status).label, attendance.grade,
+                ]])
 
     buf = io.BytesIO()
     wb.save(buf)

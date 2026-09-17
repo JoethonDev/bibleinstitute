@@ -201,6 +201,8 @@ urlpatterns = [
     path('scan/<str:token>/', scan_preview, name="scan-preview"),
     path('scan/<str:token>/<str:action>/', record_attendance, name="record-attendance"),
     path('dashboard/attendance/', attendance_management, name="attendance-management"),
+    path('dashboard/attendance/policy/', attendance_policy_save, name="attendance-policy-save"),
+    path('dashboard/attendance/reconcile/', attendance_reconcile, name="attendance-reconcile"),
     path('dashboard/attendance/<int:record_id>/correct/', attendance_correction, name="attendance-correction"),
     path('dashboard/attendance/<int:record_id>/delete/', delete_attendance, name="attendance-delete"),
 

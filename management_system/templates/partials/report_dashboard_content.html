@@ -97,9 +97,10 @@
                   <th scope="col">{% translate "Grade" %}</th>
                   <th scope="col">{% translate "Grade %" %}</th>
                   <th scope="col">{% translate "Expected" %}</th>
-                  <th scope="col">{% translate "Valid" %}</th>
-                  <th scope="col">{% translate "Invalid" %}</th>
+                  <th scope="col">{% translate "Full days" %}</th>
+                  <th scope="col">{% translate "Partial" %}</th>
                   <th scope="col">{% translate "Absent" %}</th>
+                  <th scope="col">{% translate "Attendance Score" %}</th>
                   <th scope="col">{% translate "Attendance %" %}</th>
                   <th scope="col">{% translate "Absence %" %}</th>
                 </tr>
@@ -115,12 +116,13 @@
                     <td>{{ row.valid }}</td>
                     <td>{{ row.invalid }}</td>
                     <td>{{ row.absent }}</td>
+                    <td>{{ row.attendance_score }}</td>
                     <td>{{ row.attendance_rate }}%</td>
                     <td>{{ row.absence_rate }}%</td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="10" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
+                    <td colspan="11" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
                   </tr>
                 {% endfor %}
               </tbody>

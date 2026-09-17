@@ -6,7 +6,7 @@ from django.urls import reverse_lazy
 from django.db.models import Case, F, Sum, Prefetch, Q, Value, When, prefetch_related_objects
 from django.utils import timezone
 from django.utils.timezone import now
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 import json
 import uuid
 from django.utils.translation import gettext_lazy as _
@@ -29,6 +29,14 @@ def assign_academic_date():
 
 def default_meeting_weekdays():
     return [6, 1]  # Sunday and Tuesday using datetime.date.weekday().
+
+
+def default_attendance_entrance_deadline():
+    return time(18, 30)
+
+
+def default_attendance_exit_time():
+    return time(20, 30)
 
 
 class PublicationStatus(models.TextChoices):
@@ -1772,10 +1780,53 @@ class AcademicHoliday(models.Model):
         return f"{self.name} - {self.date}"
 
 
+class AttendancePolicy(models.Model):
+    """The single global entrance/exit window used to grade daily attendance."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    entrance_deadline = models.TimeField(default=default_attendance_entrance_deadline)
+    exit_time = models.TimeField(default=default_attendance_exit_time)
+    buffer_minutes = models.PositiveSmallIntegerField(default=5)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_policy_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Attendance Policy")
+        verbose_name_plural = _("Attendance Policies")
+
+    def __str__(self):
+        return str(_("Attendance Policy"))
+
+    @classmethod
+    def load(cls) -> "AttendancePolicy":
+        return cls.objects.get_or_create(singleton="default")[0]
+
+    @property
+    def entrance_limit(self) -> time:
+        """The first entrance instant that counts as late."""
+        return (datetime.combine(date.min, self.entrance_deadline) + timedelta(minutes=self.buffer_minutes)).time()
+
+    @property
+    def exit_earliest(self) -> time:
+        """The last exit instant that counts as an early departure."""
+        return (datetime.combine(date.min, self.exit_time) - timedelta(minutes=self.buffer_minutes)).time()
+
+
 class AttendanceRecord(models.Model):
     class Action(models.TextChoices):
         ENTRANCE = "entrance", _("Entrance")
         EXIT = "exit", _("Exit")
+
+    class Source(models.TextChoices):
+        SCAN = "scan", _("Scan")
+        AUTO = "auto", _("Auto reconciliation")
+        MANUAL = "manual", _("Manual reconciliation")
 
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="attendance_records")
     course_offering = models.ForeignKey(
@@ -1787,6 +1838,7 @@ class AttendanceRecord(models.Model):
     )
     attendance_date = models.DateField()
     action = models.CharField(max_length=10, choices=Action.choices)
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.SCAN)
     scanned_at = models.DateTimeField(auto_now_add=True)
     scanned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="scanned_records")
     corrected_at = models.DateTimeField(null=True, blank=True)

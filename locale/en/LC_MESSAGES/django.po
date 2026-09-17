@@ -10107,6 +10107,106 @@ msgid "All files"
 msgstr "All files"
 
 
+msgid "Attendance Policy"
+msgstr "Attendance Policy"
+
+msgid "Attendance Policies"
+msgstr "Attendance Policies"
+
+msgid "Auto reconciliation"
+msgstr "Auto reconciliation"
+
+msgid "Manual reconciliation"
+msgstr "Manual reconciliation"
+
+msgid "Scan"
+msgstr "Scan"
+
+msgid "On time"
+msgstr "On time"
+
+msgid "Late entrance"
+msgstr "Late entrance"
+
+msgid "Early exit"
+msgstr "Early exit"
+
+msgid "Late entrance and early exit"
+msgstr "Late entrance and early exit"
+
+msgid "Incomplete"
+msgstr "Incomplete"
+
+msgid "Attendance settings updated."
+msgstr "Attendance settings updated."
+
+msgid "Full days"
+msgstr "Full days"
+
+msgid "Partial"
+msgstr "Partial"
+
+msgid "Attendance Score"
+msgstr "Attendance Score"
+
+msgid "Entrance deadline"
+msgstr "Entrance deadline"
+
+msgid "Meeting exit time"
+msgstr "Meeting exit time"
+
+msgid "Buffer (minutes)"
+msgstr "Buffer (minutes)"
+
+msgid "The buffer cannot exceed 120 minutes."
+msgstr "The buffer cannot exceed 120 minutes."
+
+msgid "Attendance settings"
+msgstr "Attendance settings"
+
+msgid "Reconcile missing exits"
+msgstr "Reconcile missing exits"
+
+msgid "Reconcile missing exits for this date?"
+msgstr "Reconcile missing exits for this date?"
+
+msgid "Save settings"
+msgstr "Save settings"
+
+msgid "Source"
+msgstr "Source"
+
+msgid "Day status"
+msgstr "Day status"
+
+msgid "Camera permission was denied. Allow camera access and try again."
+msgstr "Camera permission was denied. Allow camera access and try again."
+
+msgid "Camera access is unavailable on this device."
+msgstr "Camera access is unavailable on this device."
+
+msgid "QR scanning is not available in this browser. Type the QR token in the Find Student field as a fallback."
+msgstr "QR scanning is not available in this browser. Type the QR token in the Find Student field as a fallback."
+
+msgid "Recorded at"
+msgstr "Recorded at"
+
+#, python-format
+msgid "%(count)s missing exit(s) were recorded for %(date)s."
+msgstr "%(count)s missing exit(s) were recorded for %(date)s."
+
+#, python-format
+msgid "No missing exits were found for %(date)s."
+msgstr "No missing exits were found for %(date)s."
+
+#, python-format
+msgid "Entrance after %(limit)s or exit before %(earliest)s counts as partial attendance."
+msgstr "Entrance after %(limit)s or exit before %(earliest)s counts as partial attendance."
+
+#, python-format
+msgid "Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits."
+msgstr "Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

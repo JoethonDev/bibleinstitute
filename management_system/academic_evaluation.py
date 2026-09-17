@@ -14,6 +14,7 @@ from django.utils.translation import gettext as _
 from .academic_formula import save_promotion_formula
 from .models import (
     AcademicYearLevel,
+    AttendancePolicy,
     AttendanceRecord,
     CourseOffering,
     Enrollment,
@@ -26,6 +27,7 @@ from .models import (
     Submission,
     Quiz,
 )
+from .utils.attendance import attendance_scores_for_students
 from .utils.timezones import application_timezone
 
 
@@ -37,6 +39,7 @@ class EvaluationPlan:
     published_lesson_count: int
     quiz_possible_points: dict[int, int]
     grading_errors: tuple[str, ...]
+    attendance_policy: AttendancePolicy | None = None
 
 
 def applicable_formula(scope: AcademicYearLevel, offering: CourseOffering) -> PromotionFormula | None:
@@ -130,6 +133,11 @@ def build_evaluation_plan(
         for rule in rules
         if rule.metric == PromotionRule.Metric.QUIZ
     }
+    attendance_policy = (
+        AttendancePolicy.load()
+        if any(rule.metric == PromotionRule.Metric.ATTENDANCE for rule in rules)
+        else None
+    )
     return EvaluationPlan(
         formula=formula,
         rules=rules,
@@ -140,6 +148,7 @@ def build_evaluation_plan(
         ).count(),
         quiz_possible_points=quiz_possible_points,
         grading_errors=_quiz_mismatch_errors(rules, offering, starts_on, ends_on),
+        attendance_policy=attendance_policy,
     )
 
 
@@ -193,20 +202,6 @@ def evaluation_enrollments(plan: EvaluationPlan):
             annotations[f"{prefix}_unresolved_points"] = Coalesce(
                 Subquery(unresolved_rule), Value(0), output_field=IntegerField()
             )
-        else:
-            attendance = AttendanceRecord.objects.filter(
-                student=OuterRef("student_id"),
-                course_offering=plan.course_offering,
-                attendance_date__gte=plan.formula.evaluation_starts_on,
-                attendance_date__lte=plan.formula.evaluation_ends_on,
-            ).values("student", "attendance_date").annotate(
-                action_count=Count("action", distinct=True)
-            ).filter(action_count=2).values("student").annotate(
-                total=Count("attendance_date")
-            ).values("total")[:1]
-            annotations[f"{prefix}_valid_days"] = Coalesce(
-                Subquery(attendance), Value(0), output_field=IntegerField()
-            )
 
     return Enrollment.objects.filter(
         academic_year_level=plan.formula.academic_year_level,
@@ -218,7 +213,36 @@ def evaluation_enrollments(plan: EvaluationPlan):
     ).annotate(**annotations)
 
 
-def evaluate_enrollment(enrollment, plan: EvaluationPlan) -> dict:
+def _json_number(value) -> int | float:
+    value = Decimal(value)
+    return int(value) if value == value.to_integral_value() else float(value)
+
+
+def evaluate_enrollment_page(enrollments, plan: EvaluationPlan) -> list[dict]:
+    """Evaluate one bounded enrollment page with a single graded-attendance query."""
+    enrollments = list(enrollments)
+    scores: dict[int, Decimal] = {}
+    if plan.attendance_policy is not None:
+        offline_student_ids = [
+            enrollment.student_id
+            for enrollment in enrollments
+            if enrollment.student.study_mode != "online"
+        ]
+        if offline_student_ids:
+            scores = attendance_scores_for_students(
+                student_ids=offline_student_ids,
+                course_offering=plan.course_offering,
+                starts_on=plan.formula.evaluation_starts_on,
+                ends_on=plan.formula.evaluation_ends_on,
+                policy=plan.attendance_policy,
+            )
+    return [
+        evaluate_enrollment(enrollment, plan, scores.get(enrollment.student_id))
+        for enrollment in enrollments
+    ]
+
+
+def evaluate_enrollment(enrollment, plan: EvaluationPlan, attendance_score: Decimal | None = None) -> dict:
     """Calculate one already-annotated course row; callers pass bounded pages."""
     metrics = []
     online = enrollment.student.study_mode == "online"
@@ -228,7 +252,7 @@ def evaluate_enrollment(enrollment, plan: EvaluationPlan) -> dict:
             if online:
                 continue
             denominator = plan.published_lesson_count
-            earned = getattr(enrollment, f"{prefix}_valid_days", 0)
+            earned = attendance_score if attendance_score is not None else Decimal("0")
         else:
             denominator = plan.quiz_possible_points[rule.pk] - getattr(
                 enrollment, f"{prefix}_unresolved_points", 0
@@ -244,7 +268,7 @@ def evaluate_enrollment(enrollment, plan: EvaluationPlan) -> dict:
             "minimum_percent": rule.minimum_percent,
             "passed": percent >= rule.minimum_percent,
             "denominator": denominator,
-            "earned": int(earned),
+            "earned": _json_number(earned),
         })
 
     errors = list(plan.grading_errors)
@@ -332,10 +356,11 @@ def _persist_course_result_batch(formula, plan, enrollments) -> tuple[int, int]:
     }
     new_results = []
     changed_results = []
+    rows = {row["enrollment"].pk: row for row in evaluate_enrollment_page(enrollments, plan)}
     for enrollment in enrollments:
         if enrollment.pk in consumed_enrollment_ids:
             continue
-        row = evaluate_enrollment(enrollment, plan)
+        row = rows[enrollment.pk]
         result = existing.get(enrollment.pk)
         if result:
             result.computed_score = row["computed_score"]

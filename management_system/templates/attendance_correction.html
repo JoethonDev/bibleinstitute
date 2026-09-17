@@ -34,8 +34,12 @@
           <span>{{ record.get_action_display }}</span>
         </div>
         <div class="ad-meta-item">
+          <b>{% translate "Source" %}</b>
+          <span>{{ record.get_source_display }}</span>
+        </div>
+        <div class="ad-meta-item">
           <b>{% translate "Scanned at" %}</b>
-          <span>{{ record.scanned_at }}</span>
+          <span>{{ record.scanned_at|date:"Y-m-d H:i:s" }}</span>
         </div>
       </div>
 

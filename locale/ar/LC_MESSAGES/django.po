@@ -10672,6 +10672,106 @@ msgid "All files"
 msgstr "كل الملفات"
 
 
+msgid "Attendance Policy"
+msgstr "سياسة الحضور"
+
+msgid "Attendance Policies"
+msgstr "سياسات الحضور"
+
+msgid "Auto reconciliation"
+msgstr "تسوية تلقائية"
+
+msgid "Manual reconciliation"
+msgstr "تسوية يدوية"
+
+msgid "Scan"
+msgstr "مسح"
+
+msgid "On time"
+msgstr "في الموعد"
+
+msgid "Late entrance"
+msgstr "دخول متأخر"
+
+msgid "Early exit"
+msgstr "خروج مبكر"
+
+msgid "Late entrance and early exit"
+msgstr "دخول متأخر وخروج مبكر"
+
+msgid "Incomplete"
+msgstr "غير مكتمل"
+
+msgid "Attendance settings updated."
+msgstr "تم تحديث إعدادات الحضور."
+
+msgid "Full days"
+msgstr "أيام كاملة"
+
+msgid "Partial"
+msgstr "جزئي"
+
+msgid "Attendance Score"
+msgstr "درجة الحضور"
+
+msgid "Entrance deadline"
+msgstr "موعد الدخول"
+
+msgid "Meeting exit time"
+msgstr "موعد انصراف اللقاء"
+
+msgid "Buffer (minutes)"
+msgstr "الهامش (بالدقائق)"
+
+msgid "The buffer cannot exceed 120 minutes."
+msgstr "لا يمكن أن يتجاوز الهامش 120 دقيقة."
+
+msgid "Attendance settings"
+msgstr "إعدادات الحضور"
+
+msgid "Reconcile missing exits"
+msgstr "تسوية حالات الخروج الناقصة"
+
+msgid "Reconcile missing exits for this date?"
+msgstr "تسوية حالات الخروج الناقصة لهذا التاريخ؟"
+
+msgid "Save settings"
+msgstr "حفظ الإعدادات"
+
+msgid "Source"
+msgstr "المصدر"
+
+msgid "Day status"
+msgstr "حالة اليوم"
+
+msgid "Camera permission was denied. Allow camera access and try again."
+msgstr "تم رفض إذن الكاميرا. اسمح بالوصول إلى الكاميرا ثم أعد المحاولة."
+
+msgid "Camera access is unavailable on this device."
+msgstr "الكاميرا غير متاحة على هذا الجهاز."
+
+msgid "QR scanning is not available in this browser. Type the QR token in the Find Student field as a fallback."
+msgstr "مسح رمز QR غير متاح في هذا المتصفح. أدخل رمز QR في حقل البحث عن طالب كبديل."
+
+msgid "Recorded at"
+msgstr "تم التسجيل في"
+
+#, python-format
+msgid "%(count)s missing exit(s) were recorded for %(date)s."
+msgstr "تم تسجيل %(count)s من حالات الخروج الناقصة بتاريخ %(date)s."
+
+#, python-format
+msgid "No missing exits were found for %(date)s."
+msgstr "لا توجد حالات خروج ناقصة بتاريخ %(date)s."
+
+#, python-format
+msgid "Entrance after %(limit)s or exit before %(earliest)s counts as partial attendance."
+msgstr "الدخول بعد %(limit)s أو الخروج قبل %(earliest)s يُحتسب حضورًا جزئيًا."
+
+#, python-format
+msgid "Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits."
+msgstr "تُحتسب عمليات الدخول بعد %(limit)s والخروج قبل %(earliest)s حضورًا جزئيًا؛ والهامش %(buffer)s دقيقة. أما حالات الخروج المُسوَّاة فتُحتسب دائمًا خروجًا في الموعد."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

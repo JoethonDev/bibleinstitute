@@ -31,7 +31,7 @@
             <i class="fas fa-stop me-1"></i>{% translate "Stop Camera" %}
           </button>
           <div id="camera-error" class="alert alert-danger d-none"></div>
-          <video id="scanner-video" playsinline class="scanner-video sd-frame w-100 rounded border d-none" autoplay muted></video>
+          <video id="scanner-video" playsinline data-jsqr-url="{% static 'vendor/jsqr/jsQR.js' %}?v={{ static_asset_version }}" class="scanner-video sd-frame w-100 rounded border d-none" autoplay muted></video>
           <div id="scan-result" class="mt-2"></div>
         </div>
       </div>
