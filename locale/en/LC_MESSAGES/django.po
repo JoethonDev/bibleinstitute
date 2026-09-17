@@ -71,17 +71,17 @@ msgstr "Only administrators can change academic enrollment state."
 
 #: .\management_system\academic_enrollment.py:83
 msgid "No course-level evaluation results exist for this student."
-msgstr ""
+msgstr "No course-level evaluation results exist for this student."
 
 #: .\management_system\academic_enrollment.py:89
 msgid "Unevaluable courses must be resolved before promotion."
-msgstr ""
+msgstr "Unevaluable courses must be resolved before promotion."
 
 #: .\management_system\academic_enrollment.py:114
 #: .\management_system\academic_enrollment.py:569
 #, python-format
 msgid "Destination offerings are missing for failed course IDs: %(ids)s."
-msgstr ""
+msgstr "Destination offerings are missing for failed course IDs: %(ids)s."
 
 #: .\management_system\academic_enrollment.py:127
 msgid "Academic year does not exist."
@@ -112,16 +112,16 @@ msgid "The selected enrollment is not a normal full-year enrollment."
 msgstr "The selected enrollment is not a normal full-year enrollment."
 
 #: .\management_system\academic_enrollment.py:270
-#, fuzzy
+#
 #| msgid "This evaluation result has already been promoted."
 msgid "Only the aggregate evaluation result can be promoted."
-msgstr "This evaluation result has already been promoted."
+msgstr "Only the aggregate evaluation result can be promoted."
 
 #: .\management_system\academic_enrollment.py:273
-#, fuzzy
+#
 #| msgid "This evaluation result has already been promoted."
 msgid "This evaluation result has already been processed."
-msgstr "This evaluation result has already been promoted."
+msgstr "This evaluation result has already been processed."
 
 #: .\management_system\academic_enrollment.py:279
 msgid "The evaluation formula and enrollment scopes do not match."
@@ -129,7 +129,7 @@ msgstr "The evaluation formula and enrollment scopes do not match."
 
 #: .\management_system\academic_enrollment.py:281
 msgid "An offering-specific formula cannot make an aggregate promotion decision."
-msgstr ""
+msgstr "An offering-specific formula cannot make an aggregate promotion decision."
 
 #: .\management_system\academic_enrollment.py:283
 msgid "Only a normal enrollment can be promoted."
@@ -153,10 +153,10 @@ msgstr "A destination normal enrollment already exists for this student."
 
 #: .\management_system\academic_enrollment.py:357
 #: .\management_system\historical_intake.py:338
-#, fuzzy
+#
 #| msgid "An exceptional enrollment already exists for one selected offering."
 msgid "Exceptional enrollment scope does not match its offering."
-msgstr "An exceptional enrollment already exists for one selected offering."
+msgstr "Exceptional enrollment scope does not match its offering."
 
 #: .\management_system\academic_enrollment.py:385
 msgid "Select no more than 1,000 students at a time."
@@ -164,10 +164,10 @@ msgstr "Select no more than 1,000 students at a time."
 
 #: .\management_system\academic_enrollment.py:409
 #: .\management_system\historical_intake.py:265
-#, fuzzy
+#
 #| msgid "This evaluation result has already been promoted."
 msgid "This historical summary has already been promoted."
-msgstr "This evaluation result has already been promoted."
+msgstr "This historical summary has already been promoted."
 
 #: .\management_system\academic_enrollment.py:410
 #: .\management_system\models.py:1251
@@ -180,16 +180,16 @@ msgid "Review the historical outcome before promotion."
 msgstr "Review the historical outcome before promotion."
 
 #: .\management_system\academic_enrollment.py:416
-#, fuzzy
+#
 #| msgid "The destination academic level is not open in the active year."
 msgid "The destination academic year must be active."
-msgstr "The destination academic level is not open in the active year."
+msgstr "The destination academic year must be active."
 
 #: .\management_system\academic_enrollment.py:418
-#, fuzzy
+#
 #| msgid "The destination academic level is not open in the active year."
 msgid "The destination academic year must be later than the historical year."
-msgstr "The destination academic level is not open in the active year."
+msgstr "The destination academic year must be later than the historical year."
 
 #: .\management_system\academic_enrollment.py:419
 msgid "A reviewed historical outcome is required before promotion."
@@ -197,7 +197,7 @@ msgstr "A reviewed historical outcome is required before promotion."
 
 #: .\management_system\academic_enrollment.py:426
 msgid "The historical source enrollment must be normal."
-msgstr ""
+msgstr "The historical source enrollment must be normal."
 
 #: .\management_system\academic_enrollment.py:432
 msgid "Exactly one active academic year is required for promotion."
@@ -212,26 +212,26 @@ msgid "Partial promotion requires at least one failed course."
 msgstr "Partial promotion requires at least one failed course."
 
 #: .\management_system\academic_enrollment.py:448
-#, fuzzy
+#
 #| msgid "The selected enrollment is not a normal full-year enrollment."
 msgid "The destination enrollment is not a normal enrollment."
-msgstr "The selected enrollment is not a normal full-year enrollment."
+msgstr "The destination enrollment is not a normal enrollment."
 
 #: .\management_system\academic_enrollment.py:449
 msgid "The destination level does not match the historical promotion outcome."
 msgstr "The destination level does not match the historical promotion outcome."
 
 #: .\management_system\academic_enrollment.py:450
-#, fuzzy
+#
 #| msgid "A destination normal enrollment already exists for this student."
 msgid "The destination enrollment is withdrawn."
-msgstr "A destination normal enrollment already exists for this student."
+msgstr "The destination enrollment is withdrawn."
 
 #: .\management_system\academic_enrollment.py:461
-#, fuzzy
+#
 #| msgid "This enrollment type requires a course offering."
 msgid "Last-level partial promotion requires failed course offerings."
-msgstr "This enrollment type requires a course offering."
+msgstr "Last-level partial promotion requires failed course offerings."
 
 #: .\management_system\academic_enrollment.py:463
 msgid "Every exceptional course must belong to the destination year and be published."
@@ -239,7 +239,7 @@ msgstr "Every exceptional course must belong to the destination year and be publ
 
 #: .\management_system\academic_enrollment.py:477
 msgid "An exceptional offering cannot use a normal enrollment."
-msgstr ""
+msgstr "An exceptional offering cannot use a normal enrollment."
 
 #: .\management_system\academic_enrollment.py:497
 msgid "Exceptional courses require a destination academic scope."
@@ -247,7 +247,7 @@ msgstr "Exceptional courses require a destination academic scope."
 
 #: .\management_system\academic_enrollment.py:528
 msgid "The next academic year must open the last level before failed-course access can be created."
-msgstr ""
+msgstr "The next academic year must open the last level before failed-course access can be created."
 
 #: .\management_system\academic_evaluation.py:108
 #, python-format
@@ -255,10 +255,10 @@ msgid "Quiz %(name)s declares %(declared)s points but its questions total %(actu
 msgstr "Quiz %(name)s declares %(declared)s points but its questions total %(actual)s."
 
 #: .\management_system\academic_evaluation.py:124
-#, fuzzy
+#
 #| msgid "Course offering is required for scheduled upload"
 msgid "A course offering is required to build a course evaluation plan."
-msgstr "Course offering is required for scheduled upload"
+msgstr "A course offering is required to build a course evaluation plan."
 
 #: .\management_system\academic_evaluation.py:254
 #, python-format
@@ -267,13 +267,13 @@ msgstr "%(count)d unresolved manual-grade question(s), excluding %(points)d poin
 
 #: .\management_system\academic_evaluation.py:259
 msgid "This course has no published lectures."
-msgstr ""
+msgstr "This course has no published lectures."
 
 #: .\management_system\academic_evaluation.py:458
-#, fuzzy
+#
 #| msgid "No attendance course is available for this student today."
 msgid "No published course offerings are available for this formula."
-msgstr "No attendance course is available for this student today."
+msgstr "No published course offerings are available for this formula."
 
 #: .\management_system\academic_evaluation.py:556
 msgid "Only administrators can override evaluation results."
@@ -338,40 +338,40 @@ msgstr "Promotion formulas can only be saved for the active academic year."
 
 #: .\management_system\academic_formula.py:92 .\management_system\forms.py:623
 #: .\management_system\models.py:751 .\management_system\models.py:988
-#, fuzzy
+#
 #| msgid "Course offering must belong to the enrollment scope."
 msgid "Course offering must belong to the selected academic scope."
-msgstr "Course offering must belong to the enrollment scope."
+msgstr "Course offering must belong to the selected academic scope."
 
 #: .\management_system\academic_formula.py:94
 msgid "Overall passing threshold must be between 0 and 100."
 msgstr "Overall passing threshold must be between 0 and 100."
 
 #: .\management_system\academic_formula.py:96 .\management_system\models.py:985
-#, fuzzy
+#
 #| msgid "Overall passing threshold must be between 0 and 100."
 msgid "The repeat threshold must be at least 1."
-msgstr "Overall passing threshold must be between 0 and 100."
+msgstr "The repeat threshold must be at least 1."
 
 #: .\management_system\academic_formula.py:99 .\management_system\forms.py:627
 #: .\management_system\models.py:992
-#, fuzzy
+#
 #| msgid "End date must be after start date."
 msgid "Evaluation end date must not be before the start date."
-msgstr "End date must be after start date."
+msgstr "Evaluation end date must not be before the start date."
 
 #: .\management_system\academic_formula.py:101 .\management_system\forms.py:629
 #: .\management_system\models.py:994
-#, fuzzy
+#
 #| msgid "Evaluation date must be inside the academic year."
 msgid "Evaluation start date must be inside the academic year."
-msgstr "Evaluation date must be inside the academic year."
+msgstr "Evaluation start date must be inside the academic year."
 
 #: .\management_system\academic_formula.py:103
-#, fuzzy
+#
 #| msgid "Evaluation date must be inside the academic year."
 msgid "Evaluation end date must be inside the academic year and cannot be in the future."
-msgstr "Evaluation date must be inside the academic year."
+msgstr "Evaluation end date must be inside the academic year and cannot be in the future."
 
 #: .\management_system\admin.py:66 .\management_system\models.py:635
 #: .\management_system\templates\academic_setup.html:55
@@ -408,18 +408,18 @@ msgid "Quiz"
 msgstr "Quiz"
 
 #: .\management_system\evaluation_export.py:92
-#, fuzzy
+#
 #| msgid "Earned Grade"
 msgid "Earned"
-msgstr "Earned Grade"
+msgstr "Earned"
 
 #: .\management_system\evaluation_export.py:93
 msgid "Denominator"
-msgstr ""
+msgstr "Denominator"
 
 #: .\management_system\evaluation_export.py:95
 msgid "Min %"
-msgstr ""
+msgstr "Min %"
 
 #: .\management_system\evaluation_export.py:96
 #: .\management_system\models.py:1126
@@ -430,17 +430,17 @@ msgstr "Passed"
 
 #: .\management_system\evaluation_export.py:119
 msgid "No Results"
-msgstr ""
+msgstr "No Results"
 
 #: .\management_system\evaluation_export.py:120
 msgid "No course-level evaluation results found for this formula."
-msgstr ""
+msgstr "No course-level evaluation results found for this formula."
 
 #: .\management_system\evaluation_export.py:126
-#, fuzzy
+#
 #| msgid "Quiz Summary"
 msgid "Summary"
-msgstr "Quiz Summary"
+msgstr "Summary"
 
 #: .\management_system\evaluation_export.py:128
 #: .\management_system\templates\calendar_management.html:243
@@ -527,16 +527,16 @@ msgstr "Status"
 #: .\management_system\evaluation_export.py:129
 #: .\management_system\evaluation_export.py:166
 #: .\management_system\templates\promotion_evaluation.html:662
-#, fuzzy
+#
 #| msgid "Published offerings"
 msgid "Published Lectures"
-msgstr "Published offerings"
+msgstr "Published Lectures"
 
 #: .\management_system\evaluation_export.py:130
-#, fuzzy
+#
 #| msgid "Attendance Records"
 msgid "Valid Attendance Records"
-msgstr "Attendance Records"
+msgstr "Valid Attendance Records"
 
 #: .\management_system\evaluation_export.py:130
 #: .\management_system\views.py:5319 .\management_system\views.py:5372
@@ -544,24 +544,24 @@ msgid "Attendance %"
 msgstr "Attendance %"
 
 #: .\management_system\evaluation_export.py:131
-#, fuzzy
+#
 #| msgid "Repeated"
 msgid "Repeat Threshold"
-msgstr "Repeated"
+msgstr "Repeat Threshold"
 
 #: .\management_system\evaluation_export.py:131
 #: .\management_system\evaluation_export.py:165
-#, fuzzy
+#
 #| msgid "Evaluation"
 msgid "Evaluation Start"
-msgstr "Evaluation"
+msgstr "Evaluation Start"
 
 #: .\management_system\evaluation_export.py:131
 #: .\management_system\evaluation_export.py:165
-#, fuzzy
+#
 #| msgid "Evaluation"
 msgid "Evaluation End"
-msgstr "Evaluation"
+msgstr "Evaluation End"
 
 #: .\management_system\evaluation_export.py:164 .\management_system\forms.py:20
 #: .\management_system\forms.py:25 .\management_system\forms.py:40
@@ -617,31 +617,31 @@ msgstr "Level"
 
 #: .\management_system\evaluation_export.py:167
 msgid "Weighted Score"
-msgstr ""
+msgstr "Weighted Score"
 
 #: .\management_system\evaluation_export.py:167
-#, fuzzy
+#
 #| msgid "Computed"
 msgid "Computed Status"
-msgstr "Computed"
+msgstr "Computed Status"
 
 #: .\management_system\evaluation_export.py:167
-#, fuzzy
+#
 #| msgid "By Status"
 msgid "Final Status"
-msgstr "By Status"
+msgstr "Final Status"
 
 #: .\management_system\evaluation_export.py:168
-#, fuzzy
+#
 #| msgid "Override note"
 msgid "Override Note"
-msgstr "Override note"
+msgstr "Override Note"
 
 #: .\management_system\evaluation_export.py:168
-#, fuzzy
+#
 #| msgid "Evaluation"
 msgid "Evaluation Errors"
-msgstr "Evaluation"
+msgstr "Evaluation Errors"
 
 #: .\management_system\forms.py:21 .\management_system\forms.py:30
 #: .\management_system\forms.py:45 .\management_system\forms.py:82
@@ -758,10 +758,10 @@ msgid "Service (if any)"
 msgstr "Service (if any)"
 
 #: .\management_system\forms.py:167
-#, fuzzy
+#
 #| msgid "Identity Type"
 msgid "Identity type"
-msgstr "Identity Type"
+msgstr "Identity type"
 
 #: .\management_system\forms.py:174 .\management_system\forms.py:175
 #: .\management_system\forms.py:753 .\management_system\forms.py:867
@@ -770,28 +770,28 @@ msgid "Identity Number"
 msgstr "Identity Number"
 
 #: .\management_system\forms.py:178
-#, fuzzy
+#
 #| msgid "Study Mode"
 msgid "Study mode"
-msgstr "Study Mode"
+msgstr "Study mode"
 
 #: .\management_system\forms.py:184
-#, fuzzy
+#
 #| msgid "Study Mode"
 msgid "Study mode override"
-msgstr "Study Mode"
+msgstr "Study mode override"
 
 #: .\management_system\forms.py:187
-#, fuzzy
+#
 #| msgid "Application Status"
 msgid "Application status"
-msgstr "Application Status"
+msgstr "Application status"
 
 #: .\management_system\forms.py:193
-#, fuzzy
+#
 #| msgid "Decision"
 msgid "Decision notes"
-msgstr "Decision"
+msgstr "Decision notes"
 
 #: .\management_system\forms.py:199
 #: .\management_system\templates\progress_dashboard.html:20
@@ -800,10 +800,10 @@ msgstr "Academic year and level"
 
 #: .\management_system\forms.py:239 .\management_system\forms.py:777
 #: .\management_system\forms.py:888
-#, fuzzy
+#
 #| msgid "Enter a valid date and time."
 msgid "Enter a valid international phone number."
-msgstr "Enter a valid date and time."
+msgstr "Enter a valid international phone number."
 
 #: .\management_system\forms.py:241 .\management_system\forms.py:779
 #: .\management_system\forms.py:893
@@ -870,72 +870,72 @@ msgid "Sunday"
 msgstr "Sunday"
 
 #: .\management_system\forms.py:377 .\management_system\forms.py:462
-#, fuzzy
+#
 #| msgid "Source Academic Scope"
 msgid "Historical academic scope"
-msgstr "Source Academic Scope"
+msgstr "Historical academic scope"
 
 #: .\management_system\forms.py:379
-#, fuzzy
+#
 #| msgid "Student name"
 msgid "Source student name"
-msgstr "Student name"
+msgstr "Source student name"
 
 #: .\management_system\forms.py:381
 msgid "Find existing account"
-msgstr ""
+msgstr "Find existing account"
 
 #: .\management_system\forms.py:381
-#, fuzzy
+#
 #| msgid "Create New Lesson"
 msgid "Create new account"
-msgstr "Create New Lesson"
+msgstr "Create new account"
 
 #: .\management_system\forms.py:387
-#, fuzzy
+#
 #| msgid "Username"
 msgid "New username"
-msgstr "Username"
+msgstr "New username"
 
 #: .\management_system\forms.py:399 .\management_system\forms.py:477
 #: .\management_system\templates\historical_intake.html:95
-#, fuzzy
+#
 #| msgid "Target Academic Scope"
 msgid "Destination academic scope"
-msgstr "Target Academic Scope"
+msgstr "Destination academic scope"
 
 #: .\management_system\forms.py:401 .\management_system\forms.py:479
 #: .\management_system\templates\historical_intake.html:37
 #: .\management_system\templates\historical_intake.html:57
 msgid "Promote after review"
-msgstr ""
+msgstr "Promote after review"
 
 #: .\management_system\forms.py:405 .\management_system\forms.py:483
-#, fuzzy
+#
 #| msgid "Invalid course offering."
 msgid "Failed course offering IDs"
-msgstr "Invalid course offering."
+msgstr "Failed course offering IDs"
 
 #: .\management_system\forms.py:418
 #: .\management_system\historical_intake.py:127
 msgid "Find mode requires an LMS user ID, username, or email."
-msgstr ""
+msgstr "Find mode requires an LMS user ID, username, or email."
 
 #: .\management_system\forms.py:420
 msgid "Create mode requires a new username."
-msgstr ""
+msgstr "Create mode requires a new username."
 
 #: .\management_system\forms.py:422 .\management_system\forms.py:502
-#, fuzzy
+#
 #| msgid "Activate a higher academic year before promotion."
 msgid "Select a destination academic scope before promotion."
-msgstr "Activate a higher academic year before promotion."
+msgstr "Select a destination academic scope before promotion."
 
 #: .\management_system\forms.py:430
-#, fuzzy
+#
 #| msgid "Enter username or numeric ID"
 msgid "Username or numeric student ID"
-msgstr "Enter username or numeric ID"
+msgstr "Username or numeric student ID"
 
 #: .\management_system\forms.py:431 .\management_system\models.py:43
 #: .\management_system\templates\attendance_correction.html:22
@@ -966,32 +966,32 @@ msgid "Student"
 msgstr "Student"
 
 #: .\management_system\forms.py:436
-#, fuzzy
+#
 #| msgid "Invalid course offering."
 msgid "Failed course offerings"
-msgstr "Invalid course offering."
+msgstr "Failed course offerings"
 
 #: .\management_system\forms.py:454
-#, fuzzy
+#
 #| msgid "Select no more than 1,000 students at a time."
 msgid "Select an existing student account."
-msgstr "Select no more than 1,000 students at a time."
+msgstr "Select an existing student account."
 
 #: .\management_system\forms.py:465
 msgid "Usernames or numeric IDs, separated by commas or lines"
-msgstr ""
+msgstr "Usernames or numeric IDs, separated by commas or lines"
 
 #: .\management_system\forms.py:466
-#, fuzzy
+#
 #| msgid "Find Student"
 msgid "Existing students"
-msgstr "Find Student"
+msgstr "Existing students"
 
 #: .\management_system\forms.py:496
-#, fuzzy
+#
 #| msgid "Select no more than 1,000 students at a time."
 msgid "Select between one and 1,000 students."
-msgstr "Select no more than 1,000 students at a time."
+msgstr "Select between one and 1,000 students."
 
 #: .\management_system\forms.py:521
 #: .\management_system\templates\academic_setup.html:468
@@ -1024,16 +1024,16 @@ msgid "All courses"
 msgstr "All courses"
 
 #: .\management_system\forms.py:631 .\management_system\models.py:996
-#, fuzzy
+#
 #| msgid "Evaluation date must be inside the academic year."
 msgid "Evaluation end date must be inside the academic year."
-msgstr "Evaluation date must be inside the academic year."
+msgstr "Evaluation end date must be inside the academic year."
 
 #: .\management_system\forms.py:633 .\management_system\models.py:998
-#, fuzzy
+#
 #| msgid "Evaluation date must be inside the academic year."
 msgid "Evaluation end date cannot be in the future."
-msgstr "Evaluation date must be inside the academic year."
+msgstr "Evaluation end date cannot be in the future."
 
 #: .\management_system\forms.py:645
 msgid "All quiz types"
@@ -1057,16 +1057,16 @@ msgid "Students"
 msgstr "Students"
 
 #: .\management_system\forms.py:680
-#, fuzzy
+#
 #| msgid "Exceptional quiz opening"
 msgid "Exceptional opening date"
-msgstr "Exceptional quiz opening"
+msgstr "Exceptional opening date"
 
 #: .\management_system\forms.py:684
-#, fuzzy
+#
 #| msgid "Exam Closing Date"
 msgid "Exceptional closing date"
-msgstr "Exam Closing Date"
+msgstr "Exceptional closing date"
 
 #: .\management_system\forms.py:697
 msgid "Enter a valid date and time."
@@ -1166,177 +1166,177 @@ msgstr "A passport requires only the front document."
 
 #: .\management_system\historical_intake.py:73
 msgid "Failed course offering IDs must be positive numbers separated by commas."
-msgstr ""
+msgstr "Failed course offering IDs must be positive numbers separated by commas."
 
 #: .\management_system\historical_intake.py:83
 msgid "The intake file is too large."
-msgstr ""
+msgstr "The intake file is too large."
 
 #: .\management_system\historical_intake.py:95
 msgid "The XLSX file must contain an Intake sheet."
-msgstr ""
+msgstr "The XLSX file must contain an Intake sheet."
 
 #: .\management_system\historical_intake.py:104
 msgid "Upload a CSV or XLSX intake file."
-msgstr ""
+msgstr "Upload a CSV or XLSX intake file."
 
 #: .\management_system\historical_intake.py:110
 msgid "The intake file columns do not match the approved template."
-msgstr ""
+msgstr "The intake file columns do not match the approved template."
 
 #: .\management_system\historical_intake.py:112
-#, fuzzy
+#
 #| msgid "Percentage must be between 0 and 100."
 msgid "The intake file must contain between 1 and 1,000 rows."
-msgstr "Percentage must be between 0 and 100."
+msgstr "The intake file must contain between 1 and 1,000 rows."
 
 #: .\management_system\historical_intake.py:120
-#, fuzzy
+#
 #| msgid "The reply message ID must be a positive integer."
 msgid "LMS user ID must be a positive number."
-msgstr "The reply message ID must be a positive integer."
+msgstr "LMS user ID must be a positive number."
 
 #: .\management_system\historical_intake.py:132
 msgid "The LMS identity matches more than one account."
-msgstr ""
+msgstr "The LMS identity matches more than one account."
 
 #: .\management_system\historical_intake.py:137
 msgid "The LMS identity fields refer to different accounts."
-msgstr ""
+msgstr "The LMS identity fields refer to different accounts."
 
 #: .\management_system\historical_intake.py:139
 msgid "No LMS account matches the supplied identity."
-msgstr ""
+msgstr "No LMS account matches the supplied identity."
 
 #: .\management_system\historical_intake.py:141
-#, fuzzy
+#
 #| msgid "The selected academic year is not active."
 msgid "The selected LMS account is not a student account."
-msgstr "The selected academic year is not active."
+msgstr "The selected LMS account is not a student account."
 
 #: .\management_system\historical_intake.py:147
-#, fuzzy
+#
 #| msgid "Select Academic Scope"
 msgid "Select a valid academic scope."
-msgstr "Select Academic Scope"
+msgstr "Select a valid academic scope."
 
 #: .\management_system\historical_intake.py:154
-#, fuzzy
+#
 #| msgid "The selected academic year is not active."
 msgid "The selected academic scope is not available."
-msgstr "The selected academic year is not active."
+msgstr "The selected academic scope is not available."
 
 #: .\management_system\historical_intake.py:160
 #, python-format
 msgid "Row %(row)d has no source student name."
-msgstr ""
+msgstr "Row %(row)d has no source student name."
 
 #: .\management_system\historical_intake.py:166
 #, python-format
 msgid "Row %(row)d must identify its source academic year and level."
-msgstr ""
+msgstr "Row %(row)d must identify its source academic year and level."
 
 #: .\management_system\historical_intake.py:172
 #, python-format
 msgid "Row %(row)d has no matching source academic scope."
-msgstr ""
+msgstr "Row %(row)d has no matching source academic scope."
 
 #: .\management_system\historical_intake.py:175
 #, python-format
 msgid "Row %(row)d has an invalid historical outcome."
-msgstr ""
+msgstr "Row %(row)d has an invalid historical outcome."
 
 #: .\management_system\historical_intake.py:178
 #, python-format
 msgid "Row %(row)d must set account_action to find or create."
-msgstr ""
+msgstr "Row %(row)d must set account_action to find or create."
 
 #: .\management_system\historical_intake.py:183
 #, python-format
 msgid "Row %(row)d create mode requires lms_username."
-msgstr ""
+msgstr "Row %(row)d create mode requires lms_username."
 
 #: .\management_system\historical_intake.py:185
-#, fuzzy, python-format
+#, python-format
 #| msgid "Line %(line)d: User '%(username)s' already exists."
 msgid "Row %(row)d create username already exists."
-msgstr "Line %(line)d: User '%(username)s' already exists."
+msgstr "Row %(row)d create username already exists."
 
 #: .\management_system\historical_intake.py:191
 #, python-format
 msgid "Row %(row)d cannot be promoted with this historical outcome."
-msgstr ""
+msgstr "Row %(row)d cannot be promoted with this historical outcome."
 
 #: .\management_system\historical_intake.py:195
 #, python-format
 msgid "Row %(row)d promotion requires destination academic year and level."
-msgstr ""
+msgstr "Row %(row)d promotion requires destination academic year and level."
 
 #: .\management_system\historical_intake.py:202
 #, python-format
 msgid "Row %(row)d has no matching active destination scope."
-msgstr ""
+msgstr "Row %(row)d has no matching active destination scope."
 
 #: .\management_system\historical_intake.py:204
 #, python-format
 msgid "Row %(row)d partial promotion requires failed course offering IDs."
-msgstr ""
+msgstr "Row %(row)d partial promotion requires failed course offering IDs."
 
 #: .\management_system\historical_intake.py:213
 msgid "Ready for review"
-msgstr ""
+msgstr "Ready for review"
 
 #: .\management_system\historical_intake.py:224
-#, fuzzy
+#
 #| msgid "The selected user no longer exists."
 msgid "The create username already exists."
-msgstr "The selected user no longer exists."
+msgstr "The create username already exists."
 
 #: .\management_system\historical_intake.py:263
 msgid "This source row is already linked to a different student or academic scope."
-msgstr ""
+msgstr "This source row is already linked to a different student or academic scope."
 
 #: .\management_system\historical_intake.py:279
-#, fuzzy
+#
 #| msgid "The selected enrollment is not a normal full-year enrollment."
 msgid "The historical source enrollment is not a normal enrollment."
-msgstr "The selected enrollment is not a normal full-year enrollment."
+msgstr "The historical source enrollment is not a normal enrollment."
 
 #: .\management_system\historical_intake.py:281
 msgid "The historical source enrollment is withdrawn."
 msgstr "The historical source enrollment is withdrawn."
 
 #: .\management_system\historical_intake.py:302
-#, fuzzy
+#
 #| msgid "Exceptional opening saved for %(count)s student(s)."
 msgid "Exceptional courses can only be assigned to students."
-msgstr "Exceptional opening saved for %(count)s student(s)."
+msgstr "Exceptional courses can only be assigned to students."
 
 #: .\management_system\historical_intake.py:305
-#, fuzzy
+#
 #| msgid "Exactly one active academic year is required before acceptance."
 msgid "Exactly one active academic year is required."
-msgstr "Exactly one active academic year is required before acceptance."
+msgstr "Exactly one active academic year is required."
 
 #: .\management_system\historical_intake.py:308
 msgid "Select between one and 100 exceptional course offerings."
-msgstr ""
+msgstr "Select between one and 100 exceptional course offerings."
 
 #: .\management_system\historical_intake.py:315
-#, fuzzy
+#
 #| msgid "The destination academic level is not open in the active year."
 msgid "Every selected course must be a published offering in the active academic year."
-msgstr "The destination academic level is not open in the active year."
+msgstr "Every selected course must be a published offering in the active academic year."
 
 #: .\management_system\historical_intake.py:326
-#, fuzzy
+#
 #| msgid "A destination normal enrollment already exists for this student."
 msgid "A full-year enrollment already grants this student's active scope."
-msgstr "A destination normal enrollment already exists for this student."
+msgstr "A full-year enrollment already grants this student's active scope."
 
 #: .\management_system\historical_intake.py:340
 msgid "An existing normal enrollment cannot be converted to exceptional access."
-msgstr ""
+msgstr "An existing normal enrollment cannot be converted to exceptional access."
 
 #: .\management_system\management\commands\process_telegram_notifications.py:34
 msgid "Inspect the Telegram notification outbox and optionally retry failed rows or process due rows. Read-only by default; never calls Telegram without --process."
@@ -1565,10 +1565,10 @@ msgid "Lesson published"
 msgstr "Lesson published"
 
 #: .\management_system\models.py:261
-#, fuzzy
+#
 #| msgid "Exam Opening Date"
 msgid "Exam opening"
-msgstr "Exam Opening Date"
+msgstr "Exam opening"
 
 #: .\management_system\models.py:264 .\management_system\models.py:391
 #: .\management_system\models.py:472 .\management_system\models.py:565
@@ -1609,31 +1609,31 @@ msgstr "Open"
 
 #: .\management_system\models.py:337
 msgid "Claimed"
-msgstr ""
+msgstr "Claimed"
 
 #: .\management_system\models.py:338
 msgid "Handled"
-msgstr ""
+msgstr "Handled"
 
 #: .\management_system\models.py:339
 msgid "Blocked"
-msgstr ""
+msgstr "Blocked"
 
 #: .\management_system\models.py:378
 msgid "Inbound"
-msgstr ""
+msgstr "Inbound"
 
 #: .\management_system\models.py:379
 msgid "Outbound"
-msgstr ""
+msgstr "Outbound"
 
 #: .\management_system\models.py:382
 msgid "Text"
-msgstr ""
+msgstr "Text"
 
 #: .\management_system\models.py:383
 msgid "Photo"
-msgstr ""
+msgstr "Photo"
 
 #: .\management_system\models.py:384
 #: .\management_system\templates\partials\components\file_card.html:107
@@ -1652,17 +1652,17 @@ msgstr "Video"
 
 #: .\management_system\models.py:386
 msgid "Digest"
-msgstr ""
+msgstr "Digest"
 
 #: .\management_system\models.py:387
 msgid "Unsupported"
-msgstr ""
+msgstr "Unsupported"
 
 #: .\management_system\models.py:390
-#, fuzzy
+#
 #| msgid "Archived"
 msgid "Received"
-msgstr "Archived"
+msgstr "Received"
 
 #: .\management_system\models.py:474 .\management_system\models.py:846
 #: .\management_system\models.py:1125
@@ -1795,42 +1795,42 @@ msgstr "Fail"
 #: .\management_system\templates\promotion_evaluation.html:196
 #: .\management_system\templates\promotion_evaluation.html:207
 #: .\management_system\templates\promotion_evaluation.html:274
-#, fuzzy
+#
 #| msgid "Grade Available"
 msgid "Unevaluable"
-msgstr "Grade Available"
+msgstr "Unevaluable"
 
 #: .\management_system\models.py:1111
-#, fuzzy
+#
 #| msgid "Course offering must belong to the enrollment scope."
 msgid "Evaluation offering must belong to the formula scope."
-msgstr "Course offering must belong to the enrollment scope."
+msgstr "Evaluation offering must belong to the formula scope."
 
 #: .\management_system\models.py:1113
-#, fuzzy
+#
 #| msgid "A selected offering does not match the source scope level."
 msgid "Evaluation offering does not match the formula offering."
-msgstr "A selected offering does not match the source scope level."
+msgstr "Evaluation offering does not match the formula offering."
 
 #: .\management_system\models.py:1115
 msgid "A course-specific formula requires a course result."
-msgstr ""
+msgstr "A course-specific formula requires a course result."
 
 #: .\management_system\models.py:1117
-#, fuzzy
+#
 #| msgid "Invalid evaluation status."
 msgid "Invalid evaluation result status."
-msgstr "Invalid evaluation status."
+msgstr "Invalid evaluation result status."
 
 #: .\management_system\models.py:1124
-#, fuzzy
+#
 #| msgid "Pending"
 msgid "Pending review"
-msgstr "Pending"
+msgstr "Pending review"
 
 #: .\management_system\models.py:1127
 msgid "Partial success"
-msgstr ""
+msgstr "Partial success"
 
 #: .\management_system\models.py:1239
 #: .\management_system\templates\partials\components\file_actions_menu.html:45
@@ -1866,10 +1866,10 @@ msgid "Exit"
 msgstr "Exit"
 
 #: .\management_system\models.py:1320
-#, fuzzy
+#
 #| msgid "Meeting date must be inside the academic year."
 msgid "Attendance date must be inside the academic year."
-msgstr "Meeting date must be inside the academic year."
+msgstr "Attendance date must be inside the academic year."
 
 #: .\management_system\models.py:1409
 #, python-format
@@ -2071,17 +2071,17 @@ msgstr "Only administrators can manage Telegram broadcasts."
 
 #: .\management_system\telegram\broadcasts.py:70
 #: .\management_system\telegram_views.py:597
-#, fuzzy
+#
 #| msgid "The target scope must belong to the active academic year."
 msgid "The broadcast target must use the active academic year."
-msgstr "The target scope must belong to the active academic year."
+msgstr "The broadcast target must use the active academic year."
 
 #: .\management_system\telegram\broadcasts.py:75
 #: .\management_system\telegram\broadcasts.py:118
-#, fuzzy
+#
 #| msgid "The destination academic level is not open in the active year."
 msgid "The selected level is not open in the active academic year."
-msgstr "The destination academic level is not open in the active year."
+msgstr "The selected level is not open in the active academic year."
 
 #: .\management_system\telegram\broadcasts.py:101
 #: .\management_system\telegram_forms.py:109
@@ -2095,17 +2095,17 @@ msgid "The broadcast message must be 4,000 characters or fewer."
 msgstr "The broadcast message must be 4,000 characters or fewer."
 
 #: .\management_system\telegram\broadcasts.py:107
-#, fuzzy
+#
 #| msgid "Telegram encryption is not configured."
 msgid "Telegram storage is not configured."
-msgstr "Telegram encryption is not configured."
+msgstr "Telegram storage is not configured."
 
 #: .\management_system\telegram\broadcasts.py:113
 #: .\management_system\telegram_views.py:566
-#, fuzzy
+#
 #| msgid "No active academic year."
 msgid "There is no active academic year."
-msgstr "No active academic year."
+msgstr "There is no active academic year."
 
 #: .\management_system\telegram\broadcasts.py:129
 #: .\management_system\telegram_forms.py:136
@@ -2244,47 +2244,47 @@ msgstr "Telegram deactivation failed."
 #: .\management_system\telegram\linking.py:57
 #: .\management_system\telegram\linking.py:76
 msgid "This LMS account is not eligible for Telegram linking."
-msgstr ""
+msgstr "This LMS account is not eligible for Telegram linking."
 
 #: .\management_system\telegram\linking.py:68
 msgid "A Telegram linking request is already being prepared. Try again."
-msgstr ""
+msgstr "A Telegram linking request is already being prepared. Try again."
 
 #: .\management_system\telegram\linking.py:111
 msgid "This Telegram link is invalid. Please request a new link from your profile."
-msgstr ""
+msgstr "This Telegram link is invalid. Please request a new link from your profile."
 
 #: .\management_system\telegram\linking.py:125
 msgid "This Telegram link has already been used or revoked. Please request a new link."
-msgstr ""
+msgstr "This Telegram link has already been used or revoked. Please request a new link."
 
 #: .\management_system\telegram\linking.py:129
 msgid "This LMS account is inactive or no longer eligible. Contact support."
-msgstr ""
+msgstr "This LMS account is inactive or no longer eligible. Contact support."
 
 #: .\management_system\telegram\linking.py:131
 msgid "This Telegram account is already linked to another LMS account. Contact support."
-msgstr ""
+msgstr "This Telegram account is already linked to another LMS account. Contact support."
 
 #: .\management_system\telegram\linking.py:135
 msgid "This LMS account is already linked to Telegram. Contact support."
-msgstr ""
+msgstr "This LMS account is already linked to Telegram. Contact support."
 
 #: .\management_system\telegram\linking.py:151
 msgid "This Telegram account is already linked to an LMS account. Contact support."
-msgstr ""
+msgstr "This Telegram account is already linked to an LMS account. Contact support."
 
 #: .\management_system\telegram\linking.py:162
 msgid "The shared phone number is invalid or ambiguous. Contact support."
-msgstr ""
+msgstr "The shared phone number is invalid or ambiguous. Contact support."
 
 #: .\management_system\telegram\linking.py:184
 msgid "No eligible LMS account matches this phone number. Contact support."
-msgstr ""
+msgstr "No eligible LMS account matches this phone number. Contact support."
 
 #: .\management_system\telegram\linking.py:186
 msgid "More than one LMS account matches this phone number. Contact support."
-msgstr ""
+msgstr "More than one LMS account matches this phone number. Contact support."
 
 #: .\management_system\telegram\navigation.py:158
 #: .\management_system\templates\academic_setup.html:114
@@ -2330,16 +2330,13 @@ msgid "Previous"
 msgstr "Previous"
 
 #: .\management_system\telegram\navigation.py:159
-#, fuzzy, python-format
+#, python-format
 #| msgid ""
 #| "\n"
 #| "                Showing %(start)s–%(end)s of %(total)s results\n"
 #| "            "
 msgid "Page %(current)s of %(total)s"
-msgstr ""
-"\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
-"            "
+msgstr "Page %(current)s of %(total)s"
 
 #: .\management_system\telegram\navigation.py:162
 #: .\management_system\templates\academic_setup.html:133
@@ -2385,10 +2382,10 @@ msgid "Next"
 msgstr "Next"
 
 #: .\management_system\telegram\navigation.py:169
-#, fuzzy
+#
 #| msgid "My Courses"
 msgid "My courses"
-msgstr "My Courses"
+msgstr "My courses"
 
 #: .\management_system\telegram\navigation.py:170
 msgid "Contact support"
@@ -2438,10 +2435,10 @@ msgstr "Lessons"
 
 #: .\management_system\telegram\navigation.py:195
 #: .\management_system\telegram_tasks.py:343
-#, fuzzy
+#
 #| msgid "Exam"
 msgid "Exams"
-msgstr "Exam"
+msgstr "Exams"
 
 #: .\management_system\telegram\navigation.py:196
 #: .\management_system\telegram\navigation.py:214
@@ -2462,19 +2459,19 @@ msgstr "Back"
 
 #: .\management_system\telegram\navigation.py:229
 msgid "Listen to audio"
-msgstr ""
+msgstr "Listen to audio"
 
 #: .\management_system\telegram\navigation.py:310
-#, fuzzy, python-format
+#, python-format
 #| msgid "Level %(ordering)d"
 msgid "Level %(ordering)s"
-msgstr "Level %(ordering)d"
+msgstr "Level %(ordering)s"
 
 #: .\management_system\telegram\navigation.py:315
-#, fuzzy
+#
 #| msgid "hours"
 msgid "two hours"
-msgstr "hours"
+msgstr "two hours"
 
 #: .\management_system\telegram\navigation.py:317
 #: .\management_system\templates\display_quiz.html:107
@@ -2487,10 +2484,10 @@ msgid "hour"
 msgstr "hour"
 
 #: .\management_system\telegram\navigation.py:323
-#, fuzzy
+#
 #| msgid "minutes"
 msgid "two minutes"
-msgstr "minutes"
+msgstr "two minutes"
 
 #: .\management_system\telegram\navigation.py:325
 #: .\management_system\templates\display_quiz.html:109
@@ -2512,149 +2509,149 @@ msgstr "minute"
 #: .\management_system\telegram\navigation.py:333
 #, python-format
 msgid "%(hours)s %(hour_unit)s and %(minutes)s %(minute_unit)s"
-msgstr ""
+msgstr "%(hours)s %(hour_unit)s and %(minutes)s %(minute_unit)s"
 
 #: .\management_system\telegram\navigation.py:340
 #, python-format
 msgid "%(hours)s %(hour_unit)s"
-msgstr ""
+msgstr "%(hours)s %(hour_unit)s"
 
 #: .\management_system\telegram\navigation.py:341
 #, python-format
 msgid "%(minutes)s %(minute_unit)s"
-msgstr ""
+msgstr "%(minutes)s %(minute_unit)s"
 
 #: .\management_system\telegram\navigation.py:349
-#, fuzzy, python-format
+#, python-format
 #| msgid "Welcome back, %(name)s"
 msgid "Welcome %(name)s."
-msgstr "Welcome back, %(name)s"
+msgstr "Welcome %(name)s."
 
 #: .\management_system\telegram\navigation.py:350
-#, fuzzy
+#
 #| msgid "Welcome to the course!"
 msgid "Welcome to the institute."
-msgstr "Welcome to the course!"
+msgstr "Welcome to the institute."
 
 #: .\management_system\telegram\navigation.py:351
 msgid "Use the buttons below to browse your available courses."
-msgstr ""
+msgstr "Use the buttons below to browse your available courses."
 
 #: .\management_system\telegram\navigation.py:368
 #, python-format
 msgid "%(name)s (%(type)s)"
-msgstr ""
+msgstr "%(name)s (%(type)s)"
 
 #: .\management_system\telegram\navigation.py:373
 #: .\management_system\telegram\navigation.py:395
 #: .\management_system\telegram\navigation.py:420
-#, fuzzy, python-format
+#, python-format
 #| msgid "Course name"
 msgid "Course: %(name)s"
-msgstr "Course name"
+msgstr "Course: %(name)s"
 
 #: .\management_system\telegram\navigation.py:374
-#, fuzzy, python-format
+#, python-format
 #| msgid "Delete %(view_name)s"
 msgid "Level: %(name)s"
-msgstr "Delete %(view_name)s"
+msgstr "Level: %(name)s"
 
 #: .\management_system\telegram\navigation.py:375
-#, fuzzy, python-format
+#, python-format
 #| msgid "Academic years"
 msgid "Academic year: %(name)s"
-msgstr "Academic years"
+msgstr "Academic year: %(name)s"
 
 #: .\management_system\telegram\navigation.py:377
-#, fuzzy, python-format
+#, python-format
 #| msgid "Instructor:"
 msgid "Instructor: %(name)s"
-msgstr "Instructor:"
+msgstr "Instructor: %(name)s"
 
 #: .\management_system\telegram\navigation.py:380
 #, python-format
 msgid "Open course on the website: %(link)s"
-msgstr ""
+msgstr "Open course on the website: %(link)s"
 
 #: .\management_system\telegram\navigation.py:396
-#, fuzzy, python-format
+#, python-format
 #| msgid "Lesson Name"
 msgid "Lesson: %(name)s"
-msgstr "Lesson Name"
+msgstr "Lesson: %(name)s"
 
 #: .\management_system\telegram\navigation.py:399
-#, fuzzy, python-format
+#, python-format
 #| msgid "Lesson Description"
 msgid "Description: %(description)s"
-msgstr "Lesson Description"
+msgstr "Description: %(description)s"
 
 #: .\management_system\telegram\navigation.py:401
 #, python-format
 msgid "Publication date: %(date)s"
-msgstr ""
+msgstr "Publication date: %(date)s"
 
 #: .\management_system\telegram\navigation.py:404
 #, python-format
 msgid "Open lesson on the website: %(link)s"
-msgstr ""
+msgstr "Open lesson on the website: %(link)s"
 
 #: .\management_system\telegram\navigation.py:421
 #, python-format
 msgid "Exam: %(name)s"
-msgstr ""
+msgstr "Exam: %(name)s"
 
 #: .\management_system\telegram\navigation.py:424
 #, python-format
 msgid "Type: %(type)s"
-msgstr ""
+msgstr "Type: %(type)s"
 
 #: .\management_system\telegram\navigation.py:426
-#, fuzzy
+#
 #| msgid "Unassigned"
 msgid "Type: Unassigned"
-msgstr "Unassigned"
+msgstr "Type: Unassigned"
 
 #: .\management_system\telegram\navigation.py:427
-#, fuzzy, python-format
+#, python-format
 #| msgid "Total Grade"
 msgid "Total grade: %(grade)s"
-msgstr "Total Grade"
+msgstr "Total grade: %(grade)s"
 
 #: .\management_system\telegram\navigation.py:433
-#, fuzzy, python-format
+#, python-format
 #| msgid "Updated on %(date)s"
 msgid "Opens: %(date)s"
-msgstr "Updated on %(date)s"
+msgstr "Opens: %(date)s"
 
 #: .\management_system\telegram\navigation.py:434
 #, python-format
 msgid "Closes: %(date)s"
-msgstr ""
+msgstr "Closes: %(date)s"
 
 #: .\management_system\telegram\navigation.py:440
 #, python-format
 msgid "Duration: %(duration)s"
-msgstr ""
+msgstr "Duration: %(duration)s"
 
 #: .\management_system\telegram\navigation.py:444
 #, python-format
 msgid "Open exam on the website: %(link)s"
-msgstr ""
+msgstr "Open exam on the website: %(link)s"
 
 #: .\management_system\telegram\notifications.py:128
 msgid "Superseded by a newer exam opening window."
-msgstr ""
+msgstr "Superseded by a newer exam opening window."
 
 #: .\management_system\telegram\notifications.py:291
 #: .\management_system\telegram_tasks.py:473
-#, fuzzy
+#
 #| msgid "Telegram bot deactivated."
 msgid "The Telegram bot is inactive."
-msgstr "Telegram bot deactivated."
+msgstr "The Telegram bot is inactive."
 
 #: .\management_system\telegram\notifications.py:311
 msgid "Recipient is no longer authorized."
-msgstr ""
+msgstr "Recipient is no longer authorized."
 
 #: .\management_system\telegram\support.py:41
 msgid "Only administrators can start Telegram conversations."
@@ -2671,47 +2668,47 @@ msgstr "This user has no active linked Telegram account."
 #: .\management_system\telegram\support.py:122
 #, python-format
 msgid "Unsupported Telegram message: %(types)s"
-msgstr ""
+msgstr "Unsupported Telegram message: %(types)s"
 
 #: .\management_system\telegram\support.py:216
 msgid "The attachment is too large to store."
-msgstr ""
+msgstr "The attachment is too large to store."
 
 #: .\management_system\telegram\support.py:222
-#, fuzzy
+#
 #| msgid "No lessons available."
 msgid "Support storage is unavailable."
-msgstr "No lessons available."
+msgstr "Support storage is unavailable."
 
 #: .\management_system\telegram\support.py:249
-#, fuzzy
+#
 #| msgid "The %(document)s could not be uploaded."
 msgid "The attachment could not be stored."
-msgstr "The %(document)s could not be uploaded."
+msgstr "The attachment could not be stored."
 
 #: .\management_system\telegram\support.py:255
-#, fuzzy
+#
 #| msgid "Media coverage"
 msgid "[media message]"
-msgstr "Media coverage"
+msgstr "[media message]"
 
 #: .\management_system\telegram\support.py:257
 msgid "Unsupported message"
-msgstr ""
+msgstr "Unsupported message"
 
 #: .\management_system\telegram\support.py:261
-#, fuzzy
+#
 #| msgid "Parchment"
 msgid "Attachment"
-msgstr "Parchment"
+msgstr "Attachment"
 
 #: .\management_system\telegram\support.py:286
 msgid "Support message from a student"
-msgstr ""
+msgstr "Support message from a student"
 
 #: .\management_system\telegram\support.py:314
 msgid "This message type is not supported. Text, photos, documents, and videos are accepted."
-msgstr ""
+msgstr "This message type is not supported. Text, photos, documents, and videos are accepted."
 
 #: .\management_system\telegram\support.py:334
 msgid "This conversation is no longer available."
@@ -2722,16 +2719,16 @@ msgid "This conversation is blocked."
 msgstr "This conversation is blocked."
 
 #: .\management_system\telegram\support.py:345
-#, fuzzy
+#
 #| msgid "This conversation is no longer available."
 msgid "The selected message is no longer available."
-msgstr "This conversation is no longer available."
+msgstr "The selected message is no longer available."
 
 #: .\management_system\telegram\support.py:352
-#, fuzzy
+#
 #| msgid "Telegram encryption is not configured."
 msgid "The student's Telegram account is no longer available."
-msgstr "Telegram encryption is not configured."
+msgstr "The student's Telegram account is no longer available."
 
 #: .\management_system\telegram\support.py:397
 msgid "The reply could not be delivered; the conversation remains open."
@@ -2739,25 +2736,25 @@ msgstr "The reply could not be delivered; the conversation remains open."
 
 #: .\management_system\telegram\support.py:437
 msgid "This action is for administrators only."
-msgstr ""
+msgstr "This action is for administrators only."
 
 #: .\management_system\telegram\support.py:442
 #: .\management_system\telegram_tasks.py:234
 #: .\management_system\telegram_tasks.py:273
 #: .\management_system\telegram_tasks.py:356
 msgid "This action is no longer available."
-msgstr ""
+msgstr "This action is no longer available."
 
 #: .\management_system\telegram\support.py:477
 msgid "Reply to a support digest or use /reply <conversation_id> <message>."
-msgstr ""
+msgstr "Reply to a support digest or use /reply <conversation_id> <message>."
 
 #: .\management_system\telegram\support.py:484
 #: .\management_system\telegram_forms.py:88
-#, fuzzy
+#
 #| msgid "Holiday name is required."
 msgid "A reply message is required."
-msgstr "Holiday name is required."
+msgstr "A reply message is required."
 
 #: .\management_system\telegram_forms.py:35
 msgid "Telegram bot token"
@@ -2801,86 +2798,86 @@ msgid "Attachments"
 msgstr "Attachments"
 
 #: .\management_system\telegram_tasks.py:82
-#, fuzzy
+#
 #| msgid "Shared components"
 msgid "Share my phone number"
-msgstr "Shared components"
+msgstr "Share my phone number"
 
 #: .\management_system\telegram_tasks.py:202
 #: .\management_system\telegram_tasks.py:376
 msgid "To link your LMS account, share your phone number using the button below."
-msgstr ""
+msgstr "To link your LMS account, share your phone number using the button below."
 
 #: .\management_system\telegram_tasks.py:261
 msgid "Audio is unavailable here. Open the lesson on the website instead."
-msgstr ""
+msgstr "Audio is unavailable here. Open the lesson on the website instead."
 
 #: .\management_system\telegram_tasks.py:278
 msgid "This button is invalid. Please open the menu again."
-msgstr ""
+msgstr "This button is invalid. Please open the menu again."
 
 #: .\management_system\telegram_tasks.py:288
 #: .\management_system\telegram_tasks.py:406
-#, fuzzy
+#
 #| msgid "Telegram encryption is not configured."
 msgid "Your Telegram account is not linked yet."
-msgstr "Telegram encryption is not configured."
+msgstr "Your Telegram account is not linked yet."
 
 #: .\management_system\telegram_tasks.py:297
 msgid "Send your message to support. You can send text, photos, documents, or videos."
 msgstr "Send your message to support. You can send text, photos, documents, or videos."
 
 #: .\management_system\telegram_tasks.py:305
-#, fuzzy
+#
 #| msgid "All courses"
 msgid "Available courses"
-msgstr "All courses"
+msgstr "Available courses"
 
 #: .\management_system\telegram_tasks.py:305
-#, fuzzy
+#
 #| msgid "No courses available yet."
 msgid "No courses are currently available."
-msgstr "No courses available yet."
+msgstr "No courses are currently available."
 
 #: .\management_system\telegram_tasks.py:320
-#, fuzzy
+#
 #| msgid "No lessons available."
 msgid "No published lessons are currently available."
-msgstr "No lessons available."
+msgstr "No published lessons are currently available."
 
 #: .\management_system\telegram_tasks.py:332
 msgid "Preparing the audio."
-msgstr ""
+msgstr "Preparing the audio."
 
 #: .\management_system\telegram_tasks.py:343
 msgid "No published exams are currently available."
-msgstr ""
+msgstr "No published exams are currently available."
 
 #: .\management_system\telegram_tasks.py:368
 #: .\management_system\telegram_tasks.py:425
 #: .\management_system\telegram_tasks.py:443
 msgid "Your LMS account is now linked to Telegram."
-msgstr ""
+msgstr "Your LMS account is now linked to Telegram."
 
 #: .\management_system\telegram_tasks.py:396
 msgid "Use your LMS profile link to connect your account, or share your phone number."
-msgstr ""
+msgstr "Use your LMS profile link to connect your account, or share your phone number."
 
 #: .\management_system\telegram_tasks.py:406
 #: .\management_system\templates\profile.html:90
-#, fuzzy
+#
 #| msgid "Telegram activation failed."
 msgid "Your Telegram account is linked."
-msgstr "Telegram activation failed."
+msgstr "Your Telegram account is linked."
 
 #: .\management_system\telegram_tasks.py:415
 #: .\management_system\telegram_tasks.py:418
 msgid "Please share your own phone number using the button below."
-msgstr ""
+msgstr "Please share your own phone number using the button below."
 
 #: .\management_system\telegram_tasks.py:449
 msgid "This message type is not supported for account linking."
-msgstr ""
+msgstr "This message type is not supported for account linking."
 
 #: .\management_system\telegram_views.py:94
 msgid "Enter a Telegram bot token to save."
@@ -2911,16 +2908,16 @@ msgid "Telegram configuration could not be updated."
 msgstr "Telegram configuration could not be updated."
 
 #: .\management_system\telegram_views.py:184
-#, fuzzy
+#
 #| msgid "Only administrators can save promotion formulas."
 msgid "Only administrators may unlink a Telegram account."
-msgstr "Only administrators can save promotion formulas."
+msgstr "Only administrators may unlink a Telegram account."
 
 #: .\management_system\telegram_views.py:186
-#, fuzzy
+#
 #| msgid "Telegram activation failed."
 msgid "Your Telegram account was unlinked."
-msgstr "Telegram activation failed."
+msgstr "Your Telegram account was unlinked."
 
 #: .\management_system\telegram_views.py:419
 msgid "Telegram bot is not active."
@@ -3160,7 +3157,7 @@ msgstr "Next page"
 #: .\management_system\templates\academic_setup.html:148
 #, python-format
 msgid "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
-msgstr ""
+msgstr "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:157
 msgid "Year Levels"
@@ -3221,7 +3218,7 @@ msgstr "Offering pagination"
 #: .\management_system\templates\academic_setup.html:302
 #, python-format
 msgid "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
-msgstr ""
+msgstr "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:314
 msgid "New Course Offering"
@@ -3927,16 +3924,13 @@ msgstr "Attendance pagination"
 #: .\management_system\templates\promotion_history.html:133
 #: .\management_system\templates\report_dashboard.html:171
 #: .\management_system\templates\yearly_transcript_dashboard.html:180
-#, fuzzy, python-format
+#, python-format
 #| msgid ""
 #| "\n"
 #| "                Showing %(start)s–%(end)s of %(total)s results\n"
 #| "            "
 msgid "Showing %(start)s–%(end)s of %(total)s"
-msgstr ""
-"\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
-"            "
+msgstr "Showing %(start)s–%(end)s of %(total)s"
 
 #: .\management_system\templates\attendance_management.html:157
 msgid "Choose a filter to load results"
@@ -4256,10 +4250,10 @@ msgid "Save exceptional opening"
 msgstr "Save exceptional opening"
 
 #: .\management_system\templates\content_detail.html:168
-#, fuzzy
+#
 #| msgid "Scanned by"
 msgid "Granted by"
-msgstr "Scanned by"
+msgstr "Granted by"
 
 #: .\management_system\templates\content_detail.html:191
 #: .\management_system\templates\quiz_form.html:201
@@ -4351,10 +4345,10 @@ msgid "No file links have been added to this lesson yet."
 msgstr "No file links have been added to this lesson yet."
 
 #: .\management_system\templates\course_detail.html:58
-#, fuzzy
+#
 #| msgid "Review"
 msgid "Preview"
-msgstr "Review"
+msgstr "Preview"
 
 #: .\management_system\templates\course_detail.html:85
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:33
@@ -4647,81 +4641,81 @@ msgid "Bible Institute — Light for every nation"
 msgstr "Bible Institute — Light for every nation"
 
 #: .\management_system\templates\historical_intake.html:8
-#, fuzzy
+#
 #| msgid "Total Academic Years"
 msgid "Historical Academic Intake"
-msgstr "Total Academic Years"
+msgstr "Historical Academic Intake"
 
 #: .\management_system\templates\historical_intake.html:9
 msgid "Review previous academic records, find or create student accounts, and promote students safely."
-msgstr ""
+msgstr "Review previous academic records, find or create student accounts, and promote students safely."
 
 #: .\management_system\templates\historical_intake.html:19
 msgid "Add one student"
-msgstr ""
+msgstr "Add one student"
 
 #: .\management_system\templates\historical_intake.html:38
 msgid "Save historical record"
-msgstr ""
+msgstr "Save historical record"
 
 #: .\management_system\templates\historical_intake.html:45
 msgid "Add multiple existing students"
-msgstr ""
+msgstr "Add multiple existing students"
 
 #: .\management_system\templates\historical_intake.html:47
 msgid "Use usernames or numeric LMS IDs. This action is bounded to 1,000 students and runs transactionally."
-msgstr ""
+msgstr "Use usernames or numeric LMS IDs. This action is bounded to 1,000 students and runs transactionally."
 
 #: .\management_system\templates\historical_intake.html:57
-#, fuzzy
+#
 #| msgid "Promote selected students"
 msgid "Save selected students"
-msgstr "Promote selected students"
+msgstr "Save selected students"
 
 #: .\management_system\templates\historical_intake.html:63
 msgid "CSV/XLSX reviewed upload"
-msgstr ""
+msgstr "CSV/XLSX reviewed upload"
 
 #: .\management_system\templates\historical_intake.html:65
 msgid "Upload the reviewed template. The first submission is a dry-run; apply is allowed only when every row is valid."
-msgstr ""
+msgstr "Upload the reviewed template. The first submission is a dry-run; apply is allowed only when every row is valid."
 
 #: .\management_system\templates\historical_intake.html:68
 msgid "Intake CSV or XLSX"
-msgstr ""
+msgstr "Intake CSV or XLSX"
 
 #: .\management_system\templates\historical_intake.html:69
 msgid "Validate upload"
-msgstr ""
+msgstr "Validate upload"
 
 #: .\management_system\templates\historical_intake.html:70
 msgid "Apply reviewed upload"
-msgstr ""
+msgstr "Apply reviewed upload"
 
 #: .\management_system\templates\historical_intake.html:73
-#, fuzzy
+#
 #| msgid "Rows"
 msgid "Row"
-msgstr "Rows"
+msgstr "Row"
 
 #: .\management_system\templates\historical_intake.html:73
-#, fuzzy
+#
 #| msgid "Search Students"
 msgid "Source student"
-msgstr "Search Students"
+msgstr "Source student"
 
 #: .\management_system\templates\historical_intake.html:73
 #: .\management_system\templates\historical_intake.html:94
-#, fuzzy
+#
 #| msgid "Telegram Bot"
 msgid "Account"
-msgstr "Telegram Bot"
+msgstr "Account"
 
 #: .\management_system\templates\historical_intake.html:73
-#, fuzzy
+#
 #| msgid "Result actions"
 msgid "Result"
-msgstr "Result actions"
+msgstr "Result"
 
 #: .\management_system\templates\historical_intake.html:73
 #: .\management_system\templates\telegram_broadcast_confirm.html:59
@@ -4730,32 +4724,33 @@ msgid "Message"
 msgstr "Message"
 
 #: .\management_system\templates\historical_intake.html:79
-#, fuzzy
+#
 #| msgid "Exceptional"
 msgid "Assign exceptional failed courses"
-msgstr "Exceptional"
+msgstr "Assign exceptional failed courses"
 
 #: .\management_system\templates\historical_intake.html:81
 msgid "Select a student and only the active-year course offerings they must complete. This creates targeted access, not full-year access."
-msgstr ""
+msgstr "Select a student and only the active-year course offerings they must complete. This creates targeted access, not "
+"full-year access."
 
 #: .\management_system\templates\historical_intake.html:87
-#, fuzzy
+#
 #| msgid "View Courses"
 msgid "Assign failed courses"
-msgstr "View Courses"
+msgstr "Assign failed courses"
 
 #: .\management_system\templates\historical_intake.html:93
-#, fuzzy
+#
 #| msgid "Historical"
 msgid "Historical records"
-msgstr "Historical"
+msgstr "Historical records"
 
 #: .\management_system\templates\historical_intake.html:94
-#, fuzzy
+#
 #| msgid "Historical"
 msgid "Historical scope"
-msgstr "Historical"
+msgstr "Historical scope"
 
 #: .\management_system\templates\historical_intake.html:94
 #: .\management_system\templates\promotion_history.html:28
@@ -4764,28 +4759,28 @@ msgid "Outcome"
 msgstr "Outcome"
 
 #: .\management_system\templates\historical_intake.html:94
-#, fuzzy
+#
 #| msgid "Promotion Rules"
 msgid "Promotion"
-msgstr "Promotion Rules"
+msgstr "Promotion"
 
 #: .\management_system\templates\historical_intake.html:95
-#, fuzzy
+#
 #| msgid "Promote"
 msgid "Promoted"
-msgstr "Promote"
+msgstr "Promoted"
 
 #: .\management_system\templates\historical_intake.html:95
-#, fuzzy
+#
 #| msgid "Description"
 msgid "Destination"
-msgstr "Description"
+msgstr "Destination"
 
 #: .\management_system\templates\historical_intake.html:95
-#, fuzzy
+#
 #| msgid "Invalid course offering."
 msgid "Failed offering IDs"
-msgstr "Invalid course offering."
+msgstr "Failed offering IDs"
 
 #: .\management_system\templates\historical_intake.html:95
 #: .\management_system\templates\promotion_evaluation.html:321
@@ -4794,16 +4789,16 @@ msgid "Promote"
 msgstr "Promote"
 
 #: .\management_system\templates\historical_intake.html:95
-#, fuzzy
+#
 #| msgid "No holidays recorded"
 msgid "No historical records yet."
-msgstr "No holidays recorded"
+msgstr "No historical records yet."
 
 #: .\management_system\templates\historical_intake.html:97
-#, fuzzy
+#
 #| msgid "Historical"
 msgid "Historical intake pagination"
-msgstr "Historical"
+msgstr "Historical intake pagination"
 
 #: .\management_system\templates\index.html:41
 #, python-format
@@ -5113,10 +5108,10 @@ msgid "Users"
 msgstr "Users"
 
 #: .\management_system\templates\partials\components\admin_nav_links.html:54
-#, fuzzy
+#
 #| msgid "Historical"
 msgid "Historical Intake"
-msgstr "Historical"
+msgstr "Historical Intake"
 
 #: .\management_system\templates\partials\components\admin_nav_links.html:112
 #: .\management_system\templates\r2_management.html:84
@@ -5146,10 +5141,10 @@ msgid "Telegram Bot"
 msgstr "Telegram Bot"
 
 #: .\management_system\templates\partials\components\admin_nav_links.html:208
-#, fuzzy
+#
 #| msgid "Telegram Bot"
 msgid "Telegram Chat"
-msgstr "Telegram Bot"
+msgstr "Telegram Chat"
 
 #: .\management_system\templates\partials\components\admin_nav_links.html:224
 #: .\management_system\templates\telegram_broadcast.html:12
@@ -5384,10 +5379,10 @@ msgid "Media message"
 msgstr "Media message"
 
 #: .\management_system\templates\partials\telegram_conversation_list.html:69
-#, fuzzy
+#
 #| msgid "No messages yet."
 msgid "No messages yet"
-msgstr "No messages yet."
+msgstr "No messages yet"
 
 #: .\management_system\templates\partials\telegram_conversation_list.html:80
 #, python-format
@@ -5409,7 +5404,7 @@ msgid "Conversation list pagination"
 msgstr "Conversation list pagination"
 
 #: .\management_system\templates\partials\telegram_conversation_list.html:152
-#, fuzzy, python-format
+#, python-format
 #| msgid ""
 #| "\n"
 #| "                Showing %(start)s–%(end)s of %(total)s results\n"
@@ -5418,10 +5413,7 @@ msgid ""
 "\n"
 "                Showing %(start)s–%(end)s of %(total)s conversations\n"
 "            "
-msgstr ""
-"\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
-"                "
+msgstr "\n                Showing %(start)s–%(end)s of %(total)s conversations\n            "
 
 #: .\management_system\templates\partials\telegram_linked_user_list.html:35
 #: .\management_system\templates\telegram_conversations.html:26
@@ -5470,7 +5462,7 @@ msgid "Message history pagination"
 msgstr "Message history pagination"
 
 #: .\management_system\templates\partials\telegram_message_list.html:97
-#, fuzzy, python-format
+#, python-format
 #| msgid ""
 #| "\n"
 #| "                Showing %(start)s–%(end)s of %(total)s results\n"
@@ -5479,10 +5471,7 @@ msgid ""
 "\n"
 "                Showing %(start)s–%(end)s of %(total)s messages\n"
 "            "
-msgstr ""
-"\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
-"                "
+msgstr "\n                Showing %(start)s–%(end)s of %(total)s messages\n            "
 
 #: .\management_system\templates\partials\telegram_message_list.html:129
 msgid "Send Message"
@@ -5526,24 +5515,24 @@ msgstr "Click the QR image to download it"
 
 #: .\management_system\templates\profile.html:85
 #: .\management_system\templates\profile.html:106
-#, fuzzy
+#
 #| msgid "Telegram Bot"
 msgid "Telegram Account"
-msgstr "Telegram Bot"
+msgstr "Telegram Account"
 
 #: .\management_system\templates\profile.html:96
 msgid "Unlink Telegram"
-msgstr ""
+msgstr "Unlink Telegram"
 
 #: .\management_system\templates\profile.html:111
 msgid "Link your Telegram account to receive your lesson and quiz notifications."
-msgstr ""
+msgstr "Link your Telegram account to receive your lesson and quiz notifications."
 
 #: .\management_system\templates\profile.html:117
-#, fuzzy
+#
 #| msgid "Telegram Bot"
 msgid "Link Telegram"
-msgstr "Telegram Bot"
+msgstr "Link Telegram"
 
 #: .\management_system\templates\profile.html:165
 msgid "Watch time"
@@ -5579,10 +5568,10 @@ msgid "Recent Quiz Results"
 msgstr "Recent Quiz Results"
 
 #: .\management_system\templates\profile.html:208
-#, fuzzy
+#
 #| msgid "Latest 3"
 msgid "Latest"
-msgstr "Latest 3"
+msgstr "Latest"
 
 #: .\management_system\templates\progress_dashboard.html:21
 msgid "Academic year..."
@@ -5640,10 +5629,14 @@ msgid "Promotion Formula Builder"
 msgstr "Promotion Formula Builder"
 
 #: .\management_system\templates\promotion_evaluation.html:26
-#, fuzzy, python-format
+#, python-format
 #| msgid "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold and evaluation date, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold."
 msgid "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering."
-msgstr "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold and evaluation date, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold."
+msgstr "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, "
+"evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or "
+"attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is "
+"normalized to 100%%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet "
+"the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering."
 
 #: .\management_system\templates\promotion_evaluation.html:34
 msgid "Select Academic Scope"
@@ -5655,7 +5648,7 @@ msgstr "Select a scope…"
 
 #: .\management_system\templates\promotion_evaluation.html:60
 msgid "Leave empty for an all-courses formula, or select a specific course to configure a course-specific override."
-msgstr ""
+msgstr "Leave empty for an all-courses formula, or select a specific course to configure a course-specific override."
 
 #: .\management_system\templates\promotion_evaluation.html:65
 msgid "Load"
@@ -5745,10 +5738,10 @@ msgid "Issues"
 msgstr "Issues"
 
 #: .\management_system\templates\promotion_evaluation.html:178
-#, fuzzy
+#
 #| msgid "View Courses"
 msgid "Failed Courses"
-msgstr "View Courses"
+msgstr "Failed Courses"
 
 #: .\management_system\templates\promotion_evaluation.html:187
 msgid "Select result for promotion"
@@ -5764,14 +5757,14 @@ msgid "Unresolved manually graded questions excluded from score"
 msgstr "Unresolved manually graded questions excluded from score"
 
 #: .\management_system\templates\promotion_evaluation.html:258
-#, fuzzy
+#
 #| msgid "Fail"
 msgid "Failed:"
-msgstr "Fail"
+msgstr "Failed:"
 
 #: .\management_system\templates\promotion_evaluation.html:262
 msgid "threshold"
-msgstr ""
+msgstr "threshold"
 
 #: .\management_system\templates\promotion_evaluation.html:298
 msgid "Override status"
@@ -5790,14 +5783,14 @@ msgid "Override note"
 msgstr "Override note"
 
 #: .\management_system\templates\promotion_evaluation.html:312
-#, fuzzy
+#
 #| msgid "Course Description"
 msgid "Course result only"
-msgstr "Course Description"
+msgstr "Course result only"
 
 #: .\management_system\templates\promotion_evaluation.html:315
 msgid "Cannot promote"
-msgstr ""
+msgstr "Cannot promote"
 
 #: .\management_system\templates\promotion_evaluation.html:325
 msgid "Consumed"
@@ -5832,7 +5825,8 @@ msgstr "Academic Scope"
 
 #: .\management_system\templates\promotion_evaluation.html:442
 msgid "Select a specific course to override the all-courses formula for that offering. Leave as All courses for the aggregate formula."
-msgstr ""
+msgstr "Select a specific course to override the all-courses formula for that offering. Leave as All courses for the aggregate "
+"formula."
 
 #: .\management_system\templates\promotion_evaluation.html:454
 msgid "The minimum overall percentage a student must achieve to pass."
@@ -5840,15 +5834,16 @@ msgstr "The minimum overall percentage a student must achieve to pass."
 
 #: .\management_system\templates\promotion_evaluation.html:464
 msgid "Inclusive start date for the evaluation period. All quizzes, lessons, and attendance within this range are considered."
-msgstr ""
+msgstr "Inclusive start date for the evaluation period. All quizzes, lessons, and attendance within this range are considered."
 
 #: .\management_system\templates\promotion_evaluation.html:474
 msgid "Inclusive end date for the evaluation period. Cannot be a future date."
-msgstr ""
+msgstr "Inclusive end date for the evaluation period. Cannot be a future date."
 
 #: .\management_system\templates\promotion_evaluation.html:487
 msgid "If a student fails fewer courses than this threshold, they are promoted with exceptional enrollments for the failed courses. If they fail at or above this threshold, they repeat the entire level."
-msgstr ""
+msgstr "If a student fails fewer courses than this threshold, they are promoted with exceptional enrollments for the failed "
+"courses. If they fail at or above this threshold, they repeat the entire level."
 
 #: .\management_system\templates\promotion_evaluation.html:496
 msgid "Promotion Rules"
@@ -5918,16 +5913,16 @@ msgid "Grading Configuration Issues"
 msgstr "Grading Configuration Issues"
 
 #: .\management_system\templates\promotion_evaluation.html:629
-#, fuzzy
+#
 #| msgid "Previous"
 msgid "Preview course"
-msgstr "Previous"
+msgstr "Preview course"
 
 #: .\management_system\templates\promotion_evaluation.html:631
-#, fuzzy
+#
 #| msgid "Select Course Offering"
 msgid "Select a course to preview"
-msgstr "Select Course Offering"
+msgstr "Select a course to preview"
 
 #: .\management_system\templates\promotion_evaluation.html:639
 msgid "Search Students"
@@ -5986,10 +5981,10 @@ msgstr "Evaluation"
 
 #: .\management_system\templates\promotion_history.html:32
 #: .\management_system\templates\promotion_history.html:62
-#, fuzzy
+#
 #| msgid "Table with row actions"
 msgid "Passed (with exceptions)"
-msgstr "Table with row actions"
+msgstr "Passed (with exceptions)"
 
 #: .\management_system\templates\promotion_history.html:33
 #: .\management_system\templates\promotion_history.html:64
@@ -6004,10 +5999,10 @@ msgstr "Graduated"
 
 #: .\management_system\templates\promotion_history.html:35
 #: .\management_system\templates\promotion_history.html:68
-#, fuzzy
+#
 #| msgid "Save exceptional opening"
 msgid "Last level (exceptional)"
-msgstr "Save exceptional opening"
+msgstr "Last level (exceptional)"
 
 #: .\management_system\templates\promotion_history.html:42
 msgid "Immutable promotion history"
@@ -6022,10 +6017,10 @@ msgid "To"
 msgstr "To"
 
 #: .\management_system\templates\promotion_history.html:49
-#, fuzzy
+#
 #| msgid "Exceptional"
 msgid "Exceptional Courses"
-msgstr "Exceptional"
+msgstr "Exceptional Courses"
 
 #: .\management_system\templates\promotion_history.html:50
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:56
@@ -6916,7 +6911,8 @@ msgstr "Delete lesson?"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:160
 msgid "This is the same confirmation pattern the dashboards use today: the request keeps its CSRF token, goes through HTMX, and the row disappears only after the server agrees."
-msgstr ""
+msgstr "This is the same confirmation pattern the dashboards use today: the request keeps its CSRF token, goes through HTMX, "
+"and the row disappears only after the server agrees."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:161
 msgid "Destructive actions always stay server-confirmed."
@@ -8465,37 +8461,37 @@ msgid "Choose Role"
 msgstr "Choose Role"
 
 #: .\management_system\views.py:1388 .\management_system\views.py:1518
-#, fuzzy
+#
 #| msgid "Exceptional"
 msgid "Exceptional course access was assigned."
-msgstr "Exceptional"
+msgstr "Exceptional course access was assigned."
 
 #: .\management_system\views.py:1399
 #, python-format
 msgid "Student account not found: %(identifier)s"
-msgstr ""
+msgstr "Student account not found: %(identifier)s"
 
 #: .\management_system\views.py:1421 .\management_system\views.py:1441
-#, fuzzy, python-format
+#, python-format
 #| msgid "Exceptional opening saved for %(count)s student(s)."
 msgid "Historical intake applied for %(count)d student(s)."
-msgstr "Exceptional opening saved for %(count)s student(s)."
+msgstr "Historical intake applied for %(count)d student(s)."
 
 #: .\management_system\views.py:1432
 msgid "Resolve all upload errors before applying the intake."
-msgstr ""
+msgstr "Resolve all upload errors before applying the intake."
 
 #: .\management_system\views.py:1472
-#, fuzzy, python-format
+#, python-format
 #| msgid "Exceptional opening saved for %(count)s student(s)."
 msgid "Historical record saved for %(student)s."
-msgstr "Exceptional opening saved for %(count)s student(s)."
+msgstr "Historical record saved for %(student)s."
 
 #: .\management_system\views.py:1506
-#, fuzzy
+#
 #| msgid "Student promotion was recorded."
 msgid "Historical student promotion was recorded."
-msgstr "Student promotion was recorded."
+msgstr "Historical student promotion was recorded."
 
 #: .\management_system\views.py:1530
 msgid "This is not a CSV file"
@@ -8550,10 +8546,10 @@ msgid "Choose Academic Year"
 msgstr "Choose Academic Year"
 
 #: .\management_system\views.py:1828
-#, fuzzy
+#
 #| msgid "Save exceptional opening"
 msgid "Please correct the exceptional opening form."
-msgstr "Save exceptional opening"
+msgstr "Please correct the exceptional opening form."
 
 #: .\management_system\views.py:1843
 #, python-format
@@ -9213,10 +9209,10 @@ msgid "Day"
 msgstr "Day"
 
 #: .\management_system\views.py:5432 .\management_system\views.py:5438
-#, fuzzy
+#
 #| msgid "Promotion Formula Builder"
 msgid "Promotion formula is required."
-msgstr "Promotion Formula Builder"
+msgstr "Promotion formula is required."
 
 #: .\management_system\templates\partials\telegram_broadcast_list.html:29
 #: .\management_system\templates\partials\telegram_broadcast_list.html:31
@@ -10307,6 +10303,195 @@ msgstr "Notification queued for delivery."
 
 msgid "Retry this notification?"
 msgstr "Retry this notification?"
+
+msgid "A generated media segment exceeds the maximum allowed size."
+msgstr "A generated media segment exceeds the maximum allowed size."
+
+msgid "Account information"
+msgstr "Account information"
+
+msgid "Activate this application?"
+msgstr "Activate this application?"
+
+msgid "Active enrollment"
+msgstr "Active enrollment"
+
+msgid "Android"
+msgstr "Android"
+
+msgid "Application documents"
+msgstr "Application documents"
+
+msgid "Application information"
+msgstr "Application information"
+
+msgid "Biometric unlock is unavailable."
+msgstr "Biometric unlock is unavailable."
+
+msgid "Bulk application batches must contain between one and 100 users."
+msgstr "Bulk application batches must contain between one and 100 users."
+
+msgid "Church information"
+msgstr "Church information"
+
+msgid "Confessor name"
+msgstr "Confessor name"
+
+msgid "Confessor phone"
+msgstr "Confessor phone"
+
+msgid "Decided at"
+msgstr "Decided at"
+
+msgid "Decline this application?"
+msgstr "Decline this application?"
+
+msgid "Delivered"
+msgstr "Delivered"
+
+msgid "Edit user"
+msgstr "Edit user"
+
+msgid "excluded_user_ids must contain numeric IDs."
+msgstr "excluded_user_ids must contain numeric IDs."
+
+msgid "Expired"
+msgstr "Expired"
+
+msgid "Formula"
+msgstr "Formula"
+
+msgid "Invalid expected application status."
+msgstr "Invalid expected application status."
+
+msgid "iOS"
+msgstr "iOS"
+
+msgid "Locked"
+msgstr "Locked"
+
+msgid "Mobile"
+msgstr "Mobile"
+
+msgid "Mutation failures"
+msgstr "Mutation failures"
+
+msgid "Notification failures"
+msgstr "Notification failures"
+
+msgid "National ID / passport number"
+msgstr "National ID / passport number"
+
+msgid "No application documents uploaded."
+msgstr "No application documents uploaded."
+
+msgid "Notification delivery failed."
+msgstr "Notification delivery failed."
+
+msgid "One or more media job IDs are invalid."
+msgstr "One or more media job IDs are invalid."
+
+#, python-format
+msgid "Open folder %(name)s"
+msgstr "Open folder %(name)s"
+
+msgid "Open navigation menu"
+msgstr "Open navigation menu"
+
+#, python-format
+msgid "Open the lesson on the website: %(link)s"
+msgstr "Open the lesson on the website: %(link)s"
+
+msgid "Overrides"
+msgstr "Overrides"
+
+msgid "Personal information"
+msgstr "Personal information"
+
+msgid "Preview results"
+msgstr "Preview results"
+
+msgid "Promotion workflow"
+msgstr "Promotion workflow"
+
+msgid "Provide between one and 100 media job IDs."
+msgstr "Provide between one and 100 media job IDs."
+
+msgid "Reopen this application?"
+msgstr "Reopen this application?"
+
+msgid "Search applications"
+msgstr "Search applications"
+
+#, python-format
+msgid "Select %(name)s"
+msgstr "Select %(name)s"
+
+msgid "Select all visible applications"
+msgstr "Select all visible applications"
+
+msgid "Selection fields have invalid types."
+msgstr "Selection fields have invalid types."
+
+msgid "Skipped as stale"
+msgstr "Skipped as stale"
+
+msgid "students"
+msgstr "students"
+
+msgid "The application is no longer in the selected status."
+msgstr "The application is no longer in the selected status."
+
+msgid "The application status changed before this action was executed."
+msgstr "The application status changed before this action was executed."
+
+msgid "The normal enrollment could not be created."
+msgstr "The normal enrollment could not be created."
+
+msgid "The selection has expired. Reload the applications list and try again."
+msgstr "The selection has expired. Reload the applications list and try again."
+
+msgid "The selection is not valid for this operator."
+msgstr "The selection is not valid for this operator."
+
+msgid "This device installation belongs to another account."
+msgstr "This device installation belongs to another account."
+
+msgid "This media job has no acknowledged source to retry."
+msgstr "This media job has no acknowledged source to retry."
+
+msgid "This media part identifier is reserved."
+msgstr "This media part identifier is reserved."
+
+msgid "This notification does not exist."
+msgstr "This notification does not exist."
+
+msgid "This notification does not need a retry."
+msgstr "This notification does not need a retry."
+
+msgid "Ticketed"
+msgstr "Ticketed"
+
+msgid "Too many biometric attempts. Try again later."
+msgstr "Too many biometric attempts. Try again later."
+
+msgid "User data updated successfully."
+msgstr "User data updated successfully."
+
+msgid "User details"
+msgstr "User details"
+
+msgid "User not found."
+msgstr "User not found."
+
+msgid "user_ids must contain numeric IDs."
+msgstr "user_ids must contain numeric IDs."
+
+msgid "Web"
+msgstr "Web"
+
+msgid "You do not have access to this quiz."
+msgstr "You do not have access to this quiz."
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."

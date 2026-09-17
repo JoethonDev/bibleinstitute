@@ -10773,105 +10773,294 @@ msgid "Entrance scans after %(limit)s and exit scans before %(earliest)s count a
 msgstr "تُحتسب عمليات الدخول بعد %(limit)s والخروج قبل %(earliest)s حضورًا جزئيًا؛ والهامش %(buffer)s دقيقة. أما حالات الخروج المُسوَّاة فتُحتسب دائمًا خروجًا في الموعد."
 
 msgid "Only administrators can send announcements."
-msgstr "???? ????????? ??? ????? ?????????."
+msgstr "لا يمكن إرسال الإعلانات إلا للمسؤولين."
 
 msgid "Announcement title and body are required in both languages."
-msgstr "????? ??????? ???? ??????? ????????."
+msgstr "عنوان الإعلان ونصه مطلوبان باللغتين."
 
 msgid "Announcement content exceeds the allowed length."
-msgstr "????? ??????? ?????? ????? ??????? ??."
+msgstr "يتجاوز محتوى الإعلان الحد المسموح به."
 
 msgid "There are no active students in the selected target."
-msgstr "?? ???? ???? ????? ?? ????? ???????."
+msgstr "لا يوجد طلاب نشطون ضمن الفئة المحددة."
 
 #, python-format
 msgid "Notification sent to %(count)s students."
-msgstr "?? ????? ??????? ??? %(count)s ??????."
+msgstr "تم إرسال الإشعار إلى %(count)s طالبًا."
 
 msgid "Title (Arabic)"
-msgstr "??????? (????????)"
+msgstr "العنوان (بالعربية)"
 
 msgid "Body (Arabic)"
-msgstr "???? (????????)"
+msgstr "النص (بالعربية)"
 
 msgid "Title (English)"
-msgstr "??????? (???????????)"
+msgstr "العنوان (بالإنجليزية)"
 
 msgid "Body (English)"
-msgstr "???? (???????????)"
+msgstr "النص (بالإنجليزية)"
 
 msgid "Target levels"
-msgstr "????????? ?????????"
+msgstr "المستويات المستهدفة"
 
 msgid "Announcement titles must be 255 characters or fewer."
-msgstr "??? ??? ???? ????? ??????? ?? 255 ?????."
+msgstr "يجب ألا تتجاوز عناوين الإعلانات 255 حرفًا."
 
 msgid "Announcement bodies must be 4,000 characters or fewer."
-msgstr "??? ??? ???? ?? ??????? ?? 4000 ???."
+msgstr "يجب ألا تتجاوز نصوص الإعلانات ٤٬٠٠٠ حرف."
 
 msgid "With no level selected the announcement targets every active student."
-msgstr "??? ??? ????? ?? ?????? ?????? ??????? ??? ???? ?????? ???????."
+msgstr "عند عدم اختيار مستوى، يُرسل الإعلان إلى كل طالب نشط."
 
 msgid "Announcement"
-msgstr "?????"
+msgstr "إعلان"
 
 msgid "None"
-msgstr "????"
+msgstr "لا شيء"
 
 msgid "Notifications"
-msgstr "?????????"
+msgstr "الإشعارات"
 
 msgid "No notifications yet."
-msgstr "?? ???? ??????? ???."
+msgstr "لا توجد إشعارات بعد."
 
 msgid "View all"
-msgstr "??? ????"
+msgstr "عرض الكل"
 
 msgid "Notifications pagination"
-msgstr "????? ?????????"
+msgstr "ترقيم صفحات الإشعارات"
 
 msgid "notifications"
-msgstr "???????"
+msgstr "إشعارات"
 
 msgid "Announcements"
-msgstr "???????"
+msgstr "الإعلانات"
 
 msgid "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
-msgstr "???? ??????? ????? ????? ??? ???? ?????? ??????? ?? ??? ??????? ?????. ???? ????????? ??????? ?? ??? ?????? ??? ?????? ??? ????? ??????."
+msgstr "أرسل إعلانًا ثنائي اللغة إلى كل طالب نشط أو إلى مستويات محددة. تظهر الإعلانات المرسلة في جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
 
 msgid "Compose notification"
-msgstr "????? ?????"
+msgstr "إنشاء إشعار"
 
 msgid "Send this notification to the resolved recipients?"
-msgstr "????? ??? ??????? ??? ????????? ?????????"
+msgstr "إرسال هذا الإشعار إلى المستلمين المحددين؟"
 
 msgid "Recipients:"
-msgstr "?????????:"
+msgstr "المستلمون:"
 
 msgid "Send notification"
-msgstr "????? ???????"
+msgstr "إرسال الإشعار"
 
 msgid "Sent notifications"
-msgstr "????????? ???????"
+msgstr "الإشعارات المرسلة"
 
 #, python-format
 msgid "%(count)s Notifications"
-msgstr "%(count)s ???????"
+msgstr "%(count)s إشعارًا"
 
 msgid "Author"
-msgstr "??????"
+msgstr "المنشئ"
 
 msgid "All active students"
-msgstr "???? ?????? ???????"
+msgstr "جميع الطلاب النشطين"
 
 msgid "No notifications have been sent yet."
-msgstr "?? ??? ????? ?? ??????? ???."
+msgstr "لم تُرسل أي إشعارات بعد."
 
 msgid "Notification queued for delivery."
-msgstr "??? ????? ??????? ???????."
+msgstr "تم وضع الإشعار في قائمة انتظار الإرسال."
 
 msgid "Retry this notification?"
-msgstr "????? ?????? ????? ??? ????????"
+msgstr "إعادة محاولة إرسال هذا الإشعار؟"
+
+msgid "A generated media segment exceeds the maximum allowed size."
+msgstr "يتجاوز أحد مقاطع الوسائط المُنشأة الحد الأقصى المسموح به."
+
+msgid "Account information"
+msgstr "معلومات الحساب"
+
+msgid "Activate this application?"
+msgstr "تفعيل هذا الطلب؟"
+
+msgid "Active enrollment"
+msgstr "التسجيل النشط"
+
+msgid "Android"
+msgstr "أندرويد"
+
+msgid "Application documents"
+msgstr "مستندات الطلب"
+
+msgid "Application information"
+msgstr "معلومات الطلب"
+
+msgid "Biometric unlock is unavailable."
+msgstr "إلغاء القفل بالبصمة غير متاح."
+
+msgid "Bulk application batches must contain between one and 100 users."
+msgstr "يجب أن تتضمن دفعات الطلبات المجمعة من مستخدم واحد إلى ١٠٠ مستخدم."
+
+msgid "Church information"
+msgstr "معلومات الكنيسة"
+
+msgid "Confessor name"
+msgstr "اسم الأب الروحي"
+
+msgid "Confessor phone"
+msgstr "هاتف الأب الروحي"
+
+msgid "Decided at"
+msgstr "تاريخ اتخاذ القرار"
+
+msgid "Decline this application?"
+msgstr "رفض هذا الطلب؟"
+
+msgid "Delivered"
+msgstr "تم التسليم"
+
+msgid "Edit user"
+msgstr "تعديل المستخدم"
+
+msgid "excluded_user_ids must contain numeric IDs."
+msgstr "يجب أن تحتوي excluded_user_ids على معرّفات رقمية."
+
+msgid "Expired"
+msgstr "منتهي"
+
+msgid "Formula"
+msgstr "الصيغة"
+
+msgid "Invalid expected application status."
+msgstr "حالة الطلب المتوقعة غير صالحة."
+
+msgid "iOS"
+msgstr "iOS"
+
+msgid "Locked"
+msgstr "مقفل"
+
+msgid "Mobile"
+msgstr "الهاتف المحمول"
+
+msgid "Mutation failures"
+msgstr "إخفاقات التعديل"
+
+msgid "Notification failures"
+msgstr "إخفاقات الإشعارات"
+
+msgid "National ID / passport number"
+msgstr "رقم بطاقة الرقم القومي / جواز السفر"
+
+msgid "No application documents uploaded."
+msgstr "لم يتم رفع مستندات الطلب."
+
+msgid "Notification delivery failed."
+msgstr "فشل تسليم الإشعار."
+
+msgid "One or more media job IDs are invalid."
+msgstr "واحد أو أكثر من معرّفات مهام الوسائط غير صالح."
+
+#, python-format
+msgid "Open folder %(name)s"
+msgstr "فتح المجلد %(name)s"
+
+msgid "Open navigation menu"
+msgstr "فتح قائمة التنقل"
+
+#, python-format
+msgid "Open the lesson on the website: %(link)s"
+msgstr "افتح الدرس على الموقع: %(link)s"
+
+msgid "Overrides"
+msgstr "التجاوزات"
+
+msgid "Personal information"
+msgstr "المعلومات الشخصية"
+
+msgid "Preview results"
+msgstr "معاينة النتائج"
+
+msgid "Promotion workflow"
+msgstr "سير عمل الترقية"
+
+msgid "Provide between one and 100 media job IDs."
+msgstr "أدخل من ١ إلى ١٠٠ من معرّفات مهام الوسائط."
+
+msgid "Reopen this application?"
+msgstr "إعادة فتح هذا الطلب؟"
+
+msgid "Search applications"
+msgstr "البحث في الطلبات"
+
+#, python-format
+msgid "Select %(name)s"
+msgstr "تحديد %(name)s"
+
+msgid "Select all visible applications"
+msgstr "تحديد كل الطلبات الظاهرة"
+
+msgid "Selection fields have invalid types."
+msgstr "حقول التحديد تحتوي على أنواع غير صالحة."
+
+msgid "Skipped as stale"
+msgstr "تم التخطي لكونه قديمًا"
+
+msgid "students"
+msgstr "الطلاب"
+
+msgid "The application is no longer in the selected status."
+msgstr "لم يعد الطلب بالحالة المحددة."
+
+msgid "The application status changed before this action was executed."
+msgstr "تغيرت حالة الطلب قبل تنفيذ هذا الإجراء."
+
+msgid "The normal enrollment could not be created."
+msgstr "تعذر إنشاء التسجيل العادي."
+
+msgid "The selection has expired. Reload the applications list and try again."
+msgstr "انتهت صلاحية التحديد. أعد تحميل قائمة الطلبات وحاول مرة أخرى."
+
+msgid "The selection is not valid for this operator."
+msgstr "التحديد غير صالح لهذا المسؤول."
+
+msgid "This device installation belongs to another account."
+msgstr "معرّف تثبيت هذا الجهاز مرتبط بحساب آخر."
+
+msgid "This media job has no acknowledged source to retry."
+msgstr "لا تحتوي مهمة الوسائط هذه على مصدر تم تأكيده لإعادة المحاولة."
+
+msgid "This media part identifier is reserved."
+msgstr "معرّف جزء الوسائط هذا محجوز."
+
+msgid "This notification does not exist."
+msgstr "هذا الإشعار غير موجود."
+
+msgid "This notification does not need a retry."
+msgstr "لا يحتاج هذا الإشعار إلى إعادة المحاولة."
+
+msgid "Ticketed"
+msgstr "تم إصدار التذكرة"
+
+msgid "Too many biometric attempts. Try again later."
+msgstr "محاولات البصمة كثيرة جدًا. حاول مرة أخرى لاحقًا."
+
+msgid "User data updated successfully."
+msgstr "تم تحديث بيانات المستخدم بنجاح."
+
+msgid "User details"
+msgstr "تفاصيل المستخدم"
+
+msgid "User not found."
+msgstr "المستخدم غير موجود."
+
+msgid "user_ids must contain numeric IDs."
+msgstr "يجب أن تحتوي user_ids على معرّفات رقمية."
+
+msgid "Web"
+msgstr "الويب"
+
+msgid "You do not have access to this quiz."
+msgstr "ليس لديك صلاحية الوصول إلى هذا الاختبار."
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
