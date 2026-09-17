@@ -1,0 +1,40 @@
+{% load i18n %}
+<div class="ps-notif-panel-inner">
+  <div class="ps-notif-panel-head">
+    <span class="ps-notif-panel-title">{% translate "Notifications" %}</span>
+    {% if unread_count %}
+    <span class="ps-notif-count">{{ unread_count }}</span>
+    {% endif %}
+  </div>
+
+  {% if notification_items %}
+  <div class="ps-notif-panel-list">
+    {% for item in notification_items %}
+    <form method="post" action="{{ item.open_url }}" class="ps-notif-item-form">
+      {% csrf_token %}
+      <button type="submit" class="ps-notif-item{% if not item.is_read %} is-unread{% endif %}">
+        <span class="ps-notif-item-title">{{ item.title }}</span>
+        <span class="ps-notif-item-body">{{ item.body|truncatechars:90 }}</span>
+        <time class="ps-notif-item-time">{{ item.created_at }}</time>
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="ps-notif-empty">{% translate "No notifications yet." %}</p>
+  {% endif %}
+
+  <div class="ps-notif-panel-foot">
+    {% if unread_count %}
+    <form method="post" action="{% url 'student-notification-read-all' %}"
+          hx-post="{% url 'student-notification-read-all' %}"
+          hx-target="#notification-panel" hx-swap="innerHTML"
+          class="ps-notif-mark-all-form">
+      {% csrf_token %}
+      <button type="submit" class="ps-notif-mark-all">{% translate "Mark all as read" %}</button>
+    </form>
+    {% endif %}
+    <a class="ps-notif-view-all" href="{% url 'student-notifications' %}">{% translate "View all" %}</a>
+  </div>
+</div>
+<span id="notification-badge" class="ps-notif-badge" hx-swap-oob="true"{% if not unread_count %} hidden{% endif %}>{% if unread_count %}{{ unread_count }}{% endif %}</span>

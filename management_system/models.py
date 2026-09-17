@@ -569,16 +569,82 @@ class MobilePushDevice(models.Model):
         return f"{self.user.username} mobile device ({self.platform})"
 
 
+class Announcement(models.Model):
+    """One admin-authored notification fanned out to the student inbox."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        COMPLETED = "completed", _("Completed")
+        FAILED = "failed", _("Failed")
+
+    academic_year = models.ForeignKey(
+        "AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="announcements",
+    )
+    levels = models.ManyToManyField(
+        "Level",
+        blank=True,
+        related_name="announcements",
+        help_text=_("With no level selected the announcement targets every active student."),
+    )
+    title_ar = models.CharField(max_length=255)
+    body_ar = models.TextField()
+    title_en = models.CharField(max_length=255)
+    body_en = models.TextField()
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_announcements",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    recipient_count = models.PositiveIntegerField(default=0)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(title_ar="")
+                    & ~models.Q(body_ar="")
+                    & ~models.Q(title_en="")
+                    & ~models.Q(body_en="")
+                ),
+                name="announcement_content_not_empty",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["-created_at", "-id"], name="announcement_recent_idx"),
+            models.Index(fields=["status", "updated_at"], name="announcement_status_idx"),
+        ]
+
+    def __str__(self):
+        return self.title_en or self.title_ar
+
+
 class StudentNotification(models.Model):
     """One durable, student-visible academic notification event."""
 
     class NotificationType(models.TextChoices):
         LESSON_PUBLISHED = "lesson_published", _("Lesson published")
         QUIZ_OPENING = "quiz_opening", _("Exam opening")
+        ANNOUNCEMENT = "announcement", _("Announcement")
 
     class NavigationType(models.TextChoices):
         LESSON = "lesson", _("Lesson")
         QUIZ = "quiz", _("Exam")
+        NONE = "none", _("None")
 
     student = models.ForeignKey(
         User,
@@ -602,6 +668,13 @@ class StudentNotification(models.Model):
         null=True,
         blank=True,
         related_name="student_notifications",
+    )
+    announcement = models.ForeignKey(
+        "Announcement",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
     )
     effective_opening_at = models.DateTimeField(null=True, blank=True)
     effective_closing_at = models.DateTimeField(null=True, blank=True)
@@ -642,11 +715,26 @@ class StudentNotification(models.Model):
                         effective_opening_at__isnull=False,
                         effective_closing_at__isnull=False,
                     )
+                    | models.Q(
+                        notification_type="announcement",
+                        lesson__isnull=True,
+                        quiz__isnull=True,
+                        navigation_type="none",
+                        effective_opening_at__isnull=True,
+                        effective_closing_at__isnull=True,
+                    )
                 ),
                 name="student_notification_source_type_match",
             ),
             models.CheckConstraint(
-                condition=models.Q(offering_id__gt=0) & models.Q(entity_id__gt=0),
+                condition=(
+                    models.Q(offering_id__gt=0, entity_id__gt=0)
+                    | models.Q(
+                        notification_type="announcement",
+                        offering_id=0,
+                        entity_id=0,
+                    )
+                ),
                 name="student_notification_route_ids_positive",
             ),
             models.CheckConstraint(

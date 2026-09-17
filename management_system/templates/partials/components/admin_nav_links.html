@@ -274,6 +274,19 @@
                 <span>{% translate "Telegram Accounts" %}</span>
             </a>
         </li>
+
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'notifications-management' %}"
+               hx-get="{% url 'notifications-management' %}"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-bell"></i>
+                <span>{% translate "Notifications" %}</span>
+            </a>
+        </li>
         {% endif %}
 
         <li class="nav-item">

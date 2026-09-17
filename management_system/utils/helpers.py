@@ -384,7 +384,7 @@ def append_message_toasts(request, response):
     return response
 
 
-def render_page(request, full_template, partial_template, context):
+def render_page(request, full_template, partial_template, context, status=200):
     """
     Render the content partial for HTMX requests, the full shell otherwise.
     The partial must render the page's root #content element so the client
@@ -394,12 +394,13 @@ def render_page(request, full_template, partial_template, context):
     so the partial is wrapped in partials/page_region.html together with the
     page breadcrumbs. HTMX partial responses cannot render the shell toast
     stack, so any pending Django messages are appended as an out-of-band swap
-    of the shell's #toast-stack element.
+    of the shell's #toast-stack element. ``status`` lets validation failures
+    keep their HTTP status in both render modes.
     """
     if is_htmx(request):
         wrapped_context = {**context, "page_region_partial": partial_template}
         return append_message_toasts(
             request,
-            render(request, "partials/page_region.html", wrapped_context),
+            render(request, "partials/page_region.html", wrapped_context, status=status),
         )
-    return render(request, full_template, context)
+    return render(request, full_template, context, status=status)

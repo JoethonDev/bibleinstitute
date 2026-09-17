@@ -1,0 +1,19 @@
+{% load i18n %}
+<div id="notification-root" class="ps-notif"
+     data-live-url="{% url 'student-notification-live' %}"
+     data-last-seen-key="lms-notifications-last-seen">
+  <a id="notification-bell-button" class="ps-notif-bell"
+     href="{% url 'student-notifications' %}"
+     aria-expanded="false" aria-controls="notification-panel"
+     aria-label="{% translate 'Notifications' %}">
+    <i class="fas fa-bell" aria-hidden="true"></i>
+    <span id="notification-badge" class="ps-notif-badge" hidden></span>
+  </a>
+  <div id="notification-panel" class="ps-notif-panel" hidden
+       role="dialog" aria-label="{% translate 'Notifications' %}"
+       hx-get="{% url 'student-notification-panel' %}"
+       hx-trigger="click from:#notification-bell-button"
+       hx-target="#notification-panel"
+       hx-swap="innerHTML"></div>
+  <div id="notification-popups" class="ps-notif-popups" aria-live="polite"></div>
+</div>

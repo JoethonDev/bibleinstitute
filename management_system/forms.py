@@ -1257,3 +1257,107 @@ class SignupDetailsForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+class AnnouncementForm(forms.Form):
+    """Validate one admin announcement draft without persistence work.
+
+    This is a trust-boundary validator only. Admin authorization, active-year
+    level validation, recipient resolution, and the inbox fan-out transaction
+    belong to ``management_system.announcements``. Level choices are injected
+    by the view so this form never queries the database during construction,
+    and they represent only the active academic year's levels.
+    """
+
+    title_ar = forms.CharField(
+        required=True,
+        label=_("Title (Arabic)"),
+        max_length=255,
+        error_messages={
+            "required": _("Announcement title and body are required in both languages."),
+            "max_length": _("Announcement titles must be 255 characters or fewer."),
+        },
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "maxlength": 255,
+                "dir": "rtl",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    body_ar = forms.CharField(
+        required=True,
+        label=_("Body (Arabic)"),
+        max_length=4000,
+        error_messages={
+            "required": _("Announcement title and body are required in both languages."),
+            "max_length": _("Announcement bodies must be 4,000 characters or fewer."),
+        },
+        widget=forms.Textarea(
+            attrs={"class": "form-control", "rows": 5, "maxlength": 4000, "dir": "rtl"}
+        ),
+    )
+    title_en = forms.CharField(
+        required=True,
+        label=_("Title (English)"),
+        max_length=255,
+        error_messages={
+            "required": _("Announcement title and body are required in both languages."),
+            "max_length": _("Announcement titles must be 255 characters or fewer."),
+        },
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "maxlength": 255,
+                "dir": "ltr",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    body_en = forms.CharField(
+        required=True,
+        label=_("Body (English)"),
+        max_length=4000,
+        error_messages={
+            "required": _("Announcement title and body are required in both languages."),
+            "max_length": _("Announcement bodies must be 4,000 characters or fewer."),
+        },
+        widget=forms.Textarea(
+            attrs={"class": "form-control", "rows": 5, "maxlength": 4000, "dir": "ltr"}
+        ),
+    )
+    levels = forms.MultipleChoiceField(
+        required=False,
+        label=_("Target levels"),
+        help_text=_("With no level selected the announcement targets every active student."),
+        error_messages={
+            "invalid_choice": _("The selected level is not open in the active academic year."),
+        },
+        widget=forms.CheckboxSelectMultiple(),
+    )
+
+    def __init__(self, *args, level_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if level_choices is not None:
+            self.fields["levels"].choices = level_choices
+
+    def _clean_required_text(self, field_name: str) -> str:
+        value = (self.cleaned_data.get(field_name) or "").strip()
+        if not value:
+            raise ValidationError(
+                _("Announcement title and body are required in both languages.")
+            )
+        return value
+
+    def clean_title_ar(self) -> str:
+        return self._clean_required_text("title_ar")
+
+    def clean_body_ar(self) -> str:
+        return self._clean_required_text("body_ar")
+
+    def clean_title_en(self) -> str:
+        return self._clean_required_text("title_en")
+
+    def clean_body_en(self) -> str:
+        return self._clean_required_text("body_en")

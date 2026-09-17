@@ -39,6 +39,7 @@
 
     <!-- Shared Alpine store definitions must load before Alpine fires alpine:init. -->
     <script defer src="{% static 'js/alpine/stores/notifications.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'js/notification_center.js' %}?v={{ static_asset_version }}"></script>
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
@@ -124,6 +125,9 @@
             </ul>
 
             <div class="app-nav-actions ps-site-actions">
+              {% if user.is_authenticated %}
+              {% include 'partials/notification_center.html' %}
+              {% endif %}
               <form action="{% url 'set_language' %}" method="post" id="language-form" class="ps-inline-form">
                 {% csrf_token %}
                 <input name="next" type="hidden" value="{{ request.get_full_path }}">

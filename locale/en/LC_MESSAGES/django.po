@@ -10207,6 +10207,107 @@ msgstr "Entrance after %(limit)s or exit before %(earliest)s counts as partial a
 msgid "Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits."
 msgstr "Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits."
 
+msgid "Only administrators can send announcements."
+msgstr "Only administrators can send announcements."
+
+msgid "Announcement title and body are required in both languages."
+msgstr "Announcement title and body are required in both languages."
+
+msgid "Announcement content exceeds the allowed length."
+msgstr "Announcement content exceeds the allowed length."
+
+msgid "There are no active students in the selected target."
+msgstr "There are no active students in the selected target."
+
+#, python-format
+msgid "Notification sent to %(count)s students."
+msgstr "Notification sent to %(count)s students."
+
+msgid "Title (Arabic)"
+msgstr "Title (Arabic)"
+
+msgid "Body (Arabic)"
+msgstr "Body (Arabic)"
+
+msgid "Title (English)"
+msgstr "Title (English)"
+
+msgid "Body (English)"
+msgstr "Body (English)"
+
+msgid "Target levels"
+msgstr "Target levels"
+
+msgid "Announcement titles must be 255 characters or fewer."
+msgstr "Announcement titles must be 255 characters or fewer."
+
+msgid "Announcement bodies must be 4,000 characters or fewer."
+msgstr "Announcement bodies must be 4,000 characters or fewer."
+
+msgid "With no level selected the announcement targets every active student."
+msgstr "With no level selected the announcement targets every active student."
+
+msgid "Announcement"
+msgstr "Announcement"
+
+msgid "None"
+msgstr "None"
+
+msgid "Notifications"
+msgstr "Notifications"
+
+msgid "No notifications yet."
+msgstr "No notifications yet."
+
+msgid "View all"
+msgstr "View all"
+
+msgid "Notifications pagination"
+msgstr "Notifications pagination"
+
+msgid "notifications"
+msgstr "notifications"
+
+msgid "Announcements"
+msgstr "Announcements"
+
+msgid "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
+msgstr "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
+
+msgid "Compose notification"
+msgstr "Compose notification"
+
+msgid "Send this notification to the resolved recipients?"
+msgstr "Send this notification to the resolved recipients?"
+
+msgid "Recipients:"
+msgstr "Recipients:"
+
+msgid "Send notification"
+msgstr "Send notification"
+
+msgid "Sent notifications"
+msgstr "Sent notifications"
+
+#, python-format
+msgid "%(count)s Notifications"
+msgstr "%(count)s Notifications"
+
+msgid "Author"
+msgstr "Author"
+
+msgid "All active students"
+msgstr "All active students"
+
+msgid "No notifications have been sent yet."
+msgstr "No notifications have been sent yet."
+
+msgid "Notification queued for delivery."
+msgstr "Notification queued for delivery."
+
+msgid "Retry this notification?"
+msgstr "Retry this notification?"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

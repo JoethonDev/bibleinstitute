@@ -3285,3 +3285,40 @@
     border-radius: .6rem;
     background: #fff;
 }
+/* Admin announcements composer */
+.announcement-levels {
+    border: 0;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+.announcement-levels > legend {
+    float: none;
+    width: auto;
+    padding: 0;
+    margin-bottom: .35rem;
+}
+.announcement-levels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: .25rem .75rem;
+}
+.announcement-recipient-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.announcement-recipient-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    padding: .2rem .7rem;
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767.98px) {
+    .announcement-levels-grid {
+        grid-template-columns: 1fr;
+    }
+}

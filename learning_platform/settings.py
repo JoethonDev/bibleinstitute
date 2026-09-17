@@ -217,6 +217,7 @@ CELERY_IMPORTS = (
     "management_system.media_tasks",
     "management_system.mobile_push_tasks",
     "management_system.mobile_otp_tasks",
+    "management_system.announcement_tasks",
 )
 CELERY_TASK_ROUTES = {
     "management_system.media_tasks.*": {"queue": "media"},
@@ -240,6 +241,11 @@ CELERY_BEAT_SCHEDULE = {
     "reconcile-daily-attendance": {
         "task": "management_system.attendance_tasks.reconcile_daily_attendance",
         "schedule": crontab(hour=22, minute=0),
+    },
+    "recover-pending-announcements": {
+        "task": "management_system.announcement_tasks.recover_pending_announcements",
+        "schedule": 60.0,
+        "kwargs": {"limit": 50},
     },
 }
 

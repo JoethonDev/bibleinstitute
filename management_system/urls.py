@@ -22,6 +22,17 @@ from management_system.telegram_views import (
     telegram_start_conversation,
     telegram_unlink,
 )
+from management_system.notification_views import (
+    announcement_retry,
+    notifications_management,
+    notifications_recipient_count,
+    student_notification_live,
+    student_notification_open,
+    student_notification_panel,
+    student_notification_read,
+    student_notification_read_all,
+    student_notifications,
+)
 
 urlpatterns = [
     path(
@@ -50,6 +61,14 @@ urlpatterns = [
     path('api/offerings/<int:offering_id>/quiz-status/', api_quiz_status, name="api-quiz-status"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
+
+    # Notifications (student inbox and header bell)
+    path('notifications/', student_notifications, name="student-notifications"),
+    path('notifications/panel/', student_notification_panel, name="student-notification-panel"),
+    path('notifications/live/', student_notification_live, name="student-notification-live"),
+    path('notifications/read-all/', student_notification_read_all, name="student-notification-read-all"),
+    path('notifications/<int:notification_id>/open/', student_notification_open, name="student-notification-open"),
+    path('notifications/<int:notification_id>/read/', student_notification_read, name="student-notification-read"),
     
     # Admin Routes
     path('dashboard/', admin_panel, name="admin-panel"),
@@ -177,6 +196,11 @@ urlpatterns = [
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/cancel/', telegram_broadcast_cancel, name="telegram-broadcast-cancel"),
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/retry/', telegram_broadcast_retry, name="telegram-broadcast-retry"),
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/', telegram_broadcast_detail, name="telegram-broadcast-detail"),
+
+    # App notifications (admin composer and sent history)
+    path('dashboard/notifications/', notifications_management, name="notifications-management"),
+    path('dashboard/notifications/recipient-count/', notifications_recipient_count, name="notifications-recipient-count"),
+    path('dashboard/notifications/<int:announcement_id>/retry/', announcement_retry, name="announcement-retry"),
 
     # Phase 3 — Student Applications
     path('signup/', signup, name="signup"),

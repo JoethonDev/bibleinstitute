@@ -1,0 +1,139 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+  <div class="grade-matrix-header">
+    <div>
+      <div class="ad-kicker"><i class="fas fa-bell" aria-hidden="true"></i> {% translate "Announcements" %}</div>
+      <h3 class="ad-title mb-2">{% translate "Notifications" %}</h3>
+      <p class="ad-lede mb-0">{% translate "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app." %}</p>
+    </div>
+  </div>
+
+  <section class="ad-card mb-4" aria-label="{% translate 'Compose notification' %}">
+    <div class="ad-card-head">
+      <strong><i class="fas fa-pen-to-square" aria-hidden="true"></i> {% translate "Compose notification" %}</strong>
+    </div>
+    <div class="ad-card-body">
+      <form method="post" action="{% url 'notifications-management' %}" id="notification-compose-form" hx-post="{% url 'notifications-management' %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Send this notification to the resolved recipients?' %}">
+        {% csrf_token %}
+        {% if announcement_form.non_field_errors %}
+        <div class="ad-alert ad-alert--danger" role="alert">
+          {% for error in announcement_form.non_field_errors %}
+          <p class="mb-0">{{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="mb-3">
+              <label class="form-label" for="{{ announcement_form.title_ar.id_for_label }}">{{ announcement_form.title_ar.label }}</label>
+              {{ announcement_form.title_ar }}
+              {% if announcement_form.title_ar.errors %}<div class="text-danger">{{ announcement_form.title_ar.errors }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ announcement_form.body_ar.id_for_label }}">{{ announcement_form.body_ar.label }}</label>
+              {{ announcement_form.body_ar }}
+              {% if announcement_form.body_ar.errors %}<div class="text-danger">{{ announcement_form.body_ar.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="mb-3">
+              <label class="form-label" for="{{ announcement_form.title_en.id_for_label }}">{{ announcement_form.title_en.label }}</label>
+              {{ announcement_form.title_en }}
+              {% if announcement_form.title_en.errors %}<div class="text-danger">{{ announcement_form.title_en.errors }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ announcement_form.body_en.id_for_label }}">{{ announcement_form.body_en.label }}</label>
+              {{ announcement_form.body_en }}
+              {% if announcement_form.body_en.errors %}<div class="text-danger">{{ announcement_form.body_en.errors }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <fieldset class="announcement-levels">
+          <legend class="form-label">{{ announcement_form.levels.label }}</legend>
+          <div class="announcement-levels-grid">
+            {% for checkbox in announcement_form.levels %}
+            <div class="form-check">
+              {{ checkbox.tag }}
+              <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+            </div>
+            {% endfor %}
+          </div>
+          <small class="text-muted d-block mt-1">{{ announcement_form.levels.help_text }}</small>
+          {% if announcement_form.levels.errors %}<div class="text-danger mt-1">{{ announcement_form.levels.errors }}</div>{% endif %}
+        </fieldset>
+
+        <p class="announcement-recipient-line mb-3">
+          {% translate "Recipients:" %}
+          <span id="notification-recipient-count" class="ad-pill ad-pill--teal announcement-recipient-count"
+                hx-post="{{ recipient_count_url }}"
+                hx-trigger="load, change from:#notification-compose-form"
+                hx-include="closest form"
+                aria-live="polite">…</span>
+        </p>
+
+        <button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-paper-plane" aria-hidden="true"></i> {% translate "Send notification" %}</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="ad-card">
+    <div class="ad-card-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <strong><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> {% translate "Sent notifications" %}</strong>
+      <span class="ad-pill ad-pill--muted">{% blocktranslate with count=page_obj.paginator.count %}{{ count }} Notifications{% endblocktranslate %}</span>
+    </div>
+    <div class="ad-table-wrap">
+      <table class="ad-table">
+        <caption class="visually-hidden">{% translate "Sent notifications" %}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Date" %}</th>
+            <th scope="col">{% translate "Status" %}</th>
+            <th scope="col">{% translate "Author" %}</th>
+            <th scope="col">{% translate "Target" %}</th>
+            <th scope="col">{% translate "Recipients" %}</th>
+            <th scope="col">{% translate "Title (Arabic)" %}</th>
+            <th scope="col">{% translate "Title (English)" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for announcement in page_obj %}
+          <tr>
+            <td>{{ announcement.created_at }}<span class="d-block text-muted small">{{ announcement.academic_year.name }}</span></td>
+            <td>
+              <span class="ad-pill {% if announcement.status == 'completed' %}ad-pill--success{% elif announcement.status == 'failed' %}ad-pill--danger{% elif announcement.status == 'sending' %}ad-pill--warning{% else %}ad-pill--muted{% endif %}">{{ announcement.get_status_display }}</span>
+              {% if announcement.status == 'failed' %}
+              <form method="post" action="{% url 'announcement-retry' announcement.pk %}" hx-post="{% url 'announcement-retry' announcement.pk %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Retry this notification?' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="ad-btn ad-btn--ghost ad-btn--sm">{% translate "Retry" %}</button>
+              </form>
+              <span class="d-block text-danger small">{{ announcement.last_error }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if announcement.created_by %}{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}{% else %}—{% endif %}
+            </td>
+            <td>
+              {% with announcement_levels=announcement.levels.all %}
+              {% if announcement_levels %}{% for level in announcement_levels %}{{ level }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}{% translate "All active students" %}{% endif %}
+              {% endwith %}
+            </td>
+            <td>{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}—{% endif %}</td>
+            <td>{{ announcement.title_ar|truncatechars:60 }}</td>
+            <td>{{ announcement.title_en|truncatechars:60 }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="ad-empty">{% translate "No notifications have been sent yet." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% translate "Notifications pagination" as aria_label %}
+  {% translate "notifications" as item_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" aria_label=aria_label item_label=item_label %}
+</div>

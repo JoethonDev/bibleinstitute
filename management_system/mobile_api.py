@@ -46,7 +46,6 @@ from .models import (
     Grade,
     LectureProgress,
     MobilePushDevice,
-    StudentNotification,
     User,
     ViewingSession,
 )
@@ -60,10 +59,12 @@ from .utils.student_data import (
     student_grades_queryset,
     student_lesson_data,
     student_notification_data,
+    student_notifications_queryset,
     student_profile_data,
     student_progress_data,
     student_quiz_data,
     student_quiz_statuses,
+    unread_notification_count,
 )
 from .views import (
     create_viewing_session,
@@ -505,7 +506,7 @@ def grades(request):
 @require_http_methods(["GET"])
 def notifications(request):
     page_obj, unread_count = student_notification_data(
-        request.user, normalize_language(request), _page_value(request)
+        request.user, _page_value(request)
     )
     language = normalize_language(request)
     items = [notification_payload(row, language) for row in page_obj.object_list]
@@ -517,13 +518,9 @@ def notifications(request):
 @require_mobile_session
 @require_http_methods(["GET"])
 def notification_unread_count(request):
-    unread_count = StudentNotification.objects.filter(
-        student=request.user,
-        cancelled_at__isnull=True,
-        scheduled_for__lte=timezone.now(),
-        read_at__isnull=True,
-    ).count()
-    return json_api_response(request, {"unread_count": unread_count})
+    return json_api_response(
+        request, {"unread_count": unread_notification_count(request.user)}
+    )
 
 
 @csrf_exempt
@@ -531,12 +528,12 @@ def notification_unread_count(request):
 @require_POST
 def notification_read(request, notification_id):
     with transaction.atomic():
-        notification = StudentNotification.objects.select_for_update().filter(
-            pk=notification_id,
-            student=request.user,
-            cancelled_at__isnull=True,
-            scheduled_for__lte=timezone.now(),
-        ).first()
+        notification = (
+            student_notifications_queryset(request.user)
+            .select_for_update()
+            .filter(pk=notification_id)
+            .first()
+        )
         if notification is None:
             return _error(request, "forbidden", _("You do not have access to this notification."), 403)
         if notification.read_at is None:
@@ -549,11 +546,8 @@ def notification_read(request, notification_id):
 @require_mobile_session
 @require_POST
 def notification_read_all(request):
-    updated = StudentNotification.objects.filter(
-        student=request.user,
-        cancelled_at__isnull=True,
-        scheduled_for__lte=timezone.now(),
-        read_at__isnull=True,
+    updated = student_notifications_queryset(request.user).filter(
+        read_at__isnull=True
     ).update(read_at=timezone.now(), updated_at=timezone.now())
     return json_api_response(request, {"status": "read", "updated": updated})
 

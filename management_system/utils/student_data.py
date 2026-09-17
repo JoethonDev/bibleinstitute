@@ -486,28 +486,43 @@ def student_grades_queryset(user: User) -> QuerySet:
     ).select_related("quiz__course_offering__course", "quiz__quiz_type").order_by("-submitted_at", "-pk")
 
 
-def student_notification_data(user: User, language: str, page: int) -> tuple[Page, int]:
-    queryset = StudentNotification.objects.filter(
+def student_notifications_queryset(user: User) -> QuerySet:
+    """Return the durable notifications visible to one account.
+
+    This is the one visibility rule for web and mobile clients: cancelled
+    notifications and notifications scheduled for the future stay hidden.
+    """
+    return StudentNotification.objects.filter(
         student=user,
         cancelled_at__isnull=True,
         scheduled_for__lte=now(),
-    ).order_by("-created_at", "-pk")
+    )
+
+
+def unread_notification_count(user: User) -> int:
+    return student_notifications_queryset(user).filter(read_at__isnull=True).count()
+
+
+def localized_notification_text(notification: StudentNotification, language: str) -> tuple[str, str]:
+    """Return the stored snapshot text for one language."""
+    if language == "ar":
+        return notification.title_ar, notification.body_ar
+    return notification.title_en, notification.body_en
+
+
+def student_notification_data(user: User, page: int) -> tuple[Page, int]:
+    queryset = student_notifications_queryset(user).order_by("-created_at", "-pk")
     page_obj = Paginator(queryset, PAGE_SIZE).get_page(page)
-    unread_count = StudentNotification.objects.filter(
-        student=user,
-        cancelled_at__isnull=True,
-        scheduled_for__lte=now(),
-        read_at__isnull=True,
-    ).count()
-    return page_obj, unread_count
+    return page_obj, unread_notification_count(user)
 
 
 def notification_payload(notification: StudentNotification, language: str) -> dict:
+    title, body = localized_notification_text(notification, language)
     return {
         "id": notification.pk,
         "type": notification.notification_type,
-        "title": notification.title_ar if language == "ar" else notification.title_en,
-        "body": notification.body_ar if language == "ar" else notification.body_en,
+        "title": title,
+        "body": body,
         "navigation": {
             "type": notification.navigation_type,
             "offering_id": notification.offering_id,
