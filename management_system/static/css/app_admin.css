@@ -252,6 +252,10 @@
     overflow: hidden;
 }
 
+/* The drive grid hosts absolutely positioned file-action dropdowns; the card
+   must not clip them or the last menu item (Delete) becomes unreachable. */
+.ad-card:has(.ad-drive-grid) { overflow: visible; }
+
 .ad-card-head {
     display: flex;
     align-items: center;
