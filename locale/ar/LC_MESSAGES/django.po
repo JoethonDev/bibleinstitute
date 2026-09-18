@@ -3271,6 +3271,9 @@ msgstr "نسخ"
 msgid "Loading…"
 msgstr "جارٍ التحميل…"
 
+msgid "Load more notifications"
+msgstr "تحميل المزيد من الإشعارات"
+
 #: .\management_system\templates\academic_setup.html:521
 msgid "Unable to load offerings"
 msgstr "تعذر تحميل المقررات"

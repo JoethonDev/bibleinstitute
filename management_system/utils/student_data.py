@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.core.paginator import Page, Paginator
-from django.db.models import Exists, F, OuterRef, Prefetch, QuerySet, Window
+from django.db.models import Exists, F, OuterRef, Prefetch, Q, QuerySet, Window
 from django.db.models.functions import RowNumber
 from django.utils.timezone import now
 
@@ -514,6 +514,20 @@ def student_notification_data(user: User, page: int) -> tuple[Page, int]:
     queryset = student_notifications_queryset(user).order_by("-created_at", "-pk")
     page_obj = Paginator(queryset, PAGE_SIZE).get_page(page)
     return page_obj, unread_notification_count(user)
+
+
+def student_notification_cursor_page(
+    user: User,
+    before_created_at: datetime,
+    before_id: int,
+) -> tuple[list[StudentNotification], bool]:
+    """Return the next stable history page after a notification cursor."""
+    queryset = student_notifications_queryset(user).filter(
+        Q(created_at__lt=before_created_at)
+        | Q(created_at=before_created_at, pk__lt=before_id)
+    ).select_related("lesson", "quiz").order_by("-created_at", "-pk")
+    rows = list(queryset[: PAGE_SIZE + 1])
+    return rows[:PAGE_SIZE], len(rows) > PAGE_SIZE
 
 
 def notification_payload(notification: StudentNotification, language: str) -> dict:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -10,6 +12,7 @@ from django.http import HttpResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone, translation
+from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
@@ -31,6 +34,7 @@ from .utils.helpers import (
 )
 from .utils.student_data import (
     localized_notification_text,
+    student_notification_cursor_page,
     student_notification_data,
     student_notifications_queryset,
     unread_notification_count,
@@ -113,6 +117,20 @@ def _live_notification_item(notification: StudentNotification, language: str) ->
     }
 
 
+def _notification_cursor_url(notifications: list[StudentNotification], has_more: bool) -> str:
+    if not notifications or not has_more:
+        return ""
+    last = notifications[-1]
+    query = urlencode(
+        {
+            "before_created_at": last.created_at.isoformat(),
+            "before_id": last.pk,
+            "fragment": "1",
+        }
+    )
+    return f"{reverse('student-notifications')}?{query}"
+
+
 def _panel_context(request) -> dict:
     language = _web_language(request)
     notifications = list(
@@ -143,20 +161,53 @@ def _panel_response(request, status: int = 200):
 def student_notifications(request):
     """Bounded, paginated notification history for the signed-in account."""
     language = _web_language(request)
+    if request.GET.get("fragment") == "1":
+        before_created_at = parse_datetime(request.GET.get("before_created_at", ""))
+        try:
+            before_id = int(request.GET.get("before_id", ""))
+        except (TypeError, ValueError):
+            before_id = 0
+        if (
+            before_created_at is not None
+            and timezone.is_aware(before_created_at)
+            and before_id > 0
+        ):
+            notifications, has_more = student_notification_cursor_page(
+                request.user,
+                before_created_at,
+                before_id,
+            )
+        else:
+            first_page, unused_unread_count = student_notification_data(request.user, 1)
+            notifications = list(first_page.object_list)
+            has_more = first_page.has_next()
+        return render(
+            request,
+            "partials/notification_history_page.html",
+            {
+                "notification_items": [
+                    _notification_item(notification, language)
+                    for notification in notifications
+                ],
+                "next_url": _notification_cursor_url(notifications, has_more),
+            },
+        )
     try:
         page_number = max(1, int(request.GET.get("page", 1)))
     except (TypeError, ValueError):
         page_number = 1
     page_obj, unread_count = student_notification_data(request.user, page_number)
+    notifications = list(page_obj.object_list)
+    next_url = _notification_cursor_url(notifications, page_obj.has_next())
     context = {
         "page_obj": page_obj,
         "notification_items": [
-            _notification_item(notification, language)
-            for notification in page_obj.object_list
+            _notification_item(notification, language) for notification in notifications
         ],
         "unread_count": unread_count,
         "pagination_query": pagination_query_string(request),
         "read_all_url": reverse("student-notification-read-all"),
+        "next_url": next_url,
         "breadcrumb_items": generate_breadcrumb([(_("Notifications"), None)]),
     }
     return render(request, "notifications.html", context)

@@ -22,6 +22,41 @@
     var panel = document.getElementById('notification-panel');
     var popups = document.getElementById('notification-popups');
 
+    function positionPopupStack() {
+        if (!popups) {
+            return;
+        }
+        var nav = document.querySelector('.ps-site-nav');
+        var toastStack = document.getElementById('toast-stack');
+        var top = 84;
+        if (nav) {
+            top = nav.getBoundingClientRect().bottom + 8;
+        }
+        if (toastStack) {
+            top = Math.max(top, toastStack.getBoundingClientRect().bottom + 8);
+        }
+        popups.style.setProperty('--ps-notif-top', Math.ceil(top) + 'px');
+        popups.style.setProperty(
+            '--ps-notif-max-height',
+            Math.max(120, window.innerHeight - top - 16) + 'px'
+        );
+    }
+
+    positionPopupStack();
+    window.addEventListener('resize', positionPopupStack);
+    window.addEventListener('scroll', positionPopupStack, { passive: true });
+    if (typeof ResizeObserver === 'function') {
+        var popupLayoutObserver = new ResizeObserver(positionPopupStack);
+        var observedNav = document.querySelector('.ps-site-nav');
+        var observedToastStack = document.getElementById('toast-stack');
+        if (observedNav) {
+            popupLayoutObserver.observe(observedNav);
+        }
+        if (observedToastStack) {
+            popupLayoutObserver.observe(observedToastStack);
+        }
+    }
+
     var lastSeen = parseInt(window.localStorage.getItem(lastSeenKey) || '0', 10) || 0;
     var shownIds = new Set();
 
@@ -53,6 +88,7 @@
         if (element && element.parentNode) {
             element.parentNode.removeChild(element);
         }
+        positionPopupStack();
     }
 
     function openNotification(item) {
@@ -170,6 +206,7 @@
         article.appendChild(body);
         article.appendChild(actions);
         popups.appendChild(article);
+        positionPopupStack();
 
         while (popups.children.length > MAX_POPUPS) {
             popups.removeChild(popups.firstElementChild);
@@ -208,6 +245,129 @@
                 } catch (error) { /* storage unavailable */ }
             })
             .catch(function () { /* errors are intentionally swallowed */ });
+    }
+
+    function initNotificationHistory() {
+        var history = document.getElementById('notification-history');
+        if (!history || history.getAttribute('data-history-ready') === 'true') {
+            return;
+        }
+        history.setAttribute('data-history-ready', 'true');
+
+        var items = document.getElementById('notification-history-items');
+        var sentinel = history.querySelector('.ps-notif-history-sentinel');
+        var idleLabel = history.querySelector('.ps-notif-history-idle');
+        var status = history.querySelector('.ps-notif-history-status');
+        var pagination = document.querySelector('.ps-notif-pagination');
+        var nextUrl = history.getAttribute('data-next-url') || '';
+        var loading = false;
+        var observer = null;
+        var knownIds = new Set();
+
+        Array.prototype.forEach.call(
+            items ? items.querySelectorAll('[data-notification-id]') : [],
+            function (item) {
+                knownIds.add(item.getAttribute('data-notification-id'));
+            }
+        );
+
+        function setLoading(isLoading) {
+            loading = isLoading;
+            if (!sentinel) {
+                return;
+            }
+            sentinel.disabled = isLoading;
+            sentinel.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+            if (idleLabel) {
+                idleLabel.hidden = isLoading;
+            }
+            if (status) {
+                status.hidden = !isLoading;
+            }
+        }
+
+        function stopLoadingMore() {
+            if (observer && sentinel) {
+                observer.unobserve(sentinel);
+            }
+            if (sentinel) {
+                sentinel.hidden = true;
+            }
+        }
+
+        function appendPage(responseText) {
+            var parsed = new DOMParser().parseFromString(responseText, 'text/html');
+            var fragment = parsed.querySelector('.ps-notif-history-fragment');
+            if (!fragment || !items) {
+                throw new Error('notification page fragment missing');
+            }
+            Array.prototype.forEach.call(fragment.children, function (child) {
+                if (child.tagName && child.tagName.toLowerCase() === 'article') {
+                    var notificationId = child.getAttribute('data-notification-id');
+                    if (!notificationId || !knownIds.has(notificationId)) {
+                        if (notificationId) {
+                            knownIds.add(notificationId);
+                        }
+                        items.appendChild(document.importNode(child, true));
+                    }
+                }
+            });
+            nextUrl = fragment.getAttribute('data-next-url') || '';
+            history.setAttribute('data-next-url', nextUrl);
+            if (!nextUrl) {
+                stopLoadingMore();
+            }
+        }
+
+        function loadMore() {
+            if (!nextUrl || loading) {
+                return;
+            }
+            setLoading(true);
+            fetch(nextUrl, {
+                headers: { 'Accept': 'text/html' },
+                credentials: 'same-origin'
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('notification history failed');
+                    }
+                    return response.text();
+                })
+                .then(appendPage)
+                .catch(function () {
+                    // Keep the sentinel available so the student can retry.
+                })
+                .then(function () {
+                    setLoading(false);
+                });
+        }
+
+        if (pagination) {
+            pagination.hidden = true;
+        }
+        if (!nextUrl) {
+            stopLoadingMore();
+            return;
+        }
+
+        if ('IntersectionObserver' in window && sentinel) {
+            observer = new IntersectionObserver(function (entries) {
+                if (entries[0] && entries[0].isIntersecting) {
+                    loadMore();
+                }
+            }, { rootMargin: '480px 0px' });
+            observer.observe(sentinel);
+        }
+        if (sentinel) {
+            sentinel.addEventListener('click', loadMore);
+            sentinel.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    loadMore();
+                }
+            });
+        }
     }
 
     function closePanel() {
@@ -260,6 +420,7 @@
     });
 
     poll();
+    initNotificationHistory();
     window.setInterval(function () {
         if (!document.hidden) {
             poll();

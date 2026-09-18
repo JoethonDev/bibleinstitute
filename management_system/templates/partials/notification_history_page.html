@@ -1,0 +1,4 @@
+{% load i18n %}
+<div class="ps-notif-history-fragment" data-next-url="{{ next_url }}">
+  {% include "partials/notification_history_items.html" with notification_items=notification_items %}
+</div>

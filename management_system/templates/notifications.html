@@ -15,25 +15,14 @@
   </div>
 
   {% if notification_items %}
-  <div class="ps-notif-list">
-    {% for item in notification_items %}
-    <article class="ps-notif-entry{% if not item.is_read %} is-unread{% endif %}">
-      <form method="post" action="{{ item.open_url }}" class="ps-notif-entry-title-form">
-        {% csrf_token %}
-        <button type="submit" class="ps-notif-entry-title-button">{{ item.title }}</button>
-      </form>
-      <p class="ps-notif-entry-body">{{ item.body }}</p>
-      <time class="ps-notif-entry-time">{{ item.created_at }}</time>
-      {% if not item.is_read %}
-      <form method="post" action="{{ item.read_url }}" class="ps-notif-entry-read">
-        {% csrf_token %}
-        <button type="submit" class="ps-notif-entry-read-button">{% translate "Mark as read" %}</button>
-      </form>
-      {% elif item.target_url %}
-      <a class="ps-notif-entry-open" href="{{ item.target_url }}">{% translate "View" %}</a>
-      {% endif %}
-    </article>
-    {% endfor %}
+  <div id="notification-history" class="ps-notif-history" data-next-url="{{ next_url }}">
+    <div id="notification-history-items" class="ps-notif-list">
+      {% include "partials/notification_history_items.html" with notification_items=notification_items %}
+    </div>
+    <button type="button" class="ps-notif-history-sentinel" aria-label="{% translate 'Notifications pagination' %}">
+      <span class="ps-notif-history-idle">{% translate "Load more notifications" %}</span>
+      <span class="ps-notif-history-status" aria-live="polite" hidden>{% translate "Loading…" %}</span>
+    </button>
   </div>
   {% else %}
   <p class="ps-notif-empty">{% translate "No notifications yet." %}</p>
@@ -41,6 +30,6 @@
 
   {% translate "Notifications pagination" as aria_label %}
   {% translate "notifications" as item_label %}
-  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=aria_label item_label=item_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=aria_label item_label=item_label wrapper_class="ps-notif-pagination" %}
 </div>
 {% endblock %}

@@ -3323,6 +3323,9 @@ msgstr "Copy"
 msgid "Loading…"
 msgstr "Loading…"
 
+msgid "Load more notifications"
+msgstr "Load more notifications"
+
 #: .\management_system\templates\academic_setup.html:521
 msgid "Unable to load offerings"
 msgstr "Unable to load offerings"
