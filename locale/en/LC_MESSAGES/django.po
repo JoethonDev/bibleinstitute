@@ -10252,6 +10252,24 @@ msgstr "Announcement titles must be 255 characters or fewer."
 msgid "Announcement bodies must be 4,000 characters or fewer."
 msgstr "Announcement bodies must be 4,000 characters or fewer."
 
+msgid "Action button label"
+msgstr "Action button label"
+
+msgid "Action button URL"
+msgstr "Action button URL"
+
+msgid "Use a site path such as /en/courses/ or an http(s) URL."
+msgstr "Use a site path such as /en/courses/ or an http(s) URL."
+
+msgid "An action label and URL must be provided together."
+msgstr "An action label and URL must be provided together."
+
+msgid "Action labels must be 80 characters or fewer."
+msgstr "Action labels must be 80 characters or fewer."
+
+msgid "Enter a valid action URL."
+msgstr "Enter a valid action URL."
+
 msgid "With no level selected the announcement targets every active student."
 msgstr "With no level selected the announcement targets every active student."
 

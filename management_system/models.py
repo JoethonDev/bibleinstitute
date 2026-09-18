@@ -591,6 +591,8 @@ class Announcement(models.Model):
     )
     title = models.CharField(max_length=255)
     body = models.TextField()
+    action_label = models.CharField(max_length=80, blank=True, default="")
+    action_url = models.CharField(max_length=2048, blank=True, default="")
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -618,6 +620,13 @@ class Announcement(models.Model):
                     & ~models.Q(body="")
                 ),
                 name="announcement_content_not_empty",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(action_label="", action_url="")
+                    | (models.Q(action_label__gt="") & models.Q(action_url__gt=""))
+                ),
+                name="announcement_action_pair",
             ),
         ]
         indexes = [
@@ -679,6 +688,8 @@ class StudentNotification(models.Model):
     body_ar = models.TextField()
     title_en = models.CharField(max_length=255)
     body_en = models.TextField()
+    action_label = models.CharField(max_length=80, blank=True, default="")
+    action_url = models.CharField(max_length=2048, blank=True, default="")
     navigation_type = models.CharField(
         max_length=16,
         choices=NavigationType.choices,
@@ -736,6 +747,13 @@ class StudentNotification(models.Model):
             models.CheckConstraint(
                 condition=models.Q(push_expires_at__gt=models.F("scheduled_for")),
                 name="student_notification_push_expiry_after_schedule",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(action_label="", action_url="")
+                    | (models.Q(action_label__gt="") & models.Q(action_url__gt=""))
+                ),
+                name="student_notification_action_pair",
             ),
         ]
         indexes = [

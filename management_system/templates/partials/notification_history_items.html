@@ -5,8 +5,14 @@
     {% csrf_token %}
     <button type="submit" class="ps-notif-entry-title-button">{{ item.title }}</button>
   </form>
-  <p class="ps-notif-entry-body">{{ item.body }}</p>
+  <p class="ps-notif-entry-body">{{ item.body|urlize }}</p>
   <time class="ps-notif-entry-time">{{ item.created_at }}</time>
+  {% if item.action_url %}
+  <form method="post" action="{{ item.open_url }}" class="ps-notif-entry-action">
+    {% csrf_token %}
+    <button type="submit" class="ps-notif-entry-action-button">{{ item.action_label }}</button>
+  </form>
+  {% endif %}
   {% if not item.is_read %}
   <form method="post" action="{{ item.read_url }}" class="ps-notif-entry-read">
     {% csrf_token %}

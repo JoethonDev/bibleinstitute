@@ -10,14 +10,22 @@
   {% if notification_items %}
   <div class="ps-notif-panel-list">
     {% for item in notification_items %}
-    <form method="post" action="{{ item.open_url }}" class="ps-notif-item-form">
-      {% csrf_token %}
-      <button type="submit" class="ps-notif-item{% if not item.is_read %} is-unread{% endif %}">
+    <div class="ps-notif-item{% if not item.is_read %} is-unread{% endif %}">
+      <form method="post" action="{{ item.open_url }}" class="ps-notif-item-form">
+        {% csrf_token %}
+        <button type="submit" class="ps-notif-item-title-button">
         <span class="ps-notif-item-title">{{ item.title }}</span>
-        <span class="ps-notif-item-body">{{ item.body|truncatechars:90 }}</span>
-        <time class="ps-notif-item-time">{{ item.created_at }}</time>
-      </button>
-    </form>
+        </button>
+      </form>
+      <span class="ps-notif-item-body">{{ item.body|truncatechars:90|urlize }}</span>
+      <time class="ps-notif-item-time">{{ item.created_at }}</time>
+      {% if item.action_url %}
+      <form method="post" action="{{ item.open_url }}" class="ps-notif-item-action">
+        {% csrf_token %}
+        <button type="submit" class="ps-notif-item-action-button">{{ item.action_label }}</button>
+      </form>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
   {% else %}

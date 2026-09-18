@@ -36,6 +36,20 @@
           </div>
         </div>
 
+        <div class="announcement-action-fields">
+          <div class="mb-3">
+            <label class="form-label" for="{{ announcement_form.action_label.id_for_label }}">{{ announcement_form.action_label.label }}</label>
+            {{ announcement_form.action_label }}
+            {% if announcement_form.action_label.errors %}<div class="text-danger">{{ announcement_form.action_label.errors }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ announcement_form.action_url.id_for_label }}">{{ announcement_form.action_url.label }}</label>
+            {{ announcement_form.action_url }}
+            {% if announcement_form.action_url.help_text %}<small class="text-muted d-block mt-1">{{ announcement_form.action_url.help_text }}</small>{% endif %}
+            {% if announcement_form.action_url.errors %}<div class="text-danger">{{ announcement_form.action_url.errors }}</div>{% endif %}
+          </div>
+        </div>
+
         <fieldset class="announcement-levels">
           <legend class="form-label">{{ announcement_form.levels.label }}</legend>
           <div class="announcement-levels-grid">

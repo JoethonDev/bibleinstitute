@@ -144,6 +144,14 @@ def _notification_payload(delivery: PushDelivery) -> dict:
             "navigation_type": notification.navigation_type,
             "offering_id": notification.offering_id,
             "entity_id": notification.entity_id,
+            "action": (
+                {
+                    "label": notification.action_label,
+                    "url": notification.action_url,
+                }
+                if notification.action_url
+                else None
+            ),
         },
         "sound": "default",
         "priority": "high",

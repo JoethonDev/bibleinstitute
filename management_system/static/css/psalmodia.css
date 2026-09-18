@@ -764,7 +764,6 @@ html::-webkit-scrollbar-thumb {
     background: transparent;
     border: 0;
     border-block-end: 1px solid var(--ps-line, rgba(23, 48, 58, .12));
-    cursor: pointer;
 }
 
 .ps-notif-item.is-unread {
@@ -789,6 +788,57 @@ html::-webkit-scrollbar-thumb {
     color: var(--ps-muted, #5b6b73);
     font-size: .78rem;
     line-height: 1.35;
+}
+
+.ps-notif-item-body a,
+.ps-notif-entry-body a,
+.ps-notif-popup-body a {
+    color: var(--ps-teal, #2F5D73);
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+}
+
+.ps-notif-item-title-button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.ps-notif-item-title-button:focus-visible {
+    outline: 2px solid var(--ps-gold, #B4853A);
+    outline-offset: 2px;
+}
+
+.ps-notif-item-action,
+.ps-notif-entry-action {
+    margin: .5rem 0 0;
+}
+
+.ps-notif-item-action-button,
+.ps-notif-entry-action-button {
+    display: inline-block;
+    padding: .2rem .6rem;
+    background: transparent;
+    border: 1px solid var(--ps-teal, #2F5D73);
+    border-radius: 999px;
+    color: var(--ps-teal, #2F5D73);
+    font-size: .76rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ps-notif-item-action-button:hover,
+.ps-notif-item-action-button:focus-visible,
+.ps-notif-entry-action-button:hover,
+.ps-notif-entry-action-button:focus-visible {
+    border-color: var(--ps-gold, #B4853A);
+    color: var(--ps-gold, #B4853A);
 }
 
 .ps-notif-item-time {

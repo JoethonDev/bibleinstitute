@@ -13,6 +13,7 @@ from .utils.timezones import user_time_zone_choices
 from .utils.countries import country_choices
 from .utils.timezones import parse_application_datetime
 from .utils.quiz_access import eligible_quiz_students
+from .announcements import AnnouncementError, clean_announcement_action
 
 
 class UserLoginForm(AuthenticationForm):
@@ -1298,6 +1299,34 @@ class AnnouncementForm(forms.Form):
             attrs={"class": "form-control", "rows": 5, "maxlength": 4000, "dir": "auto"}
         ),
     )
+    action_label = forms.CharField(
+        required=False,
+        label=_("Action button label"),
+        max_length=80,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "maxlength": 80,
+                "dir": "auto",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    action_url = forms.CharField(
+        required=False,
+        label=_("Action button URL"),
+        max_length=2048,
+        help_text=_("Use a site path such as /en/courses/ or an http(s) URL."),
+        widget=forms.URLInput(
+            attrs={
+                "class": "form-control",
+                "maxlength": 2048,
+                "inputmode": "url",
+                "autocomplete": "off",
+                "dir": "ltr",
+            }
+        ),
+    )
     levels = forms.MultipleChoiceField(
         required=False,
         label=_("Target levels"),
@@ -1326,3 +1355,16 @@ class AnnouncementForm(forms.Form):
 
     def clean_body(self) -> str:
         return self._clean_required_text("body")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        try:
+            action_label, action_url = clean_announcement_action(
+                cleaned_data.get("action_label"),
+                cleaned_data.get("action_url"),
+            )
+        except AnnouncementError as exc:
+            raise ValidationError(str(exc)) from exc
+        cleaned_data["action_label"] = action_label
+        cleaned_data["action_url"] = action_url
+        return cleaned_data

@@ -537,6 +537,14 @@ def notification_payload(notification: StudentNotification, language: str) -> di
         "type": notification.notification_type,
         "title": title,
         "body": body,
+        "action": (
+            {
+                "label": notification.action_label,
+                "url": notification.action_url,
+            }
+            if notification.action_url
+            else None
+        ),
         "navigation": {
             "type": notification.navigation_type,
             "offering_id": notification.offering_id,

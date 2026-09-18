@@ -143,6 +143,36 @@
             .catch(function () { /* errors are intentionally swallowed */ });
     }
 
+    function renderLinkedText(element, text) {
+        var value = String(text || '');
+        var pattern = /https?:\/\/[^\s<]+/gi;
+        var cursor = 0;
+        var match;
+        while ((match = pattern.exec(value)) !== null) {
+            var rawUrl = match[0];
+            var url = rawUrl;
+            var trailing = url.match(/[.,!?;:)}\]]+$/);
+            if (trailing) {
+                url = url.slice(0, -trailing[0].length);
+            }
+            if (!url) {
+                continue;
+            }
+            element.appendChild(document.createTextNode(value.slice(cursor, match.index)));
+            var link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = url;
+            element.appendChild(link);
+            if (trailing) {
+                element.appendChild(document.createTextNode(trailing[0]));
+            }
+            cursor = match.index + rawUrl.length;
+        }
+        element.appendChild(document.createTextNode(value.slice(cursor)));
+    }
+
     function renderPopup(item) {
         if (!popups) {
             return;
@@ -168,7 +198,7 @@
 
         var body = document.createElement('p');
         body.className = 'ps-notif-popup-body';
-        body.textContent = item.body || '';
+        renderLinkedText(body, item.body);
 
         var actions = document.createElement('div');
         actions.className = 'ps-notif-popup-actions';
@@ -176,7 +206,9 @@
         var viewButton = document.createElement('button');
         viewButton.type = 'button';
         viewButton.className = 'ps-notif-popup-open';
-        viewButton.textContent = translate('View');
+        viewButton.textContent = item.action_url && item.action_label
+            ? item.action_label
+            : translate('View');
         viewButton.addEventListener('click', function () {
             openNotification(item);
         });

@@ -10821,6 +10821,24 @@ msgstr "يجب ألا تتجاوز عناوين الإعلانات 255 حرفً�
 msgid "Announcement bodies must be 4,000 characters or fewer."
 msgstr "يجب ألا تتجاوز نصوص الإعلانات ٤٬٠٠٠ حرف."
 
+msgid "Action button label"
+msgstr "نص زر الإجراء"
+
+msgid "Action button URL"
+msgstr "رابط زر الإجراء"
+
+msgid "Use a site path such as /en/courses/ or an http(s) URL."
+msgstr "استخدم مسارًا داخل الموقع مثل /ar/courses/ أو رابط http(s)."
+
+msgid "An action label and URL must be provided together."
+msgstr "يجب إدخال نص زر الإجراء ورابطه معًا."
+
+msgid "Action labels must be 80 characters or fewer."
+msgstr "يجب ألا يتجاوز نص زر الإجراء ٨٠ حرفًا."
+
+msgid "Enter a valid action URL."
+msgstr "أدخل رابط إجراء صالحًا."
+
 msgid "With no level selected the announcement targets every active student."
 msgstr "عند عدم اختيار مستوى، يُرسل الإعلان إلى كل طالب نشط."
 

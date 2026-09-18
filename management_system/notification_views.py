@@ -53,6 +53,8 @@ def _web_language(request) -> str:
 
 def _notification_target_url(notification: StudentNotification) -> str | None:
     """Return the student route a notification points at, when still valid."""
+    if notification.action_url:
+        return notification.action_url
     if (
         notification.navigation_type == StudentNotification.NavigationType.LESSON
         and notification.lesson_id
@@ -78,6 +80,8 @@ def _notification_item(notification: StudentNotification, language: str) -> dict
         "id": notification.pk,
         "title": title,
         "body": body,
+        "action_label": notification.action_label,
+        "action_url": notification.action_url,
         "is_read": notification.read_at is not None,
         "created_at": notification.created_at,
         "target_url": _notification_target_url(notification),
@@ -114,6 +118,8 @@ def _live_notification_item(notification: StudentNotification, language: str) ->
         "open_url": item["open_url"],
         "read_url": item["read_url"],
         "target_url": item["target_url"],
+        "action_label": item["action_label"],
+        "action_url": item["action_url"],
     }
 
 
@@ -333,6 +339,8 @@ def notifications_management(request):
                     actor=request.user,
                     title=form.cleaned_data["title"],
                     body=form.cleaned_data["body"],
+                    action_label=form.cleaned_data["action_label"],
+                    action_url=form.cleaned_data["action_url"],
                     level_ids=form.cleaned_data["levels"],
                 )
             except AnnouncementError as exc:

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import unicodedata
 from collections.abc import Iterable
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 from celery import current_app
 from django.conf import settings
@@ -27,6 +29,8 @@ from .models import (
 ANNOUNCEMENT_BATCH_SIZE = 500
 MAX_ANNOUNCEMENT_TITLE = 255
 MAX_ANNOUNCEMENT_BODY = 4000
+MAX_ANNOUNCEMENT_ACTION_LABEL = 80
+MAX_ANNOUNCEMENT_ACTION_URL = 2048
 ANNOUNCEMENT_FANOUT_TASK = "management_system.announcement_tasks.fan_out_announcement"
 ANNOUNCEMENT_RECOVERY_GRACE = timedelta(minutes=2)
 ANNOUNCEMENT_STALE_AFTER = timedelta(minutes=15)
@@ -131,17 +135,58 @@ def _clean_content(value, *, max_length: int) -> str:
     return text
 
 
+def clean_announcement_action(label, url) -> tuple[str, str]:
+    """Validate the optional action button without accepting unsafe URLs."""
+    label = str(label or "").strip()
+    url = str(url or "").strip()
+    if not label and not url:
+        return "", ""
+    if not label or not url:
+        raise AnnouncementError(
+            _("An action label and URL must be provided together.")
+        )
+    if len(label) > MAX_ANNOUNCEMENT_ACTION_LABEL:
+        raise AnnouncementError(
+            _("Action labels must be 80 characters or fewer.")
+        )
+    if len(url) > MAX_ANNOUNCEMENT_ACTION_URL or any(
+        character.isspace()
+        or unicodedata.category(character) in {"Cc", "Cf"}
+        or character == "\\"
+        for character in url
+    ):
+        raise AnnouncementError(_("Enter a valid action URL."))
+    try:
+        parsed = urlsplit(url)
+        hostname = parsed.hostname
+        parsed.port
+    except ValueError as exc:
+        raise AnnouncementError(_("Enter a valid action URL.")) from exc
+    if url.startswith("/") and not url.startswith("//"):
+        if not parsed.path:
+            raise AnnouncementError(_("Enter a valid action URL."))
+    elif parsed.scheme in {"http", "https"} and parsed.netloc:
+        if parsed.username or parsed.password or not hostname:
+            raise AnnouncementError(_("Enter a valid action URL."))
+    else:
+        raise AnnouncementError(_("Enter a valid action URL."))
+    return label, url
+
+
 def send_announcement(
     *,
     actor: User,
     title: str,
     body: str,
+    action_label: str,
+    action_url: str,
     level_ids: Iterable[int] | None = None,
 ) -> Announcement:
     """Queue one announcement; the inbox fan-out runs in a background task."""
     _require_admin(actor)
     title = _clean_content(title, max_length=MAX_ANNOUNCEMENT_TITLE)
     body = _clean_content(body, max_length=MAX_ANNOUNCEMENT_BODY)
+    action_label, action_url = clean_announcement_action(action_label, action_url)
     levels = resolve_announcement_levels(level_ids or [])
 
     with transaction.atomic():
@@ -165,6 +210,8 @@ def send_announcement(
             created_by=actor,
             title=title,
             body=body,
+            action_label=action_label,
+            action_url=action_url,
         )
         if levels:
             announcement.levels.set(levels)
@@ -240,6 +287,8 @@ def fan_out_announcement(announcement_id: int) -> int:
                     body_ar=announcement.body,
                     title_en=announcement.title,
                     body_en=announcement.body,
+                    action_label=announcement.action_label,
+                    action_url=announcement.action_url,
                     scheduled_for=scheduled_for,
                     push_expires_at=push_expires_at,
                 )
