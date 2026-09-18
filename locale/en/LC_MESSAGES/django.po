@@ -10209,6 +10209,9 @@ msgstr "Only administrators can send announcements."
 msgid "Announcement title and body are required in both languages."
 msgstr "Announcement title and body are required in both languages."
 
+msgid "Announcement title and body are required."
+msgstr "Announcement title and body are required."
+
 msgid "Announcement content exceeds the allowed length."
 msgstr "Announcement content exceeds the allowed length."
 
@@ -10230,6 +10233,12 @@ msgstr "Title (English)"
 
 msgid "Body (English)"
 msgstr "Body (English)"
+
+msgid "Body"
+msgstr "Body"
+
+msgid "Public Home"
+msgstr "Public Home"
 
 msgid "Target levels"
 msgstr "Target levels"
@@ -10269,6 +10278,9 @@ msgstr "Announcements"
 
 msgid "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
 msgstr "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
+
+msgid "Send an announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
+msgstr "Send an announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
 
 msgid "Compose notification"
 msgstr "Compose notification"

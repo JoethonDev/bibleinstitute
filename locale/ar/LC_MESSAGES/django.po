@@ -10778,6 +10778,9 @@ msgstr "لا يمكن إرسال الإعلانات إلا للمسؤولين."
 msgid "Announcement title and body are required in both languages."
 msgstr "عنوان الإعلان ونصه مطلوبان باللغتين."
 
+msgid "Announcement title and body are required."
+msgstr "عنوان الإعلان ونصه مطلوبان."
+
 msgid "Announcement content exceeds the allowed length."
 msgstr "يتجاوز محتوى الإعلان الحد المسموح به."
 
@@ -10799,6 +10802,12 @@ msgstr "العنوان (بالإنجليزية)"
 
 msgid "Body (English)"
 msgstr "النص (بالإنجليزية)"
+
+msgid "Body"
+msgstr "النص"
+
+msgid "Public Home"
+msgstr "الصفحة الرئيسية العامة"
 
 msgid "Target levels"
 msgstr "المستويات المستهدفة"
@@ -10838,6 +10847,9 @@ msgstr "الإعلانات"
 
 msgid "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
 msgstr "أرسل إعلانًا ثنائي اللغة إلى كل طالب نشط أو إلى مستويات محددة. تظهر الإعلانات المرسلة في جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
+
+msgid "Send an announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
+msgstr "أرسل إعلانًا إلى كل طالب نشط أو إلى مستويات محددة. تظهر الإعلانات المرسلة في جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
 
 msgid "Compose notification"
 msgstr "إنشاء إشعار"

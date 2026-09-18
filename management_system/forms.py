@@ -1269,62 +1269,33 @@ class AnnouncementForm(forms.Form):
     and they represent only the active academic year's levels.
     """
 
-    title_ar = forms.CharField(
+    title = forms.CharField(
         required=True,
-        label=_("Title (Arabic)"),
+        label=_("Title"),
         max_length=255,
         error_messages={
-            "required": _("Announcement title and body are required in both languages."),
+            "required": _("Announcement title and body are required."),
             "max_length": _("Announcement titles must be 255 characters or fewer."),
         },
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
                 "maxlength": 255,
-                "dir": "rtl",
+                "dir": "auto",
                 "autocomplete": "off",
             }
         ),
     )
-    body_ar = forms.CharField(
+    body = forms.CharField(
         required=True,
-        label=_("Body (Arabic)"),
+        label=_("Body"),
         max_length=4000,
         error_messages={
-            "required": _("Announcement title and body are required in both languages."),
+            "required": _("Announcement title and body are required."),
             "max_length": _("Announcement bodies must be 4,000 characters or fewer."),
         },
         widget=forms.Textarea(
-            attrs={"class": "form-control", "rows": 5, "maxlength": 4000, "dir": "rtl"}
-        ),
-    )
-    title_en = forms.CharField(
-        required=True,
-        label=_("Title (English)"),
-        max_length=255,
-        error_messages={
-            "required": _("Announcement title and body are required in both languages."),
-            "max_length": _("Announcement titles must be 255 characters or fewer."),
-        },
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "maxlength": 255,
-                "dir": "ltr",
-                "autocomplete": "off",
-            }
-        ),
-    )
-    body_en = forms.CharField(
-        required=True,
-        label=_("Body (English)"),
-        max_length=4000,
-        error_messages={
-            "required": _("Announcement title and body are required in both languages."),
-            "max_length": _("Announcement bodies must be 4,000 characters or fewer."),
-        },
-        widget=forms.Textarea(
-            attrs={"class": "form-control", "rows": 5, "maxlength": 4000, "dir": "ltr"}
+            attrs={"class": "form-control", "rows": 5, "maxlength": 4000, "dir": "auto"}
         ),
     )
     levels = forms.MultipleChoiceField(
@@ -1346,18 +1317,12 @@ class AnnouncementForm(forms.Form):
         value = (self.cleaned_data.get(field_name) or "").strip()
         if not value:
             raise ValidationError(
-                _("Announcement title and body are required in both languages.")
+                _("Announcement title and body are required.")
             )
         return value
 
-    def clean_title_ar(self) -> str:
-        return self._clean_required_text("title_ar")
+    def clean_title(self) -> str:
+        return self._clean_required_text("title")
 
-    def clean_body_ar(self) -> str:
-        return self._clean_required_text("body_ar")
-
-    def clean_title_en(self) -> str:
-        return self._clean_required_text("title_en")
-
-    def clean_body_en(self) -> str:
-        return self._clean_required_text("body_en")
+    def clean_body(self) -> str:
+        return self._clean_required_text("body")

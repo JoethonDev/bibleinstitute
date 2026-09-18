@@ -4,7 +4,7 @@
     <div>
       <div class="ad-kicker"><i class="fas fa-bell" aria-hidden="true"></i> {% translate "Announcements" %}</div>
       <h3 class="ad-title mb-2">{% translate "Notifications" %}</h3>
-      <p class="ad-lede mb-0">{% translate "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app." %}</p>
+      <p class="ad-lede mb-0">{% translate "Send an announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app." %}</p>
     </div>
   </div>
 
@@ -23,30 +23,16 @@
         </div>
         {% endif %}
 
-        <div class="row g-3">
-          <div class="col-12 col-lg-6">
-            <div class="mb-3">
-              <label class="form-label" for="{{ announcement_form.title_ar.id_for_label }}">{{ announcement_form.title_ar.label }}</label>
-              {{ announcement_form.title_ar }}
-              {% if announcement_form.title_ar.errors %}<div class="text-danger">{{ announcement_form.title_ar.errors }}</div>{% endif %}
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="{{ announcement_form.body_ar.id_for_label }}">{{ announcement_form.body_ar.label }}</label>
-              {{ announcement_form.body_ar }}
-              {% if announcement_form.body_ar.errors %}<div class="text-danger">{{ announcement_form.body_ar.errors }}</div>{% endif %}
-            </div>
+        <div class="announcement-copy-fields">
+          <div class="mb-3">
+            <label class="form-label" for="{{ announcement_form.title.id_for_label }}">{{ announcement_form.title.label }}</label>
+            {{ announcement_form.title }}
+            {% if announcement_form.title.errors %}<div class="text-danger">{{ announcement_form.title.errors }}</div>{% endif %}
           </div>
-          <div class="col-12 col-lg-6">
-            <div class="mb-3">
-              <label class="form-label" for="{{ announcement_form.title_en.id_for_label }}">{{ announcement_form.title_en.label }}</label>
-              {{ announcement_form.title_en }}
-              {% if announcement_form.title_en.errors %}<div class="text-danger">{{ announcement_form.title_en.errors }}</div>{% endif %}
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="{{ announcement_form.body_en.id_for_label }}">{{ announcement_form.body_en.label }}</label>
-              {{ announcement_form.body_en }}
-              {% if announcement_form.body_en.errors %}<div class="text-danger">{{ announcement_form.body_en.errors }}</div>{% endif %}
-            </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ announcement_form.body.id_for_label }}">{{ announcement_form.body.label }}</label>
+            {{ announcement_form.body }}
+            {% if announcement_form.body.errors %}<div class="text-danger">{{ announcement_form.body.errors }}</div>{% endif %}
           </div>
         </div>
 
@@ -93,8 +79,8 @@
             <th scope="col">{% translate "Author" %}</th>
             <th scope="col">{% translate "Target" %}</th>
             <th scope="col">{% translate "Recipients" %}</th>
-            <th scope="col">{% translate "Title (Arabic)" %}</th>
-            <th scope="col">{% translate "Title (English)" %}</th>
+            <th scope="col">{% translate "Title" %}</th>
+            <th scope="col">{% translate "Body" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -120,8 +106,8 @@
               {% endwith %}
             </td>
             <td>{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}—{% endif %}</td>
-            <td>{{ announcement.title_ar|truncatechars:60 }}</td>
-            <td>{{ announcement.title_en|truncatechars:60 }}</td>
+            <td>{{ announcement.title|truncatechars:60 }}</td>
+            <td>{{ announcement.body|truncatechars:100 }}</td>
           </tr>
           {% empty %}
           <tr>

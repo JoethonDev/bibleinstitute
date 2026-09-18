@@ -123,9 +123,7 @@ def count_announcement_recipients(level_ids: Iterable[int] | None) -> int:
 def _clean_content(value, *, max_length: int) -> str:
     text = str(value or "").strip()
     if not text:
-        raise AnnouncementError(
-            _("Announcement title and body are required in both languages.")
-        )
+        raise AnnouncementError(_("Announcement title and body are required."))
     if len(text) > max_length:
         raise AnnouncementError(
             _("Announcement content exceeds the allowed length.")
@@ -136,18 +134,14 @@ def _clean_content(value, *, max_length: int) -> str:
 def send_announcement(
     *,
     actor: User,
-    title_ar: str,
-    body_ar: str,
-    title_en: str,
-    body_en: str,
+    title: str,
+    body: str,
     level_ids: Iterable[int] | None = None,
 ) -> Announcement:
     """Queue one announcement; the inbox fan-out runs in a background task."""
     _require_admin(actor)
-    title_ar = _clean_content(title_ar, max_length=MAX_ANNOUNCEMENT_TITLE)
-    title_en = _clean_content(title_en, max_length=MAX_ANNOUNCEMENT_TITLE)
-    body_ar = _clean_content(body_ar, max_length=MAX_ANNOUNCEMENT_BODY)
-    body_en = _clean_content(body_en, max_length=MAX_ANNOUNCEMENT_BODY)
+    title = _clean_content(title, max_length=MAX_ANNOUNCEMENT_TITLE)
+    body = _clean_content(body, max_length=MAX_ANNOUNCEMENT_BODY)
     levels = resolve_announcement_levels(level_ids or [])
 
     with transaction.atomic():
@@ -169,10 +163,8 @@ def send_announcement(
         announcement = Announcement.objects.create(
             academic_year=academic_year,
             created_by=actor,
-            title_ar=title_ar,
-            body_ar=body_ar,
-            title_en=title_en,
-            body_en=body_en,
+            title=title,
+            body=body,
         )
         if levels:
             announcement.levels.set(levels)
@@ -244,10 +236,10 @@ def fan_out_announcement(announcement_id: int) -> int:
                     offering_id=0,
                     entity_id=0,
                     idempotency_key=f"announcement:{announcement.pk}:user:{student.pk}",
-                    title_ar=announcement.title_ar,
-                    body_ar=announcement.body_ar,
-                    title_en=announcement.title_en,
-                    body_en=announcement.body_en,
+                    title_ar=announcement.title,
+                    body_ar=announcement.body,
+                    title_en=announcement.title,
+                    body_en=announcement.body,
                     scheduled_for=scheduled_for,
                     push_expires_at=push_expires_at,
                 )

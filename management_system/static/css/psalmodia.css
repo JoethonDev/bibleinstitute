@@ -279,6 +279,11 @@ html::-webkit-scrollbar-thumb {
     color: var(--ps-teal);
     background: transparent;
 }
+.ps-site-notification-slot {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-start: .35rem;
+}
 .ps-site-nav-link {
     color: var(--ps-ink) !important;
     font-weight: 600;
@@ -974,6 +979,11 @@ html::-webkit-scrollbar-thumb {
     text-decoration: underline;
 }
 
+.ps-notif-entry-title-button,
+.ps-notif-entry-body {
+    overflow-wrap: anywhere;
+}
+
 .ps-notif-entry-body {
     margin: .35rem 0;
     color: var(--ps-muted, #5b6b73);
@@ -1016,5 +1026,27 @@ html::-webkit-scrollbar-thumb {
 @media (prefers-reduced-motion: reduce) {
     .ps-notif-bell {
         transition: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .ps-site-nav > .container {
+        flex-wrap: wrap;
+    }
+
+    .ps-site-notification-slot {
+        order: 3;
+        margin-inline-start: .35rem;
+    }
+
+    .ps-site-nav .navbar-collapse {
+        flex-basis: 100%;
+        order: 4;
+    }
+
+    .ps-notif-panel {
+        inset-inline-end: -.25rem;
+        width: min(calc(100vw - 1rem), 24rem);
+        max-width: calc(100vw - 1rem);
     }
 }

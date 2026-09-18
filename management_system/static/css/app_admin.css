@@ -3286,6 +3286,9 @@
     background: #fff;
 }
 /* Admin announcements composer */
+.announcement-copy-fields {
+    max-width: 52rem;
+}
 .announcement-levels {
     border: 0;
     padding: 0;

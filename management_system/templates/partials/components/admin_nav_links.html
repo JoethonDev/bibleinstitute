@@ -13,6 +13,12 @@
             <span>{% translate "Home" %}</span>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="ad-tab" href="{% url 'home' %}">
+            <i class="fas fa-globe"></i>
+            <span>{% translate "Public Home" %}</span>
+        </a>
+    </li>
     
     {% if role == 'admin' %}
         <li class="nav-item">

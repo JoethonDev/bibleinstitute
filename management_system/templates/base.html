@@ -93,6 +93,11 @@
               <button class="navbar-toggler ps-site-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <i class="fas fa-bars"></i>
               </button>
+              {% if user.is_authenticated and request.user.role.role == "student" %}
+              <div class="ps-site-notification-slot">
+                {% include 'partials/notification_center.html' %}
+              </div>
+              {% endif %}
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1 ps-site-nav-list">
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'home' %}">{% translate "Home" %}</a></li>
@@ -110,8 +115,9 @@
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
               {% if request.user.role.role == "student" %}
-              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
-              {% endif %}
+               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
+               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-notifications' %}">{% translate "Notifications" %}</a></li>
+               {% endif %}
               {% if request.user.role.role == "student" or request.user.role.role == "admin" %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'download-qr' %}">{% translate "My QR" %}</a></li>
               {% endif %}
@@ -125,9 +131,6 @@
             </ul>
 
             <div class="app-nav-actions ps-site-actions">
-              {% if user.is_authenticated %}
-              {% include 'partials/notification_center.html' %}
-              {% endif %}
               <form action="{% url 'set_language' %}" method="post" id="language-form" class="ps-inline-form">
                 {% csrf_token %}
                 <input name="next" type="hidden" value="{{ request.get_full_path }}">

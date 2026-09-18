@@ -589,10 +589,8 @@ class Announcement(models.Model):
         related_name="announcements",
         help_text=_("With no level selected the announcement targets every active student."),
     )
-    title_ar = models.CharField(max_length=255)
-    body_ar = models.TextField()
-    title_en = models.CharField(max_length=255)
-    body_en = models.TextField()
+    title = models.CharField(max_length=255)
+    body = models.TextField()
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -616,10 +614,8 @@ class Announcement(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    ~models.Q(title_ar="")
-                    & ~models.Q(body_ar="")
-                    & ~models.Q(title_en="")
-                    & ~models.Q(body_en="")
+                    ~models.Q(title="")
+                    & ~models.Q(body="")
                 ),
                 name="announcement_content_not_empty",
             ),
@@ -630,7 +626,7 @@ class Announcement(models.Model):
         ]
 
     def __str__(self):
-        return self.title_en or self.title_ar
+        return self.title
 
 
 class StudentNotification(models.Model):

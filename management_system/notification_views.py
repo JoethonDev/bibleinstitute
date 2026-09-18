@@ -280,10 +280,8 @@ def notifications_management(request):
             try:
                 send_announcement(
                     actor=request.user,
-                    title_ar=form.cleaned_data["title_ar"],
-                    body_ar=form.cleaned_data["body_ar"],
-                    title_en=form.cleaned_data["title_en"],
-                    body_en=form.cleaned_data["body_en"],
+                    title=form.cleaned_data["title"],
+                    body=form.cleaned_data["body"],
                     level_ids=form.cleaned_data["levels"],
                 )
             except AnnouncementError as exc:
