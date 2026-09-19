@@ -1,167 +1,160 @@
-/* Searchable Egyptian city picker for the signup city field.
+/* Single-input Egyptian city combobox for the signup city field.
  *
- * When the selected country is Egypt, the free-text city input is enhanced
- * into a search input plus a <select> fed by the <datalist
- * id="egyptian-cities"> list. Matching mirrors the server normalization
- * (management_system.utils.search.normalize_search_text) and additionally
- * folds ta marbuta (ة -> ه) so common spellings such as "القاهره" also find
- * "القاهرة". Other countries keep the plain text input unchanged.
+ * The text input stays the only control: while the selected country is Egypt,
+ * typing filters a suggestion list using the shared normalized Arabic
+ * matching (arabic_search.js). Choosing a suggestion writes the canonical
+ * city name into the input; free text stays allowed. On submit, a typed value
+ * that normalizes to a known city is replaced with that canonical city name.
  */
 
-function normalizeCitySearchTerm(value) {
-    var term = String(value || "");
-    try {
-        term = term.normalize("NFKC");
-    } catch (error) {
-        /* Engines without String.prototype.normalize keep the literal form. */
+function findCanonicalCity(cityNames, value) {
+    var normalized = normalizeArabicSearchTerm(value);
+    if (!normalized) return null;
+    for (var index = 0; index < cityNames.length; index += 1) {
+        if (normalizeArabicSearchTerm(cityNames[index]) === normalized) {
+            return cityNames[index];
+        }
     }
-    term = term
-        .replace(/[\u0623\u0625\u0622\u0671]/g, "\u0627") /* أ إ آ ٱ -> ا */
-        .replace(/[\u0649\u0626]/g, "\u064A") /* ى ئ -> ي */
-        .replace(/\u0624/g, "\u0648") /* ؤ -> و */
-        .replace(/\u0629/g, "\u0647") /* ة -> ه (picker-only fold) */
-        .replace(/[\u064B-\u065F\u0670\u0640\u06D6-\u06ED]/g, "") /* harakat/tatweel */
-        .toLowerCase();
-    return term.replace(/\s+/g, " ").trim();
-}
-
-function citySearchMatches(haystack, needle) {
-    var normalizedNeedle = normalizeCitySearchTerm(needle);
-    if (!normalizedNeedle) return true;
-    return normalizeCitySearchTerm(haystack).indexOf(normalizedNeedle) !== -1;
+    return null;
 }
 
 function enhanceCitySearch() {
     var countrySelect = document.getElementById("id_country");
     var datalist = document.getElementById("egyptian-cities");
-    if (!countrySelect || !datalist) return;
+    var input = document.getElementById("city");
+    if (!countrySelect || !datalist || !input || input.tagName !== "INPUT") return;
+    if (input.dataset.cityCombobox === "true") return;
+    input.dataset.cityCombobox = "true";
 
-    var cityValues = Array.from(datalist.options)
+    var cityNames = Array.from(datalist.options)
         .map(function (option) { return option.value; })
         .filter(Boolean);
-    /* Labels come from the server-rendered datalist attributes so they always
-     * follow the page language (the /jsi18n/ catalog resolves its own). */
-    var labels = {
-        search: datalist.dataset.searchPlaceholder || "",
-        placeholder: datalist.dataset.placeholder || "",
-        empty: datalist.dataset.emptyLabel || "",
-    };
+    var emptyLabel = datalist.dataset.emptyLabel || "";
+    var SUGGESTION_LIMIT = 100;
 
-    function buildSelector() {
-        var input = document.getElementById("city");
-        if (!input || input.tagName !== "INPUT") return;
+    var list = document.createElement("ul");
+    list.id = "city-suggestions";
+    list.className = "city-suggestions";
+    list.setAttribute("role", "listbox");
+    list.hidden = true;
+    input.parentNode.classList.add("city-combobox");
+    input.parentNode.insertBefore(list, input.nextSibling);
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-controls", list.id);
+    input.setAttribute("autocomplete", "off");
 
-        var wrapper = document.createElement("div");
-        wrapper.id = "city-search-wrapper";
+    var activeIndex = -1;
 
-        var search = document.createElement("input");
-        search.type = "search";
-        search.id = "city-search";
-        search.className = "form-control mb-2";
-        search.placeholder = labels.search;
-        search.setAttribute("aria-label", labels.search);
-        search.setAttribute("autocomplete", "off");
+    function isEgypt() {
+        return (countrySelect.value || "").toUpperCase() === "EG";
+    }
 
-        var select = document.createElement("select");
-        select.className = "form-select";
-        select.setAttribute("data-city-select", "true");
-        select.name = input.name || "city";
+    function close() {
+        list.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("aria-activedescendant");
+        activeIndex = -1;
+    }
 
-        var placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = labels.placeholder;
-        select.appendChild(placeholder);
-
-        cityValues.forEach(function (value) {
-            var option = document.createElement("option");
-            option.value = value;
-            option.textContent = value;
-            option.dataset.citySearch = normalizeCitySearchTerm(value);
-            select.appendChild(option);
+    function selectableOptions() {
+        return Array.from(list.children).filter(function (item) {
+            return item.dataset.empty !== "true";
         });
+    }
 
-        /* Preserve the in-progress value: exact match, normalized match, or a
-         * temporary option so switching countries never drops typed text. */
-        var current = (input.value || "").trim();
-        if (current) {
-            var selected = cityValues.indexOf(current) !== -1 ? current : null;
-            if (!selected) {
-                var currentNormalized = normalizeCitySearchTerm(current);
-                selected = cityValues.find(function (value) {
-                    return normalizeCitySearchTerm(value) === currentNormalized;
-                }) || null;
-            }
-            if (selected) {
-                select.value = selected;
-                input.value = selected;
-            } else {
-                var temporary = document.createElement("option");
-                temporary.value = current;
-                temporary.textContent = current;
-                temporary.dataset.citySearch = normalizeCitySearchTerm(current);
-                select.appendChild(temporary);
-                select.value = current;
-            }
+    function setActive(index) {
+        var options = selectableOptions();
+        if (!options.length) {
+            activeIndex = -1;
+            return;
         }
+        if (index < 0) index = options.length - 1;
+        if (index >= options.length) index = 0;
+        activeIndex = index;
+        Array.from(list.children).forEach(function (item) {
+            item.classList.toggle("is-active", item === options[activeIndex]);
+        });
+        input.setAttribute("aria-activedescendant", options[activeIndex].id);
+        options[activeIndex].scrollIntoView({ block: "nearest" });
+    }
 
-        var empty = document.createElement("div");
-        empty.className = "form-text";
-        empty.textContent = labels.empty;
-        empty.hidden = true;
-
-        var originalId = input.id;
-        input.id = originalId + "-text";
-        input.disabled = true;
-        input.hidden = true;
-        select.id = originalId;
-
-        input.parentNode.insertBefore(wrapper, input.nextSibling);
-        wrapper.appendChild(search);
-        wrapper.appendChild(select);
-        wrapper.appendChild(empty);
-
-        var applyFilter = function () {
-            var needle = search.value;
-            var visible = 0;
-            Array.from(select.options).forEach(function (option) {
-                if (!option.value) return;
-                var matches = citySearchMatches(option.dataset.citySearch || option.textContent, needle);
-                option.hidden = !matches && option.value !== select.value;
-                if (matches) visible += 1;
+    function render(term) {
+        var matches = cityNames.filter(function (name) {
+            return arabicSearchMatches(name, term);
+        });
+        list.textContent = "";
+        matches.slice(0, SUGGESTION_LIMIT).forEach(function (name, index) {
+            var item = document.createElement("li");
+            item.id = "city-suggestion-" + index;
+            item.className = "city-suggestion";
+            item.setAttribute("role", "option");
+            item.textContent = name;
+            item.addEventListener("mousedown", function (event) {
+                event.preventDefault();
+                input.value = name;
+                close();
             });
-            empty.hidden = !needle || visible > 0;
-        };
-        search.addEventListener("input", applyFilter);
-    }
-
-    function teardownSelector() {
-        var select = document.querySelector('[data-city-select="true"]');
-        var wrapper = document.getElementById("city-search-wrapper");
-        var input = document.getElementById("city-text");
-        if (!select || !input) return;
-        input.value = select.value;
-        input.disabled = false;
-        input.hidden = false;
-        input.id = "city";
-        if (wrapper && wrapper.parentNode) {
-            wrapper.parentNode.removeChild(wrapper);
-        } else if (select.parentNode) {
-            select.parentNode.removeChild(select);
+            list.appendChild(item);
+        });
+        if (!matches.length) {
+            var empty = document.createElement("li");
+            empty.className = "city-suggestion city-suggestion--empty";
+            empty.dataset.empty = "true";
+            empty.textContent = emptyLabel;
+            list.appendChild(empty);
         }
+        activeIndex = -1;
+        list.hidden = false;
+        input.setAttribute("aria-expanded", "true");
     }
 
-    function applyMode() {
-        var isEgypt = (countrySelect.value || "").toUpperCase() === "EG";
-        var active = document.querySelector('[data-city-select="true"]');
-        if (isEgypt && !active) buildSelector();
-        if (!isEgypt && active) teardownSelector();
+    function canonicalize() {
+        if (!isEgypt()) return;
+        var canonical = findCanonicalCity(cityNames, input.value);
+        if (canonical) input.value = canonical;
     }
 
-    if (countrySelect.dataset.citySearchEnhanced !== "true") {
-        countrySelect.dataset.citySearchEnhanced = "true";
-        countrySelect.addEventListener("change", applyMode);
-    }
-    applyMode();
+    input.addEventListener("input", function () {
+        if (isEgypt()) render(input.value);
+        else close();
+    });
+    input.addEventListener("focus", function () {
+        if (isEgypt()) render(input.value);
+    });
+    input.addEventListener("blur", function () {
+        close();
+    });
+    input.addEventListener("keydown", function (event) {
+        if (list.hidden) {
+            if (event.key === "ArrowDown" && isEgypt()) {
+                event.preventDefault();
+                render(input.value);
+            }
+            return;
+        }
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActive(activeIndex + 1);
+        } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActive(activeIndex - 1);
+        } else if (event.key === "Enter") {
+            var options = selectableOptions();
+            if (activeIndex >= 0 && options[activeIndex]) {
+                event.preventDefault();
+                input.value = options[activeIndex].textContent;
+                close();
+            }
+        } else if (event.key === "Escape") {
+            close();
+        }
+    });
+    if (input.form) input.form.addEventListener("submit", canonicalize);
+    countrySelect.addEventListener("change", function () {
+        if (!isEgypt()) close();
+    });
 }
 
 document.addEventListener("DOMContentLoaded", enhanceCitySearch);

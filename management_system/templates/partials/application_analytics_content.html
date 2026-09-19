@@ -86,16 +86,34 @@
         </div>
 
         <div class="col-12 col-md-4">
-          <label class="form-label fw-semibold" for="analytics-city-select">{% translate "Cities" %}</label>
-          <select name="city" class="form-select" id="analytics-city-select" multiple size="6"
-                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                  hx-indicator="#application-analytics-loading">
-            {% for city in city_options %}
-              <option value="{{ city }}" {% if city in selected_cities %}selected{% endif %}>{{ city }}</option>
-            {% endfor %}
-          </select>
-          <div class="form-text">{% translate "Hold Ctrl or Cmd to select multiple cities." %}</div>
+          <label class="form-label fw-semibold" id="analytics-city-label">{% translate "Cities" %}</label>
+          <div class="dropdown">
+            <button class="ad-btn ad-btn--ghost dropdown-toggle w-100 analytics-city-toggle" type="button"
+                    id="analytics-city-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                    aria-expanded="false">
+              {% if selected_cities %}{% translate "Cities" %}: {{ selected_cities|length }}{% else %}{% translate "All cities" %}{% endif %}
+            </button>
+            <div class="dropdown-menu w-100 analytics-city-menu" aria-labelledby="analytics-city-toggle">
+              <input type="search" id="analytics-city-search" class="form-control form-control-sm mb-2"
+                     placeholder="{% translate 'Search cities' %}" aria-label="{% translate 'Search cities' %}"
+                     autocomplete="off">
+              <div class="analytics-city-options">
+                {% for city in city_options %}
+                  <label class="form-check analytics-city-option" data-city="{{ city }}">
+                    <input class="form-check-input" type="checkbox" name="city" value="{{ city }}"
+                           {% if city in selected_cities %}checked{% endif %}
+                           hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                           hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                           hx-indicator="#application-analytics-loading">
+                    <span class="form-check-label">{{ city }}</span>
+                  </label>
+                {% empty %}
+                  <div class="form-text">{% translate "No matching cities" %}</div>
+                {% endfor %}
+              </div>
+              <div class="form-text analytics-city-empty" id="analytics-city-empty" hidden>{% translate "No matching cities" %}</div>
+            </div>
+          </div>
         </div>
 
         <div class="col-12 col-md-8 d-flex gap-2">
@@ -112,31 +130,31 @@
 
   <div class="ad-stats mb-4">
     <div class="ad-stat">
-      <i class="fas fa-file-lines ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-file-lines"></i></div>
       <div><b>{{ kpis.total }}</b><span>{% translate "Total applications" %}</span></div>
     </div>
     <div class="ad-stat ad-stat--gold">
-      <i class="fas fa-hourglass-half ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-hourglass-half"></i></div>
       <div><b>{{ kpis.pending }}</b><span>{% translate "Pending" %}</span></div>
     </div>
     <div class="ad-stat ad-stat--green">
-      <i class="fas fa-user-check ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-user-check"></i></div>
       <div><b>{{ kpis.active }}</b><span>{% translate "Active" %}</span></div>
     </div>
     <div class="ad-stat ad-stat--red">
-      <i class="fas fa-user-xmark ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-user-xmark"></i></div>
       <div><b>{{ kpis.declined }}</b><span>{% translate "Declined" %}</span></div>
     </div>
     <div class="ad-stat">
-      <i class="fas fa-wifi ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-wifi"></i></div>
       <div><b>{{ kpis.online }}</b><span>{% translate "Online" %}</span></div>
     </div>
     <div class="ad-stat">
-      <i class="fas fa-building ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-building"></i></div>
       <div><b>{{ kpis.offline }}</b><span>{% translate "Offline" %}</span></div>
     </div>
     <div class="ad-stat ad-stat--gold">
-      <i class="fas fa-percent ad-stat-ic"></i>
+      <div class="ad-stat-ic"><i class="fas fa-percent"></i></div>
       <div><b>{{ kpis.conversion_rate }}%</b><span>{% translate "Conversion rate" %}</span></div>
     </div>
   </div>

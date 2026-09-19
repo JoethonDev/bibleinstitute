@@ -10529,6 +10529,12 @@ msgstr "You do not have access to this quiz."
 msgid "All applications"
 msgstr "All applications"
 
+msgid "Added"
+msgstr "Added"
+
+msgid "All cities"
+msgstr "All cities"
+
 msgid "Application Analytics"
 msgstr "Application Analytics"
 

@@ -38,6 +38,20 @@
     {% if role == 'admin' or role == 'staff' %}
         <li class="nav-item">
             <a class="ad-tab"
+               href="{% url 'application-analytics' %}"
+               hx-get="{% url 'application-analytics' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-chart-pie"></i>
+                <span>{% translate "Analytics" %}</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="ad-tab"
                href="{% url 'user-dashboard' %}"
                hx-get="{% url 'user-dashboard' %}"
                hx-trigger="click"
@@ -333,20 +347,6 @@
                hx-select="#page-region">
                 <i class="fas fa-chart-column"></i>
                 <span>{% translate "Reports" %}</span>
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="ad-tab"
-               href="{% url 'application-analytics' %}"
-               hx-get="{% url 'application-analytics' %}"
-               hx-trigger="click"
-               hx-target="#display-page"
-               hx-swap="innerHTML"
-               hx-push-url="true"
-               hx-select="#page-region">
-                <i class="fas fa-chart-pie"></i>
-                <span>{% translate "Analytics" %}</span>
             </a>
         </li>
 

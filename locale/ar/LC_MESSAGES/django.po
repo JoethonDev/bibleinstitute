@@ -11098,6 +11098,12 @@ msgstr "ليس لديك صلاحية الوصول إلى هذا الاختبار
 msgid "All applications"
 msgstr "كل الطلبات"
 
+msgid "Added"
+msgstr "المضاف"
+
+msgid "All cities"
+msgstr "كل المدن"
+
 msgid "Application Analytics"
 msgstr "تحليلات الطلبات"
 

@@ -18,6 +18,7 @@
     var chartjsFailed = false;
     var chartjsErrorLogged = false;
     var charts = [];
+    var cityMenuState = { open: false, search: '' };
 
     function loadChartJs(url) {
         if (window.Chart) return Promise.resolve(window.Chart);
@@ -54,6 +55,50 @@
         var body = canvas && canvas.closest('.ad-card-body');
         var heading = body ? body.querySelector('h6') : null;
         return heading ? heading.textContent.trim() : '';
+    }
+
+    function filterCityOptions(menu, term) {
+        var visible = 0;
+        menu.querySelectorAll('.analytics-city-option').forEach(function (option) {
+            var matches = arabicSearchMatches(option.dataset.city || option.textContent, term);
+            option.hidden = !matches;
+            if (matches) visible += 1;
+        });
+        var empty = menu.querySelector('#analytics-city-empty');
+        if (empty) empty.hidden = !term || visible > 0;
+    }
+
+    function initCityChecklist() {
+        var toggle = document.getElementById('analytics-city-toggle');
+        if (!toggle) return;
+        var dropdown = toggle.closest('.dropdown');
+        var menu = dropdown ? dropdown.querySelector('.analytics-city-menu') : null;
+        if (!menu) return;
+
+        /* Re-open the menu after the HTMX swap that follows a checkbox change
+         * so several cities can be picked without reopening every time. */
+        if (cityMenuState.open && window.bootstrap && window.bootstrap.Dropdown) {
+            window.bootstrap.Dropdown.getOrCreateInstance(toggle).show();
+        }
+        if (dropdown && dropdown.dataset.cityMenuWired !== 'true') {
+            dropdown.dataset.cityMenuWired = 'true';
+            dropdown.addEventListener('show.bs.dropdown', function () { cityMenuState.open = true; });
+            dropdown.addEventListener('hide.bs.dropdown', function () { cityMenuState.open = false; });
+        }
+        menu.querySelectorAll('input[name="city"][type="checkbox"]').forEach(function (box) {
+            box.addEventListener('change', function () { cityMenuState.open = true; });
+        });
+
+        var search = menu.querySelector('#analytics-city-search');
+        if (!search) return;
+        if (cityMenuState.search) {
+            search.value = cityMenuState.search;
+            filterCityOptions(menu, cityMenuState.search);
+        }
+        search.addEventListener('input', function () {
+            cityMenuState.search = search.value;
+            filterCityOptions(menu, search.value);
+        });
     }
 
     function buildCharts(Chart, data) {
@@ -105,14 +150,34 @@
                     backgroundColor: THEME.tealFill,
                     fill: true,
                     tension: 0.25,
-                    pointRadius: 0,
+                    pointRadius: 2.5,
+                    pointHoverRadius: 6,
                     borderWidth: 2
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: tooltip },
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        rtl: rtl,
+                        callbacks: {
+                            label: function (item) {
+                                var values = data.series.cumulative || [];
+                                var index = item.dataIndex;
+                                var current = values[index] || 0;
+                                var previous = index > 0 ? (values[index - 1] || 0) : 0;
+                                return [
+                                    data.series.cumulative_label + ': ' + current,
+                                    data.series.previous_label + ': ' + previous,
+                                    data.series.added_label + ': ' + (current - previous)
+                                ];
+                            }
+                        }
+                    }
+                },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: THEME.tick, autoSkip: true, maxTicksLimit: 14 } },
                     y: { beginAtZero: true, ticks: { color: THEME.tick, precision: 0 }, grid: { color: THEME.grid } }
@@ -207,7 +272,10 @@
             return;
         }
         var host = document.querySelector('#content[data-chartjs-url]');
-        if (!host || payloadNode.dataset.analyticsReady === 'true') return;
+        if (!host) return;
+
+        initCityChecklist();
+        if (payloadNode.dataset.analyticsReady === 'true') return;
 
         var data;
         try {

@@ -50,8 +50,6 @@
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         <datalist id="egyptian-cities"
-                                  data-search-placeholder="{% translate 'Search cities' %}"
-                                  data-placeholder="{% translate 'Select your city' %}"
                                   data-empty-label="{% translate 'No matching cities' %}">
                             {% for city in egyptian_cities %}<option value="{{ city }}"></option>{% endfor %}
                         </datalist>
@@ -88,8 +86,9 @@
 {% endblock %}
 
 {% block script %}
-<script src="{% static 'js/country_select.js' %}"></script>
-<script src="{% static 'js/city_select.js' %}"></script>
+<script src="{% static 'js/country_select.js' %}?v={{ static_asset_version }}"></script>
+<script src="{% static 'js/arabic_search.js' %}?v={{ static_asset_version }}"></script>
+<script src="{% static 'js/city_select.js' %}?v={{ static_asset_version }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const identityType = document.getElementById('id_identity_type');

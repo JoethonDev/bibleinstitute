@@ -108,15 +108,16 @@ def _parse_iso_date(value) -> date | None:
 
 
 def analytics_date_range(scope: AcademicYearLevel | None, from_param, to_param) -> tuple[date, date]:
-    """Validated date window; defaults to the scope year or the last year."""
+    """Validated date window; defaults to the last 30 days (or the scope year's final 30 days)."""
     today = timezone.localdate()
-    if scope is not None:
-        default_from = scope.academic_year.starts_on
-        default_to = min(today, scope.academic_year.ends_on)
-        if default_to < default_from:
-            default_to = scope.academic_year.ends_on
+    window = timedelta(days=29)  # Last 30 calendar days, including the end date.
+    if scope is not None and not (
+        scope.academic_year.starts_on <= today <= scope.academic_year.ends_on
+    ):
+        default_to = scope.academic_year.ends_on
+        default_from = max(scope.academic_year.starts_on, default_to - window)
     else:
-        default_from = today - timedelta(days=364)
+        default_from = today - window
         default_to = today
     date_from = _parse_iso_date(from_param) or default_from
     date_to = _parse_iso_date(to_param) or default_to
@@ -126,12 +127,12 @@ def analytics_date_range(scope: AcademicYearLevel | None, from_param, to_param) 
 
 
 def resolve_analytics_group(value, date_from: date, date_to: date) -> str:
-    """Validated bucket grouping, bounded so the page never renders unbounded points."""
+    """Validated bucket grouping; defaults to weekly, bounded to avoid unbounded points."""
     span = (date_to - date_from).days
     if value in ANALYTICS_GROUPINGS:
         group = value
     else:
-        group = "day" if span <= 62 else ("week" if span <= 365 else "month")
+        group = "week"
     if group == "day" and span > DAY_GROUP_MAX_SPAN:
         group = "week"
     if group == "week" and span > 365 * 3:
@@ -367,6 +368,9 @@ def build_analytics_context(request) -> dict:
             "online": series["online"],
             "offline": series["offline"],
             "cumulative": series["cumulative"],
+            "cumulative_label": str(_("Cumulative")),
+            "previous_label": str(_("Previous")),
+            "added_label": str(_("Added")),
         },
         "status": {
             "labels": [str(_("Pending")), str(_("Active")), str(_("Declined"))],
