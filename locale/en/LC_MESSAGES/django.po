@@ -10526,6 +10526,75 @@ msgstr "Web"
 msgid "You do not have access to this quiz."
 msgstr "You do not have access to this quiz."
 
+msgid "All applications"
+msgstr "All applications"
+
+msgid "Application Analytics"
+msgstr "Application Analytics"
+
+msgid "Application submissions over time with study mode, status, and city insights."
+msgstr "Application submissions over time with study mode, status, and city insights."
+
+msgid "Applications by city"
+msgstr "Applications by city"
+
+msgid "Applications by weekday"
+msgstr "Applications by weekday"
+
+msgid "Academic scope"
+msgstr "Academic scope"
+
+msgid "Cities"
+msgstr "Cities"
+
+msgid "Clear filters"
+msgstr "Clear filters"
+
+msgid "Conversion rate"
+msgstr "Conversion rate"
+
+msgid "Cumulative"
+msgstr "Cumulative"
+
+msgid "Cumulative submissions"
+msgstr "Cumulative submissions"
+
+msgid "Daily"
+msgstr "Daily"
+
+msgid "Group by"
+msgstr "Group by"
+
+msgid "Hold Ctrl or Cmd to select multiple cities."
+msgstr "Hold Ctrl or Cmd to select multiple cities."
+
+msgid "Monthly"
+msgstr "Monthly"
+
+msgid "No matching cities"
+msgstr "No matching cities"
+
+msgid "Search cities"
+msgstr "Search cities"
+
+msgid "Select your city"
+msgstr "Select your city"
+
+msgid "Other"
+msgstr "Other"
+
+msgid "Submissions over time"
+msgstr "Submissions over time"
+
+msgid "Total applications"
+msgstr "Total applications"
+
+msgid "Unspecified"
+msgstr "Unspecified"
+
+msgid "Weekly"
+msgstr "Weekly"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

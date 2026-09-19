@@ -11095,6 +11095,75 @@ msgstr "الويب"
 msgid "You do not have access to this quiz."
 msgstr "ليس لديك صلاحية الوصول إلى هذا الاختبار."
 
+msgid "All applications"
+msgstr "كل الطلبات"
+
+msgid "Application Analytics"
+msgstr "تحليلات الطلبات"
+
+msgid "Application submissions over time with study mode, status, and city insights."
+msgstr "الطلبات المقدمة عبر الزمن مع رؤى نظام الدراسة والحالة والمدينة."
+
+msgid "Applications by city"
+msgstr "الطلبات حسب المدينة"
+
+msgid "Applications by weekday"
+msgstr "الطلبات حسب يوم الأسبوع"
+
+msgid "Academic scope"
+msgstr "النطاق الأكاديمي"
+
+msgid "Cities"
+msgstr "المدن"
+
+msgid "Clear filters"
+msgstr "مسح الفلاتر"
+
+msgid "Conversion rate"
+msgstr "نسبة التحويل"
+
+msgid "Cumulative"
+msgstr "تراكمي"
+
+msgid "Cumulative submissions"
+msgstr "الطلبات التراكمية"
+
+msgid "Daily"
+msgstr "يومي"
+
+msgid "Group by"
+msgstr "التجميع حسب"
+
+msgid "Hold Ctrl or Cmd to select multiple cities."
+msgstr "اضغط Ctrl أو Cmd لاختيار عدة مدن."
+
+msgid "Monthly"
+msgstr "شهري"
+
+msgid "No matching cities"
+msgstr "لا توجد مدن مطابقة"
+
+msgid "Search cities"
+msgstr "ابحث عن المدن"
+
+msgid "Select your city"
+msgstr "اختر مدينتك"
+
+msgid "Other"
+msgstr "أخرى"
+
+msgid "Submissions over time"
+msgstr "الطلبات عبر الزمن"
+
+msgid "Total applications"
+msgstr "إجمالي الطلبات"
+
+msgid "Unspecified"
+msgstr "غير محدد"
+
+msgid "Weekly"
+msgstr "أسبوعي"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

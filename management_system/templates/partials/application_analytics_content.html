@@ -1,0 +1,227 @@
+{% load static %}
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content"
+     data-chartjs-url="{% static 'vendor/chartjs/chart.umd.min.js' %}?v={{ static_asset_version }}">
+
+  <div class="ad-pane-head">
+    <h3 class="ad-pane-title mb-0">{% translate "Application Analytics" %}</h3>
+    <span id="application-analytics-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+    <p class="ad-pane-desc">{% translate "Application submissions over time with study mode, status, and city insights." %}</p>
+    <div class="d-flex gap-2">
+      <a href="{% url 'export-application-analytics-csv' %}{% if export_query %}?{{ export_query }}{% endif %}" class="ad-btn ad-btn--ghost ad-btn--sm">
+        <i class="fas fa-file-csv"></i>
+        {% translate "Export CSV" %}
+      </a>
+    </div>
+  </div>
+
+  <div class="ad-card mb-4">
+    <div class="ad-card-body">
+      <form method="get" action="{% url 'application-analytics' %}" class="row g-3 align-items-end"
+            hx-get="{% url 'application-analytics' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML"
+            hx-push-url="true" hx-sync="this:abort" hx-indicator="#application-analytics-loading">
+
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold" for="analytics-scope-select">{% translate "Academic scope" %}</label>
+          <select name="scope" class="form-select" id="analytics-scope-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for option in scope_options %}
+              <option value="{{ option.value }}" {% if option.value == selected_scope %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label fw-semibold" for="analytics-date-from">{% translate "From" %}</label>
+          <input type="date" name="from" id="analytics-date-from" class="form-control" value="{{ date_from }}"
+                 hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                 hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                 hx-indicator="#application-analytics-loading">
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label fw-semibold" for="analytics-date-to">{% translate "To" %}</label>
+          <input type="date" name="to" id="analytics-date-to" class="form-control" value="{{ date_to }}"
+                 hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                 hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                 hx-indicator="#application-analytics-loading">
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label fw-semibold" for="analytics-group-select">{% translate "Group by" %}</label>
+          <select name="group" class="form-select" id="analytics-group-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for value, label in group_options %}
+              <option value="{{ value }}" {% if value == group %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label fw-semibold" for="analytics-status-select">{% translate "Status" %}</label>
+          <select name="status" class="form-select" id="analytics-status-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for value, label in status_options %}
+              <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label fw-semibold" for="analytics-study-mode-select">{% translate "Study mode" %}</label>
+          <select name="study_mode" class="form-select" id="analytics-study-mode-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for value, label in study_mode_options %}
+              <option value="{{ value }}" {% if value == selected_study_mode %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold" for="analytics-city-select">{% translate "Cities" %}</label>
+          <select name="city" class="form-select" id="analytics-city-select" multiple size="6"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for city in city_options %}
+              <option value="{{ city }}" {% if city in selected_cities %}selected{% endif %}>{{ city }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">{% translate "Hold Ctrl or Cmd to select multiple cities." %}</div>
+        </div>
+
+        <div class="col-12 col-md-8 d-flex gap-2">
+          <button type="submit" class="ad-btn ad-btn--ghost">{% translate "Filter" %}</button>
+          <a href="{% url 'application-analytics' %}" class="ad-btn ad-btn--ghost"
+             hx-get="{% url 'application-analytics' %}" hx-target="#content" hx-select="#content"
+             hx-swap="outerHTML" hx-push-url="true">
+            {% translate "Clear filters" %}
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="ad-stats mb-4">
+    <div class="ad-stat">
+      <i class="fas fa-file-lines ad-stat-ic"></i>
+      <div><b>{{ kpis.total }}</b><span>{% translate "Total applications" %}</span></div>
+    </div>
+    <div class="ad-stat ad-stat--gold">
+      <i class="fas fa-hourglass-half ad-stat-ic"></i>
+      <div><b>{{ kpis.pending }}</b><span>{% translate "Pending" %}</span></div>
+    </div>
+    <div class="ad-stat ad-stat--green">
+      <i class="fas fa-user-check ad-stat-ic"></i>
+      <div><b>{{ kpis.active }}</b><span>{% translate "Active" %}</span></div>
+    </div>
+    <div class="ad-stat ad-stat--red">
+      <i class="fas fa-user-xmark ad-stat-ic"></i>
+      <div><b>{{ kpis.declined }}</b><span>{% translate "Declined" %}</span></div>
+    </div>
+    <div class="ad-stat">
+      <i class="fas fa-wifi ad-stat-ic"></i>
+      <div><b>{{ kpis.online }}</b><span>{% translate "Online" %}</span></div>
+    </div>
+    <div class="ad-stat">
+      <i class="fas fa-building ad-stat-ic"></i>
+      <div><b>{{ kpis.offline }}</b><span>{% translate "Offline" %}</span></div>
+    </div>
+    <div class="ad-stat ad-stat--gold">
+      <i class="fas fa-percent ad-stat-ic"></i>
+      <div><b>{{ kpis.conversion_rate }}%</b><span>{% translate "Conversion rate" %}</span></div>
+    </div>
+  </div>
+
+  <div class="analytics-charts-grid mb-4">
+    <div class="ad-card analytics-chart-card--wide">
+      <div class="ad-card-body">
+        <h6 class="mb-3">{% translate "Submissions over time" %}</h6>
+        <div class="analytics-chart-canvas">
+          <canvas id="analytics-series-chart" role="img" aria-label="{% translate 'Submissions over time' %}"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="ad-card analytics-chart-card--wide">
+      <div class="ad-card-body">
+        <h6 class="mb-3">{% translate "Cumulative submissions" %}</h6>
+        <div class="analytics-chart-canvas">
+          <canvas id="analytics-cumulative-chart" role="img" aria-label="{% translate 'Cumulative submissions' %}"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="ad-card">
+      <div class="ad-card-body">
+        <h6 class="mb-3">{% translate "Application status" %}</h6>
+        <div class="analytics-chart-canvas">
+          <canvas id="analytics-status-chart" role="img" aria-label="{% translate 'Application status' %}"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="ad-card">
+      <div class="ad-card-body">
+        <h6 class="mb-3">{% translate "Study mode" %}</h6>
+        <div class="analytics-chart-canvas">
+          <canvas id="analytics-mode-chart" role="img" aria-label="{% translate 'Study mode' %}"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="ad-card analytics-chart-card--wide">
+      <div class="ad-card-body">
+        <h6 class="mb-3">{% translate "Applications by city" %}</h6>
+        <div class="analytics-chart-canvas">
+          <canvas id="analytics-city-chart" role="img" aria-label="{% translate 'Applications by city' %}"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="ad-card">
+      <div class="ad-card-body">
+        <h6 class="mb-3">{% translate "Applications by weekday" %}</h6>
+        <div class="analytics-chart-canvas">
+          <canvas id="analytics-weekday-chart" role="img" aria-label="{% translate 'Applications by weekday' %}"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ad-card">
+    <div class="ad-table-wrap">
+      <table class="ad-table">
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Period" %}</th>
+            <th scope="col">{% translate "Online" %}</th>
+            <th scope="col">{% translate "Offline" %}</th>
+            <th scope="col">{% translate "Total" %}</th>
+            <th scope="col">{% translate "Cumulative" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in series_rows %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td>{{ row.online }}</td>
+              <td>{{ row.offline }}</td>
+              <td>{{ row.total }}</td>
+              <td>{{ row.cumulative }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {{ charts|json_script:"application-analytics-data" }}
+</div>

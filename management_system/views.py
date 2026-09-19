@@ -61,6 +61,12 @@ from .grade_matrix import (
     grade_matrix_student_queryset,
     grade_matrix_workbook,
 )
+from .application_analytics import (
+    ANALYTICS_CSV_HEADERS,
+    build_analytics_context,
+    build_analytics_dataset,
+    iter_analytics_csv_rows,
+)
 from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
 from .utils.r2_filters import FileFilterConfig, filter_preset_choices, get_filter_preset
 from .utils.r2_manager import R2Manager
@@ -76,6 +82,7 @@ from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
+from .utils.egyptian_cities import EGYPTIAN_CITIES
 from .utils.r2_references import rewrite_lesson_r2_references
 from .utils.attendance import (
     DAY_GRADE_NONE,
@@ -327,11 +334,13 @@ class LoginView(views.LoginView):
 
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect(reverse("home"))
+            return redirect(reverse("view-profile"))
         logger.info("Display login page")
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(reverse("view-profile"))
         translation.activate('ar')  # Activating Arabic language
         response =  super().post(request, *args, **kwargs)
         username = request.POST.get("username")
@@ -4180,6 +4189,8 @@ def r2_management_dashboard(request):
 # ============================================================================
 
 def signup(request):
+    if request.user.is_authenticated:
+        return redirect("view-profile")
     copy = get_institute_copy(translation.get_language(), "courses")["copy"]
     if request.method == "POST":
         form = SignupForm(request.POST, request.FILES)
@@ -4225,7 +4236,7 @@ def signup(request):
                     except Exception:
                         pass
                 form.add_error(None, "; ".join(str(message) for message in exc.messages))
-                return render(request, "signup.html", {"form": form, "copy": copy})
+                return render(request, "signup.html", {"form": form, "copy": copy, "egyptian_cities": EGYPTIAN_CITIES})
             except Exception:
                 for key in uploaded_keys:
                     try:
@@ -4236,7 +4247,7 @@ def signup(request):
             return render(request, "signup_success.html")
     else:
         form = SignupForm()
-    return render(request, "signup.html", {"form": form, "copy": copy})
+    return render(request, "signup.html", {"form": form, "copy": copy, "egyptian_cities": EGYPTIAN_CITIES})
 
 def _application_search_query(value):
     return normalized_contains_q(
@@ -6776,6 +6787,38 @@ def export_report_xlsx(request):
     safe_name = _safe_filename(scope.academic_year.name)
     response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    return response
+
+
+@capability_required(can_view_reports)
+def application_analytics_dashboard(request):
+    return render_page(
+        request,
+        "application_analytics.html",
+        "partials/application_analytics_content.html",
+        build_analytics_context(request),
+    )
+
+
+@capability_required(can_view_reports)
+def export_application_analytics_csv(request):
+    dataset = build_analytics_dataset(request)
+
+    def csv_rows():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([_(header) for header in ANALYTICS_CSV_HEADERS])
+        yield output.getvalue()
+        for row in iter_analytics_csv_rows(dataset["queryset"]):
+            output.seek(0)
+            output.truncate(0)
+            writer.writerow(row)
+            yield output.getvalue()
+
+    response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="application_analytics_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    )
     return response
 
 

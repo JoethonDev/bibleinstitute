@@ -124,6 +124,8 @@ urlpatterns = [
     path('dashboard/reports/grades/export-xlsx/', export_grades_matrix_xlsx, name="export-grades-matrix-xlsx"),
     path('dashboard/reports/payments/', payments_matrix_dashboard, name="payments-matrix-dashboard"),
     path('dashboard/reports/payments/<int:payment_id>/', academic_payment_document, name="academic-payment-document"),
+    path('dashboard/reports/analytics/', application_analytics_dashboard, name="application-analytics"),
+    path('dashboard/reports/analytics/export-csv/', export_application_analytics_csv, name="export-application-analytics-csv"),
 
     # Upload Videos
     path('dashboard/upload-files/', upload_file, name="upload-files"),
