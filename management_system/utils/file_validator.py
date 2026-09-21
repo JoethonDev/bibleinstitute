@@ -29,6 +29,10 @@ def downloadable_audio_key(manifest_key: str) -> str | None:
     basename = posixpath.basename(manifest_key)[:-5]
     if not basename or any(part in {"", ".", ".."} for part in manifest_key.split("/")):
         return None
+    if basename.casefold().endswith("_audio"):
+        basename = basename[:-6]
+    if not basename:
+        return None
     return posixpath.join(folder, DOWNLOADABLE_AUDIO_FOLDER, f"{basename}.mp3")
 
 
