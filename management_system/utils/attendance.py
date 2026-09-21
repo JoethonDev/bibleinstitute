@@ -7,7 +7,7 @@ import zoneinfo
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Exists, OuterRef, TextChoices
+from django.db.models import Count, Exists, OuterRef, Q, TextChoices
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -20,6 +20,7 @@ from ..models import (
     Enrollment,
     Lesson,
     PublicationStatus,
+    User,
 )
 
 
@@ -115,6 +116,93 @@ def merge_attendance_pairs(pairs: dict) -> dict:
         if existing is None or _pair_completeness(pair) > _pair_completeness(existing):
             merged[student_id][attendance_day] = pair
     return merged
+
+
+def attendance_scope_query(*, academic_year_id, level_id=None, offering_id=None) -> Q:
+    """Return the record scope for one management attendance filter set."""
+    if offering_id:
+        return Q(course_offering_id=offering_id)
+
+    offering_scope = Q(course_offering__academic_year_level__academic_year_id=academic_year_id)
+    unassigned_scope = Q(
+        course_offering__isnull=True,
+        student__enrollments__academic_year_level__academic_year_id=academic_year_id,
+        student__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+        student__enrollments__enrollment_type=Enrollment.Type.NORMAL,
+    )
+    if level_id:
+        offering_scope &= Q(course_offering__academic_year_level__level_id=level_id)
+        unassigned_scope &= Q(student__enrollments__academic_year_level__level_id=level_id)
+    return offering_scope | unassigned_scope
+
+
+def offline_attendance_students(*, academic_year_id, level_id=None, offering_scope_id=None):
+    """Return the eligible offline students for a year/level attendance roster."""
+    enrollments = Q(
+        enrollments__academic_year_level__academic_year_id=academic_year_id,
+        enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+        enrollments__enrollment_type=Enrollment.Type.NORMAL,
+    )
+    if offering_scope_id:
+        enrollments &= Q(enrollments__academic_year_level_id=offering_scope_id)
+    elif level_id:
+        enrollments &= Q(enrollments__academic_year_level__level_id=level_id)
+    return User.objects.filter(
+        role__role="student",
+        application_status="active",
+        study_mode="offline",
+    ).filter(enrollments).distinct()
+
+
+def annotate_daily_attendance_students(
+    students,
+    *,
+    academic_year_id,
+    level_id=None,
+    offering_id=None,
+    source=None,
+    attendance_date,
+):
+    """Annotate a bounded roster with whether each student has entrance/exit scans."""
+    record_scope = attendance_scope_query(
+        academic_year_id=academic_year_id,
+        level_id=level_id,
+        offering_id=offering_id,
+    )
+    entrance = AttendanceRecord.objects.filter(
+        student_id=OuterRef("pk"),
+        attendance_date=attendance_date,
+        action=AttendanceRecord.Action.ENTRANCE,
+    ).filter(record_scope)
+    exit_records = AttendanceRecord.objects.filter(
+        student_id=OuterRef("pk"),
+        attendance_date=attendance_date,
+        action=AttendanceRecord.Action.EXIT,
+    ).filter(record_scope)
+    if source:
+        entrance = entrance.filter(source=source)
+        exit_records = exit_records.filter(source=source)
+    return students.annotate(
+        has_entrance_scan=Exists(entrance),
+        has_exit_scan=Exists(exit_records),
+    )
+
+
+def daily_attendance_summary(students) -> dict[str, int]:
+    """Aggregate roster coverage without materializing the student population."""
+    counts = students.aggregate(
+        total_offline=Count("pk"),
+        entrance=Count("pk", filter=Q(has_entrance_scan=True)),
+        exit=Count("pk", filter=Q(has_exit_scan=True)),
+        complete=Count("pk", filter=Q(has_entrance_scan=True, has_exit_scan=True)),
+        scanned=Count(
+            "pk",
+            filter=Q(has_entrance_scan=True) | Q(has_exit_scan=True),
+        ),
+    )
+    counts["not_scanned"] = counts["total_offline"] - counts["scanned"]
+    counts["incomplete"] = counts["scanned"] - counts["complete"]
+    return counts
 
 
 def attendance_scores_for_students(

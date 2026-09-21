@@ -87,13 +87,17 @@ from .utils.r2_references import rewrite_lesson_r2_references
 from .utils.attendance import (
     DAY_GRADE_NONE,
     AttendanceDayStatus,
+    annotate_daily_attendance_students,
     assign_unassigned_attendance,
+    attendance_scope_query,
+    daily_attendance_summary,
     get_expected_dates,
     get_student_attendance_context,
     grade_attendance_day,
     is_expected_date,
     local_scan_time,
     merge_attendance_pairs,
+    offline_attendance_students,
     pair_attendance_records,
     reconcile_missing_exits,
 )
@@ -5910,54 +5914,70 @@ def record_attendance(request, token, action):
 
 @capability_required(can_scan_attendance)
 def attendance_management(request):
-    year_id = request.GET.get("academic_year")
-    if year_id and not year_id.isdigit():
-        year_id = None
-    level_id = request.GET.get("level")
-    action = request.GET.get("action")
-    offering_id = request.GET.get("course_offering")
-    attendance_date = request.GET.get("date", "")
-    student_search = normalize_search_text(request.GET.get("student", "").strip()[:100])
-    years = AcademicYear.objects.all()
-    levels = Level.objects.filter(
-        year_links__academic_year_id=year_id
-    ).order_by("ordering") if year_id else Level.objects.none()
+    raw_year_id = request.GET.get("academic_year", "")
+    year_id = int(raw_year_id) if raw_year_id.isdigit() and len(raw_year_id) <= 18 else None
+    years = AcademicYear.objects.all().order_by("ordering")
+    selected_year_obj = years.filter(pk=year_id).first() if year_id else None
+    year_id = selected_year_obj.pk if selected_year_obj else None
+
+    raw_level_id = request.GET.get("level", "")
+    requested_level_id = int(raw_level_id) if raw_level_id.isdigit() and len(raw_level_id) <= 18 else None
+    levels = Level.objects.filter(year_links__academic_year_id=year_id).order_by("ordering") if year_id else Level.objects.none()
+    selected_level_obj = levels.filter(pk=requested_level_id).first() if requested_level_id else None
+    level_id = selected_level_obj.pk if selected_level_obj else None
+
     course_offerings = CourseOffering.objects.filter(
-        academic_year_level__academic_year_id=year_id
+        academic_year_level__academic_year_id=year_id,
     ).select_related(
         "course", "academic_year_level__academic_year", "academic_year_level__level"
     ).order_by("course__name", "pk") if year_id else CourseOffering.objects.none()
+    if level_id:
+        course_offerings = course_offerings.filter(academic_year_level__level_id=level_id)
+    raw_offering_id = request.GET.get("course_offering", "")
+    requested_offering_id = int(raw_offering_id) if raw_offering_id.isdigit() and len(raw_offering_id) <= 18 else None
+    selected_offering_obj = course_offerings.filter(pk=requested_offering_id).first() if requested_offering_id else None
+    offering_id = selected_offering_obj.pk if selected_offering_obj else None
+    offering_scope_id = selected_offering_obj.academic_year_level_id if selected_offering_obj else None
+
+    attendance_date = request.GET.get("date", "")
+    parsed_date = None
+    date_error = False
+    if attendance_date:
+        try:
+            parsed_date = datetime.strptime(attendance_date, "%Y-%m-%d").date()
+            attendance_date = parsed_date.isoformat()
+        except (TypeError, ValueError):
+            attendance_date = ""
+            date_error = True
+
+    action = request.GET.get("action")
+    if action not in ("entrance", "exit"):
+        action = ""
+    source = request.GET.get("source")
+    if source not in (AttendanceRecord.Source.SCAN, AttendanceRecord.Source.AUTO, AttendanceRecord.Source.MANUAL):
+        source = ""
+    scan_status = request.GET.get("scan_status")
+    if scan_status not in ("scanned", "not_scanned", "complete", "incomplete", "absent"):
+        scan_status = ""
+    student_search = normalize_search_text(request.GET.get("student", "").strip()[:100])
+
     if year_id:
         records = AttendanceRecord.objects.all().select_related(
             "student", "course_offering__course", "course_offering__academic_year_level__academic_year",
             "course_offering__academic_year_level__level", "scanned_by"
-        ).filter(
-            Q(course_offering__academic_year_level__academic_year_id=year_id)
-            | Q(
-                student__enrollments__academic_year_level__academic_year_id=year_id,
-                student__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
-                student__enrollments__enrollment_type=Enrollment.Type.NORMAL,
-            )
-        ).distinct()
-        if level_id and level_id.isdigit():
-            records = records.filter(
-                Q(course_offering__academic_year_level__level_id=int(level_id))
-                | Q(
-                    student__enrollments__academic_year_level__level_id=int(level_id),
-                    student__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
-                    student__enrollments__enrollment_type=Enrollment.Type.NORMAL,
-                )
-            ).distinct()
-        if offering_id and offering_id.isdigit():
-            records = records.filter(course_offering_id=int(offering_id))
-        if action in ("entrance", "exit"):
+        ).filter(attendance_scope_query(
+            academic_year_id=year_id,
+            level_id=level_id,
+            offering_id=offering_id,
+        ))
+        if action:
             records = records.filter(action=action)
-        if attendance_date:
-            try:
-                parsed_date = datetime.strptime(attendance_date, "%Y-%m-%d").date()
-                records = records.filter(attendance_date=parsed_date)
-            except (TypeError, ValueError):
-                records = records.none()
+        if source:
+            records = records.filter(source=source)
+        if parsed_date:
+            records = records.filter(attendance_date=parsed_date)
+        elif date_error:
+            records = records.none()
         if student_search:
             records = records.filter(
                 normalized_contains_q(
@@ -5965,7 +5985,7 @@ def attendance_management(request):
                     student_search,
                 )
             )
-        records = records.order_by("-attendance_date", "-scanned_at")
+        records = records.order_by("-attendance_date", "-scanned_at", "-pk").distinct()
     else:
         records = AttendanceRecord.objects.none()
     policy = AttendancePolicy.load()
@@ -5975,7 +5995,16 @@ def attendance_management(request):
         pair_records = AttendanceRecord.objects.filter(
             student_id__in={record.student_id for record in page_records},
             attendance_date__in={record.attendance_date for record in page_records},
-        ).values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
+        ).filter(attendance_scope_query(
+            academic_year_id=year_id,
+            level_id=level_id,
+            offering_id=offering_id,
+        ))
+        if source:
+            pair_records = pair_records.filter(source=source)
+        pair_records = pair_records.values(
+            "student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at"
+        )
         day_pairs = pair_attendance_records(pair_records)
     else:
         day_pairs = {}
@@ -5986,17 +6015,108 @@ def attendance_management(request):
         day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
         record.day_grade = day.grade
         record.day_status_label = AttendanceDayStatus(day.status).label
+
+    daily_summary = None
+    roster_page_obj = None
+    roster_students = []
+    meeting_count = 0
+    if year_id and parsed_date:
+        roster = offline_attendance_students(
+            academic_year_id=year_id,
+            level_id=level_id,
+            offering_scope_id=offering_scope_id,
+        )
+        if student_search:
+            roster = roster.filter(
+                normalized_contains_q(("username", "first_name", "last_name", "email"), student_search)
+            )
+        roster = annotate_daily_attendance_students(
+            roster,
+            academic_year_id=year_id,
+            level_id=level_id,
+            offering_id=offering_id,
+            source=source,
+            attendance_date=parsed_date,
+        )
+        daily_summary = daily_attendance_summary(roster)
+        daily_summary["scanned_percent"] = round(
+            (daily_summary["scanned"] / daily_summary["total_offline"] * 100)
+            if daily_summary["total_offline"] else 0,
+            1,
+        )
+        if scan_status == "scanned":
+            roster = roster.filter(Q(has_entrance_scan=True) | Q(has_exit_scan=True))
+        elif scan_status == "not_scanned" or scan_status == "absent":
+            roster = roster.filter(has_entrance_scan=False, has_exit_scan=False)
+        elif scan_status == "complete":
+            roster = roster.filter(has_entrance_scan=True, has_exit_scan=True)
+        elif scan_status == "incomplete":
+            roster = roster.filter(
+                Q(has_entrance_scan=True, has_exit_scan=False)
+                | Q(has_entrance_scan=False, has_exit_scan=True)
+            )
+        roster = roster.order_by("last_name", "first_name", "username", "pk")
+        roster_page_obj = Paginator(roster, 25).get_page(request.GET.get("roster_page", 1))
+        roster_students = list(roster_page_obj)
+        roster_student_ids = [student.pk for student in roster_students]
+        if roster_student_ids:
+            roster_records = AttendanceRecord.objects.filter(
+                student_id__in=roster_student_ids,
+                attendance_date=parsed_date,
+            ).filter(attendance_scope_query(
+                academic_year_id=year_id,
+                level_id=level_id,
+                offering_id=offering_id,
+            )).select_related("course_offering__course").order_by("scanned_at", "pk")
+            if source:
+                roster_records = roster_records.filter(source=source)
+            merged_roster_pairs = merge_attendance_pairs(pair_attendance_records(roster_records))
+            for student in roster_students:
+                pair = merged_roster_pairs.get(student.pk, {}).get(parsed_date, {})
+                day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
+                student.attendance_entrance = pair.get("entrance")
+                student.attendance_exit = pair.get("exit")
+                student.attendance_course = (
+                    (pair.get("entrance") or pair.get("exit")).course_offering
+                    if pair.get("entrance") or pair.get("exit") else None
+                )
+                student.day_grade = day.grade
+                student.day_status = day.status
+                student.day_status_label = AttendanceDayStatus(day.status).label
+                student.roster_state = (
+                    "complete" if pair.get("entrance") and pair.get("exit")
+                    else "incomplete" if pair else "absent"
+                )
+        meeting_query = AcademicYearLevelMeeting.objects.filter(
+            academic_year_level__academic_year_id=year_id,
+            meeting_date=parsed_date,
+        )
+        if level_id:
+            meeting_query = meeting_query.filter(academic_year_level__level_id=level_id)
+        if offering_id:
+            meeting_query = meeting_query.filter(course_offering_id=offering_id)
+        meeting_count = meeting_query.count()
+
+    daily_summary_query = daily_summary or {}
     return render_page(request, "attendance_management.html", "partials/attendance_management_content.html", {
         "records": page_obj,
         "page_obj": page_obj,
-        "pagination_query": pagination_query_string(request),
+        "record_pagination_query": pagination_query_string(request, exclude=("page",)),
+        "roster_pagination_query": pagination_query_string(request, exclude=("roster_page",)),
+        "roster_page_obj": roster_page_obj,
+        "roster_students": roster_students,
+        "daily_summary": daily_summary_query,
+        "meeting_count": meeting_count,
+        "date_error": date_error,
         "years": years,
         "levels": levels,
         "course_offerings": course_offerings,
-        "selected_year": int(year_id) if year_id and year_id.isdigit() else None,
-        "selected_level": int(level_id) if level_id and level_id.isdigit() else None,
-        "selected_offering": int(offering_id) if offering_id and offering_id.isdigit() else None,
-        "selected_action": action if action in ("entrance", "exit") else "",
+        "selected_year": year_id,
+        "selected_level": level_id,
+        "selected_offering": offering_id,
+        "selected_action": action,
+        "selected_source": source,
+        "selected_scan_status": scan_status,
         "selected_date": attendance_date,
         "student_search": student_search,
         "has_filter": bool(year_id),

@@ -11535,3 +11535,40 @@ msgstr "نسخ الاختبارات"
 
 msgid "Quiz type"
 msgstr "نوع الاختبار"
+
+msgid "All sources"
+msgstr "كل المصادر"
+
+msgid "Scan status"
+msgstr "حالة المسح"
+
+msgid "Not scanned"
+msgstr "لم يتم المسح"
+
+msgid "Enter a valid date."
+msgstr "أدخل تاريخًا صحيحًا."
+
+msgid "No scheduled meeting was found for this date in the selected scope."
+msgstr "لم يُعثر على لقاء مجدول لهذا التاريخ في النطاق المحدد."
+
+msgid "Offline attendance scan coverage"
+msgstr "نسبة مسح حضور الطلاب بنظام الحضور المباشر"
+
+#, python-format
+msgid "Scanned %(scanned)s of %(total)s offline students"
+msgstr "تم مسح %(scanned)s من أصل %(total)s من طلاب الحضور المباشر"
+
+msgid "No offline students in the selected scope for this date."
+msgstr "لا يوجد طلاب حضور مباشر في النطاق المحدد لهذا التاريخ."
+
+msgid "Select a date to view the offline roster and scan coverage."
+msgstr "اختر تاريخًا لعرض كشف الحضور ونسبة المسح."
+
+msgid "Daily attendance roster"
+msgstr "كشف الحضور اليومي"
+
+msgid "Daily attendance roster pagination"
+msgstr "صفحات كشف الحضور اليومي"
+
+msgid "No students match the selected roster filters."
+msgstr "لا يوجد طلاب يطابقون مرشحات كشف الحضور المحددة."

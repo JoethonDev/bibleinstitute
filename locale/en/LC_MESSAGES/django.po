@@ -11259,3 +11259,40 @@ msgstr "Copy quizzes"
 
 msgid "Quiz type"
 msgstr "Quiz type"
+
+msgid "All sources"
+msgstr "All sources"
+
+msgid "Scan status"
+msgstr "Scan status"
+
+msgid "Not scanned"
+msgstr "Not scanned"
+
+msgid "Enter a valid date."
+msgstr "Enter a valid date."
+
+msgid "No scheduled meeting was found for this date in the selected scope."
+msgstr "No scheduled meeting was found for this date in the selected scope."
+
+msgid "Offline attendance scan coverage"
+msgstr "Offline attendance scan coverage"
+
+#, python-format
+msgid "Scanned %(scanned)s of %(total)s offline students"
+msgstr "Scanned %(scanned)s of %(total)s offline students"
+
+msgid "No offline students in the selected scope for this date."
+msgstr "No offline students in the selected scope for this date."
+
+msgid "Select a date to view the offline roster and scan coverage."
+msgstr "Select a date to view the offline roster and scan coverage."
+
+msgid "Daily attendance roster"
+msgstr "Daily attendance roster"
+
+msgid "Daily attendance roster pagination"
+msgstr "Daily attendance roster pagination"
+
+msgid "No students match the selected roster filters."
+msgstr "No students match the selected roster filters."

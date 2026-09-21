@@ -3354,3 +3354,56 @@
 .analytics-city-option:hover { background: var(--ps-mist); }
 .analytics-city-option .form-check-input { margin: 0; flex: 0 0 auto; }
 .analytics-city-option .form-check-label { cursor: pointer; }
+
+/* ── Attendance daily roster and scan coverage ── */
+.ad-coverage-card .ad-coverage-date {
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--ps-muted);
+}
+.ad-coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: .6rem;
+    margin: .2rem 0 1rem;
+}
+.ad-coverage-item {
+    border: 1px solid var(--ps-line);
+    border-radius: .6rem;
+    background: var(--ps-surface);
+    padding: .65rem .6rem;
+    text-align: center;
+}
+.ad-coverage-item .ad-stat-value {
+    font-size: 1.25rem;
+    margin-bottom: .15rem;
+}
+.ad-coverage-track {
+    display: block;
+    height: .65rem;
+    border-radius: 999px;
+    background: var(--ps-line);
+    overflow: hidden;
+}
+.ad-coverage-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--ps-teal), var(--ps-teal-deep));
+    transition: width .3s ease;
+}
+.ad-coverage-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: .4rem;
+    margin-top: .5rem;
+    font-size: .82rem;
+    color: var(--ps-muted);
+}
+.ad-coverage-meta strong { color: var(--ps-ink); }
+.ad-roster-table td,
+.ad-roster-table th { vertical-align: middle; }
+.ad-roster-table .ad-pill { white-space: nowrap; }
+.ad-roster-table .ad-actions { justify-content: flex-end; }

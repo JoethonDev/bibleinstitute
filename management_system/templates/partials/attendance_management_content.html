@@ -47,7 +47,7 @@
   </div>
   {% endif %}
 
-  <div class="ad-card">
+  <div class="ad-card mb-4">
     <div class="ad-card-body">
       <form method="get" class="row g-3 align-items-end mb-4" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#attendance-loading">
         <div class="col-12 col-md-5 col-lg-4">
@@ -71,6 +71,26 @@
         <div class="col-12 col-md-4 col-lg-2">
           <label for="date" class="form-label">{% translate "Date" %}</label>
           <input id="date" name="date" type="date" value="{{ selected_date }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+        </div>
+        <div class="col-12 col-md-4 col-lg-2">
+          <label for="attendance-source" class="form-label">{% translate "Source" %}</label>
+          <select id="attendance-source" name="source" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+            <option value="">{% translate "All sources" %}</option>
+            <option value="scan" {% if selected_source == "scan" %}selected{% endif %}>{% translate "Scan" %}</option>
+            <option value="auto" {% if selected_source == "auto" %}selected{% endif %}>{% translate "Auto reconciliation" %}</option>
+            <option value="manual" {% if selected_source == "manual" %}selected{% endif %}>{% translate "Manual reconciliation" %}</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-lg-2">
+          <label for="attendance-scan-status" class="form-label">{% translate "Scan status" %}</label>
+          <select id="attendance-scan-status" name="scan_status" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
+            <option value="">{% translate "All statuses" %}</option>
+            <option value="scanned" {% if selected_scan_status == "scanned" %}selected{% endif %}>{% translate "Scanned" %}</option>
+            <option value="not_scanned" {% if selected_scan_status == "not_scanned" %}selected{% endif %}>{% translate "Not scanned" %}</option>
+            <option value="complete" {% if selected_scan_status == "complete" %}selected{% endif %}>{% translate "Complete" %}</option>
+            <option value="incomplete" {% if selected_scan_status == "incomplete" %}selected{% endif %}>{% translate "Incomplete" %}</option>
+            <option value="absent" {% if selected_scan_status == "absent" %}selected{% endif %}>{% translate "Absent" %}</option>
+          </select>
         </div>
         <div class="col-12 col-md-4 col-lg-2">
           <label for="action" class="form-label">{% translate "Action" %}</label>
@@ -100,6 +120,143 @@
         </div>
       </form>
 
+      {% if date_error %}
+      <div class="ad-alert ad-alert--info" role="alert">
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        <span>{% translate "Enter a valid date." %}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if has_filter and daily_summary %}
+  <div class="ad-card ad-coverage-card mb-4">
+    <div class="ad-card-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <h5 class="mb-0"><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>{% translate "Attendance Summary" %}</h5>
+      <span class="ad-coverage-date">{% translate "Date" %}: {{ selected_date }}</span>
+    </div>
+    <div class="ad-card-body">
+      {% if meeting_count == 0 %}
+      <div class="ad-alert ad-alert--info mb-3" role="alert">
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        <span>{% translate "No scheduled meeting was found for this date in the selected scope." %}</span>
+      </div>
+      {% endif %}
+      <div class="ad-coverage-grid">
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value ad-stat-value--teal">{{ daily_summary.total_offline }}</div>
+          <div class="ad-stat-label">{% translate "Offline students" %}</div>
+        </div>
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value ad-stat-value--success">{{ daily_summary.scanned }}</div>
+          <div class="ad-stat-label">{% translate "Scanned" %}</div>
+        </div>
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value ad-stat-value--warning">{{ daily_summary.not_scanned }}</div>
+          <div class="ad-stat-label">{% translate "Not scanned" %}</div>
+        </div>
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value">{{ daily_summary.entrance }}</div>
+          <div class="ad-stat-label">{% translate "Entrance" %}</div>
+        </div>
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value">{{ daily_summary.exit }}</div>
+          <div class="ad-stat-label">{% translate "Exit" %}</div>
+        </div>
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value ad-stat-value--success">{{ daily_summary.complete }}</div>
+          <div class="ad-stat-label">{% translate "Complete" %}</div>
+        </div>
+        <div class="ad-coverage-item">
+          <div class="ad-stat-value ad-stat-value--warning">{{ daily_summary.incomplete }}</div>
+          <div class="ad-stat-label">{% translate "Incomplete" %}</div>
+        </div>
+      </div>
+      {% if daily_summary.total_offline %}
+      {% widthratio daily_summary.scanned daily_summary.total_offline 100 as scanned_percent %}
+      <div class="ad-coverage-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ scanned_percent }}" aria-label="{% translate 'Offline attendance scan coverage' %}">
+        <span class="ad-coverage-fill" style="width: {{ scanned_percent }}%;"></span>
+      </div>
+      <p class="ad-coverage-meta mb-0">
+        <span>{% blocktranslate with scanned=daily_summary.scanned total=daily_summary.total_offline %}Scanned {{ scanned }} of {{ total }} offline students{% endblocktranslate %}</span>
+        <strong>{{ scanned_percent }}%</strong>
+      </p>
+      {% else %}
+      <p class="ad-coverage-meta mb-0">{% translate "No offline students in the selected scope for this date." %}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% elif has_filter and not date_error %}
+  <div class="ad-card mb-4">
+    <div class="ad-card-body">
+      <div class="ad-empty">
+        {% translate "Select a date to view the offline roster and scan coverage." as roster_hint_title %}
+        {% include "partials/empty_state.html" with icon="fa-calendar-day" title=roster_hint_title description="" %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if roster_page_obj is not None %}
+  <div class="ad-card mb-4">
+    <div class="ad-card-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <h5 class="mb-0"><i class="fas fa-users me-2" aria-hidden="true"></i>{% translate "Daily attendance roster" %}</h5>
+    </div>
+    <div class="ad-card-body">
+      <div class="ad-table-wrap">
+        <table class="ad-table ad-roster-table">
+          <thead>
+            <tr>
+              <th>{% translate "Student" %}</th>
+              <th>{% translate "Course" %}</th>
+              <th>{% translate "Entrance" %}</th>
+              <th>{% translate "Exit" %}</th>
+              <th>{% translate "Day status" %}</th>
+              <th>{% translate "Grade" %}</th>
+              <th class="text-end">{% translate "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in roster_students %}
+              <tr>
+                <td class="fw-semibold">{{ s.get_full_name|default:s.username }}</td>
+                <td>{{ s.attendance_course.course.name|default:"—" }}</td>
+                <td class="text-nowrap">{% if s.attendance_entrance %}{{ s.attendance_entrance.scanned_at|date:"H:i:s" }}{% else %}—{% endif %}</td>
+                <td class="text-nowrap">{% if s.attendance_exit %}{{ s.attendance_exit.scanned_at|date:"H:i:s" }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if s.roster_state == "complete" %}<span class="ad-pill ad-pill--success">{% translate "Complete" %}</span>
+                  {% elif s.roster_state == "incomplete" %}<span class="ad-pill ad-pill--warning">{% translate "Incomplete" %}</span>
+                  {% else %}<span class="ad-pill ad-pill--danger">{% translate "Absent" %}</span>{% endif %}
+                </td>
+                <td>{{ s.day_grade }}</td>
+                <td class="text-end text-nowrap">
+                  <div class="ad-actions">
+                    {% with first_record=s.attendance_entrance|default:s.attendance_exit %}
+                    {% if first_record %}
+                    <a href="{% url 'attendance-correction' first_record.pk %}" class="ad-action-btn" title="{% translate 'Edit' %}"><i class="fas fa-pen"></i></a>
+                    {% endif %}
+                    {% endwith %}
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="ad-empty">{% translate "No students match the selected roster filters." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% translate "Daily attendance roster" as roster_item_label %}
+      {% translate "Daily attendance roster pagination" as roster_aria_label %}
+      {% include "partials/pagination.html" with page_obj=roster_page_obj pagination_query=roster_pagination_query page_param="roster_page" item_label=roster_item_label aria_label=roster_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ad-card mb-4">
+    <div class="ad-card-head">
+      <h5 class="mb-0"><i class="fas fa-clock me-2" aria-hidden="true"></i>{% translate "Attendance Records" %}</h5>
+    </div>
+    <div class="ad-card-body">
       {% if has_filter %}
       <div class="ad-table-wrap">
         <table class="ad-table">
@@ -148,7 +305,7 @@
         </table>
       </div>
       {% translate "Attendance pagination" as pagination_aria_label %}
-      {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
+      {% include "partials/pagination.html" with page_obj=page_obj pagination_query=record_pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
       {% else %}
       {% translate "Choose a filter to load results" as attendance_empty_title %}
       {% translate "Select an academic year to view attendance records." as attendance_empty_desc %}
