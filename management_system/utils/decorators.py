@@ -4,7 +4,8 @@ Extends Django's @login_required with permission checking.
 """
 from functools import wraps
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 from django.utils.translation import gettext as _
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
@@ -70,7 +71,7 @@ def login_required_with_permission(role_type=None, resource=None):
                 user = User.objects.get(username=request.user)
             except User.DoesNotExist:
                 logger.warning(f"User {request.user} not found in database")
-                return HttpResponse(_("Unauthorized"), status=403)
+                raise PermissionDenied
             
             # Check if role type is specified and validate
             if role_type:
@@ -79,7 +80,7 @@ def login_required_with_permission(role_type=None, resource=None):
                         f"User: {user} (role: {user.role.role}) attempted to access "
                         f"{resource or 'resource'} requiring {role_type} permission"
                     )
-                    return HttpResponse(_("Unauthorized"), status=403)
+                    raise PermissionDenied
             
             # User is authorized, proceed with view
             return view_func(request, *args, **kwargs)
@@ -128,7 +129,7 @@ def capability_required(cap_check):
         def wrapper(request, *args, **kwargs):
             if not cap_check(request.user):
                 logger.warning(f"User {request.user} denied by {cap_check.__name__}")
-                return HttpResponse(_("Unauthorized"), status=403)
+                raise PermissionDenied
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator

@@ -9523,6 +9523,9 @@ msgstr "لا يمكن نقل مهمة الوسائط من %(current)s إلى %(t
 msgid "Media job progress must be between 0 and 100."
 msgstr "يجب أن يكون تقدم مهمة الوسائط بين 0 و100."
 
+msgid "The maximum number of media processing attempts has been reached."
+msgstr "تم الوصول إلى الحد الأقصى لمحاولات معالجة الوسائط."
+
 #: .\management_system/media_processing.py:204
 msgid "Media processing failed."
 msgstr "فشلت معالجة الوسائط."
@@ -11169,6 +11172,15 @@ msgstr "غير محدد"
 
 msgid "Weekly"
 msgstr "أسبوعي"
+
+msgid "Bad request."
+msgstr "طلب غير صالح."
+
+msgid "Access denied."
+msgstr "الوصول مرفوض."
+
+msgid "Server error."
+msgstr "خطأ في الخادم."
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."

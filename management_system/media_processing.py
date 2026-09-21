@@ -65,6 +65,9 @@ SOURCE_EXTENSIONS = {
 MAX_FAILURE_HISTORY = 20
 MAX_ERROR_MESSAGE_LENGTH = 4000
 MAX_STDERR_LENGTH = 8000
+MAX_MEDIA_ATTEMPTS = 3
+ATTEMPT_LIMIT_ERROR = "attempt_limit_exceeded"
+ATTEMPT_LIMIT_MESSAGE = _("The maximum number of media processing attempts has been reached.")
 AUTOMATION_PART_PREFIX = "automation-"
 PUBLICATION_PENDING_ERROR = "publication_pending"
 PUBLICATION_FAILED_ERROR = "publish_failed"
@@ -80,7 +83,6 @@ NON_RETRYABLE_FAILURE_CODES = frozenset({
     "invalid_playlist",
     "empty_playlist",
     "output_collision",
-    "segment_size_exceeded",
     "staging_object_missing",
     "staging_object_incomplete",
     "staging_size_mismatch",
@@ -96,6 +98,41 @@ ALLOWED_TRANSITIONS = {
     MediaProcessingStatus.SUCCEEDED: frozenset(),
     MediaProcessingStatus.CANCELLED: frozenset(),
 }
+
+ACTIVE_WORKER_STATUSES = frozenset({
+    MediaProcessingStatus.PROCESSING,
+    MediaProcessingStatus.UPLOADING,
+    MediaProcessingStatus.VERIFYING,
+})
+
+
+class MediaJobLeaseLost(Exception):
+    """Raised when an older worker attempt no longer owns the job."""
+
+    code = "media_job_lease_lost"
+
+
+def _mark_attempt_limit_locked(job: MediaProcessingJob) -> None:
+    """Terminally fail a locked job that has exhausted worker attempts."""
+    now = timezone.now()
+    history = list(job.failure_history or [])
+    history.append({
+        "attempt": job.attempt_count,
+        "code": ATTEMPT_LIMIT_ERROR,
+        "message": str(ATTEMPT_LIMIT_MESSAGE),
+        "at": now.isoformat(),
+    })
+    job.failure_history = history[-MAX_FAILURE_HISTORY:]
+    job.error_code = ATTEMPT_LIMIT_ERROR
+    job.error_message = str(ATTEMPT_LIMIT_MESSAGE)[:MAX_ERROR_MESSAGE_LENGTH]
+    job.status = MediaProcessingStatus.FAILED
+    job.phase = MediaProcessingPhase.FAILED
+    job.finished_at = now
+    job.staging_expires_at = now + timedelta(hours=media_limits()["failed_retention_hours"])
+    job.save(update_fields=[
+        "failure_history", "error_code", "error_message", "status", "phase",
+        "finished_at", "staging_expires_at",
+    ])
 
 
 def media_limits() -> dict[str, Any]:
@@ -267,9 +304,18 @@ def initialize_deadlines(created_at=None) -> tuple[Any, Any]:
 
 
 @transaction.atomic
-def transition_job(job_id: int, target_status: str, *, phase: str | None = None, progress: int | None = None) -> MediaProcessingJob:
+def transition_job(
+    job_id: int,
+    target_status: str,
+    *,
+    phase: str | None = None,
+    progress: int | None = None,
+    expected_attempt_count: int | None = None,
+) -> MediaProcessingJob:
     """Lock one job and apply one legal lifecycle transition."""
     job = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
+    if expected_attempt_count is not None and job.attempt_count != expected_attempt_count:
+        raise MediaJobLeaseLost
     if target_status != job.status and target_status not in ALLOWED_TRANSITIONS.get(job.status, frozenset()):
         raise ValidationError(
             _("Media job cannot transition from %(current)s to %(target)s.")
@@ -296,6 +342,9 @@ def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
     job = MediaProcessingJob.objects.select_for_update().filter(public_id=public_id).first()
     if job is None or job.status != MediaProcessingStatus.QUEUED:
         return None
+    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+        _mark_attempt_limit_locked(job)
+        return None
     timestamp = timezone.now()
     job.status = MediaProcessingStatus.PROCESSING
     job.phase = MediaProcessingPhase.DOWNLOAD
@@ -308,9 +357,21 @@ def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
 
 
 @transaction.atomic
-def record_job_failure(job_id: int, error_code: str, error_message: str, *, phase: str = MediaProcessingPhase.FAILED) -> MediaProcessingJob:
+def record_job_failure(
+    job_id: int,
+    error_code: str,
+    error_message: str,
+    *,
+    phase: str = MediaProcessingPhase.FAILED,
+    expected_attempt_count: int | None = None,
+) -> MediaProcessingJob:
     """Persist a bounded failure record while retaining the job for retry."""
     job = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
+    if expected_attempt_count is not None and job.attempt_count != expected_attempt_count:
+        return job
+    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+        error_code = ATTEMPT_LIMIT_ERROR
+        error_message = ATTEMPT_LIMIT_MESSAGE
     message = str(error_message or _("Media processing failed."))[:MAX_ERROR_MESSAGE_LENGTH]
     history = list(job.failure_history or [])
     history.append({
@@ -374,6 +435,8 @@ def queue_verified_job(
         MediaProcessingStatus.SUCCEEDED,
     }:
         return job, False
+    if job.status == MediaProcessingStatus.FAILED and job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+        raise ValidationError(ATTEMPT_LIMIT_MESSAGE)
     if job.status == MediaProcessingStatus.FAILED and not job.source_acknowledged_at:
         raise ValidationError(_("This media job has no acknowledged source to retry."))
     if job.status not in {MediaProcessingStatus.AWAITING_UPLOAD, MediaProcessingStatus.FAILED}:
@@ -402,7 +465,12 @@ def queue_verified_job(
 
 
 @transaction.atomic
-def requeue_stalled_job(public_id: Any, *, dispatched_at=None) -> MediaProcessingJob | None:
+def requeue_stalled_job(
+    public_id: Any,
+    *,
+    dispatched_at=None,
+    stale_before=None,
+) -> MediaProcessingJob | None:
     """Reset one stalled queued/processing job and return its locked row."""
     job = MediaProcessingJob.objects.select_for_update().filter(public_id=public_id).first()
     if job is None or job.status not in {
@@ -410,12 +478,62 @@ def requeue_stalled_job(public_id: Any, *, dispatched_at=None) -> MediaProcessin
         MediaProcessingStatus.PROCESSING,
     }:
         return None
+    if stale_before is not None:
+        marker = (
+            job.last_dispatched_at
+            if job.status == MediaProcessingStatus.QUEUED
+            else job.last_heartbeat_at
+        )
+        if marker is not None and marker > stale_before:
+            return None
+    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+        _mark_attempt_limit_locked(job)
+        return job
     job.status = MediaProcessingStatus.QUEUED
     job.phase = MediaProcessingPhase.QUEUED
     job.progress = 0
     job.last_dispatched_at = dispatched_at or timezone.now()
-    job.save(update_fields=["status", "phase", "progress", "last_dispatched_at"])
+    job.last_heartbeat_at = None
+    job.save(update_fields=["status", "phase", "progress", "last_dispatched_at", "last_heartbeat_at"])
     return job
+
+
+def assert_media_job_lease(job_id: int, attempt_count: int) -> None:
+    """Abort work that no longer belongs to the current worker attempt."""
+    if not MediaProcessingJob.objects.filter(
+        pk=job_id,
+        attempt_count=attempt_count,
+        status__in=ACTIVE_WORKER_STATUSES,
+    ).exists():
+        raise MediaJobLeaseLost
+
+
+def cleanup_job_workdirs(public_id: Any) -> int:
+    """Remove abandoned temporary work directories for one media job only."""
+    work_root = getattr(settings, "MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
+    prefix = f"media-{public_id}-"
+    removed = 0
+    try:
+        entries = list(os.scandir(work_root))
+    except (FileNotFoundError, NotADirectoryError, OSError):
+        return 0
+    root = os.path.realpath(work_root)
+    for entry in entries:
+        try:
+            is_candidate = entry.name.startswith(prefix) and entry.is_dir(follow_symlinks=False)
+        except OSError:
+            continue
+        if not is_candidate:
+            continue
+        path = os.path.realpath(entry.path)
+        if os.path.commonpath((root, path)) != root:
+            continue
+        try:
+            shutil.rmtree(path)
+            removed += 1
+        except OSError:
+            logger.warning("Could not remove abandoned media work directory %s", entry.path, exc_info=True)
+    return removed
 
 
 def schedule_media_job_after_commit(public_id: Any) -> None:
@@ -498,6 +616,7 @@ def is_retryable_failed_job(job: MediaProcessingJob) -> bool:
     """Apply the shared retry gate for retained failed media jobs."""
     return bool(
         job.status == MediaProcessingStatus.FAILED
+        and job.attempt_count < MAX_MEDIA_ATTEMPTS
         and job.source_acknowledged_at
         and not job.staging_deleted_at
         and is_retryable_media_failure(job.error_code)
@@ -826,6 +945,7 @@ def _run_hls(
     *,
     probe: MediaProbe | None = None,
     rate_scale: float = 1.0,
+    segment_seconds: float | None = None,
 ) -> tuple[str, list[str]]:
     """Encode one HLS rendition from a local source.
 
@@ -837,10 +957,11 @@ def _run_hls(
     """
     os.makedirs(output_dir, exist_ok=True)
     limits = media_limits()
+    segment_seconds = segment_seconds or limits["segment_seconds"]
     playlist = os.path.join(output_dir, f"{base_name}.m3u8")
     segment_pattern = os.path.join(output_dir, f"{base_name}_%03d.ts")
     muxer = [
-        "-f", "hls", "-hls_time", str(limits["segment_seconds"]),
+        "-f", "hls", "-hls_time", str(segment_seconds),
         "-hls_list_size", "0", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments",
         "-hls_segment_filename", segment_pattern, "-progress", "pipe:1", "-nostats",
         playlist,
@@ -857,7 +978,7 @@ def _run_hls(
         if limits["video_max_width"]:
             command += ["-vf", video_scale_filter(limits["video_max_width"])]
         command += [
-            "-force_key_frames", f"expr:gte(t,n_forced*{limits['segment_seconds']})",
+            "-force_key_frames", f"expr:gte(t,n_forced*{segment_seconds})",
             *audio_encode_args(probe or MediaProbe(source_kind="video", duration=0.0, channels=2), limits),
             *muxer,
         ]
@@ -882,35 +1003,62 @@ def _encode_hls_with_size_cap(
     *,
     probe: MediaProbe | None = None,
 ) -> tuple[str, list[str]]:
-    """Encode HLS and guarantee every segment is inside the size cap.
+    """Encode HLS with an adaptive segment-size target.
 
-    Capped-CRF already makes an oversized segment unlikely; if one still
-    appears (unusual source or a misconfigured rate), the encode is retried
-    once with the rate window reduced by 20% before the job fails for
-    operator review.
+    Capped-CRF normally keeps segments below the configured target. Difficult
+    sources get progressively shorter segments and lower rate windows. The
+    final generated output is accepted with a warning if the target is still
+    exceeded: the size check is an operational quality target, not a reason to
+    reject an otherwise valid uploaded source.
     """
     limits = media_limits()
-    playlist, names = _run_hls(
-        input_path, output_dir, base_name, stream, duration, progress_callback, probe=probe,
-    )
-    oversized = _oversized_segments(output_dir, names, limits["max_segment_bytes"])
-    if not oversized:
-        return playlist, names
+    target_seconds = limits["segment_seconds"]
+    attempts = []
+    for rate_scale, seconds in (
+        (1.0, target_seconds),
+        (0.8, max(2, round(target_seconds * 0.5))),
+        (0.6, max(1, round(target_seconds * 0.25))),
+        (0.4, 1),
+    ):
+        profile = (rate_scale, float(seconds))
+        if profile not in attempts:
+            attempts.append(profile)
+
+    playlist = ""
+    names: list[str] = []
+    oversized: list[str] = []
+    for attempt, (rate_scale, seconds) in enumerate(attempts):
+        if attempt:
+            logger.warning(
+                "media_segment_over_cap retrying_adaptive_profile oversized=%s base=%s "
+                "rate_scale=%s segment_seconds=%s",
+                len(oversized),
+                base_name,
+                rate_scale,
+                seconds,
+            )
+        playlist, names = _run_hls(
+            input_path,
+            output_dir,
+            base_name,
+            stream,
+            duration,
+            progress_callback,
+            probe=probe,
+            rate_scale=rate_scale,
+            segment_seconds=seconds,
+        )
+        oversized = _oversized_segments(output_dir, names, limits["max_segment_bytes"])
+        if not oversized:
+            return playlist, names
+
     logger.warning(
-        "media_segment_over_cap retrying_lower_rate oversized=%s base=%s",
+        "media_segment_over_cap accepting_best_effort_output oversized=%s base=%s "
+        "max_bytes=%s",
         len(oversized),
         base_name,
+        limits["max_segment_bytes"],
     )
-    playlist, names = _run_hls(
-        input_path, output_dir, base_name, stream, duration, progress_callback,
-        probe=probe, rate_scale=0.8,
-    )
-    oversized = _oversized_segments(output_dir, names, limits["max_segment_bytes"])
-    if oversized:
-        raise MediaProcessingError(
-            _("A generated media segment exceeds the maximum allowed size."),
-            "segment_size_exceeded",
-        )
     return playlist, names
 
 
@@ -1144,9 +1292,14 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
 
 __all__ = [
     "ALLOWED_TRANSITIONS",
+    "ACTIVE_WORKER_STATUSES",
+    "ATTEMPT_LIMIT_ERROR",
+    "ATTEMPT_LIMIT_MESSAGE",
     "AUTOMATION_PART_PREFIX",
+    "MAX_MEDIA_ATTEMPTS",
     "MediaProcessingPhase",
     "MediaProcessingStatus",
+    "MediaJobLeaseLost",
     "NON_RETRYABLE_FAILURE_CODES",
     "PUBLICATION_ERROR_CODES",
     "PUBLICATION_FAILED_ERROR",
@@ -1154,6 +1307,8 @@ __all__ = [
     "PUBLICATION_PENDING_MESSAGE",
     "attachment_requested",
     "claim_queued_job",
+    "assert_media_job_lease",
+    "cleanup_job_workdirs",
     "claim_attachment_retry",
     "finish_attachment_retry",
     "finish_lesson_publication",

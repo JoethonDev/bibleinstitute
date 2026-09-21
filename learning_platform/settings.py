@@ -300,16 +300,17 @@ MEDIA_WORKER_CONCURRENCY = int(os.getenv("MEDIA_WORKER_CONCURRENCY", "1"))
 # muxed audio track, and the extracted audio HLS/MP3 are produced separately.
 MEDIA_VIDEO_CRF = int(os.getenv("MEDIA_VIDEO_CRF", "23"))
 MEDIA_VIDEO_PRESET = os.getenv("MEDIA_VIDEO_PRESET", "fast")
-# Capped CRF keeps every HLS segment under MEDIA_MAX_SEGMENT_BYTES: worst case
-# is about (maxrate + audio) x segment seconds plus the VBV burst of one
-# bufsize window.
+# Capped CRF targets MEDIA_MAX_SEGMENT_BYTES: worst case is about
+# (maxrate + audio) x segment seconds plus the VBV burst of one bufsize window.
+# The media worker adaptively retries oversized output and accepts a final
+# best-effort rendition rather than rejecting an otherwise valid source.
 MEDIA_VIDEO_MAXRATE = os.getenv("MEDIA_VIDEO_MAXRATE", "448k")
 MEDIA_VIDEO_BUFSIZE = os.getenv("MEDIA_VIDEO_BUFSIZE", "448k")
 MEDIA_VIDEO_MAX_WIDTH = int(os.getenv("MEDIA_VIDEO_MAX_WIDTH", "854"))
 MEDIA_AUDIO_BITRATE = os.getenv("MEDIA_AUDIO_BITRATE", "96k")
 MEDIA_AUDIO_MONO_BITRATE = os.getenv("MEDIA_AUDIO_MONO_BITRATE", "64k")
 MEDIA_MP3_BITRATE = os.getenv("MEDIA_MP3_BITRATE", "128k")
-# 0 disables the worker-side segment size verification.
+# 0 disables the worker-side segment size check.
 MEDIA_MAX_SEGMENT_BYTES = int(os.getenv("MEDIA_MAX_SEGMENT_BYTES", str(512 * 1000)))
 
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.

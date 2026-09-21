@@ -185,7 +185,6 @@ from django.core.paginator import Paginator
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
 logger = getLogger(__name__)
-# DRIVE_CLIENT = get_drive_client()
 CLOUD_CLIENT = boto3.client(
     's3',
     endpoint_url=getattr(settings, "R2_ENDPOINT_URL", None),
@@ -273,7 +272,7 @@ class AdminPermissionView(LoginProtection):
         user = User.objects.get(username=request.user)
         if can_manage_content(user):
             return super(LoginProtection, self).dispatch(request, *args, **kwargs)
-        return HttpResponse(_("Unauthorized"), status=403)
+        raise PermissionDenied
 
 class FormBase(AdminPermissionView, FormView):
     view_name = ""
@@ -889,13 +888,13 @@ class ProfileDetail(LoginProtection, DetailView):
 
     def get(self, request, *args, **kwargs):
         if self.kwargs.get(self.pk_url_kwarg) and not can_manage_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=403) # Translate "Unauthorized"
+            raise PermissionDenied
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object != request.user:
-            return HttpResponse(_("Unauthorized"), status=403)
+            raise PermissionDenied
 
         with transaction.atomic():
             locked_user = User.objects.select_for_update().get(pk=request.user.pk)
@@ -1038,33 +1037,6 @@ def stream_lesson(request, offering_id, lesson_id, file_index):
         status=410,
     )
     
-
-# @login_required(login_url=LOGIN_URL)
-# def retrieve_segment(request, lesson_id, segment_id):
-#     try:
-#         username = request.user
-#         lesson = get_object_or_404(Lesson, pk=lesson_id)
-
-#         if not lesson.has_segment(segment_id):
-#             logger.error("Segment with id : {segment_id} is not found in {lesson.name}")
-#             return HttpResponse('Not Found!', status=404)
-
-#         file_metadata = DRIVE_CLIENT.files().get(fileId=segment_id, fields="name").execute()
-#         file_name = file_metadata.get("name")
-
-#         video_segment = DRIVE_CLIENT.files().get_media(fileId=segment_id)
-#         ts_file = download_from_drive(video_segment)
-#         logger.info(f"{file_name} TS file of {lesson.name} is loaded!")
-
-#         return FileResponse(ts_file)
-    
-#     except Http404:
-#         logger.error(f"Retrieving segments for lesson with id : {lesson_id} is not found for user: {username}")
-#         raise Http404
-
-#     except HttpError as e:
-#         logger.error(f"Downloading {file_name} segments file is failed for user : {username}")
-#         logger.error(f"Stack Trace : {str(e)}")
 
 @login_required(login_url=LOGIN_URL)
 def take_exam(request, offering_id, quiz_id, *, allow_management=False):
@@ -1831,7 +1803,7 @@ class DeleteUser(UserBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=403)
+            raise PermissionDenied
         return super(UserBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("user-dashboard")
 
@@ -1878,7 +1850,7 @@ class DeleteCourse(CourseBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=403)
+            raise PermissionDenied
         return super(CourseBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("course-dashboard")
 
@@ -2246,7 +2218,7 @@ class DeleteLesson(LessonBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=403)
+            raise PermissionDenied
         return super(LessonBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 
@@ -3252,7 +3224,7 @@ class DeleteQuiz(QuizBaseView, DeleteView):
         if not request.user.is_authenticated:
             return redirect(f"{LOGIN_URL}?next={request.get_full_path()}")
         if not can_delete_content(request.user):
-            return HttpResponse(_("Unauthorized"), status=403)
+            raise PermissionDenied
         return super(QuizBaseView, self).dispatch(request, *args, **kwargs)
     success_url = reverse_lazy("lesson-dashboard")
 

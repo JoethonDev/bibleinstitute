@@ -9,17 +9,19 @@ from datetime import timedelta
 import redis
 from celery import shared_task
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
 from .media_processing import (
     MediaProcessingPhase,
     MediaProcessingStatus,
+    MediaJobLeaseLost,
     _attach_outputs,
+    assert_media_job_lease,
     automation_lesson_media_complete,
     claim_attachment_retry,
     claim_queued_job,
+    cleanup_job_workdirs,
     finish_attachment_retry,
     is_automation_job,
     publish_automation_lesson,
@@ -52,7 +54,7 @@ def _redis_client():
 
 
 class MediaProgressReporter:
-    """Write bounded live progress and throttled durable heartbeats."""
+    """Write live progress and throttled durable heartbeats."""
 
     def __init__(self, job: MediaProcessingJob):
         self.job = job
@@ -63,10 +65,28 @@ class MediaProgressReporter:
     def update(self, phase: str, progress: int) -> None:
         progress = max(0, min(99, int(progress)))
         now = time.time()
+        heartbeat_at = timezone.now()
+        if now - self.last_db_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
+            updated = MediaProcessingJob.objects.filter(
+                pk=self.job.pk,
+                attempt_count=self.job.attempt_count,
+                status__in=(
+                    MediaProcessingStatus.PROCESSING,
+                    MediaProcessingStatus.UPLOADING,
+                    MediaProcessingStatus.VERIFYING,
+                ),
+            ).update(
+                phase=phase,
+                progress=progress,
+                last_heartbeat_at=heartbeat_at,
+            )
+            if not updated:
+                raise MediaJobLeaseLost
+            self.last_db_heartbeat = now
         values = {
             "phase": phase,
             "progress": progress,
-            "heartbeat_at": timezone.now().isoformat(),
+            "heartbeat_at": heartbeat_at.isoformat(),
             "attempt": self.job.attempt_count,
             "worker_id": str(getattr(settings, "MEDIA_WORKER_ID", "media-worker")),
         }
@@ -76,18 +96,12 @@ class MediaProgressReporter:
                 self.redis.expire(self.key, LIVE_PROGRESS_TTL)
             except Exception:
                 logger.warning("Redis live media progress is unavailable", exc_info=True)
-        if now - self.last_db_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
-            MediaProcessingJob.objects.filter(pk=self.job.pk).update(
-                phase=phase,
-                progress=progress,
-                last_heartbeat_at=timezone.now(),
-            )
-            self.last_db_heartbeat = now
 
     def clear(self) -> None:
         if self.redis is not None:
             try:
-                self.redis.delete(self.key)
+                if self.redis.hget(self.key, "attempt") == str(self.job.attempt_count):
+                    self.redis.delete(self.key)
             except Exception:
                 logger.warning("Could not clear Redis media progress", exc_info=True)
 
@@ -114,6 +128,7 @@ def process_media_job(self, public_id: str):
     job = claim_queued_job(public_id)
     if job is None:
         return {"status": "ignored", "public_id": str(public_id)}
+    cleanup_job_workdirs(job.public_id)
     reporter = MediaProgressReporter(job)
     created = None
     try:
@@ -127,6 +142,7 @@ def process_media_job(self, public_id: str):
                     MediaProcessingStatus.UPLOADING,
                     phase=MediaProcessingPhase.UPLOAD_OUTPUT,
                     progress=progress,
+                    expected_attempt_count=job.attempt_count,
                 )
                 upload_state["transitioned"] = True
             reporter.update(phase, progress)
@@ -141,10 +157,13 @@ def process_media_job(self, public_id: str):
             MediaProcessingStatus.VERIFYING,
             phase=MediaProcessingPhase.VERIFY,
             progress=96,
+            expected_attempt_count=job.attempt_count,
         )
         now = timezone.now()
         with transaction.atomic():
             locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
+            if locked.attempt_count != job.attempt_count:
+                raise MediaJobLeaseLost
             locked.phase = MediaProcessingPhase.VERIFY
             locked.progress = 96
             locked.output_keys = created["output_keys"]
@@ -164,11 +183,14 @@ def process_media_job(self, public_id: str):
             try:
                 reporter.update(MediaProcessingPhase.ATTACH, 98)
                 _attach_outputs(job, created["manifest_key"], created["audio_manifest_key"], created["download_key"])
+            except MediaJobLeaseLost:
+                raise
             except Exception as exc:
                 attachment_error = exc
 
         staging_error = None
         if attachment_error is None:
+            assert_media_job_lease(job.pk, job.attempt_count)
             try:
                 delete_object_exact(job.source_key)
             except Exception as exc:
@@ -176,6 +198,8 @@ def process_media_job(self, public_id: str):
 
         with transaction.atomic():
             locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
+            if locked.attempt_count != job.attempt_count:
+                raise MediaJobLeaseLost
             locked.status = MediaProcessingStatus.SUCCEEDED
             locked.phase = MediaProcessingPhase.COMPLETE
             locked.progress = 100
@@ -222,9 +246,12 @@ def process_media_job(self, public_id: str):
             "attachment_error": bool(attachment_error),
             "publication_error": not publication_ok,
         }
+    except MediaJobLeaseLost:
+        logger.warning("media_job_lease_lost public_id=%s attempt=%s", public_id, job.attempt_count)
+        return {"status": "stale", "public_id": str(public_id)}
     except Exception as exc:
         code = getattr(exc, "code", "media_processing_failed")
-        record_job_failure(job.pk, code, str(exc))
+        record_job_failure(job.pk, code, str(exc), expected_attempt_count=job.attempt_count)
         raise
     finally:
         reporter.clear()
@@ -267,19 +294,6 @@ def retry_media_attachment(public_id: str):
     return {"status": "attached", "public_id": str(public_id)}
 
 
-def _recovery_redis_client():
-    return _redis_client()
-
-
-def _has_live_progress(client, public_id) -> bool:
-    if client is None:
-        return False
-    try:
-        return bool(client.exists(f"media:job:{public_id}"))
-    except Exception:
-        return False
-
-
 def _mark_recovery_failure(job: MediaProcessingJob, code: str, message: str, now) -> None:
     history = list(job.failure_history or [])
     history.append({
@@ -306,7 +320,7 @@ def recover_pending_media_jobs(limit: int = 100):
     """Recover delayed acknowledgements and lost media-worker dispatches."""
     limit = max(1, min(100, int(limit)))
     now = timezone.now()
-    client = _recovery_redis_client()
+    client = _redis_client()
     queued_count = 0
     failed_count = 0
     candidate_ids = list(
@@ -342,43 +356,33 @@ def recover_pending_media_jobs(limit: int = 100):
         job = MediaProcessingJob.objects.filter(pk=job_id).first()
         if job is None:
             continue
-        live = _has_live_progress(client, job.public_id)
-        if live:
-            continue
         if job.status == MediaProcessingStatus.QUEUED:
             if job.last_dispatched_at and now - job.last_dispatched_at < grace:
                 continue
+            stale_before = now - grace
         elif job.status == MediaProcessingStatus.PROCESSING:
             if job.last_heartbeat_at and now - job.last_heartbeat_at < heartbeat_grace:
                 continue
-        stalled = requeue_stalled_job(job.public_id, dispatched_at=now)
+            stale_before = now - heartbeat_grace
+        else:
+            continue
+        stalled = requeue_stalled_job(
+            job.public_id,
+            dispatched_at=now,
+            stale_before=stale_before,
+        )
         if stalled is not None:
+            if client is not None:
+                try:
+                    client.delete(f"media:job:{stalled.public_id}")
+                except Exception:
+                    logger.warning("Could not clear stale Redis media progress", exc_info=True)
+            if stalled.status == MediaProcessingStatus.FAILED:
+                failed_count += 1
+                continue
             schedule_media_job_after_commit(stalled.public_id)
             queued_count += 1
     return {"queued": queued_count, "failed": failed_count}
-
-
-def retry_failed_media_jobs(limit: int = 100):
-    """Verify retained failed sources and requeue a bounded set of jobs."""
-    limit = max(1, min(100, int(limit)))
-    queued = 0
-    rejected = 0
-    job_ids = list(
-        MediaProcessingJob.objects.filter(
-            status=MediaProcessingStatus.FAILED,
-            source_acknowledged_at__isnull=False,
-        ).order_by("finished_at", "pk").values_list("public_id", flat=True)[:limit]
-    )
-    for job_id in job_ids:
-        try:
-            queued_job, transitioned = queue_verified_job(job_id)
-        except (MediaStorageError, ValidationError, MediaProcessingJob.DoesNotExist):
-            rejected += 1
-            continue
-        if transitioned:
-            schedule_media_job_after_commit(queued_job.public_id)
-            queued += 1
-    return {"queued": queued, "rejected": rejected}
 
 
 __all__ = [
@@ -387,5 +391,4 @@ __all__ = [
     "process_media_job",
     "recover_pending_media_jobs",
     "retry_media_attachment",
-    "retry_failed_media_jobs",
 ]

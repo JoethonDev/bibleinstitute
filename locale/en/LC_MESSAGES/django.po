@@ -9314,6 +9314,9 @@ msgstr "Media job cannot transition from %(current)s to %(target)s."
 msgid "Media job progress must be between 0 and 100."
 msgstr "Media job progress must be between 0 and 100."
 
+msgid "The maximum number of media processing attempts has been reached."
+msgstr "The maximum number of media processing attempts has been reached."
+
 #: .\management_system/media_processing.py:204
 msgid "Media processing failed."
 msgstr "Media processing failed."
@@ -10600,6 +10603,15 @@ msgstr "Unspecified"
 
 msgid "Weekly"
 msgstr "Weekly"
+
+msgid "Bad request."
+msgstr "Bad request."
+
+msgid "Access denied."
+msgstr "Access denied."
+
+msgid "Server error."
+msgstr "Server error."
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."

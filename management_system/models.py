@@ -2117,31 +2117,6 @@ class Lesson(models.Model):
     def can_edit(self):
         return self.status == PublicationStatus.DRAFT
 
-    def has_segment(self, segment: str):
-        links = json.loads(self.links)
-        segments_collection = [value['segments'] for value in links]
-        for collection in segments_collection:
-            if segment in collection:
-                return True
-        return False
-
-    def serialize(self):
-        links = json.loads(self.links)
-        separated_parts = dict()
-        # Type - File_id - Index
-        for file in links:
-            index = file['index']
-            file_data = {
-                "type" : file['type'],
-                "file_id": file['file_id']
-            }
-            if index in separated_parts:
-                separated_parts[index].append(file_data)
-            else:
-                separated_parts[index] = [file_data]
-        
-        return [value for value in separated_parts.values()]
-    
 class MediaProcessingJob(models.Model):
     """Durable state for one source-file media processing job."""
 

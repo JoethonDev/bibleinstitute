@@ -21,6 +21,7 @@ from django.views.i18n import JavaScriptCatalog
 from django.views.generic import RedirectView
 from django.templatetags.static import static
 from management_system.telegram_views import telegram_webhook
+from management_system import error_views
 
 urlpatterns = [
     path("favicon.ico", RedirectView.as_view(url=static("login-logo.png"), permanent=False)),
@@ -44,3 +45,7 @@ urlpatterns += i18n_patterns(
     path('', include('management_system.urls')),
     # prefix_default_language=False
 )
+
+handler400 = error_views.bad_request
+handler403 = error_views.permission_denied
+handler500 = error_views.server_error

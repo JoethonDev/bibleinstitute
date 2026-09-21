@@ -6,14 +6,13 @@ import json
 import re
 from datetime import date, datetime, timedelta
 from django.contrib import messages as django_messages
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.timezone import now
-from django.http import HttpResponse
-from django.core.exceptions import ValidationError
 from logging import getLogger
 from urllib.parse import unquote
 from management_system.utils.decorators import check_role_permission
@@ -156,11 +155,11 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     try:
         user = User.objects.get(username=request.user)
     except User.DoesNotExist:
-        return HttpResponse(_("Unauthorized"), status=403)
+        raise PermissionDenied
     
     if not check_role_permission(user, 'management'):
         logger.warning(f"User: {user} attempted to access {view} dashboard")
-        return HttpResponse(_("Unauthorized"), status=403)
+        raise PermissionDenied
     
     # Paginate objects
     page_obj = paginate_obj(request, obj, context.get("page_size", 15))
