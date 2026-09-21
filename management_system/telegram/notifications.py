@@ -1,4 +1,4 @@
-"""Durable, authorized Telegram lesson and exam notification delivery."""
+"""Durable, authorized Telegram academic and announcement delivery."""
 
 from __future__ import annotations
 
@@ -92,6 +92,17 @@ def _authorized_delivery(
             and delivery.pk in authorized_ids
             and _quiz_delivery_is_open(delivery, exceptional_windows)
         )
+    if delivery.notification_type == TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT:
+        notification = delivery.student_notification
+        return bool(
+            delivery.announcement_id
+            and delivery.announcement is not None
+            and notification is not None
+            and notification.notification_type == StudentNotification.NotificationType.ANNOUNCEMENT
+            and notification.student_id == delivery.user_id
+            and notification.announcement_id == delivery.announcement_id
+            and notification.cancelled_at is None
+        )
     return False
 
 
@@ -120,7 +131,7 @@ def _authorized_delivery_ids(deliveries) -> set[int]:
         enrollment_type__in=(Enrollment.Type.REPEAT, Enrollment.Type.REMEDIAL, Enrollment.Type.MANUAL),
         course_offering_id=OuterRef("source_offering_id"),
     )
-    return set(
+    academic_ids = set(
         deliveries.annotate(
             source_offering_id=Case(
                 When(lesson_id__isnull=False, then=F("lesson__course_offering_id")),
@@ -134,6 +145,10 @@ def _authorized_delivery_ids(deliveries) -> set[int]:
             ),
         )
         .filter(
+            notification_type__in=(
+                TelegramNotificationDelivery.NotificationType.LESSON_PUBLISHED,
+                TelegramNotificationDelivery.NotificationType.QUIZ_OPENING,
+            ),
             user__is_active=True,
             user__application_status="active",
             user__role__role="student",
@@ -141,6 +156,19 @@ def _authorized_delivery_ids(deliveries) -> set[int]:
         .filter(Exists(normal_access) | Exists(targeted_access))
         .values_list("pk", flat=True)
     )
+    announcement_ids = set(
+        deliveries.filter(
+            notification_type=TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT,
+            user__is_active=True,
+            user__application_status="active",
+            user__role__role="student",
+            student_notification__notification_type=StudentNotification.NotificationType.ANNOUNCEMENT,
+            student_notification__student_id=F("user_id"),
+            student_notification__announcement_id=F("announcement_id"),
+            student_notification__cancelled_at__isnull=True,
+        ).values_list("pk", flat=True)
+    )
+    return academic_ids | announcement_ids
 
 
 def _mark_skipped(delivery_id: int, message: str) -> None:
@@ -201,6 +229,24 @@ def _send_delivery(
                 links,
             ),
         )
+    if delivery.notification_type == TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT:
+        announcement = delivery.announcement
+        if announcement is None:
+            raise ValueError("Announcement delivery has no source.")
+        reply_markup = None
+        if announcement.action_label and announcement.action_url.startswith(("http://", "https://")):
+            reply_markup = telebot.types.InlineKeyboardMarkup()
+            reply_markup.add(
+                telebot.types.InlineKeyboardButton(
+                    announcement.action_label,
+                    url=announcement.action_url,
+                )
+            )
+        return bot.send_message(
+            delivery.telegram_account.telegram_chat_id,
+            f"{announcement.title}\n\n{announcement.body}",
+            reply_markup=reply_markup,
+        )
     opening, closing = exceptional_windows.get(
         (delivery.quiz_id, delivery.user_id),
         (delivery.quiz.opening_date, delivery.quiz.closing_date),
@@ -225,6 +271,11 @@ def _materialize_due_deliveries(limit: int) -> int:
         StudentNotification.objects.filter(
             scheduled_for__lte=now,
             cancelled_at__isnull=True,
+            notification_type__in=(
+                TelegramNotificationDelivery.NotificationType.LESSON_PUBLISHED,
+                TelegramNotificationDelivery.NotificationType.QUIZ_OPENING,
+                TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT,
+            ),
         )
         .prefetch_related("telegram_deliveries")
         .order_by("scheduled_for", "pk")[:scan_limit]
@@ -260,6 +311,7 @@ def _materialize_due_deliveries(limit: int) -> int:
                 student_notification_id=notification.pk,
                 lesson_id=notification.lesson_id,
                 quiz_id=notification.quiz_id,
+                announcement_id=notification.announcement_id,
                 scheduled_for=now,
             )
         )
@@ -294,6 +346,7 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
 
     deliveries = TelegramNotificationDelivery.objects.select_related(
         "user", "user__role", "telegram_account",
+        "student_notification", "announcement",
         "lesson__course_offering__academic_year_level__academic_year",
         "lesson__course_offering__course",
         "quiz__course_offering__academic_year_level__academic_year",

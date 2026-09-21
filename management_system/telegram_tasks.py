@@ -559,7 +559,14 @@ def process_telegram_update(update_id: int) -> None:
         )
 
 
-@shared_task(ignore_result=True)
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=900,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 3},
+    ignore_result=True,
+)
 def process_due_telegram_notifications(limit: int = 500) -> None:
     """Recover and send due Telegram notifications without a second worker."""
     with translation.override("ar"):

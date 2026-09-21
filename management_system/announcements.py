@@ -24,6 +24,7 @@ from .models import (
     StudentNotification,
     User,
 )
+from .student_notifications import TELEGRAM_NOTIFICATION_TASK
 
 
 ANNOUNCEMENT_BATCH_SIZE = 500
@@ -312,6 +313,9 @@ def fan_out_announcement(announcement_id: int) -> int:
             completed_at=completed_at,
             last_error="",
             updated_at=completed_at,
+        )
+        transaction.on_commit(
+            lambda: current_app.send_task(TELEGRAM_NOTIFICATION_TASK)
         )
         return created
     except Exception:

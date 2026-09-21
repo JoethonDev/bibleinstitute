@@ -333,11 +333,12 @@ class TelegramWebhookUpdate(models.Model):
 
 
 class TelegramNotificationDelivery(models.Model):
-    """Durable, idempotent lesson/exam notification delivery state."""
+    """Durable, idempotent academic and announcement delivery state."""
 
     class NotificationType(models.TextChoices):
         LESSON_PUBLISHED = "lesson_published", _("Lesson published")
         QUIZ_OPENING = "quiz_opening", _("Exam opening")
+        ANNOUNCEMENT = "announcement", _("Announcement")
 
     class Status(models.TextChoices):
         QUEUED = "queued", _("Queued")
@@ -377,6 +378,13 @@ class TelegramNotificationDelivery(models.Model):
         blank=True,
         related_name="telegram_notification_deliveries",
     )
+    announcement = models.ForeignKey(
+        "Announcement",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="telegram_deliveries",
+    )
     scheduled_for = models.DateTimeField()
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     attempt_count = models.PositiveSmallIntegerField(default=0)
@@ -393,10 +401,17 @@ class TelegramNotificationDelivery(models.Model):
                     models.Q(
                         notification_type="lesson_published",
                         quiz__isnull=True,
+                        announcement__isnull=True,
                     )
                     | models.Q(
                         notification_type="quiz_opening",
                         lesson__isnull=True,
+                        announcement__isnull=True,
+                    )
+                    | models.Q(
+                        notification_type="announcement",
+                        lesson__isnull=True,
+                        quiz__isnull=True,
                     )
                 ),
                 name="telegram_delivery_source_matches_type",
@@ -407,6 +422,10 @@ class TelegramNotificationDelivery(models.Model):
             models.Index(fields=["user", "status"], name="tg_delivery_user_status_idx"),
             models.Index(fields=["notification_type", "lesson"], name="tg_delivery_lesson_idx"),
             models.Index(fields=["notification_type", "quiz"], name="tg_delivery_quiz_idx"),
+            models.Index(
+                fields=["notification_type", "announcement"],
+                name="tg_delivery_announcement_idx",
+            ),
         ]
 
     def __str__(self):
