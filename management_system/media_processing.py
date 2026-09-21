@@ -186,8 +186,9 @@ def _oversized_segments(output_dir: str, segment_names: list[str], max_bytes: in
 def validate_requested_folder(folder: Any) -> str:
     """Normalize and validate a final R2 destination folder.
 
-    Empty means the bucket root. Reserved staging and read-only historical
-    prefixes are never accepted by the new processing path.
+    Empty means the bucket root. The private staging prefix is never accepted
+    as a final output destination; academic-year prefixes remain valid output
+    roots so new-year media can be added beside existing content.
     """
     if not isinstance(folder, str):
         raise ValidationError(_("Requested folder is invalid."))
@@ -203,7 +204,7 @@ def validate_requested_folder(folder: Any) -> str:
     parts = folder.split("/")
     if any(not part or part in {".", ".."} for part in parts):
         raise ValidationError(_("Requested folder is invalid."))
-    if parts[0] in {"Raw Files", "First Year", "Second Year"}:
+    if parts[0] == "Raw Files":
         raise ValidationError(_("This storage folder is reserved."))
     return folder
 
