@@ -247,6 +247,11 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 60.0,
         "kwargs": {"limit": 50},
     },
+    "process-due-telegram-notifications": {
+        "task": "management_system.telegram_tasks.process_due_telegram_notifications",
+        "schedule": 15.0,
+        "kwargs": {"limit": 500},
+    },
 }
 
 # Expo Push Service is the only mobile push provider. The access token is

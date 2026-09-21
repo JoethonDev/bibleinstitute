@@ -34,9 +34,19 @@ RETRY_DELAYS = (60, 300, 900)
 def _claim_due_ids(limit: int) -> list[int]:
     now = timezone.now()
     stale_before = now - timedelta(minutes=15)
-    TelegramNotificationDelivery.objects.filter(
+    stale_deliveries = TelegramNotificationDelivery.objects.filter(
         status=TelegramNotificationDelivery.Status.SENDING,
         updated_at__lt=stale_before,
+    )
+    stale_deliveries.filter(
+        attempt_count__gte=MAX_DELIVERY_ATTEMPTS,
+    ).update(
+        status=TelegramNotificationDelivery.Status.FAILED,
+        last_error=_("Telegram message delivery failed."),
+        updated_at=now,
+    )
+    stale_deliveries.filter(
+        attempt_count__lt=MAX_DELIVERY_ATTEMPTS,
     ).update(
         status=TelegramNotificationDelivery.Status.QUEUED,
         scheduled_for=now,
@@ -267,6 +277,10 @@ def _materialize_due_deliveries(limit: int) -> int:
     """
     now = timezone.now()
     scan_limit = max(1, min(int(limit), NOTIFICATION_BATCH_SIZE))
+    active_telegram_account = TelegramAccount.objects.filter(
+        user_id=OuterRef("student_id"),
+        is_active=True,
+    )
     notifications = list(
         StudentNotification.objects.filter(
             scheduled_for__lte=now,
@@ -277,6 +291,7 @@ def _materialize_due_deliveries(limit: int) -> int:
                 TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT,
             ),
         )
+        .filter(Exists(active_telegram_account))
         .prefetch_related("telegram_deliveries")
         .order_by("scheduled_for", "pk")[:scan_limit]
     )
@@ -330,18 +345,31 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
     ids = _claim_due_ids(limit)
     if not ids:
         return {"sent": 0, "skipped": 0, "failed": 0}
+    attempt_counts = dict(
+        TelegramNotificationDelivery.objects.filter(pk__in=ids).values_list(
+            "pk", "attempt_count"
+        )
+    )
 
     config = TelegramBotConfig.objects.filter(is_active=True).first()
     if config is None:
         for delivery_id in ids:
-            _mark_failed_or_retry(delivery_id, 1, _("The Telegram bot is inactive."))
+            _mark_failed_or_retry(
+                delivery_id,
+                attempt_counts.get(delivery_id),
+                _("The Telegram bot is inactive."),
+            )
         return {"sent": 0, "skipped": 0, "failed": len(ids)}
     try:
         bot_token = stored_token(config)
         bot = bot or telebot.TeleBot(bot_token, parse_mode=None, threaded=False)
     except Exception:
         for delivery_id in ids:
-            _mark_failed_or_retry(delivery_id, 1, _("Telegram message delivery failed."))
+            _mark_failed_or_retry(
+                delivery_id,
+                attempt_counts.get(delivery_id),
+                _("Telegram message delivery failed."),
+            )
         return {"sent": 0, "skipped": 0, "failed": len(ids)}
 
     deliveries = TelegramNotificationDelivery.objects.select_related(
