@@ -132,7 +132,7 @@ def media_limits() -> dict[str, Any]:
         "audio_bitrate": bitrate,
         "audio_mono_bitrate": bitrate_setting("MEDIA_AUDIO_MONO_BITRATE", "64k"),
         "mp3_bitrate": bitrate_setting("MEDIA_MP3_BITRATE", "128k"),
-        "max_segment_bytes": max(0, int(getattr(settings, "MEDIA_MAX_SEGMENT_BYTES", 512000))),
+        "max_segment_bytes": max(0, int(getattr(settings, "MEDIA_MAX_SEGMENT_BYTES", 2048000))),
     }
 
 
