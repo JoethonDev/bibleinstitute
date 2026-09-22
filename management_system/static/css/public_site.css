@@ -8,3 +8,14 @@
 @media(max-width:991.98px){.institute-topbar .container>span,.institute-topbar .container>div a:not(:last-child){display:none}.public-stats{grid-template-columns:repeat(2,1fr)}.public-hero-inner h1,.public-inner-hero h1{font-size:3rem}.public-pillar-grid,.public-path-grid,.public-purpose-grid,.public-system-grid,.public-course-list,.public-steps{grid-template-columns:1fr}.public-pillar-grid article,.public-purpose-grid article{border-inline-end:0;border-bottom:1px solid var(--public-line)}.public-news-card,.public-quote>.container,.public-curriculum-preview,.public-video-grid,.public-story,.public-values>.container,.public-campus,.public-courses-heading,.public-faculty,.public-fees>.container,.public-faq{grid-template-columns:1fr;gap:2.5rem}.public-quote>.container>span{display:none}.public-quote>.container{min-height:380px}.public-campus>div:last-child{padding:3rem 1.5rem}.public-overview{grid-template-columns:repeat(2,1fr)}.public-system-grid article:nth-child(odd){border-inline-end:0}.public-fees>.container>div:not(:first-child){border-inline-start:0;border-top:1px solid rgba(255,255,255,.35)}.public-calendar>.container{grid-template-columns:1fr}.public-values>.container>div:last-child{grid-template-columns:1fr}}
 @media(max-width:575.98px){.public-section{padding-top:4.5rem;padding-bottom:4.5rem}.public-home-hero{min-height:780px}.public-hero-inner{min-height:640px;align-items:flex-start;padding-top:5rem}.public-hero-inner h1,.public-inner-hero h1{font-size:2.5rem}.public-stats>div{padding:.75rem}.public-stats strong{font-size:1.4rem}.public-stats span{font-size:.65rem}.public-news-card{grid-template-columns:1fr}.public-date{border-inline-end:0;border-bottom:1px solid #cec4b1;padding-bottom:1rem}.public-date strong{font-size:3.5rem}.public-quote blockquote{padding-inline-start:1.2rem}.public-book-art{min-height:320px}.public-cta>.container,.public-admission-note{flex-direction:column;align-items:flex-start}.public-timeline>.container{grid-template-columns:1fr;gap:1.5rem}.public-timeline .container>div{padding:0}.public-overview>div{padding:1rem}.public-course-list article{grid-template-columns:45px 1fr}}
 @media(prefers-reduced-motion:reduce){.public-btn{transition:none}}
+@supports (background-image: image-set(url('x') type('image/webp'), url('x') type('image/png'))) {
+    .public-home-hero {
+        background-image: image-set(url('../bible-slider1.webp') type('image/webp'), url('../bible-slider1.png') type('image/png'));
+    }
+    .public-path-image-1 {
+        background-image: image-set(url('../bible-slider2.webp') type('image/webp'), url('../bible-slider2.png') type('image/png'));
+    }
+    .public-path-image-2 {
+        background-image: image-set(url('../bible-slider3.webp') type('image/webp'), url('../bible-slider3.png') type('image/png'));
+    }
+}

@@ -200,7 +200,7 @@
                    class="sd-qr-link">
                     <img src="{% url 'download-qr' %}"
                          alt="{% translate 'QR code for profile access' %}"
-                         class="sd-qr-img">
+                          class="sd-qr-img" loading="lazy" decoding="async">
                 </a>
                 <p class="sd-qr-hint sd-qr-hint--centered">
                     <i class="fas fa-download"></i> {% translate "Click the QR image to download it" %}
