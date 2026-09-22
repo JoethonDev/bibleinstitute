@@ -1407,9 +1407,10 @@
     animation: none;
 }
 
-/* The legacy body background is blue-gray. Keep the area below short pages in
-   the same Psalmodia surface as the admin pane instead of exposing a strip of
-   the old shell background. */
+/* The legacy document/body backgrounds are blue-gray. Keep the area below
+   short pages on the same Psalmodia surface as the admin pane instead of
+   exposing a strip of the old shell background. */
+html:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 /* Neutralize legacy fixed sidebar — use Psalmodia full-height sticky rail geometry */
