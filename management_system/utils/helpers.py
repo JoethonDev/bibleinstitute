@@ -133,6 +133,25 @@ def pagination_query_string(request, exclude=("page",)):
     return params.urlencode()
 
 
+def apply_table_sorting(queryset, request, sort_fields, default_sort):
+    """Apply a whitelisted, deterministic ordering to an admin table queryset."""
+    if not sort_fields or default_sort not in sort_fields:
+        return queryset, "", "asc"
+
+    sort_key = request.GET.get("sort", "")
+    if sort_key not in sort_fields:
+        sort_key = default_sort
+    direction = "desc" if request.GET.get("order") == "desc" else "asc"
+    fields = sort_fields[sort_key]
+    if isinstance(fields, str):
+        fields = (fields,)
+    prefix = "-" if direction == "desc" else ""
+    ordering = [f"{prefix}{field}" for field in fields]
+    if "pk" not in fields and "-pk" not in fields:
+        ordering.append("pk")
+    return queryset.order_by(*ordering), sort_key, direction
+
+
 def paginate_obj(request, obj, page_size=15):
     """
     Paginate a queryset or list of objects.
@@ -181,6 +200,17 @@ def render_dashboard(request, obj, view, context, parameters=[]):
         logger.warning(f"User: {user} attempted to access {view} dashboard")
         raise PermissionDenied
     
+    sort_fields = context.get("sort_fields", {})
+    if sort_fields:
+        obj, sort_key, sort_order = apply_table_sorting(
+            obj,
+            request,
+            sort_fields,
+            context.get("default_sort", next(iter(sort_fields), "")),
+        )
+        context["sort_key"] = sort_key
+        context["sort_order"] = sort_order
+
     # Paginate objects
     page_obj = paginate_obj(request, obj, context.get("page_size", 15))
 

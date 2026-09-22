@@ -11645,6 +11645,12 @@ msgstr "حالة الحضور"
 msgid "Each matrix cell represents one scheduled course meeting."
 msgstr "تمثل كل خلية في المصفوفة لقاءً واحدًا مجدولًا للمقرر."
 
+msgid "By"
+msgstr "بواسطة"
+
+msgid "Each meeting shows entrance, exit, scanner, and grade details."
+msgstr "يعرض كل لقاء تفاصيل الدخول والخروج والماسح والدرجة."
+
 msgid "Attendance matrix by student and meeting"
 msgstr "مصفوفة الحضور حسب الطالب واللقاء"
 

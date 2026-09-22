@@ -2297,6 +2297,7 @@ class Quiz(models.Model):
                 self.total_grade,
                 format_application_datetime(self.opening_date, "%H:%M:%S, %d/%m/%Y"),
                 format_application_datetime(self.closing_date, "%H:%M:%S, %d/%m/%Y"),
+                getattr(self, "submissions_count", 0),
             ],
             "url" : reverse_lazy("quiz-view", args=[self.pk,])
         }

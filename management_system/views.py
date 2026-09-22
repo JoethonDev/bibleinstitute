@@ -1404,30 +1404,25 @@ def user_dashboard(request):
         scope["role"],
     )
 
-    # Apply sorting
-    sort_by = request.GET.get('sort', 'joined_date')
-    order = request.GET.get('order', 'asc')
-    
-    # Simple explicit map for safety
-    column_mapping = {
-        'Username': 'username',
-        'First Name': 'first_name',
-        'Last Name': 'last_name',
-        'Email': 'email',
-        'Role': 'role__role',
-        'Joined Date': 'joined_date'
-    }
-    
-    model_sort_by = column_mapping.get(sort_by, sort_by)  
-    if order == 'desc':
-        users = users.order_by(f'-{model_sort_by}')
-    else:
-        users = users.order_by(model_sort_by)
-
     context = {
         "name_value" : scope["search"],
         "filtering" : scope["role_value"],
         "columns" : User.get_columns(),
+        "table_columns": [
+            {"label": _("Username"), "key": "username"},
+            {"label": _("Name"), "key": "name"},
+            {"label": _("Role"), "key": "role"},
+            {"label": _("Joined Date"), "key": "joined_date"},
+            {"label": _("Last Login"), "key": "last_login"},
+        ],
+        "sort_fields": {
+            "username": "username",
+            "name": ("last_name", "first_name"),
+            "role": "role__role",
+            "joined_date": "joined_date",
+            "last_login": "last_login",
+        },
+        "default_sort": "joined_date",
         "options" : [_('Choose Role'), *Role.get_readable_values()],
         "search_placeholder": _("Search username, email, name, phone, or national ID"),
         "table_scope": scope,
@@ -1852,12 +1847,24 @@ def course_dashboard(request):
         scope["level_value"],
     )
 
-    courses = courses.order_by("name")
 
     context = {
         "name_value" : scope["search"],
         "filtering" : scope["level_value"],
         "columns" : Course.get_columns(),
+        "table_columns": [
+            {"label": _("Name"), "key": "name"},
+            {"label": _("Description"), "key": "description"},
+            {"label": _("Level"), "key": "level"},
+            {"label": _("Instructor"), "key": "instructor"},
+        ],
+        "sort_fields": {
+            "name": "name",
+            "description": "description",
+            "level": "level__ordering",
+            "instructor": "instructor",
+        },
+        "default_sort": "name",
         "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
         "table_scope": scope,
     }
@@ -2061,12 +2068,25 @@ def lesson_dashboard(request):
         scope["offering"],
     )
 
-    lessons = lessons.order_by("name")
-
     context = {
         "name_value" : scope["search"],
         "course_value" : str(scope["offering"]) if scope["offering"] else "",
         "columns" : Lesson.get_columns(),
+        "table_columns": [
+            {"label": _("Name"), "key": "name"},
+            {"label": _("Course"), "key": "course"},
+            {"label": _("Level"), "key": "level"},
+            {"label": _("Academic Year"), "key": "academic_year"},
+            {"label": _("Last Updated"), "key": "updated_date"},
+        ],
+        "sort_fields": {
+            "name": "name",
+            "course": "course_offering__course__name",
+            "level": "course_offering__academic_year_level__level__ordering",
+            "academic_year": "course_offering__academic_year_level__academic_year__ordering",
+            "updated_date": "updated_date",
+        },
+        "default_sort": "name",
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
@@ -2958,7 +2978,7 @@ def quiz_dashboard(request):
         return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
 
     scope = content_scope(request, year_id=selected_year.pk)
-    quizzes = quiz_queryset(scope).select_related(
+    quizzes = quiz_queryset(scope).annotate(submissions_count=Count("grade", distinct=True)).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
         "course_offering__academic_year_level__academic_year",
@@ -2973,12 +2993,33 @@ def quiz_dashboard(request):
         scope["offering"],
     )
 
-    quizzes = quizzes.order_by("name")
-
     context = {
         "name_value" : scope["search"],
         "course_value" : str(scope["offering"]) if scope["offering"] else "",
         "columns" : Quiz.get_columns(),
+        "table_columns": [
+            {"label": _("Name"), "key": "name"},
+            {"label": _("Course"), "key": "course"},
+            {"label": _("Level"), "key": "level"},
+            {"label": _("Academic Year"), "key": "academic_year"},
+            {"label": _("Quiz Type"), "key": "quiz_type"},
+            {"label": _("Grades"), "key": "grades"},
+            {"label": _("Opening Date"), "key": "opening_date"},
+            {"label": _("Closing Date"), "key": "closing_date"},
+            {"label": _("Submissions"), "key": "submissions"},
+        ],
+        "sort_fields": {
+            "name": "name",
+            "course": "course_offering__course__name",
+            "level": "course_offering__academic_year_level__level__ordering",
+            "academic_year": "course_offering__academic_year_level__academic_year__ordering",
+            "quiz_type": "quiz_type__name_en",
+            "grades": "total_grade",
+            "opening_date": "opening_date",
+            "closing_date": "closing_date",
+            "submissions": "submissions_count",
+        },
+        "default_sort": "name",
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
@@ -3503,7 +3544,7 @@ def submission_dashboard(request, quiz_id):
 
     logger.info(f"User : {user} filters submissions using {name} username and grades range between ( {min_grade} , {max_grade} )")
 
-    grades = Grade.objects.filter(query).order_by("submitted_at")
+    grades = Grade.objects.filter(query).select_related("user").order_by("submitted_at")
 
     context = {
         "name_value" : name or "",
@@ -3511,6 +3552,17 @@ def submission_dashboard(request, quiz_id):
         "min_grade" : min_grade,
         "filtering" : year or "",
         "columns" : Grade.get_columns(),
+        "table_columns": [
+            {"label": _("Name"), "key": "name"},
+            {"label": _("Grades"), "key": "grades"},
+            {"label": _("Submission Date"), "key": "submitted_at"},
+        ],
+        "sort_fields": {
+            "name": "user__username",
+            "grades": "total_grade",
+            "submitted_at": "submitted_at",
+        },
+        "default_sort": "submitted_at",
         "options" : [_("Choose Academic Year"), *[str(value) for value in Grade.get_years(quiz_id)]], # Translate "Choose Academic Year"
         "submission_user" : True,
         "template_name" : "submission_dashboard.html",
@@ -6089,6 +6141,7 @@ def attendance_management(request):
         "matrix_rows": matrix_rows,
         "meetings": meetings,
         "meeting_count": len(meetings),
+        "matrix_column_count": (len(meetings) * 4) + 6,
         "student_count": page_obj.paginator.count,
         "policy": policy,
         "policy_form": AttendancePolicyForm(instance=policy),

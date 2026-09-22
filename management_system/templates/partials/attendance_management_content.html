@@ -20,8 +20,8 @@
          href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
          hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
          hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-        <span>{{ tab.name }}</span>
-        <small>{{ tab.student_count }} {% translate "Students" %}</small>
+         <span>{{ tab.name }}</span>
+         <small>{{ tab.student_count }} {% translate "Students" %}</small>
       </a>
     {% endfor %}
   </nav>
@@ -113,13 +113,49 @@
     <div class="grade-matrix-table-wrap attendance-matrix-table-wrap">
       <table class="ad-table grade-matrix-table attendance-matrix-table">
         <caption class="visually-hidden">{% translate "Attendance matrix by student and meeting" %}</caption>
-        <thead><tr class="grade-matrix-course-row"><th class="grade-matrix-identity" rowspan="2" scope="col">{% translate "Student" %}</th>{% for meeting in meetings %}<th scope="col" class="attendance-matrix-meeting-head"><span>{{ meeting.date|date:"d M" }}</span><small>{{ meeting.course_name }}</small></th>{% endfor %}<th scope="col" colspan="5" class="attendance-matrix-summary-head">{% translate "Summary" %}</th></tr><tr class="grade-matrix-quiz-row">{% for meeting in meetings %}<th scope="col" class="attendance-matrix-date-head">{{ meeting.date|date:"Y-m-d" }}</th>{% endfor %}<th scope="col">{% translate "Full" %}</th><th scope="col">{% translate "Partial" %}</th><th scope="col">{% translate "Incomplete" %}</th><th scope="col">{% translate "Absent" %}</th><th scope="col">{% translate "Score" %}</th></tr></thead>
+        <colgroup>
+          <col class="attendance-matrix-col-student">
+          {% for meeting in meetings %}<col class="attendance-matrix-col-time"><col class="attendance-matrix-col-time"><col class="attendance-matrix-col-by"><col class="attendance-matrix-col-grade">{% endfor %}
+          <col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary">
+        </colgroup>
+        <thead>
+          <tr class="grade-matrix-course-row">
+            <th class="grade-matrix-identity" rowspan="2" scope="col">{% translate "Student" %}</th>
+            {% for meeting in meetings %}
+              <th scope="col" colspan="4" class="attendance-matrix-meeting-head"><span>{{ meeting.date|date:"d M" }}</span><small>{{ meeting.date|date:"Y-m-d" }}</small><small>{{ meeting.course_name }}</small></th>
+            {% endfor %}
+            <th scope="col" colspan="5" class="attendance-matrix-summary-head">{% translate "Summary" %}</th>
+          </tr>
+          <tr class="grade-matrix-quiz-row">
+            {% for meeting in meetings %}<th scope="col">{% translate "Entrance" %}</th><th scope="col">{% translate "Exit" %}</th><th scope="col">{% translate "By" %}</th><th scope="col">{% translate "Grade" %}</th>{% endfor %}
+            <th scope="col">{% translate "Full" %}</th><th scope="col">{% translate "Partial" %}</th><th scope="col">{% translate "Incomplete" %}</th><th scope="col">{% translate "Absent" %}</th><th scope="col">{% translate "Score" %}</th>
+          </tr>
+        </thead>
         <tbody>
-          {% for row in matrix_rows %}<tr><th scope="row" class="grade-matrix-identity"><span class="grade-matrix-student-name">{{ row.student.get_full_name|default:row.student.username }}</span><span class="grade-matrix-student-meta">{{ row.student.username }} · #{{ row.student.pk }}</span></th>{% for cell in row.cells %}<td class="attendance-matrix-cell attendance-matrix-cell--{{ cell.status }}"><span class="attendance-matrix-grade">{{ cell.grade }}</span><span class="attendance-matrix-status">{{ cell.status_label }}</span>{% if cell.entrance or cell.exit %}<div class="attendance-matrix-scans">{% if cell.entrance %}<span>{% translate "Entrance" %}: {{ cell.entrance.scanned_at|date:"H:i:s" }} <small>{{ cell.entrance_source_label }}</small></span>{% endif %}{% if cell.exit %}<span>{% translate "Exit" %}: {{ cell.exit.scanned_at|date:"H:i:s" }} <small>{{ cell.exit_source_label }}</small></span>{% endif %}</div><div class="attendance-matrix-actions">{% if cell.entrance %}<a href="{% url 'attendance-correction' cell.entrance.pk %}" class="ad-action-btn" title="{% translate 'Correct entrance' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct entrance" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form>{% endif %}{% if cell.exit %}<a href="{% url 'attendance-correction' cell.exit.pk %}" class="ad-action-btn" title="{% translate 'Correct exit' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct exit" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form>{% endif %}</div>{% endif %}</td>{% endfor %}<td class="attendance-matrix-summary-cell">{{ row.full_days }}</td><td class="attendance-matrix-summary-cell">{{ row.partial_days }}</td><td class="attendance-matrix-summary-cell">{{ row.incomplete_days }}</td><td class="attendance-matrix-summary-cell">{{ row.absent_days }}</td><td class="attendance-matrix-summary-cell attendance-matrix-score">{{ row.score }}</td></tr>{% empty %}<tr><td colspan="{{ meeting_count|add:6 }}" class="ad-empty">{% translate "No students match the selected filters." %}</td></tr>{% endfor %}
+          {% for row in matrix_rows %}
+          <tr>
+            <th scope="row" class="grade-matrix-identity"><span class="grade-matrix-student-name">{{ row.student.get_full_name|default:row.student.username }}</span><span class="grade-matrix-student-meta">{{ row.student.username }} · #{{ row.student.pk }}</span></th>
+            {% for cell in row.cells %}
+              <td class="attendance-matrix-detail-cell attendance-matrix-cell--{{ cell.status }}">
+                {% if cell.entrance %}<span class="attendance-matrix-time">{{ cell.entrance.scanned_at|date:"H:i:s" }}</span><span class="attendance-matrix-source">{{ cell.entrance_source_label }}</span>{% else %}<span class="attendance-matrix-missing">—</span>{% endif %}
+                {% if cell.entrance %}<div class="attendance-matrix-actions"><a href="{% url 'attendance-correction' cell.entrance.pk %}" class="ad-action-btn" title="{% translate 'Correct entrance' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct entrance" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form></div>{% endif %}
+              </td>
+              <td class="attendance-matrix-detail-cell attendance-matrix-cell--{{ cell.status }}">
+                {% if cell.exit %}<span class="attendance-matrix-time">{{ cell.exit.scanned_at|date:"H:i:s" }}</span><span class="attendance-matrix-source">{{ cell.exit_source_label }}</span>{% else %}<span class="attendance-matrix-missing">—</span>{% endif %}
+                {% if cell.exit %}<div class="attendance-matrix-actions"><a href="{% url 'attendance-correction' cell.exit.pk %}" class="ad-action-btn" title="{% translate 'Correct exit' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct exit" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form></div>{% endif %}
+              </td>
+              <td class="attendance-matrix-by-cell attendance-matrix-cell--{{ cell.status }}"><span>{% if cell.entrance %}{% translate "Entrance" %}: {{ cell.entrance_by_label }}{% endif %}{% if cell.entrance and cell.exit %}<br>{% endif %}{% if cell.exit %}{% translate "Exit" %}: {{ cell.exit_by_label }}{% endif %}{% if not cell.entrance and not cell.exit %}—{% endif %}</span></td>
+              <td class="attendance-matrix-grade-cell attendance-matrix-cell--{{ cell.status }}"><span class="attendance-matrix-grade">{{ cell.grade }}</span><span class="attendance-matrix-status">{{ cell.status_label }}</span></td>
+            {% endfor %}
+            <td class="attendance-matrix-summary-cell">{{ row.full_days }}</td><td class="attendance-matrix-summary-cell">{{ row.partial_days }}</td><td class="attendance-matrix-summary-cell">{{ row.incomplete_days }}</td><td class="attendance-matrix-summary-cell">{{ row.absent_days }}</td><td class="attendance-matrix-summary-cell attendance-matrix-score">{{ row.score }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="{{ matrix_column_count }}" class="ad-empty">{% translate "No students match the selected filters." %}</td></tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>
-    <div class="grade-matrix-legend"><span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Complete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Partial" %} / {% translate "Incomplete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Absent" %}</span><span class="grade-matrix-legend-note">{% translate "The student name column stays fixed while the matrix scrolls." %}</span></div>
+    <div class="grade-matrix-legend"><span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Complete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Partial" %} / {% translate "Incomplete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Absent" %}</span><span class="grade-matrix-legend-note">{% translate "Each meeting shows entrance, exit, scanner, and grade details." %}</span></div>
     {% else %}<div class="ad-empty"><i class="fas fa-calendar-xmark" aria-hidden="true"></i><strong>{% translate "No scheduled meetings." %}</strong><span>{% translate "Choose a different date range or course." %}</span></div>{% endif %}
   </section>
 

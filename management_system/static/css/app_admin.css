@@ -1397,13 +1397,20 @@
 /* Force legacy admin-layout to use Psalmodia grid when it also has .ad-shell */
 .admin-layout.ad-shell {
     display: grid;
+    align-items: stretch;
     min-height: 100vh;
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    background: var(--ps-page-bg);
     opacity: 1;
     animation: none;
 }
+
+/* The legacy body background is blue-gray. Keep the area below short pages in
+   the same Psalmodia surface as the admin pane instead of exposing a strip of
+   the old shell background. */
+body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 /* Neutralize legacy fixed sidebar — use Psalmodia full-height sticky rail geometry */
 .admin-sidebar.ad-rail {
@@ -2066,16 +2073,28 @@
     margin-bottom: .9rem;
 }
 .attendance-matrix-table-wrap { max-height: 48rem; }
+.attendance-matrix-table {
+    table-layout: fixed;
+}
 .attendance-matrix-table th,
-.attendance-matrix-table td { min-width: 9.5rem; vertical-align: top; }
-.attendance-matrix-table .attendance-matrix-meeting-head { min-width: 10.5rem; white-space: normal; }
+.attendance-matrix-table td { min-width: 0; vertical-align: top; }
+.attendance-matrix-table .attendance-matrix-col-student { width: 15rem; }
+.attendance-matrix-table .attendance-matrix-col-time { width: 7.2rem; }
+.attendance-matrix-table .attendance-matrix-col-by { width: 9.5rem; }
+.attendance-matrix-table .attendance-matrix-col-grade { width: 6.8rem; }
+.attendance-matrix-table .attendance-matrix-col-summary { width: 5.4rem; }
+.attendance-matrix-table .attendance-matrix-meeting-head { min-width: 0; white-space: normal; }
 .attendance-matrix-meeting-head span,
 .attendance-matrix-meeting-head small,
 .attendance-matrix-date-head { display: block; }
-.attendance-matrix-meeting-head small { margin-top: .15rem; color: var(--ps-muted); font-size: .65rem; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.attendance-matrix-meeting-head small { margin-top: .15rem; color: var(--ps-muted); font-size: .62rem; font-weight: 650; letter-spacing: 0; line-height: 1.2; text-transform: none; }
+.attendance-matrix-meeting-head small + small { margin-top: .08rem; }
+.attendance-matrix-table thead .grade-matrix-quiz-row th { white-space: normal; line-height: 1.2; }
 .attendance-matrix-summary-head,
 .attendance-matrix-summary-cell { background: var(--ps-gold-soft) !important; color: var(--ps-gold-deep) !important; }
-.attendance-matrix-cell { min-width: 10.5rem; white-space: normal !important; }
+.attendance-matrix-detail-cell,
+.attendance-matrix-by-cell,
+.attendance-matrix-grade-cell { white-space: normal !important; }
 .attendance-matrix-cell--on_time { background: rgba(220, 241, 232, .68) !important; }
 .attendance-matrix-cell--late_entrance,
 .attendance-matrix-cell--early_exit,
@@ -2084,9 +2103,11 @@
 .attendance-matrix-cell--absent { background: rgba(245, 238, 232, .82) !important; }
 .attendance-matrix-grade { display: block; color: var(--ps-ink); font-size: .92rem; font-weight: 800; }
 .attendance-matrix-status { display: block; margin-top: .1rem; color: var(--ps-muted); font-size: .64rem; font-weight: 700; line-height: 1.25; }
-.attendance-matrix-scans { display: grid; gap: .12rem; margin-top: .35rem; color: var(--ps-ink); font-size: .65rem; line-height: 1.35; }
-.attendance-matrix-scans span { display: block; }
-.attendance-matrix-scans small { color: var(--ps-muted); font-size: .6rem; }
+.attendance-matrix-time { display: block; color: var(--ps-ink); font-size: .72rem; font-weight: 800; direction: ltr; text-align: center; }
+.attendance-matrix-source { display: block; margin-top: .12rem; color: var(--ps-muted); font-size: .58rem; line-height: 1.2; }
+.attendance-matrix-by-cell { color: var(--ps-ink); font-size: .64rem; line-height: 1.35; }
+.attendance-matrix-by-cell span { display: block; overflow-wrap: anywhere; }
+.attendance-matrix-missing { color: var(--ps-muted); font-weight: 700; }
 .attendance-matrix-actions { display: flex; align-items: center; gap: .2rem; margin-top: .35rem; }
 .attendance-matrix-actions .ad-action-btn { width: 1.65rem; height: 1.65rem; min-width: 1.65rem; padding: 0; }
 .attendance-matrix-score { font-weight: 800; }

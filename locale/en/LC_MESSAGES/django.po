@@ -11369,6 +11369,12 @@ msgstr "Attendance status"
 msgid "Each matrix cell represents one scheduled course meeting."
 msgstr "Each matrix cell represents one scheduled course meeting."
 
+msgid "By"
+msgstr "By"
+
+msgid "Each meeting shows entrance, exit, scanner, and grade details."
+msgstr "Each meeting shows entrance, exit, scanner, and grade details."
+
 msgid "Attendance matrix by student and meeting"
 msgstr "Attendance matrix by student and meeting"
 

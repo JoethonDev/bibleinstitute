@@ -111,6 +111,15 @@ def _record_source_label(record: AttendanceRecord | None) -> str:
     return str(dict(AttendanceRecord.Source.choices).get(record.source, record.source))
 
 
+def _record_by_label(record: AttendanceRecord | None) -> str:
+    if record is None:
+        return "—"
+    actor = getattr(record, "scanned_by", None)
+    if getattr(record, "scanned_by_id", None) and actor:
+        return actor.get_full_name() or actor.username
+    return _record_source_label(record)
+
+
 def attendance_matrix_page(
     page: Page,
     meetings: list[dict[str, Any]],
@@ -170,6 +179,8 @@ def attendance_matrix_page(
                 "grade": day.grade,
                 "entrance_source_label": _record_source_label(pair.get("entrance")),
                 "exit_source_label": _record_source_label(pair.get("exit")),
+                "entrance_by_label": _record_by_label(pair.get("entrance")),
+                "exit_by_label": _record_by_label(pair.get("exit")),
             })
         rows.append({
             "student": student,

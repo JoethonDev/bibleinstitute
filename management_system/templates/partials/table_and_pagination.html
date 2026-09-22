@@ -13,7 +13,7 @@
 {% else %}
 <div x-data="{
         ...tableManager(),
-        columns: [{% for col in columns %}{ name: '{{ col|escapejs }}', visible: true }{% if not forloop.last %},{% endif %}{% endfor %}],
+        columns: [{% if table_columns %}{% for col in table_columns %}{ name: '{{ col.label|escapejs }}', visible: true }{% if not forloop.last %},{% endif %}{% endfor %}{% else %}{% for col in columns %}{ name: '{{ col|escapejs }}', visible: true }{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}],
         viewKey: '{{ view|default:'default'|escapejs }}',
          bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}',
         selectionToken: '{{ bulk_selection_token|default:''|escapejs }}',
@@ -107,6 +107,25 @@
                                @change="toggleAll($event)"
                                :checked="selectAll">
                     </th>
+                    {% if table_columns %}
+                    {% for col in table_columns %}
+                    <th class="sortable-column"
+                        x-show="columns[{{ forloop.counter0 }}].visible"
+                         hx-get="{{ url }}?{% if sort_query %}{{ sort_query }}&{% endif %}sort={{ col.key|urlencode }}&order={% if sort_key == col.key and sort_order == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#table-container"
+                        hx-push-url="true"
+                        hx-indicator="#table-loading"
+                        role="button"
+                        tabindex="0">
+                        <span>{{ col.label }}</span>
+                        {% if sort_key == col.key %}
+                            <i class="fas fa-sort-{{ sort_order|default:'asc' }} ms-1"></i>
+                        {% else %}
+                            <i class="fas fa-sort text-muted ms-1 sort-icon"></i>
+                        {% endif %}
+                    </th>
+                    {% endfor %}
+                    {% else %}
                     {% for col in columns %}
                     <th class="sortable-column"
                         x-show="columns[{{ forloop.counter0 }}].visible"
@@ -124,6 +143,7 @@
                         {% endif %}
                     </th>
                     {% endfor %}
+                    {% endif %}
                     <th class="column-actions text-center">
                         {% translate "Actions" %}
                     </th>
@@ -271,7 +291,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if submission_view %}{{ columns|length|add:3 }}{% else %}{{ columns|length|add:2 }}{% endif %}" class="ad-empty">
+                    <td colspan="{% if submission_view %}{% if table_columns %}{{ table_columns|length|add:3 }}{% else %}{{ columns|length|add:3 }}{% endif %}{% else %}{% if table_columns %}{{ table_columns|length|add:2 }}{% else %}{{ columns|length|add:2 }}{% endif %}{% endif %}" class="ad-empty">
                         {% translate "No Data Available" as table_empty_title %}
                         {% translate "No records found matching your criteria." as table_empty_desc %}
                         {% include "partials/empty_state.html" with icon="fa-inbox" title=table_empty_title description=table_empty_desc %}
