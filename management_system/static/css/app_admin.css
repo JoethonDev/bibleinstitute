@@ -1436,7 +1436,9 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     margin-inline-start: 0;
     padding: 1rem 1.5rem 2rem;
     background: var(--ps-page-bg);
-    min-height: 100vh;
+    /* The outer shell provides viewport coverage; short pages should size to content. */
+    align-self: start;
+    min-height: auto;
     width: 100%;
     max-width: 100%;
     min-width: 0;
