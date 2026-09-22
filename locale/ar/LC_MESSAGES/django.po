@@ -3809,6 +3809,22 @@ msgstr "التقويم"
 msgid "Academic year"
 msgstr "السنة الدراسية"
 
+#: .\management_system\templates\partials\attendance_management_content.html:74
+msgid "From date"
+msgstr "من تاريخ"
+
+#: .\management_system\templates\partials\attendance_management_content.html:78
+msgid "To date"
+msgstr "إلى تاريخ"
+
+#: .\management_system\templates\partials\attendance_management_content.html:150
+msgid "Entrance source"
+msgstr "مصدر الدخول"
+
+#: .\management_system\templates\partials\attendance_management_content.html:152
+msgid "Exit source"
+msgstr "مصدر الخروج"
+
 #: .\management_system\templates\attendance_management.html:21
 msgid "All years"
 msgstr "كل السنوات"
@@ -3892,6 +3908,9 @@ msgstr "اختر تصفية لتحميل النتائج"
 #: .\management_system\templates\attendance_management.html:158
 msgid "Select an academic year to view attendance records."
 msgstr "اختر سنة دراسية لعرض سجلات الحضور."
+
+msgid "Select a date range to view attendance records."
+msgstr "اختر نطاقًا زمنيًا لعرض سجلات الحضور."
 
 #: .\management_system\templates\base.html:11
 #: .\management_system\templates\base.html:19
@@ -11547,6 +11566,9 @@ msgstr "لم يتم المسح"
 
 msgid "Enter a valid date."
 msgstr "أدخل تاريخًا صحيحًا."
+
+msgid "Enter a valid date range."
+msgstr "أدخل نطاقًا زمنيًا صحيحًا."
 
 msgid "No scheduled meeting was found for this date in the selected scope."
 msgstr "لم يُعثر على لقاء مجدول لهذا التاريخ في النطاق المحدد."

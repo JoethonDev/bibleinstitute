@@ -6,8 +6,9 @@ from decimal import Decimal
 import zoneinfo
 
 from django.conf import settings
-from django.db import transaction
-from django.db.models import Count, Exists, OuterRef, Q, TextChoices
+from django.core.paginator import Paginator
+from django.db import connection, transaction
+from django.db.models import Exists, OuterRef, TextChoices
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -17,9 +18,13 @@ from ..models import (
     AcademicYearLevelMeeting,
     AttendancePolicy,
     AttendanceRecord,
+    Course,
+    CourseOffering,
     Enrollment,
     Lesson,
+    Level,
     PublicationStatus,
+    Role,
     User,
 )
 
@@ -118,91 +123,210 @@ def merge_attendance_pairs(pairs: dict) -> dict:
     return merged
 
 
-def attendance_scope_query(*, academic_year_id, level_id=None, offering_id=None) -> Q:
-    """Return the record scope for one management attendance filter set."""
-    if offering_id:
-        return Q(course_offering_id=offering_id)
-
-    offering_scope = Q(course_offering__academic_year_level__academic_year_id=academic_year_id)
-    unassigned_scope = Q(
-        course_offering__isnull=True,
-        student__enrollments__academic_year_level__academic_year_id=academic_year_id,
-        student__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
-        student__enrollments__enrollment_type=Enrollment.Type.NORMAL,
-    )
-    if level_id:
-        offering_scope &= Q(course_offering__academic_year_level__level_id=level_id)
-        unassigned_scope &= Q(student__enrollments__academic_year_level__level_id=level_id)
-    return offering_scope | unassigned_scope
-
-
-def offline_attendance_students(*, academic_year_id, level_id=None, offering_scope_id=None):
-    """Return the eligible offline students for a year/level attendance roster."""
-    enrollments = Q(
-        enrollments__academic_year_level__academic_year_id=academic_year_id,
-        enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
-        enrollments__enrollment_type=Enrollment.Type.NORMAL,
-    )
-    if offering_scope_id:
-        enrollments &= Q(enrollments__academic_year_level_id=offering_scope_id)
-    elif level_id:
-        enrollments &= Q(enrollments__academic_year_level__level_id=level_id)
-    return User.objects.filter(
-        role__role="student",
-        application_status="active",
-        study_mode="offline",
-    ).filter(enrollments).distinct()
-
-
-def annotate_daily_attendance_students(
-    students,
+def attendance_roster_page(
     *,
-    academic_year_id,
-    level_id=None,
-    offering_id=None,
-    source=None,
-    attendance_date,
+    academic_year_id: int,
+    starts_on,
+    ends_on,
+    level_id: int | None = None,
+    offering_id: int | None = None,
+    student_search: str = "",
+    action: str = "",
+    source: str = "",
+    scan_status: str = "",
+    page_number: int = 1,
+    per_page: int = 25,
+    policy: AttendancePolicy,
 ):
-    """Annotate a bounded roster with whether each student has entrance/exit scans."""
-    record_scope = attendance_scope_query(
-        academic_year_id=academic_year_id,
-        level_id=level_id,
-        offering_id=offering_id,
-    )
-    entrance = AttendanceRecord.objects.filter(
-        student_id=OuterRef("pk"),
-        attendance_date=attendance_date,
-        action=AttendanceRecord.Action.ENTRANCE,
-    ).filter(record_scope)
-    exit_records = AttendanceRecord.objects.filter(
-        student_id=OuterRef("pk"),
-        attendance_date=attendance_date,
-        action=AttendanceRecord.Action.EXIT,
-    ).filter(record_scope)
+    """Return one SQL-paginated row per eligible student and calendar meeting.
+
+    Calendar meetings define the attendance days. Offline normal enrollments
+    provide the roster, while both attendance actions are optional left joins
+    so absent students remain visible without materializing a cross-product in
+    Python.
+    """
+    quote_name = connection.ops.quote_name
+    tables = {
+        "meeting": quote_name(AcademicYearLevelMeeting._meta.db_table),
+        "scope": quote_name(AcademicYearLevel._meta.db_table),
+        "level": quote_name(Level._meta.db_table),
+        "offering": quote_name(CourseOffering._meta.db_table),
+        "course": quote_name(Course._meta.db_table),
+        "enrollment": quote_name(Enrollment._meta.db_table),
+        "user": quote_name(User._meta.db_table),
+        "role": quote_name(Role._meta.db_table),
+        "record": quote_name(AttendanceRecord._meta.db_table),
+    }
+
+    meeting_source_filter = ""
     if source:
-        entrance = entrance.filter(source=source)
-        exit_records = exit_records.filter(source=source)
-    return students.annotate(
-        has_entrance_scan=Exists(entrance),
-        has_exit_scan=Exists(exit_records),
-    )
+        meeting_source_filter = " AND {alias}.source = %s"
 
+    student_filter = ""
+    if student_search:
+        student_filter = """
+            AND (
+                lms_arabic_search_normalize(u.username) LIKE %s
+                OR lms_arabic_search_normalize(u.first_name) LIKE %s
+                OR lms_arabic_search_normalize(u.last_name) LIKE %s
+                OR lms_arabic_search_normalize(u.email) LIKE %s
+            )
+        """
+    scope_filter = ""
+    if level_id:
+        scope_filter += " AND ayl.level_id = %s"
+    if offering_id:
+        scope_filter += " AND m.course_offering_id = %s"
 
-def daily_attendance_summary(students) -> dict[str, int]:
-    """Aggregate roster coverage without materializing the student population."""
-    counts = students.aggregate(
-        total_offline=Count("pk"),
-        entrance=Count("pk", filter=Q(has_entrance_scan=True)),
-        exit=Count("pk", filter=Q(has_exit_scan=True)),
-        complete=Count("pk", filter=Q(has_entrance_scan=True, has_exit_scan=True)),
-        scanned=Count(
-            "pk",
-            filter=Q(has_entrance_scan=True) | Q(has_exit_scan=True),
-        ),
-    )
-    counts["not_scanned"] = counts["total_offline"] - counts["scanned"]
-    counts["incomplete"] = counts["scanned"] - counts["complete"]
-    return counts
+    base_sql = f"""
+        WITH roster AS (
+            SELECT
+                m.id AS meeting_id,
+                m.meeting_date,
+                ayl.id AS scope_id,
+                lvl.id AS level_id,
+                lvl.display_name AS level_name,
+                co.id AS offering_id,
+                c.name AS course_name,
+                u.id AS student_id,
+                u.username,
+                u.first_name,
+                u.last_name,
+                er.id AS entrance_id,
+                er.scanned_at AS entrance_scanned_at,
+                er.source AS entrance_source,
+                er.scanned_by_id AS entrance_scanned_by_id,
+                er.corrected_at AS entrance_corrected_at,
+                eu.username AS entrance_scanned_by_username,
+                eu.first_name AS entrance_scanned_by_first_name,
+                eu.last_name AS entrance_scanned_by_last_name,
+                xr.id AS exit_id,
+                xr.scanned_at AS exit_scanned_at,
+                xr.source AS exit_source,
+                xr.scanned_by_id AS exit_scanned_by_id,
+                xr.corrected_at AS exit_corrected_at,
+                xu.username AS exit_scanned_by_username,
+                xu.first_name AS exit_scanned_by_first_name,
+                xu.last_name AS exit_scanned_by_last_name
+            FROM {tables['meeting']} m
+            JOIN {tables['scope']} ayl ON ayl.id = m.academic_year_level_id
+            JOIN {tables['level']} lvl ON lvl.id = ayl.level_id
+            JOIN {tables['offering']} co ON co.id = m.course_offering_id
+            JOIN {tables['course']} c ON c.id = co.course_id
+            JOIN {tables['enrollment']} en
+              ON en.academic_year_level_id = m.academic_year_level_id
+             AND en.enrollment_type = %s
+             AND en.status IN (%s, %s)
+             AND en.course_offering_id IS NULL
+            JOIN {tables['user']} u ON u.id = en.student_id
+            JOIN {tables['role']} role ON role.id = u.role_id AND role.role = %s
+            LEFT JOIN {tables['record']} er
+              ON er.student_id = u.id
+             AND er.course_offering_id = m.course_offering_id
+             AND er.attendance_date = m.meeting_date
+             AND er.action = %s
+             {meeting_source_filter.format(alias='er')}
+            LEFT JOIN {tables['user']} eu ON eu.id = er.scanned_by_id
+            LEFT JOIN {tables['record']} xr
+              ON xr.student_id = u.id
+             AND xr.course_offering_id = m.course_offering_id
+             AND xr.attendance_date = m.meeting_date
+             AND xr.action = %s
+             {meeting_source_filter.format(alias='xr')}
+            LEFT JOIN {tables['user']} xu ON xu.id = xr.scanned_by_id
+            WHERE ayl.academic_year_id = %s
+              AND m.meeting_date BETWEEN %s AND %s
+              AND u.study_mode = %s
+              AND u.application_status = %s
+              {scope_filter}
+              {student_filter}
+            GROUP BY
+                m.id, m.meeting_date, ayl.id, lvl.id, lvl.display_name,
+                co.id, c.name, u.id, u.username, u.first_name, u.last_name,
+                er.id, er.scanned_at, er.source, er.scanned_by_id,
+                er.corrected_at, eu.username, eu.first_name, eu.last_name,
+                xr.id, xr.scanned_at, xr.source, xr.scanned_by_id,
+                xr.corrected_at, xu.username, xu.first_name, xu.last_name
+        )
+        SELECT * FROM roster
+    """
+
+    # The SQL text order is: enrollment type/status, role, record actions and
+    # optional source filters, then year/date/study/application filters.
+    sql_params = [
+        "normal", "active", "completed", "student",
+        AttendanceRecord.Action.ENTRANCE,
+    ]
+    if source:
+        sql_params.append(source)
+    sql_params.append(AttendanceRecord.Action.EXIT)
+    if source:
+        sql_params.append(source)
+    sql_params.extend([academic_year_id, starts_on, ends_on, "offline", "active"])
+    if level_id:
+        sql_params.append(level_id)
+    if offering_id:
+        sql_params.append(offering_id)
+    if student_search:
+        sql_params.extend([f"%{student_search}%"] * 4)
+
+    where = []
+    if action == AttendanceRecord.Action.ENTRANCE:
+        where.append("entrance_id IS NOT NULL")
+    elif action == AttendanceRecord.Action.EXIT:
+        where.append("exit_id IS NOT NULL")
+    if scan_status in {"scanned", "not_scanned", "complete", "incomplete", "absent"}:
+        if scan_status == "scanned":
+            where.append("(entrance_id IS NOT NULL OR exit_id IS NOT NULL)")
+        elif scan_status in {"not_scanned", "absent"}:
+            where.append("entrance_id IS NULL AND exit_id IS NULL")
+        elif scan_status == "complete":
+            where.append("entrance_id IS NOT NULL AND exit_id IS NOT NULL")
+        else:
+            where.append("(entrance_id IS NOT NULL) <> (exit_id IS NOT NULL)")
+    if where:
+        base_sql += " WHERE " + " AND ".join(where)
+
+    try:
+        page_number = int(page_number)
+    except (TypeError, ValueError):
+        page_number = 1
+
+    with connection.cursor() as cursor:
+        cursor.execute(f"SELECT COUNT(*) FROM ({base_sql}) attendance_roster", sql_params)
+        total = cursor.fetchone()[0]
+        offset = max(page_number - 1, 0) * per_page
+        cursor.execute(
+            base_sql + " ORDER BY meeting_date DESC, level_name, course_name, last_name, first_name, username, student_id LIMIT %s OFFSET %s",
+            [*sql_params, per_page, offset],
+        )
+        columns = [column[0] for column in cursor.description]
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    source_labels = dict(AttendanceRecord.Source.choices)
+    for row in rows:
+        entrance = (
+            {"source": row["entrance_source"], "scanned_at": row["entrance_scanned_at"]}
+            if row["entrance_id"] else None
+        )
+        exit_record = (
+            {"source": row["exit_source"], "scanned_at": row["exit_scanned_at"]}
+            if row["exit_id"] else None
+        )
+        day = grade_attendance_day(entrance, exit_record, policy)
+        row.update({
+            "day_grade": day.grade,
+            "day_status": day.status,
+            "day_status_label": AttendanceDayStatus(day.status).label,
+            "entrance_source_label": source_labels.get(row["entrance_source"], "—"),
+            "exit_source_label": source_labels.get(row["exit_source"], "—"),
+        })
+
+    paginator = Paginator([], per_page)
+    paginator.count = total
+    page = paginator.get_page(max(page_number, 1))
+    page.object_list = rows
+    return page
 
 
 def attendance_scores_for_students(

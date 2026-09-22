@@ -1052,13 +1052,15 @@ main:has(.sd-page) {
     transition: border-color var(--ps-motion), box-shadow var(--ps-motion);
 }
 
-.sd-opt.is-checked {
+.sd-opt.is-checked,
+.sd-opt:has(> input[type="radio"]:checked) {
     border-color: var(--ps-gold);
     background: var(--ps-gold-soft);
     box-shadow: inset 0 0 0 1px var(--ps-gold);
 }
 
-.sd-opt.is-checked .sd-opt-dot {
+.sd-opt.is-checked .sd-opt-dot,
+.sd-opt:has(> input[type="radio"]:checked) .sd-opt-dot {
     border-color: var(--ps-gold-deep);
     box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 6px var(--ps-gold-deep);
 }

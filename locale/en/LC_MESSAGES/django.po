@@ -3859,6 +3859,22 @@ msgstr "Calendar"
 msgid "Academic year"
 msgstr "Academic year"
 
+#: .\management_system\templates\partials\attendance_management_content.html:74
+msgid "From date"
+msgstr "From date"
+
+#: .\management_system\templates\partials\attendance_management_content.html:78
+msgid "To date"
+msgstr "To date"
+
+#: .\management_system\templates\partials\attendance_management_content.html:150
+msgid "Entrance source"
+msgstr "Entrance source"
+
+#: .\management_system\templates\partials\attendance_management_content.html:152
+msgid "Exit source"
+msgstr "Exit source"
+
 #: .\management_system\templates\attendance_management.html:21
 msgid "All years"
 msgstr "All years"
@@ -3942,6 +3958,9 @@ msgstr "Choose a filter to load results"
 #: .\management_system\templates\attendance_management.html:158
 msgid "Select an academic year to view attendance records."
 msgstr "Select an academic year to view attendance records."
+
+msgid "Select a date range to view attendance records."
+msgstr "Select a date range to view attendance records."
 
 #: .\management_system\templates\base.html:11
 #: .\management_system\templates\base.html:19
@@ -11271,6 +11290,9 @@ msgstr "Not scanned"
 
 msgid "Enter a valid date."
 msgstr "Enter a valid date."
+
+msgid "Enter a valid date range."
+msgstr "Enter a valid date range."
 
 msgid "No scheduled meeting was found for this date in the selected scope."
 msgstr "No scheduled meeting was found for this date in the selected scope."
