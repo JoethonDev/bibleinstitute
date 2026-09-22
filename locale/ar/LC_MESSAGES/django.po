@@ -11629,3 +11629,36 @@ msgstr "صفحات كشف الحضور اليومي"
 
 msgid "No students match the selected roster filters."
 msgstr "لا يوجد طلاب يطابقون مرشحات كشف الحضور المحددة."
+
+msgid "Attendance matrix"
+msgstr "مصفوفة الحضور"
+
+msgid "Review attendance by student, scheduled meeting, and course."
+msgstr "مراجعة الحضور حسب الطالب واللقاء المجدول والمقرر."
+
+msgid "Attendance filters"
+msgstr "مرشحات الحضور"
+
+msgid "Attendance status"
+msgstr "حالة الحضور"
+
+msgid "Each matrix cell represents one scheduled course meeting."
+msgstr "تمثل كل خلية في المصفوفة لقاءً واحدًا مجدولًا للمقرر."
+
+msgid "Attendance matrix by student and meeting"
+msgstr "مصفوفة الحضور حسب الطالب واللقاء"
+
+msgid "Choose a different date range or course."
+msgstr "اختر نطاقًا زمنيًا أو مقررًا مختلفًا."
+
+msgid "Attendance matrix pagination"
+msgstr "صفحات مصفوفة الحضور"
+
+msgid "Correct entrance"
+msgstr "تصحيح الدخول"
+
+msgid "Correct exit"
+msgstr "تصحيح الخروج"
+
+msgid "Full"
+msgstr "كامل"

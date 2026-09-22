@@ -2056,6 +2056,45 @@
     .grade-matrix-legend-note { margin-inline-start: 0; width: 100%; }
 }
 
+/* ---------------- Attendance matrix ---------------- */
+.attendance-matrix-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    flex-wrap: wrap;
+    padding: .75rem 1rem;
+    margin-bottom: .9rem;
+}
+.attendance-matrix-table-wrap { max-height: 48rem; }
+.attendance-matrix-table th,
+.attendance-matrix-table td { min-width: 9.5rem; vertical-align: top; }
+.attendance-matrix-table .attendance-matrix-meeting-head { min-width: 10.5rem; white-space: normal; }
+.attendance-matrix-meeting-head span,
+.attendance-matrix-meeting-head small,
+.attendance-matrix-date-head { display: block; }
+.attendance-matrix-meeting-head small { margin-top: .15rem; color: var(--ps-muted); font-size: .65rem; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.attendance-matrix-summary-head,
+.attendance-matrix-summary-cell { background: var(--ps-gold-soft) !important; color: var(--ps-gold-deep) !important; }
+.attendance-matrix-cell { min-width: 10.5rem; white-space: normal !important; }
+.attendance-matrix-cell--on_time { background: rgba(220, 241, 232, .68) !important; }
+.attendance-matrix-cell--late_entrance,
+.attendance-matrix-cell--early_exit,
+.attendance-matrix-cell--late_and_early,
+.attendance-matrix-cell--incomplete { background: rgba(251, 241, 223, .78) !important; }
+.attendance-matrix-cell--absent { background: rgba(245, 238, 232, .82) !important; }
+.attendance-matrix-grade { display: block; color: var(--ps-ink); font-size: .92rem; font-weight: 800; }
+.attendance-matrix-status { display: block; margin-top: .1rem; color: var(--ps-muted); font-size: .64rem; font-weight: 700; line-height: 1.25; }
+.attendance-matrix-scans { display: grid; gap: .12rem; margin-top: .35rem; color: var(--ps-ink); font-size: .65rem; line-height: 1.35; }
+.attendance-matrix-scans span { display: block; }
+.attendance-matrix-scans small { color: var(--ps-muted); font-size: .6rem; }
+.attendance-matrix-actions { display: flex; align-items: center; gap: .2rem; margin-top: .35rem; }
+.attendance-matrix-actions .ad-action-btn { width: 1.65rem; height: 1.65rem; min-width: 1.65rem; padding: 0; }
+.attendance-matrix-score { font-weight: 800; }
+
+@media (max-width: 900px) {
+    .attendance-matrix-student-filter { grid-column: 1 / -1; }
+}
+
 /* ---------------- Dense table variant (transcripts) ---------------- */
 .ad-table--dense th,
 .ad-table--dense td { padding: .4rem .6rem; font-size: .82rem; white-space: nowrap; }

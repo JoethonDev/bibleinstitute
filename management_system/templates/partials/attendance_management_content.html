@@ -1,234 +1,128 @@
 {% load i18n %}
-<div id="content" class="container-fluid py-3 ad-page">
-  <div class="ad-pane-head mb-4">
-    <h3 class="ad-pane-title mb-0">{% translate "Attendance Records" %}<span id="attendance-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h3>
-    <p class="ad-pane-desc">{% translate "Attendance" %}</p>
-    <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'scanner' %}" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-qrcode me-1"></i>{% translate "Scanner" %}</a>
-      <a href="{% url 'calendar-management' %}" class="ad-btn ad-btn--ghost ad-btn--sm"><i class="fas fa-calendar-days me-1"></i>{% translate "Calendar" %}</a>
-      {% if can_manage_policy %}
-      <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-policy-panel" aria-expanded="false" aria-controls="attendance-policy-panel"><i class="fas fa-sliders me-1"></i>{% translate "Attendance settings" %}</button>
-      {% if selected_date %}
-      <form method="post" action="{% url 'attendance-reconcile' %}" hx-post="{% url 'attendance-reconcile' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Reconcile missing exits for this date?' %}">
-        {% csrf_token %}
-        <input type="hidden" name="date" value="{% if selected_date %}{{ selected_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
-        <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-clock-rotate-left me-1"></i>{% translate "Reconcile missing exits" %}</button>
-      </form>
-      {% endif %}
-      {% endif %}
+<div class="container-fluid py-3 ad-page attendance-matrix-page" id="content">
+  <div class="grade-matrix-header">
+    <div>
+      <div class="ad-kicker"><i class="fas fa-calendar-check"></i> {% translate "Attendance" %}</div>
+      <h3 class="ad-title mb-2">{% translate "Attendance matrix" %}</h3>
+      <p class="ad-lede mb-0">{% translate "Review attendance by student, scheduled meeting, and course." %}</p>
+    </div>
+    <div class="grade-matrix-actions">
+      <a href="{% url 'scanner' %}" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-qrcode" aria-hidden="true"></i> {% translate "Scanner" %}</a>
+      <a href="{% url 'calendar-management' %}" class="ad-btn ad-btn--ghost ad-btn--sm"><i class="fas fa-calendar-days" aria-hidden="true"></i> {% translate "Calendar" %}</a>
+      <span id="attendance-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
     </div>
   </div>
 
+  <nav class="grade-matrix-level-tabs ad-card" role="tablist" aria-label="{% translate 'Academic level' %}">
+    {% for tab in level_tabs %}
+      <a class="grade-matrix-level-tab{% if tab.selected %} is-active{% endif %}"
+         role="tab" aria-selected="{{ tab.selected|yesno:'true,false' }}"
+         href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
+         hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
+         hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+        <span>{{ tab.name }}</span>
+        <small>{{ tab.student_count }} {% translate "Students" %}</small>
+      </a>
+    {% endfor %}
+  </nav>
+
   {% if can_manage_policy %}
+  <div class="attendance-matrix-toolbar ad-card">
+    <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-policy-panel" aria-expanded="false" aria-controls="attendance-policy-panel"><i class="fas fa-sliders" aria-hidden="true"></i> {% translate "Attendance settings" %}</button>
+    {% if selected_date %}
+    <form method="post" action="{% url 'attendance-reconcile' %}" hx-post="{% url 'attendance-reconcile' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Reconcile missing exits for this date?' %}">
+      {% csrf_token %}
+      <input type="hidden" name="date" value="{{ selected_date }}">
+      <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> {% translate "Reconcile missing exits" %}</button>
+    </form>
+    {% endif %}
+  </div>
   <div class="collapse" id="attendance-policy-panel">
-    <div class="ad-card mb-4">
+    <div class="ad-card mb-3">
       <div class="ad-card-body">
         <form method="post" action="{% url 'attendance-policy-save' %}" hx-post="{% url 'attendance-policy-save' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true">
           {% csrf_token %}
           <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-3">
-              <label class="form-label" for="{{ policy_form.entrance_deadline.id_for_label }}">{{ policy_form.entrance_deadline.label }}</label>
-              {{ policy_form.entrance_deadline }}
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label" for="{{ policy_form.exit_time.id_for_label }}">{{ policy_form.exit_time.label }}</label>
-              {{ policy_form.exit_time }}
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label" for="{{ policy_form.buffer_minutes.id_for_label }}">{{ policy_form.buffer_minutes.label }}</label>
-              {{ policy_form.buffer_minutes }}
-            </div>
+            <div class="col-12 col-md-3"><label class="form-label" for="{{ policy_form.entrance_deadline.id_for_label }}">{{ policy_form.entrance_deadline.label }}</label>{{ policy_form.entrance_deadline }}</div>
+            <div class="col-12 col-md-3"><label class="form-label" for="{{ policy_form.exit_time.id_for_label }}">{{ policy_form.exit_time.label }}</label>{{ policy_form.exit_time }}</div>
+            <div class="col-12 col-md-3"><label class="form-label" for="{{ policy_form.buffer_minutes.id_for_label }}">{{ policy_form.buffer_minutes.label }}</label>{{ policy_form.buffer_minutes }}</div>
           </div>
           <p class="form-text mt-3 mb-0">{% blocktranslate with limit=policy.entrance_limit|time:"H:i" earliest=policy.exit_earliest|time:"H:i" buffer=policy.buffer_minutes %}Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits.{% endblocktranslate %}</p>
-          <div class="mt-3">
-            <button type="submit" class="ad-btn ad-btn--teal">{% translate "Save settings" %}</button>
-          </div>
+          <button type="submit" class="ad-btn ad-btn--teal mt-3">{% translate "Save settings" %}</button>
         </form>
       </div>
     </div>
   </div>
   {% endif %}
 
-  <div class="ad-card mb-4">
-    <div class="ad-card-body">
-      <form method="get" class="row g-3 align-items-end mb-4" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#attendance-loading">
-        <div class="col-12 col-md-5 col-lg-4">
-          <label for="academic-year" class="form-label">{% translate "Academic year" %}</label>
-          <select id="academic-year" name="academic_year" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-            <option value="">{% translate "All years" %}</option>
-            {% for y in years %}
-              <option value="{{ y.id }}" {% if selected_year == y.id %}selected{% endif %}>{{ y }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12 col-md-4 col-lg-3">
-          <label for="level" class="form-label">{% translate "Level" %}</label>
-          <select id="level" name="level" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-            <option value="">{% translate "All levels" %}</option>
-            {% for level in levels %}
-              <option value="{{ level.id }}" {% if selected_level == level.id %}selected{% endif %}>{{ level.display_name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12 col-md-4 col-lg-2">
-          <label for="date-from" class="form-label">{% translate "From date" %}</label>
-          <input id="date-from" name="date_from" type="date" value="{{ selected_date_from }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-        </div>
-        <div class="col-12 col-md-4 col-lg-2">
-          <label for="date-to" class="form-label">{% translate "To date" %}</label>
-          <input id="date-to" name="date_to" type="date" value="{{ selected_date_to }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-        </div>
-        <div class="col-12 col-md-4 col-lg-2">
-          <label for="attendance-source" class="form-label">{% translate "Source" %}</label>
-          <select id="attendance-source" name="source" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-            <option value="">{% translate "All sources" %}</option>
-            <option value="scan" {% if selected_source == "scan" %}selected{% endif %}>{% translate "Scan" %}</option>
-            <option value="auto" {% if selected_source == "auto" %}selected{% endif %}>{% translate "Auto reconciliation" %}</option>
-            <option value="manual" {% if selected_source == "manual" %}selected{% endif %}>{% translate "Manual reconciliation" %}</option>
-          </select>
-        </div>
-        <div class="col-12 col-md-4 col-lg-2">
-          <label for="attendance-scan-status" class="form-label">{% translate "Scan status" %}</label>
-          <select id="attendance-scan-status" name="scan_status" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-            <option value="">{% translate "All statuses" %}</option>
-            <option value="scanned" {% if selected_scan_status == "scanned" %}selected{% endif %}>{% translate "Scanned" %}</option>
-            <option value="not_scanned" {% if selected_scan_status == "not_scanned" %}selected{% endif %}>{% translate "Not scanned" %}</option>
-            <option value="complete" {% if selected_scan_status == "complete" %}selected{% endif %}>{% translate "Complete" %}</option>
-            <option value="incomplete" {% if selected_scan_status == "incomplete" %}selected{% endif %}>{% translate "Incomplete" %}</option>
-            <option value="absent" {% if selected_scan_status == "absent" %}selected{% endif %}>{% translate "Absent" %}</option>
-          </select>
-        </div>
-        <div class="col-12 col-md-4 col-lg-2">
-          <label for="action" class="form-label">{% translate "Action" %}</label>
-          <select id="action" name="action" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-            <option value="">{% translate "All actions" %}</option>
-            <option value="entrance" {% if selected_action == "entrance" %}selected{% endif %}>{% translate "Entrance" %}</option>
-            <option value="exit" {% if selected_action == "exit" %}selected{% endif %}>{% translate "Exit" %}</option>
-          </select>
-        </div>
-        <div class="col-12 col-md-5 col-lg-3">
-          <label for="course-offering" class="form-label">{% translate "Course" %}</label>
-          <select id="course-offering" name="course_offering" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="change">
-            <option value="">{% translate "All courses" %}</option>
-            {% for co in course_offerings %}
-              <option value="{{ co.id }}" {% if selected_offering == co.id %}selected{% endif %}>
-                {{ co.course.name }} — {{ co.academic_year_level.level.display_name }} — {{ co.academic_year_level.academic_year }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12 col-md-5 col-lg-3">
-          <label for="student" class="form-label">{% translate "Student" %}</label>
-          <input id="student" name="student" type="search" value="{{ student_search }}" class="form-control" placeholder="{% translate 'Name, username, or email' %}" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading" hx-trigger="keyup changed delay:400ms, search">
-        </div>
-        <div class="col-12 col-md-auto">
-          <button type="submit" class="ad-btn ad-btn--teal">{% translate "Filter" %}</button>
-        </div>
-      </form>
+  <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Attendance filters' %}">
+    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#attendance-loading">
+      <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-year">{% translate "Academic year" %}</label>
+        <select id="attendance-matrix-year" name="academic_year" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+          {% for year in years %}<option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} · {% translate "Active" %}{% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-course">{% translate "Course offering" %}</label>
+        <select id="attendance-matrix-course" name="course_offering" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+          <option value="">{% translate "All courses" %}</option>
+          {% for course in course_offerings %}<option value="{{ course.pk }}"{% if selected_offering == course.pk %} selected{% endif %}>{{ course.course.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-from">{% translate "From date" %}</label>
+        <input id="attendance-matrix-from" name="date_from" type="date" value="{{ selected_date_from }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-to">{% translate "To date" %}</label>
+        <input id="attendance-matrix-to" name="date_to" type="date" value="{{ selected_date_to }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-source">{% translate "Source" %}</label>
+        <select id="attendance-matrix-source" name="source" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+          <option value="">{% translate "All sources" %}</option><option value="scan"{% if selected_source == "scan" %} selected{% endif %}>{% translate "Scan" %}</option><option value="auto"{% if selected_source == "auto" %} selected{% endif %}>{% translate "Auto reconciliation" %}</option><option value="manual"{% if selected_source == "manual" %} selected{% endif %}>{% translate "Manual reconciliation" %}</option>
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-status">{% translate "Attendance status" %}</label>
+        <select id="attendance-matrix-status" name="scan_status" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+          <option value="all"{% if selected_scan_status == "all" %} selected{% endif %}>{% translate "All students" %}</option><option value="scanned"{% if selected_scan_status == "scanned" %} selected{% endif %}>{% translate "Scanned" %}</option><option value="not_scanned"{% if selected_scan_status == "not_scanned" %} selected{% endif %}>{% translate "Not scanned" %}</option><option value="complete"{% if selected_scan_status == "complete" %} selected{% endif %}>{% translate "Complete" %}</option><option value="incomplete"{% if selected_scan_status == "incomplete" %} selected{% endif %}>{% translate "Incomplete" %}</option><option value="absent"{% if selected_scan_status == "absent" %} selected{% endif %}>{% translate "Absent" %}</option>
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field">
+        <label for="attendance-matrix-action">{% translate "Action" %}</label>
+        <select id="attendance-matrix-action" name="action" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+          <option value="">{% translate "All actions" %}</option><option value="entrance"{% if selected_action == "entrance" %} selected{% endif %}>{% translate "Entrance" %}</option><option value="exit"{% if selected_action == "exit" %} selected{% endif %}>{% translate "Exit" %}</option>
+        </select>
+      </div>
+      <div class="grade-matrix-filter-field attendance-matrix-student-filter">
+        <label for="attendance-matrix-search">{% translate "Search student" %}</label>
+        <div class="grade-matrix-input-wrap"><i class="fas fa-search" aria-hidden="true"></i><input id="attendance-matrix-search" type="search" name="student" value="{{ student_search }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading"></div>
+      </div>
+      <div class="grade-matrix-filter-actions"><button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-filter" aria-hidden="true"></i> {% translate "Apply" %}</button><a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a></div>
+    </form>
+    {% if date_error %}<div class="ad-alert ad-alert--info mt-3" role="alert"><i class="fas fa-circle-info" aria-hidden="true"></i> <span>{% translate "Enter a valid date range." %}</span></div>{% endif %}
+    <div class="grade-matrix-filter-summary"><span>{% translate "Showing" %}:</span><span class="ad-pill ad-pill--teal">{{ selected_scope.level.display_name }}</span><span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if selected_year.is_active %} · {% translate "Active year" %}{% else %} · {% translate "Historical year" %}{% endif %}</span><span class="grade-matrix-summary-spacer"></span><span>{{ student_count }} {% translate "Students" %} · {{ meeting_count }} {% translate "Meetings" %}</span></div>
+  </section>
 
-      {% if date_error %}
-      <div class="ad-alert ad-alert--info" role="alert">
-        <i class="fas fa-circle-info" aria-hidden="true"></i>
-        <span>{% translate "Enter a valid date range." %}</span>
-      </div>
-      {% endif %}
+  <section class="ad-card grade-matrix-card attendance-matrix-card" aria-labelledby="attendance-matrix-heading">
+    <div class="grade-matrix-card-head"><div><h4 id="attendance-matrix-heading" class="mb-1">{{ selected_scope.level.display_name }} · {{ selected_year.name }}</h4><p class="mb-0">{% translate "Each matrix cell represents one scheduled course meeting." %}</p></div><span class="ad-pill ad-pill--success"><i class="fas fa-circle" aria-hidden="true"></i> {% if selected_year.is_active %}{% translate "Active year" %}{% else %}{% translate "Historical year" %}{% endif %}</span></div>
+    {% if meetings %}
+    <div class="grade-matrix-table-wrap attendance-matrix-table-wrap">
+      <table class="ad-table grade-matrix-table attendance-matrix-table">
+        <caption class="visually-hidden">{% translate "Attendance matrix by student and meeting" %}</caption>
+        <thead><tr class="grade-matrix-course-row"><th class="grade-matrix-identity" rowspan="2" scope="col">{% translate "Student" %}</th>{% for meeting in meetings %}<th scope="col" class="attendance-matrix-meeting-head"><span>{{ meeting.date|date:"d M" }}</span><small>{{ meeting.course_name }}</small></th>{% endfor %}<th scope="col" colspan="5" class="attendance-matrix-summary-head">{% translate "Summary" %}</th></tr><tr class="grade-matrix-quiz-row">{% for meeting in meetings %}<th scope="col" class="attendance-matrix-date-head">{{ meeting.date|date:"Y-m-d" }}</th>{% endfor %}<th scope="col">{% translate "Full" %}</th><th scope="col">{% translate "Partial" %}</th><th scope="col">{% translate "Incomplete" %}</th><th scope="col">{% translate "Absent" %}</th><th scope="col">{% translate "Score" %}</th></tr></thead>
+        <tbody>
+          {% for row in matrix_rows %}<tr><th scope="row" class="grade-matrix-identity"><span class="grade-matrix-student-name">{{ row.student.get_full_name|default:row.student.username }}</span><span class="grade-matrix-student-meta">{{ row.student.username }} · #{{ row.student.pk }}</span></th>{% for cell in row.cells %}<td class="attendance-matrix-cell attendance-matrix-cell--{{ cell.status }}"><span class="attendance-matrix-grade">{{ cell.grade }}</span><span class="attendance-matrix-status">{{ cell.status_label }}</span>{% if cell.entrance or cell.exit %}<div class="attendance-matrix-scans">{% if cell.entrance %}<span>{% translate "Entrance" %}: {{ cell.entrance.scanned_at|date:"H:i:s" }} <small>{{ cell.entrance_source_label }}</small></span>{% endif %}{% if cell.exit %}<span>{% translate "Exit" %}: {{ cell.exit.scanned_at|date:"H:i:s" }} <small>{{ cell.exit_source_label }}</small></span>{% endif %}</div><div class="attendance-matrix-actions">{% if cell.entrance %}<a href="{% url 'attendance-correction' cell.entrance.pk %}" class="ad-action-btn" title="{% translate 'Correct entrance' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct entrance" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form>{% endif %}{% if cell.exit %}<a href="{% url 'attendance-correction' cell.exit.pk %}" class="ad-action-btn" title="{% translate 'Correct exit' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct exit" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form>{% endif %}</div>{% endif %}</td>{% endfor %}<td class="attendance-matrix-summary-cell">{{ row.full_days }}</td><td class="attendance-matrix-summary-cell">{{ row.partial_days }}</td><td class="attendance-matrix-summary-cell">{{ row.incomplete_days }}</td><td class="attendance-matrix-summary-cell">{{ row.absent_days }}</td><td class="attendance-matrix-summary-cell attendance-matrix-score">{{ row.score }}</td></tr>{% empty %}<tr><td colspan="{{ meeting_count|add:6 }}" class="ad-empty">{% translate "No students match the selected filters." %}</td></tr>{% endfor %}
+        </tbody>
+      </table>
     </div>
-  </div>
+    <div class="grade-matrix-legend"><span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Complete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Partial" %} / {% translate "Incomplete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Absent" %}</span><span class="grade-matrix-legend-note">{% translate "The student name column stays fixed while the matrix scrolls." %}</span></div>
+    {% else %}<div class="ad-empty"><i class="fas fa-calendar-xmark" aria-hidden="true"></i><strong>{% translate "No scheduled meetings." %}</strong><span>{% translate "Choose a different date range or course." %}</span></div>{% endif %}
+  </section>
 
-  <div class="ad-card mb-4">
-    <div class="ad-card-body">
-      {% if has_filter %}
-      <div class="ad-table-wrap">
-        <table class="ad-table">
-          <thead>
-            <tr>
-              <th>{% translate "Student" %}</th>
-              <th>{% translate "Level" %}</th>
-              <th>{% translate "Course" %}</th>
-              <th>{% translate "Date" %}</th>
-              <th>{% translate "Entrance" %}</th>
-              <th>{% translate "Entrance source" %}</th>
-              <th>{% translate "Exit" %}</th>
-              <th>{% translate "Exit source" %}</th>
-              <th>{% translate "Day status" %}</th>
-              <th>{% translate "Grade" %}</th>
-              <th class="text-end">{% translate "Actions" %}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in page_obj.object_list %}
-              <tr>
-                <td class="fw-semibold">{% if r.first_name or r.last_name %}{{ r.first_name }} {{ r.last_name }}{% else %}{{ r.username }}{% endif %}</td>
-                <td>{{ r.level_name|default:"—" }}</td>
-                <td>{{ r.course_name|default:"—" }}</td>
-                <td class="text-nowrap">{{ r.meeting_date|date:"Y-m-d" }}</td>
-                <td class="text-nowrap">
-                  {% if r.entrance_id %}
-                    <span class="d-block">{{ r.entrance_scanned_at|date:"Y-m-d H:i:s" }}</span>
-                    <span class="d-block small text-muted">
-                      <span class="fw-semibold">{% translate "Scanned by" %}:</span>
-                      {% if r.entrance_scanned_by_first_name or r.entrance_scanned_by_last_name %}{{ r.entrance_scanned_by_first_name }} {{ r.entrance_scanned_by_last_name }}
-                      {% elif r.entrance_scanned_by_username %}{{ r.entrance_scanned_by_username }}
-                      {% else %}—{% endif %}
-                      {% if r.entrance_corrected_at %}<span class="ad-pill ad-pill--muted ms-1">{% translate "Corrected" %}: {{ r.entrance_corrected_at|date:"Y-m-d H:i:s" }}</span>{% endif %}
-                    </span>
-                  {% else %}—{% endif %}
-                </td>
-                <td>{{ r.entrance_source_label }}</td>
-                <td class="text-nowrap">
-                  {% if r.exit_id %}
-                    <span class="d-block">{{ r.exit_scanned_at|date:"Y-m-d H:i:s" }}</span>
-                    <span class="d-block small text-muted">
-                      <span class="fw-semibold">{% translate "Scanned by" %}:</span>
-                      {% if r.exit_scanned_by_first_name or r.exit_scanned_by_last_name %}{{ r.exit_scanned_by_first_name }} {{ r.exit_scanned_by_last_name }}
-                      {% elif r.exit_scanned_by_username %}{{ r.exit_scanned_by_username }}
-                      {% else %}—{% endif %}
-                      {% if r.exit_corrected_at %}<span class="ad-pill ad-pill--muted ms-1">{% translate "Corrected" %}: {{ r.exit_corrected_at|date:"Y-m-d H:i:s" }}</span>{% endif %}
-                    </span>
-                  {% else %}—{% endif %}
-                </td>
-                <td>{{ r.exit_source_label }}</td>
-                <td>
-                  {% if r.day_status == "on_time" %}<span class="ad-pill ad-pill--success">{{ r.day_status_label }}</span>
-                  {% elif r.day_status == "absent" %}<span class="ad-pill ad-pill--danger">{{ r.day_status_label }}</span>
-                  {% else %}<span class="ad-pill ad-pill--warning">{{ r.day_status_label }}</span>{% endif %}
-                </td>
-                <td>{{ r.day_grade }}</td>
-                <td class="text-end text-nowrap">
-                  <div class="ad-actions">
-                    {% if r.entrance_id %}
-                    <a href="{% url 'attendance-correction' r.entrance_id %}" class="ad-action-btn" title="{% translate 'Entrance' %}"><i class="fas fa-pen"></i></a>
-                    <form method="post" action="{% url 'attendance-delete' r.entrance_id %}" hx-post="{% url 'attendance-delete' r.entrance_id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
-                      {% csrf_token %}
-                      <button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash"></i></button>
-                    </form>
-                    {% endif %}
-                    {% if r.exit_id %}
-                    <a href="{% url 'attendance-correction' r.exit_id %}" class="ad-action-btn" title="{% translate 'Exit' %}"><i class="fas fa-pen"></i></a>
-                    <form method="post" action="{% url 'attendance-delete' r.exit_id %}" hx-post="{% url 'attendance-delete' r.exit_id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
-                      {% csrf_token %}
-                      <button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash"></i></button>
-                    </form>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="11" class="ad-empty">{% translate "No attendance records found." %}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% translate "Attendance pagination" as pagination_aria_label %}
-      {% translate "Attendance Records" as pagination_item_label %}
-      {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query item_label=pagination_item_label aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
-      {% else %}
-      {% translate "Choose a filter to load results" as attendance_empty_title %}
-      {% translate "Select a date range to view attendance records." as attendance_empty_desc %}
-      <div class="ad-empty">
-        {% include "partials/empty_state.html" with icon="fa-filter" title=attendance_empty_title description=attendance_empty_desc %}
-      </div>
-      {% endif %}
-    </div>
-  </div>
+  {% translate "Attendance matrix pagination" as pagination_aria_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
 </div>

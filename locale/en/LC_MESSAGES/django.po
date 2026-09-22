@@ -11353,3 +11353,36 @@ msgstr "Daily attendance roster pagination"
 
 msgid "No students match the selected roster filters."
 msgstr "No students match the selected roster filters."
+
+msgid "Attendance matrix"
+msgstr "Attendance matrix"
+
+msgid "Review attendance by student, scheduled meeting, and course."
+msgstr "Review attendance by student, scheduled meeting, and course."
+
+msgid "Attendance filters"
+msgstr "Attendance filters"
+
+msgid "Attendance status"
+msgstr "Attendance status"
+
+msgid "Each matrix cell represents one scheduled course meeting."
+msgstr "Each matrix cell represents one scheduled course meeting."
+
+msgid "Attendance matrix by student and meeting"
+msgstr "Attendance matrix by student and meeting"
+
+msgid "Choose a different date range or course."
+msgstr "Choose a different date range or course."
+
+msgid "Attendance matrix pagination"
+msgstr "Attendance matrix pagination"
+
+msgid "Correct entrance"
+msgstr "Correct entrance"
+
+msgid "Correct exit"
+msgstr "Correct exit"
+
+msgid "Full"
+msgstr "Full"
