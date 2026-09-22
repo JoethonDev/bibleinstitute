@@ -5,6 +5,9 @@
 
 {% block body %}
 <div id="{{ id }}" class="sd-page">
+{% if extended_view == 'admin_panel.html' %}
+<link rel="stylesheet" href="{% static 'css/app_student.css' %}?v={{ static_asset_version }}">
+{% endif %}
 <div class="container py-4">
     <!-- Back Navigation -->
     <div class="row justify-content-center">
