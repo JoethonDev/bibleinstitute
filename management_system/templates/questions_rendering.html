@@ -108,7 +108,7 @@
                                         </button>
                                     </div>
                                 </div>
-                            {% elif mode == "exam" %}
+                            {% elif mode == "exam" or mode == "preview" %}
                                 <label class="fw-semibold mb-2 sd-chip sd-question-label"><i class="fas fa-arrow-up-wide-short"></i> {% translate "Order Events" %}</label>
                                 <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="order_events">
                                 <div class="structured-list mb-2 w-100" data-order-item-list>
@@ -175,7 +175,7 @@
                                         </button>
                                     </div>
                                 </div>
-                            {% elif mode == "exam" %}
+                            {% elif mode == "exam" or mode == "preview" %}
                                 <label class="fw-semibold mb-2 sd-chip sd-question-label"><i class="fas fa-link"></i> {% translate "Match Related" %}</label>
                                 <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="match_related">
                                 {% for pair in question.exam_pairs %}

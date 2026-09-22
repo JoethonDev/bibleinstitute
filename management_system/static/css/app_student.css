@@ -1644,6 +1644,12 @@ main:has(.sd-page) {
 
 .sd-quiz-head--success { background: linear-gradient(120deg, var(--ps-success), var(--ps-success-deep)); }
 .sd-quiz-head--closed { background: var(--ps-slate); }
+.sd-quiz-head--preview { background: linear-gradient(120deg, var(--ps-teal-deep), var(--ps-teal)); }
+.sd-quiz-preview-alert {
+    color: var(--ps-ink);
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-gold);
+}
 .sd-quiz-grade-label { font-size: .9rem; }
 .sd-quiz-grade-value { font-size: 1.4rem; }
 .sd-quiz-closed-alert {

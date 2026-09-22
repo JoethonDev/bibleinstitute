@@ -16,10 +16,26 @@
 
     function navigateToCode(raw) {
         try {
-            var parsed = new URL(raw);
-            if (parsed.origin !== window.location.origin) throw new Error('origin');
+            if (typeof raw !== 'string') throw new Error('empty');
+            // QR readers can return a BOM or surrounding whitespace.  Both
+            // are harmless in a URL but make the old strict parser reject a
+            // valid server-generated scan path on some devices.
+            var value = raw.replace(/^\uFEFF/, '').trim();
+            if (!value) throw new Error('empty');
+            if (!/^(?:https?:\/\/|\/)/i.test(value)) throw new Error('relative-path');
+            var parsed = new URL(value, window.location.origin);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('protocol');
+            if (!/^\/(?:(?:en|ar)\/)?scan\/[^/?#]+\/?$/.test(parsed.pathname) || parsed.search || parsed.hash) {
+                throw new Error('scan-path');
+            }
+            // Older QR images and canonical QR images may contain the public
+            // host. Rebase only the validated scan path onto this scanner's
+            // origin; never navigate to the host carried by camera content.
+            if (parsed.origin !== window.location.origin) {
+                parsed = new URL(parsed.pathname, window.location.origin);
+            }
             stop();
-            window.location.href = raw;
+            window.location.href = parsed.href;
             return true;
         } catch (error) {
             document.getElementById('scan-result').textContent = gettext('Invalid QR content.');

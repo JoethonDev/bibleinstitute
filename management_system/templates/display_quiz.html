@@ -24,12 +24,14 @@
                 {% endif %}
 
                 <!-- Card header colour changes by quiz mode -->
-                <div class="sd-quiz-head {% if mode == 'view' %}sd-quiz-head--success{% elif mode == 'closed_unsolved' %}sd-quiz-head--closed{% endif %}">
+                <div class="sd-quiz-head {% if mode == 'view' %}sd-quiz-head--success{% elif mode == 'closed_unsolved' %}sd-quiz-head--closed{% elif mode == 'preview' %}sd-quiz-head--preview{% endif %}">
                     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center w-100">
                         <div>
                             <h4 class="sd-quiz-title d-flex align-items-center gap-2">
                                 {% if mode == "exam" %}
                                     <i class="fas fa-pen-to-square"></i>
+                                {% elif mode == "preview" %}
+                                    <i class="fas fa-flask"></i>
                                 {% elif mode == "view" %}
                                     <i class="fas fa-circle-check"></i>
                                 {% else %}
@@ -50,6 +52,13 @@
 
                 <div class="sd-screen">
 
+                    {% if mode == "preview" %}
+                    <div class="alert sd-quiz-preview-alert d-flex align-items-center gap-3 mb-4" role="status">
+                        <i class="fas fa-flask fa-lg"></i>
+                        <div>{% translate "Interactive preview: choose, type, reorder, and match answers. Nothing will be submitted or graded." %}</div>
+                    </div>
+                    {% endif %}
+
                     <!-- Closed / not taken banner -->
                     {% if mode == "closed_unsolved" %}
                     <div class="alert sd-quiz-closed-alert d-flex align-items-center gap-3 mb-4">
@@ -69,7 +78,7 @@
                         {% include 'questions_rendering.html' %}
 
                         <!-- Show submit only for exam mode (student) or correction mode (management) -->
-                        {% if mode == "exam" or not is_student %}
+                        {% if mode == "exam" or mode == "view" and not is_student %}
                         <div class="sd-quiz-foot d-grid mt-4">
                             <button type="submit" class="sd-btn sd-btn--gold btn-lg">
                                 {% if is_student %}
@@ -87,7 +96,7 @@
     </div>
 
     
-    {% if mode == "exam" %}
+    {% if mode == "exam" or mode == "preview" %}
         <script>
             (() => {
                 // NOTE: All JavaScript logic has been preserved as requested.
@@ -112,6 +121,7 @@
                     return jsTranslations_quiz[key] || key;
                 }
 
+                const isPreview = '{{ mode|escapejs }}' === 'preview';
                 let timerEl = document.querySelector("#timer span");
                 const startTime = Math.floor(Date.now() / 1000);
                 const endTime = parseInt('{{ closing_date|escapejs }}'.split(",")[0]);
@@ -261,6 +271,9 @@
                 }
                 
                 function saveAnswer(event) {
+                    if (isPreview) {
+                        return;
+                    }
                     let answers = localStorage.getItem("answers") ? JSON.parse(localStorage.getItem("answers")) : [];
                     let element = event.target;
                     let isFound = false;
@@ -320,11 +333,15 @@
                     var timerInterval = setInterval(countDown, 1000);
                 }
                 if(form) {
-                    setupInitialAnswers();
-                    form.addEventListener("submit", () => localStorage.clear());
-                    document.querySelectorAll(".answers-section input, .answers-section textarea, .answers-section select").forEach(field => {
-                        field.addEventListener("change", saveAnswer);
-                    });
+                    if (isPreview) {
+                        form.addEventListener("submit", (event) => event.preventDefault());
+                    } else {
+                        setupInitialAnswers();
+                        form.addEventListener("submit", () => localStorage.clear());
+                        document.querySelectorAll(".answers-section input, .answers-section textarea, .answers-section select").forEach(field => {
+                            field.addEventListener("change", saveAnswer);
+                        });
+                    }
                     form.querySelectorAll('[data-action="move-order-up"], [data-action="move-order-down"]').forEach((button) => {
                         console.log("Attaching move event to button", button);
                         button.addEventListener('click', handleOrderMove);

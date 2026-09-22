@@ -5,6 +5,7 @@ Provides reusable utilities for common operations.
 import json
 import re
 from datetime import date, datetime, timedelta
+from django.conf import settings
 from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
@@ -14,7 +15,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.timezone import now
 from logging import getLogger
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 from management_system.utils.decorators import check_role_permission
 from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade
 from management_system.academic_access import user_can_write_offering_activity
@@ -37,6 +38,25 @@ def hx_target_id(request):
     if "#" in target:
         return unquote(target.rsplit("#", 1)[1])
     return target
+
+
+def build_scan_url(request, token: str) -> str:
+    """Build the canonical absolute URL encoded by every attendance QR code."""
+    scan_path = reverse("scan-preview", args=[token])
+    configured_domain = (getattr(settings, "DJANGO_SITE_DOMAIN", "") or "").strip().rstrip("/")
+    if configured_domain:
+        parsed = urlsplit(configured_domain)
+        if (
+            parsed.scheme in {"http", "https"}
+            and parsed.netloc
+            and not parsed.username
+            and not parsed.password
+            and not parsed.path.strip("/")
+            and not parsed.query
+            and not parsed.fragment
+        ):
+            return f"{configured_domain}{scan_path}"
+    return request.build_absolute_uri(scan_path)
 
 
 def get_datetime(datetime_string):

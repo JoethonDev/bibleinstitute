@@ -4326,6 +4326,15 @@ msgstr "لم تتم إضافة روابط ملفات إلى هذا الدرس ب
 msgid "Preview"
 msgstr "مراجعة"
 
+msgid "Try Interactive Preview"
+msgstr "تجربة المعاينة التفاعلية"
+
+msgid "Interactive preview: choose, type, reorder, and match answers. Nothing will be submitted or graded."
+msgstr "معاينة تفاعلية: اختر الإجابات واكتبها وأعد ترتيبها وطابق بينها. لن يتم إرسال أي شيء أو تصحيحه."
+
+msgid "Quiz preview cannot be submitted."
+msgstr "لا يمكن إرسال معاينة الاختبار."
+
 #: .\management_system\templates\course_detail.html:85
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:33
 msgid "Course Content"

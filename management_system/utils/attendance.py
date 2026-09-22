@@ -185,7 +185,7 @@ def attendance_roster_page(
                 m.meeting_date,
                 ayl.id AS scope_id,
                 lvl.id AS level_id,
-                lvl.display_name AS level_name,
+                COALESCE(NULLIF(lvl.name_en, ''), NULLIF(lvl.name_ar, ''), CAST(lvl.ordering AS TEXT)) AS level_name,
                 co.id AS offering_id,
                 c.name AS course_name,
                 u.id AS student_id,
@@ -241,7 +241,8 @@ def attendance_roster_page(
               {scope_filter}
               {student_filter}
             GROUP BY
-                m.id, m.meeting_date, ayl.id, lvl.id, lvl.display_name,
+                m.id, m.meeting_date, ayl.id, lvl.id,
+                COALESCE(NULLIF(lvl.name_en, ''), NULLIF(lvl.name_ar, ''), CAST(lvl.ordering AS TEXT)),
                 co.id, c.name, u.id, u.username, u.first_name, u.last_name,
                 er.id, er.scanned_at, er.source, er.scanned_by_id,
                 er.corrected_at, eu.username, eu.first_name, eu.last_name,

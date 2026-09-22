@@ -4372,6 +4372,15 @@ msgstr "No file links have been added to this lesson yet."
 msgid "Preview"
 msgstr "Preview"
 
+msgid "Try Interactive Preview"
+msgstr "Try Interactive Preview"
+
+msgid "Interactive preview: choose, type, reorder, and match answers. Nothing will be submitted or graded."
+msgstr "Interactive preview: choose, type, reorder, and match answers. Nothing will be submitted or graded."
+
+msgid "Quiz preview cannot be submitted."
+msgstr "Quiz preview cannot be submitted."
+
 #: .\management_system\templates\course_detail.html:85
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:33
 msgid "Course Content"

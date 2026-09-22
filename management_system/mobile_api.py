@@ -66,6 +66,7 @@ from .utils.student_data import (
     student_quiz_statuses,
     unread_notification_count,
 )
+from .utils.helpers import build_scan_url
 from .views import (
     create_viewing_session,
     generate_audio_download,
@@ -360,7 +361,7 @@ def profile(request):
 def profile_qr(request):
     if not request.user.qr_token:
         return _error(request, "qr_unavailable", _("The QR code is unavailable."), 404)
-    qr_data = request.build_absolute_uri(reverse("scan-preview", args=[request.user.qr_token]))
+    qr_data = build_scan_url(request, request.user.qr_token)
     image = qrcode.make(qr_data)
     buffer = BytesIO()
     image.save(buffer, format="PNG")

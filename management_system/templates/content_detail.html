@@ -37,6 +37,11 @@
         <i class="fas fa-edit me-1"></i>{% translate "Edit" %}
       </a>
       {% endif %}
+      {% if is_quiz and can_preview_quiz %}
+      <a href="{% url 'quiz-details' offering_id=offering.pk quiz_id=content.pk %}?preview=1" class="ad-pill--on-dark ad-pill--on-dark-action">
+        <i class="fas fa-flask me-1"></i>{% translate "Try Interactive Preview" %}
+      </a>
+      {% endif %}
     </div>
   </div>
 

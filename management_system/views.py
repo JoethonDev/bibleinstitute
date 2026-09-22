@@ -78,7 +78,7 @@ from .utils.file_validator import (
     FileValidator,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, download_from_bucket, generate_unique_url, get_r2_client
-from .utils.helpers import get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
+from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
 from .utils.application_uploads import upload_application_file
@@ -1041,20 +1041,34 @@ def stream_lesson(request, offering_id, lesson_id, file_index):
 
 @login_required(login_url=LOGIN_URL)
 def take_exam(request, offering_id, quiz_id, *, allow_management=False):
+    preview_requested = request.GET.get("preview") == "1"
+    if request.method == "POST" and preview_requested:
+        # Reject crafted preview submissions before loading the offering or
+        # touching any submission/grade workflow.
+        raise PermissionDenied(_("Quiz preview cannot be submitted."))
+
     try:
         user = User.objects.get(pk=request.user.pk)
+        if preview_requested and not can_manage_academic_setup(user):
+            raise PermissionDenied
         offering = get_accessible_offering_or_403(
             user,
             offering_id,
             write=request.method == "POST",
             allow_management=allow_management,
         )
-        quiz = get_object_or_404(Quiz, pk=quiz_id, course_offering=offering)
+        quiz_filters = {"pk": quiz_id, "course_offering": offering}
+        if not user_has_management_role(user):
+            # Unpublished quizzes are not student resources.  Apply the same
+            # visibility boundary as the course-detail list so a guessed
+            # quiz URL cannot bypass Draft/Archived visibility.
+            quiz_filters["status"] = PublicationStatus.PUBLISHED
+        quiz = get_object_or_404(Quiz, **quiz_filters)
 
         submission_datetime = now()
         # Quiz can be submitted from opening time through the 30-minute closing buffer
         can_submit = is_quiz_open(quiz, submission_datetime, user)
-        _, effective_closing_date = quiz_window(quiz, user)
+        _effective_opening_date, effective_closing_date = quiz_window(quiz, user)
 
         # Check if user has previously taken this quiz
         quiz_mode, grade = get_student_quiz_status(quiz, user, submission_datetime)
@@ -1064,7 +1078,10 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             logger.info(f"User : {user} is accessing {quiz.name} in {offering.course.name} offering")
 
             # Determine quiz mode using cohort-year window logic
-            if user_has_management_role(user):
+            if preview_requested:
+                quiz_mode = "preview"
+                query_set = Question.objects.filter(quiz_id=quiz_id)
+            elif user_has_management_role(user):
                 # Admins/teachers always see in "view" mode for student quizzes
                 quiz_mode = "view"
                 query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user) if grade else Question.objects.filter(quiz_id=quiz_id)
@@ -1081,7 +1098,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 query_set = Question.objects.filter(quiz_id=quiz_id)
 
             # Serialize questions; strip answer data to prevent leakage
-            if quiz_mode == "exam":
+            if quiz_mode in {"exam", "preview"}:
                 questions = [q.serialize() for q in query_set]
                 random.shuffle(questions)
                 questions = [prepare_exam_question(q) for q in questions]
@@ -1107,7 +1124,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "total_grade": total_grade,
                 "closing_date": ensure_aware(effective_closing_date).timestamp(),
                 "exam_taken": True if grade else False,
-                "back_url": reverse("course-details", args=[offering_id]),
+                "back_url": reverse("quiz-view", args=[quiz_id]) if preview_requested else reverse("course-details", args=[offering_id]),
                 "quiz_closing_date_str": format_user_datetime(effective_closing_date, user, "%d/%m/%Y %H:%M"),
             })
         
@@ -1947,7 +1964,8 @@ def quiz_detail(request, quiz_id):
         ),
         pk=quiz_id,
     )
-    exception_form = QuizExceptionalOpeningForm(quiz=quiz) if can_manage_academic_setup(request.user) else None
+    can_preview_quiz = can_manage_academic_setup(request.user)
+    exception_form = QuizExceptionalOpeningForm(quiz=quiz) if can_preview_quiz else None
     return render(request, "content_detail.html", {
         "content": quiz,
         "content_kind": "quiz",
@@ -1959,6 +1977,7 @@ def quiz_detail(request, quiz_id):
         "edit_url": reverse("quiz-update", args=[quiz.pk]),
         "exception_form": exception_form,
         "exceptional_openings": getattr(quiz, "exceptional_openings", []),
+        "can_preview_quiz": can_preview_quiz,
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Quizzes"), reverse("quiz-dashboard")),
@@ -5784,7 +5803,7 @@ def download_qr(request):
     if not request.user.qr_token:
         request.user.qr_token = secrets.token_urlsafe(32)
         request.user.save(update_fields=["qr_token"])
-    qr_data = request.build_absolute_uri(reverse("scan-preview", args=[request.user.qr_token]))
+    qr_data = build_scan_url(request, request.user.qr_token)
     img = qrcode.make(qr_data)
     buf = BytesIO()
     img.save(buf, format="PNG")
