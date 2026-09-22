@@ -81,7 +81,11 @@ from .utils.storage_operations import list_current_folder, list_current_folder_p
 from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
-from .utils.application_uploads import upload_application_file
+from .utils.application_uploads import (
+    APPLICATION_DOCUMENT_FIELDS,
+    APPLICATION_PREVIEW_FIELDS,
+    upload_application_file,
+)
 from .utils.egyptian_cities import EGYPTIAN_CITIES
 from .utils.r2_references import rewrite_lesson_r2_references
 from .utils.attendance import (
@@ -663,20 +667,20 @@ class ProfileDetail(LoginProtection, DetailView):
             AcademicPayment.objects.filter(student=user)
             .select_related("academic_year_level__academic_year", "academic_year_level__level")
         )
-        document_fields = (
-            ("identity_front", "identity_front_key", _("Identity Front")),
-            ("identity_back", "identity_back_key", _("Identity Back")),
-            ("payment", "payment_key", _("Payment")),
-            ("profile", "profile_image_key", _("Profile")),
-        )
+        document_labels = {
+            "identity_front": _("Identity Front"),
+            "identity_back": _("Identity Back"),
+            "payment": _("Payment"),
+            "profile": _("Profile"),
+        }
         application_documents = []
-        for document_type, model_field, label in document_fields:
+        for document_type, model_field in APPLICATION_DOCUMENT_FIELDS.items():
             key = getattr(user, model_field, None)
             if not key:
                 continue
             application_documents.append({
                 "type": document_type,
-                "label": label,
+                "label": document_labels[document_type],
                 "url": reverse("application-document", args=[user.pk, document_type]),
                 "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 "is_image": (mimetypes.guess_type(key)[0] or "").startswith("image/"),
@@ -1472,15 +1476,16 @@ def user_profile(request, user_id):
     can_view_application_data = can_manage_applications(request.user)
     application_documents = []
     if can_view_application_data:
-        for document_type, field_name, label in (
-            ("identity_front", "identity_front_key", _("Identity Front")),
-            ("identity_back", "identity_back_key", _("Identity Back")),
-            ("payment", "payment_key", _("Payment")),
-            ("profile", "profile_image_key", _("Profile")),
-        ):
+        document_labels = {
+            "identity_front": _("Identity Front"),
+            "identity_back": _("Identity Back"),
+            "payment": _("Payment"),
+            "profile": _("Profile"),
+        }
+        for document_type, field_name in APPLICATION_DOCUMENT_FIELDS.items():
             if getattr(user, field_name, None):
                 application_documents.append({
-                    "label": label,
+                    "label": document_labels[document_type],
                     "url": reverse("application-document", args=[user.pk, document_type]),
                     "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 })
@@ -3444,15 +3449,17 @@ def academic_payment_document(request, payment_id):
     payment = get_object_or_404(AcademicPayment, pk=payment_id)
     if payment.student_id != request.user.pk and not can_view_reports(request.user):
         raise PermissionDenied
+    is_download = request.GET.get("download") == "1"
+    key = payment.receipt_key if is_download or not payment.receipt_preview_key else payment.receipt_preview_key
     try:
-        storage_response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=payment.receipt_key)
+        storage_response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
         response = FileResponse(
             storage_response["Body"],
             content_type=storage_response.get("ContentType")
-            or mimetypes.guess_type(payment.receipt_key)[0]
+            or mimetypes.guess_type(key)[0]
             or "application/octet-stream",
-            as_attachment=request.GET.get("download") == "1",
-            filename=os.path.basename(payment.receipt_key),
+            as_attachment=is_download,
+            filename=os.path.basename(payment.receipt_key if is_download else key),
         )
         if storage_response.get("ContentLength") is not None:
             response["Content-Length"] = str(storage_response["ContentLength"])
@@ -4194,16 +4201,23 @@ def signup(request):
                     if user.city:
                         is_offline = OfflineCity.objects.filter(name__iexact=user.city, is_active=True).exists()
                         user.study_mode = "offline" if is_offline else "online"
-                    file_type_map = {"identity_front": "identity_front_key", "identity_back": "identity_back_key", "payment": "payment_key", "profile": "profile_image_key"}
+                    file_type_map = APPLICATION_DOCUMENT_FIELDS
                     required_upload_types = {"identity_front", "profile"}
                     if user.identity_type == "national_id":
                         required_upload_types.add("identity_back")
                     for upload_type, model_field in file_type_map.items():
                         if upload_type in request.FILES:
-                            key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, request.FILES[upload_type], upload_type)
-                            if key:
-                                setattr(user, model_field, key)
-                                uploaded_keys.append(key)
+                            uploaded = upload_application_file(
+                                CLOUD_CLIENT,
+                                bucket_name,
+                                user.id,
+                                request.FILES[upload_type],
+                                upload_type,
+                            )
+                            if uploaded:
+                                setattr(user, model_field, uploaded.original_key)
+                                setattr(user, APPLICATION_PREVIEW_FIELDS[upload_type], uploaded.preview_key)
+                                uploaded_keys.extend(uploaded.keys)
                     missing_documents = [
                         upload_type for upload_type in required_upload_types
                         if not getattr(user, file_type_map[upload_type], None)
@@ -4217,7 +4231,13 @@ def signup(request):
                         named = ", ".join(str(document_labels[t]) for t in file_type_map if t in missing_documents)
                         raise ValidationError(_("Missing required document(s): %(documents)s.") % {"documents": named})
                     if uploaded_keys:
-                        user.save(update_fields=[v for v in file_type_map.values() if getattr(user, v, None)] + ["study_mode"])
+                        user.save(
+                            update_fields=[
+                                *[v for v in file_type_map.values() if getattr(user, v, None)],
+                                *[v for v in APPLICATION_PREVIEW_FIELDS.values() if getattr(user, v, None)],
+                                "study_mode",
+                            ]
+                        )
                     elif user.study_mode:
                         user.save(update_fields=["study_mode"])
                     send_application_received(user)
@@ -4316,10 +4336,10 @@ def applications_dashboard(request):
 def application_review(request, user_id):
     user = get_object_or_404(User, pk=user_id)
     document_fields = {
-        "identity_front": ("identity_front_key", _("Identity Front")),
-        "identity_back": ("identity_back_key", _("Identity Back")),
-        "payment": ("payment_key", _("Payment")),
-        "profile": ("profile_image_key", _("Profile")),
+        "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
+        "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
+        "payment": ("payment_key", "payment_preview_key", _("Payment")),
+        "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
     }
     if request.method == "POST":
         form = ApplicationAdminForm(request.POST, request.FILES, instance=user)
@@ -4341,21 +4361,32 @@ def application_review(request, user_id):
                         or original_is_active and not user.is_active
                     ):
                         revoke_user_mobile_access(user)
-                    for upload_type, (model_field, document_label) in document_fields.items():
+                    for upload_type, (model_field, preview_field, document_label) in document_fields.items():
                         previous_key = getattr(user, model_field, None)
+                        previous_preview_key = getattr(user, preview_field, None)
                         if form.cleaned_data.get(f"clear_{upload_type}"):
-                            if previous_key:
-                                old_keys.append(previous_key)
+                            old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
                             setattr(user, model_field, None)
+                            setattr(user, preview_field, None)
                         uploaded_file = form.cleaned_data.get(upload_type)
                         if uploaded_file:
-                            new_key = upload_application_file(CLOUD_CLIENT, bucket_name, user.id, uploaded_file, upload_type)
-                            if not new_key:
+                            uploaded = upload_application_file(
+                                CLOUD_CLIENT,
+                                bucket_name,
+                                user.id,
+                                uploaded_file,
+                                upload_type,
+                            )
+                            if not uploaded:
                                 raise ValidationError(_("The %(document)s could not be uploaded.") % {"document": document_label})
-                            if previous_key and previous_key != new_key:
-                                old_keys.append(previous_key)
-                            setattr(user, model_field, new_key)
-                            uploaded_keys.append(new_key)
+                            old_keys.extend(
+                                key
+                                for key in (previous_key, previous_preview_key)
+                                if key and key not in uploaded.keys
+                            )
+                            setattr(user, model_field, uploaded.original_key)
+                            setattr(user, preview_field, uploaded.preview_key)
+                            uploaded_keys.extend(uploaded.keys)
                     user.save()
 
                     if desired_status != original_status:
@@ -4392,7 +4423,7 @@ def application_review(request, user_id):
         form = ApplicationAdminForm(instance=user)
 
     documents = []
-    for document_type, (field, label) in document_fields.items():
+    for document_type, (field, _preview_field, label) in document_fields.items():
         key = getattr(user, field, None)
         if key:
             content_type = mimetypes.guess_type(key)[0] or ""
@@ -4454,8 +4485,20 @@ def application_delete(request, user_id):
                     user.identity_back_key,
                     user.payment_key,
                     user.profile_image_key,
+                    user.identity_front_preview_key,
+                    user.identity_back_preview_key,
+                    user.payment_preview_key,
+                    user.profile_image_preview_key,
                 ) if key
             ]
+            document_keys.extend(
+                key
+                for receipt_key, preview_key in AcademicPayment.objects.filter(student_id=user.pk).values_list(
+                    "receipt_key", "receipt_preview_key"
+                )
+                for key in (receipt_key, preview_key)
+                if key
+            )
             telegram_keys = list(
                 TelegramAttachment.objects.filter(
                     message__conversation__user_id=user.pk,
@@ -4483,31 +4526,34 @@ def application_document(request, user_id, document_type):
     if request.user.pk != user_id and not can_manage_applications(request.user):
         raise PermissionDenied
     document_fields = {
-        "identity_front": "identity_front_key",
-        "identity_back": "identity_back_key",
-        "payment": "payment_key",
-        "profile": "profile_image_key",
+        "identity_front": ("identity_front_key", "identity_front_preview_key"),
+        "identity_back": ("identity_back_key", "identity_back_preview_key"),
+        "payment": ("payment_key", "payment_preview_key"),
+        "profile": ("profile_image_key", "profile_image_preview_key"),
     }
-    model_field = document_fields.get(document_type)
-    if not model_field:
+    document_spec = document_fields.get(document_type)
+    if not document_spec:
         raise Http404
     user = get_object_or_404(User, pk=user_id)
-    key = getattr(user, model_field, None)
-    if not key:
+    original_field, preview_field = document_spec
+    original_key = getattr(user, original_field, None)
+    if not original_key:
         raise Http404
+    is_download = request.GET.get("download") == "1"
+    key = original_key if is_download or not getattr(user, preview_field, None) else getattr(user, preview_field)
     try:
         storage_response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
         response = FileResponse(
             storage_response["Body"],
             content_type=storage_response.get("ContentType") or mimetypes.guess_type(key)[0] or "application/octet-stream",
-            as_attachment=request.GET.get("download") == "1",
-            filename=os.path.basename(key),
+            as_attachment=is_download,
+            filename=os.path.basename(original_key if is_download else key),
         )
         if storage_response.get("ContentLength") is not None:
             response["Content-Length"] = str(storage_response["ContentLength"])
         # Avatars/documents are polled repeatedly by live pages (Telegram chat,
         # dashboards); let the browser reuse a fresh copy instead of re-downloading.
-        if request.GET.get("download") != "1":
+        if not is_download:
             response["Cache-Control"] = "private, max-age=300"
         return response
     except Exception as exc:
@@ -4542,21 +4588,23 @@ def profile_missing_documents(request):
                 uploaded_file = form.cleaned_data.get(document_type)
                 if not uploaded_file:
                     continue
-                key = upload_application_file(
+                uploaded = upload_application_file(
                     CLOUD_CLIENT,
                     bucket_name,
                     user.pk,
                     uploaded_file,
                     document_type,
                 )
-                if not key:
+                if not uploaded:
                     raise ValidationError(
                         _("The %(document)s could not be uploaded.")
                         % {"document": form.fields[document_type].label}
                     )
-                setattr(user, model_field, key)
-                update_fields.append(model_field)
-                uploaded_keys.append(key)
+                preview_field = APPLICATION_PREVIEW_FIELDS[document_type]
+                setattr(user, model_field, uploaded.original_key)
+                setattr(user, preview_field, uploaded.preview_key)
+                update_fields.extend([model_field, preview_field])
+                uploaded_keys.extend(uploaded.keys)
             if not update_fields:
                 raise ValidationError(_("Select at least one missing document."))
             user.save(update_fields=update_fields)
@@ -4586,7 +4634,7 @@ def profile_missing_documents(request):
 @require_POST
 def profile_academic_payment(request):
     """Accept one new, non-replaceable receipt for an eligible academic scope."""
-    uploaded_key = None
+    uploaded_keys = []
     try:
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
@@ -4599,22 +4647,24 @@ def profile_academic_payment(request):
                 academic_year_level=scope,
             ).exists():
                 raise ValidationError(_("A payment receipt already exists for this academic level."))
-            uploaded_key = upload_application_file(
+            uploaded = upload_application_file(
                 CLOUD_CLIENT,
                 bucket_name,
                 user.pk,
                 form.cleaned_data["payment"],
                 "academic_payment",
             )
-            if not uploaded_key:
+            if not uploaded:
                 raise ValidationError(_("The payment receipt could not be uploaded."))
+            uploaded_keys.extend(uploaded.keys)
             AcademicPayment.objects.create(
                 student=user,
                 academic_year_level=scope,
-                receipt_key=uploaded_key,
+                receipt_key=uploaded.original_key,
+                receipt_preview_key=uploaded.preview_key,
             )
     except (ValidationError, User.DoesNotExist) as exc:
-        if uploaded_key:
+        for uploaded_key in uploaded_keys:
             try:
                 CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=uploaded_key)
             except Exception:
@@ -4624,7 +4674,7 @@ def profile_academic_payment(request):
         messages.error(request, str(exc))
         return redirect("view-profile")
     except Exception:
-        if uploaded_key:
+        for uploaded_key in uploaded_keys:
             try:
                 CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=uploaded_key)
             except Exception:

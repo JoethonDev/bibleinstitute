@@ -232,7 +232,12 @@ def _send_delivery(
             links = []
         return bot.send_message(
             delivery.telegram_account.telegram_chat_id,
-            format_lesson(delivery.lesson, bool(links), delivery.user),
+            "\n\n".join(
+                (
+                    _("Lesson published"),
+                    format_lesson(delivery.lesson, bool(links), delivery.user),
+                )
+            ),
             reply_markup=lesson_detail_keyboard(
                 delivery.lesson.course_offering_id,
                 delivery.lesson.pk,
@@ -263,7 +268,12 @@ def _send_delivery(
     )
     return bot.send_message(
         delivery.telegram_account.telegram_chat_id,
-        format_quiz(delivery.quiz, delivery.user, opening, closing),
+        "\n\n".join(
+            (
+                _("Exam opening"),
+                format_quiz(delivery.quiz, delivery.user, opening, closing),
+            )
+        ),
         reply_markup=quiz_detail_keyboard(delivery.quiz.course_offering_id, delivery.quiz.pk),
     )
 

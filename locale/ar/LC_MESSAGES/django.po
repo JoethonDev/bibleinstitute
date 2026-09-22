@@ -2563,6 +2563,28 @@ msgstr "تاريخ النشر: %(date)s"
 msgid "Open lesson on the website: %(link)s"
 msgstr "افتح الدرس على الموقع: %(link)s"
 
+#: .\management_system\telegram\navigation.py
+msgid "Open lesson"
+msgstr "فتح الدرس"
+
+#: .\management_system\telegram\navigation.py
+msgid "Download MP3"
+msgstr "تحميل MP3"
+
+#: .\management_system\telegram\navigation.py
+#, python-format
+msgid "Download MP3 %(number)s"
+msgstr "تحميل MP3 (الجزء %(number)s)"
+
+#: .\management_system\telegram\navigation.py
+#, python-format
+msgid "Download MP3 (Part %(number)s)"
+msgstr "تحميل MP3 (الجزء %(number)s)"
+
+#: .\management_system\telegram\navigation.py
+msgid "MP3 audio download is available using the button below."
+msgstr "يتوفر تحميل الصوت بصيغة MP3 باستخدام الزر أدناه."
+
 #: .\management_system\telegram\navigation.py:421
 #, python-format
 msgid "Exam: %(name)s"
@@ -2601,6 +2623,10 @@ msgstr "المدة: %(duration)s"
 #, python-format
 msgid "Open exam on the website: %(link)s"
 msgstr "افتح الامتحان على الموقع: %(link)s"
+
+#: .\management_system\telegram\navigation.py
+msgid "Open exam"
+msgstr "فتح الامتحان"
 
 #: .\management_system\telegram\notifications.py:128
 msgid "Superseded by a newer exam opening window."

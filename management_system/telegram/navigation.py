@@ -248,14 +248,24 @@ def lesson_list_keyboard(offering_id: int, lessons, page: int, page_count: int) 
 
 
 def lesson_detail_keyboard(offering_id: int, lesson_id: int, audio_entries) -> telebot.types.InlineKeyboardMarkup:
-    """Audio choices in paired rows, followed by Back and Home."""
+    """Open/download actions followed by Back and Home.
+
+    Audio buttons intentionally use translated action labels rather than R2 or
+    lecture filenames, and each carries its one-based part number so multiple
+    parts stay distinguishable. The callback still carries only the bounded
+    numeric index; the handler re-authorizes the lesson and retrieves the asset.
+    """
     keyboard = _KB(row_width=2)
+    lesson_link = website_url("lesson-details", [offering_id, lesson_id])
+    if lesson_link:
+        keyboard.row(_ROW(_("Open lesson"), url=lesson_link))
+    audio_entries = audio_entries or []
     audio_buttons = [
         _ROW(
-            audio_label(link, index),
+            _("Download MP3 (Part %(number)s)") % {"number": index + 1},
             callback_data=make_callback("lesson_audio", offering_id, lesson_id, index),
         )
-        for index, link in enumerate(audio_entries or [])
+        for index, _link in enumerate(audio_entries)
     ]
     _add_paired(keyboard, audio_buttons)
     _add_paired(
@@ -292,8 +302,11 @@ def quiz_list_keyboard(offering_id: int, quizzes, page: int, page_count: int) ->
 
 
 def quiz_detail_keyboard(offering_id: int, quiz_id: int) -> telebot.types.InlineKeyboardMarkup:
-    """Quiz detail actions: Back and Home."""
+    """Open the quiz website, followed by Back and Home."""
     keyboard = _KB(row_width=2)
+    quiz_link = website_url("quiz-details", [offering_id, quiz_id])
+    if quiz_link:
+        keyboard.row(_ROW(_("Open exam"), url=quiz_link))
     _add_paired(
         keyboard,
         [
@@ -450,7 +463,9 @@ def format_lesson(lesson, audio_available: bool, user) -> str:
     link = website_url("lesson-details", [offering.pk, lesson.pk])
     if link:
         lines.append(_('Open lesson on the website: %(link)s') % {"link": link})
-    return "\n".join(lines)
+    if audio_available:
+        lines.append(_("MP3 audio download is available using the button below."))
+    return "\n\n".join(lines)
 
 
 def format_quiz(quiz, user, opening=None, closing=None) -> str:
@@ -490,4 +505,4 @@ def format_quiz(quiz, user, opening=None, closing=None) -> str:
     link = website_url("quiz-details", [offering.pk, quiz.pk])
     if link:
         lines.append(_('Open exam on the website: %(link)s') % {"link": link})
-    return "\n".join(lines)
+    return "\n\n".join(lines)

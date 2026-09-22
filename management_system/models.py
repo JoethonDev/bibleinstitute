@@ -162,6 +162,10 @@ class User(AbstractUser):
     identity_back_key = models.CharField(max_length=500, null=True, blank=True)
     payment_key = models.CharField(max_length=500, null=True, blank=True)
     profile_image_key = models.CharField(max_length=500, null=True, blank=True)
+    identity_front_preview_key = models.CharField(max_length=500, null=True, blank=True)
+    identity_back_preview_key = models.CharField(max_length=500, null=True, blank=True)
+    payment_preview_key = models.CharField(max_length=500, null=True, blank=True)
+    profile_image_preview_key = models.CharField(max_length=500, null=True, blank=True)
 
     APPLICATION_STATUSES = [("pending", _("Pending")), ("active", _("Active")), ("declined", _("Declined"))]
     application_status = models.CharField(max_length=10, choices=APPLICATION_STATUSES, default="active")
@@ -1294,6 +1298,7 @@ class AcademicPayment(models.Model):
         related_name="academic_payments",
     )
     receipt_key = models.CharField(max_length=500)
+    receipt_preview_key = models.CharField(max_length=500, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
