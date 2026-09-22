@@ -2115,6 +2115,12 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .attendance-matrix-actions .ad-action-btn { width: 1.65rem; height: 1.65rem; min-width: 1.65rem; padding: 0; }
 .attendance-matrix-score { font-weight: 800; }
 
+/* The matrix is the final attendance content; do not add a second shell-level
+   trailing gap after its card. Other admin pages retain the shared spacing. */
+.admin-main-content.ad-panes:has(#content.attendance-matrix-page) { padding-bottom: 0; }
+#content.attendance-matrix-page { padding-bottom: 0 !important; }
+#content.attendance-matrix-page > .attendance-matrix-card { margin-bottom: 0; }
+
 @media (max-width: 900px) {
     .attendance-matrix-student-filter { grid-column: 1 / -1; }
 }
