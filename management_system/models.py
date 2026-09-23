@@ -2137,10 +2137,6 @@ class Lesson(models.Model):
             end_range = user_join_date.replace(year=user_join_date.year + self.course_offering.course.level.ordering, day=28)
         return user_join_date <= self.created_date <= end_range
 
-    @property
-    def can_edit(self):
-        return self.status == PublicationStatus.DRAFT
-
 class MediaProcessingJob(models.Model):
     """Durable state for one source-file media processing job."""
 

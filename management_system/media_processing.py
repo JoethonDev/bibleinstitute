@@ -1120,7 +1120,7 @@ def _attach_outputs(job: MediaProcessingJob, manifest_key: str, audio_manifest_k
 
     with transaction.atomic():
         lesson = job.lesson.__class__.objects.select_for_update().get(pk=job.lesson_id)
-        if not can_manage_content(job.created_by) or not lesson.can_edit:
+        if not can_manage_content(job.created_by):
             raise MediaProcessingError(_("The lesson is no longer editable."), "attachment_not_editable")
         try:
             links = json.loads(lesson.links or "[]")

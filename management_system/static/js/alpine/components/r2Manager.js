@@ -209,7 +209,8 @@ function r2Manager() {
          * Delete single file
          */
         deleteFile(fileKey, fileName, fileExt) {
-            const isM3u8 = fileExt === '.m3u8';
+            const isM3u8 = (typeof fileKey === 'string' && fileKey.toLowerCase().endsWith('.m3u8'))
+                || (typeof fileExt === 'string' && fileExt.toLowerCase() === '.m3u8');
             const run = () => {
                 const endpoint = isM3u8 ? this.routes.deleteM3u8 : this.routes.delete;
                 return fetch(endpoint, {
@@ -270,13 +271,18 @@ function r2Manager() {
             if (this.selectedFiles.length === 0) return;
             const run = () => {
                 const filesToDelete = [...this.selectedFiles];
-                return Promise.all(filesToDelete.map(fileKey =>
-                    fetch(this.routes.delete, {
+                return Promise.all(filesToDelete.map(fileKey => {
+                    // Manifests must clean their segment children before the
+                    // parent, so route them to the smart m3u8 endpoint.
+                    const endpoint = (typeof fileKey === 'string' && fileKey.toLowerCase().endsWith('.m3u8'))
+                        ? this.routes.deleteM3u8
+                        : this.routes.delete;
+                    return fetch(endpoint, {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRFToken() },
                         body: JSON.stringify({ file_key: fileKey })
-                    }).then(r => r.ok ? { fileKey, success: true } : { fileKey, success: false })
-                ))
+                    }).then(r => r.ok ? { fileKey, success: true } : { fileKey, success: false });
+                }))
                 .then(results => {
                     const succeeded = results.filter(r => r.success).map(r => r.fileKey);
                     const failed = results.filter(r => !r.success).length;

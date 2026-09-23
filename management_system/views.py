@@ -2117,7 +2117,8 @@ def create_lesson(request):
     elif request.method == "POST":
         publication_status = _requested_publication_status(request)
         if publication_status is None:
-            return HttpResponse(_("Invalid publication status."), status=400)
+            error(request, _("Invalid publication status."), extra_tags="alert-danger")
+            return redirect(reverse("lesson-create"))
         lesson_name = request.POST.get("lesson_name", "")
         lesson_description = request.POST.get("description", "").strip()
         offering_id = request.POST.get("course_offering")
@@ -2210,21 +2211,9 @@ def update_lesson(request, lesson_id):
     elif request.method == "POST":
         publication_status = _requested_publication_status(request)
         if publication_status is None:
-            return HttpResponse(_("Invalid publication status."), status=400)
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
-        if not lesson.can_edit:
-            if publication_status == lesson.status:
-                return HttpResponse(_("Published or archived lesson cannot be edited."), status=403)
-            previous_status = lesson.status
-            with transaction.atomic():
-                lesson.status = publication_status
-                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                    lesson.publication_event_version += 1
-                lesson.save(update_fields=["status", "updated_date", "publication_event_version"])
-                if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                    create_lesson_publication_event(lesson)
-            success(request, _("Lesson status is updated successfully"), extra_tags="alert-success")
+            error(request, _("Invalid publication status."), extra_tags="alert-danger")
             return redirect(reverse("lesson-update", args=[lesson_id]))
+        lesson = get_object_or_404(Lesson, pk=lesson_id)
         lesson_name = request.POST.get("lesson_name", "")
         lesson_description = request.POST.get("description", "").strip()
         offering_id = request.POST.get("course_offering")
@@ -2284,8 +2273,6 @@ def _media_job_lesson_target(lesson_id, part_id):
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValidationError(_("The selected lesson is invalid.")) from exc
     lesson = get_object_or_404(Lesson.objects.select_related("course_offering"), pk=lesson_pk)
-    if not lesson.can_edit:
-        raise ValidationError(_("Only an editable draft lesson can receive new media."))
     return lesson, validate_browser_part_id(part_id) or f"p{uuid.uuid4().hex[:32]}"
 
 
@@ -3081,7 +3068,8 @@ def create_quiz(request):
     elif request.method == "POST":
         publication_status = _requested_publication_status(request)
         if publication_status is None:
-            return HttpResponse(_("Invalid publication status."), status=400)
+            error(request, _("Invalid publication status."), extra_tags="alert-danger")
+            return redirect(reverse("quiz-create"))
         questions, quiz = unpack_quiz_form(request.POST)
 
         try:
@@ -3184,18 +3172,21 @@ def update_quiz(request, quiz_id):
     elif request.method == "POST":
         publication_status = _requested_publication_status(request)
         if publication_status is None:
-            return HttpResponse(_("Invalid publication status."), status=400)
+            error(request, _("Invalid publication status."), extra_tags="alert-danger")
+            return redirect(reverse("quiz-update", args=[quiz_id]))
         questions, quiz_data = unpack_quiz_form(request.POST)
         try:
             # Update Quiz
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             if not quiz.can_edit:
                 if publication_status == quiz.status:
-                    return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                    error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
+                    return redirect(reverse("quiz-update", args=[quiz_id]))
                 with transaction.atomic():
                     quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
                     if publication_status == quiz.status:
-                        return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                        error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
+                        return redirect(reverse("quiz-update", args=[quiz_id]))
                     previous_status = quiz.status
                     quiz.status = publication_status
                     quiz.save(update_fields=["status"])
@@ -3242,7 +3233,8 @@ def update_quiz(request, quiz_id):
             with transaction.atomic():
                 quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
                 if not quiz.can_edit:
-                    return HttpResponse(_("Published or archived quiz cannot be edited."), status=403)
+                    error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
+                    return redirect(reverse("quiz-update", args=[quiz_id]))
                 previous_status = quiz.status
                 previous_opening_date = quiz.opening_date
                 previous_closing_date = quiz.closing_date
@@ -3713,15 +3705,15 @@ def api_delete_file(request):
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
+
     try:
 
         data = json.loads(request.body)
         file_key = data.get('file_key')
-        
+
         if not file_key:
             return JsonResponse({'error': _('File key required')}, status=400)
-        
+
         referencing = Lesson.objects.filter(Q(links__contains=file_key))
         if referencing.exists():
             names = list(referencing.values_list("name", flat=True)[:5])
@@ -3729,14 +3721,30 @@ def api_delete_file(request):
                 "error": _("File is referenced by lessons: %(names)s. Delete lessons first or reupload.") % {"names": ", ".join(names)}
             }, status=409)
 
+        if isinstance(file_key, str) and file_key.lower().endswith('.m3u8'):
+            # A manifest must clean its segment children first, otherwise the
+            # .ts objects are orphaned. Children are deleted before the parent.
+            successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
+            logger.info(f"User {request.user} deleted m3u8 file {file_key} with {len(successful)} related files")
+            if file_key in successful:
+                return JsonResponse({
+                    'success': True,
+                    'message': _('M3U8 file and segments deleted successfully'),
+                    'deleted_count': len(successful),
+                    'failed_count': len(failed),
+                    'deleted_files': successful,
+                    'failed_files': failed,
+                })
+            return JsonResponse({'error': _('Failed to delete file')}, status=500)
+
         success = R2_MANAGER.delete_file(file_key)
-        
+
         if success:
             logger.info(f"User {request.user} deleted file: {file_key}")
             return JsonResponse({'success': True, 'message': _('File deleted successfully')})
         else:
             return JsonResponse({'error': _('Failed to delete file')}, status=500)
-    
+
     except Exception as e:
         logger.error(f"Error deleting file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
@@ -3744,26 +3752,34 @@ def api_delete_file(request):
 @capability_required(can_delete_content)
 def api_delete_m3u8_file(request):
     """
-    API endpoint to delete an m3u8 file and all its related .ts segment files
+    API endpoint to delete an m3u8 file and all its related .ts segment files.
+    Segment children are deleted before the parent manifest.
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
+
     try:
 
         data = json.loads(request.body)
         file_key = data.get('file_key')
-        
+
         if not file_key:
             return JsonResponse({'error': _('File key required')}, status=400)
-        
-        if not file_key.endswith('.m3u8'):
+
+        if not file_key.lower().endswith('.m3u8'):
             return JsonResponse({'error': _('File must be an m3u8 file')}, status=400)
-        
+
+        referencing = Lesson.objects.filter(Q(links__contains=file_key))
+        if referencing.exists():
+            names = list(referencing.values_list("name", flat=True)[:5])
+            return JsonResponse({
+                "error": _("File is referenced by lessons: %(names)s. Delete lessons first or reupload.") % {"names": ", ".join(names)}
+            }, status=409)
+
         successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
-        
+
         logger.info(f"User {request.user} deleted m3u8 file {file_key} with {len(successful)} related files")
-        
+
         return JsonResponse({
             'success': True,
             'message': _('M3U8 file and segments deleted successfully'),
@@ -3772,7 +3788,7 @@ def api_delete_m3u8_file(request):
             'deleted_files': successful,
             'failed_files': failed
         })
-    
+
     except Exception as e:
         logger.error(f"Error deleting m3u8 file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
@@ -3780,23 +3796,47 @@ def api_delete_m3u8_file(request):
 @capability_required(can_delete_content)
 def api_delete_files_batch(request):
     """
-    API endpoint to delete multiple files in batch
+    API endpoint to delete multiple files in batch.
+    Manifest entries clean their segment children before the parent manifest;
+    lesson-referenced keys are reported as failed instead of orphaning lessons.
     """
     if request.method != 'DELETE':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
+
     try:
 
         data = json.loads(request.body)
         file_keys = data.get('file_keys', [])
-        
+
         if not file_keys:
             return JsonResponse({'error': _('No files specified')}, status=400)
-        
-        successful, failed = R2_MANAGER.delete_files_batch(file_keys)
-        
+
+        successful: list = []
+        failed: list = []
+        plain_keys: list = []
+        for key in file_keys:
+            if not isinstance(key, str) or not key:
+                failed.append(key)
+                continue
+            if Lesson.objects.filter(Q(links__contains=key)).exists():
+                failed.append(key)
+                continue
+            if key.lower().endswith('.m3u8'):
+                ok, bad = R2_MANAGER.delete_m3u8_with_segments(key)
+                successful.extend(ok)
+                failed.extend(bad)
+                # A manifest whose parent delete failed is already in `bad`;
+                # do not also queue it for the plain batch below.
+            else:
+                plain_keys.append(key)
+
+        if plain_keys:
+            ok, bad = R2_MANAGER.delete_files_batch(plain_keys)
+            successful.extend(ok)
+            failed.extend(bad)
+
         logger.info(f"User {request.user} batch deleted {len(successful)} files")
-        
+
         return JsonResponse({
             'success': True,
             'message': _('Files deleted successfully'),
@@ -3805,7 +3845,7 @@ def api_delete_files_batch(request):
             'deleted_files': successful,
             'failed_files': failed
         })
-    
+
     except Exception as e:
         logger.error(f"Error in batch delete: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)

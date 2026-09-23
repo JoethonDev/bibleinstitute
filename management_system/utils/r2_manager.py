@@ -10,6 +10,7 @@ This module provides comprehensive R2 storage management functions including:
 
 import boto3
 import os
+import posixpath
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
@@ -91,53 +92,160 @@ class R2Manager:
         
         return successful, failed
     
+    def _m3u8_child_keys(self, m3u8_key: str, base_name: str, folder: str) -> List[str]:
+        """Resolve the exact `.ts` children referenced by one manifest.
+
+        The canonical layout stores segments under
+        ``<folder>/Video Segments/`` and ``<folder>/Audio Segments/`` while the
+        playlist carries relative references such as
+        ``Video Segments/<base>_000.ts``. Reading the playlist is the source of
+        truth so a ``lecture1`` manifest can never collect a sibling
+        ``lecture10_*`` object. Legacy same-directory playlists (bare
+        ``<base>_NNN.ts`` references) are also accepted.
+        """
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=m3u8_key)
+            body = response.get("Body")
+            try:
+                raw = body.read() if body is not None else b""
+            finally:
+                close = getattr(body, "close", None)
+                if close is not None:
+                    try:
+                        close()
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"Error reading manifest {m3u8_key}: {e}")
+            return []
+        try:
+            text = raw.decode("utf-8", errors="strict")
+        except Exception as e:
+            print(f"Error decoding manifest {m3u8_key}: {e}")
+            return []
+        # Playlists are small text files; bound the parse to avoid huge reads.
+        if len(text) > 2 * 1024 * 1024:
+            print(f"Manifest {m3u8_key} too large to parse safely")
+            return []
+        children: List[str] = []
+        seen = set()
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if not line.lower().endswith(".ts"):
+                continue
+            if line.startswith("/") or "\\" in line or "://" in line:
+                continue
+            if "?" in line or "#" in line:
+                continue
+            parts = line.split("/")
+            if any(not part or part in (".", "..") for part in parts):
+                continue
+            resolved = posixpath.normpath(posixpath.join(folder, line)) if folder else posixpath.normpath(line)
+            if resolved.startswith("../") or resolved in (".", ".."):
+                continue
+            if folder and not resolved.startswith(folder + "/"):
+                continue
+            resolved_parts = resolved.split("/")
+            if len(resolved_parts) < 2:
+                continue
+            parent = resolved_parts[-2]
+            filename = resolved_parts[-1]
+            if parent in ("Video Segments", "Audio Segments"):
+                pass
+            elif resolved_parts[:-1] == folder.split("/") if folder else "/" not in resolved:
+                # Legacy same-directory layout: only exact base matches.
+                if not (filename.endswith(".ts") and filename.startswith(base_name + "_")):
+                    continue
+            else:
+                continue
+            if resolved != m3u8_key and resolved not in seen:
+                seen.add(resolved)
+                children.append(resolved)
+        return children
+
+    def _m3u8_fallback_scan(self, base_name: str, folder: str) -> List[str]:
+        """List canonical segment subfolders for ``base_name`` with pagination.
+
+        Used only when the manifest cannot be read/parsed, so orphaned
+        segments are still cleaned without ever guessing outside the two
+        canonical subfolders. The ``base + "_"`` prefix rule keeps
+        ``lecture1`` from matching ``lecture10_*``.
+        """
+        found: List[str] = []
+        prefixes = []
+        if folder:
+            prefixes = [folder + "/Video Segments/", folder + "/Audio Segments/"]
+        else:
+            prefixes = ["Video Segments/", "Audio Segments/"]
+        try:
+            paginator = self.client.get_paginator("list_objects_v2")
+        except Exception as e:
+            print(f"Error creating paginator for {base_name}: {e}")
+            return []
+        try:
+            for prefix in prefixes:
+                pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+                for page in pages:
+                    for obj in page.get("Contents", []):
+                        key = obj["Key"]
+                        filename = key.split("/")[-1]
+                        if filename.endswith(".ts") and filename.startswith(base_name + "_"):
+                            # Stay strictly inside the manifest folder subtree.
+                            if folder and not key.startswith(folder + "/"):
+                                continue
+                            if key not in found:
+                                found.append(key)
+        except Exception as e:
+            print(f"Error scanning segments for {base_name}: {e}")
+            return []
+        return found
+
     def delete_m3u8_with_segments(self, m3u8_key: str) -> Tuple[List[str], List[str]]:
         """
-        Delete an m3u8 file and all its related .ts segment files
-        Only deletes .ts files in the SAME directory as the m3u8 file
-        
+        Delete an m3u8 manifest and all its related .ts segment files.
+
+        Children are resolved from the playlist itself (canonical
+        ``Video Segments/``/``Audio Segments/`` references, plus legacy
+        same-directory references) and are deleted BEFORE the parent
+        manifest, so a video delete never orphans its segments.
+
         Args:
             m3u8_key: Full key/path of the .m3u8 file
-        
+
         Returns:
             Tuple of (successful_deletions, failed_deletions)
         """
-        if not m3u8_key.endswith('.m3u8'):
+        if not m3u8_key.lower().endswith('.m3u8'):
             return [], [m3u8_key]
-        
+
         # Get the directory and base name of the m3u8 file
-        directory = '/'.join(m3u8_key.split('/')[:-1])
-        if directory:
-            directory += '/'
-        
-        base_name = m3u8_key.split('/')[-1].replace('.m3u8', '')
-        
-        files_to_delete = [m3u8_key]
-        
-        # List all files in the same directory
+        parts = m3u8_key.split('/')[:-1]
+        folder = '/'.join(parts)
+        base_name = m3u8_key.split('/')[-1][:-len('.m3u8')]
+
+        children = self._m3u8_child_keys(m3u8_key, base_name, folder)
+        if not children:
+            children = self._m3u8_fallback_scan(base_name, folder)
+
+        successful: List[str] = []
+        failed: List[str] = []
+
+        # Delete children first so the parent manifest is removed last.
+        if children:
+            ok, bad = self.delete_files_batch(children)
+            successful.extend(ok)
+            failed.extend(bad)
+
         try:
-            response = self.client.list_objects_v2(
-                Bucket=self.bucket_name,
-                Prefix=directory
-            )
-            
-            if 'Contents' in response:
-                for obj in response['Contents']:
-                    key = obj['Key']
-                    filename = key.split('/')[-1]
-                    
-                    # Only include .ts files that match the pattern and are in the same directory
-                    if (filename.endswith('.ts') and 
-                        filename.startswith(base_name) and
-                        '/' not in key[len(directory):]):
-                        files_to_delete.append(key)
-        
+            self.client.delete_object(Bucket=self.bucket_name, Key=m3u8_key)
+            successful.append(m3u8_key)
         except Exception as e:
-            print(f"Error listing segments for {m3u8_key}: {e}")
-            return [], [m3u8_key]
-        
-        # Delete all files
-        return self.delete_files_batch(files_to_delete)
+            print(f"Error deleting manifest {m3u8_key}: {e}")
+            failed.append(m3u8_key)
+
+        return successful, failed
     
     def rename_file(self, old_key: str, new_key: str) -> bool:
         """
