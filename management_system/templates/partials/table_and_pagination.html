@@ -207,32 +207,29 @@
                     </td>
                     {% endfor %}
 
-                    <!-- View Submissions Column (for quizzes) -->
-                    {% if submission_view %}
-                    <td class="column-actions">
-                        <div class="ad-actions">
-                            <a href="{{ values.url }}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
-                                <i class="fas fa-question-circle me-1"></i>
-                                <span>{% translate "Quiz Details" %}</span>
-                            </a>
-                            <button class="ad-btn ad-btn--teal ad-btn--sm"
-                                    hx-get="{{ values.url }}view-submission/"
-                                    hx-swap="innerHTML"
-                                    hx-target="#display-page"
-                                    hx-trigger="click"
-                                    hx-push-url="true"
-                                    hx-select="#page-region">
-                                <i class="fas fa-users me-1"></i>
-                                <span>{% translate "View Submissions" %}</span>
-                            </button>
-                        </div>
-                    </td>
-                    {% endif %}
-
                     <!-- Action Buttons -->
-                    <td class="column-actions">
+                    <td class="column-actions{% if submission_view %} quiz-actions-cell{% endif %}">
+                        {% if submission_view %}
+                        <div class="quiz-actions">
+                            <div class="ad-actions quiz-actions-row">
+                                <a href="{{ values.url }}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                                    <i class="fas fa-question-circle me-1"></i>
+                                    <span>{% translate "Quiz Details" %}</span>
+                                </a>
+                                <button class="ad-btn ad-btn--teal ad-btn--sm"
+                                        hx-get="{{ values.url }}view-submission/"
+                                        hx-swap="innerHTML"
+                                        hx-target="#display-page"
+                                        hx-trigger="click"
+                                        hx-push-url="true"
+                                        hx-select="#page-region">
+                                    <i class="fas fa-users me-1"></i>
+                                    <span>{% translate "View Submissions" %}</span>
+                                </button>
+                            </div>
+                        {% endif %}
                         {% if submission_user %}
-                        <div class="ad-actions">
+                        <div class="ad-actions{% if submission_view %} quiz-actions-row{% endif %}">
                             <button class="ad-btn ad-btn--teal ad-btn--sm"
                                     hx-get="{{ values.url }}"
                                     hx-swap="innerHTML"
@@ -250,7 +247,7 @@
                             </a>
                         </div>
                         {% else %}
-                        <div class="ad-actions">
+                        <div class="ad-actions{% if submission_view %} quiz-actions-row{% endif %}">
                             {% if view == "user" %}
                             <a class="ad-btn ad-btn--outline-gold ad-btn--sm"
                                href="{{ values.url }}"
@@ -285,6 +282,9 @@
                                 <i class="fas fa-trash me-1"></i>
                                 <span>{% translate "Delete" %}</span>
                             </button>
+                        </div>
+                        {% endif %}
+                        {% if submission_view %}
                         </div>
                         {% endif %}
                     </td>

@@ -157,8 +157,7 @@
     </div>
     <div class="grade-matrix-legend"><span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Complete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Partial" %} / {% translate "Incomplete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Absent" %}</span><span class="grade-matrix-legend-note">{% translate "Each meeting shows entrance, exit, scanner, and grade details." %}</span></div>
     {% else %}<div class="ad-empty"><i class="fas fa-calendar-xmark" aria-hidden="true"></i><strong>{% translate "No scheduled meetings." %}</strong><span>{% translate "Choose a different date range or course." %}</span></div>{% endif %}
+    {% translate "Attendance matrix pagination" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
   </section>
-
-  {% translate "Attendance matrix pagination" as pagination_aria_label %}
-  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
 </div>

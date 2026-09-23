@@ -622,6 +622,20 @@
 /* ---------------- Row / icon action buttons ---------------- */
 .ad-actions { display: inline-flex; align-items: center; gap: .25rem; z-index: 5; }
 
+.quiz-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+}
+
+.quiz-actions-row {
+    justify-content: center;
+    flex-wrap: nowrap;
+}
+
+.quiz-actions-row .ad-btn { white-space: nowrap; }
+
 .ad-action-btn {
     width: 2.75rem;
     height: 2.75rem;
@@ -2120,6 +2134,11 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .admin-main-content.ad-panes:has(#content.attendance-matrix-page) { padding-bottom: 0; }
 #content.attendance-matrix-page { padding-bottom: 0 !important; }
 #content.attendance-matrix-page > .attendance-matrix-card { margin-bottom: 0; }
+/* Keep the card footer compact so the legend/pagination stack does not read
+   as a large blank area below the matrix. Scoped to this page only. */
+#content.attendance-matrix-page > .attendance-matrix-card > .grade-matrix-legend { padding: .5rem 1.15rem .4rem; }
+#content.attendance-matrix-page > .attendance-matrix-card > .ad-page-wrapper { margin-top: 0; padding: .4rem 1rem .7rem; gap: .35rem; }
+#content.attendance-matrix-page > .attendance-matrix-card > .ad-page-wrapper.mt-3 { margin-top: 0 !important; }
 
 @media (max-width: 900px) {
     .attendance-matrix-student-filter { grid-column: 1 / -1; }

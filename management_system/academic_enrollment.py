@@ -438,7 +438,7 @@ def set_user_normal_enrollment_scope(
     ).exclude(academic_year_level=selected_scope).update(
         status=Enrollment.Status.INACTIVE,
     )
-    enrollment, _ = Enrollment.objects.select_for_update().get_or_create(
+    enrollment, _created = Enrollment.objects.select_for_update().get_or_create(
         student=locked_user,
         academic_year_level=selected_scope,
         course_offering=None,
@@ -835,7 +835,7 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
                 % {"ids": ", ".join(str(course_id) for course_id in sorted(missing))}
             )
 
-        student_ids = [result.enrollment.student_id for result, _, _ in eligible]
+        student_ids = [result.enrollment.student_id for result, _rows, _failed_rows in eligible]
         target_offering_ids = [destination_offerings[course_id].pk for course_id in course_ids]
         existing = {
             (enrollment.student_id, enrollment.course_offering_id): enrollment
@@ -845,7 +845,7 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
             )
         }
         to_create = []
-        for result, _, failed_rows in eligible:
+        for result, _rows, failed_rows in eligible:
             for failed_row in failed_rows:
                 offering = destination_offerings[failed_row.course_offering.course_id]
                 key = (result.enrollment.student_id, offering.pk)
@@ -869,7 +869,7 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
                 )
             })
 
-        source_ids = [result.enrollment_id for result, _, _ in eligible]
+        source_ids = [result.enrollment_id for result, _rows, _failed_rows in eligible]
         Enrollment.objects.filter(pk__in=source_ids).update(status=Enrollment.Status.COMPLETED)
         histories = []
         for result, rows, failed_rows in eligible:

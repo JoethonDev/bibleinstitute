@@ -154,6 +154,7 @@ from .academic_evaluation import (
 )
 from .evaluation_export import build_evaluation_workbook, xlsx_safe_cell
 from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
+from .mobile_auth import revoke_user_mobile_access
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
 from .media_processing import (
@@ -2173,7 +2174,7 @@ def navigate_folder(request, folder_id=None):
         root = False
         drive, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_id, folders_only=folders_only)
     else:
-        drive, _ = list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=folders_only)
+        drive, _parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=folders_only)
 
     return render(request, "drive_files.html", {
         "drive" : drive,
@@ -2430,7 +2431,7 @@ def media_job_source_complete(request, job_uuid):
         client_size = payload.get("size")
         if client_size is not None and client_size != job.source_size:
             raise ValidationError(_("The uploaded source size does not match the media job."))
-        queued, _ = queue_verified_job(
+        queued, _was_queued = queue_verified_job(
             job.public_id,
             expected_etag=payload.get("etag") or None,
             acknowledged_at=timezone.now(),
@@ -2531,7 +2532,7 @@ def media_job_retry(request, job_uuid):
     if job.status != MediaProcessingStatus.FAILED or not job.source_acknowledged_at:
         return JsonResponse({"message": _("Only failed jobs with a retained source can be retried.")}, status=409)
     try:
-        queued, _ = queue_verified_job(
+        queued, _was_queued = queue_verified_job(
             job.public_id,
             acknowledged_at=job.source_acknowledged_at,
         )
@@ -3603,7 +3604,7 @@ def submission_user(request, quiz_id, user_id):
         })
     
     elif request.method == "POST":
-        questions, _ = unpack_quiz_form(request.POST)
+        questions, _parsed_form_data = unpack_quiz_form(request.POST)
         
         manual_graded_questions = 0
         modified_questions = []
@@ -4081,7 +4082,7 @@ def api_quiz_status(request, offering_id):
         result = []
 
         for quiz in quizzes:
-            status, _ = get_student_quiz_status(quiz, user, current_time)
+            status, _status_detail = get_student_quiz_status(quiz, user, current_time)
 
             result.append({"id": quiz.pk, "status": status})
 
