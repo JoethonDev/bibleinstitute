@@ -3877,6 +3877,28 @@ def api_rename_file(request):
             else:
                 return JsonResponse({'error': _('Failed to rename folder')}, status=500)
 
+        if isinstance(old_key, str) and old_key.lower().endswith('.ts'):
+            return JsonResponse(
+                {'error': _('Segment files cannot be renamed directly. Rename the video file instead.')},
+                status=400,
+            )
+
+        if (isinstance(old_key, str) and isinstance(new_key, str)
+                and old_key.lower().endswith('.m3u8') and new_key.lower().endswith('.m3u8')):
+            # A manifest rename must move its segment children and rewrite the
+            # playlist references, otherwise the renamed video loses its media.
+            renamed_ok, rename_error, renamed_keys = R2_MANAGER.rename_m3u8_with_segments(old_key, new_key)
+            if renamed_ok:
+                updated_count = rewrite_lesson_r2_references(old_key, new_key)
+                logger.info(f"User {request.user} renamed m3u8 file from {old_key} to {new_key} with {len(renamed_keys)} related files.")
+                return JsonResponse({
+                    'success': True,
+                    'message': _('File renamed successfully and %(count)d database references updated') % {'count': updated_count},
+                    'new_key': new_key,
+                    'renamed_files': renamed_keys,
+                })
+            return JsonResponse({'error': _(rename_error) if rename_error else _('Failed to rename file')}, status=409 if 'already exists' in (rename_error or '') else 500)
+
         success = R2_MANAGER.rename_file(old_key, new_key)
         
         if success:

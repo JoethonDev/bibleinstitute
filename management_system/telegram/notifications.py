@@ -284,12 +284,20 @@ def _materialize_due_deliveries(limit: int) -> int:
     Recipients are resolved at due time (mirroring the mobile dispatcher) so a
     student who links a Telegram account after event creation still receives
     the message. Idempotent: an existing delivery for the event key is kept.
+
+    The due scan excludes already-materialized events in SQL via an anti-join.
+    Without this, the bounded ``[:scan_limit]`` window would keep returning
+    the oldest already-delivered rows and starve newer notifications forever
+    once more than ``NOTIFICATION_BATCH_SIZE`` deliveries accumulate.
     """
     now = timezone.now()
     scan_limit = max(1, min(int(limit), NOTIFICATION_BATCH_SIZE))
     active_telegram_account = TelegramAccount.objects.filter(
         user_id=OuterRef("student_id"),
         is_active=True,
+    )
+    already_materialized = TelegramNotificationDelivery.objects.filter(
+        idempotency_key=OuterRef("idempotency_key"),
     )
     notifications = list(
         StudentNotification.objects.filter(
@@ -302,6 +310,7 @@ def _materialize_due_deliveries(limit: int) -> int:
             ),
         )
         .filter(Exists(active_telegram_account))
+        .filter(~Exists(already_materialized))
         .prefetch_related("telegram_deliveries")
         .order_by("scheduled_for", "pk")[:scan_limit]
     )

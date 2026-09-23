@@ -162,10 +162,27 @@ def _notification_payload(delivery: PushDelivery) -> dict:
 def _materialize_due_deliveries(limit: int) -> int:
     now = timezone.now()
     scan_limit = max(1, min(int(limit), DELIVERY_SCAN_LIMIT))
-    active_device_exists = MobilePushDevice.objects.filter(
-        user_id=OuterRef("student_id"),
-        is_active=True,
-        disabled_at__isnull=True,
+    # Exclude fully-materialized notifications in SQL. Without this, the
+    # bounded [:scan_limit] window keeps returning the oldest already-covered
+    # rows and starves newer notifications once the delivered backlog exceeds
+    # the scan window. The nested anti-join keeps notifications that still
+    # have at least one active device without a delivery, so late-registered
+    # devices and partial batches are still picked up.
+    missing_device_exists = (
+        MobilePushDevice.objects.filter(
+            user_id=OuterRef("student_id"),
+            is_active=True,
+            disabled_at__isnull=True,
+        )
+        .annotate(_sn_notif_id=OuterRef("pk"))
+        .filter(
+            ~Exists(
+                PushDelivery.objects.filter(
+                    notification_id=OuterRef("_sn_notif_id"),
+                    device_id=OuterRef("pk"),
+                )
+            )
+        )
     )
     active_devices = MobilePushDevice.objects.filter(
         is_active=True,
@@ -188,7 +205,7 @@ def _materialize_due_deliveries(limit: int) -> int:
             student__application_status="active",
             student__role__role="student",
         )
-        .filter(Exists(active_device_exists))
+        .filter(Exists(missing_device_exists))
         .select_related("student")
         .prefetch_related(
             Prefetch(

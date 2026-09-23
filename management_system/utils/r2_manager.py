@@ -246,7 +246,196 @@ class R2Manager:
             failed.append(m3u8_key)
 
         return successful, failed
-    
+
+    @staticmethod
+    def _is_safe_object_key(key: str) -> bool:
+        """Reject absolute/traversal/scheme/query keys before a rename."""
+        if not isinstance(key, str) or not key or len(key) > 1024:
+            return False
+        if key.startswith("/") or "\\" in key or "://" in key:
+            return False
+        if "?" in key or "#" in key:
+            return False
+        parts = key.split("/")
+        if any(not part or part in (".", "..") for part in parts):
+            return False
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in key):
+            return False
+        return True
+
+    def _object_exists(self, key: str) -> bool:
+        """Return True when R2 already holds ``key``."""
+        try:
+            self.client.head_object(Bucket=self.bucket_name, Key=key)
+            return True
+        except Exception:
+            return False
+
+    def _read_manifest_text(self, m3u8_key: str) -> Optional[str]:
+        """Fetch one manifest as UTF-8 text, bounded to 2 MiB."""
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=m3u8_key)
+            body = response.get("Body")
+            try:
+                raw = body.read() if body is not None else b""
+            finally:
+                close = getattr(body, "close", None)
+                if close is not None:
+                    try:
+                        close()
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"Error reading manifest {m3u8_key}: {e}")
+            return None
+        try:
+            text = raw.decode("utf-8", errors="strict")
+        except Exception as e:
+            print(f"Error decoding manifest {m3u8_key}: {e}")
+            return None
+        if len(text) > 2 * 1024 * 1024:
+            print(f"Manifest {m3u8_key} too large to rewrite safely")
+            return None
+        return text
+
+    def rename_m3u8_with_segments(
+        self, old_key: str, new_key: str
+    ) -> Tuple[bool, str, List[str]]:
+        """Rename a manifest and rewrite/rename its exact `.ts` children.
+
+        The playlist contents are the source of truth: every referenced
+        segment is copied to the new base name, the playlist lines are
+        rewritten to the new references, the new manifest is uploaded, and
+        only then are the old children deleted before the old parent. The
+        paired audio manifest/MP3 sibling is intentionally untouched; only
+        the selected manifest and its direct children move.
+        """
+        if not isinstance(old_key, str) or not isinstance(new_key, str):
+            return False, "Invalid file key.", []
+        if not old_key.lower().endswith(".m3u8") or not new_key.lower().endswith(".m3u8"):
+            return False, "Both files must be m3u8 manifests.", []
+        if old_key == new_key:
+            return False, "The new name must differ.", []
+        if not self._is_safe_object_key(old_key) or not self._is_safe_object_key(new_key):
+            return False, "Invalid file key.", []
+
+        old_folder = "/".join(old_key.split("/")[:-1])
+        new_folder = "/".join(new_key.split("/")[:-1])
+        old_base = old_key.split("/")[-1][:-len(".m3u8")]
+        new_base = new_key.split("/")[-1][:-len(".m3u8")]
+        if not old_base or not new_base:
+            return False, "Invalid file name.", []
+
+        text = self._read_manifest_text(old_key)
+        if text is None:
+            return False, "The manifest could not be read.", []
+
+        pairs: List[Tuple[str, str, str, str]] = []
+        seen_old: set = set()
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or not line.lower().endswith(".ts"):
+                continue
+            if line.startswith("/") or "\\" in line or "://" in line:
+                return False, f"Unsupported segment reference: {line}.", []
+            if "?" in line or "#" in line:
+                return False, f"Unsupported segment reference: {line}.", []
+            ref_parts = line.split("/")
+            if any(not part or part in (".", "..") for part in ref_parts):
+                return False, f"Unsupported segment reference: {line}.", []
+            resolved = posixpath.normpath(posixpath.join(old_folder, line)) if old_folder else posixpath.normpath(line)
+            if resolved.startswith("../") or resolved in (".", ".."):
+                return False, f"Unsupported segment reference: {line}.", []
+            if old_folder and not resolved.startswith(old_folder + "/"):
+                return False, f"Unsupported segment reference: {line}.", []
+            resolved_parts = resolved.split("/")
+            if len(resolved_parts) < 2:
+                return False, f"Unsupported segment reference: {line}.", []
+            parent = resolved_parts[-2]
+            filename = resolved_parts[-1]
+            if parent in ("Video Segments", "Audio Segments"):
+                sub = parent
+            elif resolved_parts[:-1] == old_folder.split("/") if old_folder else "/" not in resolved:
+                sub = ""
+                if not (filename.endswith(".ts") and filename.startswith(old_base + "_")):
+                    return False, f"Unsupported segment reference: {line}.", []
+            else:
+                return False, f"Unsupported segment reference: {line}.", []
+            if not filename.startswith(old_base + "_"):
+                return False, f"Segment {filename} does not match {old_base}.", []
+            if resolved in seen_old:
+                continue
+            seen_old.add(resolved)
+            suffix = filename[len(old_base):]
+            new_filename = new_base + suffix
+            if new_folder and sub:
+                new_resolved = new_folder + "/" + sub + "/" + new_filename
+                new_ref = sub + "/" + new_filename
+            elif new_folder:
+                new_resolved = new_folder + "/" + new_filename
+                new_ref = new_filename
+            elif sub:
+                new_resolved = sub + "/" + new_filename
+                new_ref = sub + "/" + new_filename
+            else:
+                new_resolved = new_filename
+                new_ref = new_filename
+            pairs.append((line, resolved, new_ref, new_resolved))
+
+        if self._object_exists(new_key):
+            return False, "A file with the new name already exists.", []
+        for _, _, _, new_child in pairs:
+            if self._object_exists(new_child):
+                return False, f"Segment {new_child.split('/')[-1]} already exists.", []
+
+        created: List[str] = []
+        try:
+            for _, old_child, _, new_child in pairs:
+                self.client.copy_object(
+                    Bucket=self.bucket_name,
+                    CopySource={"Bucket": self.bucket_name, "Key": old_child},
+                    Key=new_child,
+                )
+                created.append(new_child)
+            by_old_ref = {ref: new_ref for ref, _, new_ref, _ in pairs}
+            rewritten: List[str] = []
+            for raw_line in text.splitlines():
+                line = raw_line.strip()
+                if line and not line.startswith("#") and line.lower().endswith(".ts") and line in by_old_ref:
+                    rewritten.append(by_old_ref[line])
+                else:
+                    rewritten.append(raw_line)
+            payload = "\n".join(rewritten) + "\n"
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=new_key,
+                Body=payload.encode("utf-8"),
+                ContentType="application/vnd.apple.mpegurl",
+            )
+            created.append(new_key)
+        except Exception as e:
+            print(f"Error renaming manifest {old_key} to {new_key}: {e}")
+            for key in created:
+                try:
+                    self.client.delete_object(Bucket=self.bucket_name, Key=key)
+                except Exception:
+                    pass
+            return False, "The rename failed before any old file was removed.", []
+
+        # Old children go first so the old parent is removed last.
+        old_children = [old_child for _, old_child, _, _ in pairs]
+        if old_children:
+            ok, bad = self.delete_files_batch(old_children)
+            if bad:
+                print(f"Old segments not fully removed for {old_key}: {bad}")
+                return False, "Renamed, but some old segment files remain.", created
+        try:
+            self.client.delete_object(Bucket=self.bucket_name, Key=old_key)
+        except Exception as e:
+            print(f"Error removing old manifest {old_key}: {e}")
+            return False, "Renamed, but the old manifest remains.", created
+        return True, "", created
+
     def rename_file(self, old_key: str, new_key: str) -> bool:
         """
         Rename a file (implemented as copy + delete)
