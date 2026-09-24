@@ -1879,7 +1879,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-progress-window { display: grid; gap: .12rem; padding: .45rem .7rem; color: var(--ps-muted); font-size: .7rem; white-space: nowrap; }
 .ad-progress-window strong { color: var(--ps-ink); font-size: .76rem; }
 .ad-progress-list { display: grid; gap: .7rem; }
-.ad-progress-row { min-width: 0; padding: 1rem; }
+.ad-progress-row { width: 100%; max-width: 100%; min-width: 0; padding: 1rem; container-type: inline-size; }
 .ad-progress-summary { display: grid; grid-template-columns: minmax(13rem, 1.7fr) minmax(8.5rem, 1.15fr) repeat(2, minmax(6.5rem, .72fr)) repeat(2, minmax(7.5rem, .9fr)) auto; align-items: start; gap: .8rem; min-width: 0; }
 .ad-progress-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .ad-progress-avatar, .ad-progress-metric-icon { display: grid; place-items: center; flex: 0 0 2.35rem; width: 2.35rem; height: 2.35rem; border-radius: 50%; color: var(--ps-teal); background: var(--ps-teal-soft); }
@@ -1907,7 +1907,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-progress-disclosure > summary::-webkit-details-marker, .ad-progress-day > summary::-webkit-details-marker { display: none; }
 .ad-progress-disclosure[open] > summary i { transform: rotate(180deg); }
 .ad-progress-disclosure > summary i { transition: transform var(--ps-motion); }
-.ad-progress-expanded { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(17rem, .8fr); gap: .85rem; padding-top: .85rem; border-top: 1px solid var(--ps-line-cool); }
+.ad-progress-expanded { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; min-width: 0; width: 100%; padding-top: .85rem; border-top: 1px solid var(--ps-line-cool); }
 .ad-progress-timeline-card, .ad-progress-daily-card { min-width: 0; padding: .85rem; border: 1px solid var(--ps-line-cool); border-radius: .8rem; background: var(--ps-paper); }
 .ad-progress-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; }
 .ad-progress-section-head h6 { margin: 0; color: var(--ps-ink); font-size: .84rem; font-weight: 700; }
@@ -1973,6 +1973,15 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     .ad-progress-day > summary { grid-template-columns: minmax(4.3rem, 1fr) minmax(3.5rem, .85fr) auto auto auto; gap: .24rem; padding-inline: .4rem; }
     .ad-progress-day-date, .ad-progress-day-time, .ad-progress-day-sessions, .ad-progress-day-gain { font-size: .62rem; }
     .ad-progress-highlights { grid-template-columns: 1fr; }
+}
+
+@container (max-width: 760px) {
+    .ad-progress-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .ad-progress-identity, .ad-progress-completion { grid-column: 1 / -1; }
+    .ad-progress-metric { grid-row: auto; }
+    .ad-progress-date { grid-row: auto; }
+    .ad-progress-disclosure { grid-column: 2; justify-self: end; }
+    .ad-progress-expanded { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------------- Content detail column helpers ---------------- */
