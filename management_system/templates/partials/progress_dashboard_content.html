@@ -71,18 +71,21 @@
                         </td>
                         <td>
                             {% if p.timeline_events %}
-                            <details class="ad-progress-timeline">
-                                <summary>{% blocktranslate count event_count=p.timeline_events|length %}{{ event_count }} event{% plural %}{{ event_count }} events{% endblocktranslate %}</summary>
+                            <div class="ad-progress-timeline" aria-label="{% translate 'Timeline' %}">
+                                <div class="ad-progress-timeline-head">
+                                    {% blocktranslate count event_count=p.timeline_events|length %}{{ event_count }} event{% plural %}{{ event_count }} events{% endblocktranslate %}
+                                </div>
                                 <ol class="ad-progress-timeline-list">
                                     {% for event in p.timeline_events %}
                                     <li>
-                                        <span class="ad-pill ad-pill--muted">{{ event.get_event_type_display }}</span>
+                                        <span class="ad-progress-timeline-marker" aria-hidden="true"></span>
+                                        <span class="ad-progress-timeline-type">{{ event.get_event_type_display }}</span>
                                         <time datetime="{{ event.occurred_at|date:'c' }}">{{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}</time>
-                                        {% if event.percent %}<small class="ps-muted-text">{{ event.percent }}%</small>{% endif %}
+                                        {% if event.percent %}<small class="ad-progress-timeline-percent">{{ event.percent }}%</small>{% endif %}
                                     </li>
                                     {% endfor %}
                                 </ol>
-                            </details>
+                            </div>
                             {% else %}
                             <span class="ps-muted-text">{% translate "No timeline events." %}</span>
                             {% endif %}

@@ -1,3 +1,5 @@
+const PROGRESS_HEARTBEAT_INTERVAL_MS = 10000;
+
 function progressTracker() {
     return {
         playedRanges: [],
@@ -13,6 +15,7 @@ function progressTracker() {
         interval: null,
         heartbeatInFlight: false,
         pendingEnd: false,
+        finalHeartbeatSent: false,
         pageExitHandler: null,
 
         init() {
@@ -27,7 +30,7 @@ function progressTracker() {
                 return;
             }
             this.startSession();
-            this.interval = setInterval(() => this.sendHeartbeat(), 10000);
+            this.interval = setInterval(() => this.sendHeartbeat(), PROGRESS_HEARTBEAT_INTERVAL_MS);
             this.pageExitHandler = () => this.sendHeartbeat(true);
             window.addEventListener('pagehide', this.pageExitHandler);
         },
@@ -66,25 +69,32 @@ function progressTracker() {
             if (!media || !Number.isFinite(media.currentTime)) return;
 
             if (media.played && media.played.length) {
+                const ranges = [];
                 for (let index = 0; index < media.played.length; index += 1) {
                     const start = media.played.start(index);
                     const end = media.played.end(index);
                     if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
-                        this.playedRanges.push([start, end]);
+                        ranges.push([start, end]);
                     }
                 }
+                this.playedRanges = ranges;
             } else {
-                this.playedRanges.push([media.currentTime, media.currentTime + 5]);
+                this.playedRanges = [[media.currentTime, media.currentTime + 5]];
             }
         },
 
         sendHeartbeat(ending = false) {
             if (!this.sessionId) return;
+            if (ending && this.finalHeartbeatSent) return;
             if (this.heartbeatInFlight) {
-                this.pendingEnd = this.pendingEnd || ending;
+                if (ending) {
+                    this.pendingEnd = true;
+                    this.finalHeartbeatSent = true;
+                }
                 return;
             }
             if (this.playedRanges.length === 0 && !ending) return;
+            if (ending) this.finalHeartbeatSent = true;
             const ranges = this.playedRanges;
             this.playedRanges = [];
             this.heartbeatInFlight = true;
@@ -106,7 +116,9 @@ function progressTracker() {
                 this.heartbeatInFlight = false;
                 const shouldEnd = this.pendingEnd;
                 this.pendingEnd = false;
-                if (this.playedRanges.length || shouldEnd) this.sendHeartbeat(shouldEnd);
+                // Ordinary buffered ranges wait for the next 10-second tick.
+                // Only a queued finalization is sent immediately.
+                if (shouldEnd) this.sendHeartbeat(true);
             });
         },
 

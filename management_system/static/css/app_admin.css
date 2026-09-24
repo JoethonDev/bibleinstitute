@@ -1870,11 +1870,39 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-meter--progress { height: 20px; max-width: 200px; }
 .ad-meter--progress > span { position: absolute; inset: 0; inset-inline-end: auto; border-radius: 999px; background: linear-gradient(90deg, var(--ps-gold), var(--ps-teal)); }
 
-.ad-progress-timeline { min-width: 13rem; }
-.ad-progress-timeline summary { cursor: pointer; color: var(--ps-teal-deep); font-weight: 700; }
-.ad-progress-timeline-list { display: grid; gap: .35rem; margin: .6rem 0 0; padding-inline-start: 1.1rem; }
-.ad-progress-timeline-list li { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; color: var(--ps-ink); font-size: .8rem; }
-.ad-progress-timeline-list time { white-space: nowrap; }
+.ad-progress-timeline { min-width: 15rem; max-width: 22rem; }
+.ad-progress-timeline-head {
+    color: var(--ps-teal-deep);
+    font-size: .76rem;
+    font-weight: 700;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid var(--ps-line);
+}
+.ad-progress-timeline-list {
+    display: grid;
+    gap: .2rem;
+    list-style: none;
+    margin: .35rem 0 0;
+    padding: 0;
+}
+.ad-progress-timeline-list li {
+    display: grid;
+    grid-template-columns: .45rem auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: .4rem;
+    min-height: 1.65rem;
+    color: var(--ps-ink);
+    font-size: .76rem;
+}
+.ad-progress-timeline-marker {
+    width: .38rem;
+    height: .38rem;
+    border-radius: 50%;
+    background: var(--ps-gold);
+}
+.ad-progress-timeline-type { color: var(--ps-teal-deep); font-weight: 700; }
+.ad-progress-timeline-list time { white-space: nowrap; color: var(--ps-muted); }
+.ad-progress-timeline-percent { color: var(--ps-teal-deep); font-weight: 700; }
 
 /* ---------------- Content detail column helpers ---------------- */
 .ad-col-number { width: 48px; }
