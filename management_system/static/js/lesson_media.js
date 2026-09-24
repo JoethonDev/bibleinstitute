@@ -1,6 +1,7 @@
 /* Shared student lesson media initialization.
- * The course page loads this once; HTMX lesson fragments reuse the same
- * listeners instead of registering a second media/PDF implementation.
+ * Video.js owns the transport for audio and video where HLS is not native.
+ * Safari/iOS keeps the browser's native HLS controls as the compatibility
+ * path, and failed initialization always falls back to those controls.
  */
 (function () {
     'use strict';
@@ -11,139 +12,33 @@
         return translations[key] || (typeof gettext === 'function' ? gettext(fallback) : fallback);
     }
 
-    function shouldUseNativeHls(media) {
-        const native = media?.canPlayType('application/vnd.apple.mpegurl');
-        if (!native) return false;
-        if (!window.Hls || !Hls.isSupported()) return true;
-        return 'ManagedMediaSource' in window;
+    function isNativeHls(media) {
+        if (!media || typeof media.canPlayType !== 'function') return false;
+        return Boolean(
+            media.canPlayType('application/vnd.apple.mpegurl')
+            || media.canPlayType('application/x-mpegURL')
+        );
     }
 
-    function disposeVideoJsPlayers(container) {
-        container.querySelectorAll('.sd-media-fullscreen').forEach(button => {
-            button._fullscreenCleanup?.();
-        });
-        container.querySelectorAll('video.video-js').forEach(videoEl => {
-            const player = videoEl.player;
-            if (player && typeof player.dispose === 'function') {
-                player.dispose();
-            }
-        });
+    function isVideo(media) {
+        return media?.tagName?.toLowerCase() === 'video';
     }
 
-    function setFullscreenState(button, active) {
-        if (!button) return;
-        const icon = button.querySelector('i');
-        const label = active ? button.dataset.exitFullscreenLabel : button.dataset.fullscreenLabel;
-        button.setAttribute('aria-label', label || 'Fullscreen');
-        const hiddenLabel = button.querySelector('.visually-hidden');
-        if (hiddenLabel) hiddenLabel.textContent = label || 'Fullscreen';
-        if (icon) {
-            icon.classList.toggle('fa-expand', !active);
-            icon.classList.toggle('fa-compress', active);
-        }
-        button.classList.toggle('is-active', active);
-    }
-
-    function installNativeFullscreen(video) {
-        const wrapper = video?.closest('.sd-live-player');
-        const button = wrapper?.querySelector('.sd-media-fullscreen');
-        if (!wrapper || !button) return;
-
-        button.hidden = false;
-        if (button.dataset.fullscreenBound === 'true') return;
-        button.dataset.fullscreenBound = 'true';
-
-        const currentFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement;
-
-        const clickHandler = () => {
-            if (video.webkitDisplayingFullscreen === true) {
-                video.webkitExitFullscreen?.();
-                return;
-            }
-            if (currentFullscreenElement() === wrapper || currentFullscreenElement() === video) {
-                try {
-                    if (typeof document.exitFullscreen === 'function') document.exitFullscreen();
-                    else document.webkitExitFullscreen?.();
-                } catch (_) {
-                    // Fullscreen can be denied or already closed by the browser.
-                }
-                return;
-            }
-            if (typeof video.webkitEnterFullscreen === 'function') {
-                try {
-                    video.webkitEnterFullscreen();
-                } catch (_) {
-                    // Safari can reject fullscreen when the gesture is no longer active.
-                }
-                return;
-            }
-            try {
-                if (typeof wrapper.requestFullscreen === 'function') {
-                    Promise.resolve(wrapper.requestFullscreen()).catch(() => {});
-                } else if (typeof wrapper.webkitRequestFullscreen === 'function') {
-                    wrapper.webkitRequestFullscreen();
-                } else if (typeof video.requestFullscreen === 'function') {
-                    Promise.resolve(video.requestFullscreen()).catch(() => {});
-                } else if (typeof video.webkitRequestFullscreen === 'function') {
-                    video.webkitRequestFullscreen();
-                }
-            } catch (_) {
-                // Fullscreen may be unavailable outside a user gesture.
-            }
-        };
-
-        button.addEventListener('click', clickHandler);
-
-        const update = () => {
-            const active = currentFullscreenElement() === wrapper || currentFullscreenElement() === video || video.webkitDisplayingFullscreen === true;
-            setFullscreenState(button, active);
-        };
-        document.addEventListener('fullscreenchange', update);
-        document.addEventListener('webkitfullscreenchange', update);
-        video.addEventListener('webkitbeginfullscreen', update);
-        video.addEventListener('webkitendfullscreen', update);
-        button._fullscreenCleanup = () => {
-            button.removeEventListener('click', clickHandler);
-            document.removeEventListener('fullscreenchange', update);
-            document.removeEventListener('webkitfullscreenchange', update);
-            video.removeEventListener('webkitbeginfullscreen', update);
-            video.removeEventListener('webkitendfullscreen', update);
-            delete button._fullscreenCleanup;
-            delete button.dataset.fullscreenBound;
-        };
-        update();
-    }
-
-    function initializeVideoJs(video) {
-        if (!video || video.player) return;
-        const source = video.querySelector('source');
-        if (!source || !source.src) return;
-        if (shouldUseNativeHls(video)) {
-            video.src = source.src;
-            video.load();
-            installNativeFullscreen(video);
-            return;
-        }
-        const player = videojs(video, {
-            controls: true,
-            fluid: true,
-            playbackRates: [0.5, 1, 1.5, 2],
-            controlBar: {
-                volumePanel: true,
-                playbackRateMenuButton: true,
-                playToggle: true,
-                fullscreenToggle: true
-            }
-        });
-        player.seekButtons({ forward: 10, back: 10 });
+    function mediaErrorStatus(error) {
+        return Number(
+            error?.status
+            || error?.statusCode
+            || error?.response?.status
+            || error?.response?.code
+            || error?.xhr?.status
+        );
     }
 
     function reloadExpiredMedia() {
         const key = `media-session-reload:${window.location.pathname}`;
         if (sessionStorage.getItem(key)) return;
         sessionStorage.setItem(key, '1');
-        // Media authorization expired: refresh the page content region so all
-        // signed media URLs are re-issued without a full document reload.
+        // Signed media URLs are refreshed by swapping the current content region.
         if (window.htmx) {
             htmx.ajax('GET', window.location.pathname + window.location.search, {
                 target: '#content',
@@ -155,53 +50,134 @@
         }
     }
 
-    function initializeHlsAudio(audio) {
-        if (!audio || audio.hls) return;
-        const source = audio.querySelector('source');
-        if (!source || !source.src) return;
-        if (shouldUseNativeHls(audio)) {
-            audio.src = source.src;
-            audio.load();
-            return;
-        }
-        if (!window.Hls || !Hls.isSupported()) return;
-        const hls = new Hls();
-        hls.loadSource(source.src);
-        hls.attachMedia(audio);
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-            if (data?.response?.code === 401 || data?.response?.code === 403) {
-                reloadExpiredMedia();
-            }
-        });
-        audio.hls = hls;
+    function handleMediaError(media, player) {
+        const error = player?.error?.() || media?.error;
+        if ([401, 403].includes(mediaErrorStatus(error))) reloadExpiredMedia();
     }
 
-    function attachMediaSource(element, url) {
-        const source = element?.querySelector('source');
-        if (!element || !source || !url) return;
-        source.src = url;
-        if (element.tagName.toLowerCase() === 'video') {
-            if (shouldUseNativeHls(element)) {
-                element.src = url;
-                element.load();
-                installNativeFullscreen(element);
-                return;
-            }
-            let player = element.player;
-            if (!player) {
-                initializeVideoJs(element);
-                player = element.player;
-            }
-            if (!player) return;
-            player.src({ src: url, type: 'application/x-mpegURL' });
-            player.one('error', () => {
-                const response = player.error()?.response;
-                if (response?.code === 401 || response?.code === 403) reloadExpiredMedia();
-            });
-        } else {
-            element.load();
-            initializeHlsAudio(element);
+    function registerVideoJsLanguage() {
+        if (!window.videojs || typeof videojs.addLanguage !== 'function') return;
+        const language = translations.language || 'en';
+        videojs.addLanguage(language, {
+            Play: translate('play', 'Play'),
+            Pause: translate('pause', 'Pause'),
+            Mute: translate('mute', 'Mute'),
+            Unmute: translate('unmute', 'Unmute'),
+            Fullscreen: translate('fullscreen', 'Enter fullscreen'),
+            'Exit Fullscreen': translate('exitFullscreen', 'Exit fullscreen'),
+            'Playback Rate': translate('playbackRate', 'Playback speed'),
+            'Rewind 10 Seconds': translate('rewind', 'Rewind 10 seconds'),
+            'Forward 10 Seconds': translate('forward', 'Forward 10 seconds'),
+        });
+    }
+
+    function nativeFallback(media, url) {
+        if (!media || !url) return;
+        media.classList.remove('video-js', 'vjs-theme-city');
+        media.controls = true;
+        media._mediaSourceUrl = url;
+        media.src = url;
+        media.load();
+    }
+
+    function videoJsOptions(media) {
+        const controls = [
+            'playToggle',
+            'volumePanel',
+            'currentTimeDisplay',
+            'timeDivider',
+            'durationDisplay',
+            'progressControl',
+            'playbackRateMenuButton',
+        ];
+        if (isVideo(media)) controls.push('fullscreenToggle');
+        return {
+            controls: true,
+            fluid: isVideo(media),
+            responsive: isVideo(media),
+            preload: 'auto',
+            playbackRates: [0.75, 1, 1.25, 1.5, 2],
+            language: translations.language || 'en',
+            userActions: { hotkeys: true },
+            html5: {
+                vhs: { overrideNative: true },
+                nativeAudioTracks: false,
+                nativeVideoTracks: false,
+            },
+            controlBar: { children: controls },
+        };
+    }
+
+    function initializeVideoJs(media, url) {
+        if (!media || !url) return null;
+        if (!window.videojs || typeof videojs !== 'function') {
+            nativeFallback(media, url);
+            return null;
         }
+
+        media.classList.add('video-js', 'vjs-theme-city');
+        try {
+            const player = media.player || videojs(media, videoJsOptions(media));
+            player.controls(true);
+            player.src({ src: url, type: 'application/x-mpegURL' });
+            if (typeof player.seekButtons === 'function') {
+                player.seekButtons({ forward: 10, back: 10 });
+            }
+            if (!player._lessonMediaErrorBound) {
+                player._lessonMediaErrorBound = true;
+                player.on('error', () => handleMediaError(media, player));
+            }
+            media._mediaSourceUrl = url;
+            return player;
+        } catch (error) {
+            console.warn('Video.js initialization failed; using native controls.', error);
+            const player = media.player;
+            if (player && typeof player.dispose === 'function') player.dispose();
+            nativeFallback(media, url);
+            return null;
+        }
+    }
+
+    function disposeMedia(media) {
+        media._mediaErrorCleanup?.();
+        const player = media.player;
+        if (player && typeof player.dispose === 'function') player.dispose();
+        media._mediaSourceUrl = null;
+        media._lessonMediaInitialized = false;
+    }
+
+    function disposeVideoJsPlayers(container) {
+        container.querySelectorAll('video, audio').forEach(disposeMedia);
+    }
+
+    function attachMediaSource(media, url) {
+        const source = media?.querySelector('source');
+        if (!media || !source || !url || media._mediaSourceUrl === url) return;
+        source.src = url;
+
+        if (isNativeHls(media)) {
+            nativeFallback(media, url);
+            return;
+        }
+
+        initializeVideoJs(media, url);
+    }
+
+    function initializeMediaElement(media) {
+        if (!media || media._lessonMediaInitialized) return;
+        media._lessonMediaInitialized = true;
+        media.controls = true;
+        media.setAttribute('controlsList', 'nodownload');
+
+        const errorHandler = () => handleMediaError(media, media.player);
+        media.addEventListener('error', errorHandler);
+        media._mediaErrorCleanup = () => {
+            media.removeEventListener('error', errorHandler);
+            delete media._mediaErrorCleanup;
+        };
+
+        const source = media.querySelector('source');
+        if (source?.src) attachMediaSource(media, source.src);
     }
 
     async function initializePdfViewer(viewer) {
@@ -263,12 +239,8 @@
     }
 
     function initializeAllElements(container = document) {
-        container.querySelectorAll('video.video-js').forEach(initializeVideoJs);
-        container.querySelectorAll('audio').forEach(initializeHlsAudio);
-        container.querySelectorAll('video, audio').forEach(media => {
-            media.addEventListener('error', reloadExpiredMedia, { once: true });
-            media.setAttribute('controlsList', 'nodownload');
-        });
+        registerVideoJsLanguage();
+        container.querySelectorAll('video, audio').forEach(initializeMediaElement);
         container.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
     }
 
@@ -277,8 +249,6 @@
     });
 
     function swapTarget(event) {
-        // The vendored HTMX 4 runtime dispatches lifecycle events with the
-        // request context: detail.ctx.target holds the swap target element.
         return event.detail?.ctx?.target || event.detail?.target || null;
     }
 
@@ -288,16 +258,12 @@
 
     document.body.addEventListener('htmx:before:swap', event => {
         const target = swapTarget(event);
-        if (isMediaSwapTarget(target)) {
-            disposeVideoJsPlayers(target);
-        }
+        if (isMediaSwapTarget(target)) disposeVideoJsPlayers(target);
     });
 
     document.body.addEventListener('htmx:after:swap', event => {
         const target = swapTarget(event);
         if (isMediaSwapTarget(target)) {
-            // A fresh content region carries newly signed media URLs, so any
-            // one-shot expired-media reload guard can be released.
             sessionStorage.removeItem(`media-session-reload:${window.location.pathname}`);
             initializeAllElements(target);
         }

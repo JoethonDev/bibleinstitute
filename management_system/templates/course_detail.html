@@ -155,11 +155,20 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
 <script src="{% static 'videojs/video.min.js' %}?v={{ static_asset_version }}"></script>
 <script src="{% static 'videojs/videojs-seek-buttons.min.js' %}?v={{ static_asset_version }}"></script>
 <script>
     window.lessonMediaTranslations = {
+        language: '{{ request.LANGUAGE_CODE|default:"en"|escapejs }}',
+        play: '{% translate "Play"|escapejs %}',
+        pause: '{% translate "Pause"|escapejs %}',
+        mute: '{% translate "Mute"|escapejs %}',
+        unmute: '{% translate "Unmute"|escapejs %}',
+        fullscreen: '{% translate "Enter fullscreen"|escapejs %}',
+        exitFullscreen: '{% translate "Exit fullscreen"|escapejs %}',
+        rewind: '{% translate "Rewind 10 seconds"|escapejs %}',
+        forward: '{% translate "Forward 10 seconds"|escapejs %}',
+        playbackRate: '{% translate "Playback speed"|escapejs %}',
         page: '{% translate "Page"|escapejs %}',
         pdfError: '{% translate "Error loading PDF."|escapejs %}'
     };

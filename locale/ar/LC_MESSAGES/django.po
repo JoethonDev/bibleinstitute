@@ -2376,6 +2376,33 @@ msgstr "ملء الشاشة"
 msgid "Exit fullscreen"
 msgstr "الخروج من ملء الشاشة"
 
+msgid "Play"
+msgstr "تشغيل"
+
+msgid "Pause"
+msgstr "إيقاف مؤقت"
+
+msgid "Mute"
+msgstr "كتم الصوت"
+
+msgid "Unmute"
+msgstr "إلغاء كتم الصوت"
+
+msgid "Rewind 10 seconds"
+msgstr "إرجاع 10 ثوانٍ"
+
+msgid "Forward 10 seconds"
+msgstr "تقديم 10 ثوانٍ"
+
+msgid "Seek"
+msgstr "شريط التشغيل"
+
+msgid "Volume"
+msgstr "مستوى الصوت"
+
+msgid "Playback speed"
+msgstr "سرعة التشغيل"
+
 #: .\management_system\telegram\navigation.py:169
 msgid "My courses"
 msgstr "دوراتي"

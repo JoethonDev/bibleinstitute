@@ -52,7 +52,6 @@ function progressTracker() {
                     bubbles: true,
                     detail: { element: media, url: this.mediaUrl },
                 }));
-                media.load();
             }
         },
 

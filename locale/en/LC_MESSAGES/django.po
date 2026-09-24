@@ -2390,6 +2390,33 @@ msgstr "Enter fullscreen"
 msgid "Exit fullscreen"
 msgstr "Exit fullscreen"
 
+msgid "Play"
+msgstr "Play"
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Mute"
+msgstr "Mute"
+
+msgid "Unmute"
+msgstr "Unmute"
+
+msgid "Rewind 10 seconds"
+msgstr "Rewind 10 seconds"
+
+msgid "Forward 10 seconds"
+msgstr "Forward 10 seconds"
+
+msgid "Seek"
+msgstr "Seek"
+
+msgid "Volume"
+msgstr "Volume"
+
+msgid "Playback speed"
+msgstr "Playback speed"
+
 #: .\management_system\telegram\navigation.py:169
 #
 #| msgid "My Courses"
