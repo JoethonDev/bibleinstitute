@@ -77,11 +77,13 @@
                                 </div>
                                 <ol class="ad-progress-timeline-list">
                                     {% for event in p.timeline_events %}
-                                    <li>
+                                    <li title="{{ event.get_event_type_display }} — {{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}{% if event.percent %} — {{ event.percent }}%{% endif %}">
                                         <span class="ad-progress-timeline-marker" aria-hidden="true"></span>
-                                        <span class="ad-progress-timeline-type">{{ event.get_event_type_display }}</span>
-                                        <time datetime="{{ event.occurred_at|date:'c' }}">{{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}</time>
-                                        {% if event.percent %}<small class="ad-progress-timeline-percent">{{ event.percent }}%</small>{% endif %}
+                                        <span class="visually-hidden">
+                                            {{ event.get_event_type_display }}
+                                            {{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}
+                                            {% if event.percent %}{{ event.percent }}%{% endif %}
+                                        </span>
                                     </li>
                                     {% endfor %}
                                 </ol>

@@ -13,6 +13,10 @@ function progressTracker() {
         heartbeatUrl: null,
         mediaUrl: null,
         interval: null,
+        mediaRefreshTimer: null,
+        mediaRefreshInFlight: false,
+        destroyed: false,
+        segmentTokenLifetimeSeconds: 600,
         heartbeatInFlight: false,
         pendingEnd: false,
         finalHeartbeatSent: false,
@@ -31,27 +35,37 @@ function progressTracker() {
             }
             this.startSession();
             this.interval = setInterval(() => this.sendHeartbeat(), PROGRESS_HEARTBEAT_INTERVAL_MS);
-            this.pageExitHandler = () => this.sendHeartbeat(true);
+            this.pageExitHandler = () => {
+                this.cancelMediaRefresh();
+                this.sendHeartbeat(true);
+            };
             window.addEventListener('pagehide', this.pageExitHandler);
         },
 
         destroy() {
+            this.destroyed = true;
             if (this.interval) clearInterval(this.interval);
+            this.cancelMediaRefresh();
             if (this.pageExitHandler) window.removeEventListener('pagehide', this.pageExitHandler);
             this.sendHeartbeat(true);
         },
 
-        async startSession() {
+        async startSession({refresh = false} = {}) {
             const response = await fetch(this.startSessionUrl);
             if (!response.ok) {
                 throw new Error(`Viewing session request failed: ${response.status}`);
             }
             const data = await response.json();
+            if (this.destroyed || this.finalHeartbeatSent) return;
+            const hadSession = Boolean(this.sessionId);
             this.sessionId = data.session_id;
+            if (Number.isFinite(data.segment_token_lifetime_seconds) && data.segment_token_lifetime_seconds > 0) {
+                this.segmentTokenLifetimeSeconds = data.segment_token_lifetime_seconds;
+            }
             if (typeof data.progress_percent === 'number' && Number.isFinite(data.progress_percent)) {
                 this.progressPercent = Math.min(Math.max(Math.round(data.progress_percent), 0), 100);
             }
-            sessionStorage.removeItem(`media-session-reload:${window.location.pathname}`);
+            if (!refresh) sessionStorage.removeItem(`media-session-reload:${window.location.pathname}`);
             this.mediaUrl = `${data.manifest_url}?session_id=${encodeURIComponent(data.session_id)}&token=${encodeURIComponent(data.token)}`;
             const media = this.$el.querySelector('video, audio');
             const source = media?.querySelector('source');
@@ -59,8 +73,37 @@ function progressTracker() {
                 source.src = this.mediaUrl;
                 media.dispatchEvent(new CustomEvent('media-session-ready', {
                     bubbles: true,
-                    detail: { element: media, url: this.mediaUrl },
+                    detail: { element: media, url: this.mediaUrl, refresh: refresh || hadSession },
                 }));
+            }
+            this.scheduleMediaRefresh();
+        },
+
+        scheduleMediaRefresh() {
+            this.cancelMediaRefresh();
+            if (this.destroyed || this.finalHeartbeatSent || !this.sessionId) return;
+            const refreshDelay = Math.max(
+                30000,
+                Math.floor(this.segmentTokenLifetimeSeconds * 1000 * 0.8),
+            );
+            this.mediaRefreshTimer = setTimeout(() => this.refreshMediaSession(), refreshDelay);
+        },
+
+        cancelMediaRefresh() {
+            if (this.mediaRefreshTimer) clearTimeout(this.mediaRefreshTimer);
+            this.mediaRefreshTimer = null;
+        },
+
+        async refreshMediaSession() {
+            if (this.destroyed || this.finalHeartbeatSent || !this.sessionId || this.mediaRefreshInFlight) return;
+            this.mediaRefreshInFlight = true;
+            try {
+                await this.startSession({refresh: true});
+            } catch (error) {
+                console.warn('progressTracker: media token refresh failed', error);
+                this.scheduleMediaRefresh();
+            } finally {
+                this.mediaRefreshInFlight = false;
             }
         },
 

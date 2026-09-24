@@ -80,6 +80,39 @@
         media.load();
     }
 
+    function armPlaybackRestore(media, preservePosition) {
+        if (!preservePosition || !media) return null;
+        const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
+        const wasPlaying = !media.paused && !media.ended;
+        let restored = false;
+        const restore = () => {
+            if (restored) return;
+            restored = true;
+            media.removeEventListener('loadedmetadata', restore);
+            try {
+                const player = media.player;
+                if (currentTime > 0) {
+                    if (player && typeof player.currentTime === 'function') {
+                        player.currentTime(currentTime);
+                    } else {
+                        media.currentTime = currentTime;
+                    }
+                }
+                if (wasPlaying) {
+                    const playResult = player && typeof player.play === 'function'
+                        ? player.play()
+                        : media.play();
+                    if (playResult?.catch) playResult.catch(() => {});
+                }
+            } catch (_) {
+                // The source may still be changing; the next media error can refresh it again.
+            }
+        };
+        media.addEventListener('loadedmetadata', restore);
+        window.setTimeout(restore, 1500);
+        return restore;
+    }
+
     function videoJsOptions(media) {
         const controls = [
             'playToggle',
@@ -150,9 +183,10 @@
         container.querySelectorAll('video, audio').forEach(disposeMedia);
     }
 
-    function attachMediaSource(media, url) {
+    function attachMediaSource(media, url, preservePosition = false) {
         const source = media?.querySelector('source');
         if (!media || !source || !url || media._mediaSourceUrl === url) return;
+        armPlaybackRestore(media, preservePosition);
         source.src = url;
 
         if (isNativeHls(media)) {
@@ -245,7 +279,11 @@
     }
 
     document.addEventListener('media-session-ready', event => {
-        attachMediaSource(event.detail?.element, event.detail?.url);
+        attachMediaSource(
+            event.detail?.element,
+            event.detail?.url,
+            Boolean(event.detail?.refresh),
+        );
     });
 
     function swapTarget(event) {

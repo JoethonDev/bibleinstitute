@@ -6497,6 +6497,7 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         "session_id": session.session_id,
         "token": token,
         "expires_at": session.expires_at.isoformat(),
+        "segment_token_lifetime_seconds": int(MEDIA_SEGMENT_TOKEN_LIFETIME.total_seconds()),
         "manifest_url": reverse("lesson-manifest", args=[offering.pk, lesson.pk, file_index]),
         "progress_percent": progress_percent,
     })
@@ -6704,12 +6705,27 @@ def progress_heartbeat(request, *, allow_management=False):
     if timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Session expired.")}, status=403)
 
+    def progress_response(note=None):
+        current = LectureProgress.objects.filter(
+            student=request.user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+        ).values("percent", "completed_at").first()
+        payload = {
+            "status": "ok",
+            "percent": int(current["percent"] or 0) if current else 0,
+            "completed": bool(current and current["completed_at"]),
+        }
+        if note:
+            payload["note"] = note
+        return JsonResponse(payload)
+
     if not user_can_write_offering_activity(
         request.user,
         session.lesson.course_offering,
         allow_management=allow_management,
     ):
-        return JsonResponse({"status": "ok", "note": _("Historical content is read-only")})
+        return progress_response(_("Historical content is read-only"))
 
     heartbeat_at = timezone.now()
     session.last_heartbeat = heartbeat_at
@@ -6735,7 +6751,7 @@ def progress_heartbeat(request, *, allow_management=False):
     # Get verified segment requests for this session
     verified = set(session.verified_requests.values_list("segment_number", flat=True))
     if not verified:
-        return JsonResponse({"status": "ok", "note": _("No verified segments yet")})
+        return progress_response(_("No verified segments yet"))
 
     # Get segment time ranges from lesson and filter to verified ones
     lesson_segments = get_lesson_segments(
@@ -6757,7 +6773,7 @@ def progress_heartbeat(request, *, allow_management=False):
             })
 
     if not verified_ranges:
-        return JsonResponse({"status": "ok", "note": _("No verified segment ranges")})
+        return progress_response(_("No verified segment ranges"))
 
     total_secs = sum(end - start for start, end in all_ranges)
     with transaction.atomic():
