@@ -47,6 +47,7 @@
                         <th scope="col">{% translate "Part" %}</th>
                         <th scope="col">{% translate "Progress" %}</th>
                         <th scope="col">{% translate "Completed" context "progress" %}</th>
+                        <th scope="col">{% translate "Timeline" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,10 +69,28 @@
                             <span class="ad-pill ad-pill--muted">{% translate "No" %}</span>
                             {% endif %}
                         </td>
+                        <td>
+                            {% if p.timeline_events %}
+                            <details class="ad-progress-timeline">
+                                <summary>{% blocktranslate count event_count=p.timeline_events|length %}{{ event_count }} event{% plural %}{{ event_count }} events{% endblocktranslate %}</summary>
+                                <ol class="ad-progress-timeline-list">
+                                    {% for event in p.timeline_events %}
+                                    <li>
+                                        <span class="ad-pill ad-pill--muted">{{ event.get_event_type_display }}</span>
+                                        <time datetime="{{ event.occurred_at|date:'c' }}">{{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}</time>
+                                        {% if event.percent %}<small class="ps-muted-text">{{ event.percent }}%</small>{% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ol>
+                            </details>
+                            {% else %}
+                            <span class="ps-muted-text">{% translate "No timeline events." %}</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="ad-empty">
+                        <td colspan="6" class="ad-empty">
                             {% translate "No progress records for this selection." as progress_empty_desc %}
                             {% translate "Select an academic year to load progress data." as progress_filter_desc %}
                             {% if selected_year %}

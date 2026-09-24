@@ -1870,6 +1870,12 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-meter--progress { height: 20px; max-width: 200px; }
 .ad-meter--progress > span { position: absolute; inset: 0; inset-inline-end: auto; border-radius: 999px; background: linear-gradient(90deg, var(--ps-gold), var(--ps-teal)); }
 
+.ad-progress-timeline { min-width: 13rem; }
+.ad-progress-timeline summary { cursor: pointer; color: var(--ps-teal-deep); font-weight: 700; }
+.ad-progress-timeline-list { display: grid; gap: .35rem; margin: .6rem 0 0; padding-inline-start: 1.1rem; }
+.ad-progress-timeline-list li { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; color: var(--ps-ink); font-size: .8rem; }
+.ad-progress-timeline-list time { white-space: nowrap; }
+
 /* ---------------- Content detail column helpers ---------------- */
 .ad-col-number { width: 48px; }
 

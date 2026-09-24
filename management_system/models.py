@@ -2027,6 +2027,7 @@ class ViewingSession(models.Model):
     session_id = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField()
     last_heartbeat = models.DateTimeField(default=timezone.now)
+    ended_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["session_id"])]
@@ -2042,6 +2043,63 @@ class ViewingSession(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.name} part {self.part_id}"
+
+
+class LectureProgressEvent(models.Model):
+    class EventType(models.TextChoices):
+        STARTED = "started", _("Started")
+        ACTIVITY = "activity", _("Activity")
+        COMPLETED = "completed", _("80% completed")
+        ENDED = "ended", _("Ended")
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lecture_progress_events")
+    lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="lecture_progress_events")
+    viewing_session = models.ForeignKey(
+        ViewingSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="progress_events",
+    )
+    part_id = models.CharField(max_length=100)
+    event_type = models.CharField(max_length=16, choices=EventType.choices)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    bucket_start = models.DateTimeField(null=True, blank=True)
+    percent = models.PositiveSmallIntegerField(default=0)
+    unique_seconds = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["student", "lesson", "part_id", "occurred_at"],
+                name="lecture_event_timeline_idx",
+            ),
+            models.Index(
+                fields=["event_type", "occurred_at"],
+                name="lecture_event_type_time_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["viewing_session", "event_type"],
+                condition=models.Q(event_type__in=["started", "ended"]),
+                name="lecture_event_session_boundary_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "lesson", "part_id", "event_type"],
+                condition=models.Q(event_type="completed"),
+                name="lecture_event_completion_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["viewing_session", "event_type", "bucket_start"],
+                condition=models.Q(event_type="activity"),
+                name="lecture_event_activity_bucket_uniq",
+            ),
+        ]
+        ordering = ["occurred_at", "pk"]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.lesson.name} part {self.part_id}: {self.get_event_type_display()}"
 
 
 class VerifiedSegmentRequest(models.Model):

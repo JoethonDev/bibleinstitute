@@ -1,7 +1,26 @@
+import math
+
+
 def merge_ranges(ranges):
     if not ranges:
         return []
-    sorted_ranges = sorted(ranges, key=lambda x: x[0])
+    valid_ranges = []
+    for item in ranges:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            continue
+        try:
+            start, end = float(item[0]), float(item[1])
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(start) or not math.isfinite(end):
+            continue
+        start, end = max(0.0, start), max(0.0, end)
+        if end <= start:
+            continue
+        valid_ranges.append((start, end))
+    if not valid_ranges:
+        return []
+    sorted_ranges = sorted(valid_ranges, key=lambda x: x[0])
     merged = [list(sorted_ranges[0])]
     for start, end in sorted_ranges[1:]:
         if start <= merged[-1][1]:
@@ -36,3 +55,9 @@ def intersect_verified(player_ranges, verified_segments):
             if start < end:
                 result.append((start, end))
     return merge_ranges(result)
+
+
+def merge_verified_progress_ranges(existing_ranges, player_ranges, verified_segments):
+    """Merge only newly verified playback into the persisted coverage union."""
+    newly_verified = intersect_verified(player_ranges, verified_segments)
+    return merge_ranges(list(existing_ranges or []) + newly_verified)

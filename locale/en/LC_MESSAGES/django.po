@@ -11283,6 +11283,29 @@ msgstr "Academic level"
 msgid "Grades filters"
 msgstr "Grades filters"
 
+msgid "Started"
+msgstr "Started"
+
+msgid "Activity"
+msgstr "Activity"
+
+msgid "80% completed"
+msgstr "80% completed"
+
+msgid "Ended"
+msgstr "Ended"
+
+msgid "Timeline"
+msgstr "Timeline"
+
+msgid "No timeline events."
+msgstr "No timeline events."
+
+msgid "%(event_count)s event"
+msgid_plural "%(event_count)s events"
+msgstr[0] "%(event_count)s event"
+msgstr[1] "%(event_count)s events"
+
 msgid "Name or username"
 msgstr "Name or username"
 

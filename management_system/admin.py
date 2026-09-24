@@ -198,6 +198,14 @@ class LectureProgressAdmin(admin.ModelAdmin):
     raw_id_fields = ["student"]
 
 
+@admin.register(LectureProgressEvent)
+class LectureProgressEventAdmin(admin.ModelAdmin):
+    list_display = ["student", "lesson", "part_id", "event_type", "occurred_at", "percent"]
+    list_filter = ["event_type"]
+    date_hierarchy = "occurred_at"
+    raw_id_fields = ["student", "lesson", "viewing_session"]
+
+
 @admin.register(VerifiedSegmentRequest)
 class VerifiedSegmentRequestAdmin(admin.ModelAdmin):
     list_display = ["session", "segment_number", "segment_key", "requested_at"]

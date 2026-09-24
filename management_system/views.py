@@ -156,7 +156,7 @@ from .evaluation_export import build_evaluation_workbook, xlsx_safe_cell
 from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
 from .mobile_auth import revoke_user_mobile_access
 from .utils.hls_parser import get_lesson_segments, get_segment_number
-from .utils.progress_merge import intersect_verified, merge_ranges, unique_seconds, calculate_percent
+from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
 from .media_processing import (
     claim_attachment_retry,
     initialize_deadlines,
@@ -6329,7 +6329,52 @@ def create_viewing_session(student, lesson, part_id, *, mobile_session=None):
         session_id=session_id,
         expires_at=expires_at,
     )
+    LectureProgressEvent.objects.get_or_create(
+        viewing_session=session,
+        event_type=LectureProgressEvent.EventType.STARTED,
+        defaults={
+            "student": student,
+            "lesson": lesson,
+            "part_id": part_id,
+            "occurred_at": timezone.now(),
+        },
+    )
     return session
+
+
+def _record_progress_event(
+    session,
+    event_type,
+    *,
+    occurred_at=None,
+    percent=0,
+    unique_seconds=0,
+):
+    occurred_at = occurred_at or timezone.now()
+    defaults = {
+        "student": session.student,
+        "lesson": session.lesson,
+        "part_id": session.part_id,
+        "viewing_session": session,
+        "occurred_at": occurred_at,
+        "percent": max(0, min(int(percent or 0), 100)),
+        "unique_seconds": max(0, int(unique_seconds or 0)),
+    }
+    if event_type == LectureProgressEvent.EventType.COMPLETED:
+        lookup = {
+            "student": session.student,
+            "lesson": session.lesson,
+            "part_id": session.part_id,
+            "event_type": event_type,
+        }
+    else:
+        lookup = {
+            "viewing_session": session,
+            "event_type": event_type,
+        }
+    if event_type == LectureProgressEvent.EventType.ACTIVITY:
+        lookup["bucket_start"] = occurred_at.replace(second=0, microsecond=0)
+    return LectureProgressEvent.objects.get_or_create(**lookup, defaults=defaults)
 
 
 MEDIA_TOKEN_VERSION = "v2"
@@ -6431,10 +6476,17 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         student=request.user,
         lesson=lesson,
         part_id=part_id,
+        ended_at__isnull=True,
         expires_at__gt=timezone.now(),
     ).order_by("-expires_at").first()
     if session is None:
         session = create_viewing_session(request.user, lesson, part_id)
+    else:
+        _record_progress_event(
+            session,
+            LectureProgressEvent.EventType.STARTED,
+            occurred_at=timezone.now(),
+        )
     token = sign_session(session.session_id, session.expires_at, audience="web")
     progress_percent = LectureProgress.objects.filter(
         student=request.user,
@@ -6618,8 +6670,9 @@ def progress_heartbeat(request, *, allow_management=False):
 
     session_id = data.get("session_id")
     ranges = data.get("ranges", [])
+    ended = data.get("ended", False)
 
-    if not session_id or not isinstance(ranges, list):
+    if not session_id or not isinstance(ranges, list) or not isinstance(ended, bool):
         return JsonResponse({"error": _("Missing session identifier or time ranges.")}, status=400)
 
     if len(ranges) > 200:
@@ -6658,8 +6711,26 @@ def progress_heartbeat(request, *, allow_management=False):
     ):
         return JsonResponse({"status": "ok", "note": _("Historical content is read-only")})
 
-    session.last_heartbeat = timezone.now()
-    session.save(update_fields=["last_heartbeat"])
+    heartbeat_at = timezone.now()
+    session.last_heartbeat = heartbeat_at
+    update_fields = ["last_heartbeat"]
+    if ended and session.ended_at is None:
+        session.ended_at = heartbeat_at
+        update_fields.append("ended_at")
+    session.save(update_fields=update_fields)
+
+    if ranges:
+        _record_progress_event(
+            session,
+            LectureProgressEvent.EventType.ACTIVITY,
+            occurred_at=heartbeat_at,
+        )
+    if ended:
+        _record_progress_event(
+            session,
+            LectureProgressEvent.EventType.ENDED,
+            occurred_at=heartbeat_at,
+        )
 
     # Get verified segment requests for this session
     verified = set(session.verified_requests.values_list("segment_number", flat=True))
@@ -6688,37 +6759,36 @@ def progress_heartbeat(request, *, allow_management=False):
     if not verified_ranges:
         return JsonResponse({"status": "ok", "note": _("No verified segment ranges")})
 
-    intersected = intersect_verified(ranges, verified_ranges)
-    merged = merge_ranges(intersected)
-    unique_secs = unique_seconds(merged)
     total_secs = sum(end - start for start, end in all_ranges)
-    percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
-
-    progress, created = LectureProgress.objects.update_or_create(
-        student=request.user,
-        lesson=session.lesson,
-        part_id=session.part_id,
-        defaults={
-            "percent": percent,
-        }
-    )
-
-    # Merge with existing ranges
-    if not created and progress.merged_ranges:
-        all_ranges = merge_ranges(list(progress.merged_ranges) + merged)
-        progress.merged_ranges = all_ranges
-        unique_secs = unique_seconds(all_ranges)
+    with transaction.atomic():
+        progress, _created = LectureProgress.objects.select_for_update().get_or_create(
+            student=request.user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+            defaults={"merged_ranges": []},
+        )
+        merged = merge_verified_progress_ranges(
+            progress.merged_ranges,
+            ranges,
+            verified_ranges,
+        )
+        unique_secs = unique_seconds(merged)
         percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
-        progress.percent = percent
-    else:
         progress.merged_ranges = merged
+        progress.percent = percent
+        progress.unique_seconds = int(round(unique_secs))
+        if not progress.completed_at and percent >= 80:
+            progress.completed_at = timezone.now()
+        progress.save()
 
-    progress.unique_seconds = int(round(unique_secs))
-    COMPLETION_THRESHOLD = 80
-    if not progress.completed_at and percent >= COMPLETION_THRESHOLD:
-        progress.completed_at = timezone.now()
-
-    progress.save()
+        if progress.completed_at:
+            _record_progress_event(
+                session,
+                LectureProgressEvent.EventType.COMPLETED,
+                occurred_at=progress.completed_at,
+                percent=percent,
+                unique_seconds=progress.unique_seconds,
+            )
 
     return JsonResponse({
         "status": "ok",
@@ -6775,6 +6845,25 @@ def progress_dashboard(request):
 
     progress = progress.select_related("student", "lesson").order_by("-lesson__name", "student__username")
     page_obj = Paginator(progress, 25).get_page(request.GET.get("page", 1))
+    page_rows = list(page_obj.object_list)
+    event_map = {}
+    if page_rows:
+        event_filter = Q()
+        for row in page_rows:
+            event_filter |= Q(
+                student_id=row.student_id,
+                lesson_id=row.lesson_id,
+                part_id=row.part_id,
+            )
+        events = LectureProgressEvent.objects.filter(event_filter).order_by("occurred_at", "pk")
+        row_keys = {(row.student_id, row.lesson_id, row.part_id) for row in page_rows}
+        for event in events:
+            key = (event.student_id, event.lesson_id, event.part_id)
+            if key in row_keys:
+                event_map.setdefault(key, []).append(event)
+    for row in page_rows:
+        row.timeline_events = event_map.get((row.student_id, row.lesson_id, row.part_id), [])
+    page_obj.object_list = page_rows
 
     return render_page(request, "progress_dashboard.html", "partials/progress_dashboard_content.html", {
         "progress": page_obj,

@@ -11,6 +11,9 @@ function progressTracker() {
         heartbeatUrl: null,
         mediaUrl: null,
         interval: null,
+        heartbeatInFlight: false,
+        pendingEnd: false,
+        pageExitHandler: null,
 
         init() {
             this.offeringId = this.$el.dataset.offeringId;
@@ -25,11 +28,14 @@ function progressTracker() {
             }
             this.startSession();
             this.interval = setInterval(() => this.sendHeartbeat(), 10000);
+            this.pageExitHandler = () => this.sendHeartbeat(true);
+            window.addEventListener('pagehide', this.pageExitHandler);
         },
 
         destroy() {
             if (this.interval) clearInterval(this.interval);
-            this.sendHeartbeat();
+            if (this.pageExitHandler) window.removeEventListener('pagehide', this.pageExitHandler);
+            this.sendHeartbeat(true);
         },
 
         async startSession() {
@@ -56,20 +62,37 @@ function progressTracker() {
         },
 
         onTimeUpdate(event) {
-            const video = event.target;
-            if (Number.isFinite(video.currentTime)) {
-                this.playedRanges.push([video.currentTime, video.currentTime + 5]);
+            const media = event.currentTarget || event.target;
+            if (!media || !Number.isFinite(media.currentTime)) return;
+
+            if (media.played && media.played.length) {
+                for (let index = 0; index < media.played.length; index += 1) {
+                    const start = media.played.start(index);
+                    const end = media.played.end(index);
+                    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+                        this.playedRanges.push([start, end]);
+                    }
+                }
+            } else {
+                this.playedRanges.push([media.currentTime, media.currentTime + 5]);
             }
         },
 
-        sendHeartbeat() {
-            if (!this.sessionId || this.playedRanges.length === 0) return;
+        sendHeartbeat(ending = false) {
+            if (!this.sessionId) return;
+            if (this.heartbeatInFlight) {
+                this.pendingEnd = this.pendingEnd || ending;
+                return;
+            }
+            if (this.playedRanges.length === 0 && !ending) return;
             const ranges = this.playedRanges;
             this.playedRanges = [];
+            this.heartbeatInFlight = true;
             fetch(this.heartbeatUrl, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRF()},
-                body: JSON.stringify({session_id: this.sessionId, ranges: ranges}),
+                body: JSON.stringify({session_id: this.sessionId, ranges: ranges, ended: ending}),
+                keepalive: ending,
             }).then(async response => {
                 if (response.ok) {
                     try {
@@ -79,7 +102,12 @@ function progressTracker() {
                         }
                     } catch (_) { /* ignore malformed json */ }
                 }
-            }).catch(() => { /* ignore network errors */ });
+            }).catch(() => { /* ignore network errors */ }).finally(() => {
+                this.heartbeatInFlight = false;
+                const shouldEnd = this.pendingEnd;
+                this.pendingEnd = false;
+                if (this.playedRanges.length || shouldEnd) this.sendHeartbeat(shouldEnd);
+            });
         },
 
         getCSRF() {

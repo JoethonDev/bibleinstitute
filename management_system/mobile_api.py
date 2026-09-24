@@ -660,6 +660,7 @@ def media_session(request, offering_id, lesson_id, file_index):
             part_id=part_id,
             access_channel=ViewingSession.AccessChannel.MOBILE,
             mobile_session=request.mobile_session,
+            ended_at__isnull=True,
             expires_at__gt=timezone.now(),
         ).order_by("-expires_at").first()
     if session is None:

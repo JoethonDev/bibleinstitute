@@ -2403,6 +2403,33 @@ msgstr "مستوى الصوت"
 msgid "Playback speed"
 msgstr "سرعة التشغيل"
 
+msgid "Started"
+msgstr "بدأ"
+
+msgid "Activity"
+msgstr "نشاط"
+
+msgid "80% completed"
+msgstr "اكتمل بنسبة ٨٠٪"
+
+msgid "Ended"
+msgstr "انتهى"
+
+msgid "Timeline"
+msgstr "الخط الزمني"
+
+msgid "No timeline events."
+msgstr "لا توجد أحداث زمنية."
+
+msgid "%(event_count)s event"
+msgid_plural "%(event_count)s events"
+msgstr[0] "حدث واحد"
+msgstr[1] "حدثان"
+msgstr[2] "%(event_count)s أحداث"
+msgstr[3] "%(event_count)s حدثًا"
+msgstr[4] "%(event_count)s حدث"
+msgstr[5] "%(event_count)s حدث"
+
 #: .\management_system\telegram\navigation.py:169
 msgid "My courses"
 msgstr "دوراتي"
