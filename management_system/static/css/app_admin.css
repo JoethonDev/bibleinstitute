@@ -1880,7 +1880,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-progress-window strong { color: var(--ps-ink); font-size: .76rem; }
 .ad-progress-list { display: grid; gap: .7rem; }
 .ad-progress-row { min-width: 0; padding: 1rem; }
-.ad-progress-summary { display: grid; grid-template-columns: minmax(13rem, 1.7fr) minmax(8.5rem, 1.15fr) repeat(2, minmax(6.5rem, .72fr)) repeat(2, minmax(7.5rem, .9fr)) auto; align-items: center; gap: .8rem; min-width: 0; }
+.ad-progress-summary { display: grid; grid-template-columns: minmax(13rem, 1.7fr) minmax(8.5rem, 1.15fr) repeat(2, minmax(6.5rem, .72fr)) repeat(2, minmax(7.5rem, .9fr)) auto; align-items: start; gap: .8rem; min-width: 0; }
 .ad-progress-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .ad-progress-avatar, .ad-progress-metric-icon { display: grid; place-items: center; flex: 0 0 2.35rem; width: 2.35rem; height: 2.35rem; border-radius: 50%; color: var(--ps-teal); background: var(--ps-teal-soft); }
 .ad-progress-ident-text { min-width: 0; }
