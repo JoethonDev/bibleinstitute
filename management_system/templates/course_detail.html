@@ -167,7 +167,7 @@
 <script src="{% static 'js/lesson_media.js' %}?v={{ static_asset_version }}"></script>
 <script>
     const lessonLinks = document.querySelectorAll(".course-sidebar .list-group-item-action[hx-get]");
-    if (lessonLinks.length > 0 && document.querySelector("#display-page #content-loaded")) {
+    if (lessonLinks.length > 0 && document.querySelector("#display-page #content-loaded.content-empty")) {
         setTimeout(() => {
             lessonLinks[0].click();
         }, 100);

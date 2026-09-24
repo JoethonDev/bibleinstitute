@@ -1005,10 +1005,18 @@ def view_lesson_details(request, offering_id, lesson_id):
     lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
     if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
         raise PermissionDenied(_("You do not have access to this lesson."))
+    management_preview = user_has_management_role(user)
+    lessons = offering.lessons.all() if management_preview else offering.lessons.filter(status=PublicationStatus.PUBLISHED)
+    quizzes = offering.quizzes.all() if management_preview else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
     lesson_links = json.loads(lesson.links)
     return render(request, "lesson_stream.html", {
+        "offering": offering,
         "offering_id": offering.pk,
+        "course": offering.course,
         "lesson_id": lesson_id,
+        "lessons": lessons,
+        "quizzes": quizzes,
+        "management_preview": management_preview,
         "links": [{
             "url": reverse(
                 "lesson-manifest" if file.get("file_type") in {"video", "audio"} else "lesson-stream",

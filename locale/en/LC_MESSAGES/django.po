@@ -2381,6 +2381,15 @@ msgstr "Page %(current)s of %(total)s"
 msgid "Next"
 msgstr "Next"
 
+msgid "Slide"
+msgstr "Slide"
+
+msgid "Enter fullscreen"
+msgstr "Enter fullscreen"
+
+msgid "Exit fullscreen"
+msgstr "Exit fullscreen"
+
 #: .\management_system\telegram\navigation.py:169
 #
 #| msgid "My Courses"

@@ -787,6 +787,37 @@ main:has(.sd-page) {
     font-size: 1em;
 }
 
+/* Native HLS does not use Video.js controls, so provide the same fullscreen
+   affordance without changing the signed source or progress contracts. */
+.sd-media-fullscreen {
+    position: absolute;
+    inset-block-start: .75rem;
+    inset-inline-end: .75rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid rgba(255, 253, 248, .55);
+    border-radius: .65rem;
+    background: rgba(16, 38, 46, .82);
+    color: var(--ps-gold-soft);
+    cursor: pointer;
+    transition: background-color var(--ps-motion), color var(--ps-motion), transform var(--ps-motion);
+}
+
+.sd-media-fullscreen:hover,
+.sd-media-fullscreen:focus-visible,
+.sd-media-fullscreen.is-active {
+    background: var(--ps-gold);
+    color: var(--ps-ink-deep);
+}
+
+.sd-media-fullscreen:focus-visible {
+    outline: 2px solid var(--ps-gold-soft);
+    outline-offset: 2px;
+}
+
 /* Audio body in the live template — proposal-consistent golden gradient */
 .sd-audio-body {
     display: flex;
@@ -1593,6 +1624,10 @@ main:has(.sd-page) {
     .sd-cal-grid { gap: .2rem; }
     .sd-learn-head { align-items: flex-start; }
     .sd-learn-badges { margin-inline-start: 0; }
+    .sd-media-fullscreen {
+        inset-block-start: .5rem;
+        inset-inline-end: .5rem;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1782,6 +1817,42 @@ main:has(.sd-page) {
 .sd-carousel-wrap {
     margin-bottom: 2rem;
     box-shadow: 0 4px 24px rgba(23, 48, 58, .06);
+}
+
+.sd-carousel-indicators {
+    z-index: 3;
+    gap: .35rem;
+    margin-inline: 3.5rem;
+    margin-bottom: .65rem;
+}
+
+.sd-carousel-indicators [data-bs-target] {
+    width: 2.6rem;
+    height: .38rem;
+    margin-inline: 0;
+    border: 1px solid rgba(255, 253, 248, .8);
+    border-radius: 999px;
+    background-color: var(--ps-gold-soft);
+    opacity: .72;
+    transition: opacity var(--ps-motion), background-color var(--ps-motion), transform var(--ps-motion);
+}
+
+.sd-carousel-indicators [data-bs-target].active {
+    background-color: var(--ps-gold);
+    opacity: 1;
+    transform: scaleX(1.12);
+}
+
+@media (max-width: 575.98px) {
+    .sd-carousel-indicators {
+        margin-inline: 3rem;
+        margin-bottom: .45rem;
+    }
+
+    .sd-carousel-indicators [data-bs-target] {
+        width: 2.2rem;
+        height: .45rem;
+    }
 }
 
 .sd-welcome {

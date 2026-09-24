@@ -2367,6 +2367,15 @@ msgstr "الصفحة %(current)s من %(total)s"
 msgid "Next"
 msgstr "التالي"
 
+msgid "Slide"
+msgstr "شريحة"
+
+msgid "Enter fullscreen"
+msgstr "ملء الشاشة"
+
+msgid "Exit fullscreen"
+msgstr "الخروج من ملء الشاشة"
+
 #: .\management_system\telegram\navigation.py:169
 msgid "My courses"
 msgstr "دوراتي"
