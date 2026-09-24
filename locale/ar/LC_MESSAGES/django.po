@@ -2430,6 +2430,150 @@ msgstr[3] "%(event_count)s حدثًا"
 msgstr[4] "%(event_count)s حدث"
 msgstr[5] "%(event_count)s حدث"
 
+msgid "Student Progress"
+msgstr "تقدم الطلاب"
+
+msgid "Learning progress and meaningful study activity by lesson part."
+msgstr "تقدم التعلم ونشاط الدراسة الفعلي لكل جزء من الدرس."
+
+msgid "Search student name..."
+msgstr "ابحث باسم الطالب..."
+
+msgid "All lessons"
+msgstr "كل الدروس"
+
+msgid "Activity window"
+msgstr "فترة النشاط"
+
+msgid "Student progress records"
+msgstr "سجلات تقدم الطلاب"
+
+msgid "Part %(number)s"
+msgstr "الجزء %(number)s"
+
+msgid "Verified lesson progress"
+msgstr "تقدم الدرس المؤكد"
+
+msgid "In progress"
+msgstr "قيد التقدم"
+
+msgid "Not started"
+msgstr "لم يبدأ"
+
+msgid "Activity history unavailable"
+msgstr "سجل النشاط غير متاح"
+
+msgid "Progress changed"
+msgstr "تغير التقدم"
+
+msgid "Active days"
+msgstr "أيام النشاط"
+
+msgid "Active watch time"
+msgstr "وقت المشاهدة الفعلي"
+
+msgid "Playback time is credited only while visible playback is advancing; paused and idle time is excluded."
+msgstr "يُحتسب وقت التشغيل أثناء تقدم المشاهدة الظاهرة فقط؛ ولا يُحتسب التوقف أو الخمول."
+
+msgid "First started"
+msgstr "أول بدء"
+
+msgid "Last active"
+msgstr "آخر نشاط"
+
+msgid "Show study activity details"
+msgstr "عرض تفاصيل نشاط الدراسة"
+
+msgid "Study activity details"
+msgstr "تفاصيل نشاط الدراسة"
+
+msgid "Study timeline"
+msgstr "الخط الزمني للدراسة"
+
+msgid "Meaningful daily playback activity · last 30 days"
+msgstr "نشاط المشاهدة الفعلي يوميًا · آخر 30 يومًا"
+
+msgid "Activity intensity legend"
+msgstr "دليل كثافة النشاط"
+
+msgid "No activity"
+msgstr "لا نشاط"
+
+msgid "Low"
+msgstr "منخفض"
+
+msgid "Medium"
+msgstr "متوسط"
+
+msgid "High"
+msgstr "مرتفع"
+
+msgid "Daily active playback over the last 30 days"
+msgstr "المشاهدة النشطة يوميًا خلال آخر 30 يومًا"
+
+msgid "Daily breakdown"
+msgstr "التفصيل اليومي"
+
+msgid "Days with recorded active watching"
+msgstr "الأيام المسجل فيها مشاهدة نشطة"
+
+msgid "Load watching session details"
+msgstr "تحميل تفاصيل جلسات المشاهدة"
+
+msgid "No active study days in this period."
+msgstr "لا توجد أيام دراسة نشطة في هذه الفترة."
+
+msgid "Most active day"
+msgstr "أكثر الأيام نشاطًا"
+
+msgid "Most progress"
+msgstr "أكبر تقدم"
+
+msgid "Earlier activity predates active-time tracking. These totals include only activity recorded since"
+msgstr "يسبق النشاط السابق بدء تتبع وقت المشاهدة الفعلي. تشمل هذه المجاميع النشاط المسجل منذ"
+
+msgid "No watching activity has been recorded yet."
+msgstr "لم يُسجل نشاط مشاهدة بعد."
+
+msgid "No watching sessions were recorded for this day."
+msgstr "لم تُسجل جلسات مشاهدة في هذا اليوم."
+
+msgid "Watching session pages"
+msgstr "صفحات جلسات المشاهدة"
+
+msgid "Invalid playback sequence."
+msgstr "تسلسل تشغيل غير صالح."
+
+msgid "%(hours)s hr %(minutes)s min"
+msgstr "%(hours)s س %(minutes)s د"
+
+msgid "%(minutes)s min"
+msgstr "%(minutes)s د"
+
+msgid "%(seconds)s sec"
+msgstr "%(seconds)s ث"
+
+msgid "%(session_count)s session"
+msgid_plural "%(session_count)s sessions"
+msgstr[0] "لا توجد جلسات"
+msgstr[1] "جلسة واحدة"
+msgstr[2] "جلستان"
+msgstr[3] "%(session_count)s جلسات"
+msgstr[4] "%(session_count)s جلسة"
+msgstr[5] "%(session_count)s جلسة"
+
+msgid "%(session_count)s meaningful session"
+msgid_plural "%(session_count)s meaningful sessions"
+msgstr[0] "لا توجد جلسات فعلية"
+msgstr[1] "جلسة فعلية واحدة"
+msgstr[2] "جلستان فعليتان"
+msgstr[3] "%(session_count)s جلسات فعلية"
+msgstr[4] "%(session_count)s جلسة فعلية"
+msgstr[5] "%(session_count)s جلسة فعلية"
+
+msgid "%(active)s active days over %(elapsed)s calendar days"
+msgstr "%(active)s أيام نشاط على مدى %(elapsed)s يومًا تقويميًا"
+
 #: .\management_system\telegram\navigation.py:169
 msgid "My courses"
 msgstr "دوراتي"

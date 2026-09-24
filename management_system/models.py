@@ -2028,6 +2028,14 @@ class ViewingSession(models.Model):
     expires_at = models.DateTimeField()
     last_heartbeat = models.DateTimeField(default=timezone.now)
     ended_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_sequence = models.PositiveIntegerField(default=0)
+    watch_session = models.ForeignKey(
+        "LectureWatchSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="viewing_sessions",
+    )
 
     class Meta:
         indexes = [models.Index(fields=["session_id"])]
@@ -2049,6 +2057,7 @@ class LectureProgressEvent(models.Model):
     class EventType(models.TextChoices):
         STARTED = "started", _("Started")
         ACTIVITY = "activity", _("Activity")
+        PROGRESS = "progress", _("Progress changed")
         COMPLETED = "completed", _("80% completed")
         ENDED = "ended", _("Ended")
 
@@ -2130,12 +2139,64 @@ class LectureProgress(models.Model):
     unique_seconds = models.PositiveIntegerField(default=0)
     percent = models.PositiveSmallIntegerField(default=0)
     completed_at = models.DateTimeField(null=True, blank=True)
+    activity_tracking_started_at = models.DateTimeField(default=timezone.now, editable=False)
+    activity_history_incomplete = models.BooleanField(default=False, editable=False)
 
     class Meta:
         unique_together = [("student", "lesson", "part_id")]
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.name} part {self.part_id}: {self.percent}%"
+
+
+class LectureWatchSession(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lecture_watch_sessions")
+    lesson = models.ForeignKey("Lesson", on_delete=models.CASCADE, related_name="lecture_watch_sessions")
+    part_id = models.CharField(max_length=100)
+    started_at = models.DateTimeField()
+    last_active_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+    active_watch_seconds = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["started_at", "pk"]
+        indexes = [
+            models.Index(
+                fields=["student", "lesson", "part_id", "started_at"],
+                name="lecture_watch_timeline_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "lesson", "part_id"],
+                condition=models.Q(ended_at__isnull=True),
+                name="lecture_watch_one_open_uniq",
+            ),
+        ]
+
+
+class LectureWatchDay(models.Model):
+    watch_session = models.ForeignKey(
+        LectureWatchSession,
+        on_delete=models.CASCADE,
+        related_name="days",
+    )
+    study_date = models.DateField()
+    active_watch_seconds = models.PositiveIntegerField(default=0)
+    progress_start_percent = models.PositiveSmallIntegerField(null=True, blank=True)
+    progress_end_percent = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["study_date", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["watch_session", "study_date"],
+                name="lecture_watch_day_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["study_date", "watch_session"], name="lecture_watch_day_date_idx"),
+        ]
 
 
 class Lesson(models.Model):

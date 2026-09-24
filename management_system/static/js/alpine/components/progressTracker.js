@@ -3,6 +3,9 @@ const PROGRESS_HEARTBEAT_INTERVAL_MS = 10000;
 function progressTracker() {
     return {
         playedRanges: [],
+        activeSecondsBuffer: 0,
+        heartbeatSequence: 0,
+        playbackSample: null,
         progressPercent: 0,
         sessionId: null,
         offeringId: null,
@@ -15,12 +18,16 @@ function progressTracker() {
         interval: null,
         mediaRefreshTimer: null,
         mediaRefreshInFlight: false,
+        mediaRecoverySessionId: null,
+        mediaAuthErrorHandler: null,
         destroyed: false,
         segmentTokenLifetimeSeconds: 600,
         heartbeatInFlight: false,
         pendingEnd: false,
         finalHeartbeatSent: false,
         pageExitHandler: null,
+        progressUpdateHandler: null,
+        visibilityHandler: null,
 
         init() {
             this.offeringId = this.$el.dataset.offeringId;
@@ -33,13 +40,39 @@ function progressTracker() {
                 console.error('progressTracker: missing start-session-url or heartbeat-url data attributes');
                 return;
             }
+            this.progressUpdateHandler = event => {
+                const detail = event.detail || {};
+                if (
+                    String(detail.lessonId) !== String(this.lessonId)
+                    || String(detail.partId) !== String(this.partId)
+                ) return;
+                this.setProgressPercent(detail.percent);
+            };
+            window.addEventListener('lecture-progress-updated', this.progressUpdateHandler);
+            this.mediaAuthErrorHandler = event => {
+                const detail = event.detail || {};
+                if (
+                    detail.sourceUrl !== this.mediaUrl
+                    || !this.sessionId
+                    || this.mediaRecoverySessionId === this.sessionId
+                ) return;
+                this.mediaRecoverySessionId = this.sessionId;
+                this.refreshMediaSession();
+            };
+            this.$el.addEventListener('media-auth-expired', this.mediaAuthErrorHandler);
             this.startSession();
             this.interval = setInterval(() => this.sendHeartbeat(), PROGRESS_HEARTBEAT_INTERVAL_MS);
             this.pageExitHandler = () => {
+                this.resetPlaybackSample();
                 this.cancelMediaRefresh();
                 this.sendHeartbeat(true);
             };
             window.addEventListener('pagehide', this.pageExitHandler);
+            this.visibilityHandler = () => {
+                this.resetPlaybackSample();
+                if (document.hidden) this.sendHeartbeat();
+            };
+            document.addEventListener('visibilitychange', this.visibilityHandler);
         },
 
         destroy() {
@@ -47,6 +80,13 @@ function progressTracker() {
             if (this.interval) clearInterval(this.interval);
             this.cancelMediaRefresh();
             if (this.pageExitHandler) window.removeEventListener('pagehide', this.pageExitHandler);
+            if (this.visibilityHandler) document.removeEventListener('visibilitychange', this.visibilityHandler);
+            if (this.progressUpdateHandler) {
+                window.removeEventListener('lecture-progress-updated', this.progressUpdateHandler);
+            }
+            if (this.mediaAuthErrorHandler) {
+                this.$el.removeEventListener('media-auth-expired', this.mediaAuthErrorHandler);
+            }
             this.sendHeartbeat(true);
         },
 
@@ -63,9 +103,9 @@ function progressTracker() {
                 this.segmentTokenLifetimeSeconds = data.segment_token_lifetime_seconds;
             }
             if (typeof data.progress_percent === 'number' && Number.isFinite(data.progress_percent)) {
-                this.progressPercent = Math.min(Math.max(Math.round(data.progress_percent), 0), 100);
+                this.setProgressPercent(data.progress_percent);
+                this.publishProgress();
             }
-            if (!refresh) sessionStorage.removeItem(`media-session-reload:${window.location.pathname}`);
             this.mediaUrl = `${data.manifest_url}?session_id=${encodeURIComponent(data.session_id)}&token=${encodeURIComponent(data.token)}`;
             const media = this.$el.querySelector('video, audio');
             const source = media?.querySelector('source');
@@ -99,6 +139,7 @@ function progressTracker() {
             this.mediaRefreshInFlight = true;
             try {
                 await this.startSession({refresh: true});
+                this.mediaRecoverySessionId = null;
             } catch (error) {
                 console.warn('progressTracker: media token refresh failed', error);
                 this.scheduleMediaRefresh();
@@ -107,9 +148,26 @@ function progressTracker() {
             }
         },
 
+        setProgressPercent(value) {
+            if (typeof value !== 'number' || !Number.isFinite(value)) return;
+            this.progressPercent = Math.min(Math.max(Math.round(value), 0), 100);
+        },
+
+        publishProgress() {
+            window.dispatchEvent(new CustomEvent('lecture-progress-updated', {
+                detail: {
+                    lessonId: this.lessonId,
+                    partId: this.partId,
+                    percent: this.progressPercent,
+                },
+            }));
+        },
+
         onTimeUpdate(event) {
             const media = event.currentTarget || event.target;
             if (!media || !Number.isFinite(media.currentTime)) return;
+
+            this.samplePlayback(media);
 
             if (media.played && media.played.length) {
                 const ranges = [];
@@ -126,6 +184,44 @@ function progressTracker() {
             }
         },
 
+        onPlay(event) {
+            const media = event.currentTarget || event.target;
+            this.playbackSample = media ? {at: performance.now(), time: media.currentTime} : null;
+        },
+
+        onPause() {
+            this.resetPlaybackSample();
+            this.sendHeartbeat();
+        },
+
+        resetPlaybackSample() {
+            this.playbackSample = null;
+        },
+
+        samplePlayback(media) {
+            const now = performance.now();
+            const visibleAndPlaying = !document.hidden && !media.paused && !media.seeking;
+            if (!visibleAndPlaying) {
+                this.playbackSample = null;
+                return;
+            }
+            const current = {at: now, time: media.currentTime};
+            const previous = this.playbackSample;
+            this.playbackSample = current;
+            if (!previous) return;
+            const elapsed = (now - previous.at) / 1000;
+            const playbackDelta = current.time - previous.time;
+            if (
+                elapsed <= 2.5
+                && elapsed > 0
+                && playbackDelta > 0
+                && playbackDelta / elapsed >= 0.25
+                && playbackDelta / elapsed <= 4
+            ) {
+                this.activeSecondsBuffer += Math.min(elapsed, 2.5);
+            }
+        },
+
         sendHeartbeat(ending = false) {
             if (!this.sessionId) return;
             if (ending && this.finalHeartbeatSent) return;
@@ -136,22 +232,32 @@ function progressTracker() {
                 }
                 return;
             }
-            if (this.playedRanges.length === 0 && !ending) return;
+            if (this.playedRanges.length === 0 && this.activeSecondsBuffer === 0 && !ending) return;
             if (ending) this.finalHeartbeatSent = true;
             const ranges = this.playedRanges;
+            const activeSeconds = this.activeSecondsBuffer;
             this.playedRanges = [];
+            this.activeSecondsBuffer = 0;
+            this.heartbeatSequence += 1;
             this.heartbeatInFlight = true;
             fetch(this.heartbeatUrl, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': this.getCSRF()},
-                body: JSON.stringify({session_id: this.sessionId, ranges: ranges, ended: ending}),
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    ranges: ranges,
+                    ended: ending,
+                    active_seconds: activeSeconds,
+                    sequence: this.heartbeatSequence,
+                }),
                 keepalive: ending,
             }).then(async response => {
                 if (response.ok) {
                     try {
                         const data = await response.json();
                         if (typeof data.percent === 'number' && Number.isFinite(data.percent)) {
-                            this.progressPercent = Math.min(Math.max(Math.round(data.percent), 0), 100);
+                            this.setProgressPercent(data.percent);
+                            this.publishProgress();
                         }
                     } catch (_) { /* ignore malformed json */ }
                 }

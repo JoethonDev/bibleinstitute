@@ -34,25 +34,24 @@
         );
     }
 
-    function reloadExpiredMedia() {
-        const key = `media-session-reload:${window.location.pathname}`;
-        if (sessionStorage.getItem(key)) return;
-        sessionStorage.setItem(key, '1');
-        // Signed media URLs are refreshed by swapping the current content region.
-        if (window.htmx) {
-            htmx.ajax('GET', window.location.pathname + window.location.search, {
-                target: '#content',
-                select: '#content',
-                swap: 'outerHTML',
-            });
-        } else {
-            window.location.reload();
-        }
+    function requestMediaRefresh(media) {
+        const source = media?.querySelector('source');
+        const url = media?._mediaSourceUrl || source?.src;
+        if (!media || !url) return;
+        media.dispatchEvent(new CustomEvent('media-auth-expired', {
+            bubbles: true,
+            detail: {element: media, sourceUrl: url},
+        }));
     }
 
     function handleMediaError(media, player) {
         const error = player?.error?.() || media?.error;
-        if ([401, 403].includes(mediaErrorStatus(error))) reloadExpiredMedia();
+        const status = mediaErrorStatus(error);
+        // Video.js/VHS reports failed segment requests as a generic network
+        // MediaError on some browsers, without exposing the HTTP status.
+        if (status === 401 || error?.code === 2 || media?.error?.code === 2) {
+            requestMediaRefresh(media);
+        }
     }
 
     function registerVideoJsLanguage() {
@@ -141,7 +140,7 @@
         };
     }
 
-    function initializeVideoJs(media, url) {
+    function initializeVideoJs(media, url, preservePosition = false) {
         if (!media || !url) return null;
         if (!window.videojs || typeof videojs !== 'function') {
             nativeFallback(media, url);
@@ -152,6 +151,7 @@
         try {
             const player = media.player || videojs(media, videoJsOptions(media));
             player.controls(true);
+            if (preservePosition && typeof player.error === 'function') player.error(null);
             player.src({ src: url, type: 'application/x-mpegURL' });
             if (typeof player.seekButtons === 'function') {
                 player.seekButtons({ forward: 10, back: 10 });
@@ -194,7 +194,7 @@
             return;
         }
 
-        initializeVideoJs(media, url);
+        initializeVideoJs(media, url, preservePosition);
     }
 
     function initializeMediaElement(media) {
@@ -302,7 +302,6 @@
     document.body.addEventListener('htmx:after:swap', event => {
         const target = swapTarget(event);
         if (isMediaSwapTarget(target)) {
-            sessionStorage.removeItem(`media-session-reload:${window.location.pathname}`);
             initializeAllElements(target);
         }
     });

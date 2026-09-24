@@ -17,6 +17,7 @@ from django.core import signing
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from django.utils import formats
+from django.utils.dateparse import parse_date
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
@@ -88,6 +89,13 @@ from .utils.storage_operations import list_current_folder, list_current_folder_p
 from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_activated, send_application_declined
+from .progress_activity import (
+    format_active_duration,
+    part_display_name,
+    progress_activity_for_rows,
+    credit_watch_sample,
+    watch_sessions_for_day,
+)
 from .utils.application_uploads import (
     APPLICATION_DOCUMENT_FIELDS,
     APPLICATION_PREVIEW_FIELDS,
@@ -6372,8 +6380,13 @@ def _record_progress_event(
             "viewing_session": session,
             "event_type": event_type,
         }
-    if event_type == LectureProgressEvent.EventType.ACTIVITY:
+    if event_type in {
+        LectureProgressEvent.EventType.ACTIVITY,
+        LectureProgressEvent.EventType.PROGRESS,
+    }:
         lookup["bucket_start"] = occurred_at.replace(second=0, microsecond=0)
+    if event_type == LectureProgressEvent.EventType.PROGRESS:
+        lookup["percent"] = defaults["percent"]
     return LectureProgressEvent.objects.get_or_create(**lookup, defaults=defaults)
 
 
@@ -6472,21 +6485,9 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         return JsonResponse({"error": _("Invalid media file.")}, status=400)
 
     part_id = file_info.get("part_id", "")
-    session = ViewingSession.objects.filter(
-        student=request.user,
-        lesson=lesson,
-        part_id=part_id,
-        ended_at__isnull=True,
-        expires_at__gt=timezone.now(),
-    ).order_by("-expires_at").first()
-    if session is None:
-        session = create_viewing_session(request.user, lesson, part_id)
-    else:
-        _record_progress_event(
-            session,
-            LectureProgressEvent.EventType.STARTED,
-            occurred_at=timezone.now(),
-        )
+    # Each player/tab gets an independent authorization session and sequence.
+    # Logical study sessions are shared and serialized by the progress row lock.
+    session = create_viewing_session(request.user, lesson, part_id)
     token = sign_session(session.session_id, session.expires_at, audience="web")
     progress_percent = LectureProgress.objects.filter(
         student=request.user,
@@ -6672,9 +6673,27 @@ def progress_heartbeat(request, *, allow_management=False):
     session_id = data.get("session_id")
     ranges = data.get("ranges", [])
     ended = data.get("ended", False)
+    active_seconds = data.get("active_seconds", 0)
+    sequence = data.get("sequence")
 
-    if not session_id or not isinstance(ranges, list) or not isinstance(ended, bool):
+    if (
+        not session_id
+        or not isinstance(ranges, list)
+        or not isinstance(ended, bool)
+        or isinstance(active_seconds, bool)
+        or not isinstance(active_seconds, (int, float))
+        or not math.isfinite(active_seconds)
+        or active_seconds < 0
+        or active_seconds > 3600
+    ):
         return JsonResponse({"error": _("Missing session identifier or time ranges.")}, status=400)
+    if active_seconds > 0 and (
+        isinstance(sequence, bool)
+        or not isinstance(sequence, int)
+        or sequence <= 0
+        or sequence > 2_147_483_647
+    ):
+        return JsonResponse({"error": _("Invalid playback sequence.")}, status=400)
 
     if len(ranges) > 200:
         return JsonResponse({"error": _("Too many time ranges.")}, status=400)
@@ -6720,6 +6739,9 @@ def progress_heartbeat(request, *, allow_management=False):
             payload["note"] = note
         return JsonResponse(payload)
 
+    if session.ended_at is not None:
+        return progress_response()
+
     if not user_can_write_offering_activity(
         request.user,
         session.lesson.course_offering,
@@ -6735,12 +6757,6 @@ def progress_heartbeat(request, *, allow_management=False):
         update_fields.append("ended_at")
     session.save(update_fields=update_fields)
 
-    if ranges:
-        _record_progress_event(
-            session,
-            LectureProgressEvent.EventType.ACTIVITY,
-            occurred_at=heartbeat_at,
-        )
     if ended:
         _record_progress_event(
             session,
@@ -6777,6 +6793,9 @@ def progress_heartbeat(request, *, allow_management=False):
 
     total_secs = sum(end - start for start, end in all_ranges)
     with transaction.atomic():
+        locked_session = ViewingSession.objects.select_for_update().get(pk=session.pk)
+        if locked_session.ended_at is not None and locked_session.ended_at != heartbeat_at:
+            return progress_response()
         progress, _created = LectureProgress.objects.select_for_update().get_or_create(
             student=request.user,
             lesson=session.lesson,
@@ -6790,6 +6809,7 @@ def progress_heartbeat(request, *, allow_management=False):
         )
         unique_secs = unique_seconds(merged)
         percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
+        previous_percent = progress.percent
         progress.merged_ranges = merged
         progress.percent = percent
         progress.unique_seconds = int(round(unique_secs))
@@ -6797,9 +6817,29 @@ def progress_heartbeat(request, *, allow_management=False):
             progress.completed_at = timezone.now()
         progress.save()
 
+        credit_watch_sample(
+            locked_session,
+            progress,
+            active_seconds=active_seconds,
+            sequence=sequence,
+            progress_before=previous_percent,
+            progress_after=percent,
+            ended=ended,
+            now=heartbeat_at,
+        )
+
+        if percent != previous_percent:
+            _record_progress_event(
+                locked_session,
+                LectureProgressEvent.EventType.PROGRESS,
+                occurred_at=heartbeat_at,
+                percent=percent,
+                unique_seconds=progress.unique_seconds,
+            )
+
         if progress.completed_at:
             _record_progress_event(
-                session,
+                locked_session,
                 LectureProgressEvent.EventType.COMPLETED,
                 occurred_at=progress.completed_at,
                 percent=percent,
@@ -6828,7 +6868,7 @@ def progress_dashboard(request):
     progress = LectureProgress.objects.none()
 
     selected_scope = None
-    if academic_year_level_id and str(academic_year_level_id).isdigit():
+    if academic_year_level_id and str(academic_year_level_id).isdigit() and len(str(academic_year_level_id)) <= 18:
         selected_scope = get_object_or_404(
             AcademicYearLevel,
             pk=int(academic_year_level_id),
@@ -6859,32 +6899,43 @@ def progress_dashboard(request):
             student_filter |= Q(student_id=int(student_search))
         progress = progress.filter(student_filter)
 
-    progress = progress.select_related("student", "lesson").order_by("-lesson__name", "student__username")
+    progress = progress.select_related(
+        "student", "lesson", "lesson__course_offering__course",
+    ).order_by("-lesson__name", "student__username", "pk")
+
+    detail_id = request.GET.get("activity_detail")
+    detail_day = request.GET.get("activity_day")
+    if detail_id and str(detail_id).isdigit() and len(str(detail_id)) <= 18 and detail_day:
+        study_date = parse_date(detail_day)
+        if study_date is None or study_date > timezone.localdate() or study_date < timezone.localdate() - timedelta(days=29):
+            raise Http404
+        row = get_object_or_404(progress, pk=int(detail_id))
+        session_page = Paginator(
+            watch_sessions_for_day(row, study_date), 50,
+        ).get_page(request.GET.get("session_page", 1))
+        for watch_session in session_page.object_list:
+            watch_session.duration_label = format_active_duration(watch_session.day_active_seconds)
+        return render(request, "partials/progress_activity_sessions.html", {
+            "progress_row": row,
+            "activity_day": study_date,
+            "session_page": session_page,
+            "session_query": pagination_query_string(request, exclude=("session_page",)),
+            "session_list_id": f"progress-session-list-{row.pk}-{study_date:%Y%m%d}",
+            "session_list_selector": f"#progress-session-list-{row.pk}-{study_date:%Y%m%d}",
+        })
+
     page_obj = Paginator(progress, 25).get_page(request.GET.get("page", 1))
     page_rows = list(page_obj.object_list)
-    event_map = {}
-    if page_rows:
-        event_filter = Q()
-        for row in page_rows:
-            event_filter |= Q(
-                student_id=row.student_id,
-                lesson_id=row.lesson_id,
-                part_id=row.part_id,
-            )
-        events = LectureProgressEvent.objects.filter(event_filter).order_by("occurred_at", "pk")
-        row_keys = {(row.student_id, row.lesson_id, row.part_id) for row in page_rows}
-        for event in events:
-            key = (event.student_id, event.lesson_id, event.part_id)
-            if key in row_keys:
-                event_map.setdefault(key, []).append(event)
+    progress_activity_for_rows(page_rows)
     for row in page_rows:
-        row.timeline_events = event_map.get((row.student_id, row.lesson_id, row.part_id), [])
+        row.part_display_name = part_display_name(row.lesson, row.part_id)
     page_obj.object_list = page_rows
 
     return render_page(request, "progress_dashboard.html", "partials/progress_dashboard_content.html", {
         "progress": page_obj,
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
+        "activity_query": pagination_query_string(request, exclude=("page", "activity_detail", "activity_day")),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Progress"), None),
@@ -6898,6 +6949,8 @@ def progress_dashboard(request):
         "selected_offering": int(offering_id) if offering_id else None,
         "selected_lesson": int(lesson_id) if lesson_id else None,
         "selected_student": student_search,
+        "progress_window_start": timezone.localdate() - timedelta(days=29),
+        "progress_window_end": timezone.localdate(),
     })
 
 @capability_required(can_view_reports)

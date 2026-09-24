@@ -1,115 +1,155 @@
 {% load i18n %}
 <div class="container-fluid py-3 ad-page" id="content">
-
-    <div class="ad-pane-head">
-        <h4 class="ad-pane-title mb-0">{% translate "Lecture Progress" %}</h4>
+    <div class="ad-pane-head ad-progress-heading">
+        <div>
+            <h4 class="ad-pane-title mb-1">{% translate "Student Progress" %}</h4>
+            <p class="ad-progress-intro mb-0">{% translate "Learning progress and meaningful study activity by lesson part." %}</p>
+        </div>
         <span id="progress-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
     </div>
 
-    <form method="get" class="row g-2 mb-3" hx-get="{% url 'progress-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#progress-loading">
-        <div class="col-auto">
-            <select name="academic_year" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading" aria-label="{% translate 'Academic year and level' %}">
+    <form method="get" class="ad-filters ad-progress-filters" hx-get="{% url 'progress-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#progress-loading">
+        <div class="ad-progress-filter">
+            <label for="progress-scope">{% translate "Academic year and level" %}</label>
+            <select id="progress-scope" name="academic_year" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
                 <option value="">{% translate "Academic year..." %}</option>
                 {% for scope in scopes %}
                 <option value="{{ scope.id }}" {% if selected_year == scope.id %}selected{% endif %}>{{ scope.academic_year.name }} — {{ scope.level.display_name }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-auto">
-            <select name="course_offering" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading" aria-label="{% translate 'Course offering' %}">
-                <option value="">{% translate "Course offering..." %}</option>
-                {% for o in offerings %}
-                <option value="{{ o.id }}" {% if selected_offering == o.id %}selected{% endif %}>{{ o.course.name }}</option>
-                {% endfor %}
+        <div class="ad-progress-filter">
+            <label for="progress-offering">{% translate "Course offering" %}</label>
+            <select id="progress-offering" name="course_offering" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
+                <option value="">{% translate "All courses" %}</option>
+                {% for o in offerings %}<option value="{{ o.id }}" {% if selected_offering == o.id %}selected{% endif %}>{{ o.course.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="col-auto">
-            <select name="lesson" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading" aria-label="{% translate 'Lesson' %}">
-                <option value="">{% translate "Lesson..." %}</option>
-                {% for l in lessons %}
-                <option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>
-                {% endfor %}
+        <div class="ad-progress-filter">
+            <label for="progress-lesson">{% translate "Lesson" %}</label>
+            <select id="progress-lesson" name="lesson" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
+                <option value="">{% translate "All lessons" %}</option>
+                {% for l in lessons %}<option value="{{ l.id }}" {% if selected_lesson == l.id %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="col-auto">
-            <label class="visually-hidden" for="progress-student-search">{% translate "Student" %}</label>
-            <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Student search...' %}" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
+        <div class="ad-progress-filter ad-progress-filter--search">
+            <label for="progress-student-search">{% translate "Student" %}</label>
+            <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Search student name...' %}" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
         </div>
+        {% if selected_year %}<div class="ad-progress-window">{% translate "Activity window" %}<strong>{% blocktranslate with start=progress_window_start|date:"DATE_FORMAT" end=progress_window_end|date:"DATE_FORMAT" %}{{ start }} – {{ end }}{% endblocktranslate %}</strong></div>{% endif %}
     </form>
 
-    <div class="ad-card">
-        <div class="ad-table-wrap">
-            <table class="ad-table">
-                <thead>
-                    <tr>
-                        <th scope="col">{% translate "Student" %}</th>
-                        <th scope="col">{% translate "Lesson" %}</th>
-                        <th scope="col">{% translate "Part" %}</th>
-                        <th scope="col">{% translate "Progress" %}</th>
-                        <th scope="col">{% translate "Completed" context "progress" %}</th>
-                        <th scope="col">{% translate "Timeline" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in progress %}
-                    <tr>
-                        <td>{{ p.student.get_full_name|default:p.student.username }}</td>
-                        <td>{{ p.lesson.name }}</td>
-                        <td><code>{{ p.part_id }}</code></td>
-                        <td>
-                            <div class="ad-meter ad-meter--progress" role="progressbar" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">
-                                <span style="width:{{ p.percent }}%"></span>
-                            </div>
-                            <small class="ps-muted-text">{{ p.percent }}%</small>
-                        </td>
-                        <td>
-                            {% if p.completed_at %}
-                            <span class="ad-pill ad-pill--success">{% translate "Yes" %}</span>
-                            {% else %}
-                            <span class="ad-pill ad-pill--muted">{% translate "No" %}</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if p.timeline_events %}
-                            <div class="ad-progress-timeline" aria-label="{% translate 'Timeline' %}">
-                                <div class="ad-progress-timeline-head">
-                                    {% blocktranslate count event_count=p.timeline_events|length %}{{ event_count }} event{% plural %}{{ event_count }} events{% endblocktranslate %}
+    <div class="ad-progress-list" aria-label="{% translate 'Student progress records' %}">
+        {% for p in progress %}
+        {% with activity=p.activity_summary %}
+        <article class="ad-card ad-progress-row" aria-labelledby="progress-row-title-{{ p.pk }}">
+            <div class="ad-progress-summary">
+                <div class="ad-progress-identity">
+                    <span class="ad-progress-avatar" aria-hidden="true"><i class="fas fa-user-graduate"></i></span>
+                    <div class="ad-progress-ident-text">
+                        <h5 id="progress-row-title-{{ p.pk }}" class="ad-progress-student">{{ p.student.get_full_name|default:p.student.username }}</h5>
+                        <div class="ad-progress-content-title">{{ p.lesson.name }} <span aria-hidden="true">·</span> {{ p.part_display_name }}</div>
+                        <div class="ad-progress-part-id"><code>{{ p.part_id }}</code></div>
+                    </div>
+                </div>
+
+                <div class="ad-progress-completion">
+                    <div class="ad-progress-label-line"><span>{% translate "Progress" %}</span><strong>{{ p.percent }}%</strong></div>
+                    <div class="ad-meter ad-meter--progress" role="progressbar" aria-label="{% translate 'Verified lesson progress' %}" aria-valuenow="{{ p.percent }}" aria-valuemin="0" aria-valuemax="100">
+                        <span style="width:{{ p.percent }}%"></span>
+                    </div>
+                    <div class="ad-progress-state">
+                        {% if p.completed_at %}<span class="ad-pill ad-pill--success">{% translate "Completed" context "progress" %}</span>
+                        {% elif activity.available %}<span class="ad-pill ad-pill--warning">{% translate "In progress" %}</span>
+                        {% elif p.percent == 0 and p.unique_seconds == 0 and not activity.history_incomplete %}<span class="ad-pill ad-pill--muted">{% translate "Not started" %}</span>
+                        {% else %}<span class="ad-pill ad-pill--muted">{% translate "Activity history unavailable" %}</span>{% endif %}
+                    </div>
+                </div>
+
+                <div class="ad-progress-metric">
+                    <span class="ad-progress-metric-icon ad-progress-icon--gold" aria-hidden="true"><i class="far fa-calendar-check"></i></span>
+                    <span class="ad-progress-metric-copy">
+                        <strong>{% if activity.available %}{{ activity.active_days }}{% else %}—{% endif %}</strong>
+                        <span>{% translate "Active days" %}</span>
+                    </span>
+                </div>
+                <div class="ad-progress-metric">
+                    <span class="ad-progress-metric-icon" aria-hidden="true"><i class="far fa-clock"></i></span>
+                    <span class="ad-progress-metric-copy">
+                        <strong>{% if activity.available %}{{ activity.active_duration }}{% else %}—{% endif %}</strong>
+                        <span title="{% translate 'Playback time is credited only while visible playback is advancing; paused and idle time is excluded.' %}">{% translate "Active watch time" %}</span>
+                    </span>
+                </div>
+                <div class="ad-progress-date">
+                    <span>{% translate "First started" %}</span>
+                    <strong>{% if activity.first_started_at %}{{ activity.first_started_at|date:"DATE_FORMAT" }}{% else %}—{% endif %}</strong>
+                    {% if activity.first_started_at %}<small>{{ activity.first_started_at|date:"TIME_FORMAT" }}</small>{% endif %}
+                </div>
+                <div class="ad-progress-date">
+                    <span>{% if p.completed_at %}{% translate "Completed" context "progress" %}{% else %}{% translate "Last active" %}{% endif %}</span>
+                    <strong>{% if p.completed_at %}{{ p.completed_at|date:"DATE_FORMAT" }}{% elif activity.available %}{{ activity.last_active_at|date:"DATE_FORMAT" }}{% else %}—{% endif %}</strong>
+                    {% if p.completed_at %}<small>{{ p.completed_at|date:"TIME_FORMAT" }}</small>{% elif activity.available %}<small>{{ activity.last_active_at|date:"TIME_FORMAT" }}</small>{% endif %}
+                </div>
+                <details class="ad-progress-disclosure">
+                    <summary aria-label="{% translate 'Show study activity details' %}"><i class="fas fa-chevron-down" aria-hidden="true"></i><span class="visually-hidden">{% translate "Study activity details" %}</span></summary>
+                    <div class="ad-progress-expanded">
+                        {% if activity.available %}
+                        <section class="ad-progress-timeline-card" aria-labelledby="progress-timeline-title-{{ p.pk }}">
+                            <div class="ad-progress-section-head">
+                                <div><h6 id="progress-timeline-title-{{ p.pk }}">{% translate "Study timeline" %}</h6><p>{% translate "Meaningful daily playback activity · last 30 days" %}</p></div>
+                                <div class="ad-progress-legend" aria-label="{% translate 'Activity intensity legend' %}">
+                                    <span><i class="is-none"></i>{% translate "No activity" %}</span><span><i class="is-low"></i>{% translate "Low" %}</span><span><i class="is-medium"></i>{% translate "Medium" %}</span><span><i class="is-high"></i>{% translate "High" %}</span>
                                 </div>
-                                <ol class="ad-progress-timeline-list">
-                                    {% for event in p.timeline_events %}
-                                    <li title="{{ event.get_event_type_display }} — {{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}{% if event.percent %} — {{ event.percent }}%{% endif %}">
-                                        <span class="ad-progress-timeline-marker" aria-hidden="true"></span>
-                                        <span class="visually-hidden">
-                                            {{ event.get_event_type_display }}
-                                            {{ event.occurred_at|date:'SHORT_DATETIME_FORMAT' }}
-                                            {% if event.percent %}{{ event.percent }}%{% endif %}
-                                        </span>
-                                    </li>
-                                    {% endfor %}
-                                </ol>
                             </div>
-                            {% else %}
-                            <span class="ps-muted-text">{% translate "No timeline events." %}</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="ad-empty">
-                            {% translate "No progress records for this selection." as progress_empty_desc %}
-                            {% translate "Select an academic year to load progress data." as progress_filter_desc %}
-                            {% if selected_year %}
-                            {% include "partials/empty_state.html" with icon="fa-inbox" description=progress_empty_desc %}
-                            {% else %}
-                            {% include "partials/empty_state.html" with icon="fa-filter" description=progress_filter_desc %}
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <ol class="ad-progress-heatmap" aria-label="{% translate 'Daily active playback over the last 30 days' %}">
+                                {% for day in activity.timeline %}<li class="is-{{ day.intensity }}" title="{{ day.date|date:'DATE_FORMAT' }} · {{ day.duration }}"><span class="visually-hidden">{{ day.date|date:'DATE_FORMAT' }}: {{ day.duration }}</span></li>{% endfor %}
+                            </ol>
+                            <div class="ad-progress-timeline-ends"><span>{{ activity.window_start|date:"DATE_FORMAT" }}</span><span>{{ activity.window_end|date:"DATE_FORMAT" }}</span></div>
+                        </section>
+                        <section class="ad-progress-daily-card" aria-labelledby="progress-daily-title-{{ p.pk }}">
+                            <div class="ad-progress-section-head"><div><h6 id="progress-daily-title-{{ p.pk }}">{% translate "Daily breakdown" %}</h6><p>{% translate "Days with recorded active watching" %}</p></div></div>
+                            {% if activity.days %}
+                            <div class="ad-progress-daily-list">
+                                {% for day in activity.days %}
+                                <details class="ad-progress-day" hx-get="{% url 'progress-dashboard' %}?activity_detail={{ p.pk }}&activity_day={{ day.date|date:'Y-m-d' }}&{{ activity_query }}" hx-trigger="toggle once" hx-target="#progress-sessions-{{ p.pk }}-{{ day.date|date:'Ymd' }}" hx-swap="innerHTML" hx-indicator="#progress-loading">
+                                    <summary>
+                                        <span class="ad-progress-day-date">{{ day.date|date:"DATE_FORMAT" }}</span>
+                                        <span class="ad-progress-day-time">{{ day.duration }}</span>
+                                        <span class="ad-progress-day-sessions">{% blocktranslate count session_count=day.session_count %}{{ session_count }} session{% plural %}{{ session_count }} sessions{% endblocktranslate %}</span>
+                                        <span class="ad-progress-day-gain">{% if day.progress_gain is not None %}+{{ day.progress_gain }}%{% else %}—{% endif %}</span>
+                                        <i class="fas fa-chevron-down ad-progress-day-chevron" aria-hidden="true"></i>
+                                        <span class="visually-hidden">{% translate "Load watching session details" %}</span>
+                                    </summary>
+                                    <div id="progress-sessions-{{ p.pk }}-{{ day.date|date:'Ymd' }}" class="ad-progress-session-detail" aria-live="polite"></div>
+                                </details>
+                                {% endfor %}
+                            </div>
+                            {% else %}<p class="ad-progress-no-activity">{% translate "No active study days in this period." %}</p>{% endif %}
+                            <div class="ad-progress-highlights">
+                                <div><span>{% translate "Most active day" %}</span><strong>{% if activity.most_active_day %}{{ activity.most_active_day.date|date:"DATE_FORMAT" }} · {{ activity.most_active_day.duration }}{% else %}—{% endif %}</strong></div>
+                                <div><span>{% translate "Most progress" %}</span><strong>{% if activity.most_progress_day and activity.most_progress_day.progress_gain %}{{ activity.most_progress_day.date|date:"DATE_FORMAT" }} · +{{ activity.most_progress_day.progress_gain }}%{% else %}—{% endif %}</strong></div>
+                            </div>
+                        </section>
+                        <div class="ad-progress-span-note">
+                            {% if activity.elapsed_days %}{% blocktranslate with active=activity.active_days elapsed=activity.elapsed_days %}{{ active }} active days over {{ elapsed }} calendar days{% endblocktranslate %}{% endif %}
+                            <span>{% blocktranslate count session_count=activity.session_count %}{{ session_count }} meaningful session{% plural %}{{ session_count }} meaningful sessions{% endblocktranslate %}</span>
+                        </div>
+                        {% else %}
+                        <div class="ad-progress-history-note"><i class="fas fa-circle-info" aria-hidden="true"></i><span>{% if activity.history_incomplete %}{% translate "Earlier activity predates active-time tracking. These totals include only activity recorded since" %} {{ activity.tracking_started_at|date:"DATE_FORMAT" }}.{% else %}{% translate "No watching activity has been recorded yet." %}{% endif %}</span></div>
+                        {% endif %}
+                        {% if activity.available and activity.history_incomplete %}<div class="ad-progress-history-note"><i class="fas fa-circle-info" aria-hidden="true"></i><span>{% translate "Earlier activity predates active-time tracking. These totals include only activity recorded since" %} {{ activity.tracking_started_at|date:"DATE_FORMAT" }}.</span></div>{% endif %}
+                    </div>
+                </details>
+            </div>
+        </article>
+        {% endwith %}
+        {% empty %}
+        <div class="ad-card ad-progress-empty">
+            {% if selected_year %}{% translate "No progress records for this selection." as progress_empty_desc %}{% include "partials/empty_state.html" with icon="fa-inbox" description=progress_empty_desc %}
+            {% else %}{% translate "Select an academic year to load progress data." as progress_filter_desc %}{% include "partials/empty_state.html" with icon="fa-filter" description=progress_filter_desc %}{% endif %}
         </div>
-        {% translate "Progress pagination" as pagination_aria_label %}
-        {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#progress-loading" %}
+        {% endfor %}
     </div>
+    {% translate "Progress pagination" as pagination_aria_label %}
+    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#progress-loading" %}
 </div>

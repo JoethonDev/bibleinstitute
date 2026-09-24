@@ -11306,6 +11306,142 @@ msgid_plural "%(event_count)s events"
 msgstr[0] "%(event_count)s event"
 msgstr[1] "%(event_count)s events"
 
+msgid "Student Progress"
+msgstr "Student Progress"
+
+msgid "Learning progress and meaningful study activity by lesson part."
+msgstr "Learning progress and meaningful study activity by lesson part."
+
+msgid "Search student name..."
+msgstr "Search student name..."
+
+msgid "All lessons"
+msgstr "All lessons"
+
+msgid "Activity window"
+msgstr "Activity window"
+
+msgid "Student progress records"
+msgstr "Student progress records"
+
+msgid "Part %(number)s"
+msgstr "Part %(number)s"
+
+msgid "Verified lesson progress"
+msgstr "Verified lesson progress"
+
+msgid "In progress"
+msgstr "In progress"
+
+msgid "Not started"
+msgstr "Not started"
+
+msgid "Activity history unavailable"
+msgstr "Activity history unavailable"
+
+msgid "Progress changed"
+msgstr "Progress changed"
+
+msgid "Active days"
+msgstr "Active days"
+
+msgid "Active watch time"
+msgstr "Active watch time"
+
+msgid "Playback time is credited only while visible playback is advancing; paused and idle time is excluded."
+msgstr "Playback time is credited only while visible playback is advancing; paused and idle time is excluded."
+
+msgid "First started"
+msgstr "First started"
+
+msgid "Last active"
+msgstr "Last active"
+
+msgid "Show study activity details"
+msgstr "Show study activity details"
+
+msgid "Study activity details"
+msgstr "Study activity details"
+
+msgid "Study timeline"
+msgstr "Study timeline"
+
+msgid "Meaningful daily playback activity · last 30 days"
+msgstr "Meaningful daily playback activity · last 30 days"
+
+msgid "Activity intensity legend"
+msgstr "Activity intensity legend"
+
+msgid "No activity"
+msgstr "No activity"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Medium"
+msgstr "Medium"
+
+msgid "High"
+msgstr "High"
+
+msgid "Daily active playback over the last 30 days"
+msgstr "Daily active playback over the last 30 days"
+
+msgid "Daily breakdown"
+msgstr "Daily breakdown"
+
+msgid "Days with recorded active watching"
+msgstr "Days with recorded active watching"
+
+msgid "Load watching session details"
+msgstr "Load watching session details"
+
+msgid "No active study days in this period."
+msgstr "No active study days in this period."
+
+msgid "Most active day"
+msgstr "Most active day"
+
+msgid "Most progress"
+msgstr "Most progress"
+
+msgid "Earlier activity predates active-time tracking. These totals include only activity recorded since"
+msgstr "Earlier activity predates active-time tracking. These totals include only activity recorded since"
+
+msgid "No watching activity has been recorded yet."
+msgstr "No watching activity has been recorded yet."
+
+msgid "No watching sessions were recorded for this day."
+msgstr "No watching sessions were recorded for this day."
+
+msgid "Watching session pages"
+msgstr "Watching session pages"
+
+msgid "Invalid playback sequence."
+msgstr "Invalid playback sequence."
+
+msgid "%(hours)s hr %(minutes)s min"
+msgstr "%(hours)s hr %(minutes)s min"
+
+msgid "%(minutes)s min"
+msgstr "%(minutes)s min"
+
+msgid "%(seconds)s sec"
+msgstr "%(seconds)s sec"
+
+msgid "%(session_count)s session"
+msgid_plural "%(session_count)s sessions"
+msgstr[0] "%(session_count)s session"
+msgstr[1] "%(session_count)s sessions"
+
+msgid "%(session_count)s meaningful session"
+msgid_plural "%(session_count)s meaningful sessions"
+msgstr[0] "%(session_count)s meaningful session"
+msgstr[1] "%(session_count)s meaningful sessions"
+
+msgid "%(active)s active days over %(elapsed)s calendar days"
+msgstr "%(active)s active days over %(elapsed)s calendar days"
+
 msgid "Name or username"
 msgstr "Name or username"
 

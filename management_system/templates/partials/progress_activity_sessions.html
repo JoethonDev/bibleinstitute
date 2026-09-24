@@ -1,0 +1,16 @@
+{% load i18n %}
+{% url 'progress-dashboard' as progress_dashboard_url %}
+<div id="{{ session_list_id }}" class="ad-progress-session-list">
+    {% for session in session_page %}
+    <div class="ad-progress-session">
+        <time datetime="{{ session.started_at|date:'c' }}">{{ session.started_at|date:"TIME_FORMAT" }}</time>
+        <span aria-hidden="true">–</span>
+        <time datetime="{{ session.ended_at|default:session.last_active_at|date:'c' }}">{{ session.ended_at|default:session.last_active_at|date:"TIME_FORMAT" }}</time>
+        <strong>{{ session.duration_label }}</strong>
+    </div>
+    {% empty %}
+    <p class="ad-progress-no-activity">{% translate "No watching sessions were recorded for this day." %}</p>
+    {% endfor %}
+    {% translate "Watching session pages" as session_pagination_label %}
+    {% include "partials/pagination.html" with page_obj=session_page pagination_query=session_query page_param="session_page" aria_label=session_pagination_label hx_target=session_list_selector hx_select=session_list_selector hx_swap="outerHTML" hx_push_url="false" hx_url=progress_dashboard_url %}
+</div>

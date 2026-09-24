@@ -15,7 +15,7 @@
                 {% if hls_url.type == 'video' %}
                     <!-- Responsive video container (Psalmodia) -->
                     <div class="lesson-video-wrapper sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
-                        <video playsinline controls crossorigin="anonymous" class="sd-media-element" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
+                        <video playsinline controls crossorigin="anonymous" class="sd-media-element" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
                             <source type="application/x-mpegURL"/>
                             <p class="vjs-no-js">
                             {% translate "To view this video please enable JavaScript, and consider upgrading to a web browser that" %}
@@ -30,7 +30,7 @@
                     </div>
                 {% elif hls_url.type == 'audio' %}
                     <div class="sd-audio-body sd-live-player sd-live-player--audio" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ hls_url.part_id }}" data-file-index="{{ hls_url.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id hls_url.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
-                    <audio controls crossorigin="anonymous" class="sd-media-element" preload="auto" controlsList="nodownload" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
+                    <audio controls crossorigin="anonymous" class="sd-media-element" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
                         <source type="application/x-mpegURL"/>
                     </audio>
                     <div class="mt-2 d-flex align-items-center gap-2 sd-track">

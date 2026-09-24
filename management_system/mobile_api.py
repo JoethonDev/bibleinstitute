@@ -650,26 +650,14 @@ def media_session(request, offering_id, lesson_id, file_index):
     payload = _json_body(request)
     if payload is None:
         return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
-    renew = payload.get("renew") is True
     part_id = link.get("part_id", "")
-    session = None
-    if not renew:
-        session = ViewingSession.objects.filter(
-            student=request.user,
-            lesson=lesson,
-            part_id=part_id,
-            access_channel=ViewingSession.AccessChannel.MOBILE,
-            mobile_session=request.mobile_session,
-            ended_at__isnull=True,
-            expires_at__gt=timezone.now(),
-        ).order_by("-expires_at").first()
-    if session is None:
-        session = create_viewing_session(
-            request.user,
-            lesson,
-            part_id,
-            mobile_session=request.mobile_session,
-        )
+    # Keep heartbeat sequences isolated per player/tab, including token refresh.
+    session = create_viewing_session(
+        request.user,
+        lesson,
+        part_id,
+        mobile_session=request.mobile_session,
+    )
     progress_percent = LectureProgress.objects.filter(
         student=request.user, lesson=lesson, part_id=part_id
     ).values_list("percent", flat=True).first() or 0
