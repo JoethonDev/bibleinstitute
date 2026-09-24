@@ -6680,7 +6680,10 @@ def progress_heartbeat(request, *, allow_management=False):
     verified_ranges = []
     for sr in lesson_segments:
         if sr.get("number") in verified:
-            verified_ranges.append([float(sr.get("start", 0)), float(sr.get("end", 0))])
+            verified_ranges.append({
+                "start": float(sr.get("start", 0)),
+                "end": float(sr.get("end", 0)),
+            })
 
     if not verified_ranges:
         return JsonResponse({"status": "ok", "note": _("No verified segment ranges")})
