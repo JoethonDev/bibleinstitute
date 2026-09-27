@@ -36,12 +36,6 @@ INTAKE_COLUMNS = (
     "lms_user_id",
     "first_name",
     "last_name",
-    "wpay_user_id",
-    "wpay_login",
-    "wpay_email",
-    "wpay_display_name",
-    "match_score",
-    "match_review",
     "destination_academic_year",
     "destination_level",
     "promote_now",
@@ -51,11 +45,63 @@ INTAKE_COLUMNS = (
 )
 
 MAX_INTAKE_ROWS = 1000
+MAX_EXISTING_BULK_STUDENTS = 50
 PROMOTABLE_OUTCOMES = frozenset({
     HistoricalAcademicSummary.Outcome.COMPLETED,
     HistoricalAcademicSummary.Outcome.PASSED,
     HistoricalAcademicSummary.Outcome.PARTIAL,
 })
+
+
+def build_existing_intake_row(
+    *,
+    user: User,
+    source_scope: AcademicYearLevel,
+    outcome: str,
+    destination: AcademicYearLevel | None,
+    promote: bool,
+    failed_ids: list[int],
+    reason: str,
+    notes: str,
+) -> dict[str, str]:
+    """Build one canonical find-mode intake row for an existing student.
+
+    The returned dict matches the shape consumed by `_validate_row()` and
+    `intake_historical_row()`, so preview and apply always agree.
+    """
+    failed_text = ", ".join(str(value) for value in dict.fromkeys(int(value) for value in failed_ids))
+    # Only the numeric user ID identifies the account: _find_user() queries
+    # once per supplied identifier, so extra username/email copies would
+    # triple the per-row queries of a 50-student batch for no extra safety.
+    return {
+        "source_name": user.get_full_name() or user.username,
+        "source_level": str(source_scope.level.ordering),
+        "source_academic_year": source_scope.academic_year.name,
+        "historical_outcome": outcome,
+        "account_action": "find",
+        "lms_user_id": str(user.pk),
+        "lms_username": "",
+        "lms_email": "",
+        "destination_academic_year": destination.academic_year.name if destination else "",
+        "destination_level": str(destination.level.ordering) if destination else "",
+        "promote_now": "yes" if promote else "no",
+        "failed_course_offering_ids": failed_text,
+        "promotion_reason": reason,
+        "admin_note": notes,
+    }
+
+
+def summaries_for_users_scopes(users: Iterable[User], scopes: Iterable[AcademicYearLevel]) -> dict[tuple[int, int], HistoricalAcademicSummary]:
+    """Return existing summaries keyed by (user_id, scope_id) in one query."""
+    user_ids = [user.pk for user in users]
+    scope_ids = list(dict.fromkeys(scope.pk for scope in scopes))
+    if not user_ids or not scope_ids:
+        return {}
+    found = HistoricalAcademicSummary.objects.filter(
+        student_id__in=user_ids,
+        academic_year_level_id__in=scope_ids,
+    ).select_related("student")
+    return {(summary.student_id, summary.academic_year_level_id): summary for summary in found}
 
 
 def _text(value) -> str:

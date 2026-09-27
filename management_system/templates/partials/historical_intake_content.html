@@ -13,17 +13,17 @@
     <div class="ad-card mb-4">
         <div class="ad-card-head"><h5 class="mb-0">{% translate "Add one student" %}</h5></div>
         <div class="ad-card-body">
-            <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-3">
+            <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-3" x-data="{ mode: 'find' }" x-init="mode = ($el.querySelector('[name=account_action]') || {}).value || 'find'" @change="if ($event.target && $event.target.name === 'account_action') { mode = $event.target.value; }">
                 {% csrf_token %}
                 <div class="col-md-4">{{ form.source_year_level.label_tag }}{{ form.source_year_level }}{{ form.source_year_level.errors }}</div>
                 <div class="col-md-4">{{ form.source_name.label_tag }}{{ form.source_name }}{{ form.source_name.errors }}</div>
                 <div class="col-md-4">{{ form.account_action.label_tag }}{{ form.account_action }}{{ form.account_action.errors }}</div>
-                <div class="col-md-4">{{ form.lms_user_id.label_tag }}{{ form.lms_user_id }}{{ form.lms_user_id.errors }}</div>
-                <div class="col-md-4">{{ form.lms_username.label_tag }}{{ form.lms_username }}{{ form.lms_username.errors }}</div>
-                <div class="col-md-4">{{ form.lms_email.label_tag }}{{ form.lms_email }}{{ form.lms_email.errors }}</div>
-                <div class="col-md-4">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
-                <div class="col-md-4">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
-                <div class="col-md-4">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
+                <div class="col-md-4" x-show="mode === 'find'">{{ form.lms_user_id.label_tag }}{{ form.lms_user_id }}{{ form.lms_user_id.errors }}</div>
+                <div class="col-md-4" x-show="mode === 'find'">{{ form.lms_username.label_tag }}{{ form.lms_username }}{{ form.lms_username.errors }}</div>
+                <div class="col-md-4" x-show="mode === 'find'">{{ form.lms_email.label_tag }}{{ form.lms_email }}{{ form.lms_email.errors }}</div>
+                <div class="col-md-4" x-show="mode === 'create'">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
+                <div class="col-md-4" x-show="mode === 'create'">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
+                <div class="col-md-4" x-show="mode === 'create'">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
                 <div class="col-md-4">{{ form.historical_outcome.label_tag }}{{ form.historical_outcome }}{{ form.historical_outcome.errors }}</div>
                 <div class="col-md-4">{{ form.destination_scope.label_tag }}{{ form.destination_scope }}{{ form.destination_scope.errors }}</div>
                 <div class="col-md-4">{{ form.exceptional_offering_ids.label_tag }}{{ form.exceptional_offering_ids }}{{ form.exceptional_offering_ids.errors }}</div>
@@ -38,31 +38,52 @@
     </div>
 
     <div class="ad-card mb-4">
-        <div class="ad-card-head"><h5 class="mb-0">{% translate "Add multiple existing students" %}</h5></div>
+        <div class="ad-card-head"><h5 class="mb-0">{% translate "Add history to existing students" %}</h5></div>
         <div class="ad-card-body">
-            <p class="text-muted">{% translate "Use usernames or numeric LMS IDs. This action is bounded to 1,000 students and runs transactionally." %}</p>
-            {% if bulk_form.non_field_errors %}<div class="alert alert-danger">{{ bulk_form.non_field_errors }}</div>{% endif %}
+            <p class="text-muted">{% translate "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled." %}</p>
+            {% if existing_form.non_field_errors %}<div class="alert alert-danger">{{ existing_form.non_field_errors }}</div>{% endif %}
             <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-3">
-                {% csrf_token %}<input type="hidden" name="action" value="bulk_historical">
-                <div class="col-md-4">{{ bulk_form.source_year_level.label_tag }}{{ bulk_form.source_year_level }}{{ bulk_form.source_year_level.errors }}</div>
-                <div class="col-md-8">{{ bulk_form.student_identifiers.label_tag }}{{ bulk_form.student_identifiers }}{{ bulk_form.student_identifiers.errors }}</div>
-                <div class="col-md-4">{{ bulk_form.historical_outcome.label_tag }}{{ bulk_form.historical_outcome }}{{ bulk_form.historical_outcome.errors }}</div>
-                <div class="col-md-4">{{ bulk_form.destination_scope.label_tag }}{{ bulk_form.destination_scope }}{{ bulk_form.destination_scope.errors }}</div>
-                <div class="col-md-4">{{ bulk_form.exceptional_offering_ids.label_tag }}{{ bulk_form.exceptional_offering_ids }}{{ bulk_form.exceptional_offering_ids.errors }}</div>
-                <div class="col-12">{{ bulk_form.notes.label_tag }}{{ bulk_form.notes }}{{ bulk_form.notes.errors }}</div>
-                <div class="col-12">{{ bulk_form.promotion_reason.label_tag }}{{ bulk_form.promotion_reason }}{{ bulk_form.promotion_reason.errors }}</div>
+                {% csrf_token %}<input type="hidden" name="action" value="existing_preview">
+                <div class="col-md-4">{{ existing_form.student_search.label_tag }}{{ existing_form.student_search }}{{ existing_form.student_search.errors }}</div>
+                <div class="col-md-8" id="existing-students-wrap">{{ existing_form.students.label_tag }}{{ existing_form.students }}{{ existing_form.students.errors }}<p class="small text-muted mt-1 mb-0">{% translate "Hold Ctrl or Cmd to select multiple students (up to 50)." %}</p></div>
+                <div class="col-md-4">{{ existing_form.source_year_level.label_tag }}{{ existing_form.source_year_level }}{{ existing_form.source_year_level.errors }}</div>
+                <div class="col-md-4">{{ existing_form.historical_outcome.label_tag }}{{ existing_form.historical_outcome }}{{ existing_form.historical_outcome.errors }}</div>
+                <div class="col-md-4">{{ existing_form.destination_scope.label_tag }}{{ existing_form.destination_scope }}{{ existing_form.destination_scope.errors }}</div>
+                <div class="col-md-4">{{ existing_form.exceptional_offering_ids.label_tag }}{{ existing_form.exceptional_offering_ids }}{{ existing_form.exceptional_offering_ids.errors }}</div>
+                <div class="col-12">{{ existing_form.notes.label_tag }}{{ existing_form.notes }}{{ existing_form.notes.errors }}</div>
+                <div class="col-12">{{ existing_form.promotion_reason.label_tag }}{{ existing_form.promotion_reason }}{{ existing_form.promotion_reason.errors }}</div>
                 <div class="col-12 d-flex gap-3 align-items-center">
-                    <label class="form-check">{{ bulk_form.promote_now }} <span class="form-check-label">{% translate "Promote after review" %}</span></label>
-                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-users me-1"></i>{% translate "Save selected students" %}</button>
+                    <label class="form-check">{{ existing_form.promote_now }} <span class="form-check-label">{% translate "Promote after review" %}</span></label>
+                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-search me-1"></i>{% translate "Preview selected students" %}</button>
                 </div>
             </form>
+            {% if existing_preview_rows %}
+            <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="mt-4">
+                {% csrf_token %}<input type="hidden" name="action" value="existing_apply">
+                <input type="hidden" name="source_year_level" value="{{ existing_form.source_year_level.value|default:'' }}">
+                <input type="hidden" name="historical_outcome" value="{{ existing_form.historical_outcome.value|default:'' }}">
+                <input type="hidden" name="destination_scope" value="{{ existing_form.destination_scope.value|default:'' }}">
+                <input type="hidden" name="exceptional_offering_ids" value="{{ existing_form.exceptional_offering_ids.value|default:'' }}">
+                <input type="hidden" name="notes" value="{{ existing_form.notes.value|default:'' }}">
+                <input type="hidden" name="promotion_reason" value="{{ existing_form.promotion_reason.value|default:'' }}">
+                {% if existing_form.promote_now.value %}<input type="hidden" name="promote_now" value="on">{% endif %}
+                <div class="ad-table-wrap"><table class="ad-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Destination" %}</th><th>{% translate "Failed offering IDs" %}</th><th>{% translate "Status" %}</th></tr></thead><tbody>
+                {% for row in existing_preview_rows %}<tr><td>{{ row.user.get_full_name|default:row.user.username }}<br><span class="small text-muted">{{ row.user.username }}</span></td><td><input type="hidden" name="students" value="{{ row.user.pk }}"><select name="er_source_{{ row.user.pk }}" class="form-select form-select-sm" aria-label="{% translate 'Historical scope' %}">{% for scope in existing_form.source_year_level.field.queryset %}<option value="{{ scope.pk }}"{% if row.source_id == scope.pk %} selected{% endif %}>{{ scope }}</option>{% endfor %}</select></td><td><select name="er_outcome_{{ row.user.pk }}" class="form-select form-select-sm" aria-label="{% translate 'Outcome' %}">{% for value, label in outcome_choices %}<option value="{{ value }}"{% if row.outcome == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></td><td><select name="er_dest_{{ row.user.pk }}" class="form-select form-select-sm" aria-label="{% translate 'Destination' %}"><option value="">{% translate "Destination" %}</option>{% for scope in existing_form.destination_scope.field.queryset %}<option value="{{ scope.pk }}"{% if row.dest_id == scope.pk %} selected{% endif %}>{{ scope }}</option>{% endfor %}</select></td><td><input class="form-control form-control-sm" name="er_failed_{{ row.user.pk }}" value="{{ row.failed }}" placeholder="{% translate 'Failed offering IDs' %}" aria-label="{% translate 'Failed offering IDs' %}"></td><td><span class="small">{{ row.message }}</span>{% if row.has_record %}<br><span class="small text-muted">{% translate "Already recorded" %}</span>{% endif %}{% if row.already_promoted %}<br><span class="small text-danger">{% translate "Already promoted" %}</span>{% endif %}</td></tr>{% endfor %}
+                </tbody></table></div>
+                <div class="col-12 d-flex gap-3 align-items-center mt-3">
+                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-check me-1"></i>{% translate "Apply reviewed intake" %}</button>
+                    <span class="small text-muted">{% translate "Runs transactionally; any error rolls back all rows." %}</span>
+                </div>
+            </form>
+            {% endif %}
         </div>
     </div>
 
     <div class="ad-card mb-4">
         <div class="ad-card-head"><h5 class="mb-0">{% translate "CSV/XLSX reviewed upload" %}</h5></div>
         <div class="ad-card-body">
-            <p class="text-muted">{% translate "Upload the reviewed template. The first submission is a dry-run; apply is allowed only when every row is valid." %}</p>
+            <p class="text-muted">{% translate "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid." %}</p>
+            <details class="mb-2"><summary class="small">{% translate "Expected columns" %}</summary><p class="mt-2">{% for column in intake_columns %}<code class="me-1">{{ column }}</code>{% endfor %}</p></details>
             <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="d-flex flex-wrap gap-2 align-items-end">
                 {% csrf_token %}
                 <div><label for="intake-file" class="form-label">{% translate "Intake CSV or XLSX" %}</label><input id="intake-file" class="form-control" type="file" name="intake_file" accept=".csv,.xlsx" required></div>

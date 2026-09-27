@@ -10784,6 +10784,54 @@ msgstr "Server error."
 msgid "Payment Receipt"
 msgstr "Payment Receipt"
 
+msgid "Select between one and 50 students."
+msgstr "Select between one and 50 students."
+
+msgid "Search students"
+msgstr "Search students"
+
+msgid "Search username, email, or name"
+msgstr "Search username, email, or name"
+
+msgid "Row for %(student)s has no valid source academic scope."
+msgstr "Row for %(student)s has no valid source academic scope."
+
+msgid "Row for %(student)s has an invalid historical outcome."
+msgstr "Row for %(student)s has an invalid historical outcome."
+
+msgid "Row for %(student)s: %(message)s"
+msgstr "Row for %(student)s: %(message)s"
+
+msgid "Add history to existing students"
+msgstr "Add history to existing students"
+
+msgid "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled."
+msgstr "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled."
+
+msgid "Hold Ctrl or Cmd to select multiple students (up to 50)."
+msgstr "Hold Ctrl or Cmd to select multiple students (up to 50)."
+
+msgid "Preview selected students"
+msgstr "Preview selected students"
+
+msgid "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid."
+msgstr "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid."
+
+msgid "Expected columns"
+msgstr "Expected columns"
+
+msgid "Apply reviewed intake"
+msgstr "Apply reviewed intake"
+
+msgid "Runs transactionally; any error rolls back all rows."
+msgstr "Runs transactionally; any error rolls back all rows."
+
+msgid "Already recorded"
+msgstr "Already recorded"
+
+msgid "Already promoted"
+msgstr "Already promoted"
+
 #~ msgid "Priest Name"
 #~ msgstr "Priest Name"
 
@@ -10804,9 +10852,6 @@ msgstr "Payment Receipt"
 
 #~ msgid "Preview results pagination"
 #~ msgstr "Preview results pagination"
-
-#~ msgid "Already recorded"
-#~ msgstr "Already recorded"
 
 #~ msgid "Some actions already recorded for today."
 #~ msgstr "Some actions already recorded for today."

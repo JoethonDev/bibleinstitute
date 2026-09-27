@@ -504,15 +504,32 @@ class ExceptionalCourseAssignmentForm(forms.Form):
         return student
 
 
-class HistoricalBulkIntakeForm(forms.Form):
+class HistoricalExistingBulkForm(forms.Form):
+    """Find-mode bulk intake for existing students (1–50 per run)."""
+
+    students = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": "8", "id": "existing-students-select"}),
+        label=_("Existing students"),
+    )
+    student_search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": _("Search username, email, or name"),
+            "hx-get": "",
+            "hx-target": "#existing-students-wrap",
+            "hx-select": "#existing-students-wrap",
+            "hx-swap": "outerHTML",
+            "hx-include": "#existing-students-select",
+            "hx-trigger": "keyup changed delay:400ms, search",
+        }),
+        label=_("Search students"),
+    )
     source_year_level = forms.ModelChoiceField(
         queryset=AcademicYearLevel.objects.none(),
         widget=forms.Select(attrs={"class": "form-select"}),
         label=_("Historical academic scope"),
-    )
-    student_identifiers = forms.CharField(
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": _("Usernames or numeric IDs, separated by commas or lines")}),
-        label=_("Existing students"),
     )
     historical_outcome = forms.ChoiceField(
         choices=HistoricalAcademicSummary.Outcome.choices,
@@ -535,18 +552,18 @@ class HistoricalBulkIntakeForm(forms.Form):
     notes = forms.CharField(required=False, label=_("Notes"), widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}))
     promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, student_options=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["source_year_level"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=False).select_related("academic_year", "level").order_by("academic_year__ordering", "level__ordering")
         self.fields["destination_scope"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by("level__ordering")
+        if student_options is not None:
+            self.fields["students"].queryset = student_options
 
-    def clean_student_identifiers(self):
-        values = [value.strip() for value in self.cleaned_data["student_identifiers"].replace(",", "\n").splitlines() if value.strip()]
-        values = [value if value.isdigit() else normalize_username(value) for value in values]
-        values = list(dict.fromkeys(values))
-        if not values or len(values) > 1000:
-            raise forms.ValidationError(_("Select between one and 1,000 students."))
-        return values
+    def clean_students(self):
+        students = list(self.cleaned_data["students"])
+        if not students or len(students) > 50:
+            raise forms.ValidationError(_("Select between one and 50 students."))
+        return students
 
     def clean(self):
         cleaned = super().clean()

@@ -50,7 +50,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalBulkIntakeForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
@@ -147,10 +147,13 @@ from .academic_enrollment import (
 )
 from .historical_intake import (
     INTAKE_COLUMNS,
+    MAX_EXISTING_BULK_STUDENTS,
     assign_exceptional_courses,
+    build_existing_intake_row,
     intake_historical_row,
     parse_intake_upload,
     preview_intake_rows,
+    summaries_for_users_scopes,
 )
 from .academic_copy import copy_offerings
 from .academic_formula import normalize_formula_rules, save_promotion_formula
@@ -1540,9 +1543,46 @@ def user_profile(request, user_id):
 def historical_intake(request):
     form = HistoricalIntakeForm(request.POST or None)
     exceptional_form = ExceptionalCourseAssignmentForm(request.POST or None)
-    bulk_form = HistoricalBulkIntakeForm(request.POST or None)
+    existing_q = str(request.GET.get("student_search") or request.GET.get("existing_q") or request.POST.get("student_search") or "")[:64].strip()
+    base_students = User.objects.filter(role__role="student", is_active=True).select_related("role")
+    selected_ids: list[int] = []
+    if request.method == "POST" and request.POST.get("action") in ("existing_preview", "existing_apply"):
+        # Bound the rendered options to the submitted batch plus any search
+        # narrowing; validation still rejects non-student IDs. Rendering the
+        # full active-student queryset here would emit ~10,000 options.
+        submitted_ids = [int(value) for value in request.POST.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
+        options_filter = Q(pk__in=submitted_ids)
+        if existing_q:
+            search_filter = normalized_contains_q(("username", "email", "first_name", "last_name"), existing_q)
+            if existing_q.isdigit():
+                search_filter |= Q(pk=int(existing_q))
+            options_filter |= search_filter
+        student_options = base_students.filter(options_filter).order_by("username")[:100]
+    else:
+        selected_ids = [int(value) for value in request.GET.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
+        if existing_q:
+            search_filter = normalized_contains_q(("username", "email", "first_name", "last_name"), existing_q)
+            if existing_q.isdigit():
+                search_filter |= Q(pk=int(existing_q))
+            if selected_ids:
+                search_filter |= Q(pk__in=selected_ids)
+            student_options = base_students.filter(search_filter).order_by("username")[:100]
+        elif selected_ids:
+            student_options = base_students.filter(pk__in=selected_ids).order_by("username")[:100]
+        else:
+            student_options = base_students.none()
+    if request.method == "POST":
+        existing_form = HistoricalExistingBulkForm(request.POST, student_options=student_options)
+    else:
+        # Unbound GET: re-mark currently selected options (and the search text)
+        # so HTMX search swaps never wipe the user's selection.
+        existing_form = HistoricalExistingBulkForm(
+            student_options=student_options,
+            initial={"students": selected_ids, "student_search": existing_q},
+        )
     preview = []
     upload_digest = ""
+    existing_preview_rows = []
     if request.method == "POST":
         if request.POST.get("action") == "assign_exceptional":
             if exceptional_form.is_valid():
@@ -1556,40 +1596,126 @@ def historical_intake(request):
                     return redirect("historical-intake")
                 except (ValidationError, PermissionDenied) as exc:
                     exceptional_form.add_error(None, str(exc))
-        elif request.POST.get("action") == "bulk_historical" and bulk_form.is_valid():
-            cleaned = bulk_form.cleaned_data
-            identifiers = cleaned["student_identifiers"]
+        elif request.POST.get("action") == "existing_preview" and existing_form.is_valid():
+            cleaned = existing_form.cleaned_data
+            users = list(cleaned["students"])[:MAX_EXISTING_BULK_STUDENTS]
             rows = []
-            for identifier in identifiers:
-                user = User.objects.filter(pk=int(identifier)).first() if identifier.isdigit() else User.objects.filter(username=normalize_username(identifier)).first()
-                if user is None or not user.role or user.role.role != "student":
-                    bulk_form.add_error("student_identifiers", _("Student account not found: %(identifier)s") % {"identifier": identifier})
-                    break
-                rows.append({
-                    "source_name": user.get_full_name() or user.username,
-                    "source_level": str(cleaned["source_year_level"].level.ordering),
-                    "source_academic_year": cleaned["source_year_level"].academic_year.name,
-                    "historical_outcome": cleaned["historical_outcome"],
-                    "account_action": "find",
-                    "lms_user_id": str(user.pk),
-                    "lms_username": user.username,
-                    "lms_email": user.email,
-                    "destination_academic_year": cleaned["destination_scope"].academic_year.name if cleaned["destination_scope"] else "",
-                    "destination_level": str(cleaned["destination_scope"].level.ordering) if cleaned["destination_scope"] else "",
-                    "promote_now": "yes" if cleaned["promote_now"] else "no",
-                    "failed_course_offering_ids": cleaned["exceptional_offering_ids"],
-                    "promotion_reason": cleaned["promotion_reason"],
-                    "admin_note": cleaned["notes"],
+            for user in users:
+                row = build_existing_intake_row(
+                    user=user,
+                    source_scope=cleaned["source_year_level"],
+                    outcome=cleaned["historical_outcome"],
+                    destination=cleaned["destination_scope"],
+                    promote=bool(cleaned["promote_now"]),
+                    failed_ids=[],
+                    reason=cleaned["promotion_reason"] or "",
+                    notes=cleaned["notes"] or "",
+                )
+                row["failed_course_offering_ids"] = cleaned["exceptional_offering_ids"] or ""
+                rows.append(row)
+            known = summaries_for_users_scopes(
+                users,
+                [cleaned["source_year_level"]] + ([cleaned["destination_scope"]] if cleaned["destination_scope"] else []),
+            )
+            for user, row, item in zip(users, rows, preview_intake_rows(rows)):
+                summary = known.get((user.pk, cleaned["source_year_level"].pk))
+                existing_preview_rows.append({
+                    "user": user,
+                    "source_id": cleaned["source_year_level"].pk,
+                    "outcome": cleaned["historical_outcome"],
+                    "dest_id": cleaned["destination_scope"].pk if cleaned["destination_scope"] else "",
+                    "failed": cleaned["exceptional_offering_ids"] or "",
+                    "account": item["account"],
+                    "message": item["message"],
+                    "action": item["action"],
+                    "has_record": summary is not None,
+                    "already_promoted": bool(summary and summary.promoted_at),
                 })
-            if rows and not bulk_form.errors:
+        elif request.POST.get("action") == "existing_apply" and existing_form.is_valid():
+            cleaned = existing_form.cleaned_data
+            users = list(cleaned["students"])[:MAX_EXISTING_BULK_STUDENTS]
+            promote = bool(cleaned["promote_now"])
+            reason = cleaned["promotion_reason"] or ""
+            notes = cleaned["notes"] or ""
+            raw_sources = {}
+            raw_outcomes = {}
+            raw_dests = {}
+            raw_failed = {}
+            for user in users:
+                key = str(user.pk)
+                raw_sources[user.pk] = request.POST.get(f"er_source_{key}") or str(cleaned["source_year_level"].pk)
+                raw_outcomes[user.pk] = request.POST.get(f"er_outcome_{key}") or cleaned["historical_outcome"]
+                raw_dests[user.pk] = request.POST.get(f"er_dest_{key}", "")
+                if not raw_dests[user.pk] and cleaned["destination_scope"]:
+                    raw_dests[user.pk] = str(cleaned["destination_scope"].pk)
+                raw_failed[user.pk] = request.POST.get(f"er_failed_{key}", cleaned["exceptional_offering_ids"] or "")
+            source_map = {
+                scope.pk: scope
+                for scope in AcademicYearLevel.objects.select_related("academic_year", "level").filter(
+                    pk__in=[int(value) for value in set(raw_sources.values()) if value.isdigit()],
+                    academic_year__is_active=False,
+                )
+            }
+            dest_map = {
+                scope.pk: scope
+                for scope in AcademicYearLevel.objects.select_related("academic_year", "level").filter(
+                    pk__in=[int(value) for value in set(raw_dests.values()) if value.isdigit()],
+                    academic_year__is_active=True,
+                )
+            }
+            rows = []
+            row_errors = []
+            for user in users:
+                source = source_map.get(int(raw_sources[user.pk])) if raw_sources[user.pk].isdigit() else None
+                outcome = raw_outcomes[user.pk]
+                dest = dest_map.get(int(raw_dests[user.pk])) if raw_dests[user.pk].isdigit() else None
+                if source is None:
+                    row_errors.append(_("Row for %(student)s has no valid source academic scope.") % {"student": user.username})
+                    continue
+                if outcome not in HistoricalAcademicSummary.Outcome.values:
+                    row_errors.append(_("Row for %(student)s has an invalid historical outcome.") % {"student": user.username})
+                    continue
+                rows.append((user, build_existing_intake_row(
+                    user=user,
+                    source_scope=source,
+                    outcome=outcome,
+                    destination=dest,
+                    promote=promote,
+                    failed_ids=[],
+                    reason=reason,
+                    notes=notes,
+                )))
+                rows[-1][1]["failed_course_offering_ids"] = raw_failed[user.pk] or ""
+            if not row_errors:
+                for (user, row), item in zip(rows, preview_intake_rows([row for _, row in rows])):
+                    if item["action"] == "error":
+                        row_errors.append(_("Row for %(student)s: %(message)s") % {"student": user.username, "message": item["message"]})
+            if row_errors:
+                for error in row_errors:
+                    existing_form.add_error(None, error)
+                known = summaries_for_users_scopes(users, list(source_map.values()))
+                for user in users:
+                    existing_preview_rows.append({
+                        "user": user,
+                        "source_id": raw_sources[user.pk] if raw_sources[user.pk].isdigit() else "",
+                        "outcome": raw_outcomes[user.pk],
+                        "dest_id": raw_dests[user.pk] if raw_dests[user.pk].isdigit() else "",
+                        "failed": raw_failed[user.pk] or "",
+                        "account": user.username,
+                        "message": "; ".join(row_errors),
+                        "action": "error",
+                        "has_record": any(key[0] == user.pk for key in known),
+                        "already_promoted": False,
+                    })
+            else:
                 try:
                     with transaction.atomic():
-                        for index, row in enumerate(rows):
-                            intake_historical_row(row=row, actor=request.user, source_key=f"bulk:{request.user.pk}:{uuid.uuid4().hex}:{index}", source_file="admin-bulk")
+                        for index, (user, row) in enumerate(rows):
+                            intake_historical_row(row=row, actor=request.user, source_key=f"existing:{request.user.pk}:{uuid.uuid4().hex}:{index}", source_file="admin-existing-bulk")
                     messages.success(request, _("Historical intake applied for %(count)d student(s).") % {"count": len(rows)})
                     return redirect("historical-intake")
                 except ValidationError as exc:
-                    bulk_form.add_error(None, str(exc))
+                    existing_form.add_error(None, str(exc))
         elif request.FILES.get("intake_file"):
             try:
                 rows, upload_digest = parse_intake_upload(request.FILES["intake_file"])
@@ -1649,7 +1775,10 @@ def historical_intake(request):
     return render_page(request, "historical_intake.html", "partials/historical_intake_content.html", {
         "form": form,
         "exceptional_form": exceptional_form,
-        "bulk_form": bulk_form,
+        "existing_form": existing_form,
+        "existing_preview_rows": existing_preview_rows,
+        "existing_q": existing_q,
+        "outcome_choices": HistoricalAcademicSummary.Outcome.choices,
         "summaries": summary_page_obj.object_list,
         "summary_page_obj": summary_page_obj,
         "pagination_query": pagination_query_string(request),

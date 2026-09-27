@@ -11458,6 +11458,51 @@ msgstr "الوصول مرفوض."
 msgid "Server error."
 msgstr "خطأ في الخادم."
 
+msgid "Select between one and 50 students."
+msgstr "اختر طالبًا واحدًا على الأقل وبحد أقصى 50 طالبًا."
+
+msgid "Search students"
+msgstr "البحث عن الطلاب"
+
+msgid "Search username, email, or name"
+msgstr "ابحث باسم المستخدم أو البريد الإلكتروني أو الاسم"
+
+msgid "Row for %(student)s has no valid source academic scope."
+msgstr "الصف الخاص بـ %(student)s ليس له نطاق أكاديمي مصدر صالح."
+
+msgid "Row for %(student)s has an invalid historical outcome."
+msgstr "النتيجة التاريخية في الصف الخاص بـ %(student)s غير صالحة."
+
+msgid "Row for %(student)s: %(message)s"
+msgstr "الصف الخاص بـ %(student)s: %(message)s"
+
+msgid "Add history to existing students"
+msgstr "إضافة سجل تاريخي لطلاب موجودين"
+
+msgid "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled."
+msgstr "اختر ما يصل إلى 50 طالبًا موجودًا، وراجع كل صف، ثم طبّق. تُنفَّذ الترقية بعد المراجعة عند تفعيلها."
+
+msgid "Hold Ctrl or Cmd to select multiple students (up to 50)."
+msgstr "اضغط Ctrl أو Cmd لتحديد عدة طلاب (حتى 50)."
+
+msgid "Preview selected students"
+msgstr "معاينة الطلاب المحددين"
+
+msgid "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid."
+msgstr "ارفع القالب المُراجَع (16 عمودًا، بدون حقول ووردبريس). الإرسال الأول تجريبي؛ لا يُسمح بالتطبيق إلا عندما تكون جميع الصفوف صالحة."
+
+msgid "Expected columns"
+msgstr "الأعمدة المتوقعة"
+
+msgid "Apply reviewed intake"
+msgstr "تطبيق الإدخال المُراجَع"
+
+msgid "Runs transactionally; any error rolls back all rows."
+msgstr "يُطبَّق ضمن معاملة واحدة؛ أي خطأ يتراجع عن جميع الصفوف."
+
+msgid "Already promoted"
+msgstr "تمت ترقيته بالفعل"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 
@@ -11553,8 +11598,8 @@ msgstr "خطأ في الخادم."
 #~ msgid "Preview results pagination"
 #~ msgstr "التنقل بين صفحات نتائج المعاينة"
 
-#~ msgid "Already recorded"
-#~ msgstr "تم تسجيله بالفعل"
+msgid "Already recorded"
+msgstr "تم تسجيله بالفعل"
 
 #~ msgid "Some actions already recorded for today."
 #~ msgstr "تم تسجيل بعض الإجراءات اليوم بالفعل."
