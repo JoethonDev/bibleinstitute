@@ -536,6 +536,7 @@ main:has(.sd-page) {
 .sd-media-head {
     display: flex;
     align-items: center;
+    min-width: 0;
     gap: .6rem;
     padding: .7rem 1rem;
     font-weight: 700;
@@ -543,6 +544,17 @@ main:has(.sd-page) {
     color: var(--ps-ink);
     border-bottom: 1px solid var(--ps-line);
     background: linear-gradient(180deg, var(--ps-cream), var(--ps-paper));
+}
+
+.sd-media-head h6 {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    word-break: normal;
+    unicode-bidi: plaintext;
 }
 
 .sd-media-head i { color: var(--ps-gold); }
@@ -1063,7 +1075,7 @@ main:has(.sd-page) {
     min-height: 240px;
     overflow: auto;
     overscroll-behavior: contain;
-    touch-action: pan-x pan-y;
+    touch-action: pan-x pan-y pinch-zoom;
     border-radius: .5rem;
     background: var(--ps-ink);
     scrollbar-width: thin;

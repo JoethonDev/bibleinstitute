@@ -9,7 +9,7 @@
     {% for hls_url in links %}
         <div class="card shadow-sm border-0 mb-4 lesson-media-card sd-media-card">
             <div class="card-header bg-light lesson-media-header sd-media-head">
-                <h6 class="mb-0 fw-bold">{{ hls_url.name }}</h6>
+                <h6 class="mb-0 fw-bold" dir="auto">{{ hls_url.name }}</h6>
             </div>
             <div class="card-body p-2 p-sm-3">
                 {% if hls_url.type == 'video' %}

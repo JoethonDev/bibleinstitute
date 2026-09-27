@@ -229,6 +229,9 @@
         const zoomLabel = viewer.querySelector('.pdf-zoom-level');
         if (!canvas || !stage || !pageInfo) return;
 
+        const bookTitle = viewer.closest('.lesson-media-card')?.querySelector('.lesson-media-header h6');
+        if (bookTitle) stage.dir = getComputedStyle(bookTitle).direction;
+
         let currentPage = 1;
         let zoom = 1;
         let pdfDoc = null;
