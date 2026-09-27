@@ -15,8 +15,12 @@
 
     function ensurePdfWorker() {
         try {
-            if (window.pdfjsLib?.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            if (window.pdfjsLib?.GlobalWorkerOptions) {
+                // Set unconditionally before every document load so no
+                // navigation/swap ordering can leave workerSrc empty.
                 pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
+            } else if (!window.pdfjsLib) {
+                console.error('PDF viewer library is unavailable.');
             }
         } catch (_) {
             // Worker setup is best-effort; rendering still attempts without it.
