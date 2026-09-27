@@ -1793,6 +1793,15 @@ def historical_intake(request):
     summaries = HistoricalAcademicSummary.objects.select_related(
         "student", "academic_year_level__academic_year", "academic_year_level__level", "promotion_history__actor"
     ).order_by("-created_at")
+    record_search = str(request.GET.get("record_search") or "")[:64].strip()
+    if record_search:
+        record_filter = normalized_contains_q(
+            ("student__username", "student__email", "student__first_name", "student__last_name", "source_name"),
+            record_search,
+        )
+        if record_search.isdigit():
+            record_filter |= Q(student__pk=int(record_search))
+        summaries = summaries.filter(record_filter)
     summary_page_obj = Paginator(summaries, 25).get_page(request.GET.get("page", 1))
     return render_page(request, "historical_intake.html", "partials/historical_intake_content.html", {
         "form": form,
@@ -1802,6 +1811,7 @@ def historical_intake(request):
         "existing_q": existing_q,
         "selected_users": picker_selected,
         "student_search_results": picker_results,
+        "record_search": record_search,
         "outcome_choices": HistoricalAcademicSummary.Outcome.choices,
         "summaries": summary_page_obj.object_list,
         "summary_page_obj": summary_page_obj,

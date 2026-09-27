@@ -10847,6 +10847,15 @@ msgstr "No students selected yet."
 msgid "No matching students."
 msgstr "No matching students."
 
+msgid "Search records"
+msgstr "Search records"
+
+msgid "Search student or source name"
+msgstr "Search student or source name"
+
+msgid "No matching historical records."
+msgstr "No matching historical records."
+
 #~ msgid "Priest Name"
 #~ msgstr "Priest Name"
 

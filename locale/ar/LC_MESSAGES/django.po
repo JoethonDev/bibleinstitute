@@ -11518,6 +11518,15 @@ msgstr "لم يتم تحديد أي طلاب بعد."
 msgid "No matching students."
 msgstr "لا يوجد طلاب مطابقون."
 
+msgid "Search records"
+msgstr "البحث في السجلات"
+
+msgid "Search student or source name"
+msgstr "ابحث باسم الطالب أو الاسم المصدري"
+
+msgid "No matching historical records."
+msgstr "لا توجد سجلات تاريخية مطابقة."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 
