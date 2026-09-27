@@ -117,6 +117,7 @@ from .utils.attendance import (
     reconcile_missing_exits,
 )
 from .utils.timezones import ensure_aware, format_user_datetime
+from .utils.validators import normalize_username
 from .utils.search import normalize_search_text, normalized_contains_q
 from .admin_tables import (
     bulk_delete_records,
@@ -1560,7 +1561,7 @@ def historical_intake(request):
             identifiers = cleaned["student_identifiers"]
             rows = []
             for identifier in identifiers:
-                user = User.objects.filter(pk=int(identifier)).first() if identifier.isdigit() else User.objects.filter(username=identifier).first()
+                user = User.objects.filter(pk=int(identifier)).first() if identifier.isdigit() else User.objects.filter(username=normalize_username(identifier)).first()
                 if user is None or not user.role or user.role.role != "student":
                     bulk_form.add_error("student_identifiers", _("Student account not found: %(identifier)s") % {"identifier": identifier})
                     break
@@ -1718,6 +1719,7 @@ def user_bulk_create(request):
                         
                         try:
                             username, first_name, last_name, password, role_name = row
+                            username = normalize_username(username)
                             
                             if User.objects.filter(username=username).exists():
                                 errors_list.append(_("Line %(line)d: User '%(username)s' already exists.") % {
@@ -1736,7 +1738,7 @@ def user_bulk_create(request):
                                 continue
 
                             user = User(
-                                username=username.strip(),
+                                username=username,
                                 first_name=first_name.strip(),
                                 last_name=last_name.strip(),
                                 role=role
@@ -6046,7 +6048,7 @@ def student_lookup(request):
 
     if not user:
         try:
-            user = User.objects.get(username__iexact=query)
+            user = User.objects.get(username=normalize_username(query))
         except User.DoesNotExist:
             pass
 

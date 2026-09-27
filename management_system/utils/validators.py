@@ -17,6 +17,13 @@ def validate_identity_by_type(identity_type, identity_number):
     elif identity_type == "passport":
         validate_passport(identity_number)
 
+
+def normalize_username(value: str) -> str:
+    """Canonicalize a username by Unicode normalization, trimming, and casing."""
+    if not isinstance(value, str):
+        return ""
+    return unicodedata.normalize("NFKC", value).strip().lower()
+
 def normalize_phone(value: str) -> str | None:
     """Return a canonical E.164-like phone or ``None`` when ambiguous.
 

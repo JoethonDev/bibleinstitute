@@ -67,6 +67,7 @@ from .utils.student_data import (
     unread_notification_count,
 )
 from .utils.helpers import build_scan_url
+from .utils.validators import normalize_username
 from .views import (
     create_viewing_session,
     generate_audio_download,
@@ -147,7 +148,8 @@ def login(request):
     username = payload.get("username")
     password = payload.get("password")
     remote_addr = request.META.get("REMOTE_ADDR", "")
-    username_key = username.strip().lower() if isinstance(username, str) else ""
+    username = normalize_username(username) if isinstance(username, str) else ""
+    username_key = username
     if mobile_login_rate_limited(username_key, remote_addr):
         return _error(request, "authentication_rate_limited", _localized(request, "Too many login attempts. Try again later."), 429)
     if not isinstance(username, str) or not isinstance(password, str) or not username or not password:

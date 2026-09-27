@@ -54,6 +54,7 @@
     <script src="{% url 'javascript-catalog' %}"></script>
     <script defer src="{% static 'js/country_select.js' %}?v={{ static_asset_version }}"></script>
     <script defer src="{% static 'js/scanner.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'js/username_normalize.js' %}?v={{ static_asset_version }}"></script>
 
     <!-- Bootstrap CSS -->
     {% if request.LANGUAGE_CODE == 'ar' %}

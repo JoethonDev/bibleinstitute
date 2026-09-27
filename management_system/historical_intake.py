@@ -22,6 +22,7 @@ from .models import (
     Role,
     User,
 )
+from .utils.validators import normalize_username
 
 
 INTAKE_COLUMNS = (
@@ -123,7 +124,7 @@ def _find_user(row: dict[str, str]) -> User:
             raise ValidationError(_("LMS user ID must be a positive number."))
         identifiers.append(User.objects.filter(pk=int(row["lms_user_id"])))
     if row.get("lms_username"):
-        identifiers.append(User.objects.filter(username=row["lms_username"]))
+        identifiers.append(User.objects.filter(username=normalize_username(row["lms_username"])))
     if row.get("lms_email"):
         identifiers.append(User.objects.filter(email__iexact=row["lms_email"]))
     if not identifiers:
@@ -181,7 +182,7 @@ def _validate_row(row: dict[str, str], index: int) -> dict:
         raise ValidationError(_("Row %(row)d must set account_action to find or create.") % {"row": index})
     student = _find_user(row) if action == "find" else None
     if action == "create":
-        username = _text(row.get("lms_username"))
+        username = normalize_username(_text(row.get("lms_username")))
         if not username:
             raise ValidationError(_("Row %(row)d create mode requires lms_username.") % {"row": index})
         if User.objects.filter(username=username).exists():
@@ -221,7 +222,7 @@ def preview_intake_rows(rows: list[dict[str, str]]) -> list[dict]:
     for index, row in enumerate(rows, start=2):
         try:
             plan = _validate_row(row, index)
-            results.append({"row": index, "source_name": row.get("source_name", ""), "action": "valid", "account": plan["student"].username if plan["student"] else row.get("lms_username", "(new account)"), "message": _("Ready for review")})
+            results.append({"row": index, "source_name": row.get("source_name", ""), "action": "valid", "account": plan["student"].username if plan["student"] else normalize_username(row.get("lms_username", "")) or "(new account)", "message": _("Ready for review")})
         except ValidationError as exc:
             results.append({"row": index, "source_name": row.get("source_name", ""), "action": "error", "account": "", "message": "; ".join(exc.messages)})
     return results
@@ -230,7 +231,7 @@ def preview_intake_rows(rows: list[dict[str, str]]) -> list[dict]:
 def _create_or_get_user(row: dict[str, str], actor: User) -> User:
     if row.get("account_action") == "find":
         return _find_user(row)
-    username = _text(row.get("lms_username"))
+    username = normalize_username(_text(row.get("lms_username")))
     if User.objects.filter(username=username).exists():
         raise ValidationError(_("The create username already exists."))
     first_name = _text(row.get("first_name"))

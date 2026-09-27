@@ -8,6 +8,32 @@
 
     const translations = window.lessonMediaTranslations || {};
 
+    const pdfAssets = window.pdfViewerAssets || {};
+    const PDF_WORKER_SRC = pdfAssets.workerSrc || '/static/vendor/pdfjs/3.11.174/pdf.worker.min.js';
+    const PDF_CMAP_URL = pdfAssets.cMapUrl || '/static/vendor/pdfjs/3.11.174/cmaps/';
+    const PDF_STANDARD_FONT_URL = pdfAssets.standardFontDataUrl || '/static/vendor/pdfjs/3.11.174/standard_fonts/';
+
+    function ensurePdfWorker() {
+        try {
+            if (window.pdfjsLib?.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
+            }
+        } catch (_) {
+            // Worker setup is best-effort; rendering still attempts without it.
+        }
+    }
+
+    function pdfDocumentOptions(url) {
+        ensurePdfWorker();
+        return {
+            url,
+            cMapUrl: PDF_CMAP_URL,
+            cMapPacked: true,
+            standardFontDataUrl: PDF_STANDARD_FONT_URL,
+            useSystemFonts: true,
+        };
+    }
+
     function translate(key, fallback) {
         return translations[key] || (typeof gettext === 'function' ? gettext(fallback) : fallback);
     }
@@ -353,7 +379,7 @@
             const result = await response.json();
             if (disposed) return;
             if (!result?.url) throw new Error('PDF source is unavailable');
-            loadingTask = pdfjsLib.getDocument(result.url);
+            loadingTask = pdfjsLib.getDocument(pdfDocumentOptions(result.url));
             pdfDoc = await loadingTask.promise;
             if (disposed) {
                 loadingTask.destroy();

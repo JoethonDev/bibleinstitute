@@ -154,10 +154,18 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="{% static 'vendor/pdfjs/3.11.174/pdf.min.js' %}?v={{ static_asset_version }}"></script>
 <script src="{% static 'videojs/video.min.js' %}?v={{ static_asset_version }}"></script>
 <script src="{% static 'videojs/videojs-seek-buttons.min.js' %}?v={{ static_asset_version }}"></script>
 <script>
+    window.pdfViewerAssets = {
+        workerSrc: "{% static 'vendor/pdfjs/3.11.174/pdf.worker.min.js' %}?v={{ static_asset_version }}",
+        cMapUrl: "{% static 'vendor/pdfjs/3.11.174/cmaps/' %}",
+        standardFontDataUrl: "{% static 'vendor/pdfjs/3.11.174/standard_fonts/' %}"
+    };
+    if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = window.pdfViewerAssets.workerSrc;
+    }
     window.lessonMediaTranslations = {
         language: '{{ request.LANGUAGE_CODE|default:"en"|escapejs }}',
         play: '{% translate "Play"|escapejs %}',

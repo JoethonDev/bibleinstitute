@@ -4,7 +4,7 @@ import secrets
 
 from django.core.exceptions import ValidationError
 from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
-from .utils.validators import normalize_phone, validate_identity_by_type
+from .utils.validators import normalize_phone, normalize_username, validate_identity_by_type
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
@@ -16,13 +16,29 @@ from .utils.quiz_access import eligible_quiz_students
 from .announcements import AnnouncementError, clean_announcement_action
 
 
+class CanonicalUsernameField(UsernameField):
+    """Render and validate usernames in their canonical lowercase form."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("max_length", 150)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value):
+        return normalize_username(super().to_python(value) or "")
+
+    def bound_data(self, data, initial):
+        if isinstance(data, str):
+            return normalize_username(data)
+        return super().bound_data(data, initial)
+
+
 class UserLoginForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
         super(UserLoginForm, self).__init__(*args, **kwargs)
         self.fields['username'].label = _("Username") # Localized
         self.fields['password'].label = _("Password") # Localized
 
-    username = UsernameField(widget=forms.TextInput(
+    username = CanonicalUsernameField(widget=forms.TextInput(
         attrs={ 
                'placeholder': _('Username'), # Localized
                'id': 'username'
@@ -48,7 +64,7 @@ class UserCreationForm(forms.ModelForm):
         self.fields['time_zone'].label = _("Time zone")
         self.fields['time_zone'].choices = user_time_zone_choices()
 
-    username = UsernameField(widget=forms.TextInput(
+    username = CanonicalUsernameField(widget=forms.TextInput(
         attrs={ 
                'placeholder': _('Username'), # Localized
                'id': 'username'
@@ -97,6 +113,14 @@ class UserCreationForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+class CanonicalUserAdminForm(forms.ModelForm):
+    username = CanonicalUsernameField()
+
+    class Meta:
+        model = User
+        fields = "__all__"
 
 
 class UserUpdateForm(UserCreationForm):
@@ -405,9 +429,9 @@ class HistoricalIntakeForm(forms.Form):
         label=_("Account action"),
     )
     lms_user_id = forms.IntegerField(required=False, min_value=1, label=_("LMS user ID"), widget=forms.NumberInput(attrs={"class": "form-control"}))
-    lms_username = forms.CharField(required=False, label=_("LMS username"), widget=forms.TextInput(attrs={"class": "form-control"}))
+    lms_username = CanonicalUsernameField(required=False, label=_("LMS username"), widget=forms.TextInput(attrs={"class": "form-control"}))
     lms_email = forms.EmailField(required=False, label=_("LMS email"), widget=forms.EmailInput(attrs={"class": "form-control"}))
-    username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}), label=_("New username"))
+    username = CanonicalUsernameField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}), label=_("New username"))
     first_name = forms.CharField(required=False, label=_("First name"), widget=forms.TextInput(attrs={"class": "form-control"}))
     last_name = forms.CharField(required=False, label=_("Last name"), widget=forms.TextInput(attrs={"class": "form-control"}))
     historical_outcome = forms.ChoiceField(
@@ -474,7 +498,7 @@ class ExceptionalCourseAssignmentForm(forms.Form):
         if value.isdigit():
             student = queryset.filter(pk=int(value)).first()
         else:
-            student = queryset.filter(username=value).first()
+            student = queryset.filter(username=normalize_username(value)).first()
         if student is None or not student.role or student.role.role != "student":
             raise forms.ValidationError(_("Select an existing student account."))
         return student
@@ -518,6 +542,7 @@ class HistoricalBulkIntakeForm(forms.Form):
 
     def clean_student_identifiers(self):
         values = [value.strip() for value in self.cleaned_data["student_identifiers"].replace(",", "\n").splitlines() if value.strip()]
+        values = [value if value.isdigit() else normalize_username(value) for value in values]
         values = list(dict.fromkeys(values))
         if not values or len(values) > 1000:
             raise forms.ValidationError(_("Select between one and 1,000 students."))
@@ -755,6 +780,9 @@ class QuizExceptionalOpeningForm(forms.Form):
 
 
 class ApplicationAdminForm(forms.ModelForm):
+    username = CanonicalUsernameField(
+        widget=forms.TextInput(attrs={"placeholder": _("Username")})
+    )
     password = forms.CharField(
         required=False,
         label=_("Password (leave blank to keep current)"),
@@ -784,7 +812,6 @@ class ApplicationAdminForm(forms.ModelForm):
         widgets = {
             "first_name": forms.TextInput(attrs={"placeholder": _("First Name")}),
             "last_name": forms.TextInput(attrs={"placeholder": _("Last Name")}),
-            "username": forms.TextInput(attrs={"placeholder": _("Username")}),
             "email": forms.EmailInput(attrs={"placeholder": _("Email")}),
             "phone": forms.TextInput(attrs={"placeholder": _("Phone")}),
             "city": forms.TextInput(attrs={"placeholder": _("City")}),
@@ -871,6 +898,10 @@ class ApplicationAdminForm(forms.ModelForm):
 
 
 class SignupForm(forms.ModelForm):
+    username = CanonicalUsernameField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"placeholder": _("Username"), "id": "username"}),
+    )
     password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}))
     full_name = forms.CharField(
         label=_("Full Name"),

@@ -12,9 +12,12 @@ import uuid
 from django.utils.translation import gettext_lazy as _
 from django.utils import translation
 from django.db.models import Max
+from django.db.models.functions import Lower, Trim
 from django.conf import settings
 from .utils.timezones import format_application_datetime
 from .utils.search import SearchNormalize
+from .managers import CanonicalUserManager
+from .utils.validators import normalize_username
 
 # Constants
 MANAGEMENT_ROLES = ["admin", "staff"]
@@ -112,6 +115,8 @@ class Role(models.Model):
         return [str(_(role.get_role_display())) for role in Role.objects.all()] # Translate display values
 
 class User(AbstractUser):
+    objects = CanonicalUserManager()
+
     class Meta:
         indexes = [
             models.Index(
@@ -135,6 +140,12 @@ class User(AbstractUser):
             GinIndex(OpClass(SearchNormalize("priest_name"), name="gin_trgm_ops"), name="user_priest_name_trgm_idx"),
             GinIndex(OpClass(SearchNormalize("phone"), name="gin_trgm_ops"), name="user_phone_trgm_idx"),
             GinIndex(OpClass(SearchNormalize("identity_number"), name="gin_trgm_ops"), name="user_identity_trgm_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(username=Lower(Trim("username"))),
+                name="user_username_canonical",
+            ),
         ]
 
     role = models.ForeignKey(Role, on_delete=models.DO_NOTHING, null=True, blank=True)
@@ -177,6 +188,9 @@ class User(AbstractUser):
     qr_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        self.username = normalize_username(self.username)
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"username"}
         if not self.role_id:
             try:
                 default_role = Role.objects.get(role='student')

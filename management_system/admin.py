@@ -1,6 +1,7 @@
 ﻿from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .mobile_auth import revoke_user_mobile_access
+from .forms import CanonicalUserAdminForm
 from .models import *
 
 # Register your models here.
@@ -12,6 +13,8 @@ def _is_admin_user(request):
 
 class UserAdmin(admin.ModelAdmin):
     """Revoke mobile access when direct admin edits invalidate an account."""
+
+    form = CanonicalUserAdminForm
 
     def save_model(self, request, obj, form, change):
         original = None
