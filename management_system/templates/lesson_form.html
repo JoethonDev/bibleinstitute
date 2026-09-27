@@ -199,7 +199,7 @@
                                          {% endfor %}
                                         
                                          <!-- Empty State -->
-                                         <div x-show="!$el.parentElement.querySelector('.video-container')"
+                                         <div x-show="selectedLectureCount === 0"
                                               class="text-center text-muted py-5">
                                              <i class="fas fa-folder-open fa-3x mb-3"></i>
                                              <p>{% translate "No lectures selected yet" %}</p>

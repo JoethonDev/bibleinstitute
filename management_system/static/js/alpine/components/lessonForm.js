@@ -11,10 +11,13 @@
  */
 function lessonForm() {
     return {
+        selectedLectureCount: 0,
+
         // Translations
         init() {
             // Initialize on page load and after HTMX swaps
             this.initializeDriveFiles();
+            this.updateSelectedLectureCount();
             
             // Listen for HTMX afterSwap events
             this.$el.addEventListener('htmx:after:swap', () => {
@@ -57,6 +60,13 @@ function lessonForm() {
                     title.textContent = title.textContent.trim().replace('.m3u8', '');
                 }
             });
+        },
+
+        updateSelectedLectureCount() {
+            const container = this.$el.querySelector('#videos-input');
+            this.selectedLectureCount = container
+                ? container.querySelectorAll('.video-container').length
+                : 0;
         },
 
         /**
@@ -115,6 +125,7 @@ function lessonForm() {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = videoCard;
             container.appendChild(tempDiv.firstElementChild);
+            this.updateSelectedLectureCount();
         },
 
         /**
@@ -122,6 +133,7 @@ function lessonForm() {
          */
         removeFile(event) {
             event.currentTarget.closest('.video-container').remove();
+            this.updateSelectedLectureCount();
         },
 
         /**
