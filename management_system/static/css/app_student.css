@@ -1079,6 +1079,11 @@ main:has(.sd-page) {
     border-radius: .5rem;
     background: var(--ps-ink);
     scrollbar-width: thin;
+    scrollbar-gutter: stable;
+}
+
+body.pdf-fs-open {
+    overflow: hidden;
 }
 
 .sd-pdf-viewer .pdf-canvas {

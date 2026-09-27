@@ -322,8 +322,14 @@
             }
         };
 
-        const toggleFullscreen = () => {
-            const isFullscreen = viewer.classList.toggle('is-fullscreen');
+        let cssFullscreenFallback = false;
+
+        const isFullscreenActive = () => document.fullscreenElement === viewer || cssFullscreenFallback;
+
+        const updateFullscreenUI = () => {
+            const isFullscreen = isFullscreenActive();
+            viewer.classList.toggle('is-fullscreen', isFullscreen);
+            document.body.classList.toggle('pdf-fs-open', isFullscreen);
             fullscreenBtn?.setAttribute('aria-pressed', String(isFullscreen));
             const label = translate(
                 isFullscreen ? 'exitFullscreen' : 'fullscreen',
@@ -340,7 +346,56 @@
                     icon.classList.toggle('fa-compress', isFullscreen);
                 }
             }
+        };
+
+        const resetStageScroll = () => {
+            stage.scrollTop = 0;
+            stage.scrollLeft = 0;
+        };
+
+        const toggleFullscreen = async () => {
+            if (disposed) return;
+            if (document.fullscreenElement === viewer) {
+                try {
+                    await document.exitFullscreen();
+                } catch (_) {
+                    cssFullscreenFallback = false;
+                    updateFullscreenUI();
+                    renderPage(currentPage);
+                }
+                return;
+            }
+            if (cssFullscreenFallback) {
+                cssFullscreenFallback = false;
+                updateFullscreenUI();
+                renderPage(currentPage);
+                resetStageScroll();
+                return;
+            }
+            const request = viewer.requestFullscreen?.bind(viewer)
+                || viewer.webkitRequestFullscreen?.bind(viewer);
+            if (request) {
+                try {
+                    await request();
+                } catch (_) {
+                    cssFullscreenFallback = true;
+                    updateFullscreenUI();
+                }
+            } else {
+                cssFullscreenFallback = true;
+                updateFullscreenUI();
+            }
             renderPage(currentPage);
+            resetStageScroll();
+        };
+
+        const onFullscreenChange = () => {
+            if (document.fullscreenElement && document.fullscreenElement !== viewer) return;
+            if (disposed) return;
+            cssFullscreenFallback = false;
+            updateFullscreenUI();
+            renderPage(currentPage);
+            resetStageScroll();
         };
 
         const onKeyDown = event => {
@@ -355,30 +410,52 @@
             : null;
         resizeObserver?.observe(stage);
 
-        prevBtn?.addEventListener('click', () => renderPage(currentPage - 1));
-        nextBtn?.addEventListener('click', () => renderPage(currentPage + 1));
+        prevBtn?.addEventListener('click', () => {
+            renderPage(currentPage - 1);
+            resetStageScroll();
+        });
+        nextBtn?.addEventListener('click', () => {
+            renderPage(currentPage + 1);
+            resetStageScroll();
+        });
         zoomOutBtn?.addEventListener('click', () => {
             zoom = Math.max(0.5, Math.round((zoom - 0.2) * 100) / 100);
             renderPage(currentPage);
+            resetStageScroll();
         });
         zoomInBtn?.addEventListener('click', () => {
             zoom = Math.min(4, Math.round((zoom + 0.2) * 100) / 100);
             renderPage(currentPage);
+            resetStageScroll();
         });
         fitWidthBtn?.addEventListener('click', () => {
             zoom = 1;
             renderPage(currentPage);
+            resetStageScroll();
         });
         fullscreenBtn?.addEventListener('click', toggleFullscreen);
         viewer.addEventListener('keydown', onKeyDown);
+        viewer.addEventListener('fullscreenchange', onFullscreenChange);
 
         viewer._pdfCleanup = () => {
             disposed = true;
             viewer.classList.remove('is-fullscreen');
+            try {
+                if (document.fullscreenElement === viewer && typeof document.exitFullscreen === 'function') {
+                    const pending = document.exitFullscreen();
+                    if (pending?.catch) pending.catch(() => {});
+                }
+            } catch (_) {
+                // Leaving fullscreen on teardown is best-effort.
+            }
+            if (!document.querySelector('.pdf-viewer.is-fullscreen')) {
+                document.body.classList.remove('pdf-fs-open');
+            }
             resizeObserver?.disconnect();
             if (renderTask) renderTask.cancel();
             loadingTask?.destroy();
             viewer.removeEventListener('keydown', onKeyDown);
+            viewer.removeEventListener('fullscreenchange', onFullscreenChange);
             delete viewer._pdfCleanup;
             delete viewer._pdfInitializing;
         };
