@@ -300,7 +300,13 @@
                 canvas.height = Math.ceil(viewport.height * pixelRatio);
                 canvas.style.width = `${viewport.width}px`;
                 canvas.style.height = `${viewport.height}px`;
+                // PDF canvas must stay LTR: the stage takes its direction from
+                // the (often Arabic) book title, and an RTL canvas disturbs
+                // pdf.js fillText positioning for visually-ordered glyph runs.
+                canvas.dir = 'ltr';
+                canvas.style.direction = 'ltr';
                 const context = canvas.getContext('2d', {alpha: false});
+                if (context && 'direction' in context) context.direction = 'ltr';
                 renderTask = page.render({
                     canvasContext: context,
                     viewport,
