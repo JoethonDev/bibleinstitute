@@ -10832,6 +10832,21 @@ msgstr "Already recorded"
 msgid "Already promoted"
 msgstr "Already promoted"
 
+msgid "Tick students to select them (up to 50); untick to remove."
+msgstr "Tick students to select them (up to 50); untick to remove."
+
+msgid "Selected"
+msgstr "Selected"
+
+msgid "Search results"
+msgstr "Search results"
+
+msgid "No students selected yet."
+msgstr "No students selected yet."
+
+msgid "No matching students."
+msgstr "No matching students."
+
 #~ msgid "Priest Name"
 #~ msgstr "Priest Name"
 

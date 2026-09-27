@@ -11503,6 +11503,21 @@ msgstr "يُطبَّق ضمن معاملة واحدة؛ أي خطأ يتراجع
 msgid "Already promoted"
 msgstr "تمت ترقيته بالفعل"
 
+msgid "Tick students to select them (up to 50); untick to remove."
+msgstr "حدّد الطلاب بوضع علامة (حتى 50)؛ أزل العلامة للإزالة."
+
+msgid "Selected"
+msgstr "المحددون"
+
+msgid "Search results"
+msgstr "نتائج البحث"
+
+msgid "No students selected yet."
+msgstr "لم يتم تحديد أي طلاب بعد."
+
+msgid "No matching students."
+msgstr "لا يوجد طلاب مطابقون."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

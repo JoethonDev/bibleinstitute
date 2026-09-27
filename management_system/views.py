@@ -1544,41 +1544,22 @@ def historical_intake(request):
     form = HistoricalIntakeForm(request.POST or None)
     exceptional_form = ExceptionalCourseAssignmentForm(request.POST or None)
     existing_q = str(request.GET.get("student_search") or request.GET.get("existing_q") or request.POST.get("student_search") or "")[:64].strip()
-    base_students = User.objects.filter(role__role="student", is_active=True).select_related("role")
-    selected_ids: list[int] = []
-    if request.method == "POST" and request.POST.get("action") in ("existing_preview", "existing_apply"):
-        # Bound the rendered options to the submitted batch plus any search
-        # narrowing; validation still rejects non-student IDs. Rendering the
-        # full active-student queryset here would emit ~10,000 options.
-        submitted_ids = [int(value) for value in request.POST.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
-        options_filter = Q(pk__in=submitted_ids)
-        if existing_q:
-            search_filter = normalized_contains_q(("username", "email", "first_name", "last_name"), existing_q)
-            if existing_q.isdigit():
-                search_filter |= Q(pk=int(existing_q))
-            options_filter |= search_filter
-        student_options = base_students.filter(options_filter).order_by("username")[:100]
-    else:
-        selected_ids = [int(value) for value in request.GET.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
-        if existing_q:
-            search_filter = normalized_contains_q(("username", "email", "first_name", "last_name"), existing_q)
-            if existing_q.isdigit():
-                search_filter |= Q(pk=int(existing_q))
-            if selected_ids:
-                search_filter |= Q(pk__in=selected_ids)
-            student_options = base_students.filter(search_filter).order_by("username")[:100]
-        elif selected_ids:
-            student_options = base_students.filter(pk__in=selected_ids).order_by("username")[:100]
-        else:
-            student_options = base_students.none()
+    # The picker accepts every student-role account, exactly like _find_user().
+    # Inactive accounts are included: historical records are often added for
+    # students whose accounts are no longer active.
+    base_students = User.objects.filter(role__role="student").select_related("role")
     if request.method == "POST":
+        # Validation runs only against the submitted IDs, so the check stays
+        # bounded no matter how many student accounts exist. The queryset must
+        # NOT be sliced: ModelMultipleChoiceField validates by filtering it,
+        # and filtering a sliced queryset fails every submitted value.
+        posted_ids = [int(value) for value in request.POST.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
+        student_options = base_students.filter(pk__in=posted_ids).order_by("username")
         existing_form = HistoricalExistingBulkForm(request.POST, student_options=student_options)
     else:
-        # Unbound GET: re-mark currently selected options (and the search text)
-        # so HTMX search swaps never wipe the user's selection.
         existing_form = HistoricalExistingBulkForm(
-            student_options=student_options,
-            initial={"students": selected_ids, "student_search": existing_q},
+            student_options=base_students.none(),
+            initial={"student_search": existing_q},
         )
     preview = []
     upload_digest = ""
@@ -1686,10 +1667,10 @@ def historical_intake(request):
                     notes=notes,
                 )))
                 rows[-1][1]["failed_course_offering_ids"] = raw_failed[user.pk] or ""
-            if not row_errors:
-                for (user, row), item in zip(rows, preview_intake_rows([row for _, row in rows])):
-                    if item["action"] == "error":
-                        row_errors.append(_("Row for %(student)s: %(message)s") % {"student": user.username, "message": item["message"]})
+            # No separate pre-validation here: intake_historical_row() validates
+            # each row inside the transaction, so concurrent changes between
+            # preview and apply cannot slip through, and failures below are
+            # re-labeled with their student before the rollback.
             if row_errors:
                 for error in row_errors:
                     existing_form.add_error(None, error)
@@ -1711,11 +1692,32 @@ def historical_intake(request):
                 try:
                     with transaction.atomic():
                         for index, (user, row) in enumerate(rows):
-                            intake_historical_row(row=row, actor=request.user, source_key=f"existing:{request.user.pk}:{uuid.uuid4().hex}:{index}", source_file="admin-existing-bulk")
+                            try:
+                                intake_historical_row(row=row, actor=request.user, source_key=f"existing:{request.user.pk}:{uuid.uuid4().hex}:{index}", source_file="admin-existing-bulk")
+                            except ValidationError as row_exc:
+                                raise ValidationError(
+                                    _("Row for %(student)s: %(message)s") % {"student": user.username, "message": "; ".join(row_exc.messages)}
+                                ) from row_exc
                     messages.success(request, _("Historical intake applied for %(count)d student(s).") % {"count": len(rows)})
                     return redirect("historical-intake")
                 except ValidationError as exc:
-                    existing_form.add_error(None, str(exc))
+                    existing_form.add_error(None, "; ".join(exc.messages))
+                    known = summaries_for_users_scopes(users, list(source_map.values()))
+                    for (user, row), item in zip(rows, preview_intake_rows([row for _, row in rows])):
+                        source_pk = int(raw_sources[user.pk]) if raw_sources[user.pk].isdigit() else -1
+                        summary = known.get((user.pk, source_pk))
+                        existing_preview_rows.append({
+                            "user": user,
+                            "source_id": raw_sources[user.pk] if raw_sources[user.pk].isdigit() else "",
+                            "outcome": raw_outcomes[user.pk],
+                            "dest_id": raw_dests[user.pk] if raw_dests[user.pk].isdigit() else "",
+                            "failed": raw_failed[user.pk] or "",
+                            "account": item["account"],
+                            "message": item["message"],
+                            "action": item["action"],
+                            "has_record": summary is not None,
+                            "already_promoted": bool(summary and summary.promoted_at),
+                        })
         elif request.FILES.get("intake_file"):
             try:
                 rows, upload_digest = parse_intake_upload(request.FILES["intake_file"])
@@ -1768,6 +1770,26 @@ def historical_intake(request):
                 return redirect("historical-intake")
             except (ValidationError, User.DoesNotExist) as exc:
                 form.add_error(None, str(exc))
+    # Checkbox picker display lists for every non-redirect response. Selected
+    # students stay ticked across searches; unticking removes them. Both lists
+    # are bounded: at most ~50 selected plus 20 search results.
+    if request.method == "GET":
+        picker_ids = [int(value) for value in request.GET.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
+    elif request.POST.get("action") in ("existing_preview", "existing_apply") and existing_form.is_valid():
+        picker_ids = [user.pk for user in existing_form.cleaned_data["students"]]
+    elif request.POST.get("action") in ("existing_preview", "existing_apply"):
+        picker_ids = [int(value) for value in request.POST.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
+    else:
+        picker_ids = []
+    picker_selected = list(base_students.filter(pk__in=picker_ids).order_by("username")[: MAX_EXISTING_BULK_STUDENTS + 5])
+    picker_results: list = []
+    if existing_q:
+        search_filter = normalized_contains_q(("username", "email", "first_name", "last_name"), existing_q)
+        if existing_q.isdigit():
+            search_filter |= Q(pk=int(existing_q))
+        picker_results = list(
+            base_students.filter(search_filter).exclude(pk__in=[user.pk for user in picker_selected]).order_by("username")[:20]
+        )
     summaries = HistoricalAcademicSummary.objects.select_related(
         "student", "academic_year_level__academic_year", "academic_year_level__level", "promotion_history__actor"
     ).order_by("-created_at")
@@ -1778,6 +1800,8 @@ def historical_intake(request):
         "existing_form": existing_form,
         "existing_preview_rows": existing_preview_rows,
         "existing_q": existing_q,
+        "selected_users": picker_selected,
+        "student_search_results": picker_results,
         "outcome_choices": HistoricalAcademicSummary.Outcome.choices,
         "summaries": summary_page_obj.object_list,
         "summary_page_obj": summary_page_obj,

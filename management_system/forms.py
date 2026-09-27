@@ -509,7 +509,9 @@ class HistoricalExistingBulkForm(forms.Form):
 
     students = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
-        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": "8", "id": "existing-students-select"}),
+        # Rendered manually as tick/untick checkboxes in the intake template;
+        # validation still runs against this queryset, bounded to submitted IDs.
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
         label=_("Existing students"),
     )
     student_search = forms.CharField(
@@ -518,10 +520,10 @@ class HistoricalExistingBulkForm(forms.Form):
             "class": "form-control",
             "placeholder": _("Search username, email, or name"),
             "hx-get": "",
-            "hx-target": "#existing-students-wrap",
-            "hx-select": "#existing-students-wrap",
+            "hx-target": "#existing-student-picker",
+            "hx-select": "#existing-student-picker",
             "hx-swap": "outerHTML",
-            "hx-include": "#existing-students-select",
+            "hx-include": "#existing-student-picker",
             "hx-trigger": "keyup changed delay:400ms, search",
         }),
         label=_("Search students"),
