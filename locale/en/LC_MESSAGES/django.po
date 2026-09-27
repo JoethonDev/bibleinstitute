@@ -2390,6 +2390,21 @@ msgstr "Enter fullscreen"
 msgid "Exit fullscreen"
 msgstr "Exit fullscreen"
 
+msgid "Zoom in"
+msgstr "Zoom in"
+
+msgid "Zoom out"
+msgstr "Zoom out"
+
+msgid "Fit width"
+msgstr "Fit width"
+
+msgid "PDF reading controls"
+msgstr "PDF reading controls"
+
+msgid "PDF page"
+msgstr "PDF page"
+
 msgid "Play"
 msgstr "Play"
 

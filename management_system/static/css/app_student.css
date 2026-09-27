@@ -988,20 +988,144 @@ main:has(.sd-page) {
 
 /* PDF viewer within media card — card-consistent paper background */
 .sd-pdf-viewer {
-    padding: .5rem 0;
+    width: min(100%, 56rem);
+    min-width: 0;
+    padding: .5rem;
+    background: var(--ps-paper);
+    border: 1px solid var(--ps-line-cool);
+    border-radius: var(--ps-radius);
+    box-shadow: var(--ps-shadow);
+}
+
+.sd-pdf-viewer .pdf-controls {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .35rem;
+    margin-bottom: .5rem;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: var(--ps-radius);
     background: var(--ps-paper);
 }
 
-.sd-pdf-viewer canvas {
-    max-width: 100%;
-    height: auto;
-    border-radius: var(--ps-radius);
-    background: #fff;
+.sd-pdf-viewer .pdf-controls__group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .25rem;
+    min-width: 0;
 }
 
-.sd-pdf-viewer .controls {
-    font-size: .85rem;
-    padding: .3rem .5rem;
+.sd-pdf-viewer .pdf-zoom-level {
+    min-width: 3.25rem;
+    color: var(--ps-ink);
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.sd-pdf-viewer .sd-pdf-control {
+    display: inline-flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .35rem .65rem;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .65rem;
+    background: #fff;
+    color: var(--ps-ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.sd-pdf-viewer .sd-pdf-control:hover:not(:disabled),
+.sd-pdf-viewer .sd-pdf-control:focus-visible {
+    border-color: var(--ps-gold);
+    background: var(--ps-gold-soft);
+    outline: 2px solid transparent;
+}
+
+.sd-pdf-viewer .sd-pdf-control:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+.sd-pdf-viewer .pdf-stage {
+    width: 100%;
+    max-height: min(72vh, 900px);
+    min-height: 240px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
+    border-radius: .5rem;
+    background: var(--ps-ink);
+    scrollbar-width: thin;
+}
+
+.sd-pdf-viewer .pdf-canvas {
+    display: block;
+    max-width: none !important;
+    height: auto;
+    margin-inline: auto;
+    background: #fff;
+    border-radius: 2px;
+}
+
+.sd-pdf-viewer.is-fullscreen {
+    position: fixed;
+    z-index: 2100;
+    inset: 0;
+    display: flex;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    flex-direction: column;
+    padding: max(.5rem, env(safe-area-inset-top)) max(.5rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left));
+    border: 0;
+    border-radius: 0;
+    background: var(--ps-ink);
+}
+
+.sd-pdf-viewer.is-fullscreen .pdf-controls {
+    position: relative;
+    flex-shrink: 0;
+    margin-bottom: .5rem;
+}
+
+.sd-pdf-viewer.is-fullscreen .pdf-stage {
+    max-height: none;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+@media (max-width: 575.98px) {
+    .sd-pdf-viewer {
+        padding: .3rem;
+    }
+
+    .sd-pdf-viewer .pdf-controls {
+        justify-content: center;
+        gap: .35rem;
+    }
+
+    .sd-pdf-viewer .pdf-controls__pages {
+        order: 3;
+        width: 100%;
+    }
+
+    .sd-pdf-viewer .sd-pdf-control {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        padding-inline: .55rem;
+    }
 }
 
 /* ================= SCREEN 03 — QUIZ ================= */

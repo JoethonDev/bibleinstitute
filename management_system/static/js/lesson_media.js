@@ -215,61 +215,166 @@
     }
 
     async function initializePdfViewer(viewer) {
-        if (!viewer || viewer.pdfDoc) return;
+        if (!viewer || viewer._pdfInitializing) return;
 
-        const url = viewer.dataset.url;
         const canvas = viewer.querySelector('.pdf-canvas');
-        const ctx = canvas.getContext('2d');
+        const stage = viewer.querySelector('.pdf-stage');
         const pageInfo = viewer.querySelector('.page-info');
         const prevBtn = viewer.querySelector('.prev');
         const nextBtn = viewer.querySelector('.next');
+        const zoomOutBtn = viewer.querySelector('.pdf-zoom-out');
+        const zoomInBtn = viewer.querySelector('.pdf-zoom-in');
+        const fitWidthBtn = viewer.querySelector('.pdf-fit-width');
+        const fullscreenBtn = viewer.querySelector('.pdf-fullscreen');
+        const zoomLabel = viewer.querySelector('.pdf-zoom-level');
+        if (!canvas || !stage || !pageInfo) return;
+
         let currentPage = 1;
-        viewer.pdfDoc = true;
+        let zoom = 1;
+        let pdfDoc = null;
+        let loadingTask = null;
+        let renderTask = null;
+        let renderVersion = 0;
+        let disposed = false;
+        viewer._pdfInitializing = true;
+
+        const updateControls = () => {
+            if (prevBtn) prevBtn.disabled = currentPage <= 1;
+            if (nextBtn && pdfDoc) nextBtn.disabled = currentPage >= pdfDoc.numPages;
+            if (zoomLabel) zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+        };
+
+        const renderPage = async (num) => {
+            if (!pdfDoc || disposed) return;
+            currentPage = Math.max(1, Math.min(pdfDoc.numPages, num));
+            const version = ++renderVersion;
+            if (renderTask) {
+                renderTask.cancel();
+                renderTask = null;
+            }
+            updateControls();
+            pageInfo.textContent = `${translate('page', 'Page')} ${currentPage} / ${pdfDoc.numPages}`;
+
+            try {
+                const page = await pdfDoc.getPage(currentPage);
+                if (disposed || version !== renderVersion) return;
+                const baseViewport = page.getViewport({scale: 1});
+                const availableWidth = Math.max(240, stage.clientWidth - 16);
+                const fitScale = availableWidth / baseViewport.width;
+                const viewport = page.getViewport({scale: fitScale * zoom});
+                const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2.5);
+                canvas.width = Math.ceil(viewport.width * pixelRatio);
+                canvas.height = Math.ceil(viewport.height * pixelRatio);
+                canvas.style.width = `${viewport.width}px`;
+                canvas.style.height = `${viewport.height}px`;
+                const context = canvas.getContext('2d', {alpha: false});
+                renderTask = page.render({
+                    canvasContext: context,
+                    viewport,
+                    transform: pixelRatio === 1 ? null : [pixelRatio, 0, 0, pixelRatio, 0, 0],
+                });
+                await renderTask.promise;
+                if (version === renderVersion) renderTask = null;
+            } catch (error) {
+                if (error?.name !== 'RenderingCancelledException' && !disposed) {
+                    console.error('Error rendering PDF page:', error);
+                    pageInfo.textContent = translate('pdfError', 'Error loading PDF.');
+                }
+            }
+        };
+
+        const toggleFullscreen = () => {
+            const isFullscreen = viewer.classList.toggle('is-fullscreen');
+            fullscreenBtn?.setAttribute('aria-pressed', String(isFullscreen));
+            const label = translate(
+                isFullscreen ? 'exitFullscreen' : 'fullscreen',
+                isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen',
+            );
+            if (fullscreenBtn) {
+                fullscreenBtn.setAttribute('aria-label', label);
+                fullscreenBtn.title = label;
+                const text = fullscreenBtn.querySelector('span');
+                if (text) text.textContent = label;
+                const icon = fullscreenBtn.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-expand', !isFullscreen);
+                    icon.classList.toggle('fa-compress', isFullscreen);
+                }
+            }
+            renderPage(currentPage);
+        };
+
+        const onKeyDown = event => {
+            if (event.key === 'Escape' && viewer.classList.contains('is-fullscreen')) {
+                toggleFullscreen();
+                fullscreenBtn?.focus();
+            }
+        };
+
+        const resizeObserver = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(() => renderPage(currentPage))
+            : null;
+        resizeObserver?.observe(stage);
+
+        prevBtn?.addEventListener('click', () => renderPage(currentPage - 1));
+        nextBtn?.addEventListener('click', () => renderPage(currentPage + 1));
+        zoomOutBtn?.addEventListener('click', () => {
+            zoom = Math.max(0.5, Math.round((zoom - 0.2) * 100) / 100);
+            renderPage(currentPage);
+        });
+        zoomInBtn?.addEventListener('click', () => {
+            zoom = Math.min(4, Math.round((zoom + 0.2) * 100) / 100);
+            renderPage(currentPage);
+        });
+        fitWidthBtn?.addEventListener('click', () => {
+            zoom = 1;
+            renderPage(currentPage);
+        });
+        fullscreenBtn?.addEventListener('click', toggleFullscreen);
+        viewer.addEventListener('keydown', onKeyDown);
+
+        viewer._pdfCleanup = () => {
+            disposed = true;
+            viewer.classList.remove('is-fullscreen');
+            resizeObserver?.disconnect();
+            if (renderTask) renderTask.cancel();
+            loadingTask?.destroy();
+            viewer.removeEventListener('keydown', onKeyDown);
+            delete viewer._pdfCleanup;
+            delete viewer._pdfInitializing;
+        };
 
         try {
-            const response = await fetch(url);
+            const response = await fetch(viewer.dataset.url, {credentials: 'same-origin'});
+            if (!response.ok) throw new Error(`PDF request failed (${response.status})`);
             const result = await response.json();
-            const loadingTask = pdfjsLib.getDocument(result.url);
-            const pdfDoc = await loadingTask.promise;
-
-            const renderPage = (num) => {
-                pdfDoc.getPage(num).then(page => {
-                    canvas.height = 600;
-                    canvas.width = 400;
-                    const viewportDefault = page.getViewport({ scale: 1 });
-                    const scale = Math.min(canvas.width / viewportDefault.width, canvas.height / viewportDefault.height);
-                    const viewport = page.getViewport({ scale });
-                    const tempCanvas = document.createElement('canvas');
-                    const tempCtx = tempCanvas.getContext('2d');
-                    tempCanvas.width = viewport.width;
-                    tempCanvas.height = viewport.height;
-                    page.render({ canvasContext: tempCtx, viewport }).promise.then(() => {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.fillStyle = 'white';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        const xOffset = (canvas.width - viewport.width) / 2;
-                        const yOffset = (canvas.height - viewport.height) / 2;
-                        ctx.drawImage(tempCanvas, xOffset, yOffset);
-                    });
-                    pageInfo.textContent = `${translate('page', 'Page')} ${num} / ${pdfDoc.numPages}`;
-                });
-            };
-
-            renderPage(currentPage);
-            prevBtn.addEventListener('click', () => {
-                if (currentPage <= 1) return;
-                currentPage--;
-                renderPage(currentPage);
-            });
-            nextBtn.addEventListener('click', () => {
-                if (currentPage >= pdfDoc.numPages) return;
-                currentPage++;
-                renderPage(currentPage);
-            });
+            if (disposed) return;
+            if (!result?.url) throw new Error('PDF source is unavailable');
+            loadingTask = pdfjsLib.getDocument(result.url);
+            pdfDoc = await loadingTask.promise;
+            if (disposed) {
+                loadingTask.destroy();
+                return;
+            }
+            viewer.pdfDoc = pdfDoc;
+            updateControls();
+            await renderPage(currentPage);
         } catch (error) {
-            console.error('Error loading PDF:', error);
-            if (pageInfo) pageInfo.textContent = translate('pdfError', 'Error loading PDF.');
+            if (!disposed) {
+                console.error('Error loading PDF:', error);
+                pageInfo.textContent = translate('pdfError', 'Error loading PDF.');
+            }
+        } finally {
+            viewer._pdfInitializing = false;
         }
+    }
+
+    function disposePdfViewers(container) {
+        if (!container) return;
+        const viewers = [];
+        if (container.matches?.('.pdf-viewer')) viewers.push(container);
+        viewers.push(...(container.querySelectorAll?.('.pdf-viewer') || []));
+        viewers.forEach(viewer => viewer._pdfCleanup?.());
     }
 
     function initializeAllElements(container = document) {
@@ -296,7 +401,10 @@
 
     document.body.addEventListener('htmx:before:swap', event => {
         const target = swapTarget(event);
-        if (isMediaSwapTarget(target)) disposeVideoJsPlayers(target);
+        if (isMediaSwapTarget(target)) {
+            disposeVideoJsPlayers(target);
+            disposePdfViewers(target);
+        }
     });
 
     document.body.addEventListener('htmx:after:swap', event => {

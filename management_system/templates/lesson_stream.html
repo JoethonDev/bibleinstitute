@@ -48,11 +48,36 @@
                 {% else %}
                    <div class="d-flex justify-content-center">
                        <div class="pdf-viewer sd-pdf-viewer" data-url="{{ hls_url.url }}">
-                            <canvas class="pdf-canvas shadow-sm"></canvas>
-                            <div class="controls d-flex justify-content-between align-items-center mt-3">
-                                <button class="prev btn btn-outline-secondary btn-sm"><i class="fas {% if request.LANGUAGE_CODE == 'en'  %}fa-arrow-left{% else %}fa-arrow-right{% endif %}"></i></button>
-                                <span class="page-info mx-2 text-muted small">{% translate "Page" %} 1 / ?</span>
-                                <button class="next btn btn-outline-secondary btn-sm"><i class="fas {% if request.LANGUAGE_CODE == 'en'  %}fa-arrow-right{% else %}fa-arrow-left{% endif %}"></i></button>
+                            <div class="pdf-controls" role="toolbar" aria-label="{% translate 'PDF reading controls' %}">
+                                <div class="pdf-controls__group">
+                                    <button type="button" class="pdf-zoom-out sd-pdf-control" aria-label="{% translate 'Zoom out' %}" title="{% translate 'Zoom out' %}">
+                                        <i class="fas fa-minus" aria-hidden="true"></i>
+                                    </button>
+                                    <span class="pdf-zoom-level" aria-live="polite">100%</span>
+                                    <button type="button" class="pdf-zoom-in sd-pdf-control" aria-label="{% translate 'Zoom in' %}" title="{% translate 'Zoom in' %}">
+                                        <i class="fas fa-plus" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" class="pdf-fit-width sd-pdf-control" aria-label="{% translate 'Fit width' %}" title="{% translate 'Fit width' %}">
+                                        <i class="fas fa-arrows-alt-h" aria-hidden="true"></i>
+                                        <span>{% translate "Fit width" %}</span>
+                                    </button>
+                                </div>
+                                <div class="pdf-controls__group pdf-controls__pages">
+                                    <button type="button" class="prev sd-pdf-control" aria-label="{% translate 'Previous page' %}" title="{% translate 'Previous page' %}">
+                                        <i class="fas {% if request.LANGUAGE_CODE == 'en' %}fa-arrow-left{% else %}fa-arrow-right{% endif %}" aria-hidden="true"></i>
+                                    </button>
+                                    <span class="page-info" aria-live="polite">{% translate "Page" %} 1 / ?</span>
+                                    <button type="button" class="next sd-pdf-control" aria-label="{% translate 'Next page' %}" title="{% translate 'Next page' %}">
+                                        <i class="fas {% if request.LANGUAGE_CODE == 'en' %}fa-arrow-right{% else %}fa-arrow-left{% endif %}" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <button type="button" class="pdf-fullscreen sd-pdf-control" aria-label="{% translate 'Enter fullscreen' %}" title="{% translate 'Enter fullscreen' %}" aria-pressed="false">
+                                    <i class="fas fa-expand" aria-hidden="true"></i>
+                                    <span>{% translate "Enter fullscreen" %}</span>
+                                </button>
+                            </div>
+                            <div class="pdf-stage" tabindex="0" aria-label="{% translate 'PDF page' %}">
+                                <canvas class="pdf-canvas shadow-sm"></canvas>
                             </div>
                        </div>
                    </div>

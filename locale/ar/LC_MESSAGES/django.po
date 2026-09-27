@@ -2376,6 +2376,21 @@ msgstr "ملء الشاشة"
 msgid "Exit fullscreen"
 msgstr "الخروج من ملء الشاشة"
 
+msgid "Zoom in"
+msgstr "تكبير"
+
+msgid "Zoom out"
+msgstr "تصغير"
+
+msgid "Fit width"
+msgstr "ملاءمة العرض"
+
+msgid "PDF reading controls"
+msgstr "أدوات قراءة PDF"
+
+msgid "PDF page"
+msgstr "صفحة PDF"
+
 msgid "Play"
 msgstr "تشغيل"
 
