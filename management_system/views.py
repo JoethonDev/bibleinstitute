@@ -222,7 +222,7 @@ cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_accoun
 PromotionRuleFormSet = formset_factory(PromotionRuleForm, extra=0, can_delete=True)
 
 
-def _lesson_links_from_form(request) -> list[dict]:
+def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
     """Build lesson link metadata while preserving downloadable MP3 siblings."""
     videos = request.POST.getlist("videos", [])
     videos_name = request.POST.getlist("videos_name", [])
@@ -231,6 +231,11 @@ def _lesson_links_from_form(request) -> list[dict]:
     if not videos or len(videos) != len(videos_name) or len(videos) != len(files_type):
         raise ValidationError(_("Lesson files are incomplete."))
 
+    existing_part_ids = {
+        link["id"]: link["part_id"]
+        for link in existing_links
+        if isinstance(link, dict) and link.get("id") and link.get("part_id")
+    }
     links = []
     for index, video_key in enumerate(videos):
         download_key = download_ids[index].strip() if index < len(download_ids) else ""
@@ -244,6 +249,7 @@ def _lesson_links_from_form(request) -> list[dict]:
             "file_type": files_type[index],
             "name": videos_name[index],
             "id": video_key,
+            "part_id": existing_part_ids.get(video_key) or secrets.token_urlsafe(8),
         }
         if download_key:
             link["download_id"] = download_key
@@ -2236,7 +2242,7 @@ def update_lesson(request, lesson_id):
         videos = request.POST.getlist("videos", [])
         if lesson_name and offering_id and videos:
             try:
-                links = _lesson_links_from_form(request)
+                links = _lesson_links_from_form(request, json.loads(lesson.links or "[]"))
 
                 previous_status = lesson.status
                 lesson.name = lesson_name
