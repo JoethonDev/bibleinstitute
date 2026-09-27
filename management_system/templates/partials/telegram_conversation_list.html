@@ -1,6 +1,7 @@
 {% load i18n %}
 <div id="telegram-conversation-list"
      class="tg-chat-list"
+     data-loaded-pages="1"
      data-poll-url="{{ conversation_list_url }}?fragment=1{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
      x-data="{
          autoRefresh: true,
@@ -16,6 +17,7 @@
              const el = this.$el;
              if (document.hidden) return;
              if (!el.dataset.pollUrl) return;
+             if (Number(el.dataset.loadedPages || '1') > 1) return;
              htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerMorph' }).catch(() => {});
          }
      }">
@@ -28,79 +30,6 @@
     </div>
 
     <ul class="tg-chat-conv-list list-unstyled mb-0">
-        {% for conversation in page_obj %}
-        {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-        <li class="tg-chat-row">
-            <a class="tg-chat-row-link"
-               href="{% url 'telegram-conversation-detail' conversation.pk %}{% if pagination_query %}?{{ pagination_query }}{% endif %}"
-               hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
-               hx-target="#telegram-chat-panel"
-               hx-swap="innerHTML"
-               aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
-                <span class="tg-chat-avatar" aria-hidden="true">
-                    {% if conversation.user.profile_image_key %}
-                    <img class="tg-chat-avatar-img"
-                         src="{% url 'application-document' conversation.user.pk 'profile' %}"
-                         alt=""
-                         loading="lazy" decoding="async"
-                         referrerpolicy="no-referrer">
-                    {% else %}
-                    <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
-                    {% endif %}
-                </span>
-
-                <span class="tg-chat-row-main">
-                    <span class="tg-chat-row-head">
-                        <span class="tg-chat-user-name">{{ student_name }}</span>
-                        <span class="tg-chat-row-username">{{ conversation.user.username }}</span>
-                        <span class="tg-chat-row-time">
-                             {% if conversation.latest_user_message_at %}
-                             <time datetime="{{ conversation.latest_user_message_at|date:'c' }}">{{ conversation.latest_user_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
-                            {% endif %}
-                        </span>
-                    </span>
-
-                    <span class="tg-chat-row-sub">
-                        <span class="tg-chat-row-preview">
-                            {% if conversation.latest_user_message_text %}
-                            {{ conversation.latest_user_message_text|truncatechars:64 }}
-                            {% elif conversation.latest_user_message_content_type %}
-                            <i class="fas fa-paperclip me-1" aria-hidden="true"></i>{% translate "Media message" %}
-                            {% else %}
-                            {% translate "No messages yet" %}
-                            {% endif %}
-                        </span>
-                        <span class="tg-chat-row-status">
-                            {% if conversation.is_unread %}
-                            <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
-                            {% else %}
-                            <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
-                            {% endif %}
-                        </span>
-                        {% if conversation.message_count %}
-                        <span class="tg-chat-row-count" title="{% blocktranslate count counter=conversation.message_count %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktranslate %}">
-                            <i class="far fa-comment-dots" aria-hidden="true"></i>{{ conversation.message_count }}
-                        </span>
-                        {% endif %}
-                    </span>
-                </span>
-
-                <span class="tg-chat-row-chevron" aria-hidden="true">
-                    <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i>
-                </span>
-            </a>
-        </li>
-        {% endwith %}
-        {% empty %}
-        <li class="ad-empty">
-            {% translate "No conversations found" as conversations_empty_title %}
-            {% translate "There are no support conversations matching the current filters." as conversations_empty_desc %}
-            {% include "partials/empty_state.html" with icon="fa-inbox" title=conversations_empty_title description=conversations_empty_desc %}
-        </li>
-        {% endfor %}
+        {% include 'partials/telegram_conversation_items.html' %}
     </ul>
-
-    {% translate "conversations" as conversations_label %}
-    {% translate "Conversation list pagination" as pagination_aria_label %}
-    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query base_url=conversation_list_url item_label=conversations_label aria_label=pagination_aria_label %}
 </div>

@@ -454,9 +454,18 @@ def _conversation_list_context(request):
 @capability_required(can_manage_academic_setup)
 @require_GET
 def telegram_conversations(request):
+    fragment = request.GET.get("fragment")
+    if fragment and not is_htmx(request):
+        return redirect("telegram-conversations")
+    if not fragment and request.GET.get("page"):
+        query = urlencode({key: request.GET[key] for key in ("search", "status") if request.GET.get(key)})
+        url = reverse("telegram-conversations")
+        return redirect(f"{url}?{query}" if query else url)
     context = _conversation_list_context(request)
-    if request.GET.get("fragment") == "1":
+    if fragment == "1":
         return render(request, "partials/telegram_conversation_list.html", context)
+    if fragment == "items":
+        return render(request, "partials/telegram_conversation_items.html", context)
 
     start_search = normalize_search_text(request.GET.get("start_search", "").strip()[:120])
     linked_users = TelegramAccount.objects.filter(
@@ -560,11 +569,20 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
 @capability_required(can_manage_academic_setup)
 @require_GET
 def telegram_conversation_detail(request, conversation_id):
+    fragment = request.GET.get("fragment")
+    if fragment and not is_htmx(request):
+        return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+    if not fragment and request.GET.get("page"):
+        return redirect("telegram-conversation-detail", conversation_id=conversation_id)
     conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
     context = _conversation_detail_context(request, conversation)
-    if request.GET.get("fragment") == "panel":
+    if fragment == "panel":
         return render(request, "partials/telegram_chat_panel.html", context)
-    if request.GET.get("fragment") == "1":
+    if fragment == "items":
+        context["message_items"] = list(context["messages_page_obj"].object_list)
+        context["include_older_sentinel"] = True
+        return render(request, "partials/telegram_message_items.html", context)
+    if fragment == "1":
         if context.get("message_items") is not None:
             return render(request, "partials/telegram_message_items.html", context)
         return render(request, "partials/telegram_message_list.html", context)

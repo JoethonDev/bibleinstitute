@@ -23,10 +23,15 @@
         {% if message.sent_at %}<time class="tg-chat-msg-time" datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
         {% if message.delivery_error %}<span class="tg-chat-msg-error" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
         {% if message.telegram_message_id and message.content_type != "digest" %}
-        <a class="tg-chat-reply-link" href="{{ detail_url }}?reply_to={{ message.telegram_message_id }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
         {% endif %}
     </div>
 </li>
 {% empty %}
 {% if show_empty %}<li class="ad-empty"><i class="fas fa-inbox" aria-hidden="true"></i>{% translate "No messages yet." %}</li>{% endif %}
 {% endfor %}
+{% if include_older_sentinel and messages_page_obj and messages_page_obj.has_previous %}
+<li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
+    data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
+    aria-hidden="true"></li>
+{% endif %}

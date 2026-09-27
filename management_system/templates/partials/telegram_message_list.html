@@ -42,12 +42,13 @@
         class="tg-chat-messages list-unstyled mb-0"
         data-poll-url="{{ panel_url }}?fragment=1"
         data-last-id="{{ latest_message_pk|default:0 }}">
+        {% if messages_page_obj.has_previous %}
+        <li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
+            data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
+            aria-hidden="true"></li>
+        {% endif %}
         {% include 'partials/telegram_message_items.html' with message_items=messages_page_obj show_empty=True %}
     </ol>
-
-    {% translate "messages" as messages_label %}
-    {% translate "Message history pagination" as pagination_aria_label %}
-    {% include "partials/pagination.html" with page_obj=messages_page_obj base_url=detail_url item_label=messages_label aria_label=pagination_aria_label %}
 
     <form method="post"
           action="{{ reply_url }}"

@@ -75,7 +75,7 @@
                       hx-target="#telegram-linked-user-list"
                       hx-select="#telegram-linked-user-list"
                       hx-swap="outerHTML"
-                      hx-push-url="true"
+                      hx-push-url="false"
                       hx-sync="this:abort">
                     <input type="hidden" name="search" value="{{ search }}">
                     <input type="hidden" name="status" value="{{ status }}">
@@ -94,7 +94,7 @@
                            hx-target="#telegram-linked-user-list"
                            hx-select="#telegram-linked-user-list"
                            hx-swap="outerHTML"
-                           hx-push-url="true"
+                           hx-push-url="false"
                            hx-indicator="#telegram-start-loading">
                     <div class="tg-chat-start-actions">
                         <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
@@ -107,7 +107,7 @@
                            hx-target="#telegram-linked-user-list"
                            hx-select="#telegram-linked-user-list"
                            hx-swap="outerHTML"
-                           hx-push-url="true">
+                           hx-push-url="false">
                             <i class="fas fa-times me-1" aria-hidden="true"></i>{% translate "Clear" %}
                         </a>
                         {% endif %}

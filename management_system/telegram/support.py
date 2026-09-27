@@ -24,6 +24,7 @@ from ..models import (
     User,
 )
 from ..utils.storage_operations import get_r2_client, upload_to_bucket
+from .text import strip_telegram_links
 
 
 logger = logging.getLogger(__name__)
@@ -162,12 +163,15 @@ def mark_all_conversations_read(*, admin: User) -> int:
 
 def _message_payload(message: dict) -> dict:
     if isinstance(message.get("text"), str):
-        return {"content_type": TelegramMessage.ContentType.TEXT, "text": message["text"].strip()}
+        return {
+            "content_type": TelegramMessage.ContentType.TEXT,
+            "text": strip_telegram_links(message["text"].strip(), message.get("entities")),
+        }
     if isinstance(message.get("photo"), list) and message["photo"]:
         photo = max((item for item in message["photo"] if isinstance(item, dict)), key=lambda item: int(item.get("file_size") or 0), default={})
         return {
             "content_type": TelegramMessage.ContentType.PHOTO,
-            "text": str(message.get("caption") or ""),
+            "text": strip_telegram_links(str(message.get("caption") or ""), message.get("caption_entities")),
             "file_id": photo.get("file_id"),
             "file_size": photo.get("file_size") or 0,
             "file_name": "telegram-photo.jpg",
@@ -178,7 +182,7 @@ def _message_payload(message: dict) -> dict:
         if isinstance(value, dict):
             return {
                 "content_type": content_type,
-                "text": str(message.get("caption") or ""),
+                "text": strip_telegram_links(str(message.get("caption") or ""), message.get("caption_entities")),
                 "file_id": value.get("file_id"),
                 "file_size": value.get("file_size") or 0,
                 "file_name": value.get("file_name") or f"telegram-{field}",

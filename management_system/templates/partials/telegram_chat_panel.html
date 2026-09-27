@@ -44,14 +44,14 @@
         {% endif %}
 
         <a class="ad-btn ad-btn--ghost ad-btn--sm"
-           href="{{ detail_url }}{% if messages_page_obj.number != 1 %}?page={{ messages_page_obj.number }}{% endif %}"
-           hx-get="{{ panel_url }}?fragment=panel{% if messages_page_obj.number != 1 %}&amp;page={{ messages_page_obj.number }}{% endif %}"
+           href="{{ detail_url }}"
+           hx-get="{{ panel_url }}?fragment=panel"
            hx-target="#telegram-chat-panel"
            hx-swap="innerHTML">
             <i class="fas fa-sync-alt me-1" aria-hidden="true"></i>{% translate "Refresh" %}
         </a>
         <a class="ad-btn ad-btn--ghost ad-btn--sm"
-           href="{{ conversation_list_url }}{% if search or status %}?{% if search %}search={{ search|urlencode }}{% endif %}{% if search and status %}&amp;{% endif %}{% if status %}status={{ status }}{% endif %}{% endif %}">
+           href="{{ conversation_list_url }}">
             <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
         </a>
     </div>
