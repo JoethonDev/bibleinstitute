@@ -10614,8 +10614,8 @@ msgstr "رسالة دعم من %(name)s"
 msgid "This message was already answered by another admin."
 msgstr "تم الرد على هذه الرسالة بالفعل بواسطة مسؤول آخر."
 
-msgid "Answered by another admin."
-msgstr "تم الرد بواسطة مسؤول آخر."
+msgid "Replied by @%(username)s"
+msgstr "تم الرد بواسطة @%(username)s"
 
 msgid "Via Telegram"
 msgstr "عبر تيليجرام"

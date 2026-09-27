@@ -1,8 +1,10 @@
 {% load i18n %}
 <div id="telegram-message-list"
      class="tg-chat-thread"
+     data-scroll-armed="false"
      x-data="{
-         autoRefresh: true,
+          autoRefresh: true,
+          polling: false,
          _timer: null,
          init() {
              this.$watch('autoRefresh', (value) => value ? this._start() : this._stop());
@@ -16,18 +18,28 @@
          _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
           _poll() {
               if (document.hidden) return;
+              if (this.polling || !window.telegramChatBeginRequest?.(this.$el)) return;
               const el = this.$el.querySelector('#telegram-message-items');
-             if (!el || !el.dataset.pollUrl) return;
-             const url = el.dataset.pollUrl + '&after=' + (el.dataset.lastId || '0');
-             htmx.ajax('GET', url, { target: el, swap: 'beforeend' })
-                 .then(() => {
-                     const items = el.querySelectorAll('li[data-msg-pk]');
-                     if (items.length) el.dataset.lastId = items[items.length - 1].dataset.msgPk;
-                     if (this.$el.scrollTop + this.$el.clientHeight >= this.$el.scrollHeight - 80) {
-                         this.$el.scrollTop = this.$el.scrollHeight;
-                     }
-                 })
-                 .catch(() => {});
+              if (!el || !el.dataset.pollUrl) {
+                  window.telegramChatEndRequest?.(this.$el);
+                  return;
+              }
+              const url = el.dataset.pollUrl + '&after=' + (el.dataset.lastId || '0');
+              this.polling = true;
+              this.$el.dataset.scrollArmed = 'false';
+              htmx.ajax('GET', url, { target: el, swap: 'beforeend' })
+                  .then(() => {
+                      const items = el.querySelectorAll('li[data-msg-pk]');
+                      if (items.length) el.dataset.lastId = items[items.length - 1].dataset.msgPk;
+                      if (this.$el.scrollTop + this.$el.clientHeight >= this.$el.scrollHeight - 80) {
+                          this.$el.scrollTop = this.$el.scrollHeight;
+                      }
+                  })
+                  .catch(() => {})
+                  .finally(() => {
+                      this.polling = false;
+                      window.telegramChatEndRequest?.(this.$el);
+                  });
          }
      }">
 

@@ -7,7 +7,8 @@ import io
 import logging
 import posixpath
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import cast
 
 import telebot
 from django.conf import settings
@@ -31,9 +32,9 @@ logger = logging.getLogger(__name__)
 
 SUPPORT_MAX_MEDIA_BYTES = 50 * 1024 * 1024
 SUPPORTED_MEDIA = {"photo", "document", "video"}
-# Other admins' copies of a student burst are cleaned up only while the
-# answered message is this fresh; older digests are left untouched.
-SUPPORT_ANSWER_WINDOW = timedelta(hours=12)
+# Telegram cannot edit or delete bot messages indefinitely. Older digests are
+# terminally marked failed without making an API call.
+SUPPORT_DIGEST_ACTION_WINDOW = timedelta(hours=48)
 
 
 class SupportReplyError(Exception):
@@ -373,6 +374,29 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
                 sent_at=timezone.now(),
             )
             sent += 1
+    if inbound_messages:
+        answered_reply = TelegramMessage.objects.filter(
+            conversation=conversation,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            delivery_status=TelegramMessage.DeliveryStatus.SENT,
+            sender_user__isnull=False,
+            sent_at__gte=min(message.created_at for message in inbound_messages),
+        ).exclude(
+            content_type=TelegramMessage.ContentType.DIGEST,
+        ).select_related("sender_user").order_by("-sent_at", "-pk").first()
+        if answered_reply:
+            try:
+                resolve_answered_announcements(
+                    bot,
+                    conversation_id=conversation.pk,
+                    responder=answered_reply.sender_user,
+                    answered_before=answered_reply.sent_at,
+                )
+            except Exception:
+                logger.exception(
+                    "telegram_support_resolution_error conversation=%s",
+                    conversation.pk,
+                )
     return sent
 
 
@@ -426,49 +450,47 @@ def _is_missing_message_error(exc: Exception) -> bool:
 def resolve_answered_announcements(
     bot: telebot.TeleBot,
     *,
-    answered_message: TelegramMessage,
+    conversation_id: int,
     responder: User,
+    answered_before: datetime | None = None,
 ) -> int:
-    """Remove other admins' digests for the answered student-message burst.
-
-    Only inbound messages younger than ``SUPPORT_ANSWER_WINDOW`` are considered,
-    so stale digests are left untouched. Deletion is attempted first; when
-    Telegram refuses (for example after the deletion window), the digest text is
-    replaced with the answered marker instead. Failures are recorded and retried
-    by the next reply while the burst is still inside the window.
-    """
-    cutoff = timezone.now() - SUPPORT_ANSWER_WINDOW
-    source_messages = TelegramMessage.objects.filter(
-        conversation_id=answered_message.conversation_id,
-        direction=TelegramMessage.Direction.INBOUND,
-        created_at__gte=cutoff,
-        created_at__lte=answered_message.created_at,
-    )
+    """Resolve every pending digest in a conversation for the other admins."""
+    now = timezone.now()
+    answered_before = answered_before or now
     responder_chats = TelegramAccount.objects.filter(
         user_id=responder.pk,
     ).values_list("telegram_chat_id", flat=True)
     digests = TelegramMessage.objects.filter(
+        conversation_id=conversation_id,
         content_type=TelegramMessage.ContentType.DIGEST,
-        source_message__in=source_messages,
         resolved_at__isnull=True,
     ).exclude(
         telegram_chat_id__in=responder_chats,
     )
+    digests = digests.filter(
+        Q(source_message__created_at__lte=answered_before)
+        | Q(source_message__isnull=True, created_at__lte=answered_before)
+    )
     resolved = 0
-    for digest in digests:
+    for digest in digests.iterator(chunk_size=100):
         resolution = TelegramMessage.Resolution.FAILED
-        if digest.telegram_message_id is not None:
+        terminal_failure = (
+            digest.telegram_message_id is None
+            or digest.created_at <= now - SUPPORT_DIGEST_ACTION_WINDOW
+        )
+        if not terminal_failure:
+            message_id = cast(int, digest.telegram_message_id)
             try:
-                bot.delete_message(digest.telegram_chat_id, digest.telegram_message_id)
+                bot.delete_message(digest.telegram_chat_id, message_id)
             except Exception as exc:
                 if _is_missing_message_error(exc):
                     resolution = TelegramMessage.Resolution.DELETED
                 else:
                     try:
                         bot.edit_message_text(
-                            _("Answered by another admin."),
+                            _("Replied by @%(username)s") % {"username": responder.username},
                             chat_id=digest.telegram_chat_id,
-                            message_id=digest.telegram_message_id,
+                            message_id=message_id,
                         )
                     except Exception as edit_exc:
                         if _is_missing_message_error(edit_exc):
@@ -483,9 +505,15 @@ def resolve_answered_announcements(
                 digest.pk,
                 digest.telegram_chat_id,
             )
-            TelegramMessage.objects.filter(pk=digest.pk).update(
-                resolution=TelegramMessage.Resolution.FAILED,
-            )
+            if terminal_failure:
+                TelegramMessage.objects.filter(pk=digest.pk).update(
+                    resolution=TelegramMessage.Resolution.FAILED,
+                    resolved_at=now,
+                )
+            else:
+                TelegramMessage.objects.filter(pk=digest.pk).update(
+                    resolution=TelegramMessage.Resolution.FAILED,
+                )
         else:
             TelegramMessage.objects.filter(pk=digest.pk).update(
                 resolved_at=timezone.now(),
@@ -608,18 +636,18 @@ def reply_to_conversation(
         version=F("version") + 1,
         updated_at=timezone.now(),
     )
-    if outbound.source_message_id:
-        try:
-            resolve_answered_announcements(
-                bot,
-                answered_message=outbound.source_message,
-                responder=admin,
-            )
-        except Exception:
-            logger.exception(
-                "telegram_support_resolution_error conversation=%s",
-                outbound.conversation_id,
-            )
+    try:
+        resolve_answered_announcements(
+            bot,
+            conversation_id=outbound.conversation_id,
+            responder=admin,
+            answered_before=outbound.sent_at,
+        )
+    except Exception:
+        logger.exception(
+            "telegram_support_resolution_error conversation=%s",
+            outbound.conversation_id,
+        )
     return outbound
 
 

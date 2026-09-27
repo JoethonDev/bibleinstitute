@@ -2,6 +2,7 @@
 <div id="telegram-conversation-list"
      class="tg-chat-list"
      data-loaded-pages="1"
+     data-scroll-armed="false"
      data-poll-url="{{ conversation_list_url }}?fragment=1{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
      x-data="{
          autoRefresh: true,
@@ -18,7 +19,13 @@
              if (document.hidden) return;
              if (!el.dataset.pollUrl) return;
              if (Number(el.dataset.loadedPages || '1') > 1) return;
-             htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerMorph' }).catch(() => {});
+             if (!window.telegramChatBeginRequest?.(el)) return;
+             el.dataset.scrollArmed = 'false';
+             htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerMorph' })
+                 .catch(() => {})
+                 .finally(() => {
+                     window.telegramChatEndRequest?.(el);
+                 });
          }
      }">
 

@@ -42,7 +42,7 @@ from .student_notifications import is_active_published_offering
 from .utils.decorators import can_manage_content
 
 
-MEDIA_FILENAME_RE = re.compile(r"[^A-Za-z0-9_-]+")
+MEDIA_FILENAME_RE = re.compile(r"[^\w-]+", re.UNICODE)
 PART_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 AUDIO_BITRATE_RE = re.compile(r"^[1-9]\d{0,2}k$")
 logger = logging.getLogger(__name__)
@@ -258,7 +258,7 @@ def source_kind_for_filename(filename: str) -> str:
 
 
 def safe_output_base_name(filename: str) -> str:
-    """Derive a bounded server-owned output basename without an extension."""
+    """Derive a bounded output basename while preserving Unicode letters."""
     if not isinstance(filename, str) or not filename or "/" in filename or "\\" in filename:
         raise ValidationError(_("Invalid file name."))
     stem = PurePosixPath(filename).stem

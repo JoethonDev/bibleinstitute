@@ -1,7 +1,7 @@
 {% load i18n %}
 {% for conversation in page_obj %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-<li class="tg-chat-row">
+<li class="tg-chat-row" data-chat-user-id="{{ conversation.user_id }}">
     <a class="tg-chat-row-link"
        href="{% url 'telegram-conversation-detail' conversation.pk %}"
        hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel"

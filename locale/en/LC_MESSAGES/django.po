@@ -9874,8 +9874,8 @@ msgstr "Support message from %(name)s"
 msgid "This message was already answered by another admin."
 msgstr "This message was already answered by another admin."
 
-msgid "Answered by another admin."
-msgstr "Answered by another admin."
+msgid "Replied by @%(username)s"
+msgstr "Replied by @%(username)s"
 
 msgid "Via Telegram"
 msgstr "Via Telegram"
