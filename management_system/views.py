@@ -3703,32 +3703,47 @@ def academic_payment_document(request, payment_id):
 @capability_required(can_grade)
 def submission_dashboard(request, quiz_id):
     quiz = get_object_or_404(Quiz, pk=quiz_id)
+    name = normalize_search_text(request.GET.get("name", "").strip()[:100])
+    available_years = sorted(Grade.get_years(quiz_id), reverse=True)
+    requested_year = request.GET.get("filtering")
+    if requested_year is None:
+        year = str(now().year)
+    elif (
+        len(requested_year) == 4
+        and requested_year.isascii()
+        and requested_year.isdigit()
+        and int(requested_year) in available_years
+    ):
+        year = requested_year
+    else:
+        year = ""
 
-    # User
-    name = request.GET.get("name", None)
-    # Year of submission
-    year = request.GET.get("filtering", now().year)
-    # Degree Range!
-    min_grade = request.GET.get("min-grade", 1)
-    max_grade = request.GET.get("max-grade", quiz.total_grade)
+    def grade_bound(value, default):
+        try:
+            return min(max(int(value), 0), quiz.total_grade)
+        except (TypeError, ValueError):
+            return default
+
+    min_grade = grade_bound(request.GET.get("min-grade", 0), 0)
+    max_grade = grade_bound(request.GET.get("max-grade", quiz.total_grade), quiz.total_grade)
     user = request.user
     view = "submission"
-    # Start with an empty Q object (matches all)
-    query = Q()
-
-    # Dynamically add conditions if filters are present
+    query = Q(quiz_id=quiz_id)
     if name:
-        name = normalize_search_text(name)
-        query &= normalized_contains_q(("user__first_name", "user__last_name"), name)
-    
-    query &= Q(submitted_at__contains=year)
-    query &= Q(total_grade__gte=min_grade)
-    query &= Q(total_grade__lte=max_grade)
-    query &= Q(quiz_id=quiz_id)
+        student_filter = normalized_contains_q(
+            ("user__username", "user__first_name", "user__last_name", "user__email"),
+            name,
+        )
+        if name.isascii() and name.isdigit() and len(name) <= 18:
+            student_filter |= Q(user_id=int(name))
+        query &= student_filter
+    if year:
+        query &= Q(submitted_at__year=int(year))
+    query &= Q(total_grade__gte=min_grade, total_grade__lte=max_grade)
 
     logger.info(f"User : {user} filters submissions using {name} username and grades range between ( {min_grade} , {max_grade} )")
 
-    grades = Grade.objects.filter(query).select_related("user").order_by("submitted_at")
+    grades = Grade.objects.filter(query).select_related("user").order_by("submitted_at", "pk")
 
     context = {
         "name_value" : name or "",
@@ -3747,8 +3762,10 @@ def submission_dashboard(request, quiz_id):
             "submitted_at": "submitted_at",
         },
         "default_sort": "submitted_at",
-        "options" : [_("Choose Academic Year"), *[str(value) for value in Grade.get_years(quiz_id)]], # Translate "Choose Academic Year"
+        "options" : [_("Choose Academic Year"), *[str(value) for value in available_years]],
         "submission_user" : True,
+        "can_delete_submission": can_manage_academic_setup(request.user),
+        "submission_filter_query": request.GET.urlencode(),
         "template_name" : "submission_dashboard.html",
         "quiz_id" : quiz_id,
         "quiz" : quiz,
@@ -3757,22 +3774,52 @@ def submission_dashboard(request, quiz_id):
 
     return render_dashboard(request, grades, view, context, parameters=[quiz_id, ])
 
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def delete_quiz_submission(request, quiz_id, grade_id):
+    student_id = Grade.objects.filter(pk=grade_id, quiz_id=quiz_id).values_list("user_id", flat=True).first()
+    if student_id is None:
+        raise Http404
+
+    try:
+        with transaction.atomic():
+            # Match take_exam's student-row serialization so deleting an attempt
+            # cannot race a duplicate submission for the same student and quiz.
+            User.objects.select_for_update().get(pk=student_id)
+            grade = Grade.objects.select_for_update().filter(
+                pk=grade_id,
+                quiz_id=quiz_id,
+                user_id=student_id,
+            ).first()
+            if grade is None:
+                raise Http404
+            Submission.objects.filter(
+                user_id=student_id,
+                question__quiz_id=quiz_id,
+            ).delete()
+            grade.delete()
+    except User.DoesNotExist as exc:
+        raise Http404 from exc
+
+    messages.success(request, _("Quiz submission deleted."))
+    dashboard_url = reverse("submission-dashboard", args=[quiz_id])
+    query_string = request.GET.urlencode()
+    return redirect(f"{dashboard_url}?{query_string}" if query_string else dashboard_url)
+
 @capability_required(can_grade)
 def submission_user(request, quiz_id, user_id):
-    submissions = Submission.objects.filter(question__quiz_id=quiz_id, user_id=user_id)
-    grade = Grade.objects.filter(quiz_id=quiz_id, user_id=user_id).first()
     quiz = get_object_or_404(Quiz, pk=quiz_id)
-
-    if not submissions:
-        logger.error(f"Submission for quiz id : {quiz_id} with user id : {user_id} is not found to get submissions!")
-        return HttpResponse(_("Not Found!"), 404) # Translate "Not Found!"
-    
-    if not grade:
-        logger.error(f"Grades for quiz id : {quiz_id} with user id : {user_id} is not found!")
-        return HttpResponse(_("Not Found!"), 404) # Translate "Not Found!"
-
     if request.method == "GET":
-        questions = [s.serialize() for s in submissions]
+        grade = get_object_or_404(Grade, quiz_id=quiz_id, user_id=user_id)
+        submissions = list(
+            Submission.objects.filter(question__quiz_id=quiz_id, user_id=user_id)
+            .select_related("question")
+            .order_by("question_id", "pk")
+        )
+        if not submissions:
+            return HttpResponse(_("Not Found!"), 404)
+        questions = [submission.serialize() for submission in submissions]
 
         return render(request, "display_quiz.html", {
             "quiz_name" : quiz.name,
@@ -3788,29 +3835,54 @@ def submission_user(request, quiz_id, user_id):
     
     elif request.method == "POST":
         questions, _parsed_form_data = unpack_quiz_form(request.POST)
-        
-        manual_graded_questions = 0
-        modified_questions = []
-        # print([s.pk for s in submissions])
-        for question in questions.values():
-            try:
-                if "manual_grade" not in question:
-                    continue
-                question_submission = submissions.get(question_id=question['id'])
-                question_submission.assign_grade(True, int(question['manual_grade']))
-                modified_questions.append(question_submission)
-                manual_graded_questions += 1
-
-            except Exception as e:
-                logger.error(f"{question['id']} is not found for {quiz} and user id : {user_id}")
-                logger.error(f"Stack Traceback : {e}")
-
         try:
-            with transaction.atomic() :
+            with transaction.atomic():
+                grade = Grade.objects.select_for_update().filter(
+                    quiz_id=quiz_id,
+                    user_id=user_id,
+                ).first()
+                if grade is None:
+                    return HttpResponse(_("Not Found!"), 404)
+                submissions = list(
+                    Submission.objects.select_for_update(of=("self",))
+                    .select_related("question")
+                    .filter(question__quiz_id=quiz_id, user_id=user_id)
+                )
+                if not submissions:
+                    return HttpResponse(_("Not Found!"), 404)
+                submissions_by_question = {
+                    str(submission.question_id): submission
+                    for submission in submissions
+                }
+                modified_questions = []
+                for question in questions.values():
+                    if "manual_grade" not in question:
+                        continue
+                    question_submission = submissions_by_question.get(str(question.get("id", "")))
+                    if question_submission is None:
+                        continue
+                    try:
+                        manual_grade = int(question["manual_grade"])
+                    except (TypeError, ValueError):
+                        continue
+                    if manual_grade < 0:
+                        continue
+                    question_submission.assign_grade(True, manual_grade)
+                    modified_questions.append(question_submission)
+
                 Submission.objects.bulk_update(modified_questions, ['is_graded', 'grade'])
-                grade.total_grade = Submission.objects.filter(user_id=user_id, question__quiz_id=quiz_id).aggregate(total=Sum("grade"))['total']
-                grade.save()
-                logger.info(f"Grades are updated to user {user_id} to be {grade.total_grade} with manual grading of {manual_graded_questions} questions")
+                grade.total_grade = Submission.objects.filter(
+                    user_id=user_id,
+                    question__quiz_id=quiz_id,
+                ).aggregate(total=Sum("grade"))["total"] or 0
+                grade.save(update_fields=["total_grade"])
+                logger.info(
+                    "Grades updated for quiz=%s user=%s questions=%s total=%s",
+                    quiz_id,
+                    user_id,
+                    len(modified_questions),
+                    grade.total_grade,
+                )
     
         except Exception as e:
             logger.error(f"Something went wrong while updating grades!")

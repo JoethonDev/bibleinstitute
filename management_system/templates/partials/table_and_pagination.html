@@ -284,6 +284,25 @@
                             </button>
                         </div>
                         {% endif %}
+                        {% if submission_user and can_delete_submission %}
+                        <div class="ad-actions quiz-actions-row">
+                            <form method="post"
+                                  action="{% url 'quiz-submission-delete' quiz_id=quiz_id grade_id=values.submission_id %}{% if submission_filter_query %}?{{ submission_filter_query }}{% endif %}"
+                                  hx-post="{% url 'quiz-submission-delete' quiz_id=quiz_id grade_id=values.submission_id %}{% if submission_filter_query %}?{{ submission_filter_query }}{% endif %}"
+                                  hx-target="#display-page"
+                                  hx-select="#page-region"
+                                  hx-swap="innerHTML"
+                                  hx-select-oob="#toast-stack"
+                                  hx-push-url="true"
+                                  data-confirm-message="{% translate 'Delete this quiz submission?' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
+                                    <i class="fas fa-trash me-1" aria-hidden="true"></i>
+                                    {% translate "Delete submission" %}
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
                         {% if submission_view %}
                         </div>
                         {% endif %}

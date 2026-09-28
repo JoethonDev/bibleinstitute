@@ -117,6 +117,7 @@ urlpatterns = [
     # Submission Dashboard
     path('dashboard/quizzez/<int:quiz_id>/view-submission/', submission_dashboard, name="submission-dashboard"),
     path('dashboard/quizzez/<int:quiz_id>/view-submission/<int:user_id>/', submission_user, name="submission-user"),
+    path('dashboard/quizzez/<int:quiz_id>/view-submission/<int:grade_id>/delete/', delete_quiz_submission, name="quiz-submission-delete"),
     path('dashboard/quizzez/<int:quiz_id>/export-csv/', export_quiz_submissions_csv, name="export-quiz-submissions-csv"),
     path('dashboard/quizzez/<int:quiz_id>/summary-csv/', export_quiz_summary_csv, name="export-quiz-summary-csv"),
     path('dashboard/grade/<int:grade_id>/export-csv/', export_submission_csv, name="export-submission-csv"),

@@ -2709,11 +2709,10 @@ class Grade(models.Model):
     
     @staticmethod
     def get_years(quiz_id):
-        years_options = set()
-        years = Grade.objects.filter(quiz__id=quiz_id).only("submitted_at").distinct()
-        for year in years:
-            years_options.add(year.submitted_at.year)
-        return years_options
+        year_dates = Grade.objects.filter(quiz_id=quiz_id).dates(
+            "submitted_at", "year", order="DESC"
+        )
+        return {year_date.year for year_date in year_dates}
     
     def __str__(self):
         return f"{self.user.username} - {self.quiz.name} ({self.total_grade})"

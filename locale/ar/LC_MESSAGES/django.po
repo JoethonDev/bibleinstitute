@@ -6883,6 +6883,15 @@ msgstr "الحد الأدنى للدرجة"
 msgid "Maximum Grade"
 msgstr "الحد الأقصى للدرجة"
 
+msgid "Delete this quiz submission?"
+msgstr "هل تريد حذف إجابة هذا الطالب عن الاختبار؟"
+
+msgid "Delete submission"
+msgstr "حذف الإجابة"
+
+msgid "Quiz submission deleted."
+msgstr "تم حذف إجابة الاختبار."
+
 #: .\management_system\templates\submission_dashboard.html:49
 #: .\management_system\templates\year_filter.html:4
 msgid "Year Filter"

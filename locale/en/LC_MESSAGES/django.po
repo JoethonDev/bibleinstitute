@@ -6655,6 +6655,15 @@ msgstr "Minimum Grade"
 msgid "Maximum Grade"
 msgstr "Maximum Grade"
 
+msgid "Delete this quiz submission?"
+msgstr "Delete this quiz submission?"
+
+msgid "Delete submission"
+msgstr "Delete submission"
+
+msgid "Quiz submission deleted."
+msgstr "Quiz submission deleted."
+
 #: .\management_system\templates\submission_dashboard.html:49
 #: .\management_system\templates\year_filter.html:4
 msgid "Year Filter"
