@@ -3707,7 +3707,12 @@ def submission_dashboard(request, quiz_id):
     available_years = sorted(Grade.get_years(quiz_id), reverse=True)
     requested_year = request.GET.get("filtering")
     if requested_year is None:
-        year = str(now().year)
+        current_year = now().year
+        year = str(
+            current_year
+            if current_year in available_years
+            else available_years[0] if available_years else ""
+        )
     elif (
         len(requested_year) == 4
         and requested_year.isascii()
@@ -3741,9 +3746,29 @@ def submission_dashboard(request, quiz_id):
         query &= Q(submitted_at__year=int(year))
     query &= Q(total_grade__gte=min_grade, total_grade__lte=max_grade)
 
-    logger.info(f"User : {user} filters submissions using {name} username and grades range between ( {min_grade} , {max_grade} )")
+    logger.info(
+        "User %s filters quiz submissions (search=%s, year=%s, grades=%s-%s)",
+        user,
+        bool(name),
+        year or "all",
+        min_grade,
+        max_grade,
+    )
 
-    grades = Grade.objects.filter(query).select_related("user").order_by("submitted_at", "pk")
+    grades = (
+        Grade.objects.filter(query)
+        .select_related("user")
+        .only(
+            "id",
+            "user_id",
+            "quiz_id",
+            "total_grade",
+            "submitted_at",
+            "user__id",
+            "user__username",
+        )
+        .order_by("submitted_at", "pk")
+    )
 
     context = {
         "name_value" : name or "",
@@ -3775,8 +3800,8 @@ def submission_dashboard(request, quiz_id):
     return render_dashboard(request, grades, view, context, parameters=[quiz_id, ])
 
 
-@require_POST
 @capability_required(can_manage_academic_setup)
+@require_POST
 def delete_quiz_submission(request, quiz_id, grade_id):
     student_id = Grade.objects.filter(pk=grade_id, quiz_id=quiz_id).values_list("user_id", flat=True).first()
     if student_id is None:

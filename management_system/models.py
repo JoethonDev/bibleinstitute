@@ -2699,7 +2699,7 @@ class Grade(models.Model):
         return {
             "id" : self.pk,
             "rows" : [self.user.username, self.total_grade, self.submitted_at.strftime("%H:%M:%S, %d/%m/%Y")],
-            "url" : reverse_lazy("submission-user", args=[self.quiz.pk, self.user.pk]),
+            "url" : reverse_lazy("submission-user", args=[self.quiz_id, self.user_id]),
             "submission_id" : self.pk  # Add submission_id for CSV export
         }
 
