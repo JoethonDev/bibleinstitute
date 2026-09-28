@@ -4765,6 +4765,18 @@ msgstr ""
 msgid "Submit Exam"
 msgstr "إرسال الامتحان"
 
+msgid "Unanswered questions"
+msgstr "أسئلة بلا إجابة"
+
+msgid "Some questions are unanswered. Submit the quiz anyway?"
+msgstr "توجد أسئلة بلا إجابة. هل تريد إرسال الاختبار على أي حال؟"
+
+msgid "Review answers"
+msgstr "مراجعة الإجابات"
+
+msgid "Submit anyway"
+msgstr "إرسال على أي حال"
+
 #: .\management_system\templates\display_quiz.html:83
 msgid "Submit Correction"
 msgstr "إرسال التصحيح"

@@ -2400,10 +2400,6 @@ class Quiz(models.Model):
         self.full_clean()
         return super().save(*args, **kwargs)
 
-    @property
-    def can_edit(self):
-        return self.status == PublicationStatus.DRAFT
-
     def serialize(self):
         return {
             "quiz_name" : self.name,

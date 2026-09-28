@@ -186,8 +186,7 @@ def _eligible_phone_matches(phone: str) -> list[User]:
             application_status="active",
             role__role__in=TELEGRAM_LINKABLE_ROLES,
         )
-        .select_related("role")
-        .only("id", "phone", "is_active", "application_status", "role_id")
+        .only("id", "phone")
         .iterator(chunk_size=500)
     )
     for candidate in candidates:

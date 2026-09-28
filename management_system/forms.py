@@ -761,7 +761,11 @@ class QuizExceptionalOpeningForm(forms.Form):
     students = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
         label=_("Students"),
-        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
+        widget=forms.SelectMultiple(attrs={
+            "class": "form-select",
+            "size": 8,
+            "data-exceptional-student-options": "true",
+        }),
     )
     opening_date = forms.CharField(
         label=_("Exceptional opening date"),
@@ -776,6 +780,12 @@ class QuizExceptionalOpeningForm(forms.Form):
         self.quiz = quiz
         super().__init__(*args, **kwargs)
         self.fields["students"].queryset = eligible_quiz_students(quiz)
+        self.fields["students"].label_from_instance = self._student_label
+
+    @staticmethod
+    def _student_label(student):
+        full_name = student.get_full_name().strip()
+        return f"{student.username} — {full_name}" if full_name else student.username
 
     def _parse_datetime(self, value):
         try:

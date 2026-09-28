@@ -4637,6 +4637,18 @@ msgstr "This quiz closed on %(date)s. Answers are not available for quizzes you 
 msgid "Submit Exam"
 msgstr "Submit Exam"
 
+msgid "Unanswered questions"
+msgstr "Unanswered questions"
+
+msgid "Some questions are unanswered. Submit the quiz anyway?"
+msgstr "Some questions are unanswered. Submit the quiz anyway?"
+
+msgid "Review answers"
+msgstr "Review answers"
+
+msgid "Submit anyway"
+msgstr "Submit anyway"
+
 #: .\management_system\templates\display_quiz.html:83
 msgid "Submit Correction"
 msgstr "Submit Correction"

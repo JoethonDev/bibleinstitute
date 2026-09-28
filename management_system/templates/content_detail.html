@@ -133,6 +133,8 @@
           {% csrf_token %}
           <div class="mb-3">
             <label for="{{ exception_form.students.id_for_label }}" class="form-label">{{ exception_form.students.label }}</label>
+            <label for="exceptional-student-search" class="visually-hidden">{% translate "Search students" %}</label>
+            <input id="exceptional-student-search" type="search" class="form-control mb-2" placeholder="{% translate 'Search students' %}" autocomplete="off" data-exceptional-student-search aria-controls="{{ exception_form.students.id_for_label }}">
             {{ exception_form.students }}
           </div>
           <div class="row g-3">

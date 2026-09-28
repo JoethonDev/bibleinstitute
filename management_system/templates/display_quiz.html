@@ -93,6 +93,24 @@
                         </div>
                         {% endif %}
                     </form>
+
+                    {% if mode == "exam" %}
+                    <div class="modal fade" id="unansweredQuestionsModal" tabindex="-1" aria-labelledby="unansweredQuestionsModalLabel" aria-describedby="unansweredQuestionsModalDescription" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="unansweredQuestionsModalLabel">{% translate "Unanswered questions" %}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                                </div>
+                                <div class="modal-body" id="unansweredQuestionsModalDescription">{% translate "Some questions are unanswered. Submit the quiz anyway?" %}</div>
+                                <div class="modal-footer">
+                                    <button type="button" class="sd-btn sd-btn--gold-outline" data-bs-dismiss="modal">{% translate "Review answers" %}</button>
+                                    <button type="button" class="sd-btn sd-btn--gold" id="confirmUnansweredQuizSubmit">{% translate "Submit anyway" %}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -340,6 +358,76 @@
                         form.addEventListener("submit", (event) => event.preventDefault());
                     } else {
                         setupInitialAnswers();
+                        let confirmedUnansweredSubmit = false;
+                        const unansweredModal = document.querySelector("#unansweredQuestionsModal");
+                        const unansweredModalInstance = unansweredModal && typeof bootstrap !== "undefined"
+                            ? bootstrap.Modal.getOrCreateInstance(unansweredModal)
+                            : null;
+                        const submitButton = form.querySelector('button[type="submit"]');
+
+                        function questionIsAnswered(questionCard) {
+                            const answerSection = questionCard.querySelector(".answers-section");
+                            if (!answerSection) return false;
+
+                            const choiceInputs = answerSection.querySelectorAll('input[type="radio"]');
+                            if (choiceInputs.length) {
+                                return Array.prototype.some.call(choiceInputs, input => input.checked);
+                            }
+
+                            const structured = answerSection.querySelector("[data-structured-answer]");
+                            if (structured && structured.dataset.structuredType === "order_events") {
+                                try {
+                                    const answer = JSON.parse(structured.value || "null");
+                                    const itemCount = answerSection.querySelectorAll("[data-order-item-row]").length;
+                                    return itemCount > 0
+                                        && Array.isArray(answer)
+                                        && answer.length === itemCount
+                                        && answer.every(item => typeof item === "string" && item.trim());
+                                } catch (error) {
+                                    return false;
+                                }
+                            }
+                            if (structured && structured.dataset.structuredType === "match_related") {
+                                const matches = answerSection.querySelectorAll("[data-match-select]");
+                                return matches.length > 0 && Array.prototype.every.call(
+                                    matches,
+                                    select => Boolean(select.value.trim())
+                                );
+                            }
+
+                            const answerFields = answerSection.querySelectorAll(
+                                'input:not([type="hidden"]):not([type="radio"]), textarea, select'
+                            );
+                            return answerFields.length > 0 && Array.prototype.some.call(
+                                answerFields,
+                                field => Boolean((field.value || "").trim())
+                            );
+                        }
+
+                        form.addEventListener("submit", event => {
+                            if (confirmedUnansweredSubmit) return;
+                            const unanswered = Array.prototype.filter.call(
+                                form.querySelectorAll("[data-question-card]"),
+                                questionCard => !questionIsAnswered(questionCard)
+                            );
+                            if (!unanswered.length) return;
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                            if (unansweredModalInstance) {
+                                unansweredModalInstance.show();
+                            } else if (window.confirm('{% translate "Some questions are unanswered. Submit the quiz anyway?"|escapejs %}')) {
+                                confirmedUnansweredSubmit = true;
+                                form.requestSubmit(submitButton);
+                            }
+                        });
+                        if (unansweredModalInstance) {
+                            document.querySelector("#confirmUnansweredQuizSubmit").addEventListener("click", () => {
+                                confirmedUnansweredSubmit = true;
+                                unansweredModalInstance.hide();
+                                form.requestSubmit(submitButton);
+                            });
+                        }
+
                         form.addEventListener("submit", () => localStorage.clear());
                         document.querySelectorAll(".answers-section input, .answers-section textarea, .answers-section select").forEach(field => {
                             field.addEventListener("change", saveAnswer);

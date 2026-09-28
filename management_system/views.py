@@ -3349,7 +3349,10 @@ def update_quiz(request, quiz_id):
                 "content_status" : quiz.status,
                 "content_status_display" : quiz.get_status_display(),
                 "publication_statuses" : PublicationStatus.choices,
-                "quiz_editable" : quiz.can_edit,
+                "quiz_editable" : (
+                    quiz.status == PublicationStatus.DRAFT
+                    or can_manage_academic_setup(request.user)
+                ),
                 "quiz_mode" : "update",
             })
         except Http404:
@@ -3365,24 +3368,23 @@ def update_quiz(request, quiz_id):
         try:
             # Update Quiz
             quiz = get_object_or_404(Quiz, pk=quiz_id)
-            if not quiz.can_edit:
-                if publication_status == quiz.status:
-                    error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
-                    return redirect(reverse("quiz-update", args=[quiz_id]))
+            can_edit_published_quiz = can_manage_academic_setup(request.user)
+            if quiz.status != PublicationStatus.DRAFT and not can_edit_published_quiz:
                 with transaction.atomic():
                     quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
-                    if publication_status == quiz.status:
-                        error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
+                    if quiz.status != PublicationStatus.DRAFT:
+                        if publication_status == quiz.status:
+                            error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
+                            return redirect(reverse("quiz-update", args=[quiz_id]))
+                        previous_status = quiz.status
+                        quiz.status = publication_status
+                        quiz.save(update_fields=["status"])
+                        if previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
+                            cancel_future_quiz_opening_events(quiz)
+                        elif publication_status == PublicationStatus.PUBLISHED:
+                            schedule_quiz_opening_events(quiz, locked=True)
+                        success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
                         return redirect(reverse("quiz-update", args=[quiz_id]))
-                    previous_status = quiz.status
-                    quiz.status = publication_status
-                    quiz.save(update_fields=["status"])
-                    if previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
-                        cancel_future_quiz_opening_events(quiz)
-                    if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                        schedule_quiz_opening_events(quiz)
-                success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
-                return redirect(reverse("quiz-update", args=[quiz_id]))
             requested_name = quiz_data['quiz_name']
             requested_opening_date = get_datetime(quiz_data['opening_date'])
             requested_closing_date = get_datetime(quiz_data['closing_date'])
@@ -3419,7 +3421,7 @@ def update_quiz(request, quiz_id):
             
             with transaction.atomic():
                 quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
-                if not quiz.can_edit:
+                if quiz.status != PublicationStatus.DRAFT and not can_edit_published_quiz:
                     error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
                     return redirect(reverse("quiz-update", args=[quiz_id]))
                 previous_status = quiz.status
@@ -3450,7 +3452,9 @@ def update_quiz(request, quiz_id):
                 if publication_status == PublicationStatus.PUBLISHED and (
                     previous_status != PublicationStatus.PUBLISHED or published_window_changed
                 ):
-                    schedule_quiz_opening_events(quiz)
+                    schedule_quiz_opening_events(quiz, locked=True)
+                elif previous_status == PublicationStatus.PUBLISHED:
+                    cancel_future_quiz_opening_events(quiz)
 
             logger.info(
                 "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",

@@ -99,6 +99,16 @@
         scanDriveSentinels();
         document.addEventListener('htmx:after:swap', scanDriveSentinels);
         document.addEventListener('htmx:after:swap', cleanupOrphanedModalBackdrop);
+        document.addEventListener('input', function (event) {
+            var search = event.target.closest && event.target.closest('[data-exceptional-student-search]');
+            if (!search) return;
+            var select = document.getElementById(search.getAttribute('aria-controls'));
+            if (!select || !select.matches('[data-exceptional-student-options]')) return;
+            var query = search.value.trim().toLocaleLowerCase();
+            Array.prototype.forEach.call(select.options, function (option) {
+                option.hidden = Boolean(query) && !option.selected && !option.text.toLocaleLowerCase().includes(query);
+            });
+        });
         document.addEventListener('click', function (event) {
             var sentinel = event.target.closest && event.target.closest('#drive-next-sentinel[data-next-url]');
             if (sentinel) loadDriveNextPage(sentinel);
