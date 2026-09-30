@@ -241,6 +241,11 @@ def progress_activity_for_rows(rows: list[LectureProgress], *, today: date | Non
         if values:
             first = None if row.activity_history_incomplete else values["first_started_at"]
             last = values["last_active_at"]
+            total_active_seconds = values["total_active_seconds"] or 0
+            for day in days:
+                day["share_percent"] = round(
+                    day["active_seconds"] * 100 / total_active_seconds
+                ) if total_active_seconds else 0
             active_end = row.completed_at or last
             elapsed_days = (
                 (timezone.localtime(active_end).date() - timezone.localtime(first).date()).days + 1
@@ -250,8 +255,8 @@ def progress_activity_for_rows(rows: list[LectureProgress], *, today: date | Non
                 "available": True,
                 "history_incomplete": row.activity_history_incomplete,
                 "tracking_started_at": row.activity_tracking_started_at,
-                "active_seconds": values["total_active_seconds"] or 0,
-                "active_duration": format_active_duration(values["total_active_seconds"] or 0),
+                "active_seconds": total_active_seconds,
+                "active_duration": format_active_duration(total_active_seconds),
                 "session_count": values["session_count"],
                 "active_days": active_day_counts.get(key, 0),
                 "first_started_at": first,

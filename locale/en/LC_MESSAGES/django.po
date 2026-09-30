@@ -11504,6 +11504,21 @@ msgstr "Daily active playback over the last 30 days"
 msgid "Daily breakdown"
 msgstr "Daily breakdown"
 
+msgid "Study timeline (last 30 days)"
+msgstr "Study timeline (last 30 days)"
+
+msgid "Meaningful daily activity (not per minute)"
+msgstr "Meaningful daily activity (not per minute)"
+
+msgid "Daily breakdown (days with activity)"
+msgstr "Daily breakdown (days with activity)"
+
+msgid "% of total"
+msgstr "% of total"
+
+msgid "Share of total watch time"
+msgstr "Share of total watch time"
+
 msgid "Days with recorded active watching"
 msgstr "Days with recorded active watching"
 
@@ -11677,6 +11692,12 @@ msgstr "Attendance status"
 
 msgid "Each matrix cell represents one scheduled course meeting."
 msgstr "Each matrix cell represents one scheduled course meeting."
+
+msgid "Expand a student row to view meeting times, scanner details, and actions."
+msgstr "Expand a student row to view meeting times, scanner details, and actions."
+
+msgid "Toggle meeting details"
+msgstr "Toggle meeting details"
 
 msgid "By"
 msgstr "By"

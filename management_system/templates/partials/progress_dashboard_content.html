@@ -96,33 +96,35 @@
                         {% if activity.available %}
                         <section class="ad-progress-timeline-card" aria-labelledby="progress-timeline-title-{{ p.pk }}">
                             <div class="ad-progress-section-head">
-                                <div><h6 id="progress-timeline-title-{{ p.pk }}">{% translate "Study timeline" %}</h6><p>{% translate "Meaningful daily playback activity · last 30 days" %}</p></div>
+                                <div><h6 id="progress-timeline-title-{{ p.pk }}">{% translate "Study timeline (last 30 days)" %}</h6><p class="ad-progress-callout">{% translate "Meaningful daily activity (not per minute)" %}</p></div>
                                 <div class="ad-progress-legend" aria-label="{% translate 'Activity intensity legend' %}">
                                     <span><i class="is-none"></i>{% translate "No activity" %}</span><span><i class="is-low"></i>{% translate "Low" %}</span><span><i class="is-medium"></i>{% translate "Medium" %}</span><span><i class="is-high"></i>{% translate "High" %}</span>
                                 </div>
                             </div>
                             <ol class="ad-progress-heatmap" aria-label="{% translate 'Daily active playback over the last 30 days' %}">
-                                {% for day in activity.timeline %}<li class="is-{{ day.intensity }}" title="{{ day.date|date:'DATE_FORMAT' }} · {{ day.duration }}"><span class="visually-hidden">{{ day.date|date:'DATE_FORMAT' }}: {{ day.duration }}</span></li>{% endfor %}
+                                {% for day in activity.timeline %}<li class="is-{{ day.intensity }}" title="{{ day.date|date:'DATE_FORMAT' }} · {{ day.duration }}"><span class="ad-progress-heatmap-cell"></span><span class="ad-progress-heatmap-date">{% if forloop.first %}{{ day.date|date:"M" }}<br>{% endif %}{{ day.date|date:"j" }}</span><span class="visually-hidden">{{ day.date|date:'DATE_FORMAT' }}: {{ day.duration }}</span></li>{% endfor %}
                             </ol>
                             <div class="ad-progress-timeline-ends"><span>{{ activity.window_start|date:"DATE_FORMAT" }}</span><span>{{ activity.window_end|date:"DATE_FORMAT" }}</span></div>
                         </section>
                         <section class="ad-progress-daily-card" aria-labelledby="progress-daily-title-{{ p.pk }}">
-                            <div class="ad-progress-section-head"><div><h6 id="progress-daily-title-{{ p.pk }}">{% translate "Daily breakdown" %}</h6><p>{% translate "Days with recorded active watching" %}</p></div></div>
+                            <div class="ad-progress-section-head"><div><h6 id="progress-daily-title-{{ p.pk }}">{% translate "Daily breakdown (days with activity)" %}</h6></div></div>
                             {% if activity.days %}
-                            <div class="ad-progress-daily-list">
-                                {% for day in activity.days %}
+                            <div class="ad-progress-daily-table" role="table" aria-label="{% translate 'Daily breakdown' %}">
+                                <div class="ad-progress-daily-table-head" role="row"><span role="columnheader">{% translate "Date" %}</span><span role="columnheader">{% translate "Watch time" %}</span><span role="columnheader">{% translate "% of total" %}</span></div>
+                                <div class="ad-progress-daily-list">
+                                {% for day in activity.days reversed %}
                                 <details class="ad-progress-day" hx-get="{% url 'progress-dashboard' %}?activity_detail={{ p.pk }}&activity_day={{ day.date|date:'Y-m-d' }}&{{ activity_query }}" hx-trigger="toggle once" hx-target="#progress-sessions-{{ p.pk }}-{{ day.date|date:'Ymd' }}" hx-swap="innerHTML" hx-indicator="#progress-loading">
                                     <summary>
                                         <span class="ad-progress-day-date">{{ day.date|date:"DATE_FORMAT" }}</span>
                                         <span class="ad-progress-day-time">{{ day.duration }}</span>
-                                        <span class="ad-progress-day-sessions">{% blocktranslate count session_count=day.session_count %}{{ session_count }} session{% plural %}{{ session_count }} sessions{% endblocktranslate %}</span>
-                                        <span class="ad-progress-day-gain">{% if day.progress_gain is not None %}+{{ day.progress_gain }}%{% else %}—{% endif %}</span>
+                                        <span class="ad-progress-day-share"><strong>{{ day.share_percent }}%</strong><span class="ad-progress-day-meter" role="progressbar" aria-label="{% translate 'Share of total watch time' %}" aria-valuenow="{{ day.share_percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{ day.share_percent }}%"></span></span></span>
                                         <i class="fas fa-chevron-down ad-progress-day-chevron" aria-hidden="true"></i>
                                         <span class="visually-hidden">{% translate "Load watching session details" %}</span>
                                     </summary>
                                     <div id="progress-sessions-{{ p.pk }}-{{ day.date|date:'Ymd' }}" class="ad-progress-session-detail" aria-live="polite"></div>
                                 </details>
                                 {% endfor %}
+                                </div>
                             </div>
                             {% else %}<p class="ad-progress-no-activity">{% translate "No active study days in this period." %}</p>{% endif %}
                             <div class="ad-progress-highlights">

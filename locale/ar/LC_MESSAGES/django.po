@@ -2529,6 +2529,21 @@ msgstr "المشاهدة النشطة يوميًا خلال آخر 30 يومًا
 msgid "Daily breakdown"
 msgstr "التفصيل اليومي"
 
+msgid "Study timeline (last 30 days)"
+msgstr "الخط الزمني للدراسة (آخر 30 يومًا)"
+
+msgid "Meaningful daily activity (not per minute)"
+msgstr "نشاط يومي هادف (وليس لكل دقيقة)"
+
+msgid "Daily breakdown (days with activity)"
+msgstr "التفصيل اليومي (الأيام التي بها نشاط)"
+
+msgid "% of total"
+msgstr "النسبة من الإجمالي"
+
+msgid "Share of total watch time"
+msgstr "النسبة من إجمالي وقت المشاهدة"
+
 msgid "Days with recorded active watching"
 msgstr "الأيام المسجل فيها مشاهدة نشطة"
 
@@ -11965,6 +11980,12 @@ msgstr "حالة الحضور"
 
 msgid "Each matrix cell represents one scheduled course meeting."
 msgstr "تمثل كل خلية في المصفوفة لقاءً واحدًا مجدولًا للمقرر."
+
+msgid "Expand a student row to view meeting times, scanner details, and actions."
+msgstr "وسّع صف الطالب لعرض أوقات اللقاءات وتفاصيل المسح والإجراءات."
+
+msgid "Toggle meeting details"
+msgstr "عرض أو إخفاء تفاصيل اللقاءات"
 
 msgid "By"
 msgstr "بواسطة"
