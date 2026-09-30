@@ -62,10 +62,10 @@
                 </div>
                 <div class="submission-filter-field submission-filter-field--search">
                     <label for="submission-search">{% translate "Student" %}</label>
-                    <input id="submission-search" class="form-control filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-select="#page-region" hx-replace-url="true" hx-sync="#display-page:replace" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="input changed delay:200ms, search" hx-target="#display-page" hx-swap="innerHTML">
+                    <input id="submission-search" class="form-control filters-fields" type="search" placeholder="{% translate "Search" %}" name="name" value="{{ name_value }}" hx-preserve hx-select="#page-region" hx-replace-url="true" hx-sync="#display-page:replace" aria-label="{% translate "Search" %}" hx-get="{{ url }}" hx-trigger="input changed delay:200ms, search" hx-target="#display-page" hx-swap="innerHTML">
                 </div>
                 <div class="submission-filter-actions">
-                    <a href="{{ url }}" hx-get="{{ url }}" hx-select="#page-region" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML" class="ad-btn ad-btn--danger ad-btn--sm">
+                    <a href="{{ url }}" hx-get="{{ url }}" hx-select="#page-region" hx-target="#display-page" hx-push-url="true" hx-swap="innerHTML" hx-sync="#display-page:replace" data-clear-search="submission-search" class="ad-btn ad-btn--danger ad-btn--sm">
                         <i class="fas fa-times-circle me-1"></i>{% translate "Clear" %}
                     </a>
                 </div>

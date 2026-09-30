@@ -30,7 +30,7 @@
         <label for="payment-matrix-search">{% translate "Search student" %}</label>
         <div class="grade-matrix-input-wrap">
           <i class="fas fa-search" aria-hidden="true"></i>
-          <input id="payment-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'payments-matrix-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#payments-loading">
+          <input id="payment-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-preserve hx-get="{% url 'payments-matrix-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#payments-loading">
         </div>
       </div>
       <div class="grade-matrix-filter-field">
@@ -51,7 +51,7 @@
       </div>
       <div class="grade-matrix-filter-actions">
         <button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-filter"></i> {% translate "Filter" %}</button>
-        <a href="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-get="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a>
+        <a href="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-get="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="payment-matrix-search" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a>
       </div>
     </form>
   </section>

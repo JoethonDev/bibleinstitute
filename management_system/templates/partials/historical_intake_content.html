@@ -138,10 +138,10 @@
             <form method="get" action="" role="search" class="d-flex flex-wrap gap-2 align-items-center mb-3">
                 <div class="ad-search">
                     <i class="fas fa-search" aria-hidden="true"></i>
-                    <input id="record-search" type="search" name="record_search" value="{{ record_search }}" placeholder="{% translate 'Search student or source name' %}" aria-label="{% translate 'Search records' %}" hx-get="" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-include="closest form" hx-sync="closest form:replace" hx-indicator="#historical-intake-loading" hx-trigger="input changed delay:200ms, search">
+                    <input id="record-search" type="search" name="record_search" value="{{ record_search }}" placeholder="{% translate 'Search student or source name' %}" aria-label="{% translate 'Search records' %}" hx-preserve hx-get="" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-include="closest form" hx-sync="closest form:replace" hx-indicator="#historical-intake-loading" hx-trigger="input changed delay:200ms, search">
                 </div>
                 <button class="ad-btn ad-btn--outline-gold" type="submit"><i class="fas fa-search me-1"></i>{% translate "Search" %}</button>
-                {% if record_search %}<a class="ad-btn ad-btn--ghost" href="{% url 'historical-intake' %}" hx-get="{% url 'historical-intake' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "Clear" %}</a>{% endif %}
+                {% if record_search %}<a class="ad-btn ad-btn--ghost" href="{% url 'historical-intake' %}" hx-get="{% url 'historical-intake' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="record-search">{% translate "Clear" %}</a>{% endif %}
             </form>
         </div>
         <div class="ad-table-wrap"><table class="ad-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Account" %}</th><th>{% translate "Promotion" %}</th></tr></thead><tbody>

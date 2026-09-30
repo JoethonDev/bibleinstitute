@@ -34,7 +34,7 @@
         </div>
         <div class="ad-progress-filter ad-progress-filter--search">
             <label for="progress-student-search">{% translate "Student" %}</label>
-            <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Search student name...' %}" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#progress-loading">
+            <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Search student name...' %}" hx-preserve hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#progress-loading">
         </div>
         {% if selected_year %}<div class="ad-progress-window">{% translate "Activity window" %}<strong>{% blocktranslate with start=progress_window_start|date:"DATE_FORMAT" end=progress_window_end|date:"DATE_FORMAT" %}{{ start }} – {{ end }}{% endblocktranslate %}</strong></div>{% endif %}
     </form>

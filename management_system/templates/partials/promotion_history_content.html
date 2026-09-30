@@ -11,7 +11,7 @@
             <form method="get" class="row g-3 align-items-end mb-3" hx-get="{% url 'promotion-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-history-loading">
                 <div class="col-md-5">
                     <label class="form-label" for="promotion-history-search">{% translate "Student" %}</label>
-                    <input id="promotion-history-search" class="form-control" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email…' %}" hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-history-loading" hx-trigger="input changed delay:200ms, search">
+                    <input id="promotion-history-search" class="form-control" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email…' %}" hx-preserve hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-history-loading" hx-trigger="input changed delay:200ms, search">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label" for="promotion-history-outcome">{% translate "Outcome" %}</label>

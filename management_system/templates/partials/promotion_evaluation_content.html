@@ -91,7 +91,7 @@
                 <div class="ad-form-field col-md-3">
                     <label for="result-search" class="form-label">{% translate "Student" %}</label>
                     <input type="text" name="result_search" id="result-search" class="form-control form-control-sm"
-                           value="{{ result_search|default:'' }}" placeholder="{% translate "Name or email…" %}"
+                           value="{{ result_search|default:'' }}" placeholder="{% translate "Name or email…" %}" hx-preserve
                            hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-loading">
                 </div>
                 <div class="ad-form-field col-md-2">
@@ -140,7 +140,7 @@
                     <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">
                         <i class="fas fa-filter me-1"></i>{% translate "Filter" %}
                     </button>
-                    <a href="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-get="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost ad-btn--sm">
+                    <a href="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-get="{% url 'promotion-formula' %}?scope={{ selected_scope.pk }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="result-search" class="ad-btn ad-btn--ghost ad-btn--sm">
                         <i class="fas fa-times me-1"></i>{% translate "Clear" %}
                     </a>
                 </div>
@@ -595,7 +595,7 @@
                 <div class="ad-form-field col-md-6 col-lg-4">
                     <label for="preview-search" class="form-label">{% translate "Search Students" %}</label>
                     <input type="text" name="search" id="preview-search" class="form-control"
-                           value="{{ preview_search|default:'' }}" placeholder="{% translate "Name or email…" %}"
+                           value="{{ preview_search|default:'' }}" placeholder="{% translate "Name or email…" %}" hx-preserve
                            hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-loading">
                 </div>
                 <div class="ad-form-actions col-md-auto d-flex gap-2">
@@ -603,7 +603,7 @@
                         <i class="fas fa-search me-1"></i>{% translate "Search" %}
                     </button>
                     {% if preview_search %}
-                    <a href="{% url 'promotion-formula' %}?scope={{ preview_scope_id }}{% if preview_offering_id %}&amp;preview_offering={{ preview_offering_id }}{% endif %}" hx-get="{% url 'promotion-formula' %}?scope={{ preview_scope_id }}{% if preview_offering_id %}&amp;preview_offering={{ preview_offering_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost ad-btn--sm">
+                    <a href="{% url 'promotion-formula' %}?scope={{ preview_scope_id }}{% if preview_offering_id %}&amp;preview_offering={{ preview_offering_id }}{% endif %}" hx-get="{% url 'promotion-formula' %}?scope={{ preview_scope_id }}{% if preview_offering_id %}&amp;preview_offering={{ preview_offering_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="preview-search" class="ad-btn ad-btn--ghost ad-btn--sm">
                         <i class="fas fa-times me-1"></i>{% translate "Clear" %}
                     </a>
                     {% endif %}

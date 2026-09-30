@@ -18,6 +18,16 @@
     document.addEventListener('DOMContentLoaded', function () {
         // HTMX 4 does not use localStorage for history snapshots by default.
         // Alpine owns client state, so every restored URL is authoritative.
+        // Preserve the live input value across content swaps; explicit Clear
+        // actions reset it before their request so hx-preserve cannot restore
+        // the previous query into the cleared page.
+        document.addEventListener('click', function (event) {
+            var clearTrigger = event.target.closest && event.target.closest('[data-clear-search]');
+            if (!clearTrigger) return;
+            var input = document.getElementById(clearTrigger.dataset.clearSearch);
+            if (input && input.matches('input[type="search"], input[type="text"]')) input.value = '';
+        }, true);
+
         var offcanvas = document.getElementById('mobileAdminMenu');
         function closeMenu() {
             if (!offcanvas || typeof bootstrap === 'undefined' || !bootstrap.Offcanvas) return;

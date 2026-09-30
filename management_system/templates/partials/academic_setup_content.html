@@ -19,7 +19,7 @@
         {% if selected_scope_id %}<input type="hidden" name="scope" value="{{ selected_scope_id }}">{% elif selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
         <div class="col-auto">
             <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
-            <input type="search" id="year-search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search years…" %}" value="{{ search }}"
+            <input type="search" id="year-search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search years…" %}" value="{{ search }}" hx-preserve
                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
         </div>
         <div class="col-auto">
@@ -150,7 +150,7 @@
               hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#setup-loading">
             <input type="hidden" name="scope" value="{{ selected_scope_id }}">
             <label for="offering-search" class="visually-hidden">{% translate "Search offerings" %}</label>
-            <input type="search" id="offering-search" name="offering_q" class="form-control form-control-sm" placeholder="{% translate "Search offerings…" %}" value="{{ offering_search }}"
+            <input type="search" id="offering-search" name="offering_q" class="form-control form-control-sm" placeholder="{% translate "Search offerings…" %}" value="{{ offering_search }}" hx-preserve
                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
             <select name="offering_status" id="offering-status" class="form-select form-select-sm ad-width-auto"
                     hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">

@@ -28,7 +28,7 @@
                 <label for="media-status-search" class="form-label">{% translate "Search media jobs" %}</label>
                 <div class="media-status-search">
                     <i class="fas fa-search" aria-hidden="true"></i>
-                    <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}"
+                    <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}" hx-preserve
                            hx-get="{% url 'media-processing-status' %}"
                            hx-include="closest form"
                            hx-trigger="input changed delay:200ms, search"
@@ -65,7 +65,7 @@
                    hx-target="#content"
                    hx-select="#content"
                    hx-swap="outerHTML"
-                   hx-push-url="true">{% translate "Clear" %}</a>
+                   hx-push-url="true" hx-sync="closest form:replace" data-clear-search="media-status-search">{% translate "Clear" %}</a>
                 {% endif %}
             </div>
         </form>
