@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
+from datetime import timedelta
 from io import BytesIO
 
 from django.contrib.auth import authenticate
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.http import Http404, StreamingHttpResponse
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse, QueryDict
 from django.urls import reverse
@@ -20,6 +24,7 @@ import qrcode
 from .forms import SignupDetailsForm
 from .mobile_auth import (
     MobileBiometricError,
+    MobilePushDeliveryInProgress,
     enroll_mobile_biometric,
     get_mobile_session,
     issue_mobile_session,
@@ -60,6 +65,7 @@ from .utils.student_data import (
     student_lesson_data,
     student_notification_data,
     student_notifications_queryset,
+    student_overview_data,
     student_profile_data,
     student_progress_data,
     student_quiz_data,
@@ -69,6 +75,8 @@ from .utils.student_data import (
 from .utils.helpers import build_scan_url
 from .utils.validators import normalize_username
 from .views import (
+    CLOUD_CLIENT,
+    bucket_name,
     create_viewing_session,
     generate_audio_download,
     lesson_manifest,
@@ -77,6 +85,8 @@ from .views import (
     take_exam,
     _valid_session_token,
 )
+
+MEDIA_RESOURCE_URL_TTL = 3600
 
 
 def _localized(request, message: str) -> str:
@@ -262,7 +272,24 @@ def otp_verify(request):
 @require_mobile_session
 @require_POST
 def logout(request):
-    revoked = revoke_mobile_session(request)
+    payload = _json_body(request) or {}
+    installation_id = _mobile_installation_id(request, payload)
+    if installation_id is None:
+        return _error(
+            request,
+            "installation_required",
+            _localized(request, "A device installation ID is required."),
+            400,
+        )
+    try:
+        revoked = revoke_mobile_session(request, installation_id)
+    except MobilePushDeliveryInProgress:
+        return _error(
+            request,
+            "push_delivery_in_progress",
+            _localized(request, "A push notification is being sent to this device. Try logging out again shortly."),
+            409,
+        )
     if not revoked:
         return _error(request, "authentication_required", _("Authentication required."), 401)
     return json_api_response(request, {"status": "logged_out"})
@@ -367,7 +394,9 @@ def profile_qr(request):
     image = qrcode.make(qr_data)
     buffer = BytesIO()
     image.save(buffer, format="PNG")
-    return HttpResponse(buffer.getvalue(), content_type="image/png")
+    response = HttpResponse(buffer.getvalue(), content_type="image/png")
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @require_mobile_session
@@ -379,6 +408,15 @@ def courses(request):
         "items": items,
         "pagination": {"page": 1, "page_size": PAGE_SIZE, "pages": 1, "total": len(items), "has_next": False, "has_previous": False},
     })
+
+
+@require_mobile_session
+@require_http_methods(["GET"])
+def overview(request):
+    return json_api_response(
+        request,
+        student_overview_data(request.user, normalize_language(request)),
+    )
 
 
 @require_mobile_session
@@ -405,7 +443,7 @@ def quiz_detail(request, offering_id, quiz_id):
     data = student_quiz_data(request.user, offering_id, quiz_id, normalize_language(request))
     if data is None:
         return _error(request, "forbidden", _("You do not have access to this quiz."), 403)
-    return json_api_response(request, {"quiz": data})
+    return json_api_response(request, data)
 
 
 @require_mobile_session
@@ -469,7 +507,29 @@ def quiz_submit(request, offering_id, quiz_id):
 @require_mobile_session
 @require_http_methods(["GET"])
 def calendar(request):
-    return json_api_response(request, {"calendar": student_calendar_data(request.user, normalize_language(request))})
+    scope_param = request.GET.get("scope_id")
+    if scope_param is not None and not scope_param.isdigit():
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    month = request.GET.get("month")
+    if month is not None and (
+        len(month) != 7
+        or month[4] != "-"
+        or not month[:4].isdigit()
+        or not month[5:].isdigit()
+    ):
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    try:
+        data = student_calendar_data(
+            request.user,
+            normalize_language(request),
+            int(scope_param) if scope_param is not None else None,
+            month,
+        )
+    except ValueError:
+        return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
+    if data is None:
+        return _error(request, "forbidden", _localized(request, "You do not have access to this offering."), 403)
+    return json_api_response(request, {"calendar": data})
 
 
 @require_mobile_session
@@ -567,11 +627,13 @@ def push_devices(request):
         ]})
     payload = _json_body(request)
     token = payload.get("expo_push_token") if payload else None
-    installation_id = payload.get("installation_id") if payload else None
+    installation_id = normalize_mobile_installation_id(
+        payload.get("installation_id") if payload else None
+    )
     platform = payload.get("platform") if payload else None
     if (
         not isinstance(token, str) or not token.startswith("ExponentPushToken[") or len(token) > 255
-        or not isinstance(installation_id, str) or not installation_id or len(installation_id) > 128
+        or installation_id is None
         or platform not in {MobilePushDevice.Platform.ANDROID, MobilePushDevice.Platform.IOS}
     ):
         return _error(request, "invalid_request", _("Invalid push-device registration."), 400)
@@ -590,13 +652,28 @@ def push_devices(request):
             device = MobilePushDevice.objects.select_for_update().filter(
                 user=request.user, installation_id=installation_id
             ).first()
+            if device and existing_token and device.pk != existing_token.pk:
+                return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
             if device is None:
-                device = MobilePushDevice.objects.create(
-                    user=request.user,
-                    expo_push_token=token,
-                    installation_id=installation_id,
-                    platform=platform,
-                )
+                if existing_token is None:
+                    device = MobilePushDevice.objects.create(
+                        user=request.user,
+                        expo_push_token=token,
+                        installation_id=installation_id,
+                        platform=platform,
+                    )
+                else:
+                    # A same-account registration may rotate its installation ID.
+                    device = existing_token
+                    device.installation_id = installation_id
+                    device.platform = platform
+                    device.is_active = True
+                    device.disabled_at = None
+                    device.last_seen_at = timezone.now()
+                    device.save(update_fields=[
+                        "user", "installation_id", "platform", "is_active",
+                        "disabled_at", "last_seen_at", "updated_at",
+                    ])
             else:
                 device.expo_push_token = token
                 device.platform = platform
@@ -728,6 +805,7 @@ def media_manifest(request, offering_id, lesson_id, file_index):
             _("The media is unavailable.") if response.status_code == 404 else _("The viewing session is invalid."),
             response.status_code,
         )
+    response["Cache-Control"] = "private, no-store"
     return response
 
 
@@ -745,8 +823,117 @@ def lesson_audio(request, offering_id, lesson_id):
         return _error(request, "invalid_media", _("Invalid audio file."), 400)
     response = generate_audio_download(request, offering_id, lesson_id)
     if response.status_code in {301, 302, 303, 307, 308}:
+        response["Cache-Control"] = "private, no-store"
         return response
     return _error(request, "audio_unavailable", _("Audio download is temporarily unavailable."), 503)
+
+
+@require_mobile_session
+@require_http_methods(["GET"])
+def lesson_media_resource(request, offering_id, lesson_id, file_index):
+    """Issue a short-lived read URL for an authorized audio file.
+
+    The returned URL is a temporary capability. The mobile client must keep it
+    only in memory and must not forward its bearer token to the storage host.
+    """
+    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
+    if lesson is None:
+        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
+    file_type = (link or {}).get("file_type") or (link or {}).get("type")
+    if not link or file_type != "audio" or not link.get("id"):
+        return _error(request, "invalid_media", _("Invalid media file."), 400)
+
+    try:
+        response = generate_audio_download(
+            request,
+            offering_id,
+            lesson_id,
+            expires_in=MEDIA_RESOURCE_URL_TTL,
+            file_index=file_index,
+        )
+        if response.status_code not in {301, 302, 303, 307, 308}:
+            return _error(
+                request,
+                "audio_unavailable",
+                _localized(request, "Audio download is temporarily unavailable."),
+                503,
+            )
+        url = response.headers.get("Location")
+        media_type = "audio/mpeg"
+    except PermissionDenied:
+        return _error(request, "forbidden", _localized(request, "You do not have access to this lesson."), 403)
+    except Http404:
+        return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _error(request, "media_unavailable", _localized(request, "The media is unavailable."), 503)
+
+    if not isinstance(url, str) or not url.startswith("https://"):
+        return _error(request, "media_unavailable", _localized(request, "The media is unavailable."), 503)
+    result = json_api_response(request, {
+        "url": url,
+        "expires_at": (timezone.now() + timedelta(seconds=MEDIA_RESOURCE_URL_TTL)).isoformat(),
+        "media_type": media_type,
+    })
+    result["Cache-Control"] = "private, no-store"
+    return result
+
+
+@require_mobile_session
+@require_http_methods(["GET"])
+def lesson_book_document(request, offering_id, lesson_id, file_index):
+    """Range-stream one authorized PDF without exposing an object-store URL."""
+    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
+    if lesson is None:
+        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
+    file_type = (link or {}).get("file_type") or (link or {}).get("type")
+    file_key = (link or {}).get("id")
+    if file_type != "book" or not isinstance(file_key, str) or not file_key:
+        return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
+
+    range_header = request.headers.get("Range", "").strip()
+    if range_header and (
+        not re.fullmatch(r"bytes=(?:\d+-\d*|-\d+)", range_header)
+    ):
+        return _error(request, "invalid_range", _localized(request, "Invalid media file."), 400)
+
+    try:
+        params = {"Bucket": bucket_name, "Key": file_key}
+        if range_header:
+            params["Range"] = range_header
+        storage_response = CLOUD_CLIENT.get_object(**params)
+    except Exception as exc:
+        status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if status == 416:
+            return HttpResponse(status=416)
+        return _error(
+            request,
+            "media_unavailable",
+            _localized(request, "The media is unavailable."),
+            503,
+        )
+
+    body = storage_response["Body"]
+
+    def stream_chunks():
+        try:
+            yield from body.iter_chunks(chunk_size=64 * 1024)
+        finally:
+            body.close()
+
+    response = StreamingHttpResponse(
+        stream_chunks(),
+        status=206 if storage_response.get("ContentRange") else 200,
+        content_type="application/pdf",
+    )
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Accept-Ranges"] = "bytes"
+    response["Content-Disposition"] = "inline"
+    if storage_response.get("ContentLength") is not None:
+        response["Content-Length"] = str(storage_response["ContentLength"])
+    if storage_response.get("ContentRange"):
+        response["Content-Range"] = storage_response["ContentRange"]
+    return response
 
 
 def _call_existing_progress(request, lesson_id=None, offering_id=None):

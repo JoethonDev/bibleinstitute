@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import random
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from django.core.paginator import Page, Paginator
-from django.db.models import Exists, F, OuterRef, Prefetch, Q, QuerySet, Window
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, QuerySet, Window
 from django.db.models.functions import RowNumber
-from django.utils.timezone import now
+from django.utils.timezone import localdate, now
 
 from ..academic_access import (
     TARGETED_ENROLLMENT_TYPES,
@@ -20,6 +20,8 @@ from ..academic_access import (
 from ..models import (
     AcademicHoliday,
     AcademicYearLevelMeeting,
+    AttendancePolicy,
+    AttendanceRecord,
     Enrollment,
     Grade,
     LectureProgress,
@@ -32,6 +34,8 @@ from ..models import (
     Submission,
     User,
 )
+from .attendance import DAY_GRADE_NONE, grade_attendance_day, pair_attendance_records
+from .progress_merge import unique_seconds
 from .timezones import ensure_aware
 
 
@@ -97,7 +101,7 @@ def _media_data(link: dict, index: int) -> dict:
         "part_id": str(link.get("part_id") or ""),
         "name": link.get("name") or link.get("title") or "",
         "streamable": file_type in {"video", "audio"} and bool(link.get("id")),
-        "downloadable": file_type in {"audio", "book"},
+        "downloadable": file_type == "audio",
     }
 
 
@@ -414,40 +418,360 @@ def student_profile_data(user: User) -> dict:
     }
 
 
-def student_calendar_data(user: User, language: str = "en") -> dict:
-    enrollments = Enrollment.objects.filter(
-        student=user,
-        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-        enrollment_type=Enrollment.Type.NORMAL,
-    ).select_related("academic_year_level__academic_year", "academic_year_level__level")
-    active_year = enrollments.filter(
-        academic_year_level__academic_year__is_active=True
-    ).order_by("-enrolled_at").first()
-    selected = active_year or enrollments.order_by(
-        "-academic_year_level__academic_year__ordering", "-enrolled_at"
-    ).first()
-    if selected is None:
-        return {"scope": None, "meetings": [], "holidays": []}
+def _calendar_month_keys(starts_on: date, ends_on: date) -> list[str]:
+    current = date(starts_on.year, starts_on.month, 1)
+    last = date(ends_on.year, ends_on.month, 1)
+    months = []
+    while current <= last and len(months) < 36:
+        months.append(current.strftime("%Y-%m"))
+        current = date(
+            current.year + (1 if current.month == 12 else 0),
+            1 if current.month == 12 else current.month + 1,
+            1,
+        )
+    return months
+
+
+def student_calendar_data(
+    user: User,
+    language: str = "en",
+    scope_id: int | None = None,
+    month: str | None = None,
+) -> dict | None:
+    """Return one authorized academic scope and one bounded calendar month.
+
+    Scope choices come only from this account's normal enrollments. The default
+    remains the active academic year, falling back to its latest normal scope.
+    ``None`` means a requested scope is not owned by this account; an invalid
+    month raises ``ValueError`` for the API boundary to map to 400.
+    """
+    enrollments = list(
+        Enrollment.objects.filter(
+            student=user,
+            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
+            enrollment_type=Enrollment.Type.NORMAL,
+        ).select_related(
+            "academic_year_level__academic_year",
+            "academic_year_level__level",
+        ).order_by(
+            "-academic_year_level__academic_year__is_active",
+            "-academic_year_level__academic_year__ordering",
+            "-enrolled_at",
+            "-pk",
+        )[:PAGE_SIZE]
+    )
+    scope_options = [
+        {
+            "id": enrollment.academic_year_level_id,
+            "academic_year": enrollment.academic_year_level.academic_year.name,
+            "level": (
+                enrollment.academic_year_level.level.name_ar
+                if language == "ar"
+                else enrollment.academic_year_level.level.name_en
+            ),
+            "is_active": enrollment.academic_year_level.academic_year.is_active,
+        }
+        for enrollment in enrollments
+    ]
+    if not enrollments:
+        return {
+            "scope": None,
+            "scope_options": [],
+            "month": None,
+            "available_months": [],
+            "year_starts_on": None,
+            "year_ends_on": None,
+            "meetings": [],
+            "holidays": [],
+        }
+
+    if scope_id is None:
+        selected = next(
+            (
+                enrollment
+                for enrollment in enrollments
+                if enrollment.academic_year_level.academic_year.is_active
+            ),
+            enrollments[0],
+        )
+    else:
+        selected = next(
+            (
+                enrollment
+                for enrollment in enrollments
+                if enrollment.academic_year_level_id == scope_id
+            ),
+            None,
+        )
+        if selected is None:
+            return None
+
     scope = selected.academic_year_level
+    year = scope.academic_year
+    months = _calendar_month_keys(year.starts_on, year.ends_on)
+    today_month = localdate().strftime("%Y-%m")
+    selected_month = month or (today_month if today_month in months else months[0])
+    if selected_month not in months:
+        raise ValueError("Calendar month is outside the selected academic year.")
+    month_date = date.fromisoformat(f"{selected_month}-01")
+    next_month = date(
+        month_date.year + (1 if month_date.month == 12 else 0),
+        1 if month_date.month == 12 else month_date.month + 1,
+        1,
+    )
     meetings = AcademicYearLevelMeeting.objects.filter(
-        academic_year_level=scope
-    ).select_related("course_offering__course").order_by("meeting_date", "pk")
+        academic_year_level=scope,
+        meeting_date__gte=month_date,
+        meeting_date__lt=next_month,
+    ).select_related("course_offering__course").order_by(
+        "meeting_date", "course_offering__course__name", "pk"
+    )
     holidays = AcademicHoliday.objects.filter(
-        academic_year=scope.academic_year
+        academic_year=year,
+        date__gte=month_date,
+        date__lt=next_month,
     ).order_by("date", "pk")
     return {
         "scope": {
             "id": scope.pk,
-            "academic_year": scope.academic_year.name,
+            "academic_year": year.name,
             "level": scope.level.name_ar if language == "ar" else scope.level.name_en,
             "level_ordering": scope.level.ordering,
             "meeting_weekdays": scope.meeting_weekdays or [],
         },
+        "scope_options": scope_options,
+        "month": selected_month,
+        "available_months": months,
+        "year_starts_on": year.starts_on.isoformat(),
+        "year_ends_on": year.ends_on.isoformat(),
         "meetings": [
-            {"date": row.meeting_date.isoformat(), "offering_id": row.course_offering_id, "course": row.course_offering.course.name}
+            {
+                "date": row.meeting_date.isoformat(),
+                "offering_id": row.course_offering_id,
+                "course": row.course_offering.course.name,
+            }
             for row in meetings
         ],
-        "holidays": [{"date": holiday.date.isoformat(), "name": holiday.name} for holiday in holidays],
+        "holidays": [
+            {"date": holiday.date.isoformat(), "name": holiday.name}
+            for holiday in holidays
+        ],
+    }
+
+
+def student_course_progress_data(
+    user: User,
+    offerings: list,
+    *,
+    include_unpublished: bool = False,
+    cap_per_offering: bool = False,
+    attendance_policy: AttendancePolicy | None = None,
+) -> dict[int, dict]:
+    """Build progress for caller-authorized offerings for HTML and mobile."""
+    offering_ids = [offering.pk for offering in offerings]
+    progress_by_offering = {
+        offering_id: {
+            "watch_time_seconds": 0,
+            "watch_time_minutes": 0,
+            "watch_percent": 0,
+            "watched_parts": 0,
+            "watchable_parts": 0,
+            "attendance_scanned": DAY_GRADE_NONE,
+            "attendance_total": 0,
+            "weekly_taken": 0,
+            "weekly_total": 0,
+            "weekly_grades": [],
+            "final_taken": 0,
+            "final_total": 0,
+            "final_grades": [],
+        }
+        for offering_id in offering_ids
+    }
+    if offering_ids:
+        if user.study_mode == "online":
+            lesson_queryset = Lesson.objects.filter(course_offering_id__in=offering_ids)
+            if not include_unpublished:
+                lesson_queryset = lesson_queryset.filter(status=PublicationStatus.PUBLISHED)
+            if cap_per_offering:
+                lesson_queryset = lesson_queryset.annotate(
+                    overview_row=Window(
+                        expression=RowNumber(),
+                        partition_by=[F("course_offering_id")],
+                        order_by=[F("created_date").asc(), F("pk").asc()],
+                    )
+                ).filter(overview_row__lte=PAGE_SIZE)
+            lessons = lesson_queryset.only(
+                "id", "course_offering_id", "links", "created_date"
+            ).order_by("course_offering_id", "created_date", "pk")
+            media_parts = {}
+            for lesson in lessons:
+                for link in _parse_links(lesson):
+                    if not isinstance(link, dict) or link.get("file_type") not in {"video", "audio"}:
+                        continue
+                    part_id = link.get("part_id")
+                    if part_id:
+                        media_parts[(lesson.pk, part_id)] = lesson.course_offering_id
+            if media_parts:
+                progress_rows = LectureProgress.objects.filter(
+                    student=user,
+                    lesson_id__in={lesson_id for lesson_id, _part_id in media_parts},
+                ).values("lesson_id", "part_id", "merged_ranges", "unique_seconds", "percent")
+                progress_by_part = {
+                    (row["lesson_id"], row["part_id"]): row
+                    for row in progress_rows
+                }
+                for part_key, offering_id in media_parts.items():
+                    metric = progress_by_offering[offering_id]
+                    metric["watchable_parts"] += 1
+                    progress = progress_by_part.get(part_key)
+                    if progress is None:
+                        continue
+                    percent = max(0, min(int(progress["percent"] or 0), 100))
+                    ranges = progress["merged_ranges"] if isinstance(progress["merged_ranges"], list) else []
+                    seconds = progress["unique_seconds"] or unique_seconds(ranges)
+                    metric["watch_time_seconds"] += max(0, seconds)
+                    metric["watch_percent"] += percent
+                    if percent >= 80:
+                        metric["watched_parts"] += 1
+        for metric in progress_by_offering.values():
+            seconds = metric.pop("watch_time_seconds", 0)
+            metric["watch_time_minutes"] = int(round(seconds / 60))
+            if metric["watchable_parts"]:
+                metric["watch_percent"] = round(
+                    metric["watch_percent"] / metric["watchable_parts"]
+                )
+
+        meeting_counts = AcademicYearLevelMeeting.objects.filter(
+            course_offering_id__in=offering_ids
+        ).values("course_offering_id").annotate(total=Count("pk"))
+        for row in meeting_counts:
+            progress_by_offering[row["course_offering_id"]]["attendance_total"] = row["total"]
+
+        if user.study_mode != "online":
+            policy = attendance_policy or AttendancePolicy.objects.first() or AttendancePolicy()
+            starts_on = min(
+                offering.academic_year_level.academic_year.starts_on
+                for offering in offerings
+            )
+            ends_on = max(
+                offering.academic_year_level.academic_year.ends_on
+                for offering in offerings
+            )
+            attendance_rows = AttendanceRecord.objects.filter(
+                student=user,
+                course_offering_id__in=offering_ids,
+                attendance_date__gte=starts_on,
+                attendance_date__lte=ends_on,
+            ).values(
+                "student_id",
+                "course_offering_id",
+                "attendance_date",
+                "action",
+                "source",
+                "scanned_at",
+            )
+            for (_student_id, offering_id, _day), pair in pair_attendance_records(attendance_rows).items():
+                progress_by_offering[offering_id]["attendance_scanned"] += grade_attendance_day(
+                    pair.get(AttendanceRecord.Action.ENTRANCE),
+                    pair.get(AttendanceRecord.Action.EXIT),
+                    policy,
+                ).grade
+
+        quiz_queryset = Quiz.objects.filter(course_offering_id__in=offering_ids)
+        if not include_unpublished:
+            quiz_queryset = quiz_queryset.filter(status=PublicationStatus.PUBLISHED)
+        if cap_per_offering:
+            quiz_queryset = quiz_queryset.annotate(
+                overview_row=Window(
+                    expression=RowNumber(),
+                    partition_by=[F("course_offering_id")],
+                    order_by=[F("opening_date").asc(), F("pk").asc()],
+                )
+            ).filter(overview_row__lte=PAGE_SIZE)
+        quizzes = list(quiz_queryset.select_related("quiz_type").only(
+                "id",
+                "name",
+                "course_offering_id",
+                "quiz_type_id",
+                "total_grade",
+                "opening_date",
+                "quiz_type__code",
+            ).order_by("opening_date", "pk"))
+        quiz_ids = [quiz.pk for quiz in quizzes]
+        for quiz in quizzes:
+            if not quiz.quiz_type:
+                continue
+            metric = progress_by_offering[quiz.course_offering_id]
+            if quiz.quiz_type.code == "weekly":
+                metric["weekly_total"] += 1
+            elif quiz.quiz_type.code == "final":
+                metric["final_total"] += 1
+
+        grades = Grade.objects.filter(
+            user=user,
+            quiz_id__in=quiz_ids,
+        ).select_related("quiz__quiz_type").order_by("quiz__opening_date", "quiz_id")
+        for grade in grades:
+            quiz_type = grade.quiz.quiz_type
+            if not quiz_type or quiz_type.code not in {"weekly", "final"}:
+                continue
+            metric = progress_by_offering[grade.quiz.course_offering_id]
+            bucket = "weekly" if quiz_type.code == "weekly" else "final"
+            metric[f"{bucket}_taken"] += 1
+            metric[f"{bucket}_grades"].append({
+                "name": grade.quiz.name,
+                "score": grade.total_grade,
+                "total": grade.quiz.total_grade,
+            })
+
+    return progress_by_offering
+
+
+def student_overview_data(user: User, language: str = "en") -> dict:
+    """Return bounded, own-account study summaries without per-offering queries."""
+    offerings = list(
+        _offering_access_annotations(
+            student_offerings_queryset(user).select_related(
+                "course",
+                "academic_year_level__academic_year",
+                "academic_year_level__level",
+            ),
+            user,
+        )[:PAGE_SIZE]
+    )
+    progress_by_offering = student_course_progress_data(
+        user,
+        offerings,
+        cap_per_offering=True,
+    )
+    course_rows = []
+    for offering in offerings:
+        progress = progress_by_offering[offering.pk]
+        progress["attendance_scanned"] = float(progress["attendance_scanned"])
+        course_rows.append({
+            **_offering_data(offering, language, include_content=False),
+            "progress": progress,
+        })
+
+    recent_grades = [
+        {
+            "id": grade.pk,
+            "quiz_id": grade.quiz_id,
+            "quiz": grade.quiz.name,
+            "offering_id": grade.quiz.course_offering_id,
+            "course": grade.quiz.course_offering.course.name,
+            "total_grade": grade.total_grade,
+            "max_grade": grade.quiz.total_grade,
+            "submitted_at": grade.submitted_at.isoformat(),
+        }
+        for grade in student_grades_queryset(user).select_related(
+            "quiz__course_offering__course"
+        )[:5]
+    ]
+    return {
+        "study_mode": user.study_mode,
+        "courses": course_rows,
+        "recent_grades": recent_grades,
     }
 
 

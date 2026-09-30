@@ -86,13 +86,13 @@
             </p>
 
             {# Filter form — GET to promotion-formula, preserves scope #}
-            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
+            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
                 <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
                 <div class="ad-form-field col-md-3">
                     <label for="result-search" class="form-label">{% translate "Student" %}</label>
                     <input type="text" name="result_search" id="result-search" class="form-control form-control-sm"
                            value="{{ result_search|default:'' }}" placeholder="{% translate "Name or email…" %}"
-                           hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:400ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                           hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-loading">
                 </div>
                 <div class="ad-form-field col-md-2">
                     <label for="result-computed-status" class="form-label">{% translate "Computed" %}</label>
@@ -579,7 +579,7 @@
             {% endif %}
 
             {# Search form — preserves scope via GET #}
-            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
+            <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
                 <input type="hidden" name="scope" value="{{ preview_scope_id }}">
                 {% if not selected_offering_id %}
                 <div class="ad-form-field col-md-5 col-lg-4">
@@ -596,7 +596,7 @@
                     <label for="preview-search" class="form-label">{% translate "Search Students" %}</label>
                     <input type="text" name="search" id="preview-search" class="form-control"
                            value="{{ preview_search|default:'' }}" placeholder="{% translate "Name or email…" %}"
-                           hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:400ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
+                           hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-loading">
                 </div>
                 <div class="ad-form-actions col-md-auto d-flex gap-2">
                     <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">

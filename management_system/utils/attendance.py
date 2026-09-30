@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time, timedelta
+from datetime import date, datetime, time as dt_time, timedelta
 from decimal import Decimal
 import zoneinfo
 
@@ -49,6 +49,31 @@ class DayAttendance:
     status: str
     late_entrance: bool
     early_exit: bool
+
+
+@dataclass(frozen=True)
+class AttendanceScanAvailability:
+    academic_year_level: AcademicYearLevel | None
+    course_offering: CourseOffering | None
+    blocked_reason: str | None
+    recorded_actions: frozenset[str]
+
+    @property
+    def can_record(self) -> bool:
+        return self.blocked_reason is None
+
+    @staticmethod
+    def duplicate_reason(action: str) -> str:
+        if action == AttendanceRecord.Action.ENTRANCE:
+            return str(_("Entrance has already been recorded for today."))
+        return str(_("Exit has already been recorded for today."))
+
+    def reason_for(self, action: str) -> str | None:
+        if self.blocked_reason:
+            return self.blocked_reason
+        if action not in self.recorded_actions:
+            return None
+        return self.duplicate_reason(action)
 
 
 def _scan_field(record, name):
@@ -411,6 +436,38 @@ def get_student_attendance_context(student, check_date):
         meeting_date=check_date,
     ).select_related("course_offering").first()
     return enrollment.academic_year_level, meeting.course_offering if meeting else None
+
+
+def attendance_scan_availability(
+    student: User,
+    check_date: date,
+    *,
+    include_recorded_actions: bool = True,
+) -> AttendanceScanAvailability:
+    """Resolve scan eligibility and action-specific duplicate reasons for one student/date."""
+    academic_year_level, course_offering = get_student_attendance_context(student, check_date)
+    blocked_reason = None
+    recorded_actions: frozenset[str] = frozenset()
+
+    if student.study_mode == "online":
+        blocked_reason = str(_("Online students cannot record attendance."))
+    elif academic_year_level is None:
+        blocked_reason = str(_("The student has no active academic-year enrollment."))
+    elif not is_expected_date(academic_year_level, check_date):
+        blocked_reason = str(_("Today is not an expected attendance day."))
+    elif include_recorded_actions:
+        recorded_actions = frozenset(AttendanceRecord.objects.filter(
+            student_id=student.pk,
+            course_offering_id=course_offering.pk if course_offering else None,
+            attendance_date=check_date,
+        ).values_list("action", flat=True))
+
+    return AttendanceScanAvailability(
+        academic_year_level=academic_year_level,
+        course_offering=course_offering,
+        blocked_reason=blocked_reason,
+        recorded_actions=recorded_actions,
+    )
 
 
 def assign_unassigned_attendance(meeting) -> int:

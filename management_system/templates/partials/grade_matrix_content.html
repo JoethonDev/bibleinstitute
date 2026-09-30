@@ -29,13 +29,13 @@
   </nav>
 
   <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Grades filters' %}">
-    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'grades-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#grades-loading">
+    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'grades-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#grades-loading">
       <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
       <div class="grade-matrix-filter-field">
         <label for="grade-matrix-search">{% translate "Search student" %}</label>
         <div class="grade-matrix-input-wrap">
           <i class="fas fa-search" aria-hidden="true"></i>
-          <input id="grade-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
+          <input id="grade-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#grades-loading">
         </div>
       </div>
       <div class="grade-matrix-filter-field">

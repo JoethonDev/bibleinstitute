@@ -76,6 +76,7 @@ from .application_analytics import (
     iter_analytics_csv_rows,
 )
 from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
+from .utils.student_data import student_course_progress_data
 from .utils.r2_filters import FileFilterConfig, filter_preset_choices, get_filter_preset
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
@@ -107,8 +108,8 @@ from .utils.attendance import (
     DAY_GRADE_NONE,
     AttendanceDayStatus,
     assign_unassigned_attendance,
+    attendance_scan_availability,
     get_expected_dates,
-    get_student_attendance_context,
     grade_attendance_day,
     is_expected_date,
     local_scan_time,
@@ -133,6 +134,7 @@ from .utils.quiz_access import grant_quiz_openings, quiz_window
 from .quiz_questions import build_question_instance
 from .quiz_import import parse_quiz_import
 from .public_content import get_institute_copy
+from .study_mode import apply_study_mode_from_city
 from .academic_enrollment import (
     activate_academic_year,
     accept_application,
@@ -711,7 +713,8 @@ class ProfileDetail(LoginProtection, DetailView):
                 "is_image": (mimetypes.guess_type(key)[0] or "").startswith("image/"),
             })
         context["application_documents"] = application_documents
-        if user_has_management_role(user):
+        management_preview = user_has_management_role(user)
+        if management_preview:
             offerings = CourseOffering.objects.select_related(
                 "course", "academic_year_level__academic_year", "academic_year_level__level"
             ).filter(
@@ -725,138 +728,16 @@ class ProfileDetail(LoginProtection, DetailView):
             )
         offerings = list(offerings)
         offering_ids = [offering.pk for offering in offerings]
-        course_progress = {
-            offering_id: {
-                "watch_time_minutes": 0,
-                "watch_time_seconds": 0,
-                "watch_percent": 0,
-                "watched_parts": 0,
-                "watchable_parts": 0,
-                "attendance_scanned": 0,
-                "attendance_total": 0,
-                "weekly_taken": 0,
-                "weekly_total": 0,
-                "weekly_grades": [],
-                "final_taken": 0,
-                "final_total": 0,
-                "final_grades": [],
-            }
-            for offering_id in offering_ids
-        }
-
-        if offering_ids:
-            media_parts = {}
-            if user.study_mode == "online":
-                lesson_rows = Lesson.objects.filter(
-                    course_offering_id__in=offering_ids,
-                    **({} if user_has_management_role(user) else {"status": PublicationStatus.PUBLISHED}),
-                ).values("id", "course_offering_id", "links")
-                for lesson in lesson_rows:
-                    try:
-                        links = json.loads(lesson["links"] or "[]")
-                    except (TypeError, json.JSONDecodeError):
-                        links = []
-                    for link in links if isinstance(links, list) else []:
-                        if not isinstance(link, dict):
-                            continue
-                        if link.get("file_type") not in {"video", "audio"}:
-                            continue
-                        part_id = link.get("part_id")
-                        if part_id:
-                            media_parts[(lesson["id"], part_id)] = lesson["course_offering_id"]
-
-            if media_parts and user.study_mode == "online":
-                progress_rows = LectureProgress.objects.filter(
-                    student=user,
-                    lesson_id__in=[lesson_id for lesson_id, _part_id in media_parts],
-                ).values("lesson_id", "part_id", "merged_ranges", "unique_seconds", "percent")
-                progress_by_part = {
-                    (row["lesson_id"], row["part_id"]): row
-                    for row in progress_rows
-                }
-                for part_key, offering_id in media_parts.items():
-                    metric = course_progress[offering_id]
-                    metric["watchable_parts"] += 1
-                    progress = progress_by_part.get(part_key)
-                    if not progress:
-                        continue
-                    percent = min(int(progress["percent"] or 0), 100)
-                    ranges = progress["merged_ranges"] if isinstance(progress["merged_ranges"], list) else []
-                    seconds = progress["unique_seconds"] or unique_seconds(ranges)
-                    metric["watch_time_seconds"] += seconds
-                    metric["watch_percent"] += percent
-                    if percent >= 80:
-                        metric["watched_parts"] += 1
-
-                for metric in course_progress.values():
-                    metric["watch_time_minutes"] = int(round(metric["watch_time_seconds"] / 60))
-                    if metric["watchable_parts"]:
-                        metric["watch_percent"] = round(
-                            metric["watch_percent"] / metric["watchable_parts"]
-                        )
-
-            meeting_dates = defaultdict(set)
-            for row in AcademicYearLevelMeeting.objects.filter(
-                course_offering_id__in=offering_ids
-            ).values("course_offering_id", "meeting_date"):
-                meeting_dates[row["course_offering_id"]].add(row["meeting_date"])
-
-            attendance_days = defaultdict(dict)
-            attendance_policy = None
-            if user.study_mode != "online":
-                attendance_policy = AttendancePolicy.load()
-                for (_student_id, attendance_offering_id, attendance_day), pair in pair_attendance_records(
-                    AttendanceRecord.objects.filter(
-                        student=user,
-                        course_offering_id__in=offering_ids,
-                    ).values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
-                ).items():
-                    attendance_days[attendance_offering_id][attendance_day] = pair
-
-            for offering_id, dates in meeting_dates.items():
-                course_progress[offering_id]["attendance_total"] = len(dates)
-                if attendance_policy is None:
-                    continue
-                graded_points = DAY_GRADE_NONE
-                for pair in attendance_days.get(offering_id, {}).values():
-                    graded_points += grade_attendance_day(
-                        pair.get("entrance"), pair.get("exit"), attendance_policy
-                    ).grade
-                course_progress[offering_id]["attendance_scanned"] = graded_points
-
-            quiz_filter = {} if user_has_management_role(user) else {"status": PublicationStatus.PUBLISHED}
-            quizzes = list(
-                Quiz.objects.filter(course_offering_id__in=offering_ids, **quiz_filter)
-                .select_related("quiz_type")
-                .order_by("opening_date", "pk")
-            )
-            quiz_ids = [quiz.pk for quiz in quizzes]
-            for quiz in quizzes:
-                if not quiz.quiz_type:
-                    continue
-                metric = course_progress[quiz.course_offering_id]
-                if quiz.quiz_type.code == "weekly":
-                    metric["weekly_total"] += 1
-                elif quiz.quiz_type.code == "final":
-                    metric["final_total"] += 1
-
-            for grade in Grade.objects.filter(user=user, quiz_id__in=quiz_ids).select_related(
-                "quiz", "quiz__quiz_type"
-            ).order_by("quiz__opening_date", "quiz_id"):
-                if not grade.quiz.quiz_type:
-                    continue
-                grade_data = {
-                    "name": grade.quiz.name,
-                    "score": grade.total_grade,
-                    "total": grade.quiz.total_grade,
-                }
-                metric = course_progress[grade.quiz.course_offering_id]
-                if grade.quiz.quiz_type.code == "weekly":
-                    metric["weekly_taken"] += 1
-                    metric["weekly_grades"].append(grade_data)
-                elif grade.quiz.quiz_type.code == "final":
-                    metric["final_taken"] += 1
-                    metric["final_grades"].append(grade_data)
+        course_progress = student_course_progress_data(
+            user,
+            offerings,
+            include_unpublished=management_preview,
+            attendance_policy=(
+                AttendancePolicy.load()
+                if offering_ids and user.study_mode != "online"
+                else None
+            ),
+        )
 
         for offering in offerings:
             offering.profile_progress = course_progress[offering.pk]
@@ -1473,6 +1354,8 @@ def user_profile(request, user_id):
         try:
             with transaction.atomic():
                 updated_user = form.save()
+                if actor_role == "admin" and apply_study_mode_from_city(updated_user):
+                    updated_user.save(update_fields=["study_mode"])
                 if (
                     original.application_status != updated_user.application_status
                     or original.is_active and not updated_user.is_active
@@ -1989,6 +1872,12 @@ class UpdateUser(UserBaseView, UpdateView):
             with transaction.atomic():
                 response = super().form_valid(form)
                 user = User.objects.get(username=self.request.user)
+                if (
+                    user.role
+                    and user.role.role == "admin"
+                    and apply_study_mode_from_city(self.object)
+                ):
+                    self.object.save(update_fields=["study_mode"])
                 if (
                     original.application_status != self.object.application_status
                     or original.is_active and not self.object.is_active
@@ -3919,7 +3808,14 @@ def submission_user(request, quiz_id, user_id):
         return HttpResponse(_("Not allowed method"), 400) # Translate
 
 @login_required(login_url=LOGIN_URL)
-def generate_audio_download(request, offering_id, lesson_id):
+def generate_audio_download(
+    request,
+    offering_id,
+    lesson_id,
+    *,
+    expires_in: int = 3600,
+    file_index: int | None = None,
+):
     user = User.objects.get(pk=request.user.pk)
     offering = get_accessible_offering_or_403(user, offering_id)
     lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
@@ -3927,7 +3823,9 @@ def generate_audio_download(request, offering_id, lesson_id):
         raise PermissionDenied(_("You do not have access to this lesson."))
 
     try:
-        file_index = int(request.GET.get("file_index", "-1"))
+        file_index = int(
+            file_index if file_index is not None else request.GET.get("file_index", "-1")
+        )
     except (TypeError, ValueError):
         raise Http404
     lesson_links = json.loads(lesson.links or "[]")
@@ -3954,7 +3852,7 @@ def generate_audio_download(request, offering_id, lesson_id):
                 "ResponseContentType": "audio/mpeg",
                 "ResponseContentDisposition": f'attachment; filename="{filename}"',
             },
-            ExpiresIn=3600,
+            ExpiresIn=max(60, min(int(expires_in), 3600)),
         )
     except Exception:
         logger.exception("Error generating downloadable audio URL for lesson %s", lesson.pk)
@@ -4607,9 +4505,7 @@ def signup(request):
             try:
                 with transaction.atomic():
                     user = form.save()
-                    if user.city:
-                        is_offline = OfflineCity.objects.filter(name__iexact=user.city, is_active=True).exists()
-                        user.study_mode = "offline" if is_offline else "online"
+                    study_mode_changed = apply_study_mode_from_city(user)
                     file_type_map = APPLICATION_DOCUMENT_FIELDS
                     required_upload_types = {"identity_front", "profile"}
                     if user.identity_type == "national_id":
@@ -4647,7 +4543,7 @@ def signup(request):
                                 "study_mode",
                             ]
                         )
-                    elif user.study_mode:
+                    elif study_mode_changed:
                         user.save(update_fields=["study_mode"])
                     send_application_received(user)
             except ValidationError as exc:
@@ -4765,6 +4661,8 @@ def application_review(request, user_id):
                         form.instance.application_status = original_status
                         form.instance.is_active = user.is_active
                     user = form.save()
+                    if apply_study_mode_from_city(user):
+                        user.save(update_fields=["study_mode"])
                     if (
                         original_role_id != user.role_id
                         or original_is_active and not user.is_active
@@ -6337,20 +6235,18 @@ def scan_preview(request, token):
         except (ValueError, TypeError):
             raise Http404
     today = timezone.localdate()
-    academic_year_level, scheduled_offering = get_student_attendance_context(user, today)
+    scan_availability = attendance_scan_availability(user, today)
+    academic_year_level = scan_availability.academic_year_level
+    scheduled_offering = scan_availability.course_offering
     academic_year = academic_year_level.academic_year if academic_year_level else None
-    already_recorded_actions = list(AttendanceRecord.objects.filter(
-        student=user,
-        attendance_date=today,
-    ).values_list("action", flat=True))
-    can_record = bool(academic_year_level and is_expected_date(academic_year_level, today) and user.study_mode != "online")
     return render(request, "scan_preview.html", {
         "student": user,
         "academic_year": academic_year,
         "scheduled_offering": scheduled_offering,
         "today": today,
-        "already_recorded_actions": already_recorded_actions,
-        "can_record": can_record,
+        "can_record": scan_availability.can_record,
+        "entrance_reason": scan_availability.reason_for(AttendanceRecord.Action.ENTRANCE),
+        "exit_reason": scan_availability.reason_for(AttendanceRecord.Action.EXIT),
         "token": token,
         "policy": AttendancePolicy.load(),
     })
@@ -6364,24 +6260,33 @@ def record_attendance(request, token, action):
         user = User.objects.get(Q(qr_token=token) | Q(pk=token))
     except (ValueError, TypeError):
         user = get_object_or_404(User, qr_token=token)
-    if user.study_mode == "online":
-        return JsonResponse({"error": _("Online students cannot record attendance.")}, status=400)
     today = timezone.localdate()
-    academic_year_level, offering = get_student_attendance_context(user, today)
-    if academic_year_level is None:
-        return JsonResponse({"error": _("The student has no active academic-year enrollment.")}, status=400)
-    if not is_expected_date(academic_year_level, today):
-        return JsonResponse({"error": _("Today is not an expected attendance day.")}, status=400)
+    scan_availability = attendance_scan_availability(user, today, include_recorded_actions=False)
+    reason = scan_availability.reason_for(action)
+    if reason:
+        already_recorded = action in scan_availability.recorded_actions
+        return JsonResponse(
+            {
+                "error": reason,
+                "code": "already_recorded" if already_recorded else "attendance_unavailable",
+            },
+            status=409 if already_recorded else 400,
+        )
     with transaction.atomic():
         rec, created = AttendanceRecord.objects.get_or_create(
             student=user,
-            course_offering=offering,
+            course_offering=scan_availability.course_offering,
             attendance_date=today,
             action=action,
             defaults={"scanned_by": request.user, "source": AttendanceRecord.Source.SCAN},
         )
+    if not created:
+        return JsonResponse(
+            {"error": scan_availability.duplicate_reason(action), "code": "already_recorded"},
+            status=409,
+        )
     return JsonResponse({
-        "status": "recorded" if created else "already_recorded",
+        "status": "recorded",
         "action": action,
         "source": rec.source,
         "scanned_at": timezone.localtime(rec.scanned_at).strftime("%H:%M:%S"),

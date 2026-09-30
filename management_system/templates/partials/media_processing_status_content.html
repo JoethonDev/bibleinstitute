@@ -22,7 +22,7 @@
               hx-select="#content"
               hx-swap="outerHTML"
               hx-push-url="true"
-              hx-sync="this:abort"
+              hx-sync="this:replace"
               hx-indicator="#media-status-loading">
             <div class="col-12 col-md-6 col-lg-5">
                 <label for="media-status-search" class="form-label">{% translate "Search media jobs" %}</label>
@@ -31,11 +31,12 @@
                     <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}"
                            hx-get="{% url 'media-processing-status' %}"
                            hx-include="closest form"
-                           hx-trigger="keyup changed delay:400ms, search"
+                           hx-trigger="input changed delay:200ms, search"
                            hx-target="#content"
                            hx-select="#content"
                            hx-swap="outerHTML"
-                           hx-push-url="true"
+                           hx-replace-url="true"
+                           hx-sync="closest form:replace"
                            hx-indicator="#media-status-loading">
                 </div>
             </div>

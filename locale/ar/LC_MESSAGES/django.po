@@ -9594,6 +9594,12 @@ msgstr "لا يوجد للطالب قيد نشط في سنة دراسية."
 msgid "Today is not an expected attendance day."
 msgstr "اليوم ليس يوم حضور مقررًا."
 
+msgid "Entrance has already been recorded for today."
+msgstr "تم تسجيل الحضور للدخول بالفعل اليوم."
+
+msgid "Exit has already been recorded for today."
+msgstr "تم تسجيل الحضور للانصراف بالفعل اليوم."
+
 #: .\management_system\views.py:4836
 msgid "Assign a calendar course before correcting this record."
 msgstr "عيّن مادة من التقويم قبل تصحيح هذا السجل."
@@ -10526,6 +10532,9 @@ msgstr "أدخل رقم هاتف صحيحًا."
 
 msgid "A device installation ID is required."
 msgstr "معرّف تثبيت الجهاز مطلوب."
+
+msgid "A push notification is being sent to this device. Try logging out again shortly."
+msgstr "يجري إرسال إشعار إلى هذا الجهاز. أعد تسجيل الخروج بعد لحظات."
 
 msgid "The device installation ID is too long."
 msgstr "معرّف تثبيت الجهاز طويل جدًا."

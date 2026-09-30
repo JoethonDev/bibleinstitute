@@ -8,7 +8,7 @@
 
     <div class="ad-pane-head">
         <h4 class="ad-pane-title">{% translate "Student Applications" %}</h4>
-        <form class="ad-search" method="get" action="{% url 'applications-dashboard' %}" role="search" hx-get="{% url 'applications-dashboard' %}" hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#applications-loading" hx-sync="this:abort">
+        <form class="ad-search" method="get" action="{% url 'applications-dashboard' %}" role="search" hx-get="{% url 'applications-dashboard' %}" hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#applications-loading" hx-sync="this:replace">
             <i class="fas fa-search" aria-hidden="true"></i>
             <input type="search"
                    name="name"
@@ -17,11 +17,12 @@
                    aria-label="{% translate 'Search applications' %}"
                    hx-get="{% url 'applications-dashboard' %}"
                    hx-include="closest form"
-                   hx-trigger="keyup changed delay:500ms, search"
-                   hx-target="#applications-workspace"
-                   hx-select="#applications-workspace"
-                   hx-swap="outerHTML"
-                   hx-push-url="true">
+                    hx-trigger="input changed delay:200ms, search"
+                    hx-target="#applications-workspace"
+                    hx-select="#applications-workspace"
+                    hx-swap="outerHTML"
+                    hx-replace-url="true"
+                    hx-sync="closest form:replace">
             <input type="hidden" name="status" value="{{ current_status }}">
         </form>
     </div>

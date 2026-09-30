@@ -9216,6 +9216,12 @@ msgstr "The student has no active academic-year enrollment."
 msgid "Today is not an expected attendance day."
 msgstr "Today is not an expected attendance day."
 
+msgid "Entrance has already been recorded for today."
+msgstr "Entrance has already been recorded for today."
+
+msgid "Exit has already been recorded for today."
+msgstr "Exit has already been recorded for today."
+
 #: .\management_system\views.py:4836
 msgid "Assign a calendar course before correcting this record."
 msgstr "Assign a calendar course before correcting this record."
@@ -11282,6 +11288,9 @@ msgstr "Enter a valid phone number."
 
 msgid "A device installation ID is required."
 msgstr "A device installation ID is required."
+
+msgid "A push notification is being sent to this device. Try logging out again shortly."
+msgstr "A push notification is being sent to this device. Try logging out again shortly."
 
 msgid "The device installation ID is too long."
 msgstr "The device installation ID is too long."

@@ -76,7 +76,7 @@
                       hx-select="#telegram-linked-user-list"
                       hx-swap="outerHTML"
                       hx-push-url="false"
-                      hx-sync="this:abort">
+                      hx-sync="this:replace">
                     <input type="hidden" name="search" value="{{ search }}">
                     <input type="hidden" name="status" value="{{ status }}">
                     <label class="form-label" for="telegram-linked-user-search">{% translate "Search linked users" %}</label>
@@ -90,12 +90,13 @@
                            autocomplete="off"
                            hx-get="{{ conversation_list_url }}"
                            hx-include="closest form"
-                           hx-trigger="keyup changed delay:400ms, search"
+                           hx-trigger="input changed delay:200ms, search"
                            hx-target="#telegram-linked-user-list"
                            hx-select="#telegram-linked-user-list"
                            hx-swap="outerHTML"
                            hx-push-url="false"
-                           hx-indicator="#telegram-start-loading">
+                           hx-indicator="#telegram-start-loading"
+                           hx-sync="closest form:replace">
                     <div class="tg-chat-start-actions">
                         <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
                             <i class="fas fa-search me-1" aria-hidden="true"></i>{% translate "Search" %}

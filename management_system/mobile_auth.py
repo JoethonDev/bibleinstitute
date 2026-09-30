@@ -15,7 +15,7 @@ from django.http import JsonResponse
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
-from .models import MobileBiometricCredential, MobilePushDevice, StudentMobileSession, User
+from .models import MobileBiometricCredential, MobilePushDevice, PushDelivery, StudentMobileSession, User
 from .utils.localization import normalize_language
 
 
@@ -26,6 +26,11 @@ LOGIN_IP_LIMIT = 30
 BIOMETRIC_RATE_WINDOW = 15 * 60
 BIOMETRIC_INSTALLATION_LIMIT = 10
 BIOMETRIC_IP_LIMIT = 30
+SESSION_LAST_USED_TOUCH_INTERVAL = timedelta(minutes=5)
+
+
+class MobilePushDeliveryInProgress(Exception):
+    """Raised when logout would remove a device during an active Expo send."""
 
 
 def _login_rate_key(kind: str, value: str) -> str:
@@ -61,7 +66,9 @@ def clear_mobile_login_failures(username: str, remote_addr: str) -> None:
 def json_api_response(request, payload: dict, status: int = 200) -> JsonResponse:
     body = dict(payload)
     body.setdefault("language", normalize_language(request))
-    return JsonResponse(body, status=status)
+    response = JsonResponse(body, status=status)
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 def mobile_installation_conflict(user, installation_id: str | None) -> bool:
@@ -246,23 +253,33 @@ def issue_mobile_session(user):
     return raw_token, session
 
 
-def revoke_mobile_session(request) -> bool:
+def revoke_mobile_session(request, installation_id: str) -> bool:
     session = get_mobile_session(request)
     if session is None:
         return False
-    session.revoked_at = timezone.now()
-    session.save(update_fields=["revoked_at"])
-    installation_id = request.headers.get("X-Installation-ID")
-    if installation_id:
-        MobilePushDevice.objects.filter(
-            user=session.user,
+    now = timezone.now()
+    with transaction.atomic():
+        locked_session = StudentMobileSession.objects.select_for_update(of=("self",)).filter(
+            pk=session.pk,
+            revoked_at__isnull=True,
+        ).first()
+        if locked_session is None:
+            return False
+        device = MobilePushDevice.objects.select_for_update().filter(
+            user_id=locked_session.user_id,
             installation_id=installation_id,
-            is_active=True,
-        ).update(
-            is_active=False,
-            disabled_at=timezone.now(),
-            updated_at=timezone.now(),
-        )
+        ).first()
+        if device is not None:
+            if PushDelivery.objects.filter(
+                device_id=device.pk,
+                status=PushDelivery.Status.SENDING,
+            ).exists():
+                raise MobilePushDeliveryInProgress
+            # PushDelivery rows are device-owned and cascade with this row;
+            # durable StudentNotification inbox entries remain untouched.
+            device.delete()
+        locked_session.revoked_at = now
+        locked_session.save(update_fields=["revoked_at"])
     return True
 
 
@@ -320,8 +337,15 @@ def get_mobile_session(request):
     user = session.user
     if not user.is_active or user.application_status != "active":
         return None
-    session.last_used_at = timezone.now()
-    session.save(update_fields=["last_used_at"])
+    current_time = timezone.now()
+    if session.last_used_at <= current_time - SESSION_LAST_USED_TOUCH_INTERVAL:
+        # Authenticated media range requests can be frequent; this is an audit
+        # timestamp, not an expiry signal, so coalesce writes to one per interval.
+        StudentMobileSession.objects.filter(
+            pk=session.pk,
+            last_used_at=session.last_used_at,
+        ).update(last_used_at=current_time)
+        session.last_used_at = current_time
     return session
 
 

@@ -22,6 +22,7 @@ urlpatterns = [
     path("me/", mobile_api.me, name="me"),
     path("profile/", mobile_api.profile, name="profile"),
     path("profile/qr/", mobile_api.profile_qr, name="profile-qr"),
+    path("overview/", mobile_api.overview, name="overview"),
     path("courses/", mobile_api.courses, name="courses"),
     path(
         "courses/<int:offering_id>/",
@@ -77,6 +78,16 @@ urlpatterns = [
         "courses/<int:offering_id>/lessons/<int:lesson_id>/media/<int:file_index>/session/",
         mobile_api.media_session,
         name="media-session",
+    ),
+    path(
+        "courses/<int:offering_id>/lessons/<int:lesson_id>/media/<int:file_index>/resource/",
+        mobile_api.lesson_media_resource,
+        name="lesson-media-resource",
+    ),
+    path(
+        "courses/<int:offering_id>/lessons/<int:lesson_id>/media/<int:file_index>/document/",
+        mobile_api.lesson_book_document,
+        name="lesson-book-document",
     ),
     path(
         "courses/<int:offering_id>/lessons/<int:lesson_id>/media/<int:file_index>/manifest/",

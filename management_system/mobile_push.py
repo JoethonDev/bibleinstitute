@@ -40,7 +40,7 @@ def _headers() -> dict[str, str]:
     }
 
 
-def _provider_post(url: str, payload: dict) -> tuple[str, dict | None]:
+def _provider_post(url: str, payload: dict | list[dict]) -> tuple[str, dict | None]:
     """Return a safe outcome code and decoded JSON without exposing response data."""
     try:
         response = requests.post(
@@ -254,24 +254,48 @@ def _claim_due_deliveries(limit: int) -> list[PushDelivery]:
     now = timezone.now()
     claim_limit = max(1, min(int(limit), DELIVERY_SCAN_LIMIT))
     with transaction.atomic():
+        eligible = PushDelivery.objects.filter(
+            status=PushDelivery.Status.QUEUED,
+            next_attempt_at__lte=now,
+            attempt_count__lt=MAX_PUSH_ATTEMPTS,
+            notification__cancelled_at__isnull=True,
+            notification__push_expires_at__gt=now,
+            notification__student__is_active=True,
+            notification__student__application_status="active",
+            notification__student__role__role="student",
+            device__user_id=F("notification__student_id"),
+            device__is_active=True,
+            device__disabled_at__isnull=True,
+        )
+        candidate_device_ids = list(dict.fromkeys(
+            eligible.order_by("next_attempt_at", "pk")
+            .values_list("device_id", flat=True)[:claim_limit]
+        ))
+        if not candidate_device_ids:
+            return []
+
+        # Device ownership changes and dispatch claiming lock devices first.
+        # Logout can therefore delete a registration only after any in-flight
+        # claim has become visible as SENDING.
+        locked_device_ids = list(
+            MobilePushDevice.objects.select_for_update(skip_locked=True)
+            .filter(
+                pk__in=candidate_device_ids,
+                is_active=True,
+                disabled_at__isnull=True,
+            )
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        if not locked_device_ids:
+            return []
         deliveries = list(
-            PushDelivery.objects.select_for_update(
+            eligible.filter(device_id__in=locked_device_ids)
+            .select_for_update(
                 of=("self",),
                 skip_locked=True,
             )
             .select_related("notification", "device")
-            .filter(
-                status=PushDelivery.Status.QUEUED,
-                next_attempt_at__lte=now,
-                attempt_count__lt=MAX_PUSH_ATTEMPTS,
-                notification__cancelled_at__isnull=True,
-                notification__push_expires_at__gt=now,
-                notification__student__is_active=True,
-                notification__student__application_status="active",
-                notification__student__role__role="student",
-                device__is_active=True,
-                device__disabled_at__isnull=True,
-            )
             .order_by("next_attempt_at", "pk")[:claim_limit]
         )
         for delivery in deliveries:
@@ -319,6 +343,28 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     if not deliveries:
         return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": 0}
     now = timezone.now()
+    owned_ids = set(
+        PushDelivery.objects.filter(
+            pk__in=[delivery.pk for delivery in deliveries],
+            status=PushDelivery.Status.SENDING,
+            device__user_id=F("notification__student_id"),
+        ).values_list("pk", flat=True)
+    )
+    reassigned = [delivery for delivery in deliveries if delivery.pk not in owned_ids]
+    if reassigned:
+        PushDelivery.objects.filter(
+            pk__in=[delivery.pk for delivery in reassigned],
+            status=PushDelivery.Status.SENDING,
+        ).update(
+            status=PushDelivery.Status.SKIPPED,
+            error_code="device_account_changed",
+            error_message="Device account changed before delivery.",
+            next_attempt_at=now,
+            updated_at=now,
+        )
+        deliveries = [delivery for delivery in deliveries if delivery.pk in owned_ids]
+    if not deliveries:
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(reassigned)}
     expired = [delivery for delivery in deliveries if delivery.notification.push_expires_at <= now]
     if expired:
         PushDelivery.objects.filter(pk__in=[delivery.pk for delivery in expired]).update(
@@ -330,23 +376,23 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
         )
         deliveries = [delivery for delivery in deliveries if delivery not in expired]
     if not deliveries:
-        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(expired)}
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(expired) + len(reassigned)}
     outcome, data = _provider_post(
         settings.EXPO_PUSH_SEND_URL,
-        {"messages": [_notification_payload(delivery) for delivery in deliveries]},
+        [_notification_payload(delivery) for delivery in deliveries],
     )
     now = timezone.now()
     if outcome != "ok":
         if outcome == "network_error" or outcome == "invalid_response" or outcome.startswith("http_5") or outcome == "http_429":
             _mark_retryable(deliveries, outcome, now)
-            return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired)}
+            return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired) + len(reassigned)}
         _mark_permanent_failure(deliveries, outcome, "Expo rejected the push request.", now)
-        return {"ticketed": 0, "failed": len(deliveries), "retried": 0, "deactivated": 0, "skipped": len(expired)}
+        return {"ticketed": 0, "failed": len(deliveries), "retried": 0, "deactivated": 0, "skipped": len(expired) + len(reassigned)}
 
     tickets = data.get("data") if isinstance(data, dict) else None
     if not isinstance(tickets, list) or len(tickets) != len(deliveries):
         _mark_retryable(deliveries, "invalid_response", now)
-        return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired)}
+        return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired) + len(reassigned)}
 
     deactivated_ids: set[int] = set()
     retryable: list[PushDelivery] = []
@@ -404,7 +450,7 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
         "failed": failed,
         "retried": retried,
         "deactivated": len(deactivated_ids),
-        "skipped": len(expired),
+        "skipped": len(expired) + len(reassigned),
     }
 
 

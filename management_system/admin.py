@@ -2,6 +2,7 @@
 from django.utils.translation import gettext_lazy as _
 from .mobile_auth import revoke_user_mobile_access
 from .forms import CanonicalUserAdminForm
+from .study_mode import apply_study_mode_from_city
 from .models import *
 
 # Register your models here.
@@ -22,6 +23,7 @@ class UserAdmin(admin.ModelAdmin):
             original = User.objects.only(
                 "role_id", "application_status", "is_active"
             ).get(pk=obj.pk)
+        apply_study_mode_from_city(obj)
         super().save_model(request, obj, form, change)
         if original is not None and (
             original.role_id != obj.role_id

@@ -22,7 +22,7 @@
 
       <div class="ad-card mb-4">
         <div class="ad-card-body">
-          <form method="get" class="row g-3 align-items-end" hx-get="{% url 'report-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#report-loading">
+          <form method="get" class="row g-3 align-items-end" hx-get="{% url 'report-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#report-loading">
             <div class="col-12 col-md-2">
               <label class="form-label fw-semibold" for="level-select">{% translate "Level" %}</label>
               <select name="level" class="form-select" id="level-select"
@@ -51,7 +51,7 @@
               <label class="form-label fw-semibold" for="student-search">{% translate "Student" %}</label>
               <input type="text" name="student" id="student-search" class="form-control"
                 value="{{ selected_student }}" placeholder="{% translate 'Search by name or username' %}"
-                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:400ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+                hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#report-loading">
             </div>
             <div class="col-12 col-md-2">
               <label class="form-label fw-semibold" for="study-mode-select">{% translate "Study Mode" %}</label>

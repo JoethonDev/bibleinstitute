@@ -56,7 +56,7 @@
   {% endif %}
 
   <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Attendance filters' %}">
-    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#attendance-loading">
+    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#attendance-loading">
       <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
       <div class="grade-matrix-filter-field">
         <label for="attendance-matrix-year">{% translate "Academic year" %}</label>
@@ -99,7 +99,7 @@
       </div>
       <div class="grade-matrix-filter-field attendance-matrix-student-filter">
         <label for="attendance-matrix-search">{% translate "Search student" %}</label>
-        <div class="grade-matrix-input-wrap"><i class="fas fa-search" aria-hidden="true"></i><input id="attendance-matrix-search" type="search" name="student" value="{{ student_search }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading"></div>
+        <div class="grade-matrix-input-wrap"><i class="fas fa-search" aria-hidden="true"></i><input id="attendance-matrix-search" type="search" name="student" value="{{ student_search }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#attendance-loading"></div>
       </div>
       <div class="grade-matrix-filter-actions"><button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-filter" aria-hidden="true"></i> {% translate "Apply" %}</button><a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a></div>
     </form>

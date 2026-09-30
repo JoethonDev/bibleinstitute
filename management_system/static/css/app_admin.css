@@ -2195,6 +2195,12 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 }
 
 /* ---------------- Attendance matrix ---------------- */
+.attendance-matrix-page,
+.attendance-matrix-card,
+.attendance-matrix-table-wrap {
+    min-width: 0;
+    max-width: 100%;
+}
 .attendance-matrix-toolbar {
     display: flex;
     align-items: center;
@@ -2203,7 +2209,13 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     padding: .75rem 1rem;
     margin-bottom: .9rem;
 }
-.attendance-matrix-table-wrap { max-height: 48rem; }
+.attendance-matrix-table-wrap {
+    display: block;
+    width: 100%;
+    max-height: 48rem;
+    overflow: auto;
+    overscroll-behavior-inline: contain;
+}
 .attendance-matrix-table {
     table-layout: fixed;
 }

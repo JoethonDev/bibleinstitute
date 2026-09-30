@@ -45,19 +45,25 @@
   </div>
 
   {# --- Entrance / Exit buttons --- #}
-  <div class="d-flex gap-2">
-    <form id="entrance-form" method="post" action="{% url 'record-attendance' token=token action='entrance' %}">
-      {% csrf_token %}
-      <button id="entrance-btn" type="submit" class="sd-btn sd-btn--teal btn-success" {% if not can_record or "entrance" in already_recorded_actions %}disabled{% endif %}>
-        <i class="fas fa-door-open me-1"></i>{% translate "Record Entrance" %}
-      </button>
-    </form>
-    <form id="exit-form" method="post" action="{% url 'record-attendance' token=token action='exit' %}">
-      {% csrf_token %}
-      <button id="exit-btn" type="submit" class="sd-btn sd-btn--gold btn-warning" {% if not can_record or "exit" in already_recorded_actions %}disabled{% endif %}>
-        <i class="fas fa-door-closed me-1"></i>{% translate "Record Exit" %}
-      </button>
-    </form>
+  <div class="d-flex flex-wrap gap-3 align-items-start">
+    <div>
+      <form id="entrance-form" method="post" action="{% url 'record-attendance' token=token action='entrance' %}">
+        {% csrf_token %}
+        <button id="entrance-btn" type="submit" class="sd-btn sd-btn--teal btn-success" {% if entrance_reason %}disabled{% endif %}>
+          <i class="fas fa-door-open me-1"></i>{% translate "Record Entrance" %}
+        </button>
+      </form>
+      {% if entrance_reason %}<small class="d-block mt-2 text-danger" role="status">{{ entrance_reason }}</small>{% endif %}
+    </div>
+    <div>
+      <form id="exit-form" method="post" action="{% url 'record-attendance' token=token action='exit' %}">
+        {% csrf_token %}
+        <button id="exit-btn" type="submit" class="sd-btn sd-btn--gold btn-warning" {% if exit_reason %}disabled{% endif %}>
+          <i class="fas fa-door-closed me-1"></i>{% translate "Record Exit" %}
+        </button>
+      </form>
+      {% if exit_reason %}<small class="d-block mt-2 text-danger" role="status">{{ exit_reason }}</small>{% endif %}
+    </div>
   </div>
 
   <p class="sd-section-note mb-3">
@@ -70,7 +76,7 @@
     </a>
   </div>
 
-  <div id="record-error" class="alert alert-danger mt-3 d-none"></div>
+  <div id="record-error" class="alert alert-danger mt-3 d-none" role="alert"></div>
   <div id="record-status" class="alert alert-success mt-3 d-none" role="status"></div>
 </div>
 </div>
@@ -91,7 +97,7 @@
             document.getElementById('record-error').textContent = data.error;
             document.getElementById('record-error').classList.remove('d-none');
             document.getElementById('record-status').classList.add('d-none');
-            btn.disabled = false;
+            btn.disabled = data.code === 'already_recorded';
           } else {
             document.getElementById('record-error').classList.add('d-none');
             btn.textContent = '{% translate "Done" %}';

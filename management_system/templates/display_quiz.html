@@ -110,6 +110,16 @@
                             </div>
                         </div>
                     </div>
+                    <dialog class="sd-quiz-confirm-dialog" id="unansweredQuestionsFallback" aria-labelledby="unansweredQuestionsFallbackLabel" aria-describedby="unansweredQuestionsFallbackDescription">
+                        <div class="sd-quiz-confirm-dialog__surface">
+                            <h2 class="sd-quiz-confirm-dialog__title" id="unansweredQuestionsFallbackLabel">{% translate "Unanswered questions" %}</h2>
+                            <p class="sd-quiz-confirm-dialog__description" id="unansweredQuestionsFallbackDescription">{% translate "Some questions are unanswered. Submit the quiz anyway?" %}</p>
+                            <div class="sd-quiz-confirm-dialog__actions">
+                                <button type="button" class="sd-btn sd-btn--gold-outline" id="reviewUnansweredQuizFallback" autofocus>{% translate "Review answers" %}</button>
+                                <button type="button" class="sd-btn sd-btn--gold" id="confirmUnansweredQuizFallback">{% translate "Submit anyway" %}</button>
+                            </div>
+                        </div>
+                    </dialog>
                     {% endif %}
                 </div>
             </div>
@@ -360,10 +370,27 @@
                         setupInitialAnswers();
                         let confirmedUnansweredSubmit = false;
                         const unansweredModal = document.querySelector("#unansweredQuestionsModal");
-                        const unansweredModalInstance = unansweredModal && typeof bootstrap !== "undefined"
-                            ? bootstrap.Modal.getOrCreateInstance(unansweredModal)
-                            : null;
+                        const unansweredFallbackDialog = document.querySelector("#unansweredQuestionsFallback");
                         const submitButton = form.querySelector('button[type="submit"]');
+
+                        function showUnansweredQuestionsModal() {
+                            if (!unansweredModal && !unansweredFallbackDialog) return;
+                            // The shared shell loads Bootstrap after the page body, so resolve it on submit.
+                            const show = () => {
+                                if (unansweredModal && window.bootstrap && window.bootstrap.Modal) {
+                                    window.bootstrap.Modal.getOrCreateInstance(unansweredModal).show();
+                                } else if (unansweredFallbackDialog && typeof unansweredFallbackDialog.showModal === "function") {
+                                    unansweredFallbackDialog.showModal();
+                                }
+                            };
+                            if (window.bootstrap && window.bootstrap.Modal) {
+                                show();
+                            } else if (document.readyState === "loading") {
+                                document.addEventListener("DOMContentLoaded", show, { once: true });
+                            } else {
+                                show();
+                            }
+                        }
 
                         function questionIsAnswered(questionCard) {
                             const answerSection = questionCard.querySelector(".answers-section");
@@ -413,19 +440,27 @@
                             if (!unanswered.length) return;
                             event.preventDefault();
                             event.stopImmediatePropagation();
-                            if (unansweredModalInstance) {
-                                unansweredModalInstance.show();
-                            } else if (window.confirm('{% translate "Some questions are unanswered. Submit the quiz anyway?"|escapejs %}')) {
-                                confirmedUnansweredSubmit = true;
-                                form.requestSubmit(submitButton);
-                            }
+                            showUnansweredQuestionsModal();
                         });
-                        if (unansweredModalInstance) {
-                            document.querySelector("#confirmUnansweredQuizSubmit").addEventListener("click", () => {
+                        const confirmUnansweredButton = document.querySelector("#confirmUnansweredQuizSubmit");
+                        if (confirmUnansweredButton) {
+                            confirmUnansweredButton.addEventListener("click", () => {
                                 confirmedUnansweredSubmit = true;
-                                unansweredModalInstance.hide();
+                                window.bootstrap.Modal.getOrCreateInstance(unansweredModal).hide();
                                 form.requestSubmit(submitButton);
                             });
+                        }
+                        const confirmFallbackButton = document.querySelector("#confirmUnansweredQuizFallback");
+                        if (confirmFallbackButton && unansweredFallbackDialog) {
+                            confirmFallbackButton.addEventListener("click", () => {
+                                confirmedUnansweredSubmit = true;
+                                unansweredFallbackDialog.close();
+                                form.requestSubmit(submitButton);
+                            });
+                        }
+                        const reviewFallbackButton = document.querySelector("#reviewUnansweredQuizFallback");
+                        if (reviewFallbackButton && unansweredFallbackDialog) {
+                            reviewFallbackButton.addEventListener("click", () => unansweredFallbackDialog.close());
                         }
 
                         form.addEventListener("submit", () => localStorage.clear());

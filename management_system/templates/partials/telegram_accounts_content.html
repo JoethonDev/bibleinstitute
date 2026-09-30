@@ -10,12 +10,12 @@
   </div>
 
   <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Telegram account filters' %}">
-    <form method="get" action="{% url 'telegram-accounts' %}" class="grade-matrix-filter-grid" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:abort" hx-indicator="#telegram-accounts-loading">
+    <form method="get" action="{% url 'telegram-accounts' %}" class="grade-matrix-filter-grid" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#telegram-accounts-loading">
       <div class="grade-matrix-filter-field">
         <label for="telegram-accounts-search">{% translate "Search" %}</label>
         <div class="grade-matrix-input-wrap">
           <i class="fas fa-search" aria-hidden="true"></i>
-          <input id="telegram-accounts-search" type="search" name="search" value="{{ search }}" maxlength="120" placeholder="{% translate 'Name, username, or phone' %}" class="form-control" hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="keyup changed delay:400ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#telegram-accounts-loading">
+          <input id="telegram-accounts-search" type="search" name="search" value="{{ search }}" maxlength="120" placeholder="{% translate 'Name, username, or phone' %}" class="form-control" hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#telegram-accounts-loading">
         </div>
       </div>
       <div class="grade-matrix-filter-field">
