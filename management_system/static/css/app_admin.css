@@ -2256,7 +2256,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .attendance-matrix-expand .fa-chevron-down { transition: transform var(--ps-motion); }
 .attendance-matrix-expand[aria-expanded="true"] .fa-chevron-down { transform: rotate(180deg); }
 .attendance-matrix-detail-row > td { padding: 0 !important; border: 0 !important; background: transparent !important; }
-.attendance-matrix-meeting-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; padding: .65rem; background: var(--ps-mist); }
+.attendance-matrix-meeting-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); align-items: start; gap: .55rem; padding: .65rem; background: var(--ps-mist); }
 .attendance-matrix-meeting {
     min-width: 0;
     padding: .7rem .8rem;
@@ -2266,10 +2266,14 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 }
 .attendance-matrix-meeting-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .65rem; padding-bottom: .5rem; border-bottom: 1px solid var(--ps-line); }
 .attendance-matrix-meeting-head > div { display: grid; min-width: 0; gap: .12rem; }
+.attendance-matrix-meeting-head-state { justify-items: end; text-align: end; }
 .attendance-matrix-meeting-head strong { color: var(--ps-ink); font-size: .78rem; }
 .attendance-matrix-meeting-head > div span { color: var(--ps-muted); font-size: .72rem; overflow-wrap: anywhere; }
 .attendance-matrix-meeting-grade { flex: 0 0 auto; color: var(--ps-muted); font-size: .68rem; }
 .attendance-matrix-meeting-grade strong { color: var(--ps-teal-deep); }
+.attendance-matrix-record-state { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .45rem; border-radius: 999px; font-size: .61rem !important; font-weight: 750; line-height: 1.25; }
+.attendance-matrix-record-state.is-recorded { color: var(--ps-teal-deep) !important; background: var(--ps-teal-soft); }
+.attendance-matrix-record-state.is-unrecorded { color: var(--ps-muted) !important; background: var(--ps-cream); }
 .attendance-matrix-meeting-data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; padding-top: .55rem; }
 .attendance-matrix-meeting-data > div { display: grid; align-content: start; justify-items: start; min-width: 0; gap: .12rem; }
 .attendance-matrix-meeting-actors { grid-column: 1 / -1; }
@@ -2300,7 +2304,8 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     .attendance-matrix-table th,
     .attendance-matrix-table td { padding: .45rem .2rem; font-size: .66rem; }
     .attendance-matrix-expand { padding: .3rem .25rem; font-size: .62rem; }
-    .attendance-matrix-meeting-head { flex-direction: column; gap: .2rem; }
+    .attendance-matrix-meeting-head { flex-direction: column; gap: .35rem; }
+    .attendance-matrix-meeting-head-state { justify-items: start; text-align: start; }
     .attendance-matrix-meeting-data { grid-template-columns: minmax(0, 1fr); }
     .attendance-matrix-meeting-actors { grid-column: auto; }
 }

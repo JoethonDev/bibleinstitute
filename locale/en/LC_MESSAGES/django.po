@@ -11699,6 +11699,12 @@ msgstr "Expand a student row to view meeting times, scanner details, and actions
 msgid "Toggle meeting details"
 msgstr "Toggle meeting details"
 
+msgid "Scan recorded"
+msgstr "Scan recorded"
+
+msgid "No scan recorded"
+msgstr "No scan recorded"
+
 msgid "By"
 msgstr "By"
 

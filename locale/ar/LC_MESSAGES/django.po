@@ -11987,6 +11987,12 @@ msgstr "وسّع صف الطالب لعرض أوقات اللقاءات وتفا
 msgid "Toggle meeting details"
 msgstr "عرض أو إخفاء تفاصيل اللقاءات"
 
+msgid "Scan recorded"
+msgstr "تم تسجيل المسح"
+
+msgid "No scan recorded"
+msgstr "لم يُسجل أي مسح"
+
 msgid "By"
 msgstr "بواسطة"
 
