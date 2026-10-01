@@ -196,6 +196,7 @@
               <th scope="col" class="text-center">{% translate "Grade" %}</th>
               <th scope="col" class="text-center">{% translate "Auto Grade" %}</th>
               <th scope="col">{% translate "Choices / Answer" %}</th>
+              {% if can_preview_quiz %}<th scope="col">{% translate "Action" %}</th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -252,6 +253,19 @@
                 <span class="ps-muted-text">{% translate "(no preview)" %}</span>
                 {% endif %}
               </td>
+              {% if can_preview_quiz %}
+              <td>
+                {% if q.auto_grade %}
+                <form method="post" action="{% url 'quiz-question-regrade' quiz_id=content.pk question_id=q.pk %}"
+                      data-confirm-message="{% translate 'Regrade saved answers using the current correct answer?' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="ad-btn ad-btn--ghost ad-btn--sm">
+                    <i class="fas fa-rotate me-1"></i>{% translate "Regrade saved answers" %}
+                  </button>
+                </form>
+                {% endif %}
+              </td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>

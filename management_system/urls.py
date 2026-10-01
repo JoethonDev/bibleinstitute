@@ -110,6 +110,7 @@ urlpatterns = [
     path('dashboard/quizzez/', quiz_dashboard, name="quiz-dashboard"),
     path('dashboard/quizzez/import/preview/', quiz_json_preview, name="quiz-json-preview"),
     path('dashboard/quizzez/<int:quiz_id>/', quiz_detail, name="quiz-view"),
+    path('dashboard/quizzez/<int:quiz_id>/questions/<int:question_id>/regrade/', regrade_quiz_question, name="quiz-question-regrade"),
     path('dashboard/quizzez/<int:quiz_id>/exceptional-opening/', quiz_exceptional_opening, name="quiz-exceptional-opening"),
     path('dashboard/quizzez/create/', create_quiz, name="quiz-create"),
     path('dashboard/quizzez/<int:quiz_id>/update/', update_quiz, name="quiz-update"),

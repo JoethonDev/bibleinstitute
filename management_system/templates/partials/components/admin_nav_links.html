@@ -179,6 +179,7 @@
             </a>
         </li>
 
+        {% if request.user.role.role == "admin" %}
         <li class="nav-item">
             <a class="ad-tab"
                href="{% url 'academic-setup' %}"
@@ -192,6 +193,7 @@
                 <span>{% translate "Academic Setup" %}</span>
             </a>
         </li>
+        {% endif %}
 
         <li class="nav-item">
             <a class="ad-tab"

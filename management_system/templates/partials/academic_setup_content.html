@@ -297,36 +297,14 @@
                     {% csrf_token %}
                     <div class="modal-header"><h5 id="yearModalLabel{{ y.id }}">{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
+                        {% for field in y.edit_form %}
                         <div class="mb-3">
-                            <label class="form-label" for="edit-year-name-{{ y.id }}">{% translate "Name" %}</label>
-                            <input type="text" name="name" id="edit-year-name-{{ y.id }}" value="{{ y.name }}" class="form-control" required>
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-year-levels-{{ y.id }}">{% translate "Levels" %}</label>
-                            <select name="levels" id="edit-year-levels-{{ y.id }}" class="form-select" multiple required size="5">
-                                {% for level in COURSE_LEVELS %}
-                                <option value="{{ level.id }}" {% if level in y.levels.all %}selected{% endif %}>{{ level.display_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-year-graduation-{{ y.id }}">{% translate "Graduation level" %}</label>
-                            <select name="graduation_level" id="edit-year-graduation-{{ y.id }}" class="form-select">
-                                <option value="">---------</option>
-                                {% for level in COURSE_LEVELS %}
-                                <option value="{{ level.id }}" {% if y.graduation_level_id == level.id %}selected{% endif %}>{{ level.display_name }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="form-text">{% translate "The level whose completion opens the graduation gallery for this year." %}</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-year-start-{{ y.id }}">{% translate "Start Date" %}</label>
-                            <input type="date" name="starts_on" id="edit-year-start-{{ y.id }}" value="{{ y.starts_on|date:'Y-m-d' }}" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-year-end-{{ y.id }}">{% translate "End Date" %}</label>
-                            <input type="date" name="ends_on" id="edit-year-end-{{ y.id }}" value="{{ y.ends_on|date:'Y-m-d' }}" class="form-control" required>
-                        </div>
+                        {% endfor %}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>

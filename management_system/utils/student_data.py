@@ -42,6 +42,28 @@ from .timezones import ensure_aware
 PAGE_SIZE = 20
 
 
+def page_metadata(page_obj: Page, page_size: int = PAGE_SIZE) -> dict[str, int | bool]:
+    return {
+        "page": page_obj.number,
+        "page_size": page_size,
+        "pages": page_obj.paginator.num_pages,
+        "total": page_obj.paginator.count,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+    }
+
+
+def _nested_page_metadata(page: int, has_next: bool) -> dict[str, int | bool | None]:
+    return {
+        "page": page,
+        "page_size": PAGE_SIZE,
+        "has_next": has_next,
+        "has_previous": page > 1,
+        "next_page": page + 1 if has_next else None,
+        "previous_page": page - 1 if page > 1 else None,
+    }
+
+
 def student_offerings_queryset(user: User) -> QuerySet:
     """Return bounded published offerings readable by a mobile account."""
     if getattr(getattr(user, "role", None), "role", None) in {"admin", "staff"}:
@@ -54,6 +76,10 @@ def student_offerings_queryset(user: User) -> QuerySet:
         "course__name",
         "pk",
     )
+
+
+def _can_read_offering(user: User, offering_id: int) -> bool:
+    return student_offerings_queryset(user).filter(pk=offering_id).exists()
 
 
 def _offering_access_annotations(queryset: QuerySet, user: User) -> QuerySet:
@@ -139,7 +165,14 @@ def _localized_quiz_summary(quiz: Quiz, language: str) -> dict:
     return result
 
 
-def _offering_data(offering, language: str, include_content: bool = True) -> dict:
+def _offering_data(
+    offering,
+    language: str,
+    include_content: bool = True,
+    *,
+    lessons_page: int = 1,
+    quizzes_page: int = 1,
+) -> dict:
     year = offering.academic_year_level.academic_year
     level = offering.academic_year_level.level
     result = {
@@ -162,78 +195,114 @@ def _offering_data(offering, language: str, include_content: bool = True) -> dic
         lessons = getattr(offering, "published_lessons", None)
         quizzes = getattr(offering, "published_quizzes", None)
         if lessons is None:
+            offset = (lessons_page - 1) * PAGE_SIZE
             lessons = list(Lesson.objects.filter(
                 course_offering=offering, status=PublicationStatus.PUBLISHED
-            ).order_by("created_date", "pk")[:PAGE_SIZE])
+            ).order_by("created_date", "pk")[offset:offset + PAGE_SIZE + 1])
         if quizzes is None:
+            offset = (quizzes_page - 1) * PAGE_SIZE
             quizzes = list(Quiz.objects.filter(
                 course_offering=offering, status=PublicationStatus.PUBLISHED
-            ).select_related("quiz_type").order_by("opening_date", "pk")[:PAGE_SIZE])
+            ).select_related("quiz_type").order_by("opening_date", "pk")[offset:offset + PAGE_SIZE + 1])
+        lesson_has_next = len(lessons) > PAGE_SIZE
+        quiz_has_next = len(quizzes) > PAGE_SIZE
         result["lessons"] = [_lesson_data(lesson) for lesson in lessons[:PAGE_SIZE]]
         result["quizzes"] = [_localized_quiz_summary(quiz, language) for quiz in quizzes[:PAGE_SIZE]]
+        result["lessons_pagination"] = _nested_page_metadata(lessons_page, lesson_has_next)
+        result["quizzes_pagination"] = _nested_page_metadata(quizzes_page, quiz_has_next)
     return result
 
 
-def student_courses_data(user: User, language: str) -> list[dict]:
+def _student_offerings_with_content(
+    user: User,
+    *,
+    lessons_page: int = 1,
+    quizzes_page: int = 1,
+) -> QuerySet:
+    lesson_offset = (lessons_page - 1) * PAGE_SIZE
     lesson_queryset = Lesson.objects.filter(status=PublicationStatus.PUBLISHED).annotate(
         mobile_row=Window(
             expression=RowNumber(),
             partition_by=[F("course_offering_id")],
             order_by=[F("created_date").asc(), F("pk").asc()],
         )
-    ).filter(mobile_row__lte=PAGE_SIZE).only(
+    ).filter(
+        mobile_row__gt=lesson_offset,
+        mobile_row__lte=lesson_offset + PAGE_SIZE + 1,
+    ).only(
         "id", "name", "description", "links", "course_offering_id", "status", "updated_date"
     ).order_by("course_offering_id", "created_date", "pk")
+    quiz_offset = (quizzes_page - 1) * PAGE_SIZE
     quiz_queryset = Quiz.objects.filter(status=PublicationStatus.PUBLISHED).select_related("quiz_type").annotate(
         mobile_row=Window(
             expression=RowNumber(),
             partition_by=[F("course_offering_id")],
             order_by=[F("opening_date").asc(), F("pk").asc()],
         )
-    ).filter(mobile_row__lte=PAGE_SIZE).only(
+    ).filter(
+        mobile_row__gt=quiz_offset,
+        mobile_row__lte=quiz_offset + PAGE_SIZE + 1,
+    ).only(
         "id", "name", "quiz_type_id", "course_offering_id", "status", "opening_date", "closing_date", "total_grade",
         "quiz_type__code", "quiz_type__name_en", "quiz_type__name_ar",
     ).order_by("course_offering_id", "opening_date", "pk")
-    offerings = _offering_access_annotations(
+    return _offering_access_annotations(
         student_offerings_queryset(user).prefetch_related(
             Prefetch("lessons", queryset=lesson_queryset, to_attr="published_lessons"),
             Prefetch("quizzes", queryset=quiz_queryset, to_attr="published_quizzes"),
         ), user
-    )[:PAGE_SIZE]
-    return [_offering_data(offering, language) for offering in offerings]
+    )
 
 
-def student_course_data(user: User, offering_id: int, language: str) -> dict | None:
-    lesson_queryset = Lesson.objects.filter(status=PublicationStatus.PUBLISHED).annotate(
-        mobile_row=Window(
-            expression=RowNumber(),
-            partition_by=[F("course_offering_id")],
-            order_by=[F("created_date").asc(), F("pk").asc()],
+def student_courses_data(
+    user: User,
+    language: str,
+    page: int = 1,
+    lessons_page: int = 1,
+    quizzes_page: int = 1,
+) -> tuple[Page, list[dict]]:
+    page_obj = Paginator(
+        _student_offerings_with_content(
+            user,
+            lessons_page=lessons_page,
+            quizzes_page=quizzes_page,
+        ),
+        PAGE_SIZE,
+    ).get_page(page)
+    items = [
+        _offering_data(
+            offering,
+            language,
+            lessons_page=lessons_page,
+            quizzes_page=quizzes_page,
         )
-    ).filter(mobile_row__lte=PAGE_SIZE).only(
-        "id", "name", "description", "links", "course_offering_id", "status", "updated_date"
-    ).order_by("course_offering_id", "created_date", "pk")
-    quiz_queryset = Quiz.objects.filter(status=PublicationStatus.PUBLISHED).select_related("quiz_type").annotate(
-        mobile_row=Window(
-            expression=RowNumber(),
-            partition_by=[F("course_offering_id")],
-            order_by=[F("opening_date").asc(), F("pk").asc()],
-        )
-    ).filter(mobile_row__lte=PAGE_SIZE).only(
-        "id", "name", "quiz_type_id", "course_offering_id", "status", "opening_date", "closing_date", "total_grade",
-        "quiz_type__code", "quiz_type__name_en", "quiz_type__name_ar",
-    ).order_by("course_offering_id", "opening_date", "pk")
-    offering = _offering_access_annotations(
-        student_offerings_queryset(user).filter(pk=offering_id).prefetch_related(
-            Prefetch("lessons", queryset=lesson_queryset, to_attr="published_lessons"),
-            Prefetch("quizzes", queryset=quiz_queryset, to_attr="published_quizzes"),
-        ), user
-    ).first()
-    return _offering_data(offering, language) if offering else None
+        for offering in page_obj.object_list
+    ]
+    return page_obj, items
+
+
+def student_course_data(
+    user: User,
+    offering_id: int,
+    language: str,
+    lessons_page: int = 1,
+    quizzes_page: int = 1,
+) -> dict | None:
+    offering = _student_offerings_with_content(
+        user,
+        lessons_page=lessons_page,
+        quizzes_page=quizzes_page,
+    ).filter(pk=offering_id).first()
+    return _offering_data(
+        offering,
+        language,
+        lessons_page=lessons_page,
+        quizzes_page=quizzes_page,
+    ) if offering else None
 
 
 def _authorized_lesson(user: User, offering_id: int, lesson_id: int) -> Lesson | None:
-    if not student_offerings_queryset(user).filter(pk=offering_id).exists():
+    if not _can_read_offering(user, offering_id):
         return None
     return Lesson.objects.filter(
         pk=lesson_id,
@@ -251,33 +320,34 @@ def student_lesson_data(user: User, offering_id: int, lesson_id: int) -> dict | 
     return _lesson_data(lesson) if lesson else None
 
 
-def _question_payload(question: Question, exam_mode: bool) -> dict:
-    choices = question.get_choices_list()
+def _question_payload(question: Question, mode: str) -> dict:
     config = question.get_config()
     payload = {
         "id": question.pk,
         "title": question.title,
         "type": question.question_type,
         "grade": question.grade,
-        "choices": choices,
+        "choices": (
+            [] if question.question_type in Question.STRUCTURED_QUESTION_TYPES
+            else question.get_choices_list()
+        ),
         "config": {},
     }
-    if exam_mode and question.question_type == "order_events":
-        payload["items"] = list(config.get("items", []))
-        random.shuffle(payload["items"])
-    if exam_mode and question.question_type == "match_related":
-        payload["pairs"] = [{"left": pair.get("left", "")} for pair in config.get("pairs", [])]
-        payload["right_options"] = [pair.get("right", "") for pair in config.get("pairs", [])]
-        random.shuffle(payload["right_options"])
-    if not exam_mode and question.question_type == "order_events":
-        payload["items"] = list(config.get("items", []))
-    if not exam_mode and question.question_type == "match_related":
-        payload["pairs"] = [{"left": pair.get("left", "")} for pair in config.get("pairs", [])]
+    if question.question_type == "order_events":
+        payload["items"] = [] if mode == "closed_unsolved" else list(config.get("items", []))
+        if mode == "exam":
+            random.shuffle(payload["items"])
+    elif question.question_type == "match_related":
+        pairs = config.get("pairs", [])
+        payload["pairs"] = [{"left": pair.get("left", "")} for pair in pairs]
+        if mode == "exam":
+            payload["right_options"] = [pair.get("right", "") for pair in pairs]
+            random.shuffle(payload["right_options"])
     return payload
 
 
-def _submitted_question_payload(question: Question, submission: Submission | None) -> dict:
-    payload = _question_payload(question, False)
+def _submitted_question_payload(question: Question, submission: Submission | None, quiz_grade: Grade | None) -> dict:
+    payload = _question_payload(question, "view")
     payload.update({
         "submitted_answer": (
             question.get_submitted_answer_payload(submission.submitted_answer)
@@ -287,32 +357,28 @@ def _submitted_question_payload(question: Question, submission: Submission | Non
         "grade_awarded": submission.grade if submission is not None and submission.is_graded else None,
         "is_graded": bool(submission is not None and submission.is_graded),
     })
+    if quiz_grade is not None and (question.auto_grade or question.question_type in Question.STRUCTURED_QUESTION_TYPES):
+        payload["correct_answer"] = question.get_correct_answer_payload()
     return payload
 
 
 def _quiz_mode(
     quiz: Quiz,
-    user: User,
     grade: Grade | None,
-    opening=None,
-    can_write: bool | None = None,
+    opening: QuizStudentOpening | Quiz,
+    can_write: bool,
 ) -> str:
     if grade:
         return "view"
-    if quiz.status == PublicationStatus.PUBLISHED and opening:
+    if quiz.status == PublicationStatus.PUBLISHED and can_write:
         current = now()
         if ensure_aware(opening.opening_date) <= current <= ensure_aware(opening.closing_date) + timedelta(minutes=30):
-            if can_write is None:
-                can_write = user_can_write_offering_activity(
-                    user, quiz.course_offering, allow_management=True
-                )
-            if can_write:
-                return "exam"
+            return "exam"
     return "closed_unsolved"
 
 
 def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str) -> dict | None:
-    if not student_offerings_queryset(user).filter(pk=offering_id).exists():
+    if not _can_read_offering(user, offering_id):
         return None
     quiz = Quiz.objects.filter(
         pk=quiz_id,
@@ -326,22 +392,20 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
     if quiz is None:
         return None
     grade = Grade.objects.filter(user=user, quiz=quiz).first()
-    opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first()
-    if opening is None:
-        opening = type("Opening", (), {"opening_date": quiz.opening_date, "closing_date": quiz.closing_date})()
-    can_write = user_can_write_offering_activity(
+    opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first() or quiz
+    can_write = not grade and user_can_write_offering_activity(
         user, quiz.course_offering, allow_management=True
     )
-    mode = _quiz_mode(quiz, user, grade, opening, can_write)
+    mode = _quiz_mode(quiz, grade, opening, can_write)
     questions = list(Question.objects.filter(quiz=quiz).order_by("pk"))
     if grade:
         submitted = {
             row.question_id: row
             for row in Submission.objects.filter(user=user, question__quiz=quiz).select_related("question")
         }
-        question_data = [_submitted_question_payload(question, submitted.get(question.pk)) for question in questions]
+        question_data = [_submitted_question_payload(question, submitted.get(question.pk), grade) for question in questions]
     else:
-        question_data = [_question_payload(question, mode == "exam") for question in questions]
+        question_data = [_question_payload(question, mode) for question in questions]
     return {
         "quiz": _localized_quiz_summary(quiz, language),
         "mode": mode,
@@ -353,7 +417,7 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
 
 
 def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
-    if not student_offerings_queryset(user).filter(pk=offering_id).exists():
+    if not _can_read_offering(user, offering_id):
         return None
     quizzes = list(Quiz.objects.filter(
         course_offering_id=offering_id,
@@ -361,7 +425,7 @@ def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
     ).select_related(
         "course_offering__academic_year_level__academic_year",
         "course_offering__academic_year_level__level",
-    ))
+    ).order_by("opening_date", "pk"))
     grades = {
         row.quiz_id: row
         for row in Grade.objects.filter(user=user, quiz_id__in=[quiz.pk for quiz in quizzes])
@@ -374,15 +438,13 @@ def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
         user_can_write_offering_activity(
             user, quizzes[0].course_offering, allow_management=True
         )
-        if quizzes
+        if quizzes and len(grades) < len(quizzes)
         else False
     )
     result = []
     for quiz in quizzes:
-        opening = openings.get(quiz.pk)
-        if opening is None:
-            opening = type("Opening", (), {"opening_date": quiz.opening_date, "closing_date": quiz.closing_date})()
-        result.append({"id": quiz.pk, "status": _quiz_mode(quiz, user, grades.get(quiz.pk), opening, can_write)})
+        opening = openings.get(quiz.pk) or quiz
+        result.append({"id": quiz.pk, "status": _quiz_mode(quiz, grades.get(quiz.pk), opening, can_write)})
     return result
 
 
@@ -459,7 +521,7 @@ def student_calendar_data(
             "-academic_year_level__academic_year__ordering",
             "-enrolled_at",
             "-pk",
-        )[:PAGE_SIZE]
+        )
     )
     scope_options = [
         {
@@ -565,7 +627,6 @@ def student_course_progress_data(
     offerings: list,
     *,
     include_unpublished: bool = False,
-    cap_per_offering: bool = False,
     attendance_policy: AttendancePolicy | None = None,
 ) -> dict[int, dict]:
     """Build progress for caller-authorized offerings for HTML and mobile."""
@@ -593,19 +654,11 @@ def student_course_progress_data(
             lesson_queryset = Lesson.objects.filter(course_offering_id__in=offering_ids)
             if not include_unpublished:
                 lesson_queryset = lesson_queryset.filter(status=PublicationStatus.PUBLISHED)
-            if cap_per_offering:
-                lesson_queryset = lesson_queryset.annotate(
-                    overview_row=Window(
-                        expression=RowNumber(),
-                        partition_by=[F("course_offering_id")],
-                        order_by=[F("created_date").asc(), F("pk").asc()],
-                    )
-                ).filter(overview_row__lte=PAGE_SIZE)
             lessons = lesson_queryset.only(
                 "id", "course_offering_id", "links", "created_date"
             ).order_by("course_offering_id", "created_date", "pk")
             media_parts = {}
-            for lesson in lessons:
+            for lesson in lessons.iterator(chunk_size=500):
                 for link in _parse_links(lesson):
                     if not isinstance(link, dict) or link.get("file_type") not in {"video", "audio"}:
                         continue
@@ -681,37 +734,21 @@ def student_course_progress_data(
         quiz_queryset = Quiz.objects.filter(course_offering_id__in=offering_ids)
         if not include_unpublished:
             quiz_queryset = quiz_queryset.filter(status=PublicationStatus.PUBLISHED)
-        if cap_per_offering:
-            quiz_queryset = quiz_queryset.annotate(
-                overview_row=Window(
-                    expression=RowNumber(),
-                    partition_by=[F("course_offering_id")],
-                    order_by=[F("opening_date").asc(), F("pk").asc()],
-                )
-            ).filter(overview_row__lte=PAGE_SIZE)
-        quizzes = list(quiz_queryset.select_related("quiz_type").only(
-                "id",
-                "name",
-                "course_offering_id",
-                "quiz_type_id",
-                "total_grade",
-                "opening_date",
-                "quiz_type__code",
-            ).order_by("opening_date", "pk"))
-        quiz_ids = [quiz.pk for quiz in quizzes]
-        for quiz in quizzes:
-            if not quiz.quiz_type:
-                continue
-            metric = progress_by_offering[quiz.course_offering_id]
-            if quiz.quiz_type.code == "weekly":
-                metric["weekly_total"] += 1
-            elif quiz.quiz_type.code == "final":
-                metric["final_total"] += 1
+        for row in quiz_queryset.values(
+            "course_offering_id", "quiz_type__code"
+        ).annotate(total=Count("pk")):
+            quiz_type = row["quiz_type__code"]
+            if quiz_type in {"weekly", "final"}:
+                progress_by_offering[row["course_offering_id"]][f"{quiz_type}_total"] = row["total"]
 
         grades = Grade.objects.filter(
             user=user,
-            quiz_id__in=quiz_ids,
-        ).select_related("quiz__quiz_type").order_by("quiz__opening_date", "quiz_id")
+            quiz__course_offering_id__in=offering_ids,
+            quiz__quiz_type__code__in=("weekly", "final"),
+        )
+        if not include_unpublished:
+            grades = grades.filter(quiz__status=PublicationStatus.PUBLISHED)
+        grades = grades.select_related("quiz__quiz_type").order_by("quiz__opening_date", "quiz_id")
         for grade in grades:
             quiz_type = grade.quiz.quiz_type
             if not quiz_type or quiz_type.code not in {"weekly", "final"}:
@@ -728,9 +765,9 @@ def student_course_progress_data(
     return progress_by_offering
 
 
-def student_overview_data(user: User, language: str = "en") -> dict:
+def student_overview_data(user: User, language: str = "en", page: int = 1) -> dict:
     """Return bounded, own-account study summaries without per-offering queries."""
-    offerings = list(
+    course_page = Paginator(
         _offering_access_annotations(
             student_offerings_queryset(user).select_related(
                 "course",
@@ -738,12 +775,13 @@ def student_overview_data(user: User, language: str = "en") -> dict:
                 "academic_year_level__level",
             ),
             user,
-        )[:PAGE_SIZE]
-    )
+        ),
+        PAGE_SIZE,
+    ).get_page(page)
+    offerings = list(course_page.object_list)
     progress_by_offering = student_course_progress_data(
         user,
         offerings,
-        cap_per_offering=True,
     )
     course_rows = []
     for offering in offerings:
@@ -772,6 +810,7 @@ def student_overview_data(user: User, language: str = "en") -> dict:
     return {
         "study_mode": user.study_mode,
         "courses": course_rows,
+        "courses_pagination": page_metadata(course_page),
         "recent_grades": recent_grades,
     }
 

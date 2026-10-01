@@ -81,7 +81,7 @@
                         {% include 'questions_rendering.html' %}
 
                         <!-- Show submit only for exam mode (student) or correction mode (management) -->
-                        {% if mode == "exam" or mode == "view" and not is_student %}
+                        {% if mode == "exam" or mode == "view" and can_correct_grade %}
                         <div class="sd-quiz-foot d-grid mt-4">
                             <button type="submit" class="sd-btn sd-btn--gold btn-lg">
                                 {% if is_student %}

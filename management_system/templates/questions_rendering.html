@@ -281,7 +281,7 @@
                             </div>
                         
                         {% elif mode == 'view' %}
-                            {% if not is_student %}
+                            {% if not is_student and can_correct_grade %}
                                 <div class="sd-manual-grade">
                                     <label for="manual_grade_{{ counter }}" class="fw-semibold mb-2 sd-manual-grade-label">
                                         <i class="fas fa-pencil"></i>

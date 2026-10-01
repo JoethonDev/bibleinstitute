@@ -5,7 +5,7 @@
 
 {% block breadcrumbs %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3 ad-page" id="content" x-data="{ applicationEditing: false }">
+<div class="container-fluid py-3 ad-page" id="content" x-data="{ applicationEditing: {% if edit_form.is_bound and edit_form.errors %}true{% else %}false{% endif %} }">
     <div class="ad-detail-head">
         {% include "partials/breadcrumbs.html" with breadcrumb_items=breadcrumb_items variant="detail" %}
         <div class="d-flex justify-content-between align-items-center ad-detail-content">

@@ -23,21 +23,22 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    const browserOrigin = allowedBrowserOrigin(request, env);
+    const browserAccess = browserAccessState(request, env);
     if (request.method === "OPTIONS") {
-      return browserOrigin !== null
-        ? corsResponse(null, browserOrigin)
+      return browserAccess.allowed && browserAccess.hasSuppliedOrigin
+        ? corsResponse(null, browserAccess.corsOrigin)
         : new Response("Forbidden", { status: 403 });
     }
 
     if (request.method === "GET" || request.method === "HEAD") {
-      if (browserOrigin === null) return new Response("Forbidden", { status: 403 });
-
       if (path.startsWith("/media/")) {
-        return handleMedia(request, env, ctx, url, browserOrigin);
+        return handleMedia(request, env, ctx, url, browserAccess);
       }
       if (path.startsWith("/public/")) {
-        return servePublic(env, url, browserOrigin);
+        if (!browserAccess.allowed || !browserAccess.hasSuppliedOrigin) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        return servePublic(env, url, browserAccess.corsOrigin);
       }
     }
 
@@ -45,7 +46,7 @@ export default {
   },
 };
 
-function allowedBrowserOrigin(request, env) {
+function browserAccessState(request, env) {
   const configuredDomains = Array.isArray(env.ALLOWED_DOMAIN)
     ? env.ALLOWED_DOMAIN
     : String(env.ALLOWED_DOMAIN || "bibleinstitute-eg.org").split(",");
@@ -53,29 +54,36 @@ function allowedBrowserOrigin(request, env) {
   const origin = request.headers.get("Origin");
   const referer = request.headers.get("Referer");
 
-  if (origin) {
+  if (origin !== null && origin !== "") {
     try {
       const parsed = new URL(origin);
-      return domains.some((domain) => isAllowedHostname(parsed.hostname, domain))
-        ? origin
-        : null;
+      const allowed = domains.some((domain) => isAllowedHostname(parsed.hostname, domain));
+      return {
+        allowed,
+        corsOrigin: allowed ? origin : null,
+        hasSuppliedOrigin: true,
+      };
     } catch (_error) {
-      return null;
+      return { allowed: false, corsOrigin: null, hasSuppliedOrigin: true };
     }
   }
 
-  if (referer) {
+  if (referer !== null && referer !== "") {
     try {
       const parsed = new URL(referer);
-      return domains.some((domain) => isAllowedHostname(parsed.hostname, domain))
-        ? ""
-        : null;
+      return {
+        allowed: domains.some((domain) => isAllowedHostname(parsed.hostname, domain)),
+        corsOrigin: "",
+        hasSuppliedOrigin: true,
+      };
     } catch (_error) {
-      return null;
+      return { allowed: false, corsOrigin: null, hasSuppliedOrigin: true };
     }
   }
 
-  return null;
+  // Native mobile HLS commonly omits both browser headers. Media requests
+  // decide whether that is allowed after validating the signed audience.
+  return { allowed: true, corsOrigin: "", hasSuppliedOrigin: false };
 }
 
 function normalizeAllowedDomain(value) {
@@ -95,7 +103,7 @@ function isAllowedHostname(hostname, domain) {
   return host === domain || host.endsWith(`.${domain}`);
 }
 
-async function handleMedia(request, env, ctx, url, browserOrigin) {
+async function handleMedia(request, env, ctx, url, browserAccess) {
   const parts = url.pathname.split("/");
   const sessionId = parts[2];
   const encodedKey = parts.slice(3).join("/");
@@ -115,10 +123,16 @@ async function handleMedia(request, env, ctx, url, browserOrigin) {
   const token = url.searchParams.get("token");
   const tokenVerification = await verifyMediaToken(token, sessionId, segmentKey, env.HMAC_SECRET);
   if (!tokenVerification.valid) {
-    return corsResponse("Unauthorized", browserOrigin, 401);
+    return corsResponse("Unauthorized", browserAccess.corsOrigin, 401);
+  }
+  if (!browserAccess.allowed) {
+    return corsResponse("Forbidden", browserAccess.corsOrigin, 403);
+  }
+  if (!browserAccess.hasSuppliedOrigin && tokenVerification.audience !== "mobile") {
+    return corsResponse("Forbidden", browserAccess.corsOrigin, 403);
   }
   const segmentNumber = segmentNumberFromKey(segmentKey);
-  if (segmentNumber === null) return corsResponse("Forbidden", browserOrigin, 403);
+  if (segmentNumber === null) return corsResponse("Forbidden", browserAccess.corsOrigin, 403);
 
   const cacheRequest = new Request(
     `${url.origin}/__segment-cache/${encodeURIComponent(segmentKey)}`,
@@ -137,12 +151,14 @@ async function handleMedia(request, env, ctx, url, browserOrigin) {
       segmentKey,
       segmentNumber,
       tokenVerification.signature,
+      tokenVerification.audience,
+      tokenVerification.expiresAt,
     ));
-    return browserResponse(cached, browserOrigin, request.method);
+    return browserResponse(cached, browserAccess.corsOrigin, request.method);
   }
 
   const object = await env.MY_BUCKET.get(segmentKey);
-  if (!object) return corsResponse("Not found", browserOrigin, 404);
+  if (!object) return corsResponse("Not found", browserAccess.corsOrigin, 404);
 
   const cacheHeaders = new Headers();
   cacheHeaders.set("Content-Type", object.httpMetadata?.contentType || "video/mp2t");
@@ -161,8 +177,10 @@ async function handleMedia(request, env, ctx, url, browserOrigin) {
     segmentKey,
     segmentNumber,
     tokenVerification.signature,
+    tokenVerification.audience,
+    tokenVerification.expiresAt,
   ));
-  return browserResponse(cacheableResponse, browserOrigin, request.method);
+  return browserResponse(cacheableResponse, browserAccess.corsOrigin, request.method);
 }
 
 async function cacheSegment(cacheRequest, response) {
@@ -190,25 +208,44 @@ function segmentNumberFromKey(key) {
 async function verifyMediaToken(token, sessionId, segmentKey, secret) {
   if (!token || !secret) return { valid: false };
   const parts = token.split(":");
-  if (parts.length !== 3 || parts[0] !== sessionId) return { valid: false };
+  if (parts.length !== 5 || parts[0] !== "v2" || parts[2] !== sessionId) {
+    return { valid: false };
+  }
 
-  const expiresAt = Number.parseInt(parts[1], 10);
+  const audience = parts[1];
+  if (audience !== "web" && audience !== "mobile") return { valid: false };
+  if (!/^\d+$/.test(parts[3])) return { valid: false };
+
+  const expiresAt = Number.parseInt(parts[3], 10);
   if (!Number.isInteger(expiresAt) || Math.floor(Date.now() / 1000) >= expiresAt) {
     return { valid: false };
   }
 
-  const expected = await hmacHex(secret, `${sessionId}:${expiresAt}:${segmentKey}`);
+  const expected = await hmacHex(
+    secret,
+    `v2|${audience}|${sessionId}|${expiresAt}|${segmentKey}`,
+  );
   return {
-    valid: timingSafeHexEqual(parts[2], expected),
-    signature: parts[2],
+    valid: timingSafeHexEqual(parts[4], expected),
+    signature: parts[4],
+    audience,
+    expiresAt,
   };
 }
 
-async function recordReceipt(env, sessionId, segmentKey, segmentNumber, signature) {
+async function recordReceipt(
+  env,
+  sessionId,
+  segmentKey,
+  segmentNumber,
+  signature,
+  audience,
+  expiresAt,
+) {
   const receiptUrl = env.DJANGO_RECEIPT_URL;
   if (!receiptUrl || !env.DJANGO_RECEIPT_SECRET) return;
   try {
-    await fetch(receiptUrl, {
+    const response = await fetch(receiptUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -219,8 +256,13 @@ async function recordReceipt(env, sessionId, segmentKey, segmentNumber, signatur
         segment_key: segmentKey,
         segment_number: segmentNumber,
         signature,
+        audience,
+        expires_at: expiresAt,
       }),
     });
+    if (!response.ok) {
+      console.error("media_receipt_failed", response.status);
+    }
   } catch (_error) {
     // Media delivery must not fail because receipt persistence is temporarily
     // unavailable. The request remains idempotent when retried by playback.

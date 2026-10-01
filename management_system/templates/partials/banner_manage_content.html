@@ -38,12 +38,12 @@
     <div class="ad-card">
         <div class="ad-card-body">
             <h5 class="ad-section-title"><i class="fas fa-list me-2"></i>{% translate "Banners" %}</h5>
-            {% if banners %}
+            {% if page_obj.object_list %}
             <div class="ad-table-wrap"><table class="ad-table">
                 <caption class="visually-hidden">{% translate "Student banner messages" %}</caption>
                 <thead><tr><th scope="col">{% translate "Title" %}</th><th scope="col">{% translate "Message" %}</th><th scope="col">{% translate "Visible" %}</th><th scope="col">{% translate "Actions" %}</th></tr></thead>
                 <tbody>
-                {% for banner in banners %}
+                {% for banner in page_obj.object_list %}
                 <tr>
                     <td>{{ banner.title }}</td>
                     <td>{{ banner.body|truncatechars:80 }}</td>
@@ -64,6 +64,7 @@
                 {% endfor %}
                 </tbody>
             </table></div>
+            {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label %}
             {% else %}
             <p class="mb-0 ps-muted-text">{% translate "No banners yet." %}</p>
             {% endif %}

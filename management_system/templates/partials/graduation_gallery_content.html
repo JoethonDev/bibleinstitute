@@ -23,6 +23,8 @@
     </a>
     {% endfor %}
   </div>
+  {% translate "Page navigation" as albums_pagination_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=albums_pagination_label %}
   {% else %}
   <div class="sd-panel-card"><p class="mb-0">{% translate "No graduation albums are available for you yet." %}</p></div>
   {% endif %}

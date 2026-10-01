@@ -1,6 +1,7 @@
 import os
 import uuid
 import warnings
+from collections.abc import Iterable
 from dataclasses import dataclass
 from io import BytesIO
 from logging import getLogger
@@ -161,3 +162,8 @@ def upload_application_file(cloud_client, bucket_name, user_id, file_obj, file_t
         return None
 
     return UploadedApplicationFile(original_key=original_key, preview_key=preview_key)
+
+
+def delete_application_files(cloud_client, bucket_name, keys: Iterable[str]) -> None:
+    for key in set(keys):
+        delete_from_bucket(cloud_client, bucket_name, key)

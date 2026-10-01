@@ -1870,9 +1870,11 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-meter--progress { height: 20px; max-width: 200px; }
 .ad-meter--progress > span { position: absolute; inset: 0; inset-inline-end: auto; border-radius: 999px; background: linear-gradient(90deg, var(--ps-gold), var(--ps-teal)); }
 
-.ad-progress-heading { align-items: flex-start; }
+.ad-progress-toolbar { display: grid; grid-template-columns: 1fr; align-items: stretch; gap: .65rem; margin-bottom: 1rem; }
+.ad-page--progress { container-type: inline-size; }
+.ad-progress-heading { align-items: flex-start; min-width: 0; margin-bottom: 0; }
 .ad-progress-intro { color: var(--ps-muted); font-size: .88rem; }
-.ad-progress-filters { display: grid; grid-template-columns: minmax(11rem, 1.2fr) repeat(2, minmax(10rem, 1fr)) minmax(14rem, 1.5fr) auto; align-items: end; gap: .75rem; margin-bottom: 1rem; }
+.ad-progress-filters { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .8fr) minmax(0, 1.1fr) auto; align-items: end; gap: .55rem; margin-bottom: 0; }
 .ad-progress-filter { min-width: 0; }
 .ad-progress-filter > label { display: block; margin-bottom: .3rem; color: var(--ps-muted); font-size: .75rem; font-weight: 700; }
 .ad-progress-filter .form-select, .ad-progress-filter .form-control { min-width: 0; min-height: 2.65rem; }
@@ -1902,12 +1904,14 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-progress-date { display: grid; min-width: 0; gap: .14rem; }
 .ad-progress-date strong { color: var(--ps-ink); font-size: .78rem; font-weight: 650; }
 .ad-progress-date small { color: var(--ps-muted); font-size: .69rem; }
-.ad-progress-disclosure { display: contents; }
-.ad-progress-disclosure > summary { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; list-style: none; color: var(--ps-teal-deep); border: 1px solid var(--ps-line-cool); border-radius: .65rem; cursor: pointer; }
-.ad-progress-disclosure > summary::-webkit-details-marker, .ad-progress-day > summary::-webkit-details-marker { display: none; }
-.ad-progress-disclosure[open] > summary i { transform: rotate(180deg); }
-.ad-progress-disclosure > summary i { transition: transform var(--ps-motion); }
-.ad-progress-expanded { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; min-width: 0; width: 100%; padding-top: .85rem; border-top: 1px solid var(--ps-line-cool); }
+.ad-progress-disclosure { display: block; width: 100%; min-width: 0; }
+.ad-progress-summary { list-style: none; cursor: pointer; }
+.ad-progress-summary::-webkit-details-marker, .ad-progress-day > summary::-webkit-details-marker { display: none; }
+.ad-progress-summary:focus-visible { outline: 2px solid var(--ps-teal); outline-offset: .25rem; }
+.ad-progress-toggle { display: grid; place-items: center; align-self: start; width: 2.25rem; height: 2.25rem; color: var(--ps-teal-deep); border: 1px solid var(--ps-line-cool); border-radius: .65rem; }
+.ad-progress-toggle i { transition: transform var(--ps-motion); }
+.ad-progress-disclosure[open] > .ad-progress-summary .ad-progress-toggle i { transform: rotate(180deg); }
+.ad-progress-expanded { display: grid; grid-template-columns: repeat(2, minmax(0, 12rem)); gap: .85rem; min-width: 0; width: fit-content; max-width: 100%; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--ps-line-cool); }
 .ad-progress-timeline-card, .ad-progress-daily-card { min-width: 0; padding: .85rem; border: 1px solid var(--ps-line-cool); border-radius: .8rem; background: var(--ps-paper); }
 .ad-progress-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; }
 .ad-progress-section-head h6 { margin: 0; color: var(--ps-ink); font-size: .84rem; font-weight: 700; }
@@ -1955,15 +1959,17 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-progress-empty { padding: 1rem; }
 
 @media (max-width: 1199.98px) {
+    .ad-progress-summary { grid-template-columns: minmax(12rem, 1.5fr) minmax(8rem, 1fr) repeat(2, minmax(6rem, .75fr)) repeat(2, minmax(7rem, .85fr)) auto; }
+}
+@container (max-width: 1120px) {
     .ad-progress-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ad-progress-filter--search { grid-column: span 2; }
     .ad-progress-window { justify-self: start; }
-    .ad-progress-summary { grid-template-columns: minmax(12rem, 1.5fr) minmax(8rem, 1fr) repeat(2, minmax(6rem, .75fr)) repeat(2, minmax(7rem, .85fr)) auto; }
 }
 @media (max-width: 991.98px) {
     .ad-progress-summary { grid-template-columns: minmax(0, 1.3fr) minmax(9rem, .9fr) repeat(2, minmax(6.5rem, .7fr)) auto; }
     .ad-progress-date { grid-row: 2; }
-    .ad-progress-expanded { grid-template-columns: 1fr; }
+    .ad-progress-expanded { grid-template-columns: 1fr; width: 100%; }
 }
 @media (max-width: 575.98px) {
     .ad-progress-filters { grid-template-columns: 1fr; gap: .55rem; }
@@ -1975,9 +1981,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     .ad-progress-completion { grid-column: 1 / 3; }
     .ad-progress-metric { grid-row: 3; }
     .ad-progress-date { grid-row: 4; }
-    .ad-progress-disclosure { grid-column: 3; grid-row: 1; }
-    .ad-progress-disclosure > summary { width: 2rem; height: 2rem; }
-    .ad-progress-expanded { grid-column: 1 / -1; }
+    .ad-progress-toggle { grid-column: 3; grid-row: 1; justify-self: end; width: 2rem; height: 2rem; }
     .ad-progress-section-head { display: grid; }
     .ad-progress-legend { justify-content: flex-start; }
     .ad-progress-heatmap { gap: .14rem; }
@@ -1989,12 +1993,13 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 }
 
 @container (max-width: 760px) {
-    .ad-progress-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-    .ad-progress-identity, .ad-progress-completion { grid-column: 1 / -1; }
+    .ad-progress-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+    .ad-progress-identity { grid-column: 1 / 3; grid-row: 1; }
+    .ad-progress-completion { grid-column: 1 / -1; }
     .ad-progress-metric { grid-row: auto; }
     .ad-progress-date { grid-row: auto; }
-    .ad-progress-disclosure { grid-column: 2; justify-self: end; }
-    .ad-progress-expanded { grid-template-columns: minmax(0, 1fr); }
+    .ad-progress-toggle { grid-column: 3; grid-row: 1; justify-self: end; }
+    .ad-progress-expanded { grid-template-columns: minmax(0, 1fr); width: 100%; }
 }
 
 /* ---------------- Content detail column helpers ---------------- */

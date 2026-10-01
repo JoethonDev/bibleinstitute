@@ -6,6 +6,7 @@ from typing import Iterable, Mapping
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Max
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 
@@ -33,6 +34,24 @@ PROMOTABLE_HISTORICAL_OUTCOMES = frozenset({
     HistoricalAcademicSummary.Outcome.PASSED,
     HistoricalAcademicSummary.Outcome.PARTIAL,
 })
+APPLICATION_STATUS_VALUES = frozenset(value for value, _label in User.APPLICATION_STATUSES)
+
+
+def _validate_expected_application_status(current_status: str, expected_status: str) -> None:
+    if expected_status not in APPLICATION_STATUS_VALUES:
+        raise ValidationError(_("Invalid expected application status."))
+    if current_status != expected_status:
+        raise ValidationError(
+            _("The application status changed before this action was executed."),
+            code="stale_status",
+        )
+
+
+def lock_application_status_for_edit(user_id: int, expected_status: str) -> User:
+    """Lock and validate status before saving a bound user form inside atomic()."""
+    user = User.objects.select_for_update().get(pk=user_id)
+    _validate_expected_application_status(user.application_status, expected_status)
+    return user
 
 
 def _require_admin(actor: User) -> None:
@@ -154,16 +173,10 @@ def set_application_status(
     """Set an application status with admin-only locking and enrollment rules."""
     _require_admin(actor)
     locked_user = User.objects.select_for_update().get(pk=application.pk)
-    if status not in {"pending", "active", "declined"}:
+    if status not in APPLICATION_STATUS_VALUES:
         raise ValidationError(_("Invalid application status."))
     if expected_status is not None:
-        if expected_status not in {"pending", "active", "declined"}:
-            raise ValidationError(_("Invalid expected application status."))
-        if locked_user.application_status != expected_status:
-            raise ValidationError(
-                _("The application status changed before this action was executed."),
-                code="stale_status",
-            )
+        _validate_expected_application_status(locked_user.application_status, expected_status)
 
     if status != "active":
         locked_user.application_status = status
@@ -253,7 +266,7 @@ def bulk_set_application_status(
     user_ids = list(dict.fromkeys(int(user_id) for user_id in user_ids))
     if not user_ids or len(user_ids) > 100:
         raise ValidationError(_("Bulk application batches must contain between one and 100 users."))
-    if status not in {"pending", "active", "declined"}:
+    if status not in APPLICATION_STATUS_VALUES:
         raise ValidationError(_("Invalid application status."))
 
     locked_users = list(
@@ -268,7 +281,7 @@ def bulk_set_application_status(
             results["errors"].append({"id": user_id, "error": str(_("User not found."))})
             continue
         expected_status = expected_statuses.get(user_id)
-        if expected_status not in {"pending", "active", "declined"}:
+        if expected_status not in APPLICATION_STATUS_VALUES:
             results["stale"].append({
                 "id": user_id,
                 "error": str(_("The application is no longer in the selected status.")),
@@ -857,34 +870,39 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
     last_level = Level.objects.order_by("-ordering").first()
     if last_level is None:
         return 0
-    # Lock base rows only: the __isnull filters force LEFT JOINs, which
-    # PostgreSQL rejects under FOR UPDATE across nullable join sides.
-    candidate_pks = list(
-        EvaluationResult.objects.filter(
-            course_offering__isnull=True,
-            promotion_history__isnull=True,
-            formula__course_offering__isnull=True,
-            formula__academic_year_level__level=last_level,
-            formula__academic_year_level__academic_year__ordering__lt=destination_year.ordering,
-            enrollment__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
-        ).order_by("pk").values_list("pk", flat=True)
+    candidate_queryset = EvaluationResult.objects.filter(
+        course_offering__isnull=True,
+        promotion_history__isnull=True,
+        formula__course_offering__isnull=True,
+        formula__academic_year_level__level=last_level,
+        formula__academic_year_level__academic_year__ordering__lt=destination_year.ordering,
+        enrollment__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
     )
-    candidates = EvaluationResult.objects.select_for_update(of=("self",)).select_related(
-        "formula", "enrollment", "enrollment__student", "enrollment__academic_year_level"
-    ).filter(pk__in=candidate_pks).order_by("pk")
-    created_count = 0
     target_scope = AcademicYearLevel.objects.filter(
         academic_year=destination_year,
         level=last_level,
     ).first()
     if target_scope is None:
-        if candidates.exists():
+        if candidate_queryset.exists():
             raise ValidationError(_("The next academic year must open the last level before failed-course access can be created."))
         return 0
-    for candidate_batch_start in range(0, candidates.count(), 500):
-        candidate_batch = list(candidates[candidate_batch_start:candidate_batch_start + 500])
+
+    last_candidate_pk = candidate_queryset.aggregate(max_pk=Max("pk"))["max_pk"]
+    if last_candidate_pk is None:
+        return 0
+
+    created_count = 0
+    last_pk = 0
+    while last_pk < last_candidate_pk:
+        candidate_batch = list(
+            candidate_queryset.filter(pk__gt=last_pk, pk__lte=last_candidate_pk)
+            .select_for_update(of=("self",))
+            .select_related("formula", "enrollment", "enrollment__student", "enrollment__academic_year_level")
+            .order_by("pk")[:500]
+        )
         if not candidate_batch:
             break
+        last_pk = candidate_batch[-1].pk
         enrollment_ids = [result.enrollment_id for result in candidate_batch]
         formula_ids = [result.formula_id for result in candidate_batch]
         course_results = EvaluationResult.objects.filter(

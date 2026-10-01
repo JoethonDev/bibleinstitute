@@ -4,7 +4,7 @@
 
 {% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 {% block body %}
-<div class="container-fluid py-3 ad-page" id="content" x-data="{ editing: false }">
+<div class="container-fluid py-3 ad-page" id="content" x-data="{ editing: {% if edit_form.is_bound and edit_form.errors %}true{% else %}false{% endif %} }">
 
     <div class="ad-detail-head mb-3">
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
@@ -12,6 +12,7 @@
                 <h4 class="ad-detail-title mb-1">{% translate "User details" %}</h4>
                 <p class="mb-0 text-white-50">{{ profile_user.get_full_name|default:profile_user.username }}</p>
             </div>
+            {% if can_edit_user %}
             <button type="button"
                     class="ad-btn ad-btn--ghost"
                     x-show="!editing"
@@ -20,9 +21,11 @@
                     :aria-expanded="editing.toString()">
                 <i class="fas fa-edit me-1" aria-hidden="true"></i>{% translate "Edit" %}
             </button>
+            {% endif %}
         </div>
     </div>
 
+    {% if can_edit_user %}
     <div id="user-edit-form" class="ad-card mb-3" x-show="editing" x-cloak>
         <div class="ad-card-head"><strong>{% translate "Edit user" %}</strong></div>
         <div class="ad-card-body">
@@ -40,6 +43,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
     <div x-show="!editing" x-cloak>
         <div class="row">

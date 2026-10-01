@@ -10344,6 +10344,9 @@ msgstr "يوجد إيصال دفع بالفعل لهذا المستوى الدر
 msgid "The payment receipt could not be uploaded."
 msgstr "تعذر رفع إيصال الدفع."
 
+msgid "The selected academic scope is no longer available for payment."
+msgstr "لم يعد النطاق الدراسي المحدد متاحًا للدفع."
+
 msgid "Academic payment receipt uploaded successfully."
 msgstr "تم رفع إيصال الدفع الدراسي بنجاح."
 
@@ -12290,3 +12293,15 @@ msgstr "تصحيح الخروج"
 
 msgid "Full"
 msgstr "كامل"
+
+msgid "Invalid quiz question."
+msgstr "سؤال الاختبار غير صالح."
+
+msgid "Regrade saved answers using the current correct answer?"
+msgstr "هل تريد إعادة تصحيح الإجابات المحفوظة باستخدام الإجابة الصحيحة الحالية؟"
+
+msgid "Regrade saved answers"
+msgstr "إعادة تصحيح الإجابات المحفوظة"
+
+msgid "%(count)s saved answers regraded."
+msgstr "أُعيد تصحيح %(count)s إجابة محفوظة."

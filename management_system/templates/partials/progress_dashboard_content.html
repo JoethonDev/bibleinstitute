@@ -1,14 +1,15 @@
 {% load i18n %}
-<div class="container-fluid py-3 ad-page" id="content">
-    <div class="ad-pane-head ad-progress-heading">
-        <div>
-            <h4 class="ad-pane-title mb-1">{% translate "Student Progress" %}</h4>
-            <p class="ad-progress-intro mb-0">{% translate "Learning progress and meaningful study activity by lesson part." %}</p>
+<div class="container-fluid py-3 ad-page ad-page--progress" id="content">
+    <div class="ad-progress-toolbar">
+        <div class="ad-pane-head ad-progress-heading">
+            <div>
+                <h4 class="ad-pane-title mb-1">{% translate "Student Progress" %}</h4>
+                <p class="ad-progress-intro mb-0">{% translate "Learning progress and meaningful study activity by lesson part." %}</p>
+            </div>
+            <span id="progress-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
         </div>
-        <span id="progress-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
-    </div>
 
-    <form method="get" class="ad-filters ad-progress-filters" hx-get="{% url 'progress-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#progress-loading">
+        <form method="get" class="ad-filters ad-progress-filters" hx-get="{% url 'progress-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#progress-loading">
         <div class="ad-progress-filter">
             <label for="progress-scope">{% translate "Academic year and level" %}</label>
             <select id="progress-scope" name="academic_year" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
@@ -37,13 +38,15 @@
             <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Search student name...' %}" hx-preserve hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#progress-loading">
         </div>
         {% if selected_year %}<div class="ad-progress-window">{% translate "Activity window" %}<strong>{% blocktranslate with start=progress_window_start|date:"DATE_FORMAT" end=progress_window_end|date:"DATE_FORMAT" %}{{ start }} – {{ end }}{% endblocktranslate %}</strong></div>{% endif %}
-    </form>
+        </form>
+    </div>
 
     <div class="ad-progress-list" aria-label="{% translate 'Student progress records' %}">
         {% for p in progress %}
         {% with activity=p.activity_summary %}
         <article class="ad-card ad-progress-row" aria-labelledby="progress-row-title-{{ p.pk }}">
-            <div class="ad-progress-summary">
+            <details class="ad-progress-disclosure">
+                <summary class="ad-progress-summary">
                 <div class="ad-progress-identity">
                     <span class="ad-progress-avatar" aria-hidden="true"><i class="fas fa-user-graduate"></i></span>
                     <div class="ad-progress-ident-text">
@@ -90,9 +93,9 @@
                     <strong>{% if p.completed_at %}{{ p.completed_at|date:"DATE_FORMAT" }}{% elif activity.available %}{{ activity.last_active_at|date:"DATE_FORMAT" }}{% else %}—{% endif %}</strong>
                     {% if p.completed_at %}<small>{{ p.completed_at|date:"TIME_FORMAT" }}</small>{% elif activity.available %}<small>{{ activity.last_active_at|date:"TIME_FORMAT" }}</small>{% endif %}
                 </div>
-                <details class="ad-progress-disclosure">
-                    <summary aria-label="{% translate 'Show study activity details' %}"><i class="fas fa-chevron-down" aria-hidden="true"></i><span class="visually-hidden">{% translate "Study activity details" %}</span></summary>
-                    <div class="ad-progress-expanded">
+                    <span class="ad-progress-toggle" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                </summary>
+                <div class="ad-progress-expanded">
                         {% if activity.available %}
                         <section class="ad-progress-timeline-card" aria-labelledby="progress-timeline-title-{{ p.pk }}">
                             <div class="ad-progress-section-head">
@@ -140,9 +143,8 @@
                         <div class="ad-progress-history-note"><i class="fas fa-circle-info" aria-hidden="true"></i><span>{% if activity.history_incomplete %}{% translate "Earlier activity predates active-time tracking. These totals include only activity recorded since" %} {{ activity.tracking_started_at|date:"DATE_FORMAT" }}.{% else %}{% translate "No watching activity has been recorded yet." %}{% endif %}</span></div>
                         {% endif %}
                         {% if activity.available and activity.history_incomplete %}<div class="ad-progress-history-note"><i class="fas fa-circle-info" aria-hidden="true"></i><span>{% translate "Earlier activity predates active-time tracking. These totals include only activity recorded since" %} {{ activity.tracking_started_at|date:"DATE_FORMAT" }}.</span></div>{% endif %}
-                    </div>
-                </details>
-            </div>
+                </div>
+            </details>
         </article>
         {% endwith %}
         {% empty %}

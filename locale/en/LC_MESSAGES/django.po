@@ -11362,6 +11362,9 @@ msgstr "A payment receipt already exists for this academic level."
 msgid "The payment receipt could not be uploaded."
 msgstr "The payment receipt could not be uploaded."
 
+msgid "The selected academic scope is no longer available for payment."
+msgstr "The selected academic scope is no longer available for payment."
+
 msgid "Academic payment receipt uploaded successfully."
 msgstr "Academic payment receipt uploaded successfully."
 
@@ -12002,3 +12005,15 @@ msgstr "Correct exit"
 
 msgid "Full"
 msgstr "Full"
+
+msgid "Invalid quiz question."
+msgstr "Invalid quiz question."
+
+msgid "Regrade saved answers using the current correct answer?"
+msgstr "Regrade saved answers using the current correct answer?"
+
+msgid "Regrade saved answers"
+msgstr "Regrade saved answers"
+
+msgid "%(count)s saved answers regraded."
+msgstr "%(count)s saved answers regraded."

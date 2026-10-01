@@ -9,6 +9,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -161,9 +162,14 @@ def app_release_manage(request):
         )
         messages.success(request, _("App version %(version)s published.") % {"version": version_name})
         return redirect("app-release-manage")
-    releases = MobileAppRelease.objects.order_by("-version_code", "-pk")[:20]
+    releases_page_obj = Paginator(
+        MobileAppRelease.objects.order_by("-version_code", "-pk"),
+        25,
+    ).get_page(request.GET.get("page", 1))
     return render_page(request, "app_release_manage.html", "partials/app_release_manage_content.html", {
-        "releases": releases,
+        "releases_page_obj": releases_page_obj,
+        "pagination_query": pagination_query_string(request),
+        "pagination_aria_label": _("Page navigation"),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("App Releases"), None),
@@ -203,9 +209,14 @@ def banner_manage(request):
             for err in form.errors.get("__all__", []):
                 messages.error(request, str(err))
         return redirect("banner-manage")
-    banners = StudentBanner.objects.order_by("-created_at", "-pk")[:50]
+    page_obj = Paginator(
+        StudentBanner.objects.order_by("-created_at", "-pk"),
+        25,
+    ).get_page(request.GET.get("page", 1))
     return render_page(request, "banner_manage.html", "partials/banner_manage_content.html", {
-        "banners": banners,
+        "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
+        "pagination_aria_label": _("Page navigation"),
         "form": BannerForm(),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),

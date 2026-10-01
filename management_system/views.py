@@ -62,6 +62,7 @@ from .grade_matrix import (
     grade_matrix_student_queryset,
     grade_matrix_workbook,
 )
+from .quiz_grading import regrade_quiz_submissions
 from .attendance_matrix import (
     ATTENDANCE_MATRIX_PAGE_SIZE,
     ATTENDANCE_MATRIX_STATUS_VALUES,
@@ -89,7 +90,7 @@ from .utils.file_validator import (
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, download_from_bucket, generate_unique_url, get_r2_client
 from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
-from .utils.email import send_application_received, send_application_activated, send_application_declined
+from .utils.email import send_application_received, send_application_status_notification
 from .progress_activity import (
     format_active_duration,
     part_display_name,
@@ -100,6 +101,7 @@ from .progress_activity import (
 from .utils.application_uploads import (
     APPLICATION_DOCUMENT_FIELDS,
     APPLICATION_PREVIEW_FIELDS,
+    delete_application_files,
     upload_application_file,
 )
 from .utils.egyptian_cities import EGYPTIAN_CITIES
@@ -142,6 +144,7 @@ from .academic_enrollment import (
     reopen_application,
     bulk_set_application_status,
     set_application_status,
+    lock_application_status_for_edit,
     set_user_normal_enrollment_scope,
     promote_evaluation_result,
     promote_evaluation_results,
@@ -342,6 +345,11 @@ class UserBaseView(FormBase):
     model = User
     pk_url_kwarg = "user_id"
     view_name = _("user") # Translate view_name
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_manage_applications(request.user):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
   
 class CourseBaseView(FormBase):
     model = Course
@@ -1068,59 +1076,53 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                     return HttpResponse(_("Invalid Request, submission is closed!")) # Translate
                 
                 questions_data, not_used = unpack_quiz_form(request.POST)
-                question_by_id = {
-                    question.pk: question
-                    for question in Question.objects.filter(quiz_id=quiz_id)
-                }
-                valid_question_ids = set(question_by_id)
-
-                # Create Quesitons
-                submissions = []
-                repeated_submissions = set()
-                total_grade = 0
-                for data in questions_data.values():
-                    question_id = int(data['id'])
-                    if question_id not in valid_question_ids:
-                        continue
-                    submitted_answer = data.get("answer", "")
-                    if question_id in repeated_submissions:
-                        continue
-                    repeated_submissions.add(question_id)
-                    # Create instance
-                    submission = Submission(
-                        question=question_by_id[question_id],
-                        submitted_answer=submitted_answer,
-                        user=user,
-                    )
-                    submission.assign_grade()
-
-                    # Sum grades
-                    total_grade += submission.grade
-
-                    # Append for bulk create!
-                    submissions.append(submission)
-                
-                # For leaved questions or error of not submitting all questions
-                unanswered_questions = valid_question_ids - repeated_submissions
-                for qid in unanswered_questions:
-                    submissions.append(
-                        Submission(
-                            question=question_by_id[qid],
-                            submitted_answer="-",
-                            user=user,
-                        )
-                    )
-
                 try:
                     with transaction.atomic():
+                        locked_quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
+                        if locked_quiz.course_offering_id != offering.pk:
+                            raise PermissionDenied
+                        if not user_has_management_role(user) and locked_quiz.status != PublicationStatus.PUBLISHED:
+                            raise PermissionDenied
+                        if not is_quiz_open(locked_quiz, now(), user) or not is_quiz_in_user_window(locked_quiz, user):
+                            return HttpResponse(_("Invalid Request, submission is closed!"))
                         locked_user = User.objects.select_for_update().get(pk=user.pk)
-                        if Grade.objects.filter(user=locked_user, quiz=quiz).exists():
+                        if Grade.objects.filter(user=locked_user, quiz=locked_quiz).exists():
                             return redirect(reverse("quiz-details", args=[offering_id, quiz_id]))
-                        for submission in submissions:
-                            submission.user = locked_user
+
+                        question_by_id = {
+                            question.pk: question
+                            for question in Question.objects.filter(quiz_id=quiz_id)
+                        }
+                        valid_question_ids = set(question_by_id)
+                        submissions = []
+                        repeated_submissions = set()
+                        total_grade = 0
+                        for data in questions_data.values():
+                            question_id = int(data['id'])
+                            if question_id not in valid_question_ids or question_id in repeated_submissions:
+                                continue
+                            repeated_submissions.add(question_id)
+                            submission = Submission(
+                                question=question_by_id[question_id],
+                                submitted_answer=data.get("answer", ""),
+                                user=locked_user,
+                            )
+                            submission.assign_grade()
+                            total_grade += submission.grade
+                            submissions.append(submission)
+
+                        unanswered_questions = valid_question_ids - repeated_submissions
+                        for qid in unanswered_questions:
+                            submission = Submission(
+                                question=question_by_id[qid],
+                                submitted_answer="-",
+                                user=locked_user,
+                            )
+                            submission.assign_grade()
+                            submissions.append(submission)
                         Submission.objects.bulk_create(submissions)
                         Grade.objects.create(
-                            quiz=quiz,
+                            quiz=locked_quiz,
                             user=locked_user,
                             submitted_at=submission_datetime,
                             total_grade=total_grade,
@@ -1140,6 +1142,8 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                     )
                     success(request, _("Quiz is sent successfully!"), extra_tags="alert-success") # Translate
 
+                except PermissionDenied:
+                    raise
                 except Exception as e:
                     error(request, _("Sending quiz has failed, Please Try again!"), extra_tags="alert-danger") # Translate
                     logger.exception(
@@ -1368,6 +1372,8 @@ def user_dashboard(request):
 
 @capability_required(can_manage_content)
 def user_profile(request, user_id):
+    if request.method == "POST" and not can_manage_applications(request.user):
+        raise PermissionDenied
     user = get_object_or_404(
         User.objects.select_related("role", "decided_by"),
         pk=user_id,
@@ -1378,28 +1384,40 @@ def user_profile(request, user_id):
     if request.method == "POST" and form.is_valid():
         original = User.objects.get(pk=user.pk)
         actor_role = getattr(getattr(request.user, "role", None), "role", None)
+        desired_status = form.cleaned_data.get("application_status", original.application_status)
         try:
             with transaction.atomic():
+                locked_user = lock_application_status_for_edit(user.pk, original.application_status)
+                form.instance = locked_user
+                if desired_status != original.application_status:
+                    form.cleaned_data["application_status"] = original.application_status
                 updated_user = form.save()
+                if actor_role == "admin" and desired_status != original.application_status:
+                    updated_user, _enrollment = set_application_status(
+                        updated_user, request.user, desired_status, original.application_status
+                    )
                 if actor_role == "admin" and apply_study_mode_from_city(updated_user):
                     updated_user.save(update_fields=["study_mode"])
-                if (
-                    original.application_status != updated_user.application_status
-                    or original.is_active and not updated_user.is_active
+                if desired_status == original.application_status and (
+                    original.is_active and not updated_user.is_active
                     or original.role_id != updated_user.role_id
                 ):
                     revoke_user_mobile_access(updated_user)
                 scope = form.cleaned_data.get("enrollment_scope")
-                if actor_role == "admin" and scope:
+                if actor_role == "admin" and scope and desired_status == "active":
                     set_user_normal_enrollment_scope(updated_user, request.user, scope)
         except ValidationError as exc:
-            form.add_error("enrollment_scope", exc)
+            form.add_error(None, exc)
         else:
             if user.pk == request.user.pk and form.cleaned_data.get("password"):
                 update_session_auth_hash(request, updated_user)
+            if desired_status != original.application_status:
+                send_application_status_notification(updated_user, desired_status)
             messages.success(request, _("User data updated successfully."))
             return redirect("user-profile", user_id=user.pk)
 
+    if request.method == "POST":
+        user.refresh_from_db()
     active_enrollment = (
         Enrollment.objects.filter(
             student=user,
@@ -1432,6 +1450,7 @@ def user_profile(request, user_id):
     return render(request, "user_detail.html", {
         "profile_user": user,
         "edit_form": form,
+        "can_edit_user": can_manage_applications(request.user),
         "active_enrollment": active_enrollment,
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
@@ -1765,7 +1784,7 @@ def exceptional_course_assign(request, user_id):
         messages.error(request, str(exc))
     return redirect("historical-intake")
 
-@capability_required(can_manage_content)
+@capability_required(can_manage_applications)
 def user_bulk_create(request):
     if request.method == 'POST':
         form = CSVUploadForm(request.POST, request.FILES)
@@ -1866,16 +1885,6 @@ class CreateUser(UserBaseView, CreateView):
     success_url = reverse_lazy("user-create")
     action = _("create") # Translate action
 
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        user = User.objects.get(username=self.request.user)
-        if user.role and user.role.role != "admin":
-            form.fields.pop("role", None)
-            form.fields.pop("password", None)
-            form.fields.pop("time_zone", None)
-        return form
-
-
 def _restrict_user_update_form(form, actor):
     actor_role = getattr(getattr(actor, "role", None), "role", None)
     if actor_role != "admin":
@@ -1894,32 +1903,40 @@ class UpdateUser(UserBaseView, UpdateView):
         return _restrict_user_update_form(form, self.request.user)
 
     def form_valid(self, form):
+        actor = self.request.user
+        actor_role = getattr(getattr(actor, "role", None), "role", None)
         try:
             original = User.objects.get(pk=self.object.pk)
+            desired_status = form.cleaned_data.get("application_status", original.application_status)
             with transaction.atomic():
+                locked_user = lock_application_status_for_edit(self.object.pk, original.application_status)
+                form.instance = locked_user
+                self.object = locked_user
+                if desired_status != original.application_status:
+                    form.cleaned_data["application_status"] = original.application_status
                 response = super().form_valid(form)
-                user = User.objects.get(username=self.request.user)
-                if (
-                    user.role
-                    and user.role.role == "admin"
-                    and apply_study_mode_from_city(self.object)
-                ):
+                if actor_role == "admin" and desired_status != original.application_status:
+                    self.object, _enrollment = set_application_status(
+                        self.object, actor, desired_status, original.application_status
+                    )
+                if actor_role == "admin" and apply_study_mode_from_city(self.object):
                     self.object.save(update_fields=["study_mode"])
-                if (
-                    original.application_status != self.object.application_status
-                    or original.is_active and not self.object.is_active
+                if desired_status == original.application_status and (
+                    original.is_active and not self.object.is_active
                     or original.role_id != self.object.role_id
                 ):
                     revoke_user_mobile_access(self.object)
                 scope = form.cleaned_data.get("enrollment_scope")
-                if user.role and user.role.role == "admin" and scope:
-                    set_user_normal_enrollment_scope(self.object, user, scope)
+                if actor_role == "admin" and scope and desired_status == "active":
+                    set_user_normal_enrollment_scope(self.object, actor, scope)
         except ValidationError as exc:
-            form.add_error("enrollment_scope", exc)
+            form.add_error(None, exc)
             return self.form_invalid(form)
         # If the password field was changed, update the session to keep user logged in
         if self.object.pk == self.request.user.pk and "password" in form.cleaned_data and form.cleaned_data["password"]:
             update_session_auth_hash(self.request, self.object)
+        if desired_status != original.application_status:
+            send_application_status_notification(self.object, desired_status)
 
         return response
 
@@ -2106,6 +2123,17 @@ def quiz_detail(request, quiz_id):
             (quiz.name or _("(untitled)"), None),
         ]),
     })
+
+
+@require_POST
+@capability_required(can_manage_academic_setup)
+def regrade_quiz_question(request, quiz_id, question_id):
+    with transaction.atomic():
+        get_object_or_404(Quiz.objects.select_for_update().only("pk"), pk=quiz_id)
+        question = get_object_or_404(Question, pk=question_id, quiz_id=quiz_id, auto_grade=True)
+        evaluated = regrade_quiz_submissions(quiz_id, [question.pk])
+    messages.success(request, _("%(count)s saved answers regraded.") % {"count": evaluated})
+    return redirect(reverse("quiz-view", args=[quiz_id]))
 
 
 @require_POST
@@ -3310,36 +3338,59 @@ def update_quiz(request, quiz_id):
             offering_id = request.POST.get("course_offering")
             requested_offering = get_object_or_404(CourseOffering, pk=offering_id)
 
-            quiz.name = requested_name
-            quiz.opening_date = requested_opening_date
-            quiz.closing_date = requested_closing_date
-            quiz.total_grade = requested_total_grade
-            quiz.status = publication_status
-            quiz.quiz_type = requested_quiz_type
-            quiz.course_offering = requested_offering
-
-            # Create Questions
-            questions_obj = []
-            questions_exists = []
-            questions_id = []
-
-            valid_question_ids = set(quiz.questions.values_list("pk", flat=True))
-            for question in questions.values():
-                question_instance = build_question_instance(question, quiz)
-
-                question_id = str(question.get("id", "")).strip()
-                if question_id and int(question_id) in valid_question_ids:
-                    question_instance.pk = int(question_id)
-                    questions_id.append(int(question_id))
-                    questions_exists.append(question_instance)
-                else:
-                    questions_obj.append(question_instance)
-            
             with transaction.atomic():
                 quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
                 if quiz.status != PublicationStatus.DRAFT and not can_edit_published_quiz:
                     error(request, _("Published or archived quiz cannot be edited."), extra_tags="alert-danger")
                     return redirect(reverse("quiz-update", args=[quiz_id]))
+                if not can_edit_published_quiz and (
+                    Grade.objects.filter(quiz_id=quiz_id).exists()
+                    or Submission.objects.filter(question__quiz_id=quiz_id).exists()
+                ):
+                    raise PermissionDenied
+
+                current_questions = {
+                    question.pk: question
+                    for question in Question.objects.filter(quiz_id=quiz_id)
+                }
+                questions_obj = []
+                questions_exists = []
+                questions_id = []
+                regrade_ids = set()
+                reset_manual_ids = set()
+                clamp_manual_ids = set()
+                for question_data in questions.values():
+                    question_instance = build_question_instance(question_data, quiz)
+                    question_id = str(question_data.get("id", "")).strip()
+                    if not question_id:
+                        questions_obj.append(question_instance)
+                        continue
+                    if not question_id.isdigit() or int(question_id) not in current_questions:
+                        raise ValidationError(_("Invalid quiz question."))
+                    question_pk = int(question_id)
+                    if question_pk in questions_id:
+                        raise ValidationError(_("Invalid quiz question."))
+                    previous = current_questions[question_pk]
+                    question_instance.pk = question_pk
+                    questions_id.append(question_pk)
+                    questions_exists.append(question_instance)
+                    scoring_changed = any(
+                        getattr(previous, field) != getattr(question_instance, field)
+                        for field in ("correct_answer", "question_type", "config", "grade", "auto_grade")
+                    )
+                    if scoring_changed:
+                        if previous.auto_grade or question_instance.auto_grade:
+                            regrade_ids.add(question_pk)
+                            if previous.auto_grade and not question_instance.auto_grade:
+                                reset_manual_ids.add(question_pk)
+                        elif previous.question_type != question_instance.question_type:
+                            regrade_ids.add(question_pk)
+                            reset_manual_ids.add(question_pk)
+                        elif previous.grade != question_instance.grade:
+                            regrade_ids.add(question_pk)
+                            clamp_manual_ids.add(question_pk)
+
+                removed_ids = set(current_questions) - set(questions_id)
                 previous_status = quiz.status
                 previous_opening_date = quiz.opening_date
                 previous_closing_date = quiz.closing_date
@@ -3360,6 +3411,13 @@ def update_quiz(request, quiz_id):
                 # Current New Questions
                 Question.objects.bulk_create(questions_obj)
                 quiz.save()
+                if regrade_ids or removed_ids:
+                    regrade_quiz_submissions(
+                        quiz_id,
+                        regrade_ids,
+                        reset_manual_ids=reset_manual_ids,
+                        clamp_manual_ids=clamp_manual_ids,
+                    )
                 published_window_changed = (
                     previous_opening_date != quiz.opening_date
                     or previous_closing_date != quiz.closing_date
@@ -3384,6 +3442,9 @@ def update_quiz(request, quiz_id):
         except Http404:
             error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
             logger.error("Offering or Quiz with id %s was not found", quiz_id)
+
+        except PermissionDenied:
+            raise
 
         except Exception as e:
             error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
@@ -3725,6 +3786,7 @@ def delete_quiz_submission(request, quiz_id, grade_id):
 
     try:
         with transaction.atomic():
+            Quiz.objects.select_for_update().only("pk").get(pk=quiz_id)
             # Match take_exam's student-row serialization so deleting an attempt
             # cannot race a duplicate submission for the same student and quiz.
             User.objects.select_for_update().get(pk=student_id)
@@ -3767,6 +3829,7 @@ def submission_user(request, quiz_id, user_id):
             "username" : request.user.username,
             "questions" : questions,
             "is_student" : False,
+            "can_correct_grade": can_manage_academic_setup(request.user),
             "mode" : "view",
             "extended_view" : "admin_panel.html",
             "id" : "content",
@@ -3775,9 +3838,12 @@ def submission_user(request, quiz_id, user_id):
         })
     
     elif request.method == "POST":
+        if not can_manage_academic_setup(request.user):
+            raise PermissionDenied
         questions, _parsed_form_data = unpack_quiz_form(request.POST)
         try:
             with transaction.atomic():
+                Quiz.objects.select_for_update().only("pk").get(pk=quiz_id)
                 grade = Grade.objects.select_for_update().filter(
                     quiz_id=quiz_id,
                     user_id=user_id,
@@ -4563,66 +4629,65 @@ def signup(request):
     if request.method == "POST":
         form = SignupForm(request.POST, request.FILES)
         if form.is_valid():
+            user = None
             uploaded_keys = []
             try:
                 with transaction.atomic():
                     user = form.save()
                     study_mode_changed = apply_study_mode_from_city(user)
-                    file_type_map = APPLICATION_DOCUMENT_FIELDS
-                    required_upload_types = {"identity_front", "profile"}
-                    if user.identity_type == "national_id":
-                        required_upload_types.add("identity_back")
-                    for upload_type, model_field in file_type_map.items():
-                        if upload_type in request.FILES:
-                            uploaded = upload_application_file(
-                                CLOUD_CLIENT,
-                                bucket_name,
-                                user.id,
-                                request.FILES[upload_type],
-                                upload_type,
-                            )
-                            if uploaded:
-                                setattr(user, model_field, uploaded.original_key)
-                                setattr(user, APPLICATION_PREVIEW_FIELDS[upload_type], uploaded.preview_key)
-                                uploaded_keys.extend(uploaded.keys)
-                    missing_documents = [
-                        upload_type for upload_type in required_upload_types
-                        if not getattr(user, file_type_map[upload_type], None)
-                    ]
-                    if missing_documents:
-                        document_labels = {
-                            "identity_front": _("Identity Front"),
-                            "identity_back": _("Identity Back"),
-                            "profile": _("Profile Photo"),
-                        }
-                        named = ", ".join(str(document_labels[t]) for t in file_type_map if t in missing_documents)
-                        raise ValidationError(_("Missing required document(s): %(documents)s.") % {"documents": named})
-                    if uploaded_keys:
-                        user.save(
-                            update_fields=[
-                                *[v for v in file_type_map.values() if getattr(user, v, None)],
-                                *[v for v in APPLICATION_PREVIEW_FIELDS.values() if getattr(user, v, None)],
-                                "study_mode",
-                            ]
-                        )
-                    elif study_mode_changed:
+                    if study_mode_changed:
                         user.save(update_fields=["study_mode"])
-                    send_application_received(user)
+
+                file_type_map = APPLICATION_DOCUMENT_FIELDS
+                required_upload_types = {"identity_front", "profile"}
+                if user.identity_type == "national_id":
+                    required_upload_types.add("identity_back")
+                for upload_type, model_field in file_type_map.items():
+                    if upload_type not in request.FILES:
+                        continue
+                    uploaded = upload_application_file(
+                        CLOUD_CLIENT,
+                        bucket_name,
+                        user.id,
+                        request.FILES[upload_type],
+                        upload_type,
+                    )
+                    if uploaded:
+                        setattr(user, model_field, uploaded.original_key)
+                        setattr(user, APPLICATION_PREVIEW_FIELDS[upload_type], uploaded.preview_key)
+                        uploaded_keys.extend(uploaded.keys)
+
+                missing_documents = [
+                    upload_type for upload_type in required_upload_types
+                    if not getattr(user, file_type_map[upload_type], None)
+                ]
+                if missing_documents:
+                    document_labels = {
+                        "identity_front": _("Identity Front"),
+                        "identity_back": _("Identity Back"),
+                        "profile": _("Profile Photo"),
+                    }
+                    named = ", ".join(str(document_labels[t]) for t in file_type_map if t in missing_documents)
+                    raise ValidationError(_("Missing required document(s): %(documents)s.") % {"documents": named})
+                if uploaded_keys:
+                    user.save(
+                        update_fields=[
+                            *[v for v in file_type_map.values() if getattr(user, v, None)],
+                            *[v for v in APPLICATION_PREVIEW_FIELDS.values() if getattr(user, v, None)],
+                        ]
+                    )
             except ValidationError as exc:
-                for key in uploaded_keys:
-                    try:
-                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
-                    except Exception:
-                        pass
+                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+                if user is not None:
+                    user.delete()
                 form.add_error(None, "; ".join(str(message) for message in exc.messages))
                 return render(request, "signup.html", {"form": form, "copy": copy, "egyptian_cities": EGYPTIAN_CITIES})
             except Exception:
-                for key in uploaded_keys:
-                    try:
-                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
-                    except Exception:
-                        pass
+                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+                if user is not None:
+                    user.delete()
                 raise
+            send_application_received(user)
             return render(request, "signup_success.html")
     else:
         form = SignupForm()
@@ -4709,27 +4774,44 @@ def application_review(request, user_id):
         "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
     }
     if request.method == "POST":
+        original_status = user.application_status
+        original_role_id = user.role_id
+        original_is_active = user.is_active
         form = ApplicationAdminForm(request.POST, request.FILES, instance=user)
         if form.is_valid():
             uploaded_keys = []
+            uploaded_by_type = {}
             old_keys = []
-            original_status = user.application_status
-            original_role_id = user.role_id
-            original_is_active = user.is_active
+            database_committed = False
             desired_status = form.cleaned_data["application_status"]
             try:
+                for upload_type, (_model_field, _preview_field, document_label) in document_fields.items():
+                    uploaded_file = form.cleaned_data.get(upload_type)
+                    if not uploaded_file:
+                        continue
+                    uploaded = upload_application_file(
+                        CLOUD_CLIENT,
+                        bucket_name,
+                        user.id,
+                        uploaded_file,
+                        upload_type,
+                    )
+                    if not uploaded:
+                        raise ValidationError(
+                            _("The %(document)s could not be uploaded.")
+                            % {"document": document_label}
+                        )
+                    uploaded_by_type[upload_type] = uploaded
+                    uploaded_keys.extend(uploaded.keys)
+
                 with transaction.atomic():
+                    locked_user = lock_application_status_for_edit(user.pk, original_status)
+                    original_role_id = locked_user.role_id
+                    original_is_active = locked_user.is_active
+                    form.instance = locked_user
                     if desired_status != original_status:
-                        form.instance.application_status = original_status
-                        form.instance.is_active = user.is_active
+                        form.cleaned_data["application_status"] = original_status
                     user = form.save()
-                    if apply_study_mode_from_city(user):
-                        user.save(update_fields=["study_mode"])
-                    if (
-                        original_role_id != user.role_id
-                        or original_is_active and not user.is_active
-                    ):
-                        revoke_user_mobile_access(user)
                     for upload_type, (model_field, preview_field, document_label) in document_fields.items():
                         previous_key = getattr(user, model_field, None)
                         previous_preview_key = getattr(user, preview_field, None)
@@ -4737,17 +4819,8 @@ def application_review(request, user_id):
                             old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
                             setattr(user, model_field, None)
                             setattr(user, preview_field, None)
-                        uploaded_file = form.cleaned_data.get(upload_type)
-                        if uploaded_file:
-                            uploaded = upload_application_file(
-                                CLOUD_CLIENT,
-                                bucket_name,
-                                user.id,
-                                uploaded_file,
-                                upload_type,
-                            )
-                            if not uploaded:
-                                raise ValidationError(_("The %(document)s could not be uploaded.") % {"document": document_label})
+                        uploaded = uploaded_by_type.get(upload_type)
+                        if uploaded:
                             old_keys.extend(
                                 key
                                 for key in (previous_key, previous_preview_key)
@@ -4755,42 +4828,45 @@ def application_review(request, user_id):
                             )
                             setattr(user, model_field, uploaded.original_key)
                             setattr(user, preview_field, uploaded.preview_key)
-                            uploaded_keys.extend(uploaded.keys)
                     user.save()
 
                     if desired_status != original_status:
                         user, _enrollment = set_application_status(
                             user, request.user, desired_status, original_status
                         )
-                for old_key in set(old_keys):
-                    try:
-                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=old_key)
-                    except Exception:
-                        logger.exception("Could not delete replaced application file %s", old_key)
+                    if desired_status == original_status and (
+                        original_role_id != user.role_id
+                        or original_is_active and not user.is_active
+                    ):
+                        revoke_user_mobile_access(user)
+                    if apply_study_mode_from_city(user):
+                        user.save(update_fields=["study_mode"])
+                database_committed = True
+                delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
                 if desired_status != original_status:
-                    if desired_status == "active":
-                        send_application_activated(user)
-                    elif desired_status == "declined":
-                        send_application_declined(user)
+                    try:
+                        send_application_status_notification(user, desired_status)
+                    except Exception:
+                        logger.exception("Could not queue application status notification for user %s", user.pk)
                 messages.success(request, _("Application and student data updated."))
                 return redirect("application-review", user_id=user.pk)
             except (ValidationError, PermissionDenied) as exc:
-                for key in uploaded_keys:
-                    try:
-                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
-                    except Exception:
-                        logger.exception("Could not clean up application file %s", key)
+                if not database_committed:
+                    delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
                 form.add_error(None, str(exc))
+            except User.DoesNotExist as exc:
+                if not database_committed:
+                    delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+                raise Http404 from exc
             except Exception:
-                for key in uploaded_keys:
-                    try:
-                        CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
-                    except Exception:
-                        logger.exception("Could not clean up application file %s", key)
+                if not database_committed:
+                    delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
                 raise
     else:
         form = ApplicationAdminForm(instance=user)
 
+    if request.method == "POST":
+        user.refresh_from_db()
     documents = []
     for document_type, (field, _preview_field, label) in document_fields.items():
         key = getattr(user, field, None)
@@ -4935,40 +5011,56 @@ def application_document(request, user_id, document_type):
 def profile_missing_documents(request):
     """Accept only currently missing signup documents for the logged-in user."""
     uploaded_keys = []
+    uploaded_by_type = {}
     try:
+        user = User.objects.get(pk=request.user.pk)
+        form = MissingApplicationDocumentsForm(
+            request.POST,
+            request.FILES,
+            instance=user,
+        )
+        submitted_types = set(request.FILES)
+        allowed_types = set(form.document_types)
+        if not submitted_types:
+            raise ValidationError(_("Select at least one missing document."))
+        if not submitted_types.issubset(allowed_types):
+            raise ValidationError(_("Only missing signup documents can be uploaded."))
+        if not form.is_valid():
+            raise ValidationError(form.errors.as_text())
+
+        for document_type, _model_field in form.document_types.items():
+            uploaded_file = form.cleaned_data.get(document_type)
+            if not uploaded_file:
+                continue
+            uploaded = upload_application_file(
+                CLOUD_CLIENT,
+                bucket_name,
+                user.pk,
+                uploaded_file,
+                document_type,
+            )
+            if not uploaded:
+                raise ValidationError(
+                    _("The %(document)s could not be uploaded.")
+                    % {"document": form.fields[document_type].label}
+                )
+            uploaded_by_type[document_type] = uploaded
+            uploaded_keys.extend(uploaded.keys)
+        if not uploaded_by_type:
+            raise ValidationError(_("Select at least one missing document."))
+
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
-            form = MissingApplicationDocumentsForm(
-                request.POST,
-                request.FILES,
-                instance=user,
-            )
-            submitted_types = set(request.FILES)
-            allowed_types = set(form.document_types)
-            if not submitted_types:
-                raise ValidationError(_("Select at least one missing document."))
+            current_form = MissingApplicationDocumentsForm(instance=user)
+            current_document_types = current_form.document_types
+            allowed_types = set(current_document_types)
             if not submitted_types.issubset(allowed_types):
                 raise ValidationError(_("Only missing signup documents can be uploaded."))
-            if not form.is_valid():
-                raise ValidationError(form.errors.as_text())
-
             update_fields = []
-            for document_type, model_field in form.document_types.items():
-                uploaded_file = form.cleaned_data.get(document_type)
-                if not uploaded_file:
-                    continue
-                uploaded = upload_application_file(
-                    CLOUD_CLIENT,
-                    bucket_name,
-                    user.pk,
-                    uploaded_file,
-                    document_type,
-                )
+            for document_type, model_field in current_document_types.items():
+                uploaded = uploaded_by_type.get(document_type)
                 if not uploaded:
-                    raise ValidationError(
-                        _("The %(document)s could not be uploaded.")
-                        % {"document": form.fields[document_type].label}
-                    )
+                    continue
                 preview_field = APPLICATION_PREVIEW_FIELDS[document_type]
                 setattr(user, model_field, uploaded.original_key)
                 setattr(user, preview_field, uploaded.preview_key)
@@ -4978,21 +5070,13 @@ def profile_missing_documents(request):
                 raise ValidationError(_("Select at least one missing document."))
             user.save(update_fields=update_fields)
     except (ValidationError, User.DoesNotExist) as exc:
-        for key in uploaded_keys:
-            try:
-                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
-            except Exception:
-                logger.exception("Could not clean up profile document %s", key)
+        delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
         if isinstance(exc, User.DoesNotExist):
             raise Http404 from exc
         messages.error(request, str(exc))
         return redirect("view-profile")
     except Exception:
-        for key in uploaded_keys:
-            try:
-                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=key)
-            except Exception:
-                logger.exception("Could not clean up profile document %s", key)
+        delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
         raise
 
     messages.success(request, _("Missing signup documents uploaded successfully."))
@@ -5005,27 +5089,36 @@ def profile_academic_payment(request):
     """Accept one new, non-replaceable receipt for an eligible academic scope."""
     uploaded_keys = []
     try:
+        user = User.objects.get(pk=request.user.pk)
+        form = AcademicPaymentForm(request.POST, request.FILES, student=user)
+        if not form.is_valid():
+            raise ValidationError(form.errors.as_text())
+        scope = form.cleaned_data["academic_year_level"]
+        if AcademicPayment.objects.filter(student=user, academic_year_level=scope).exists():
+            raise ValidationError(_("A payment receipt already exists for this academic level."))
+
+        uploaded = upload_application_file(
+            CLOUD_CLIENT,
+            bucket_name,
+            user.pk,
+            form.cleaned_data["payment"],
+            "academic_payment",
+        )
+        if not uploaded:
+            raise ValidationError(_("The payment receipt could not be uploaded."))
+        uploaded_keys.extend(uploaded.keys)
+
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
-            form = AcademicPaymentForm(request.POST, request.FILES, student=user)
-            if not form.is_valid():
-                raise ValidationError(form.errors.as_text())
-            scope = form.cleaned_data["academic_year_level"]
+            from .payments import academic_payment_scopes_for_student
+
+            if not academic_payment_scopes_for_student(user).filter(pk=scope.pk).exists():
+                raise ValidationError(_("The selected academic scope is no longer available for payment."))
             if AcademicPayment.objects.filter(
                 student=user,
                 academic_year_level=scope,
             ).exists():
                 raise ValidationError(_("A payment receipt already exists for this academic level."))
-            uploaded = upload_application_file(
-                CLOUD_CLIENT,
-                bucket_name,
-                user.pk,
-                form.cleaned_data["payment"],
-                "academic_payment",
-            )
-            if not uploaded:
-                raise ValidationError(_("The payment receipt could not be uploaded."))
-            uploaded_keys.extend(uploaded.keys)
             AcademicPayment.objects.create(
                 student=user,
                 academic_year_level=scope,
@@ -5033,21 +5126,13 @@ def profile_academic_payment(request):
                 receipt_preview_key=uploaded.preview_key,
             )
     except (ValidationError, User.DoesNotExist) as exc:
-        for uploaded_key in uploaded_keys:
-            try:
-                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=uploaded_key)
-            except Exception:
-                logger.exception("Could not clean up academic payment %s", uploaded_key)
+        delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
         if isinstance(exc, User.DoesNotExist):
             raise Http404 from exc
         messages.error(request, str(exc))
         return redirect("view-profile")
     except Exception:
-        for uploaded_key in uploaded_keys:
-            try:
-                CLOUD_CLIENT.delete_object(Bucket=bucket_name, Key=uploaded_key)
-            except Exception:
-                logger.exception("Could not clean up academic payment %s", uploaded_key)
+        delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
         raise
 
     messages.success(request, _("Academic payment receipt uploaded successfully."))
@@ -5069,12 +5154,12 @@ def application_decision(request, user_id, decision):
         if decision == "activate":
             user, _enrollment = accept_application(user, request.user, expected_status)
             if original_status != user.application_status:
-                send_application_activated(user)
+                send_application_status_notification(user, user.application_status)
             success_message = _("%(name)s activated.") % {"name": user.get_full_name() or user.username}
         elif decision == "decline":
             user = decline_application(user, request.user, expected_status)
             if original_status != user.application_status:
-                send_application_declined(user)
+                send_application_status_notification(user, user.application_status)
             success_message = _("%(name)s declined.") % {"name": user.get_full_name() or user.username}
         else:
             user = reopen_application(user, request.user, expected_status)
@@ -5185,10 +5270,7 @@ def bulk_application_decision(request):
             results["errors"].extend(batch_results["errors"])
             for changed_user in batch_results["changed_users"]:
                 try:
-                    if decision == "activate":
-                        send_application_activated(changed_user)
-                    elif decision == "decline":
-                        send_application_declined(changed_user)
+                    send_application_status_notification(changed_user, target_status)
                 except Exception as exc:
                     logger.exception(
                         "Application decision notification failed for user %s",
@@ -5362,7 +5444,7 @@ def level_delete(request, level):
         messages.success(request, _("Level %(level)d deleted.") % {"level": level})
     return redirect("levels-dashboard")
 
-@capability_required(can_manage_content)
+@capability_required(can_manage_academic_setup)
 def academic_setup(request):
     search = request.GET.get("q", "").strip()
     active_filter = request.GET.get("active", "all")
@@ -5376,6 +5458,13 @@ def academic_setup(request):
     else:
         active_filter = "all"
     year_page_obj = Paginator(years, 10).get_page(request.GET.get("page", 1))
+    course_levels = list(Level.objects.order_by("ordering"))
+    for year in year_page_obj.object_list:
+        year.edit_form = AcademicYearForm(
+            instance=year,
+            auto_id=f"edit-year-{year.pk}-%s",
+            level_choices=course_levels,
+        )
 
     selected_scope_id = request.GET.get("scope")
     selected_year_id = request.GET.get("academic_year")
@@ -5411,7 +5500,7 @@ def academic_setup(request):
             offering_status = "all"
     offering_page_obj = Paginator(offerings.order_by("course__name"), 15).get_page(request.GET.get("offering_page", 1))
     scope_courses = Course.objects.filter(level=selected_scope.level).order_by("name") if selected_scope else Course.objects.none()
-    year_form = AcademicYearForm()
+    year_form = AcademicYearForm(level_choices=course_levels)
     offering_form = CourseOfferingForm()
     copy_form = OfferingCopyForm(initial={
         "target_year_level": selected_scope.pk
@@ -5447,7 +5536,7 @@ def academic_setup(request):
         "year_form": year_form,
         "offering_form": offering_form,
         "copy_form": copy_form,
-        "COURSE_LEVELS": Level.objects.order_by("ordering"),
+        "COURSE_LEVELS": course_levels,
         "meeting_weekday_choices": [(0, _("Monday")), (1, _("Tuesday")), (2, _("Wednesday")), (3, _("Thursday")), (4, _("Friday")), (5, _("Saturday")), (6, _("Sunday"))],
     })
 
@@ -5494,7 +5583,8 @@ def academic_year_create(request):
     if request.method == "POST":
         form = AcademicYearForm(request.POST)
         if form.is_valid():
-            year = form.save()
+            with transaction.atomic():
+                form.save()
             messages.success(request, _("Academic year created."))
         else:
             for err in form.errors.get("__all__", []):
@@ -5514,8 +5604,13 @@ def academic_year_edit(request, year_id):
     if request.method == "POST":
         form = AcademicYearForm(request.POST, instance=year)
         if form.is_valid():
-            year = form.save()
-            messages.success(request, _("Academic year updated."))
+            try:
+                with transaction.atomic():
+                    form.save()
+            except ProtectedError:
+                messages.error(request, _("Cannot remove a level referenced by academic records."))
+            else:
+                messages.success(request, _("Academic year updated."))
         else:
             for err in form.errors.get("__all__", []):
                 messages.error(request, err)
@@ -5525,7 +5620,7 @@ def academic_year_edit(request, year_id):
                 label = form.fields[field].label if field in form.fields else field
                 for err in form.errors[field]:
                     messages.error(request, _("%(label)s: %(error)s") % {"label": label, "error": err})
-        return redirect("academic-setup")
+        return redirect(f"{reverse('academic-setup')}?academic_year={year.pk}")
 
 
 @require_POST

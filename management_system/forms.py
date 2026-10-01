@@ -1,6 +1,7 @@
 from django.contrib.auth.forms import AuthenticationForm, UsernameField
 from django import forms
 import secrets
+from datetime import date
 
 from django.core.exceptions import ValidationError
 from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
@@ -14,6 +15,20 @@ from .utils.countries import country_choices
 from .utils.timezones import parse_application_datetime
 from .utils.quiz_access import eligible_quiz_students
 from .announcements import AnnouncementError, clean_announcement_action
+
+
+def _joined_date_field(*, required: bool = True, initial: date | None = None) -> forms.DateField:
+    return forms.DateField(
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+        required=required,
+        initial=initial,
+    )
+
+
+def _set_password_if_provided(user: User, password: str | None) -> None:
+    if password:
+        user.set_password(password)
 
 
 class CanonicalUsernameField(UsernameField):
@@ -48,7 +63,7 @@ class UserLoginForm(AuthenticationForm):
             'placeholder': _('Password'), # Localized
             'id': 'password',
         }
-))
+    ), strip=False)
     
 class UserCreationForm(forms.ModelForm):
     date = assign_academic_date()
@@ -63,6 +78,7 @@ class UserCreationForm(forms.ModelForm):
         self.fields['password'].label = _("Password") # Localized
         self.fields['time_zone'].label = _("Time zone")
         self.fields['time_zone'].choices = user_time_zone_choices()
+        self.order_fields(["first_name", "last_name", "username", "password", "joined_date", "role", "time_zone"])
 
     username = CanonicalUsernameField(widget=forms.TextInput(
         attrs={ 
@@ -88,28 +104,24 @@ class UserCreationForm(forms.ModelForm):
         required=False
     )
 
-    joined_date = forms.DateField(
-        input_formats=["%d/%m/%Y"],
-        widget= forms.DateInput(format="%d/%m/%Y"),
-        initial=date, 
-        required=False
-    )
+    joined_date = _joined_date_field(required=False, initial=date)
 
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={
             'placeholder': _('Password'), # Localized
             'id': 'password',
-        }))
+        }), strip=False)
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "username", "password", "joined_date", "role", "time_zone"]
+        # Password is a declared input, not a model-bound field. Only save()
+        # may replace the stored hash after a non-empty value is submitted.
+        fields = ["first_name", "last_name", "username", "joined_date", "role", "time_zone"]
         exclude = []
 
     def save(self, commit=True):
         user = super(UserCreationForm, self).save(False)
-        if self.cleaned_data.get("password"):
-            user.set_password(self.cleaned_data['password'])
+        _set_password_if_provided(user, self.cleaned_data.get("password"))
         if commit:
             user.save()
         return user
@@ -117,10 +129,29 @@ class UserCreationForm(forms.ModelForm):
 
 class CanonicalUserAdminForm(forms.ModelForm):
     username = CanonicalUsernameField()
+    password = forms.CharField(
+        required=False,
+        strip=False,
+        label=_("Password (leave blank to keep current)"),
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
 
     class Meta:
         model = User
         fields = "__all__"
+        exclude = ["password"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["password"].required = not bool(self.instance.pk)
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        _set_password_if_provided(user, self.cleaned_data.get("password"))
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
 
 
 class UserUpdateForm(UserCreationForm):
@@ -134,7 +165,10 @@ class UserUpdateForm(UserCreationForm):
         attrs={
             'placeholder': _('Password'), # Localized
             'id': 'password',
-        }), required=False)
+            'autocomplete': 'new-password',
+        }), required=False, strip=False)
+
+    joined_date = _joined_date_field()
 
     email = forms.EmailField(
         max_length=254,
@@ -228,7 +262,7 @@ class UserUpdateForm(UserCreationForm):
     class Meta:
         model = User
         fields = [
-            "first_name", "last_name", "username", "password", "joined_date", "role", "time_zone",
+            "first_name", "last_name", "username", "joined_date", "role", "time_zone",
             "email", "phone", "country", "city", "education_or_job", "priest_name", "priest_phone",
             "church", "service", "identity_type", "identity_number", "study_mode",
             "study_mode_override", "application_status", "decision_notes", "enrollment_scope",
@@ -237,7 +271,8 @@ class UserUpdateForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._original_password = self.instance.password
+        self.fields["password"].label = _("Password (leave blank to keep current)")
+        self.fields["first_name"].required = False
         current_country = getattr(self.instance, "country", None)
         if current_country and current_country not in dict(country_choices()):
             self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
@@ -279,13 +314,6 @@ class UserUpdateForm(UserCreationForm):
                 raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
         return identity_number
 
-    def save(self, commit=True):
-        password = self.cleaned_data.get("password")
-        if not password:
-            self.instance.password = self._original_password
-        return super(UserUpdateForm, self).save(commit)
-
-
 class CourseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -303,7 +331,11 @@ class CourseForm(forms.ModelForm):
 
 class AcademicYearForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
+        level_choices = kwargs.pop("level_choices", None)
         super().__init__(*args, **kwargs)
+        levels = list(level_choices) if level_choices is not None else list(Level.objects.order_by("ordering"))
+        level_ids = [level.pk for level in levels]
+        level_queryset = Level.objects.filter(pk__in=level_ids).order_by("ordering")
         self.fields["name"].label = _("Academic year name")
         self.fields["levels"].label = _("Levels")
         self.fields["starts_on"].label = _("Start date")
@@ -311,10 +343,15 @@ class AcademicYearForm(forms.ModelForm):
         self.fields["ordering"].label = _("Ordering")
         self.fields["graduation_level"].label = _("Graduation level")
         self.fields["graduation_level"].help_text = _("The level whose completion opens the graduation gallery for this year.")
-        self.fields["levels"].queryset = Level.objects.order_by("ordering")
+        self.fields["levels"].queryset = level_queryset
         self.fields["levels"].required = True
-        self.fields["graduation_level"].queryset = Level.objects.order_by("ordering")
+        self.fields["levels"].choices = [(level.pk, level.display_name) for level in levels]
+        self.fields["graduation_level"].queryset = level_queryset
         self.fields["graduation_level"].required = False
+        self.fields["graduation_level"].choices = [
+            ("", "---------"),
+            *((level.pk, level.display_name) for level in levels),
+        ]
 
     class Meta:
         model = AcademicYear
@@ -823,10 +860,12 @@ class ApplicationAdminForm(forms.ModelForm):
     )
     password = forms.CharField(
         required=False,
+        strip=False,
         label=_("Password (leave blank to keep current)"),
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
-    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=False)
+    joined_date = _joined_date_field()
+    time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
     identity_front = forms.FileField(required=False, label=_("Replace identity front"))
     identity_back = forms.FileField(required=False, label=_("Replace identity back"))
     payment = forms.FileField(required=False, label=_("Replace payment receipt (optional)"))
@@ -840,7 +879,7 @@ class ApplicationAdminForm(forms.ModelForm):
     class Meta:
         model = User
         fields = [
-            "first_name", "last_name", "username", "email", "password", "joined_date", "phone", "country", "city",
+            "first_name", "last_name", "username", "email", "joined_date", "phone", "country", "city",
             "education_or_job", "priest_name", "priest_phone", "church", "service", "identity_type",
             "identity_number", "time_zone", "study_mode", "study_mode_override", "role", "is_active",
             "application_status", "decision_notes",
@@ -892,6 +931,15 @@ class ApplicationAdminForm(forms.ModelForm):
         for field_name, label in labels.items():
             if field_name in self.fields:
                 self.fields[field_name].label = label
+        self.order_fields([
+            "first_name", "last_name", "username", "email", "password", "joined_date",
+            "phone", "country", "city", "education_or_job", "priest_name",
+            "priest_phone", "church", "service", "identity_type", "identity_number",
+            "time_zone", "study_mode", "study_mode_override", "role", "is_active",
+            "application_status", "decision_notes", "identity_front", "identity_back",
+            "payment", "profile", "clear_identity_front", "clear_identity_back",
+            "clear_payment", "clear_profile",
+        ])
         self.fields["time_zone"].choices = user_time_zone_choices()
         self.fields["time_zone"].initial = getattr(self.instance, "time_zone", None) or settings.TIME_ZONE
         current_country = getattr(self.instance, "country", None)
@@ -927,9 +975,7 @@ class ApplicationAdminForm(forms.ModelForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        password = self.cleaned_data.get("password")
-        if password:
-            user.set_password(password)
+        _set_password_if_provided(user, self.cleaned_data.get("password"))
         if commit:
             user.save()
         return user
@@ -940,7 +986,10 @@ class SignupForm(forms.ModelForm):
         max_length=150,
         widget=forms.TextInput(attrs={"placeholder": _("Username"), "id": "username"}),
     )
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}))
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': _('Password'), 'id': 'password'}),
+        strip=False,
+    )
     full_name = forms.CharField(
         label=_("Full Name"),
         max_length=255,
@@ -1193,6 +1242,7 @@ class SignupDetailsForm(forms.ModelForm):
     password = forms.CharField(
         label=_("Password"),
         required=False,
+        strip=False,
         widget=forms.PasswordInput(attrs={
             "placeholder": _("Password"),
             "autocomplete": "new-password",
@@ -1321,9 +1371,7 @@ class SignupDetailsForm(forms.ModelForm):
             name_parts = self.cleaned_data["full_name"].split()
             user.first_name = name_parts[0]
             user.last_name = " ".join(name_parts[1:])
-        password = self.cleaned_data.get("password")
-        if password:
-            user.set_password(password)
+        _set_password_if_provided(user, self.cleaned_data.get("password"))
         if commit:
             user.save()
         return user

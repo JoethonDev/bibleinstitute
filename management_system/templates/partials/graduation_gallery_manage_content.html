@@ -41,16 +41,18 @@
     <div class="ad-card mb-3">
         <div class="ad-card-body">
             <h5 class="ad-section-title"><i class="fas fa-tasks me-2"></i>{% translate "Recent background jobs" %}</h5>
-            {% if jobs %}
+            {% if jobs_page_obj and jobs_page_obj.object_list %}
             <div class="ad-table-wrap"><table class="ad-table">
                 <caption class="visually-hidden">{% translate "Gallery background jobs" %}</caption>
                 <thead><tr><th scope="col">{% translate "File" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Processed" %}</th><th scope="col">{% translate "Failed" %}</th><th scope="col">{% translate "Error" %}</th></tr></thead>
                 <tbody>
-                {% for job in jobs %}
+                {% for job in jobs_page_obj.object_list %}
                 <tr><td>{{ job.original_filename }}</td><td><span class="ad-pill ad-pill--muted">{{ job.get_status_display }}</span></td><td>{{ job.processed_files }}/{{ job.total_files }}</td><td>{{ job.failed_files }}</td><td>{{ job.last_error|truncatechars:120 }}</td></tr>
                 {% endfor %}
                 </tbody>
             </table></div>
+            {% translate "Page navigation" as jobs_pagination_label %}
+            {% include "partials/pagination.html" with page_obj=jobs_page_obj pagination_query=jobs_pagination_query page_param="job_page" aria_label=jobs_pagination_label %}
             {% else %}
             <p class="mb-0 ps-muted-text">{% translate "No uploads yet for this album." %}</p>
             {% endif %}

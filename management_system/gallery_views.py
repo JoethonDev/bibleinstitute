@@ -29,8 +29,9 @@ from django.conf import settings
 def graduates(request):
     scopes = gg.graduation_scopes_for_user(request.user).annotate(
         items_count=Count("gallery_items")
-    )
-    albums = [s for s in scopes if getattr(s, "items_count", 0)]
+    ).filter(items_count__gt=0)
+    page_obj = Paginator(scopes, gg.GALLERY_PAGE_SIZE).get_page(request.GET.get("page", 1))
+    albums = page_obj.object_list
     covers = gg.album_covers([s.pk for s in albums])
     cards = []
     for scope in albums:
@@ -41,6 +42,8 @@ def graduates(request):
         cards.append({"scope": scope, "items_count": scope.items_count, "cover_url": display_url, "cover_kind": getattr(cover, "kind", "image")})
     return render_page(request, "graduation_gallery.html", "partials/graduation_gallery_content.html", {
         "albums": cards,
+        "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
     })
 
 
@@ -83,9 +86,9 @@ def graduation_gallery_manage(request):
     if raw_scope.isdigit():
         scope = picker.filter(pk=int(raw_scope)).first()
     if scope is None:
-        scope = next((s for s in picker if getattr(s, "items_count", 0)), None) or picker.first()
+        scope = picker.filter(items_count__gt=0).first() or picker.first()
     items = GraduationGalleryItem.objects.none()
-    jobs = GraduationGalleryJob.objects.none()
+    jobs_page_obj = None
     page_obj = None
     if scope is not None:
         items = (
@@ -97,17 +100,19 @@ def graduation_gallery_manage(request):
         for row in page_obj.object_list:
             display_url, _row_download = gg.gallery_item_urls(row)
             row.display_url = display_url
-        jobs = (
+        jobs_page_obj = Paginator(
             GraduationGalleryJob.objects.filter(academic_year_level=scope)
             .order_by("-created_at", "-pk")
-            .select_related("created_by")[:15]
-        )
+            .select_related("created_by"),
+            15,
+        ).get_page(request.GET.get("job_page", 1))
     return render_page(request, "graduation_gallery_manage.html", "partials/graduation_gallery_manage_content.html", {
         "picker": picker,
         "scope": scope,
         "page_obj": page_obj,
-        "pagination_query": pagination_query_string(request),
-        "jobs": jobs,
+        "jobs_page_obj": jobs_page_obj,
+        "jobs_pagination_query": pagination_query_string(request, exclude=("job_page",)),
+        "pagination_query": pagination_query_string(request, exclude=("page",)),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Graduation Gallery"), None),

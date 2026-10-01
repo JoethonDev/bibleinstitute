@@ -59,6 +59,7 @@ from .utils.student_data import (
     PAGE_SIZE,
     _authorized_lesson,
     notification_payload,
+    page_metadata,
     student_calendar_data,
     student_course_data,
     student_courses_data,
@@ -131,9 +132,9 @@ def _form_error(request, form, message: str, status: int = 400):
     )
 
 
-def _page_value(request) -> int:
+def _page_value(request, parameter: str = "page") -> int:
     try:
-        return max(1, int(request.GET.get("page", "1")))
+        return max(1, int(request.GET.get(parameter, "1")))
     except (TypeError, ValueError):
         return 1
 
@@ -141,14 +142,7 @@ def _page_value(request) -> int:
 def _paginated_payload(page_obj, items: list[dict]) -> dict:
     return {
         "items": items,
-        "pagination": {
-            "page": page_obj.number,
-            "page_size": PAGE_SIZE,
-            "pages": page_obj.paginator.num_pages,
-            "total": page_obj.paginator.count,
-            "has_next": page_obj.has_next(),
-            "has_previous": page_obj.has_previous(),
-        },
+        "pagination": page_metadata(page_obj),
     }
 
 
@@ -471,11 +465,14 @@ def profile_qr(request):
 @require_http_methods(["GET"])
 def courses(request):
     language = normalize_language(request)
-    items = student_courses_data(request.user, language)
-    return json_api_response(request, {
-        "items": items,
-        "pagination": {"page": 1, "page_size": PAGE_SIZE, "pages": 1, "total": len(items), "has_next": False, "has_previous": False},
-    })
+    page_obj, items = student_courses_data(
+        request.user,
+        language,
+        _page_value(request),
+        _page_value(request, "lesson_page"),
+        _page_value(request, "quiz_page"),
+    )
+    return json_api_response(request, _paginated_payload(page_obj, items))
 
 
 @require_mobile_session
@@ -483,14 +480,24 @@ def courses(request):
 def overview(request):
     return json_api_response(
         request,
-        student_overview_data(request.user, normalize_language(request)),
+        student_overview_data(
+            request.user,
+            normalize_language(request),
+            _page_value(request),
+        ),
     )
 
 
 @require_mobile_session
 @require_http_methods(["GET"])
 def course_detail(request, offering_id):
-    data = student_course_data(request.user, offering_id, normalize_language(request))
+    data = student_course_data(
+        request.user,
+        offering_id,
+        normalize_language(request),
+        _page_value(request, "lesson_page"),
+        _page_value(request, "quiz_page"),
+    )
     if data is None:
         return _error(request, "forbidden", _("You do not have access to this offering."), 403)
     return json_api_response(request, {"course": data})
@@ -609,7 +616,7 @@ def progress(request):
         values = raw_ids.split(",")
         if not values or any(not value.isdigit() for value in values):
             return _error(request, "invalid_request", _localized(request, "Invalid offering identifier."), 400)
-        offering_ids = [int(value) for value in values[:PAGE_SIZE]]
+        offering_ids = [int(value) for value in values]
     page_obj, items = student_progress_data(request.user, offering_ids, _page_value(request))
     return json_api_response(request, _paginated_payload(page_obj, items))
 
@@ -1088,9 +1095,10 @@ def galleries(request):
 
     scopes = gg.graduation_scopes_for_user(request.user).annotate(
         items_count=Count("gallery_items")
-    )
-    albums = [s for s in scopes if getattr(s, "items_count", 0)]
-    covers = gg.album_covers([s.pk for s in albums])
+    ).filter(items_count__gt=0)
+    page_obj = Paginator(scopes, PAGE_SIZE).get_page(_page_value(request))
+    albums = page_obj.object_list
+    covers = gg.album_covers([scope.pk for scope in albums])
     items = []
     for scope in albums:
         cover = covers.get(scope.pk)
@@ -1107,8 +1115,7 @@ def galleries(request):
                 "cover": {"display_url": cover_url, "kind": getattr(cover, "kind", "image")} if cover is not None else None,
             }
         )
-    page_obj = Paginator(items, PAGE_SIZE).get_page(_page_value(request))
-    return json_api_response(request, _paginated_payload(page_obj, list(page_obj.object_list)))
+    return json_api_response(request, _paginated_payload(page_obj, items))
 
 
 @require_mobile_session

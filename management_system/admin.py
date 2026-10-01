@@ -76,9 +76,9 @@ admin.site.register(
     Quiz,
     AcademicContentReadOnlyAdmin,
 )
-admin.site.register(Question)
-admin.site.register(Submission)
-admin.site.register(Grade)
+admin.site.register(Question, AcademicContentReadOnlyAdmin)
+admin.site.register(Submission, AcademicContentReadOnlyAdmin)
+admin.site.register(Grade, AcademicContentReadOnlyAdmin)
 
 
 @admin.register(AcademicPayment)

@@ -9,7 +9,7 @@ from io import BytesIO
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Exists, F, OuterRef, QuerySet
+from django.db.models import Exists, F, OuterRef, QuerySet, Subquery
 from django.utils.translation import gettext as _
 
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -255,19 +255,24 @@ def invalidate_gallery_urls(*keys: str) -> None:
 
 
 def album_covers(scope_ids) -> dict:
-    """Return the newest gallery item per scope in one bounded query."""
-    from .models import GraduationGalleryItem
+    """Return the newest gallery item per scope using the gallery ordering index."""
+    from .models import AcademicYearLevel, GraduationGalleryItem
 
-    covers = {}
     if not scope_ids:
-        return covers
-    for row in (
-        GraduationGalleryItem.objects.filter(academic_year_level_id__in=scope_ids)
-        .order_by("academic_year_level_id", "-created_at", "-pk")
-        .only("academic_year_level_id", "display_key", "original_key", "kind")
-    ):
-        covers.setdefault(row.academic_year_level_id, row)
-    return covers
+        return {}
+    newest_item_ids = AcademicYearLevel.objects.filter(pk__in=scope_ids).annotate(
+        newest_item_id=Subquery(
+            GraduationGalleryItem.objects.filter(academic_year_level_id=OuterRef("pk"))
+            .order_by("-created_at", "-pk")
+            .values("pk")[:1]
+        )
+    ).exclude(newest_item_id=None).values_list("newest_item_id", flat=True)
+    return {
+        row.academic_year_level_id: row
+        for row in GraduationGalleryItem.objects.filter(pk__in=newest_item_ids).only(
+            "academic_year_level_id", "display_key", "original_key", "kind"
+        )
+    }
 
 
 def classify_upload(filename: str, content_type: str) -> str:
