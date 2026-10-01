@@ -310,6 +310,16 @@
                             </select>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label" for="edit-year-graduation-{{ y.id }}">{% translate "Graduation level" %}</label>
+                            <select name="graduation_level" id="edit-year-graduation-{{ y.id }}" class="form-select">
+                                <option value="">---------</option>
+                                {% for level in COURSE_LEVELS %}
+                                <option value="{{ level.id }}" {% if y.graduation_level_id == level.id %}selected{% endif %}>{{ level.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">{% translate "The level whose completion opens the graduation gallery for this year." %}</div>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label" for="edit-year-start-{{ y.id }}">{% translate "Start Date" %}</label>
                             <input type="date" name="starts_on" id="edit-year-start-{{ y.id }}" value="{{ y.starts_on|date:'Y-m-d' }}" class="form-control" required>
                         </div>

@@ -86,13 +86,7 @@ def _safe_version(value: str) -> str:
 @login_required
 def download_app(request):
     release = MobileAppRelease.objects.order_by("-version_code", "-pk").first()
-    return render(request, "download_app.html", {
-        "release": release,
-        "breadcrumb_items": generate_breadcrumb([
-            (_("Home"), reverse("home")),
-            (_("Download our app"), None),
-        ]),
-    })
+    return render(request, "download_app.html", {"release": release})
 
 
 @login_required

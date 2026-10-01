@@ -41,7 +41,6 @@ def graduates(request):
         cards.append({"scope": scope, "items_count": scope.items_count, "cover_url": display_url, "cover_kind": getattr(cover, "kind", "image")})
     return render_page(request, "graduation_gallery.html", "partials/graduation_gallery_content.html", {
         "albums": cards,
-        "breadcrumb_items": generate_breadcrumb([(_("Home"), reverse("home")), (_("Graduates"), None)]),
     })
 
 
@@ -66,11 +65,6 @@ def graduation_gallery_detail(request, scope_id: int):
         "scope": scope,
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
-        "breadcrumb_items": generate_breadcrumb([
-            (_("Home"), reverse("home")),
-            (_("Graduates"), reverse("graduates")),
-            (f"{scope.academic_year.name} — {scope.level.display_name}", None),
-        ]),
     })
 
 
