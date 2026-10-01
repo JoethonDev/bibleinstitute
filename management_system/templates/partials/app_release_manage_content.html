@@ -1,0 +1,64 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+    <div class="ad-pane-head ad-pane-head--bordered justify-content-between">
+        <h4 class="ad-pane-title mb-0"><i class="fas fa-mobile-alt me-2 ad-page-header-icon"></i>{% translate "App Releases" %}<span id="app-release-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h4>
+    </div>
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-cloud-upload-alt me-2"></i>{% translate "Publish a new Android build" %}</h5>
+            <form method="post" action="{% url 'app-release-manage' %}" enctype="multipart/form-data" hx-post="{% url 'app-release-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                {% csrf_token %}
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label" for="id_version_name">{% translate "Version name" %}</label>
+                        <input id="id_version_name" class="form-control" type="text" name="version_name" maxlength="50" required placeholder="1.2.0">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="id_version_code">{% translate "Version code" %}</label>
+                        <input id="id_version_code" class="form-control" type="number" name="version_code" min="1" required placeholder="12">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="id_apk">{% translate "APK file" %}</label>
+                        <input id="id_apk" class="form-control" type="file" name="apk" accept=".apk" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="id_release_notes">{% translate "Release notes" %}</label>
+                        <input id="id_release_notes" class="form-control" type="text" name="release_notes" maxlength="2000">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Publish" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="ad-card">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-history me-2"></i>{% translate "Published builds" %}</h5>
+            {% if releases %}
+            <div class="ad-table-wrap"><table class="ad-table">
+                <caption class="visually-hidden">{% translate "Published app builds" %}</caption>
+                <thead><tr><th scope="col">{% translate "Version" %}</th><th scope="col">{% translate "Code" %}</th><th scope="col">{% translate "Size" %}</th><th scope="col">{% translate "Published" %}</th><th scope="col">{% translate "Actions" %}</th></tr></thead>
+                <tbody>
+                {% for release in releases %}
+                <tr>
+                    <td>{{ release.version_name }}</td>
+                    <td>{{ release.version_code }}</td>
+                    <td>{{ release.file_size|filesizeformat }}</td>
+                    <td>{{ release.created_at|date }}</td>
+                    <td>
+                        <form method="post" action="{% url 'app-release-delete' release.pk %}" hx-post="{% url 'app-release-delete' release.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this app release?' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">{% translate "Delete" %}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <p class="mb-0 ps-muted-text">{% translate "No app builds published yet." %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>

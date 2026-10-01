@@ -114,6 +114,10 @@
               {% endif %}
               {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'download-app' %}">{% translate "Download our app" %}</a></li>
+              {% if show_graduation_gallery %}
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'graduates' %}">{% translate "Graduates" %}</a></li>
+              {% endif %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
               {% if request.user.role.role == "student" %}
                <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
@@ -156,6 +160,12 @@
             </div>
         </nav>
     </header>
+
+    {% if user.is_authenticated and request.user.role.role == "student" %}
+    <div class="container">
+      {% include 'partials/student_banner.html' %}
+    </div>
+    {% endif %}
 
     {% block breadcrumb %}
     {% if breadcrumb_items %}

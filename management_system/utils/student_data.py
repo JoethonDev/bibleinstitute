@@ -102,6 +102,7 @@ def _media_data(link: dict, index: int) -> dict:
         "name": link.get("name") or link.get("title") or "",
         "streamable": file_type in {"video", "audio"} and bool(link.get("id")),
         "downloadable": file_type == "audio",
+        "readable": file_type == "book" and bool(link.get("id")),
     }
 
 

@@ -2363,3 +2363,53 @@ body.pdf-fs-open {
 .city-suggestion.is-active, .city-suggestion:hover { background: var(--ps-mist); }
 .city-suggestion--empty { cursor: default; color: var(--ps-muted); }
 .city-suggestion--empty:hover { background: transparent; }
+
+/* Graduation gallery (student albums + lightbox). */
+.gg-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:1rem}
+.gg-album-card{display:flex;flex-direction:column;overflow:hidden;border-radius:.9rem;background:var(--ps-paper,#fff);box-shadow:var(--ps-shadow,0 .25rem 1rem rgba(0,0,0,.08));text-decoration:none;color:inherit;transition:transform .25s ease,box-shadow .25s ease}
+.gg-album-card:hover{transform:translateY(-2px)}
+.gg-album-cover{width:100%;height:11rem;object-fit:cover;background:var(--ps-mist,#eef1f3)}
+.gg-album-cover.is-empty{display:grid;place-items:center;font-size:2rem;color:var(--ps-muted,#8a94a0)}
+.gg-album-meta{display:flex;flex-direction:column;gap:.15rem;padding:.7rem .9rem}
+.gg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.7rem}
+.gg-cell{margin:0;position:relative}
+.gg-thumb{display:block;width:100%;padding:0;border:0;background:none;cursor:zoom-in}
+.gg-img{width:100%;height:10rem;object-fit:cover;border-radius:.6rem;display:block}
+.gg-play{position:absolute;inset-inline-start:.5rem;bottom:.5rem;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:2rem;height:2rem;display:grid;place-items:center}
+.gg-actions{position:absolute;top:.4rem;inset-inline-end:.4rem}
+.gg-download{background:rgba(0,0,0,.55);color:#fff;border-radius:.5rem;padding:.3rem .5rem}
+.gg-back{text-decoration:none}
+.gg-lightbox{position:fixed;inset:0;z-index:1080}
+.gg-lightbox[hidden]{display:none}
+.gg-lightbox-backdrop{position:absolute;inset:0;background:rgba(10,20,28,.82);animation:gg-fade .25s ease}
+.gg-lightbox-stage{position:absolute;inset:0;display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:1fr auto;align-items:center;gap:.5rem;padding:1rem}
+.gg-lightbox-media{grid-column:2;grid-row:1;display:grid;place-items:center;min-width:0}
+.gg-lightbox-node{max-width:min(92vw,64rem);max-height:76vh;border-radius:.6rem;box-shadow:0 1rem 3rem rgba(0,0,0,.4);animation:gg-slide .28s ease}
+.gg-lightbox-bar{grid-column:1/-1;grid-row:2;display:flex;justify-content:center;gap:1rem;align-items:center}
+.gg-lightbox-download,.gg-lightbox-close{color:#fff;text-decoration:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:.6rem;padding:.45rem .9rem}
+.gg-lightbox-nav{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:50%;width:2.75rem;height:2.75rem;display:grid;place-items:center}
+body.gg-lock{overflow:hidden}
+@keyframes gg-fade{from{opacity:0}to{opacity:1}}
+@keyframes gg-slide{from{opacity:0;transform:translateX(1.5rem) scale(.98)}to{opacity:1;transform:none}}
+[dir="rtl"] .gg-lightbox-node{animation-name:gg-slide-rtl}
+@keyframes gg-slide-rtl{from{opacity:0;transform:translateX(-1.5rem) scale(.98)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.gg-album-card,.gg-lightbox-node,.gg-lightbox-backdrop{animation:none;transition:none}}
+
+/* Student banner strip (latest active banners, rotating). */
+.st-banner{display:flex;align-items:center;gap:.75rem;background:linear-gradient(120deg,#10262e,#17303a);color:#fff;border-radius:.8rem;padding:.6rem .9rem;margin:.75rem auto 0;max-width:72rem;box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
+.st-banner[hidden]{display:none}
+.st-banner-items{flex:1;min-width:0}
+.st-banner-item{display:flex;align-items:center;gap:.6rem;animation:st-fade .3s ease}
+.st-banner-item.is-hidden{display:none}
+.st-banner-icon{color:#dcb772}
+.st-banner-text{display:flex;flex-wrap:wrap;gap:.25rem .6rem;min-width:0}
+.st-banner-title{font-weight:800}
+.st-banner-body{color:#f3ead6}
+.st-banner-action{color:#10262e;background:#dcb772;border-radius:.5rem;padding:.25rem .7rem;text-decoration:none;font-weight:700;white-space:nowrap}
+.st-banner-controls{display:flex;align-items:center;gap:.5rem}
+.st-banner-dot{width:.45rem;height:.45rem;border-radius:50%;background:rgba(255,255,255,.35);display:inline-block;margin-inline-end:.25rem}
+.st-banner-dot.is-active{background:#dcb772}
+.st-banner-close{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:1.9rem;height:1.9rem;display:grid;place-items:center}
+.sd-steps{margin:0;padding-inline-start:1.25rem;display:grid;gap:.5rem}
+@keyframes st-fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.st-banner-item{animation:none}}

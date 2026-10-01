@@ -11572,6 +11572,280 @@ msgstr "ابحث باسم الطالب أو الاسم المصدري"
 msgid "No matching historical records."
 msgstr "لا توجد سجلات تاريخية مطابقة."
 
+msgid "Graduates"
+msgstr "الخريجون"
+
+msgid "Graduation Gallery"
+msgstr "معرض التخرج"
+
+msgid "Graduation party albums for every year and level you completed."
+msgstr "ألبومات حفلات التخرج لكل سنة ومستوى أكملته."
+
+msgid "No graduation albums are available for you yet."
+msgstr "لا توجد ألبومات تخرج متاحة لك بعد."
+
+msgid "Album (academic year and level)"
+msgstr "الألبوم (السنة الدراسية والمستوى)"
+
+msgid "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them."
+msgstr "تُرفع الملفات مباشرة إلى التخزين المؤقت (حتى 2 جيجابايت للأرشيف)، ثم تُحسّن الصور وتُنشر عبر مهمة خلفية."
+
+msgid "Upload photos or a zip"
+msgstr "ارفع الصور أو أرشيف zip"
+
+msgid "Images, videos, or one zip"
+msgstr "صور أو فيديوهات أو أرشيف واحد"
+
+msgid "Recent background jobs"
+msgstr "المهام الخلفية الأخيرة"
+
+msgid "Gallery background jobs"
+msgstr "مهام معرض الصور الخلفية"
+
+msgid "Photos"
+msgstr "الصور"
+
+msgid "photos"
+msgstr "صور"
+
+msgid "No uploads yet for this album."
+msgstr "لا توجد ملفات مرفوعة لهذا الألبوم بعد."
+
+msgid "This album is empty. Upload the first photos above."
+msgstr "هذا الألبوم فارغ. ارفع أول الصور أعلاه."
+
+msgid "No graduation albums configured yet."
+msgstr "لم تُجهّز ألبومات تخرج بعد."
+
+msgid "No photos in this album yet."
+msgstr "لا توجد صور في هذا الألبوم بعد."
+
+msgid "Photo viewer"
+msgstr "عارض الصور"
+
+msgid "Open photo"
+msgstr "افتح الصورة"
+
+msgid "Previous photo"
+msgstr "الصورة السابقة"
+
+msgid "Next photo"
+msgstr "الصورة التالية"
+
+msgid "Gallery page navigation"
+msgstr "التنقل بين صفحات المعرض"
+
+msgid "Gallery management pages"
+msgstr "صفحات إدارة المعرض"
+
+msgid "Delete this photo?"
+msgstr "حذف هذه الصورة؟"
+
+msgid "Photo deleted."
+msgstr "تم حذف الصورة."
+
+msgid "Photo not found."
+msgstr "الصورة غير موجودة."
+
+msgid "Invalid upload request."
+msgstr "طلب رفع غير صالح."
+
+msgid "This level is not the graduation level for its year."
+msgstr "هذا المستوى ليس مستوى التخرج لهذه السنة."
+
+msgid "Only JPG, PNG, WebP images, MP4 videos, or a zip of those is allowed."
+msgstr "مسموح فقط بصور JPG وPNG وWebP وفيديوهات MP4 أو أرشيف منها."
+
+msgid "Image files must be 25 MB or smaller."
+msgstr "يجب أن تكون الصور 25 ميجابايت أو أقل."
+
+msgid "Video files must be 500 MB or smaller."
+msgstr "يجب أن تكون الفيديوهات 500 ميجابايت أو أقل."
+
+msgid "Zip files must be 2 GB or smaller."
+msgstr "يجب أن تكون الأرشيفات 2 جيجابايت أو أقل."
+
+msgid "Storage is not configured."
+msgstr "التخزين غير مُعد."
+
+msgid "Could not authorize the upload."
+msgstr "تعذّر التصريح بالرفع."
+
+msgid "The uploaded file is missing or empty."
+msgstr "الملف المرفوع مفقود أو فارغ."
+
+msgid "No usable images or videos were found."
+msgstr "لم يتم العثور على صور أو فيديوهات صالحة."
+
+msgid "Some files were skipped because they are not supported images or videos."
+msgstr "تم تخطي بعض الملفات لأنها ليست صورًا أو فيديوهات مدعومة."
+
+msgid "Processing failed. Please retry with a smaller file."
+msgstr "فشلت المعالجة. حاول مجددًا بملف أصغر."
+
+msgid "The zip file could not be read."
+msgstr "تعذّر قراءة الأرشيف."
+
+msgid "Image content could not be read."
+msgstr "تعذّر قراءة محتوى الصورة."
+
+msgid "The graduation level must be one of the opened levels."
+msgstr "يجب أن يكون مستوى التخرج أحد المستويات المفتوحة."
+
+msgid "Graduation level"
+msgstr "مستوى التخرج"
+
+msgid "The level whose completion opens the graduation gallery for this year."
+msgstr "المستوى الذي يفتح إكماله معرض التخرج لهذه السنة."
+
+msgid "Gallery not found."
+msgstr "المعرض غير موجود."
+
+msgid "You do not have access to this gallery."
+msgstr "ليس لديك صلاحية الوصول إلى هذا المعرض."
+
+msgid "Button label (optional)"
+msgstr "تسمية الزر (اختياري)"
+
+msgid "Button link (optional)"
+msgstr "رابط الزر (اختياري)"
+
+msgid "Only .apk files are allowed."
+msgstr "مسموح فقط بملفات .apk."
+
+msgid "Unexpected file type. Upload the Android .apk build."
+msgstr "نوع ملف غير متوقع. ارفع نسخة الأندرويد .apk."
+
+msgid "The app file must be 500 MB or smaller."
+msgstr "يجب أن يكون ملف التطبيق 500 ميجابايت أو أقل."
+
+msgid "The file is not a valid Android package."
+msgstr "الملف ليس حزمة أندرويد صالحة."
+
+msgid "Version name and a positive version code are required."
+msgstr "اسم الإصدار ورمز إصدار موجب مطلوبان."
+
+msgid "This version code is already published."
+msgstr "رمز الإصدار هذا منشور بالفعل."
+
+msgid "Choose the .apk file to publish."
+msgstr "اختر ملف .apk للنشر."
+
+msgid "The upload failed. Please retry."
+msgstr "فشل الرفع. حاول مجددًا."
+
+#, python-format
+msgid "App version %(version)s published."
+msgstr "تم نشر إصدار التطبيق %(version)s."
+
+msgid "App release deleted."
+msgstr "تم حذف إصدار التطبيق."
+
+msgid "Banner published."
+msgstr "تم نشر الشريط."
+
+msgid "Banner updated."
+msgstr "تم تحديث الشريط."
+
+msgid "Banner deleted."
+msgstr "تم حذف الشريط."
+
+msgid "Download our app"
+msgstr "تحميل تطبيقنا"
+
+msgid "Bible Institute for Android"
+msgstr "المعهد الكتابي للأندرويد"
+
+msgid "Version"
+msgstr "الإصدار"
+
+msgid "Download the app"
+msgstr "تحميل التطبيق"
+
+msgid "Is this safe to install?"
+msgstr "هل هذا آمن للتثبيت؟"
+
+msgid "Yes. Android shows a warning for every app installed outside Google Play. This file is published here on the institute's official website and is safe to install."
+msgstr "نعم. يعرض أندرويد تحذيرًا لأي تطبيق يُثبت من خارج متجر Google Play. هذا الملف منشور هنا على الموقع الرسمي للمعهد وآمن للتثبيت."
+
+msgid "Installation steps"
+msgstr "خطوات التثبيت"
+
+msgid "Tap “Download the app” above and wait until the file finishes downloading."
+msgstr "اضغط «تحميل التطبيق» أعلاه وانتظر حتى يكتمل التنزيل."
+
+msgid "Open the downloaded file from your browser downloads or the Files app."
+msgstr "افتح الملف المُنزّل من تنزيلات المتصفح أو تطبيق الملفات."
+
+msgid "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install."
+msgstr "عندما يطلب أندرويد، اسمح بـ «تثبيت التطبيقات غير المعروفة» لمتصفح كروم أو الملفات، ثم اضغط تثبيت."
+
+msgid "Open “Bible Institute” and sign in with your website account."
+msgstr "افتح «Bible Institute» وسجّل الدخول بحسابك على الموقع."
+
+msgid "After updates, repeat the same steps; your account and data stay unchanged."
+msgstr "بعد التحديثات، كرر نفس الخطوات؛ حسابك وبياناتك لا تتغير."
+
+msgid "The Android app is not published yet. Please check back later."
+msgstr "تطبيق الأندرويد غير منشور بعد. تحقق لاحقًا."
+
+msgid "Dismiss announcements"
+msgstr "إخفاء الإعلانات"
+
+msgid "App Releases"
+msgstr "إصدارات التطبيق"
+
+msgid "Publish a new Android build"
+msgstr "نشر نسخة أندرويد جديدة"
+
+msgid "Version name"
+msgstr "اسم الإصدار"
+
+msgid "Version code"
+msgstr "رمز الإصدار"
+
+msgid "APK file"
+msgstr "ملف APK"
+
+msgid "Release notes"
+msgstr "ملاحظات الإصدار"
+
+msgid "Publish"
+msgstr "نشر"
+
+msgid "Published builds"
+msgstr "النسخ المنشورة"
+
+msgid "Delete this app release?"
+msgstr "حذف إصدار التطبيق هذا؟"
+
+msgid "No app builds published yet."
+msgstr "لا توجد نسخ منشورة بعد."
+
+msgid "Banners"
+msgstr "الأشرطة"
+
+msgid "New banner"
+msgstr "شريط جديد"
+
+msgid "Visible"
+msgstr "ظاهر"
+
+msgid "Hide"
+msgstr "إخفاء"
+
+msgid "Show"
+msgstr "إظهار"
+
+msgid "Delete this banner?"
+msgstr "حذف هذا الشريط؟"
+
+msgid "No banners yet."
+msgstr "لا توجد أشرطة بعد."
+
+msgid "Student banner messages"
+msgstr "رسائل شريط الطلاب"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

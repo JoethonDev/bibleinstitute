@@ -1,0 +1,141 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+    <div class="ad-pane-head ad-pane-head--bordered justify-content-between">
+        <h4 class="ad-pane-title mb-0"><i class="fas fa-graduation-cap me-2 ad-page-header-icon"></i>{% translate "Graduation Gallery" %}<span id="gallery-manage-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h4>
+    </div>
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            <form method="get" class="row g-3 align-items-end" hx-get="{% url 'graduation-gallery-manage' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#gallery-manage-loading">
+                <div class="col-md-6">
+                    <label class="form-label" for="gallery-scope">{% translate "Album (academic year and level)" %}</label>
+                    <select id="gallery-scope" class="form-select" name="scope" hx-get="{% url 'graduation-gallery-manage' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#gallery-manage-loading" hx-trigger="change">
+                        {% for option in picker %}
+                        <option value="{{ option.pk }}"{% if scope and option.pk == scope.pk %} selected{% endif %}>{{ option.academic_year.name }} — {{ option.level.display_name }} ({{ option.items_count }})</option>
+                        {% empty %}
+                        <option value="">{% translate "No graduation albums configured yet." %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+            {% if scope %}
+            <p class="ps-muted-text mt-2 mb-0">{% translate "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them." %}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% if scope %}
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-cloud-upload-alt me-2"></i>{% translate "Upload photos or a zip" %}</h5>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label" for="gallery-files">{% translate "Images, videos, or one zip" %}</label>
+                    <input id="gallery-files" class="form-control" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.m4v,.zip">
+                </div>
+                <div class="col-md-auto">
+                    <button type="button" class="ad-btn ad-btn--teal ad-btn--sm" id="gallery-upload-btn">{% translate "Upload" %}</button>
+                </div>
+            </div>
+            <div id="gallery-upload-status" class="mt-2" role="status" aria-live="polite"></div>
+        </div>
+    </div>
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-tasks me-2"></i>{% translate "Recent background jobs" %}</h5>
+            {% if jobs %}
+            <div class="ad-table-wrap"><table class="ad-table">
+                <caption class="visually-hidden">{% translate "Gallery background jobs" %}</caption>
+                <thead><tr><th scope="col">{% translate "File" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Processed" %}</th><th scope="col">{% translate "Failed" %}</th><th scope="col">{% translate "Error" %}</th></tr></thead>
+                <tbody>
+                {% for job in jobs %}
+                <tr><td>{{ job.original_filename }}</td><td><span class="ad-pill ad-pill--muted">{{ job.get_status_display }}</span></td><td>{{ job.processed_files }}/{{ job.total_files }}</td><td>{{ job.failed_files }}</td><td>{{ job.last_error|truncatechars:120 }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <p class="mb-0 ps-muted-text">{% translate "No uploads yet for this album." %}</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="ad-card">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-images me-2"></i>{% translate "Photos" %}{% if page_obj %} <span class="ad-pill ad-pill--teal ms-2">{{ page_obj.paginator.count }}</span>{% endif %}</h5>
+            {% if page_obj and page_obj.object_list %}
+            <div class="gg-manage-grid">
+                {% for item in page_obj.object_list %}
+                <figure class="gg-manage-cell">
+                    {% if item.kind == "video" %}
+                    <video class="gg-manage-img" src="{{ item.display_url }}" preload="metadata" muted playsinline></video>
+                    {% else %}
+                    <img class="gg-manage-img" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async">
+                    {% endif %}
+                    <figcaption class="gg-manage-meta"><span>{{ item.original_filename|truncatechars:28 }}</span>
+                    <form method="post" action="{% url 'gallery-item-delete' item.pk %}" hx-post="{% url 'gallery-item-delete' item.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this photo?' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">{% translate "Delete" %}</button>
+                    </form>
+                    </figcaption>
+                </figure>
+                {% endfor %}
+            </div>
+            {% translate "photos" as photos_label %}
+            {% translate "Gallery management pages" as gallery_pages_label %}
+            {% include "partials/pagination.html" with page_obj=page_obj item_label=photos_label aria_label=gallery_pages_label %}
+            {% else %}
+            <p class="mb-0 ps-muted-text">{% translate "This album is empty. Upload the first photos above." %}</p>
+            {% endif %}
+        </div>
+    </div>
+    {{ scope.pk|json_script:"gallery-scope-id" }}
+    {% endif %}
+</div>
+<script>
+(function () {
+  function csrf() {
+    var body = document.body;
+    var headers = body ? (body.getAttribute("hx-headers:inherited") || body.getAttribute("hx-headers") || "{}") : "{}";
+    try { return (JSON.parse(headers)["X-CSRFToken"]) || ""; } catch (e) { return ""; }
+  }
+  function setStatus(text) {
+    var el = document.getElementById("gallery-upload-status");
+    if (el) el.textContent = text;
+  }
+  async function pollJob(jobId, remaining) {
+    if (!jobId || remaining <= 0) return;
+    try {
+      var res = await fetch("{% url 'gallery-job-status' '00000000-0000-0000-0000-000000000000' %}".replace("00000000-0000-0000-0000-000000000000", jobId), {headers: {"X-Requested-With": "XMLHttpRequest"}});
+      var data = await res.json();
+      setStatus(data.status + ": " + data.processed_files + "/" + data.total_files);
+      if (data.status === "queued" || data.status === "processing") {
+        setTimeout(function () { pollJob(jobId, remaining - 1); }, 3000);
+      } else if (window.htmx) {
+        window.htmx.ajax("GET", window.location.pathname + window.location.search, {target: "#content", select: "#content", swap: "outerHTML"});
+      }
+    } catch (e) { /* keep last status */ }
+  }
+  var btn = document.getElementById("gallery-upload-btn");
+  if (btn) btn.addEventListener("click", async function () {
+    var scopeEl = document.getElementById("gallery-scope-id");
+    var scopeId = scopeEl ? JSON.parse(scopeEl.textContent) : null;
+    var input = document.getElementById("gallery-files");
+    var files = input ? input.files : [];
+    if (!scopeId || !files || !files.length) { setStatus(""); return; }
+    btn.disabled = true;
+    try {
+      for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        setStatus(file.name + " (" + (i + 1) + "/" + files.length + ")");
+        var authRes = await fetch("{% url 'gallery-upload-authorize' %}", {
+          method: "POST",
+          headers: {"X-CSRFToken": csrf(), "X-Requested-With": "XMLHttpRequest"},
+          body: new URLSearchParams({scope_id: String(scopeId), filename: file.name, content_type: file.type || "application/octet-stream", size: String(file.size)})
+        });
+        var auth = await authRes.json();
+        if (!authRes.ok) { setStatus((auth.error && auth.error.message) || "Upload refused."); break; }
+        var putRes = await fetch(auth.upload_url, {method: "PUT", headers: {"Content-Type": auth.headers["Content-Type"]}, body: file});
+        if (!putRes.ok) { setStatus(file.name + ": upload failed."); break; }
+        pollJob(auth.job_id, 40);
+      }
+    } finally { btn.disabled = false; }
+  });
+})();
+</script>

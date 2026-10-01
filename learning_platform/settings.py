@@ -167,6 +167,8 @@ TEMPLATES = [
                 'django.template.context_processors.i18n',
                 'management_system.context_processors.static_asset_version',
                 'management_system.context_processors.localized_alternate_urls',
+                'management_system.context_processors.graduation_gallery_visibility',
+                'management_system.context_processors.student_banners',
             ],
         },
     },
@@ -201,6 +203,9 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv(
     "REDIS_URL", "redis://redis:6379/0"
 )
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Keep Django's KeyValueFormatter (and event extra fields) active in workers;
+# Celery's default root logger hijack would replace it.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", "redis://redis:6379/1")
 CACHES = {
     "default": {
@@ -218,6 +223,7 @@ CELERY_IMPORTS = (
     "management_system.mobile_push_tasks",
     "management_system.mobile_otp_tasks",
     "management_system.announcement_tasks",
+    "management_system.gallery_tasks",
 )
 CELERY_TASK_ROUTES = {
     "management_system.media_tasks.*": {"queue": "media"},
@@ -393,6 +399,13 @@ R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME") or os.environ.get("bucket") or
 TELEGRAM_R2_BUCKET_NAME = os.environ.get("TELEGRAM_R2_BUCKET_NAME", "")
 CLOUDFLARE_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
 CLOUDFLARE_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+# Graduation gallery: gallery bytes stay private in R2_BUCKET_NAME under the
+# unguessable `galleries/` prefix. Readers receive cached signed GET URLs
+# (ResponseCacheControl `public, max-age, immutable`) that are reused until
+# shortly before expiry so Cloudflare and browsers can cache them. The album
+# listing itself stays authenticated + graduation-checked.
+GALLERY_URL_EXPIRES_SECONDS = int(os.getenv("GALLERY_URL_EXPIRES_SECONDS", "21600"))
+GALLERY_R2_PUBLIC_CACHE_MAX_AGE = int(os.getenv("GALLERY_R2_PUBLIC_CACHE_MAX_AGE", "31536000"))
 
 # Change Auth Model
 AUTH_USER_MODEL = 'management_system.User'
@@ -427,13 +440,19 @@ LOGIN_REDIRECT_URL = 'home'
 ADMIN_EMAIL = os.getenv('DJANGO_ADMIN_EMAIL', '')
 
 # Logging
+# Console records are compact key=value lines. Healthy fast requests are
+# DEBUG-only; slow responses, failures, and high-risk business events are the
+# INFO/WARNING/ERROR lines operators search for. Set DJANGO_LOG_LEVEL=DEBUG to
+# include per-request completions and request starts while diagnosing.
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO").upper()
+# Requests at or above this duration are always logged as http_request_slow.
+LOG_SLOW_REQUEST_MS = int(os.getenv("DJANGO_LOG_SLOW_REQUEST_MS", "2000"))
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
-            "format": "time={asctime} level={levelname} logger={name} event={event} request_id={request_id} route={route} method={method} status={status_code} duration_ms={duration_ms} user_id={user_id} username={username} role_id={role_id} ip={remote_ip} device={device} browser={browser} os={os} query_keys={query_keys} msg={message}",
-            "style": "{",
+            "()": "management_system.middleware.KeyValueFormatter",
         }
     },
     "filters": {
@@ -443,7 +462,7 @@ LOGGING = {
     },
     "handlers": {
         "console": {
-            "level": "INFO",
+            "level": LOG_LEVEL,
             "class": "logging.StreamHandler",
             "formatter": "verbose",
             "filters": ["request_context"],
@@ -451,12 +470,26 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "DEBUG",
+        "level": LOG_LEVEL,
     },
     "loggers": {
         "django": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # The observability middleware already logs safe failure records with
+        # request context; Django's own logger would add the raw URL path.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
+        # Beat "Sending due task" lines repeat every 15-60 seconds; task-level
+        # work events are logged by the tasks themselves.
+        "celery.beat": {
+            "handlers": ["console"],
+            "level": "WARNING",
             "propagate": False,
         },
     },

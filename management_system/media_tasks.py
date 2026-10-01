@@ -95,7 +95,11 @@ class MediaProgressReporter:
                 self.redis.hset(self.key, mapping=values)
                 self.redis.expire(self.key, LIVE_PROGRESS_TTL)
             except Exception:
-                logger.warning("Redis live media progress is unavailable", exc_info=True)
+                logger.warning(
+                    "live media progress is unavailable",
+                    extra={"event": "media_progress_redis_unavailable", "public_id": str(self.job.public_id)},
+                    exc_info=True,
+                )
 
     def clear(self) -> None:
         if self.redis is not None:
@@ -103,7 +107,11 @@ class MediaProgressReporter:
                 if self.redis.hget(self.key, "attempt") == str(self.job.attempt_count):
                     self.redis.delete(self.key)
             except Exception:
-                logger.warning("Could not clear Redis media progress", exc_info=True)
+                logger.warning(
+                    "media progress clear failed",
+                    extra={"event": "media_progress_clear_failed", "public_id": str(self.job.public_id)},
+                    exc_info=True,
+                )
 
 
 def enqueue_media_job(public_id) -> None:
@@ -131,6 +139,16 @@ def process_media_job(self, public_id: str):
     cleanup_job_workdirs(job.public_id)
     reporter = MediaProgressReporter(job)
     created = None
+    started = time.monotonic()
+    logger.info(
+        "media job started",
+        extra={
+            "event": "media_job_started",
+            "public_id": str(public_id),
+            "attempt": job.attempt_count,
+            "lesson_id": job.lesson_id,
+        },
+    )
     try:
         reporter.update(MediaProcessingPhase.DOWNLOAD, 1)
         upload_state = {"transitioned": False}
@@ -236,21 +254,54 @@ def process_media_job(self, public_id: str):
                 publish_automation_lesson(job.pk)
             except Exception as exc:
                 logger.error(
-                    "automation_publication_failed",
-                    extra={"exception_type": type(exc).__name__},
+                    "automation publication failed",
+                    extra={
+                        "event": "automation_publication_failed",
+                        "public_id": str(job.pk),
+                        "exception_type": type(exc).__name__,
+                    },
                 )
                 publication_ok = False
-        return {
+        result = {
             "status": "succeeded",
             "public_id": str(public_id),
             "attachment_error": bool(attachment_error),
             "publication_error": not publication_ok,
         }
+        logger.info(
+            "media job succeeded",
+            extra={
+                "event": "media_job_succeeded",
+                "public_id": str(public_id),
+                "attempt": job.attempt_count,
+                "duration_ms": round((time.monotonic() - started) * 1000),
+                "attachment_error": result["attachment_error"],
+                "publication_error": result["publication_error"],
+            },
+        )
+        return result
     except MediaJobLeaseLost:
-        logger.warning("media_job_lease_lost public_id=%s attempt=%s", public_id, job.attempt_count)
+        logger.warning(
+            "media job lease lost",
+            extra={
+                "event": "media_job_lease_lost",
+                "public_id": str(public_id),
+                "attempt": job.attempt_count,
+            },
+        )
         return {"status": "stale", "public_id": str(public_id)}
     except Exception as exc:
         code = getattr(exc, "code", "media_processing_failed")
+        logger.exception(
+            "media job failed",
+            extra={
+                "event": "media_job_failed",
+                "public_id": str(public_id),
+                "attempt": job.attempt_count,
+                "code": code,
+                "duration_ms": round((time.monotonic() - started) * 1000),
+            },
+        )
         record_job_failure(job.pk, code, str(exc), expected_attempt_count=job.attempt_count)
         raise
     finally:
@@ -267,11 +318,27 @@ def retry_media_attachment(public_id: str):
         _attach_outputs(job, job.manifest_key, job.audio_manifest_key, job.download_key)
     except Exception as exc:
         finish_attachment_retry(public_id, error=exc)
+        logger.warning(
+            "media attachment retry failed",
+            extra={
+                "event": "media_attachment_retry_failed",
+                "public_id": str(public_id),
+                "error_type": type(exc).__name__,
+            },
+        )
         return {"status": "failed", "public_id": str(public_id)}
     try:
         delete_object_exact(job.source_key)
     except Exception as exc:
         finish_attachment_retry(public_id, error=exc)
+        logger.warning(
+            "media attachment retry failed",
+            extra={
+                "event": "media_attachment_retry_failed",
+                "public_id": str(public_id),
+                "error_type": type(exc).__name__,
+            },
+        )
         return {"status": "failed", "public_id": str(public_id)}
     now = timezone.now()
     with transaction.atomic():
@@ -288,9 +355,17 @@ def retry_media_attachment(public_id: str):
             publish_automation_lesson(finished.pk)
         except Exception as exc:
             logger.error(
-                "automation_publication_failed",
-                extra={"exception_type": type(exc).__name__},
+                "automation publication failed",
+                extra={
+                    "event": "automation_publication_failed",
+                    "public_id": str(finished.pk),
+                    "exception_type": type(exc).__name__,
+                },
             )
+    logger.info(
+        "media attachment retry succeeded",
+        extra={"event": "media_attachment_retry_succeeded", "public_id": str(public_id)},
+    )
     return {"status": "attached", "public_id": str(public_id)}
 
 
@@ -376,12 +451,21 @@ def recover_pending_media_jobs(limit: int = 100):
                 try:
                     client.delete(f"media:job:{stalled.public_id}")
                 except Exception:
-                    logger.warning("Could not clear stale Redis media progress", exc_info=True)
+                    logger.warning(
+                        "stale media progress clear failed",
+                        extra={"event": "media_progress_clear_failed", "public_id": str(stalled.public_id)},
+                        exc_info=True,
+                    )
             if stalled.status == MediaProcessingStatus.FAILED:
                 failed_count += 1
                 continue
             schedule_media_job_after_commit(stalled.public_id)
             queued_count += 1
+    if queued_count or failed_count:
+        logger.info(
+            "pending media jobs recovered",
+            extra={"event": "media_jobs_recovered", "queued": queued_count, "failed": failed_count},
+        )
     return {"queued": queued_count, "failed": failed_count}
 
 

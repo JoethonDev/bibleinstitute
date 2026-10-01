@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -29,6 +30,8 @@ from .models import (
 )
 from .utils.attendance import attendance_scores_for_students
 from .utils.timezones import application_timezone
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -572,6 +575,17 @@ def save_formula_and_results(
         "academic_year_level", "course_offering"
     ).get(pk=formula.pk)
     counts = _recalculate_scope_results(scope)
+    logger.info(
+        "promotion formula saved",
+        extra={
+            "event": "formula_saved",
+            "formula_id": locked_formula.pk,
+            "scope_id": locked_formula.academic_year_level_id,
+            "offering_id": locked_formula.course_offering_id,
+            "results_created": counts[0],
+            "results_updated": counts[1],
+        },
+    )
     return locked_formula, counts
 
 
@@ -604,4 +618,14 @@ def override_evaluation_result(*, result_id: int, final_status: str, note: str, 
                 course_offering__isnull=False,
             ).select_related("course_offering__course"))
             _persist_aggregate_batch(global_formula, {result.enrollment_id: course_results})
+    logger.info(
+        "evaluation override saved",
+        extra={
+            "event": "evaluation_override_saved",
+            "result_id": result_id,
+            "student_id": result.enrollment.student_id,
+            "final_status": final_status,
+            "offering_id": result.course_offering_id,
+        },
+    )
     return result

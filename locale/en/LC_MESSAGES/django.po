@@ -10745,6 +10745,280 @@ msgstr "Access denied."
 msgid "Server error."
 msgstr "Server error."
 
+msgid "Graduates"
+msgstr "Graduates"
+
+msgid "Graduation Gallery"
+msgstr "Graduation Gallery"
+
+msgid "Graduation party albums for every year and level you completed."
+msgstr "Graduation party albums for every year and level you completed."
+
+msgid "No graduation albums are available for you yet."
+msgstr "No graduation albums are available for you yet."
+
+msgid "Album (academic year and level)"
+msgstr "Album (academic year and level)"
+
+msgid "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them."
+msgstr "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them."
+
+msgid "Upload photos or a zip"
+msgstr "Upload photos or a zip"
+
+msgid "Images, videos, or one zip"
+msgstr "Images, videos, or one zip"
+
+msgid "Recent background jobs"
+msgstr "Recent background jobs"
+
+msgid "Gallery background jobs"
+msgstr "Gallery background jobs"
+
+msgid "Photos"
+msgstr "Photos"
+
+msgid "photos"
+msgstr "photos"
+
+msgid "No uploads yet for this album."
+msgstr "No uploads yet for this album."
+
+msgid "This album is empty. Upload the first photos above."
+msgstr "This album is empty. Upload the first photos above."
+
+msgid "No graduation albums configured yet."
+msgstr "No graduation albums configured yet."
+
+msgid "No photos in this album yet."
+msgstr "No photos in this album yet."
+
+msgid "Photo viewer"
+msgstr "Photo viewer"
+
+msgid "Open photo"
+msgstr "Open photo"
+
+msgid "Previous photo"
+msgstr "Previous photo"
+
+msgid "Next photo"
+msgstr "Next photo"
+
+msgid "Gallery page navigation"
+msgstr "Gallery page navigation"
+
+msgid "Gallery management pages"
+msgstr "Gallery management pages"
+
+msgid "Delete this photo?"
+msgstr "Delete this photo?"
+
+msgid "Photo deleted."
+msgstr "Photo deleted."
+
+msgid "Photo not found."
+msgstr "Photo not found."
+
+msgid "Invalid upload request."
+msgstr "Invalid upload request."
+
+msgid "This level is not the graduation level for its year."
+msgstr "This level is not the graduation level for its year."
+
+msgid "Only JPG, PNG, WebP images, MP4 videos, or a zip of those is allowed."
+msgstr "Only JPG, PNG, WebP images, MP4 videos, or a zip of those is allowed."
+
+msgid "Image files must be 25 MB or smaller."
+msgstr "Image files must be 25 MB or smaller."
+
+msgid "Video files must be 500 MB or smaller."
+msgstr "Video files must be 500 MB or smaller."
+
+msgid "Zip files must be 2 GB or smaller."
+msgstr "Zip files must be 2 GB or smaller."
+
+msgid "Storage is not configured."
+msgstr "Storage is not configured."
+
+msgid "Could not authorize the upload."
+msgstr "Could not authorize the upload."
+
+msgid "The uploaded file is missing or empty."
+msgstr "The uploaded file is missing or empty."
+
+msgid "No usable images or videos were found."
+msgstr "No usable images or videos were found."
+
+msgid "Some files were skipped because they are not supported images or videos."
+msgstr "Some files were skipped because they are not supported images or videos."
+
+msgid "Processing failed. Please retry with a smaller file."
+msgstr "Processing failed. Please retry with a smaller file."
+
+msgid "The zip file could not be read."
+msgstr "The zip file could not be read."
+
+msgid "Image content could not be read."
+msgstr "Image content could not be read."
+
+msgid "The graduation level must be one of the opened levels."
+msgstr "The graduation level must be one of the opened levels."
+
+msgid "Graduation level"
+msgstr "Graduation level"
+
+msgid "The level whose completion opens the graduation gallery for this year."
+msgstr "The level whose completion opens the graduation gallery for this year."
+
+msgid "Gallery not found."
+msgstr "Gallery not found."
+
+msgid "You do not have access to this gallery."
+msgstr "You do not have access to this gallery."
+
+msgid "Button label (optional)"
+msgstr "Button label (optional)"
+
+msgid "Button link (optional)"
+msgstr "Button link (optional)"
+
+msgid "Only .apk files are allowed."
+msgstr "Only .apk files are allowed."
+
+msgid "Unexpected file type. Upload the Android .apk build."
+msgstr "Unexpected file type. Upload the Android .apk build."
+
+msgid "The app file must be 500 MB or smaller."
+msgstr "The app file must be 500 MB or smaller."
+
+msgid "The file is not a valid Android package."
+msgstr "The file is not a valid Android package."
+
+msgid "Version name and a positive version code are required."
+msgstr "Version name and a positive version code are required."
+
+msgid "This version code is already published."
+msgstr "This version code is already published."
+
+msgid "Choose the .apk file to publish."
+msgstr "Choose the .apk file to publish."
+
+msgid "The upload failed. Please retry."
+msgstr "The upload failed. Please retry."
+
+#, python-format
+msgid "App version %(version)s published."
+msgstr "App version %(version)s published."
+
+msgid "App release deleted."
+msgstr "App release deleted."
+
+msgid "Banner published."
+msgstr "Banner published."
+
+msgid "Banner updated."
+msgstr "Banner updated."
+
+msgid "Banner deleted."
+msgstr "Banner deleted."
+
+msgid "Download our app"
+msgstr "Download our app"
+
+msgid "Bible Institute for Android"
+msgstr "Bible Institute for Android"
+
+msgid "Version"
+msgstr "Version"
+
+msgid "Download the app"
+msgstr "Download the app"
+
+msgid "Is this safe to install?"
+msgstr "Is this safe to install?"
+
+msgid "Yes. Android shows a warning for every app installed outside Google Play. This file is published here on the institute's official website and is safe to install."
+msgstr "Yes. Android shows a warning for every app installed outside Google Play. This file is published here on the institute's official website and is safe to install."
+
+msgid "Installation steps"
+msgstr "Installation steps"
+
+msgid "Tap “Download the app” above and wait until the file finishes downloading."
+msgstr "Tap “Download the app” above and wait until the file finishes downloading."
+
+msgid "Open the downloaded file from your browser downloads or the Files app."
+msgstr "Open the downloaded file from your browser downloads or the Files app."
+
+msgid "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install."
+msgstr "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install."
+
+msgid "Open “Bible Institute” and sign in with your website account."
+msgstr "Open “Bible Institute” and sign in with your website account."
+
+msgid "After updates, repeat the same steps; your account and data stay unchanged."
+msgstr "After updates, repeat the same steps; your account and data stay unchanged."
+
+msgid "The Android app is not published yet. Please check back later."
+msgstr "The Android app is not published yet. Please check back later."
+
+msgid "Dismiss announcements"
+msgstr "Dismiss announcements"
+
+msgid "App Releases"
+msgstr "App Releases"
+
+msgid "Publish a new Android build"
+msgstr "Publish a new Android build"
+
+msgid "Version name"
+msgstr "Version name"
+
+msgid "Version code"
+msgstr "Version code"
+
+msgid "APK file"
+msgstr "APK file"
+
+msgid "Release notes"
+msgstr "Release notes"
+
+msgid "Publish"
+msgstr "Publish"
+
+msgid "Published builds"
+msgstr "Published builds"
+
+msgid "Delete this app release?"
+msgstr "Delete this app release?"
+
+msgid "No app builds published yet."
+msgstr "No app builds published yet."
+
+msgid "Banners"
+msgstr "Banners"
+
+msgid "New banner"
+msgstr "New banner"
+
+msgid "Visible"
+msgstr "Visible"
+
+msgid "Hide"
+msgstr "Hide"
+
+msgid "Show"
+msgstr "Show"
+
+msgid "Delete this banner?"
+msgstr "Delete this banner?"
+
+msgid "No banners yet."
+msgstr "No banners yet."
+
+msgid "Student banner messages"
+msgstr "Student banner messages"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

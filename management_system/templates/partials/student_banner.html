@@ -1,0 +1,26 @@
+{% load i18n static %}
+{% if student_banners %}
+<div class="st-banner" id="student-banner" role="region" aria-label="{% translate 'Announcements' %}">
+  <div class="st-banner-items" id="student-banner-items">
+    {% for banner in student_banners %}
+    <article class="st-banner-item{% if not forloop.first %} is-hidden{% endif %}" data-banner-item>
+      <i class="fas fa-bullhorn st-banner-icon" aria-hidden="true"></i>
+      <div class="st-banner-text">
+        <strong class="st-banner-title">{{ banner.title }}</strong>
+        <span class="st-banner-body">{{ banner.body }}</span>
+      </div>
+      {% if banner.action_url and banner.action_label %}
+      <a class="st-banner-action" href="{{ banner.action_url }}">{{ banner.action_label }}</a>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <div class="st-banner-controls">
+    <span class="st-banner-dots" aria-hidden="true">
+      {% for banner in student_banners %}<i class="st-banner-dot{% if forloop.first %} is-active{% endif %}" data-banner-dot></i>{% endfor %}
+    </span>
+    <button type="button" class="st-banner-close" id="student-banner-close" aria-label="{% translate 'Dismiss announcements' %}"><i class="fas fa-times"></i></button>
+  </div>
+</div>
+<script src="{% static 'js/student_banner.js' %}?v={{ static_asset_version }}"></script>
+{% endif %}

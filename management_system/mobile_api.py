@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import timedelta
 from io import BytesIO
@@ -86,6 +87,8 @@ from .views import (
     _valid_session_token,
 )
 
+logger = logging.getLogger(__name__)
+
 MEDIA_RESOURCE_URL_TTL = 3600
 
 
@@ -161,9 +164,17 @@ def login(request):
     username = normalize_username(username) if isinstance(username, str) else ""
     username_key = username
     if mobile_login_rate_limited(username_key, remote_addr):
+        logger.warning(
+            "mobile login rate limited",
+            extra={"event": "mobile_login_rate_limited", "attempted_username": username_key},
+        )
         return _error(request, "authentication_rate_limited", _localized(request, "Too many login attempts. Try again later."), 429)
     if not isinstance(username, str) or not isinstance(password, str) or not username or not password:
         record_mobile_login_failure(username_key, remote_addr)
+        logger.warning(
+            "mobile login failed",
+            extra={"event": "mobile_login_failed", "attempted_username": username_key},
+        )
         return _error(request, "invalid_credentials", _localized(request, "Invalid username or password."), 401)
     user = authenticate(request=request, username=username, password=password)
     if (
@@ -172,10 +183,18 @@ def login(request):
         or user.application_status != "active"
     ):
         record_mobile_login_failure(username_key, remote_addr)
+        logger.warning(
+            "mobile login failed",
+            extra={"event": "mobile_login_failed", "attempted_username": username_key},
+        )
         return _error(request, "invalid_credentials", _localized(request, "Invalid username or password."), 401)
     clear_mobile_login_failures(username_key, remote_addr)
     installation_id = payload.get("installation_id")
     if isinstance(installation_id, str) and mobile_installation_conflict(user, installation_id):
+        logger.warning(
+            "mobile login device conflict",
+            extra={"event": "mobile_login_device_conflict", "user_id": user.pk},
+        )
         return _error(request, "device_conflict", _localized(request, "This push device belongs to another account."), 409)
     revoke_other_account_biometric(
         user,
@@ -183,6 +202,10 @@ def login(request):
     )
     token, session = issue_mobile_session(
         user,
+    )
+    logger.info(
+        "mobile login succeeded",
+        extra={"event": "mobile_login_succeeded", "user_id": user.pk, "session_id": session.pk},
     )
     return json_api_response(request, {
         "token": token,
@@ -205,6 +228,10 @@ def otp_request(request):
             request.META.get("REMOTE_ADDR", ""),
         )
     except MobileOtpError as exc:
+        logger.warning(
+            "mobile OTP request failed",
+            extra={"event": "mobile_otp_request_failed", "code": exc.code},
+        )
         response = _error(
             request,
             exc.code,
@@ -215,6 +242,10 @@ def otp_request(request):
         if exc.retry_after is not None:
             response["Retry-After"] = str(exc.retry_after)
         return response
+    logger.info(
+        "mobile OTP requested",
+        extra={"event": "mobile_otp_requested", "challenge_id": str(challenge.challenge_id)},
+    )
     return json_api_response(
         request,
         {
@@ -242,6 +273,10 @@ def otp_verify(request):
             payload.get("phone_number", ""),
         )
     except MobileOtpError as exc:
+        logger.warning(
+            "mobile OTP verification failed",
+            extra={"event": "mobile_otp_failed", "code": exc.code},
+        )
         response = _error(
             request,
             exc.code,
@@ -257,6 +292,10 @@ def otp_verify(request):
         normalize_mobile_installation_id(payload.get("biometric_installation_id")),
     )
     token, session = issue_mobile_session(user)
+    logger.info(
+        "mobile OTP verified",
+        extra={"event": "mobile_otp_succeeded", "user_id": user.pk, "session_id": session.pk},
+    )
     return json_api_response(
         request,
         {
@@ -284,6 +323,10 @@ def logout(request):
     try:
         revoked = revoke_mobile_session(request, installation_id)
     except MobilePushDeliveryInProgress:
+        logger.warning(
+            "mobile logout blocked by active push delivery",
+            extra={"event": "mobile_logout_blocked", "user_id": request.user.pk, "reason": "push_delivery_in_progress"},
+        )
         return _error(
             request,
             "push_delivery_in_progress",
@@ -292,6 +335,7 @@ def logout(request):
         )
     if not revoked:
         return _error(request, "authentication_required", _("Authentication required."), 401)
+    logger.info("mobile logout", extra={"event": "mobile_logout", "user_id": request.user.pk})
     return json_api_response(request, {"status": "logged_out"})
 
 
@@ -308,7 +352,15 @@ def biometric_enroll(request):
     try:
         credential = enroll_mobile_biometric(request.user, installation_id)
     except MobileBiometricError as exc:
+        logger.warning(
+            "mobile biometric enroll failed",
+            extra={"event": "mobile_biometric_failed", "user_id": request.user.pk, "code": exc.code},
+        )
         return _error(request, exc.code, _localized(request, exc.message), exc.status)
+    logger.info(
+        "mobile biometric enrolled",
+        extra={"event": "biometric_enrolled", "user_id": request.user.pk},
+    )
     return json_api_response(
         request,
         {"status": "enrolled", "credential": credential},
@@ -331,7 +383,15 @@ def biometric_unlock(request):
             request.META.get("REMOTE_ADDR", ""),
         )
     except MobileBiometricError as exc:
+        logger.warning(
+            "mobile biometric unlock failed",
+            extra={"event": "mobile_biometric_failed", "code": exc.code},
+        )
         return _error(request, exc.code, _localized(request, exc.message), exc.status)
+    logger.info(
+        "mobile biometric unlocked",
+        extra={"event": "biometric_unlock_succeeded", "user_id": user.pk, "session_id": session.pk},
+    )
     return json_api_response(
         request,
         {
@@ -356,7 +416,15 @@ def biometric_revoke(request):
     try:
         updated = revoke_mobile_biometric(request.user, installation_id)
     except MobileBiometricError as exc:
+        logger.warning(
+            "mobile biometric revoke failed",
+            extra={"event": "mobile_biometric_failed", "user_id": request.user.pk, "code": exc.code},
+        )
         return _error(request, exc.code, _localized(request, exc.message), exc.status)
+    logger.info(
+        "mobile biometric revoked",
+        extra={"event": "biometric_revoked", "user_id": request.user.pk, "revoked_count": updated},
+    )
     return json_api_response(request, {"status": "revoked", "updated": updated})
 
 
@@ -632,7 +700,11 @@ def push_devices(request):
     )
     platform = payload.get("platform") if payload else None
     if (
-        not isinstance(token, str) or not token.startswith("ExponentPushToken[") or len(token) > 255
+        (token is not None and (
+            not isinstance(token, str)
+            or not token.startswith("ExponentPushToken[")
+            or len(token) > 255
+        ))
         or installation_id is None
         or platform not in {MobilePushDevice.Platform.ANDROID, MobilePushDevice.Platform.IOS}
     ):
@@ -646,16 +718,31 @@ def push_devices(request):
             ).exclude(user=request.user).exists()
             if conflicting_installation:
                 return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
-            existing_token = MobilePushDevice.objects.select_for_update().filter(expo_push_token=token).first()
-            if existing_token and existing_token.user_id != request.user.pk:
-                return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
+            existing_token = None
+            if token is not None:
+                existing_token = MobilePushDevice.objects.select_for_update().filter(expo_push_token=token).first()
+                if existing_token and existing_token.user_id != request.user.pk:
+                    return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
             device = MobilePushDevice.objects.select_for_update().filter(
                 user=request.user, installation_id=installation_id
             ).first()
             if device and existing_token and device.pk != existing_token.pk:
                 return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
+            now = timezone.now()
             if device is None:
-                if existing_token is None:
+                if token is None:
+                    # Opt-out: record the install as inactive with no push
+                    # target. A NULL token never matches another row, so
+                    # multiple opted-out installs coexist safely.
+                    device = MobilePushDevice.objects.create(
+                        user=request.user,
+                        expo_push_token=None,
+                        installation_id=installation_id,
+                        platform=platform,
+                        is_active=False,
+                        disabled_at=now,
+                    )
+                elif existing_token is None:
                     device = MobilePushDevice.objects.create(
                         user=request.user,
                         expo_push_token=token,
@@ -669,21 +756,33 @@ def push_devices(request):
                     device.platform = platform
                     device.is_active = True
                     device.disabled_at = None
-                    device.last_seen_at = timezone.now()
+                    device.last_seen_at = now
                     device.save(update_fields=[
                         "user", "installation_id", "platform", "is_active",
                         "disabled_at", "last_seen_at", "updated_at",
                     ])
+            elif token is None:
+                # The install declined notifications; keep ownership visible
+                # without retaining a push target.
+                device.expo_push_token = None
+                device.platform = platform
+                device.is_active = False
+                device.disabled_at = now
+                device.last_seen_at = now
+                device.save(update_fields=[
+                    "expo_push_token", "platform", "is_active",
+                    "disabled_at", "last_seen_at", "updated_at",
+                ])
             else:
                 device.expo_push_token = token
                 device.platform = platform
                 device.is_active = True
                 device.disabled_at = None
-                device.last_seen_at = timezone.now()
+                device.last_seen_at = now
                 device.save(update_fields=["expo_push_token", "platform", "is_active", "disabled_at", "last_seen_at", "updated_at"])
     except IntegrityError:
         return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
-    return json_api_response(request, {"device": {"id": device.pk, "installation_id": device.installation_id, "platform": device.platform, "is_active": True}})
+    return json_api_response(request, {"device": {"id": device.pk, "installation_id": device.installation_id, "platform": device.platform, "is_active": device.is_active}})
 
 
 @csrf_exempt
@@ -976,3 +1075,78 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
 @require_POST
 def lesson_progress(request, offering_id, lesson_id):
     return _call_existing_progress(request, lesson_id, offering_id)
+
+
+@require_mobile_session
+@require_http_methods(["GET"])
+def galleries(request):
+    """List graduation albums the bearer may view (newest year first)."""
+    from django.db.models import Count
+
+    from . import graduation_gallery as gg
+    from .models import GraduationGalleryItem
+
+    scopes = gg.graduation_scopes_for_user(request.user).annotate(
+        items_count=Count("gallery_items")
+    )
+    albums = [s for s in scopes if getattr(s, "items_count", 0)]
+    covers = gg.album_covers([s.pk for s in albums])
+    items = []
+    for scope in albums:
+        cover = covers.get(scope.pk)
+        cover_url = gg.gallery_file_url(cover.display_key) if cover is not None else None
+        items.append(
+            {
+                "scope_id": scope.pk,
+                "academic_year": scope.academic_year.name,
+                "academic_year_id": scope.academic_year_id,
+                "level": scope.level.display_name,
+                "level_id": scope.level_id,
+                "level_ordering": scope.level.ordering,
+                "items_count": scope.items_count,
+                "cover": {"display_url": cover_url, "kind": getattr(cover, "kind", "image")} if cover is not None else None,
+            }
+        )
+    page_obj = Paginator(items, PAGE_SIZE).get_page(_page_value(request))
+    return json_api_response(request, _paginated_payload(page_obj, list(page_obj.object_list)))
+
+
+@require_mobile_session
+@require_http_methods(["GET"])
+def gallery_items(request, scope_id: int):
+    """List paginated items of one graduation album."""
+    from . import graduation_gallery as gg
+    from .models import AcademicYearLevel, GraduationGalleryItem
+
+    scope = AcademicYearLevel.objects.select_related("academic_year", "level").filter(pk=scope_id).first()
+    if scope is None:
+        return _error(request, "not_found", _("Gallery not found."), 404)
+    if not gg.gallery_has_access(request.user, scope):
+        return _error(request, "forbidden", _("You do not have access to this gallery."), 403)
+    queryset = GraduationGalleryItem.objects.filter(academic_year_level=scope).order_by("-created_at", "-pk")
+    page_obj = Paginator(queryset, PAGE_SIZE).get_page(_page_value(request))
+    rows = []
+    for row in page_obj.object_list:
+        display_url, download_url = gg.gallery_item_urls(row)
+        rows.append(
+            {
+                "id": row.pk,
+                "kind": row.kind,
+                "display_url": display_url,
+                "download_url": download_url,
+                "width": row.width,
+                "height": row.height,
+                "created_at": row.created_at.isoformat(),
+            }
+        )
+    return json_api_response(
+        request,
+        {
+            "scope": {
+                "scope_id": scope.pk,
+                "academic_year": scope.academic_year.name,
+                "level": scope.level.display_name,
+            },
+            **_paginated_payload(page_obj, rows),
+        },
+    )

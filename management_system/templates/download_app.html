@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block head_meta %}
+<title>{% translate "Download our app" %}</title>
+{% endblock %}
+
+{% block body %}
+<div class="sd-page sd-download-page">
+<div class="container py-4">
+  <h1 class="sd-calendar-title"><i class="fas fa-mobile-alt me-2"></i>{% translate "Download our app" %}</h1>
+  {% if release %}
+  <div class="sd-panel-card mb-4">
+    <div class="sd-panel-head">
+      <i class="fas fa-android"></i>
+      <strong>{% translate "Bible Institute for Android" %}</strong>
+      <span class="sd-panel-sub">{% translate "Version" %} {{ release.version_name }}</span>
+    </div>
+    <div class="sd-screen">
+      <p class="ps-muted-text">
+        {% translate "Updated" %}: {{ release.created_at|date }} ·
+        {% translate "Size" %}: {{ release.file_size|filesizeformat }}
+      </p>
+      {% if release.release_notes %}<p>{{ release.release_notes|linebreaksbr }}</p>{% endif %}
+      <a class="sd-btn sd-btn--gold" href="{% url 'download-app-file' %}"><i class="fas fa-download me-1"></i>{% translate "Download the app" %}</a>
+    </div>
+  </div>
+  <div class="sd-panel-card mb-4">
+    <div class="sd-panel-head">
+      <i class="fas fa-shield-alt"></i>
+      <strong>{% translate "Is this safe to install?" %}</strong>
+    </div>
+    <div class="sd-screen">
+      <p>{% translate "Yes. Android shows a warning for every app installed outside Google Play. This file is published here on the institute's official website and is safe to install." %}</p>
+    </div>
+  </div>
+  <div class="sd-panel-card mb-4">
+    <div class="sd-panel-head">
+      <i class="fas fa-list-ol"></i>
+      <strong>{% translate "Installation steps" %}</strong>
+    </div>
+    <div class="sd-screen">
+      <ol class="sd-steps">
+        <li>{% translate "Tap “Download the app” above and wait until the file finishes downloading." %}</li>
+        <li>{% translate "Open the downloaded file from your browser downloads or the Files app." %}</li>
+        <li>{% translate "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install." %}</li>
+        <li>{% translate "Open “Bible Institute” and sign in with your website account." %}</li>
+        <li>{% translate "After updates, repeat the same steps; your account and data stay unchanged." %}</li>
+      </ol>
+    </div>
+  </div>
+  {% else %}
+  <div class="sd-panel-card"><p class="mb-0">{% translate "The Android app is not published yet. Please check back later." %}</p></div>
+  {% endif %}
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block head_meta %}
+<title>{% translate "Graduates" %}</title>
+{% endblock %}
+
+{% block body %}
+{% include "partials/graduation_gallery_content.html" %}
+{% endblock %}

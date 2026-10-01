@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time as dt_time, timedelta
 from decimal import Decimal
+import logging
 import zoneinfo
 
 from django.conf import settings
@@ -27,6 +28,8 @@ from ..models import (
     Role,
     User,
 )
+
+logger = logging.getLogger(__name__)
 
 
 DAY_GRADE_FULL = Decimal("1")
@@ -415,6 +418,16 @@ def reconcile_missing_exits(target_date=None, *, actor=None) -> int:
         return 0
     with transaction.atomic():
         AttendanceRecord.objects.bulk_create(missing, batch_size=500, ignore_conflicts=True)
+    logger.info(
+        "missing exits reconciled",
+        extra={
+            "event": "attendance_reconciled",
+            "on_date": target_date.isoformat(),
+            "count": len(missing),
+            "source": source,
+            "actor_id": actor.pk if actor is not None else None,
+        },
+    )
     return len(missing)
 
 
@@ -477,11 +490,22 @@ def assign_unassigned_attendance(meeting) -> int:
         attendance_date=OuterRef("attendance_date"),
         action=OuterRef("action"),
     )
-    return AttendanceRecord.objects.filter(
+    updated = AttendanceRecord.objects.filter(
         course_offering__isnull=True,
         attendance_date=meeting.meeting_date,
         student__enrollments__academic_year_level_id=meeting.academic_year_level_id,
     ).filter(~Exists(existing)).update(course_offering_id=meeting.course_offering_id)
+    if updated:
+        logger.info(
+            "pending attendance backfilled",
+            extra={
+                "event": "attendance_backfilled",
+                "count": updated,
+                "offering_id": meeting.course_offering_id,
+                "scope_id": meeting.academic_year_level_id,
+            },
+        )
+    return updated
 
 def get_expected_dates(academic_year_level, through_date=None):
     application_tz = zoneinfo.ZoneInfo(settings.TIME_ZONE)

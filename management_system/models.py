@@ -561,7 +561,12 @@ class MobileOtpChallenge(models.Model):
 
 
 class MobilePushDevice(models.Model):
-    """One Expo push subscription belonging to one mobile installation."""
+    """One Expo push subscription belonging to one mobile installation.
+
+    An install that declined notification permission is recorded without a
+    push token (`expo_push_token` NULL) and stays inactive, so opted-out
+    installs are visible without ever being push targets.
+    """
 
     class Platform(models.TextChoices):
         ANDROID = "android", _("Android")
@@ -572,7 +577,7 @@ class MobilePushDevice(models.Model):
         on_delete=models.CASCADE,
         related_name="mobile_push_devices",
     )
-    expo_push_token = models.CharField(max_length=255, unique=True)
+    expo_push_token = models.CharField(max_length=255, unique=True, null=True, blank=True)
     installation_id = models.CharField(max_length=128)
     platform = models.CharField(max_length=16, choices=Platform.choices)
     is_active = models.BooleanField(default=True)
@@ -1382,6 +1387,14 @@ class AcademicYear(models.Model):
     ends_on = models.DateField()
     is_active = models.BooleanField(default=False)
     ordering = models.PositiveIntegerField(unique=True)
+    graduation_level = models.ForeignKey(
+        Level,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="graduation_years",
+        help_text=_("The level whose completion opens the graduation gallery for this year."),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1883,6 +1896,128 @@ class PromotionHistory(models.Model):
             raise ValidationError(_("Invalid promotion method."))
         if self.promotion_method == self.Method.MANUAL_HISTORICAL and not self.reason.strip():
             raise ValidationError(_("A manual historical promotion requires a reason."))
+
+
+class GraduationGalleryItem(models.Model):
+    """One published graduation party file inside a year+level album."""
+
+    class Kind(models.TextChoices):
+        IMAGE = "image", _("Image")
+        VIDEO = "video", _("Video")
+
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel, on_delete=models.PROTECT, related_name="gallery_items"
+    )
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    display_key = models.CharField(max_length=500, unique=True)
+    original_key = models.CharField(max_length=500, unique=True)
+    original_filename = models.CharField(max_length=255)
+    byte_size = models.PositiveBigIntegerField(default=0)
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="gallery_uploads"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(
+                fields=["academic_year_level", "-created_at", "-id"],
+                name="gallery_item_scope_created_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.academic_year_level} — {self.original_filename}"
+
+
+class GraduationGalleryJob(models.Model):
+    """Background processing record for one staged gallery upload (file or zip)."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        PROCESSING = "processing", _("Processing")
+        COMPLETED = "completed", _("Completed")
+        FAILED = "failed", _("Failed")
+
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel, on_delete=models.PROTECT, related_name="gallery_jobs"
+    )
+    staging_key = models.CharField(max_length=500)
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    is_zip = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    total_files = models.PositiveIntegerField(default=0)
+    processed_files = models.PositiveIntegerField(default=0)
+    failed_files = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="gallery_jobs"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="gallery_job_status_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.original_filename} — {self.status}"
+
+
+class MobileAppRelease(models.Model):
+    """One published Android build served by the login-gated download page."""
+
+    version_name = models.CharField(max_length=50)
+    version_code = models.PositiveIntegerField(unique=True)
+    apk_key = models.CharField(max_length=500, unique=True)
+    file_size = models.PositiveBigIntegerField(default=0)
+    release_notes = models.TextField(blank=True, default="")
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="app_releases"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-version_code", "-pk"]
+
+    def __str__(self):
+        return f"App {self.version_name} ({self.version_code})"
+
+
+class StudentBanner(models.Model):
+    """One banner strip message shown on signed-in student pages."""
+
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    action_label = models.CharField(max_length=80, blank=True, default="")
+    action_url = models.CharField(max_length=2048, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(action_label="", action_url="")
+                    | (models.Q(action_label__gt="") & models.Q(action_url__gt=""))
+                ),
+                name="student_banner_action_pair",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["is_active", "-created_at"], name="student_banner_active_idx"),
+        ]
+
+    def __str__(self):
+        return self.title
 
 
 class MigrationReviewItem(models.Model):

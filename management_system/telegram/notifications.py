@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import timedelta
 
 import telebot
@@ -24,6 +25,8 @@ from ..utils.timezones import ensure_aware
 from .media import audio_links
 from .navigation import format_lesson, format_quiz, lesson_detail_keyboard, quiz_detail_keyboard
 from .configuration import stored_token
+
+logger = logging.getLogger(__name__)
 
 
 NOTIFICATION_BATCH_SIZE = 500
@@ -354,6 +357,11 @@ def _materialize_due_deliveries(limit: int) -> int:
             rows[start:start + NOTIFICATION_BATCH_SIZE],
             ignore_conflicts=True,
         )
+    if rows:
+        logger.info(
+            "telegram deliveries materialized",
+            extra={"event": "telegram_deliveries_materialized", "count": len(rows)},
+        )
     return len(rows)
 
 
@@ -378,6 +386,14 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
                 attempt_counts.get(delivery_id),
                 _("The Telegram bot is inactive."),
             )
+        logger.warning(
+            "telegram notifications unconfigured",
+            extra={
+                "event": "telegram_notifications_unconfigured",
+                "failed_count": len(ids),
+                "reason": "inactive_bot",
+            },
+        )
         return {"sent": 0, "skipped": 0, "failed": len(ids)}
     try:
         bot_token = stored_token(config)
@@ -389,6 +405,14 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
                 attempt_counts.get(delivery_id),
                 _("Telegram message delivery failed."),
             )
+        logger.warning(
+            "telegram notifications unconfigured",
+            extra={
+                "event": "telegram_notifications_unconfigured",
+                "failed_count": len(ids),
+                "reason": "token_unavailable",
+            },
+        )
         return {"sent": 0, "skipped": 0, "failed": len(ids)}
 
     deliveries = TelegramNotificationDelivery.objects.select_related(
@@ -436,5 +460,15 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
     if outbound_account_ids:
         TelegramAccount.objects.filter(pk__in=outbound_account_ids).update(
             last_outbound_at=timezone.now(),
+        )
+    if counts["sent"] or counts["skipped"] or counts["failed"]:
+        logger.info(
+            "telegram deliveries processed",
+            extra={
+                "event": "telegram_deliveries_processed",
+                "sent": counts["sent"],
+                "skipped": counts["skipped"],
+                "failed": counts["failed"],
+            },
         )
     return counts

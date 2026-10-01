@@ -309,18 +309,23 @@ class AcademicYearForm(forms.ModelForm):
         self.fields["starts_on"].label = _("Start date")
         self.fields["ends_on"].label = _("End date")
         self.fields["ordering"].label = _("Ordering")
+        self.fields["graduation_level"].label = _("Graduation level")
+        self.fields["graduation_level"].help_text = _("The level whose completion opens the graduation gallery for this year.")
         self.fields["levels"].queryset = Level.objects.order_by("ordering")
         self.fields["levels"].required = True
+        self.fields["graduation_level"].queryset = Level.objects.order_by("ordering")
+        self.fields["graduation_level"].required = False
 
     class Meta:
         model = AcademicYear
-        fields = ["name", "levels", "starts_on", "ends_on", "ordering"]
+        fields = ["name", "levels", "starts_on", "ends_on", "ordering", "graduation_level"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "required": True}),
             "levels": forms.SelectMultiple(attrs={"class": "form-select", "required": True, "size": 5}),
             "starts_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "ends_on": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "ordering": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "graduation_level": forms.Select(attrs={"class": "form-select"}),
         }
 
     def clean(self):
@@ -329,6 +334,10 @@ class AcademicYearForm(forms.ModelForm):
         ends_on = cleaned.get("ends_on")
         if starts_on and ends_on and starts_on >= ends_on:
             raise forms.ValidationError(_("End date must be after start date."))
+        graduation_level = cleaned.get("graduation_level")
+        levels = cleaned.get("levels")
+        if graduation_level is not None and levels is not None and graduation_level not in levels:
+            raise forms.ValidationError(_("The graduation level must be one of the opened levels."))
         return cleaned
 
 

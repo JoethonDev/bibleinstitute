@@ -1,0 +1,30 @@
+{% load i18n %}
+<div class="sd-page sd-graduates-page" id="content">
+<div class="container py-4">
+  <h1 class="sd-calendar-title"><i class="fas fa-graduation-cap me-2"></i>{% translate "Graduates" %}</h1>
+  <p class="ps-muted-text">{% translate "Graduation party albums for every year and level you completed." %}</p>
+  {% if albums %}
+  <div class="gg-album-grid">
+    {% for album in albums %}
+    <a class="gg-album-card" href="{% url 'graduation-gallery-detail' album.scope.pk %}">
+      {% if album.cover_url %}
+        {% if album.cover_kind == "video" %}
+        <video class="gg-album-cover" src="{{ album.cover_url }}" preload="metadata" muted playsinline aria-hidden="true"></video>
+        {% else %}
+        <img class="gg-album-cover" src="{{ album.cover_url }}" alt="" loading="lazy" decoding="async">
+        {% endif %}
+      {% else %}
+      <span class="gg-album-cover is-empty" aria-hidden="true"><i class="fas fa-images"></i></span>
+      {% endif %}
+      <span class="gg-album-meta">
+        <strong>{{ album.scope.academic_year.name }} — {{ album.scope.level.display_name }}</strong>
+        <small>{{ album.items_count }} {% translate "photos" %}</small>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="sd-panel-card"><p class="mb-0">{% translate "No graduation albums are available for you yet." %}</p></div>
+  {% endif %}
+</div>
+</div>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
@@ -28,6 +29,8 @@ from .models import (
 from .telegram.navigation import format_lesson, website_url
 from .telegram.recipients import eligible_student_queryset
 from .utils.timezones import ensure_aware, format_user_datetime
+
+logger = logging.getLogger(__name__)
 
 
 NOTIFICATION_BATCH_SIZE = 500
@@ -315,12 +318,23 @@ def create_lesson_publication_event(lesson: Lesson) -> int:
         )
     )
     with transaction.atomic():
-        return _persist_event_specs(
+        created = _persist_event_specs(
             source=lesson,
             event_type=StudentNotification.NotificationType.LESSON_PUBLISHED,
             specs=specs,
             telegram_account_ids=telegram_account_ids,
         )
+    if created:
+        logger.info(
+            "lesson publication events created",
+            extra={
+                "event": "lesson_publication_event_created",
+                "lesson_id": lesson.pk,
+                "offering_id": lesson.course_offering_id,
+                "student_count": created,
+            },
+        )
+    return created
 
 
 def cancel_future_quiz_opening_events(quiz: Quiz) -> int:
@@ -350,10 +364,16 @@ def cancel_future_quiz_opening_events(quiz: Quiz) -> int:
         next_attempt_at=cancellation_time,
         updated_at=cancellation_time,
     )
-    return stale_notifications.update(
+    cancelled = stale_notifications.update(
         cancelled_at=cancellation_time,
         updated_at=cancellation_time,
     )
+    if cancelled:
+        logger.info(
+            "future quiz events cancelled",
+            extra={"event": "quiz_events_cancelled", "quiz_id": quiz.pk, "count": cancelled},
+        )
+    return cancelled
 
 
 def schedule_quiz_opening_events(quiz: Quiz, *, locked: bool = False) -> int:
@@ -451,10 +471,21 @@ def schedule_quiz_opening_events(quiz: Quiz, *, locked: bool = False) -> int:
             next_attempt_at=cancellation_time,
             updated_at=cancellation_time,
         )
-        stale_notifications.update(cancelled_at=cancellation_time, updated_at=cancellation_time)
-        return _persist_event_specs(
+        superseded = stale_notifications.update(cancelled_at=cancellation_time, updated_at=cancellation_time)
+        created = _persist_event_specs(
             source=quiz,
             event_type=StudentNotification.NotificationType.QUIZ_OPENING,
             specs=specs(),
             telegram_account_ids=telegram_account_ids,
         )
+    if superseded:
+        logger.info(
+            "superseded quiz events cancelled",
+            extra={"event": "quiz_events_cancelled", "quiz_id": quiz.pk, "count": superseded},
+        )
+    if created:
+        logger.info(
+            "quiz opening events scheduled",
+            extra={"event": "quiz_opening_events_scheduled", "quiz_id": quiz.pk, "student_count": created},
+        )
+    return created

@@ -1,0 +1,72 @@
+{% load i18n %}
+<div class="container-fluid py-3 ad-page" id="content">
+    <div class="ad-pane-head ad-pane-head--bordered justify-content-between">
+        <h4 class="ad-pane-title mb-0"><i class="fas fa-bullhorn me-2 ad-page-header-icon"></i>{% translate "Banners" %}<span id="banner-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h4>
+    </div>
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-plus me-2"></i>{% translate "New banner" %}</h5>
+            <form method="post" action="{% url 'banner-manage' %}" hx-post="{% url 'banner-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}<div class="text-danger">{{ form.title.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.body.id_for_label }}">{{ form.body.label }}</label>
+                        {{ form.body }}
+                        {% if form.body.errors %}<div class="text-danger">{{ form.body.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.action_label.id_for_label }}">{{ form.action_label.label }}</label>
+                        {{ form.action_label }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.action_url.id_for_label }}">{{ form.action_url.label }}</label>
+                        {{ form.action_url }}
+                    </div>
+                </div>
+                {% if form.non_field_errors %}<div class="text-danger mt-2">{{ form.non_field_errors }}</div>{% endif %}
+                <div class="mt-3">
+                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Publish" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="ad-card">
+        <div class="ad-card-body">
+            <h5 class="ad-section-title"><i class="fas fa-list me-2"></i>{% translate "Banners" %}</h5>
+            {% if banners %}
+            <div class="ad-table-wrap"><table class="ad-table">
+                <caption class="visually-hidden">{% translate "Student banner messages" %}</caption>
+                <thead><tr><th scope="col">{% translate "Title" %}</th><th scope="col">{% translate "Message" %}</th><th scope="col">{% translate "Visible" %}</th><th scope="col">{% translate "Actions" %}</th></tr></thead>
+                <tbody>
+                {% for banner in banners %}
+                <tr>
+                    <td>{{ banner.title }}</td>
+                    <td>{{ banner.body|truncatechars:80 }}</td>
+                    <td>{% if banner.is_active %}<span class="ad-pill ad-pill--success">{% translate "Yes" %}</span>{% else %}<span class="ad-pill ad-pill--muted">{% translate "No" %}</span>{% endif %}</td>
+                    <td>
+                        <span class="ad-actions">
+                        <form method="post" action="{% url 'banner-toggle' banner.pk %}" hx-post="{% url 'banner-toggle' banner.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                            {% csrf_token %}
+                            <button type="submit" class="ad-btn ad-btn--ghost ad-btn--sm">{% if banner.is_active %}{% translate "Hide" %}{% else %}{% translate "Show" %}{% endif %}</button>
+                        </form>
+                        <form method="post" action="{% url 'banner-delete' banner.pk %}" hx-post="{% url 'banner-delete' banner.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this banner?' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">{% translate "Delete" %}</button>
+                        </form>
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <p class="mb-0 ps-muted-text">{% translate "No banners yet." %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>

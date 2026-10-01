@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from logging import Filter, getLogger
+from logging import Filter, Formatter, getLogger
 from re import fullmatch
 from time import monotonic
 from urllib.parse import urlsplit
@@ -99,6 +99,134 @@ def _route_label(request):
     return _clean(match.url_name or match.route or "unnamed", limit=160)
 
 
+# Request-context attributes rendered in a fixed order; all other module
+# ``extra`` fields are rendered alphabetically afterwards.
+_CONTEXT_FIELDS = (
+    ("request_id", "request_id"),
+    ("route", "route"),
+    ("method", "method"),
+    ("request_path", "request_path"),
+    ("query_keys", "query_keys"),
+    ("status_code", "status"),
+    ("duration_ms", "duration_ms"),
+    ("user_id", "user_id"),
+    ("username", "username"),
+    ("role_id", "role_id"),
+    ("remote_ip", "ip"),
+    ("device", "device"),
+    ("browser", "browser"),
+    ("os", "os"),
+)
+_CONTEXT_ATTRIBUTE_NAMES = frozenset(name for name, _label in _CONTEXT_FIELDS)
+
+# Standard ``logging.LogRecord`` attributes that must never be rendered as
+# event payload fields.
+_LOG_RECORD_BUILTINS = frozenset({
+    "args", "asctime", "created", "exc_info", "exc_text", "filename",
+    "funcName", "levelname", "levelno", "lineno", "message", "module",
+    "msecs", "msg", "name", "pathname", "process", "processName",
+    "relativeCreated", "stack_info", "taskName", "thread", "threadName",
+})
+
+
+def _short_logger_name(name: str) -> str:
+    prefix = "management_system."
+    return name[len(prefix):] if name.startswith(prefix) else name
+
+
+def _render_value(value) -> str:
+    return " ".join(str(value).split())
+
+
+def _is_empty(value) -> bool:
+    return value is None or value == "" or value == "-"
+
+
+def _slow_request_ms() -> float:
+    try:
+        return float(getattr(settings, "LOG_SLOW_REQUEST_MS", 2000))
+    except (TypeError, ValueError):
+        return 2000.0
+
+
+class KeyValueFormatter(Formatter):
+    """Render one compact ``key=value`` line per log record.
+
+    Request-context fields are omitted when absent so lines stay short and
+    scannable; module-provided ``extra`` fields (event payloads) follow.
+    Exceptions keep their traceback on the same record.
+    """
+
+    default_time_format = "%Y-%m-%d %H:%M:%S"
+
+    def format(self, record) -> str:
+        parts = [
+            f"time={self.formatTime(record, self.default_time_format)}",
+            f"level={record.levelname}",
+            f"logger={_short_logger_name(record.name)}",
+        ]
+        event = getattr(record, "event", None)
+        if not _is_empty(event):
+            parts.append(f"event={_render_value(event)}")
+        for attribute, label in _CONTEXT_FIELDS:
+            value = getattr(record, attribute, None)
+            if not _is_empty(value):
+                parts.append(f"{label}={_render_value(value)}")
+        for key in sorted(record.__dict__):
+            if (
+                key in _LOG_RECORD_BUILTINS
+                or key == "event"
+                or key in _CONTEXT_ATTRIBUTE_NAMES
+                or key.startswith("_")
+            ):
+                continue
+            value = record.__dict__[key]
+            if not _is_empty(value):
+                parts.append(f"{key}={_render_value(value)}")
+        message = record.getMessage()
+        if message:
+            parts.append(f"msg={_render_value(message)}")
+        line = " ".join(parts)
+        if record.exc_info:
+            if not record.exc_text:
+                record.exc_text = self.formatException(record.exc_info)
+            if record.exc_text:
+                line = f"{line}\n{record.exc_text}"
+        return line
+
+
+def _log_request_outcome(context: dict, response, log) -> None:
+    """Choose the one lifecycle event a finished request deserves.
+
+    Healthy, fast requests are DEBUG only; slow responses and failures are
+    the lines operators need to see.
+    """
+    status = response.status_code
+    route = context.get("route") or "unmatched"
+    try:
+        duration_ms = float(context.get("duration_ms") or 0)
+    except (TypeError, ValueError):
+        duration_ms = 0.0
+    if status >= 500:
+        context["event"] = "http_request_error"
+        log.error("server error")
+        return
+    if status >= 400:
+        if status == 404 and route == "unmatched":
+            context["event"] = "http_request_not_found"
+            log.info("not found")
+        else:
+            context["event"] = "http_request_failed"
+            log.warning("request failed")
+        return
+    if duration_ms >= _slow_request_ms():
+        context["event"] = "http_request_slow"
+        log.info("slow request")
+        return
+    context["event"] = "http_request_completed"
+    log.debug("request completed")
+
+
 class RequestContextFilter(Filter):
     """Add fixed searchable fields to every application/Django log record."""
 
@@ -119,9 +247,12 @@ class RequestContextFilter(Filter):
             "device": "-",
             "browser": "-",
             "os": "-",
-            "event": "application_log",
         }.items():
             setattr(record, name, values.get(name, default))
+        # Module code may attach ``extra={"event": ...}``; only fall back to
+        # the request lifecycle event when the record carries none.
+        if not getattr(record, "event", None):
+            record.event = values.get("event") or "application_log"
         return True
 
 
@@ -193,17 +324,14 @@ class RequestObservabilityMiddleware:
         response = None
         try:
             context["event"] = "http_request_started"
-            logger.info("event=http_request_started")
+            logger.debug("request started")
             response = self.get_response(request)
             context["status_code"] = response.status_code
             return response
         except Exception as exc:
             context["status_code"] = 500
             context["event"] = "http_request_exception"
-            logger.exception(
-                "event=http_request_exception exception_type=%s",
-                type(exc).__name__,
-            )
+            logger.exception("unhandled exception", extra={"exception_type": type(exc).__name__})
             if request.path_info.startswith("/api/mobile/"):
                 language = normalize_language(request)
                 with translation.override(language):
@@ -217,23 +345,13 @@ class RequestObservabilityMiddleware:
             raise
         finally:
             observed_user = getattr(request, "user", None)
-            if getattr(observed_user, "is_authenticated", False):
+            if observed_user is not None and getattr(observed_user, "is_authenticated", False):
                 context["user_id"] = observed_user.pk
                 context["username"] = _clean(observed_user.username)
                 context["role_id"] = observed_user.role_id
             context["duration_ms"] = round((monotonic() - started) * 1000, 2)
-            if response is not None and response.status_code < 400:
-                context["event"] = "http_request_completed"
-                logger.info("event=http_request_completed")
-            elif response is not None:
-                context["event"] = "http_request_failed"
-                log_method = logger.error if response.status_code >= 500 else logger.warning
-                log_method(
-                    "event=http_request_failed reason=%s",
-                    "server_error" if response.status_code >= 500 else "client_or_auth_error",
-                )
-            response_id = getattr(response, "__setitem__", None)
-            if response_id is not None:
+            if response is not None:
+                _log_request_outcome(context, response, logger)
                 response["X-Request-ID"] = request_id
             _request_context.reset(token)
 
@@ -250,10 +368,10 @@ class SessionExpiryUpdate:
             if expiry_time > 0:
                 try:
                     request.session.set_expiry(request.session.get_session_cookie_age())
-                    logger.info("event=session_expiry_refreshed")
+                    logger.debug("session expiry refreshed")
                 except Exception as e:
                     logger.exception(
-                        "event=session_expiry_refresh_failed exception_type=%s",
+                        "session expiry refresh failed exception_type=%s",
                         type(e).__name__,
                     )
 

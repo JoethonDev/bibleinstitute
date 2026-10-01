@@ -78,10 +78,17 @@ def send_mobile_otp(self, challenge_id: str, encrypted_otp: str):
                 f"رمز الدخول إلى تطبيق المعهد: {otp}\nصلاحية الرمز خمس دقائق.",
                 reply_markup=copy_keyboard,
             )
-        MobileOtpChallenge.objects.filter(pk=challenge.pk, status=MobileOtpChallenge.Status.SENDING).update(
+        updated = MobileOtpChallenge.objects.filter(
+            pk=challenge.pk, status=MobileOtpChallenge.Status.SENDING
+        ).update(
             status=MobileOtpChallenge.Status.SENT,
             telegram_message_id=getattr(message, "id", None),
         )
+        if updated:
+            logger.info(
+                "mobile OTP delivered",
+                extra={"event": "mobile_otp_delivered", "challenge_id": challenge_id},
+            )
     except Exception:
         if self.request.retries < self.max_retries:
             raise self.retry(exc=Exception("Telegram OTP delivery failed"), countdown=2 ** self.request.retries)
@@ -90,6 +97,10 @@ def send_mobile_otp(self, challenge_id: str, encrypted_otp: str):
             delivery_error="Telegram OTP delivery failed.",
         )
         logger.warning(
-            "Mobile OTP delivery failed challenge_id=%s error_code=delivery_error",
-            challenge_id,
+            "mobile OTP delivery failed",
+            extra={
+                "event": "mobile_otp_delivery_failed",
+                "challenge_id": challenge_id,
+                "code": "delivery_error",
+            },
         )

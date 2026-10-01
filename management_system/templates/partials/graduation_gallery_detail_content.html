@@ -1,0 +1,44 @@
+{% load i18n static %}
+<div class="sd-page sd-graduates-page" id="content">
+<div class="container py-4">
+  <nav aria-label="{% translate 'Breadcrumb' %}"><a class="gg-back" href="{% url 'graduates' %}"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i> {% translate "Graduates" %}</a></nav>
+  <h1 class="sd-calendar-title mt-2">{{ scope.academic_year.name }} — {{ scope.level.display_name }}</h1>
+  {% if page_obj and page_obj.object_list %}
+  <div class="gg-grid" id="gallery-grid" role="list">
+    {% for item in page_obj.object_list %}
+    <figure class="gg-cell" role="listitem">
+      <button type="button" class="gg-thumb" data-gallery-open data-kind="{{ item.kind }}" data-display="{{ item.display_url }}" data-download="{{ item.download_url }}" data-index="{{ forloop.counter0 }}" aria-label="{% translate 'Open photo' %}">
+        {% if item.kind == "video" %}
+        <video class="gg-img" src="{{ item.display_url }}" preload="metadata" muted playsinline></video>
+        <span class="gg-play" aria-hidden="true"><i class="fas fa-play"></i></span>
+        {% else %}
+        <img class="gg-img" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async">
+        {% endif %}
+      </button>
+      <figcaption class="gg-actions">
+        <a class="gg-download" href="{{ item.download_url }}" download aria-label="{% translate 'Download' %}"><i class="fas fa-download"></i></a>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  <div class="gg-lightbox" id="gallery-lightbox" hidden role="dialog" aria-modal="true" aria-label="{% translate 'Photo viewer' %}">
+    <div class="gg-lightbox-backdrop" data-gallery-close></div>
+    <div class="gg-lightbox-stage">
+      <button type="button" class="gg-lightbox-nav is-prev" data-gallery-prev aria-label="{% translate 'Previous photo' %}"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i></button>
+      <div class="gg-lightbox-media" id="gallery-lightbox-media"></div>
+      <button type="button" class="gg-lightbox-nav is-next" data-gallery-next aria-label="{% translate 'Next photo' %}"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i></button>
+      <div class="gg-lightbox-bar">
+        <a class="gg-lightbox-download" id="gallery-lightbox-download" href="#" download><i class="fas fa-download me-1"></i>{% translate "Download" %}</a>
+        <button type="button" class="gg-lightbox-close" data-gallery-close aria-label="{% translate 'Close' %}"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  </div>
+  {% translate "photos" as photos_label %}
+  {% translate "Gallery page navigation" as gallery_nav_label %}
+  {% include "partials/pagination.html" with page_obj=page_obj item_label=photos_label aria_label=gallery_nav_label %}
+  {% else %}
+  <div class="sd-panel-card"><p class="mb-0">{% translate "No photos in this album yet." %}</p></div>
+  {% endif %}
+</div>
+</div>
+<script src="{% static 'js/gallery_lightbox.js' %}?v={{ static_asset_version }}"></script>

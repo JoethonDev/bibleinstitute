@@ -366,7 +366,6 @@ class LoginView(views.LoginView):
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             return redirect(reverse("view-profile"))
-        logger.info("Display login page")
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -377,10 +376,26 @@ class LoginView(views.LoginView):
         username = request.POST.get("username")
 
         if response.status_code != 302:
-            logger.warning(f"Invalid user access for account : {username}")
+            logger.warning(
+                "web login failed",
+                extra={"event": "login_failed", "attempted_username": username or ""},
+            )
         else:
-            logger.info(f"User : {username} is successfully logged in")
-        
+            logger.info(
+                "web login succeeded",
+                extra={"event": "login_succeeded", "username": username or ""},
+            )
+
+        return response
+
+
+class LogoutView(views.LogoutView):
+    """Audit one event when a browser session is ended."""
+
+    def post(self, request, *args, **kwargs):
+        user_id = getattr(request.user, "pk", None)
+        response = super().post(request, *args, **kwargs)
+        logger.info("user logged out", extra={"event": "logout", "user_id": user_id})
         return response
 
 def index(request):
@@ -993,8 +1008,6 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
         total_grade = grade.total_grade if grade else 0
 
         if request.method == "GET":
-            logger.info(f"User : {user} is accessing {quiz.name} in {offering.course.name} offering")
-
             # Determine quiz mode using cohort-year window logic
             if preview_requested:
                 quiz_mode = "preview"
@@ -1054,8 +1067,6 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                     # Send back to main page with error message TODO
                     return HttpResponse(_("Invalid Request, submission is closed!")) # Translate
                 
-                logger.info(f"User : {user} has submitted {quiz} at {submission_datetime.strftime('%d/%m/%Y, %H:%M:%S')}")
-
                 questions_data, not_used = unpack_quiz_form(request.POST)
                 question_by_id = {
                     question.pk: question
@@ -1114,13 +1125,32 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                             submitted_at=submission_datetime,
                             total_grade=total_grade,
                         )
-                        logger.info(f"{user}'s submission is added successfully to {quiz}")
+                    submission_counts = (total_grade, len(submissions), len(unanswered_questions))
+                    logger.info(
+                        "quiz submitted",
+                        extra={
+                            "event": "quiz_submitted",
+                            "quiz_id": quiz.pk,
+                            "offering_id": offering.pk,
+                            "student_id": locked_user.pk,
+                            "total_grade": submission_counts[0],
+                            "submission_count": submission_counts[1],
+                            "unanswered_count": submission_counts[2],
+                        },
+                    )
                     success(request, _("Quiz is sent successfully!"), extra_tags="alert-success") # Translate
 
                 except Exception as e:
                     error(request, _("Sending quiz has failed, Please Try again!"), extra_tags="alert-danger") # Translate
-                    logger.error(f"{user}'s submission failed for {quiz.name}")
-                    logger.error(f"Stack Traceback: {e}")
+                    logger.exception(
+                        "quiz submission failed",
+                        extra={
+                            "event": "quiz_submission_failed",
+                            "quiz_id": quiz.pk,
+                            "offering_id": offering.pk,
+                            "student_id": user.pk,
+                        },
+                    )
             
             return redirect(reverse("quiz-details", args=[offering_id, quiz_id]))
         
@@ -1128,14 +1158,11 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             return HttpResponse(_("Not allowed method"), 400) # Translate
         
     except Http404:
-            logger.error(f"Offering with id: {offering_id} or Quiz with id: {quiz_id} not found for user: {user.username}")
-            raise Http404
-    
+        raise Http404
+
 # Admin Views
 @capability_required(can_manage_content)
 def admin_panel(request):
-    logger.info(f"User : {request.user} accesses admin panel successfully")
-
     today = timezone.now().date()
     first_of_month = today.replace(day=1)
     week_ago = today - timedelta(days=7)
@@ -3911,7 +3938,15 @@ def api_delete_file(request):
             # A manifest must clean its segment children first, otherwise the
             # .ts objects are orphaned. Children are deleted before the parent.
             successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
-            logger.info(f"User {request.user} deleted m3u8 file {file_key} with {len(successful)} related files")
+            logger.info(
+                "r2 manifest deleted",
+                extra={
+                    "event": "r2_file_deleted",
+                    "file_key": file_key,
+                    "deleted_count": len(successful),
+                    "failed_count": len(failed),
+                },
+            )
             if file_key in successful:
                 return JsonResponse({
                     'success': True,
@@ -3926,13 +3961,19 @@ def api_delete_file(request):
         success = R2_MANAGER.delete_file(file_key)
 
         if success:
-            logger.info(f"User {request.user} deleted file: {file_key}")
+            logger.info(
+                "r2 file deleted",
+                extra={"event": "r2_file_deleted", "file_key": file_key},
+            )
             return JsonResponse({'success': True, 'message': _('File deleted successfully')})
         else:
             return JsonResponse({'error': _('Failed to delete file')}, status=500)
 
     except Exception as e:
-        logger.error(f"Error deleting file: {str(e)}")
+        logger.exception(
+            "r2 file delete failed",
+            extra={"event": "r2_delete_failed", "file_key": file_key},
+        )
         return JsonResponse({'error': str(e)}, status=500)
 
 @capability_required(can_delete_content)
@@ -3964,7 +4005,15 @@ def api_delete_m3u8_file(request):
 
         successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
 
-        logger.info(f"User {request.user} deleted m3u8 file {file_key} with {len(successful)} related files")
+        logger.info(
+            "r2 manifest deleted",
+            extra={
+                "event": "r2_file_deleted",
+                "file_key": file_key,
+                "deleted_count": len(successful),
+                "failed_count": len(failed),
+            },
+        )
 
         return JsonResponse({
             'success': True,
@@ -3976,7 +4025,10 @@ def api_delete_m3u8_file(request):
         })
 
     except Exception as e:
-        logger.error(f"Error deleting m3u8 file: {str(e)}")
+        logger.exception(
+            "r2 manifest delete failed",
+            extra={"event": "r2_delete_failed", "file_key": file_key},
+        )
         return JsonResponse({'error': str(e)}, status=500)
 
 @capability_required(can_delete_content)
@@ -4021,7 +4073,14 @@ def api_delete_files_batch(request):
             successful.extend(ok)
             failed.extend(bad)
 
-        logger.info(f"User {request.user} batch deleted {len(successful)} files")
+        logger.info(
+            "r2 files deleted in batch",
+            extra={
+                "event": "r2_files_deleted",
+                "deleted_count": len(successful),
+                "failed_count": len(failed),
+            },
+        )
 
         return JsonResponse({
             'success': True,
@@ -4033,7 +4092,10 @@ def api_delete_files_batch(request):
         })
 
     except Exception as e:
-        logger.error(f"Error in batch delete: {str(e)}")
+        logger.exception(
+            "r2 batch delete failed",
+            extra={"event": "r2_delete_failed", "requested_count": len(file_keys) if isinstance(file_keys, list) else 0},
+        )
         return JsonResponse({'error': str(e)}, status=500)
 
 @capability_required(can_manage_content)

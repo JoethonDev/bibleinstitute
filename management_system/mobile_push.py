@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from datetime import timedelta
@@ -15,6 +16,8 @@ from django.db.models.functions import RowNumber
 from django.utils import timezone
 
 from .models import MobilePushDevice, PushDelivery, StudentNotification
+
+logger = logging.getLogger(__name__)
 
 
 MAX_PUSH_ATTEMPTS = 3
@@ -490,6 +493,15 @@ def _recover_stale_sending() -> None:
             )
 
 
+def _log_push_dispatch_totals(totals: dict[str, int]) -> None:
+    if not any(totals.values()):
+        return
+    logger.info(
+        "mobile push dispatched",
+        extra={"event": "mobile_push_dispatched", **totals},
+    )
+
+
 def _acquire_provider_slot(requests_per_second: int) -> None:
     """Throttle all web workers through the shared Redis cache when available."""
     while True:
@@ -517,6 +529,7 @@ def dispatch_due_mobile_push(*, limit: int = DELIVERY_SCAN_LIMIT) -> dict[str, i
     deliveries = _claim_due_deliveries(limit)
     totals = {"created": created, "ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": expired}
     if not deliveries:
+        _log_push_dispatch_totals(totals)
         return totals
 
     batch_size = max(1, min(int(getattr(settings, "EXPO_PUSH_SEND_BATCH_SIZE", 100)), 100))
@@ -532,6 +545,7 @@ def dispatch_due_mobile_push(*, limit: int = DELIVERY_SCAN_LIMIT) -> dict[str, i
         for key in ("ticketed", "failed", "retried", "deactivated"):
             totals[key] += counts[key]
         totals["skipped"] += counts["skipped"]
+    _log_push_dispatch_totals(totals)
     return totals
 
 
@@ -646,4 +660,10 @@ def process_mobile_push_receipts(*, limit: int = 1000) -> dict[str, int]:
         _acquire_provider_slot(
             max(1, int(getattr(settings, "EXPO_PUSH_REQUESTS_PER_SECOND", 5)))
         )
-    return _process_receipt_chunk(deliveries)
+    counts = _process_receipt_chunk(deliveries)
+    if any(counts.values()):
+        logger.info(
+            "mobile push receipts processed",
+            extra={"event": "mobile_push_receipts_processed", **counts},
+        )
+    return counts

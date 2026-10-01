@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import secrets
 from datetime import timedelta
 from functools import wraps
@@ -17,6 +18,8 @@ from django.utils.translation import gettext as _
 
 from .models import MobileBiometricCredential, MobilePushDevice, PushDelivery, StudentMobileSession, User
 from .utils.localization import normalize_language
+
+logger = logging.getLogger(__name__)
 
 
 MOBILE_SESSION_LIFETIME = timedelta(days=30)
@@ -280,24 +283,43 @@ def revoke_mobile_session(request, installation_id: str) -> bool:
             device.delete()
         locked_session.revoked_at = now
         locked_session.save(update_fields=["revoked_at"])
+    logger.info(
+        "mobile session revoked",
+        extra={
+            "event": "mobile_session_revoked",
+            "user_id": locked_session.user_id,
+            "device_removed": device is not None,
+        },
+    )
     return True
 
 
 def revoke_user_mobile_access(user) -> None:
     now = timezone.now()
-    StudentMobileSession.objects.filter(
+    session_count = StudentMobileSession.objects.filter(
         user=user,
         revoked_at__isnull=True,
     ).update(revoked_at=now)
-    MobilePushDevice.objects.filter(user=user, is_active=True).update(
+    device_count = MobilePushDevice.objects.filter(user=user, is_active=True).update(
         is_active=False,
         disabled_at=now,
         updated_at=now,
     )
-    MobileBiometricCredential.objects.filter(
+    credential_count = MobileBiometricCredential.objects.filter(
         user=user,
         revoked_at__isnull=True,
     ).update(revoked_at=now, updated_at=now)
+    if session_count or device_count or credential_count:
+        logger.info(
+            "mobile access revoked",
+            extra={
+                "event": "mobile_access_revoked",
+                "user_id": user.pk,
+                "session_count": session_count,
+                "device_count": device_count,
+                "credential_count": credential_count,
+            },
+        )
 
 
 def revoke_users_mobile_access(user_ids) -> None:
@@ -306,19 +328,30 @@ def revoke_users_mobile_access(user_ids) -> None:
     if not user_ids:
         return
     revoked_at = timezone.now()
-    StudentMobileSession.objects.filter(
+    session_count = StudentMobileSession.objects.filter(
         user_id__in=user_ids,
         revoked_at__isnull=True,
     ).update(revoked_at=revoked_at)
-    MobilePushDevice.objects.filter(user_id__in=user_ids, is_active=True).update(
+    device_count = MobilePushDevice.objects.filter(user_id__in=user_ids, is_active=True).update(
         is_active=False,
         disabled_at=revoked_at,
         updated_at=revoked_at,
     )
-    MobileBiometricCredential.objects.filter(
+    credential_count = MobileBiometricCredential.objects.filter(
         user_id__in=user_ids,
         revoked_at__isnull=True,
     ).update(revoked_at=revoked_at, updated_at=revoked_at)
+    if session_count or device_count or credential_count:
+        logger.info(
+            "mobile access revoked in bulk",
+            extra={
+                "event": "mobile_access_revoked_bulk",
+                "user_count": len(user_ids),
+                "session_count": session_count,
+                "device_count": device_count,
+                "credential_count": credential_count,
+            },
+        )
 
 
 def get_mobile_session(request):

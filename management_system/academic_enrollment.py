@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import Iterable, Mapping
 
@@ -23,6 +24,8 @@ from .models import (
     HistoricalAcademicSummary,
 )
 from .mobile_auth import revoke_user_mobile_access, revoke_users_mobile_access
+
+logger = logging.getLogger(__name__)
 
 
 PROMOTABLE_HISTORICAL_OUTCOMES = frozenset({
@@ -134,6 +137,10 @@ def activate_academic_year(year: AcademicYear, actor: User) -> AcademicYear:
     target.is_active = True
     target.save(update_fields=["is_active"])
     _materialize_last_level_exceptional_access(target, actor)
+    logger.info(
+        "academic year activated",
+        extra={"event": "academic_year_activated", "year_id": target.pk, "year_name": target.name},
+    )
     return target
 
 
@@ -172,6 +179,15 @@ def set_application_status(
         ])
         if status != "active":
             revoke_user_mobile_access(locked_user)
+        logger.info(
+            "application status changed",
+            extra={
+                "event": "application_status_changed",
+                "student_id": locked_user.pk,
+                "status": status,
+                "expected_status": expected_status,
+            },
+        )
         return locked_user, None
 
     active_years = list(AcademicYear.objects.select_for_update().filter(is_active=True).order_by("pk"))
@@ -207,6 +223,16 @@ def set_application_status(
         enrollment.status = Enrollment.Status.ACTIVE
         enrollment.enrolled_by = enrollment.enrolled_by or actor
         enrollment.save(update_fields=["status", "enrolled_by"])
+    logger.info(
+        "application status changed",
+        extra={
+            "event": "application_status_changed",
+            "student_id": locked_user.pk,
+            "status": status,
+            "expected_status": expected_status,
+            "enrollment_id": enrollment.pk,
+        },
+    )
     return locked_user, enrollment
 
 
@@ -379,6 +405,18 @@ def bulk_set_application_status(
             user.decided_at = decision_time if status == "declined" else None
 
     results["success"] = [user.pk for user in eligible]
+    logger.info(
+        "application batch changed",
+        extra={
+            "event": "application_bulk_changed",
+            "status": status,
+            "requested": len(user_ids),
+            "success_count": len(results["success"]),
+            "stale_count": len(results["stale"]),
+            "error_count": len(results["errors"]),
+            "changed_count": len(results["changed_users"]),
+        },
+    )
     return results
 
 
@@ -454,6 +492,14 @@ def set_user_normal_enrollment_scope(
         enrollment.status = Enrollment.Status.ACTIVE
         enrollment.enrolled_by = enrollment.enrolled_by or actor
         enrollment.save(update_fields=["status", "enrolled_by"])
+    logger.info(
+        "enrollment scope assigned",
+        extra={
+            "event": "enrollment_scope_assigned",
+            "student_id": locked_user.pk,
+            "scope_id": selected_scope.pk,
+        },
+    )
     return enrollment
 
 
@@ -573,7 +619,7 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
 
     source.status = Enrollment.Status.COMPLETED
     source.save(update_fields=["status"])
-    return PromotionHistory.objects.create(
+    history = PromotionHistory.objects.create(
         evaluation_result=result,
         source_enrollment=source,
         destination_enrollment=destination,
@@ -592,19 +638,50 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
         reason="",
         actor=actor,
     )
+    logger.info(
+        "student promoted",
+        extra={
+            "event": "promotion_applied",
+            "student_id": source.student_id,
+            "result_id": result_id,
+            "outcome": outcome,
+            "source_scope_id": source_scope.pk,
+            "destination_scope_id": destination_scope.pk if destination_scope else None,
+            "exceptional_count": len(created_exceptional),
+        },
+    )
+    return history
 
 
 def promote_evaluation_results(*, result_ids: list[int], actor: User) -> tuple[list[PromotionHistory], list[dict]]:
     """Process at most 1,000 aggregate results with isolated transactions."""
     _require_admin(actor)
-    if len(result_ids) > 1000:
+    requested_ids = list(dict.fromkeys(result_ids))
+    if len(requested_ids) > 1000:
         raise ValidationError(_("Select no more than 1,000 students at a time."))
     histories, errors = [], []
-    for result_id in dict.fromkeys(result_ids):
+    for result_id in requested_ids:
         try:
             histories.append(promote_evaluation_result(result_id=result_id, actor=actor))
         except (EvaluationResult.DoesNotExist, ValidationError, PermissionDenied) as exc:
             errors.append({"result_id": result_id, "message": str(exc)})
+            logger.warning(
+                "promotion rejected",
+                extra={
+                    "event": "promotion_rejected",
+                    "result_id": result_id,
+                    "reason": str(exc)[:200],
+                },
+            )
+    logger.info(
+        "promotion batch completed",
+        extra={
+            "event": "promotion_bulk_completed",
+            "requested": len(requested_ids),
+            "succeeded": len(histories),
+            "failed": len(errors),
+        },
+    )
     return histories, errors
 
 
@@ -743,7 +820,7 @@ def promote_historical_summary(
         HistoricalAcademicSummary.Outcome.PASSED,
     } and not exceptional_enrollment_ids
     summary.save(update_fields=["promoted_at", "reviewed_by", "reviewed_at", "certificate_eligible", "updated_at"])
-    return PromotionHistory.objects.create(
+    history = PromotionHistory.objects.create(
         evaluation_result=None,
         historical_summary=summary,
         source_enrollment=source,
@@ -761,6 +838,18 @@ def promote_historical_summary(
         reason=promotion_reason,
         actor=actor,
     )
+    logger.info(
+        "historical student promoted",
+        extra={
+            "event": "historical_promotion_applied",
+            "student_id": summary.student_id,
+            "summary_id": summary.pk,
+            "outcome": summary.outcome,
+            "destination_scope_id": destination.pk if destination else None,
+            "exceptional_count": len(exceptional_enrollment_ids),
+        },
+    )
+    return history
 
 
 def _materialize_last_level_exceptional_access(destination_year: AcademicYear, actor: User) -> int:
@@ -897,4 +986,13 @@ def _materialize_last_level_exceptional_access(destination_year: AcademicYear, a
                 actor=actor,
             ))
         PromotionHistory.objects.bulk_create(histories, batch_size=500)
+    if created_count:
+        logger.info(
+            "last-level failed-course access created",
+            extra={
+                "event": "last_level_exceptional_access_created",
+                "count": created_count,
+                "destination_year_id": destination_year.pk,
+            },
+        )
     return created_count

@@ -377,6 +377,48 @@
                 <span>{% translate "Payments matrix" %}</span>
             </a>
         </li>
+
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'graduation-gallery-manage' %}"
+               hx-get="{% url 'graduation-gallery-manage' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-graduation-cap"></i>
+                <span>{% translate "Graduation Gallery" %}</span>
+            </a>
+        </li>
+        {% if request.user.role.role == "admin" %}
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'app-release-manage' %}"
+               hx-get="{% url 'app-release-manage' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-mobile-alt"></i>
+                <span>{% translate "App Releases" %}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'banner-manage' %}"
+               hx-get="{% url 'banner-manage' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-bullhorn"></i>
+                <span>{% translate "Banners" %}</span>
+            </a>
+        </li>
+        {% endif %}
     {% endif %}
 </ul>
 {% endwith %}

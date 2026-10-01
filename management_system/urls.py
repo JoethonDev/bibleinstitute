@@ -33,6 +33,8 @@ from management_system.notification_views import (
     student_notification_read_all,
     student_notifications,
 )
+from management_system import gallery_views as graduation_gallery_views
+from management_system import portal_views as portal_extra_views
 
 urlpatterns = [
     path(
@@ -246,8 +248,25 @@ urlpatterns = [
     path('dashboard/reports/export-xlsx/', export_report_xlsx, name="export-report-xlsx"),
     path('dashboard/academic/promotion-formula/export-xlsx/', export_evaluation_xlsx, name="export-evaluation-xlsx"),
 
+    # Graduation gallery (student albums + management)
+    path('graduates/', graduation_gallery_views.graduates, name="graduates"),
+    path('graduates/<int:scope_id>/', graduation_gallery_views.graduation_gallery_detail, name="graduation-gallery-detail"),
+    path('dashboard/galleries/', graduation_gallery_views.graduation_gallery_manage, name="graduation-gallery-manage"),
+    path('api/gallery/upload-authorize/', graduation_gallery_views.gallery_upload_authorize, name="gallery-upload-authorize"),
+    path('api/gallery/jobs/<uuid:job_id>/', graduation_gallery_views.gallery_job_status, name="gallery-job-status"),
+    path('api/gallery/items/<int:item_id>/delete/', graduation_gallery_views.gallery_item_delete, name="gallery-item-delete"),
+
+    # Download-our-app page (login-gated) and admin publishing
+    path('download-app/', portal_extra_views.download_app, name="download-app"),
+    path('download-app/file/', portal_extra_views.download_app_file, name="download-app-file"),
+    path('dashboard/app-releases/', portal_extra_views.app_release_manage, name="app-release-manage"),
+    path('dashboard/app-releases/<int:release_id>/delete/', portal_extra_views.app_release_delete, name="app-release-delete"),
+    path('dashboard/banners/', portal_extra_views.banner_manage, name="banner-manage"),
+    path('dashboard/banners/<int:banner_id>/toggle/', portal_extra_views.banner_toggle, name="banner-toggle"),
+    path('dashboard/banners/<int:banner_id>/delete/', portal_extra_views.banner_delete, name="banner-delete"),
+
     # Logout
-    path('logout/', views.LogoutView.as_view(next_page='home'), name='logout'),
+    path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
 
     # P8-T04 — SEO
     path('robots.txt', robots_txt, name="robots-txt"),

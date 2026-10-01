@@ -3679,3 +3679,9 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-roster-table th { vertical-align: middle; }
 .ad-roster-table .ad-pill { white-space: nowrap; }
 .ad-roster-table .ad-actions { justify-content: flex-end; }
+
+/* Graduation gallery management. */
+.gg-manage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.8rem}
+.gg-manage-cell{margin:0;border:1px solid var(--ps-line,#e4e0d5);border-radius:.6rem;overflow:hidden;background:var(--ps-paper,#fff)}
+.gg-manage-img{width:100%;height:9rem;object-fit:cover;display:block}
+.gg-manage-meta{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.45rem .6rem;font-size:.8rem}

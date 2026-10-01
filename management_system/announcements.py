@@ -222,6 +222,14 @@ def send_announcement(
                 args=[announcement.pk],
             )
         )
+    logger.info(
+        "announcement queued",
+        extra={
+            "event": "announcement_queued",
+            "announcement_id": announcement.pk,
+            "level_count": len(levels),
+        },
+    )
     return announcement
 
 
@@ -317,9 +325,20 @@ def fan_out_announcement(announcement_id: int) -> int:
         transaction.on_commit(
             lambda: current_app.send_task(TELEGRAM_NOTIFICATION_TASK)
         )
+        logger.info(
+            "announcement fan-out completed",
+            extra={
+                "event": "announcement_fanout_completed",
+                "announcement_id": announcement.pk,
+                "recipient_count": created,
+            },
+        )
         return created
     except Exception:
-        logger.exception("Announcement %s fan-out failed.", announcement_id)
+        logger.exception(
+            "announcement fan-out failed",
+            extra={"event": "announcement_fanout_failed", "announcement_id": announcement_id},
+        )
         Announcement.objects.filter(pk=announcement.pk).update(
             status=Announcement.Status.FAILED,
             last_error=_("Notification delivery failed."),
@@ -353,7 +372,11 @@ def retry_announcement(announcement_id: int, actor: User) -> Announcement:
             )
         )
         announcement.status = Announcement.Status.QUEUED
-        return announcement
+    logger.info(
+        "announcement retry queued",
+        extra={"event": "announcement_retry_queued", "announcement_id": announcement.pk},
+    )
+    return announcement
 
 
 def pending_announcement_ids(limit: int) -> list[int]:

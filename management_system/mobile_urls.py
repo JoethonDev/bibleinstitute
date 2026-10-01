@@ -104,4 +104,10 @@ urlpatterns = [
         mobile_api.lesson_audio,
         name="lesson-audio",
     ),
+    path("galleries/", mobile_api.galleries, name="gallery-albums"),
+    path(
+        "galleries/<int:scope_id>/items/",
+        mobile_api.gallery_items,
+        name="gallery-items",
+    ),
 ]

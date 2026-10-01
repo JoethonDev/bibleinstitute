@@ -111,7 +111,7 @@ class LevelAdmin(AdminOnlyModelAdmin):
 
 @admin.register(AcademicYear)
 class AcademicYearAdmin(AdminOnlyModelAdmin):
-    list_display = ["name", "levels_display", "starts_on", "ends_on", "ordering", "is_active"]
+    list_display = ["name", "levels_display", "starts_on", "ends_on", "ordering", "is_active", "graduation_level"]
     list_filter = ["is_active"]
     search_fields = ["name"]
     ordering = ["-starts_on"]
@@ -396,6 +396,58 @@ class MigrationReviewItemAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(GraduationGalleryItem)
+class GraduationGalleryItemAdmin(AcademicContentReadOnlyAdmin):
+    """Inspection-only admin; mutations go through the gallery manage page."""
+
+    list_display = ["original_filename", "academic_year_level", "kind", "created_at"]
+    list_filter = ["kind", "academic_year_level__academic_year", "academic_year_level__level"]
+    search_fields = ["original_filename", "display_key", "original_key"]
+    ordering = ["-created_at", "-pk"]
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            "academic_year_level__academic_year", "academic_year_level__level", "uploaded_by"
+        )
+
+
+@admin.register(GraduationGalleryJob)
+class GraduationGalleryJobAdmin(AcademicContentReadOnlyAdmin):
+    """Inspection-only admin; jobs are created by the gallery manage page."""
+
+    list_display = ["original_filename", "academic_year_level", "status", "processed_files", "failed_files", "created_at"]
+    list_filter = ["status"]
+    search_fields = ["original_filename", "staging_key", "public_id"]
+    ordering = ["-created_at", "-pk"]
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            "academic_year_level__academic_year", "academic_year_level__level", "created_by"
+        )
+
+
+@admin.register(MobileAppRelease)
+class MobileAppReleaseAdmin(AcademicContentReadOnlyAdmin):
+    """Inspection-only admin; publishing goes through the app-release page."""
+
+    list_display = ["version_name", "version_code", "file_size", "created_at"]
+    ordering = ["-version_code", "-pk"]
+    list_per_page = 50
+
+
+@admin.register(StudentBanner)
+class StudentBannerAdmin(AcademicContentReadOnlyAdmin):
+    """Inspection-only admin; edits go through the banner page."""
+
+    list_display = ["title", "is_active", "created_at"]
+    list_filter = ["is_active"]
+    search_fields = ["title", "body"]
+    ordering = ["-created_at", "-pk"]
+    list_per_page = 50
 
 
 @admin.register(MediaProcessingJob)
