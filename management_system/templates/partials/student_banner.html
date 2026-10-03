@@ -19,7 +19,7 @@
     <span class="st-banner-dots" aria-hidden="true">
       {% for banner in student_banners %}<i class="st-banner-dot{% if forloop.first %} is-active{% endif %}" data-banner-dot></i>{% endfor %}
     </span>
-    <button type="button" class="st-banner-close" id="student-banner-close" aria-label="{% translate 'Dismiss announcements' %}"><i class="fas fa-times"></i></button>
+    <button type="button" class="st-banner-close" id="student-banner-close" aria-label="{% translate 'Dismiss announcements' %}"><i class="fas fa-times" aria-hidden="true"></i></button>
   </div>
 </div>
 <script src="{% static 'js/student_banner.js' %}?v={{ static_asset_version }}"></script>

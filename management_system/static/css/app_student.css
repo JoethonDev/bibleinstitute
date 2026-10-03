@@ -2395,8 +2395,8 @@ body.gg-lock{overflow:hidden}
 @keyframes gg-slide-rtl{from{opacity:0;transform:translateX(-1.5rem) scale(.98)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.gg-album-card,.gg-lightbox-node,.gg-lightbox-backdrop{animation:none;transition:none}}
 
-/* Student banner strip (latest active banners, rotating). */
-.st-banner{display:flex;align-items:center;gap:.75rem;background:linear-gradient(120deg,#10262e,#17303a);color:#fff;border-radius:.8rem;padding:.6rem .9rem;margin:.75rem auto 0;max-width:72rem;box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
+/* Student banner strip sits directly under the full-width sticky navbar. */
+.st-banner{box-sizing:border-box;width:100%;max-width:none;display:flex;align-items:center;gap:.75rem;background:linear-gradient(120deg,#10262e,#17303a);color:#fff;border-top:1px solid rgba(255,255,255,.12);padding:.55rem max(.75rem,calc((100vw - 540px)/2 + .75rem));margin:0;box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
 .st-banner[hidden]{display:none}
 .st-banner-items{flex:1;min-width:0}
 .st-banner-item{display:flex;align-items:center;gap:.6rem;animation:st-fade .3s ease}
@@ -2409,7 +2409,14 @@ body.gg-lock{overflow:hidden}
 .st-banner-controls{display:flex;align-items:center;gap:.5rem}
 .st-banner-dot{width:.45rem;height:.45rem;border-radius:50%;background:rgba(255,255,255,.35);display:inline-block;margin-inline-end:.25rem}
 .st-banner-dot.is-active{background:#dcb772}
-.st-banner-close{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:1.9rem;height:1.9rem;display:grid;place-items:center}
+.st-banner-close{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:2.75rem;height:2.75rem;min-width:2.75rem;display:grid;place-items:center;cursor:pointer;transition:background-color .18s ease,border-color .18s ease}
+.st-banner-close:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.65)}
+.st-banner-close:focus-visible{outline:3px solid #dcb772;outline-offset:2px}
+@media (min-width:768px){.st-banner{padding-inline:max(.75rem,calc((100vw - 720px)/2 + .75rem))}}
+@media (min-width:992px){.st-banner{padding-inline:max(.75rem,calc((100vw - 960px)/2 + .75rem))}}
+@media (min-width:1200px){.st-banner{padding-inline:max(.75rem,calc((100vw - 1140px)/2 + .75rem))}}
+@media (min-width:1400px){.st-banner{padding-inline:max(.75rem,calc((100vw - 1320px)/2 + .75rem))}}
+@media (max-width:575.98px){.st-banner{gap:.45rem;padding-block:.5rem}.st-banner-item{align-items:flex-start;gap:.4rem}.st-banner-controls{gap:.25rem}.st-banner-dot{margin-inline-end:.15rem}}
 .sd-steps{margin:0;padding-inline-start:1.25rem;display:grid;gap:.5rem}
 @keyframes st-fade{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.st-banner-item{animation:none}}

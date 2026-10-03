@@ -85,7 +85,10 @@
             <div class="ps-site-topbar-links"><a href="mailto:info@bibleinstitute-eg.org"><i class="fas fa-envelope fa-fw"></i> info@bibleinstitute-eg.org</a> <span class="ps-site-sep">·</span> <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-fw"></i> Facebook</a> <span class="ps-site-sep">·</span> <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener"><i class="fab fa-youtube fa-fw"></i> YouTube</a></div>
           </div>
         </div>
-        <nav class="navbar app-navbar institute-navbar ps-site-nav navbar-expand-lg sticky-top" role="navigation" aria-label="{% translate 'Main navigation' %}">
+    </header>
+
+    <div class="ps-site-sticky-shell">
+        <nav class="navbar app-navbar institute-navbar ps-site-nav navbar-expand-lg" role="navigation" aria-label="{% translate 'Main navigation' %}">
             <div class="container">
               <a class="navbar-brand ps-site-brand" href="{% url 'home' %}">
                   <img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
@@ -159,13 +162,10 @@
               </div>
             </div>
         </nav>
-    </header>
-
-    {% if user.is_authenticated and request.user.role.role == "student" %}
-    <div class="container">
-      {% include 'partials/student_banner.html' %}
+        {% if user.is_authenticated and request.user.role.role == "student" %}
+          {% include 'partials/student_banner.html' %}
+        {% endif %}
     </div>
-    {% endif %}
 
     {% include 'partials/components/toast_container.html' %}
 
