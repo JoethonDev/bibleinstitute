@@ -2431,6 +2431,28 @@ def _media_job_visible_or_403(request, job):
     return None
 
 
+def _media_cleanup_report(result):
+    if not result or "objects_checked" not in result:
+        return ""
+    return str(_(
+        "R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, %(missing)s already absent, %(failed)s failed."
+    )) % {
+        "checked": int(result.get("objects_checked", 0) or 0),
+        "found": int(result.get("objects_found", 0) or 0),
+        "deleted": int(result.get("objects_cleaned", 0) or 0),
+        "missing": int(result.get("objects_missing", 0) or 0),
+        "failed": int(result.get("objects_failed", 0) or 0),
+    }
+
+
+def _media_cleanup_error(job):
+    if job.cleanup_status != MediaCleanupStatus.FAILED:
+        return ""
+    if (job.cleanup_result or {}).get("objects_check_failed"):
+        return str(_("R2 cleanup could not verify object existence; no R2 objects were deleted. Retry cleanup."))
+    return str(_("Upload cleanup failed. You can retry cleanup."))
+
+
 def _serialize_media_job(job, live=None):
     live = live or {}
     terminal_statuses = {
@@ -2468,10 +2490,7 @@ def _serialize_media_job(job, live=None):
             is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
         ),
         "cleanup_status": job.cleanup_status,
-        "cleanup_error_message": (
-            str(_("Upload cleanup failed. You can retry cleanup."))
-            if job.cleanup_status == MediaCleanupStatus.FAILED else ""
-        ),
+        "cleanup_error_message": _media_cleanup_error(job),
         "cleanup_preserved_count": len(job.cleanup_preserved_keys or []),
         "cleanup_not_before": job.cleanup_not_before.isoformat() if job.cleanup_not_before else None,
         "cleanup_waiting_for_upload_url": bool(
@@ -2480,6 +2499,7 @@ def _serialize_media_job(job, live=None):
             and job.cleanup_not_before > timezone.now()
         ),
         "cleanup_result": job.cleanup_result or {},
+        "cleanup_report": _media_cleanup_report(job.cleanup_result or {}),
         "cleanup_finished_at": job.cleanup_finished_at.isoformat() if job.cleanup_finished_at else None,
         "can_stop": (
             job.status in {
@@ -2888,6 +2908,8 @@ def media_processing_status(request):
         job.publication_pending = bool(
             is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
         )
+        job.cleanup_report = _media_cleanup_report(job.cleanup_result or {})
+        job.cleanup_error_message = _media_cleanup_error(job)
     return render_page(request, "media_processing_status.html", "partials/media_processing_status_content.html", {
         "jobs_page": jobs_page,
         "pagination_query": pagination_query_string(request),

@@ -132,7 +132,8 @@
                         <small class="d-block text-muted mt-1" data-media-cleanup-status{% if job.cleanup_status == 'not_requested' %} hidden{% endif %}>{{ job.get_cleanup_status_display }}</small>
                         <small class="d-block text-muted mt-1" data-media-cleanup-waiting{% if not job.cleanup_waiting_for_upload_url %} hidden{% endif %}>{% translate "Cleanup waits for the source upload URL to expire." %}</small>
                         <small class="d-block text-muted mt-1" data-media-publication-pending{% if not job.publication_pending %} hidden{% endif %}>{% translate "Lesson publication is finishing; cleanup will be available afterward." %}</small>
-                        <small class="d-block text-danger mt-1" data-media-cleanup-error>{% if job.cleanup_status == 'failed' %}{% translate "Upload cleanup failed. You can retry cleanup." %}{% endif %}</small>
+                        <small class="d-block text-danger mt-1" data-media-cleanup-error{% if not job.cleanup_error_message %} hidden{% endif %}>{{ job.cleanup_error_message }}</small>
+                        <small class="d-block text-muted mt-1" data-media-cleanup-report{% if not job.cleanup_report %} hidden{% endif %}>{{ job.cleanup_report }}</small>
                         <small class="d-block text-success mt-1" data-media-cleanup-lesson{% if not job.cleanup_result.lesson_deleted %} hidden{% endif %}>{% translate "The lesson created by this upload was deleted." %}</small>
                         <small class="d-block text-warning mt-1" data-media-cleanup-preserved{% if not job.cleanup_preserved_keys %} hidden{% endif %}>{% translate "Some files were kept because they are shared or could not be verified as owned by this upload." %}</small>
                     </td>

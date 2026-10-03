@@ -48,8 +48,8 @@ from .media_processing import (
 from .media_storage import (
     STAGING_UPLOAD_URL_TTL_SECONDS,
     MediaStorageError,
+    delete_existing_objects_exact,
     delete_object_exact,
-    delete_objects_exact,
 )
 from .models import (
     LectureProgress,
@@ -801,6 +801,7 @@ def cleanup_media_upload(self, public_id: str, requested_job_ids: list[str] | No
     result.setdefault("media_links_removed", 0)
     result.setdefault("worker_directories_removed", 0)
     result.setdefault("objects_cleaned", 0)
+    result.setdefault("objects_deleted_total", 0)
     preserved: set[str] = set()
     delete_keys: set[str] = set()
     try:
@@ -891,10 +892,20 @@ def cleanup_media_upload(self, public_id: str, requested_job_ids: list[str] | No
                 preserved.update(keys)
 
         delete_keys = (source_keys | all_output_keys) - preserved
-        failed_keys = delete_objects_exact(sorted(delete_keys))
+        try:
+            deletion_report = delete_existing_objects_exact(sorted(delete_keys))
+        except Exception:
+            result["objects_check_failed"] = True
+            raise
+        result["objects_checked"] = deletion_report["checked"]
+        result["objects_found"] = deletion_report["found"]
+        result["objects_cleaned"] = deletion_report["deleted"]
+        result["objects_deleted_total"] += deletion_report["deleted"]
+        result["objects_missing"] = deletion_report["missing"]
+        result["objects_failed"] = len(deletion_report["failed_keys"])
+        failed_keys = deletion_report["failed_keys"]
         if failed_keys:
             preserved.update(failed_keys)
-            result["objects_cleaned"] = len(delete_keys) - len(failed_keys)
             _finish_media_cleanup(
                 job_ids,
                 result=result,
@@ -902,7 +913,6 @@ def cleanup_media_upload(self, public_id: str, requested_job_ids: list[str] | No
                 failed=True,
             )
             return {"status": "failed", "public_id": str(public_id)}
-        result["objects_cleaned"] = len(delete_keys)
         result["objects_preserved"] = len(preserved)
         _finish_media_cleanup(job_ids, result=result, preserved_keys=sorted(preserved))
         logger.info(
@@ -912,6 +922,10 @@ def cleanup_media_upload(self, public_id: str, requested_job_ids: list[str] | No
                 "public_id": str(public_id),
                 "job_count": len(job_ids),
                 "objects_cleaned": result["objects_cleaned"],
+                "objects_deleted_total": result["objects_deleted_total"],
+                "objects_missing": result["objects_missing"],
+                "objects_failed": result["objects_failed"],
+                "objects_check_failed": bool(result.get("objects_check_failed")),
                 "objects_preserved": result["objects_preserved"],
                 "lesson_deleted": result["lesson_deleted"],
             },

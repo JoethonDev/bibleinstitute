@@ -9775,6 +9775,12 @@ msgstr "Cleanup waits for the source upload URL to expire."
 msgid "Upload cleanup failed. You can retry cleanup."
 msgstr "Upload cleanup failed. You can retry cleanup."
 
+msgid "R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, %(missing)s already absent, %(failed)s failed."
+msgstr "R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, %(missing)s already absent, %(failed)s failed."
+
+msgid "R2 cleanup could not verify object existence; no R2 objects were deleted. Retry cleanup."
+msgstr "R2 cleanup could not verify object existence; no R2 objects were deleted. Retry cleanup."
+
 msgid "The lesson created by this upload was deleted."
 msgstr "The lesson created by this upload was deleted."
 

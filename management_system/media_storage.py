@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
 from django.conf import settings
@@ -66,6 +67,7 @@ _MAX_KEY_LENGTH = 1024
 _MAX_JOB_UUID_LENGTH = 128
 _MAX_EXACT_DELETE_KEYS = 50_000
 _DELETE_BATCH_SIZE = 1_000
+_EXACT_HEAD_WORKERS = 8
 _DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024
 STAGING_UPLOAD_URL_TTL_SECONDS = 3600
 _DEFAULT_PUT_EXPIRES = STAGING_UPLOAD_URL_TTL_SECONDS
@@ -563,17 +565,18 @@ def delete_object_exact(
     return True
 
 
-def delete_objects_exact(
+def delete_existing_objects_exact(
     keys: Any,
     *,
     client: Any = None,
     bucket: Optional[str] = None,
-) -> list[str]:
-    """Delete a bounded collection of exact keys in provider-sized batches.
+) -> dict:
+    """HEAD exact job-owned keys, delete only those found, and report counts.
 
-    The caller must supply job-owned keys. This helper never lists or deletes
-    prefixes. Missing objects are idempotent successes; returned errors contain
-    only the exact keys the provider did not delete.
+    HEAD requests run with a small fixed concurrency so large media uploads do
+    not produce a serial request per segment. Missing objects are skipped;
+    other inspection failures abort before deletion so unknown objects are not
+    treated as safe to remove.
     """
     if not isinstance(keys, (list, tuple, set, frozenset)):
         raise MediaStorageError("Exact object keys must be a bounded collection.", ERR_OUTPUT_KEY)
@@ -581,26 +584,49 @@ def delete_objects_exact(
     if len(unique_keys) > _MAX_EXACT_DELETE_KEYS:
         raise MediaStorageError("The cleanup request contains too many objects.", ERR_OUTPUT_KEY)
     if not unique_keys:
-        return []
+        return {"checked": 0, "found": 0, "deleted": 0, "missing": 0, "failed_keys": []}
+
     resolved_client, resolved_bucket = _resolve_client_bucket(client, bucket)
-    failed = []
-    for offset in range(0, len(unique_keys), _DELETE_BATCH_SIZE):
-        batch = unique_keys[offset:offset + _DELETE_BATCH_SIZE]
+
+    def object_exists(key: str) -> bool:
+        try:
+            resolved_client.head_object(Bucket=resolved_bucket, Key=key)
+        except Exception as exc:
+            response = getattr(exc, "response", {}) or {}
+            status_code = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if _error_code(exc) in _MISSING_CODES or status_code == 404:
+                return False
+            raise MediaStorageError(
+                "Could not verify an exact cleanup object; no objects were deleted.",
+                ERR_STORAGE,
+            ) from exc
+        return True
+
+    with ThreadPoolExecutor(max_workers=_EXACT_HEAD_WORKERS) as executor:
+        existing_keys = [key for key, exists in zip(unique_keys, executor.map(object_exists, unique_keys)) if exists]
+    failed_keys = []
+    for offset in range(0, len(existing_keys), _DELETE_BATCH_SIZE):
+        batch = existing_keys[offset:offset + _DELETE_BATCH_SIZE]
         try:
             response = resolved_client.delete_objects(
                 Bucket=resolved_bucket,
                 Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
             )
-        except Exception as exc:
-            raise MediaStorageError(
-                f"Could not delete exact output objects: {exc}", ERR_STORAGE
-            ) from exc
-        failed.extend(
+        except Exception:
+            failed_keys.extend(batch)
+            continue
+        failed_keys.extend(
             str(item.get("Key", ""))
             for item in response.get("Errors", [])
             if item.get("Key")
         )
-    return failed
+    return {
+        "checked": len(unique_keys),
+        "found": len(existing_keys),
+        "deleted": len(existing_keys) - len(failed_keys),
+        "missing": len(unique_keys) - len(existing_keys),
+        "failed_keys": failed_keys,
+    }
 
 
 class _CancellationAwareReader:

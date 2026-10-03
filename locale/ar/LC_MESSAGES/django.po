@@ -10191,6 +10191,12 @@ msgstr "سينتظر التنظيف حتى تنتهي صلاحية رابط رف
 msgid "Upload cleanup failed. You can retry cleanup."
 msgstr "فشل تنظيف الرفع. يمكنك إعادة محاولة التنظيف."
 
+msgid "R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, %(missing)s already absent, %(failed)s failed."
+msgstr "فحص تنظيف R2 عدد %(checked)s من المفاتيح: وُجد %(found)s، حُذف %(deleted)s، كان %(missing)s غير موجود مسبقًا، وفشل حذف %(failed)s."
+
+msgid "R2 cleanup could not verify object existence; no R2 objects were deleted. Retry cleanup."
+msgstr "تعذر التحقق من وجود كائنات R2؛ لم تُحذف أي كائنات. أعد محاولة التنظيف."
+
 msgid "The lesson created by this upload was deleted."
 msgstr "حُذف الدرس الذي أنشأه هذا الرفع."
 

@@ -9,7 +9,7 @@
     if (cleanup) cleanup();
     function refreshStatusRegion() {
         if (window.htmx) {
-            htmx.ajax('GET', window.location.pathname + window.location.search, { target: '#content', select: '#content', swap: 'outerHTML' });
+            htmx.ajax('GET', window.location.pathname + window.location.search, { target: '#content', select: '#content', swap: 'outerMorph' });
         } else {
             window.location.reload();
         }
@@ -147,6 +147,11 @@
         if (cleanupError) {
             cleanupError.textContent = job.cleanup_error_message || '';
             cleanupError.hidden = !job.cleanup_error_message;
+        }
+        var cleanupReport = row.querySelector('[data-media-cleanup-report]');
+        if (cleanupReport) {
+            cleanupReport.textContent = job.cleanup_report || '';
+            cleanupReport.hidden = !job.cleanup_report;
         }
         var stopPending = row.querySelector('[data-media-stop-pending]');
         if (stopPending) stopPending.hidden = !job.stop_requested || job.cancel_acknowledged;
