@@ -12,10 +12,11 @@ from functools import wraps
 from django.core.cache import cache
 from django.conf import settings
 from django.db import transaction
-from django.http import JsonResponse
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
+from .mobile_http import json_api_response
+from .mobile_versioning import version_block_response
 from .models import MobileBiometricCredential, MobilePushDevice, PushDelivery, StudentMobileSession, User
 from .utils.localization import normalize_language
 
@@ -64,14 +65,6 @@ def clear_mobile_login_failures(username: str, remote_addr: str) -> None:
     if username:
         cache.delete(_login_rate_key("username", username))
     cache.delete(_login_rate_key("ip", remote_addr or "unknown"))
-
-
-def json_api_response(request, payload: dict, status: int = 200) -> JsonResponse:
-    body = dict(payload)
-    body.setdefault("language", normalize_language(request))
-    response = JsonResponse(body, status=status)
-    response["Cache-Control"] = "private, no-store"
-    return response
 
 
 def mobile_installation_conflict(user, installation_id: str | None) -> bool:
@@ -398,6 +391,9 @@ def require_mobile_session(view):
                 )
             request.mobile_session = session
             request.user = session.user
+            blocked = version_block_response(request)
+            if blocked is not None:
+                return blocked
             response = view(request, *args, **kwargs)
             return response
 

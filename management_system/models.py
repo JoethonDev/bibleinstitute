@@ -2851,3 +2851,84 @@ class Grade(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.quiz.name} ({self.total_grade})"
+
+
+class MobileAppUpdatePolicy(models.Model):
+    """Backend-controlled force/optional update policy for one mobile platform.
+
+    The mobile client sends its platform + native build number on every
+    request (``X-App-Platform`` / ``X-App-Build``) and checks
+    ``GET /api/mobile/v1/app-version/`` on launch. When ``is_enabled`` and the
+    client build is below ``min_version_code`` the API answers 426 with the
+    backend-assigned ``update_url`` and the client blocks until updated.
+    Below ``latest_version_code`` (but at/above min) the client shows a
+    dismissible optional-update prompt.
+    """
+
+    class Platform(models.TextChoices):
+        ANDROID = "android", _("Android")
+        IOS = "ios", _("iOS")
+
+    platform = models.CharField(max_length=16, choices=Platform.choices, unique=True)
+    is_enabled = models.BooleanField(default=True)
+    min_version_code = models.PositiveIntegerField(default=0)
+    latest_version_code = models.PositiveIntegerField(default=0)
+    min_version_name = models.CharField(max_length=50, blank=True, default="")
+    latest_version_name = models.CharField(max_length=50, blank=True, default="")
+    update_url = models.CharField(max_length=2048, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="app_update_policies",
+    )
+
+    class Meta:
+        verbose_name = _("Mobile App Update Policy")
+        verbose_name_plural = _("Mobile App Update Policies")
+
+    def __str__(self):
+        return f"App update policy ({self.platform})"
+
+    def clean(self):
+        super().clean()
+        if self.latest_version_code < self.min_version_code:
+            raise ValidationError(
+                {"latest_version_code": _("Latest version must be at or above the minimum version.")}
+            )
+
+
+class MobileDownloadPolicy(models.Model):
+    """Backend-controlled master switches for mobile downloads.
+
+    ``in_app_download_enabled`` gates saves into the app's private offline
+    library (lesson books and audio kept inside the app). Previously saved
+    files stay readable; only new saves are blocked.
+    ``device_download_enabled`` gates exports outside the app (save-to-phone /
+    share sheet for audio, gallery download-and-share).
+    """
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    in_app_download_enabled = models.BooleanField(default=True)
+    device_download_enabled = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="download_policy_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Mobile Download Policy")
+        verbose_name_plural = _("Mobile Download Policies")
+
+    def __str__(self):
+        return str(_("Mobile Download Policy"))
+
+    @classmethod
+    def load(cls) -> "MobileDownloadPolicy":
+        return cls.objects.get_or_create(singleton="default")[0]

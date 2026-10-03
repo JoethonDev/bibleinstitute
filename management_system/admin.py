@@ -439,6 +439,47 @@ class MobileAppReleaseAdmin(AcademicContentReadOnlyAdmin):
     list_per_page = 50
 
 
+@admin.register(MobileDownloadPolicy)
+class MobileDownloadPolicyAdmin(AdminOnlyModelAdmin):
+    """Editable fallback for the in-app vs on-device download switches."""
+
+    list_display = [
+        "singleton",
+        "in_app_download_enabled",
+        "device_download_enabled",
+        "updated_at",
+    ]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MobileAppUpdatePolicy)
+class MobileAppUpdatePolicyAdmin(AdminOnlyModelAdmin):
+    """Editable fallback for the force/optional update policy per platform."""
+
+    list_display = [
+        "platform",
+        "is_enabled",
+        "min_version_code",
+        "latest_version_code",
+        "update_url",
+        "updated_at",
+    ]
+    list_filter = ["platform", "is_enabled"]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(StudentBanner)
 class StudentBannerAdmin(AcademicContentReadOnlyAdmin):
     """Inspection-only admin; edits go through the banner page."""

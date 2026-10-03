@@ -1911,7 +1911,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-progress-toggle { display: grid; place-items: center; align-self: start; width: 2.25rem; height: 2.25rem; color: var(--ps-teal-deep); border: 1px solid var(--ps-line-cool); border-radius: .65rem; }
 .ad-progress-toggle i { transition: transform var(--ps-motion); }
 .ad-progress-disclosure[open] > .ad-progress-summary .ad-progress-toggle i { transform: rotate(180deg); }
-.ad-progress-expanded { display: grid; grid-template-columns: repeat(2, minmax(0, 12rem)); gap: .85rem; min-width: 0; width: fit-content; max-width: 100%; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--ps-line-cool); }
+.ad-progress-expanded { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; min-width: 100%; width: 100%; max-width: 100%; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--ps-line-cool); }
 .ad-progress-timeline-card, .ad-progress-daily-card { min-width: 0; padding: .85rem; border: 1px solid var(--ps-line-cool); border-radius: .8rem; background: var(--ps-paper); }
 .ad-progress-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; }
 .ad-progress-section-head h6 { margin: 0; color: var(--ps-ink); font-size: .84rem; font-weight: 700; }
@@ -2261,7 +2261,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .attendance-matrix-expand .fa-chevron-down { transition: transform var(--ps-motion); }
 .attendance-matrix-expand[aria-expanded="true"] .fa-chevron-down { transform: rotate(180deg); }
 .attendance-matrix-detail-row > td { padding: 0 !important; border: 0 !important; background: transparent !important; }
-.attendance-matrix-meeting-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); align-items: start; gap: .55rem; padding: .65rem; background: var(--ps-mist); }
+.attendance-matrix-meeting-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); align-items: start; gap: .55rem; min-width: 100%; width: 100%; box-sizing: border-box; padding: .65rem; background: var(--ps-mist); }
 .attendance-matrix-meeting {
     min-width: 0;
     padding: .7rem .8rem;

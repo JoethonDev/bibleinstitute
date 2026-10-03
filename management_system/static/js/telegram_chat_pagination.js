@@ -12,7 +12,11 @@
         requestsInFlight.delete(root);
         root.dataset.scrollLockTop = String(root.scrollTop);
         if (root.isConnected) bindScrollLoading(root);
-        else bindScrollLoading();
+        else {
+            observers.get(root)?.disconnect();
+            observers.delete(root);
+            bindScrollLoading();
+        }
     }
 
     function removeDuplicateConversationRows(root) {
@@ -26,7 +30,7 @@
     }
 
     function bindScrollLoading(singleRoot = null) {
-        const roots = singleRoot
+        const roots = singleRoot && singleRoot.nodeType === 1
             ? [singleRoot]
             : document.querySelectorAll('#telegram-conversation-list, #telegram-message-list');
         roots.forEach((root) => {

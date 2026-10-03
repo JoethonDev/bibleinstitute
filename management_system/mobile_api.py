@@ -33,7 +33,6 @@ from .mobile_auth import (
     normalize_mobile_installation_id,
     mobile_installation_conflict,
     mobile_login_rate_limited,
-    json_api_response,
     normalize_language,
     revoke_other_account_biometric,
     revoke_mobile_biometric,
@@ -42,11 +41,21 @@ from .mobile_auth import (
     record_mobile_login_failure,
     unlock_mobile_biometric,
 )
+from .mobile_http import json_api_response
 from .mobile_otp import (
     OTP_RESEND_INTERVAL,
     MobileOtpError,
     request_mobile_otp,
     verify_mobile_otp,
+)
+from .mobile_versioning import (
+    build_version_payload,
+    enforce_app_version,
+    request_client_version,
+)
+from .mobile_downloads import (
+    download_policy_payload,
+    enforce_download_purpose,
 )
 from .models import (
     Grade,
@@ -148,6 +157,7 @@ def _paginated_payload(page_obj, items: list[dict]) -> dict:
 
 @csrf_exempt
 @require_POST
+@enforce_app_version
 def login(request):
     payload = _json_body(request)
     if payload is None:
@@ -211,6 +221,7 @@ def login(request):
 
 @csrf_exempt
 @require_POST
+@enforce_app_version
 def otp_request(request):
     payload = _json_body(request)
     if payload is None:
@@ -255,6 +266,7 @@ def otp_request(request):
 
 @csrf_exempt
 @require_POST
+@enforce_app_version
 def otp_verify(request):
     payload = _json_body(request)
     if payload is None:
@@ -363,6 +375,7 @@ def biometric_enroll(request):
 
 @csrf_exempt
 @require_POST
+@enforce_app_version
 def biometric_unlock(request):
     payload = _json_body(request)
     if payload is None:
@@ -420,6 +433,35 @@ def biometric_revoke(request):
         extra={"event": "biometric_revoked", "user_id": request.user.pk, "revoked_count": updated},
     )
     return json_api_response(request, {"status": "revoked", "updated": updated})
+
+
+@require_http_methods(["GET"])
+def app_version(request):
+    """Public backend-controlled update check (no auth, never 426 itself)."""
+    platform, client_code, client_name = request_client_version(request)
+    if platform is None:
+        return _error(
+            request,
+            "invalid_request",
+            _localized(request, "Invalid request format."),
+            400,
+        )
+    if client_code is None:
+        return _error(
+            request,
+            "invalid_request",
+            _localized(request, "Invalid request format."),
+            400,
+        )
+    return json_api_response(
+        request, build_version_payload(platform, client_code, client_name)
+    )
+
+
+@require_http_methods(["GET"])
+def download_policy(request):
+    """Public backend-controlled download switches (no auth)."""
+    return json_api_response(request, download_policy_payload())
 
 
 @require_mobile_session
@@ -949,6 +991,10 @@ def lesson_media_resource(request, offering_id, lesson_id, file_index):
     if not link or file_type != "audio" or not link.get("id"):
         return _error(request, "invalid_media", _("Invalid media file."), 400)
 
+    blocked = enforce_download_purpose(request)
+    if blocked is not None:
+        return blocked
+
     try:
         response = generate_audio_download(
             request,
@@ -995,6 +1041,13 @@ def lesson_book_document(request, offering_id, lesson_id, file_index):
     file_key = (link or {}).get("id")
     if file_type != "book" or not isinstance(file_key, str) or not file_key:
         return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
+
+    # The online reader sends no purpose, so reading keeps working while
+    # in-app saves are disabled. The app marks offline-library saves with
+    # ``purpose=in_app``.
+    blocked = enforce_download_purpose(request)
+    if blocked is not None:
+        return blocked
 
     range_header = request.headers.get("Range", "").strip()
     if range_header and (

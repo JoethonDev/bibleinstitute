@@ -40,7 +40,9 @@ def parse_hls_segments(playlist_content):
     return segments
 
 
-def get_lesson_segments(lesson, cloud_client, bucket_name, media_key=None):
+def get_lesson_segments(
+    lesson, cloud_client, bucket_name, media_key=None, requested_part_id=None
+):
     result = {}
     links = json.loads(lesson.links)
     candidates = {}
@@ -50,7 +52,9 @@ def get_lesson_segments(lesson, cloud_client, bucket_name, media_key=None):
         if media_key and item.get("id") != media_key:
             continue
         part_id = item.get("part_id")
-        if not part_id:
+        if not part_id or (
+            requested_part_id is not None and part_id != requested_part_id
+        ):
             continue
         if media_key or part_id not in candidates or item.get("file_type") == "video":
             candidates[part_id] = item

@@ -17,7 +17,8 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
 from .announcements import AnnouncementError, clean_announcement_action
-from .models import MobileAppRelease, StudentBanner
+from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
+from .models import MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, StudentBanner
 from .utils.decorators import capability_required, can_manage_academic_setup
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
 from .utils.storage_operations import get_r2_client, upload_to_bucket
@@ -115,9 +116,77 @@ def download_app_file(request):
     return redirect(url)
 
 
+def _parse_policy_code(value) -> int | None:
+    try:
+        code = int((value or "").strip() or 0)
+    except (TypeError, ValueError, AttributeError):
+        return None
+    if code < 0 or code > MAX_VERSION_CODE:
+        return None
+    return code
+
+
+def _save_update_policy(request):
+    """Validate and save one platform policy from the release-manage form."""
+    platform = normalize_platform(request.POST.get("policy_platform"))
+    if platform is None:
+        messages.error(request, _("Choose a valid platform for the update policy."))
+        return redirect("app-release-manage")
+    is_enabled = bool(request.POST.get(f"policy_{platform}_enabled"))
+    min_code = _parse_policy_code(request.POST.get(f"policy_{platform}_min_code"))
+    latest_code = _parse_policy_code(request.POST.get(f"policy_{platform}_latest_code"))
+    min_name = (request.POST.get(f"policy_{platform}_min_name") or "").strip()[:50]
+    latest_name = (request.POST.get(f"policy_{platform}_latest_name") or "").strip()[:50]
+    update_url = (request.POST.get(f"policy_{platform}_update_url") or "").strip()[:2048]
+    if min_code is None or latest_code is None:
+        messages.error(request, _("Version codes must be zero or a positive number."))
+        return redirect("app-release-manage")
+    if latest_code < min_code:
+        messages.error(request, _("The latest version must be at or above the minimum version."))
+        return redirect("app-release-manage")
+    if is_enabled and (min_code > 0 or latest_code > 0):
+        if not update_url or not is_valid_update_url(update_url):
+            messages.error(request, _("A valid https update link is required when versioning is enabled."))
+            return redirect("app-release-manage")
+    elif update_url and not is_valid_update_url(update_url):
+        messages.error(request, _("The update link must be a valid https URL."))
+        return redirect("app-release-manage")
+    policy, _ = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
+    policy.is_enabled = is_enabled
+    policy.min_version_code = min_code
+    policy.latest_version_code = latest_code
+    policy.min_version_name = min_name
+    policy.latest_version_name = latest_name
+    policy.update_url = update_url
+    policy.updated_by = request.user if getattr(request.user, "is_authenticated", False) else None
+    try:
+        policy.full_clean()
+    except Exception as exc:
+        messages.error(request, str(exc))
+        return redirect("app-release-manage")
+    policy.save()
+    messages.success(request, _("Update policy for %(platform)s saved.") % {"platform": platform})
+    return redirect("app-release-manage")
+
+
+def _save_download_policy(request):
+    """Save the in-app vs on-device download master switches."""
+    policy = MobileDownloadPolicy.load()
+    policy.in_app_download_enabled = bool(request.POST.get("in_app_download_enabled"))
+    policy.device_download_enabled = bool(request.POST.get("device_download_enabled"))
+    policy.updated_by = request.user if getattr(request.user, "is_authenticated", False) else None
+    policy.save()
+    messages.success(request, _("Download policy saved."))
+    return redirect("app-release-manage")
+
+
 @capability_required(can_manage_academic_setup)
 def app_release_manage(request):
     if request.method == "POST":
+        if request.POST.get("policy_platform"):
+            return _save_update_policy(request)
+        if request.POST.get("download_policy"):
+            return _save_download_policy(request)
         version_name = (request.POST.get("version_name") or "").strip()[:50]
         release_notes = (request.POST.get("release_notes") or "").strip()[:2000]
         try:
@@ -166,8 +235,13 @@ def app_release_manage(request):
         MobileAppRelease.objects.order_by("-version_code", "-pk"),
         25,
     ).get_page(request.GET.get("page", 1))
+    policies = {}
+    for platform in ("android", "ios"):
+        policies[platform], _ = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
     return render_page(request, "app_release_manage.html", "partials/app_release_manage_content.html", {
         "releases_page_obj": releases_page_obj,
+        "update_policies": policies,
+        "download_policy": MobileDownloadPolicy.load(),
         "pagination_query": pagination_query_string(request),
         "pagination_aria_label": _("Page navigation"),
         "breadcrumb_items": generate_breadcrumb([

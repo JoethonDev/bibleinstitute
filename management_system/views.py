@@ -7108,6 +7108,7 @@ def progress_heartbeat(request, *, allow_management=False):
         session.lesson,
         CLOUD_CLIENT,
         bucket_name,
+        requested_part_id=session.part_id,
     ).get(session.part_id, [])
     all_ranges = [
         [float(sr.get("start", 0)), float(sr.get("end", 0))]

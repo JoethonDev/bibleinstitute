@@ -351,6 +351,7 @@ TELEGRAM_CONVERSATION_STATUSES = frozenset(
         "processed",
     }
 )
+TELEGRAM_MESSAGE_POLL_BATCH_SIZE = 100
 
 
 def _latest_user_message_queryset():
@@ -526,7 +527,9 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
             after_id = int(after_raw)
         except (TypeError, ValueError):
             after_id = 0
-        message_items = list(messages_queryset.filter(pk__gt=after_id))
+        message_items = list(
+            messages_queryset.filter(pk__gt=after_id)[:TELEGRAM_MESSAGE_POLL_BATCH_SIZE]
+        )
     else:
         paginator = Paginator(messages_queryset, 30)
         requested_page = request.GET.get("page")
