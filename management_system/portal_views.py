@@ -151,7 +151,7 @@ def _save_update_policy(request):
     elif update_url and not is_valid_update_url(update_url):
         messages.error(request, _("The update link must be a valid https URL."))
         return redirect("app-release-manage")
-    policy, _ = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
+    policy, _created = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
     policy.is_enabled = is_enabled
     policy.min_version_code = min_code
     policy.latest_version_code = latest_code
@@ -237,7 +237,7 @@ def app_release_manage(request):
     ).get_page(request.GET.get("page", 1))
     policies = {}
     for platform in ("android", "ios"):
-        policies[platform], _ = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
+        policies[platform], _created = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
     return render_page(request, "app_release_manage.html", "partials/app_release_manage_content.html", {
         "releases_page_obj": releases_page_obj,
         "update_policies": policies,
