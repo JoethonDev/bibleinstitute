@@ -175,9 +175,12 @@ from .mobile_auth import revoke_user_mobile_access
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
 from .media_processing import (
+    ACTIVE_WORKER_STATUSES,
     claim_attachment_retry,
     initialize_deadlines,
     job_is_visible_to,
+    request_media_job_cleanup,
+    request_media_job_stop,
     queue_verified_job,
     safe_output_base_name,
     schedule_attachment_retry_after_commit,
@@ -185,9 +188,12 @@ from .media_processing import (
     validate_browser_part_id,
     validate_requested_folder,
     validate_source_descriptor,
+    is_automation_job,
+    PUBLICATION_PENDING_ERROR,
 )
 from .media_storage import (
     MediaStorageError,
+    STAGING_UPLOAD_URL_TTL_SECONDS,
     build_staging_key,
     content_type_for_key,
     create_staging_upload_url,
@@ -2427,6 +2433,15 @@ def _media_job_visible_or_403(request, job):
 
 def _serialize_media_job(job, live=None):
     live = live or {}
+    terminal_statuses = {
+        MediaProcessingStatus.CANCELLED,
+        MediaProcessingStatus.FAILED,
+        MediaProcessingStatus.SUCCEEDED,
+    }
+    cleanup_in_flight = job.cleanup_status in {
+        MediaCleanupStatus.QUEUED,
+        MediaCleanupStatus.RUNNING,
+    }
     return {
         "id": str(job.public_id),
         "filename": job.original_filename,
@@ -2447,6 +2462,51 @@ def _serialize_media_job(job, live=None):
         "download_key": job.download_key,
         "source_acknowledged": bool(job.source_acknowledged_at),
         "staging_deleted": bool(job.staging_deleted_at),
+        "stop_requested": bool(job.stop_requested_at),
+        "cancel_acknowledged": bool(job.cancel_acknowledged_at),
+        "publication_pending": bool(
+            is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
+        ),
+        "cleanup_status": job.cleanup_status,
+        "cleanup_error_message": (
+            str(_("Upload cleanup failed. You can retry cleanup."))
+            if job.cleanup_status == MediaCleanupStatus.FAILED else ""
+        ),
+        "cleanup_preserved_count": len(job.cleanup_preserved_keys or []),
+        "cleanup_not_before": job.cleanup_not_before.isoformat() if job.cleanup_not_before else None,
+        "cleanup_waiting_for_upload_url": bool(
+            job.cleanup_status == MediaCleanupStatus.QUEUED
+            and job.cleanup_not_before
+            and job.cleanup_not_before > timezone.now()
+        ),
+        "cleanup_result": job.cleanup_result or {},
+        "cleanup_finished_at": job.cleanup_finished_at.isoformat() if job.cleanup_finished_at else None,
+        "can_stop": (
+            job.status in {
+                MediaProcessingStatus.AWAITING_UPLOAD,
+                MediaProcessingStatus.QUEUED,
+                MediaProcessingStatus.PROCESSING,
+                MediaProcessingStatus.UPLOADING,
+                MediaProcessingStatus.VERIFYING,
+            }
+            and not cleanup_in_flight
+            and not job.stop_requested_at
+        ),
+        "can_cleanup": (
+            job.status in terminal_statuses
+            and job.attachment_status != MediaAttachmentStatus.PENDING
+            and not (is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR)
+            and not (
+                job.status == MediaProcessingStatus.CANCELLED
+                and job.stop_requested_at is not None
+                and job.cancel_acknowledged_at is None
+            )
+            and job.cleanup_status not in {
+                MediaCleanupStatus.QUEUED,
+                MediaCleanupStatus.RUNNING,
+                MediaCleanupStatus.COMPLETE,
+            }
+        ),
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
@@ -2499,11 +2559,14 @@ def media_job_create(request):
                     attachment_status=(MediaAttachmentStatus.PENDING if lesson else MediaAttachmentStatus.NOT_REQUESTED),
                     upload_ack_deadline_at=ack_deadline,
                     staging_expires_at=staging_expires,
+                    source_upload_url_expires_at=(
+                        timezone.now() + timedelta(seconds=STAGING_UPLOAD_URL_TTL_SECONDS)
+                    ),
                 )
                 authorization = create_staging_upload_url(
                     source_key,
                     content_type=content_type_for_key(filename),
-                    expires_in=3600,
+                    expires_in=STAGING_UPLOAD_URL_TTL_SECONDS,
                 )
                 jobs.append({
                     "id": str(job.public_id),
@@ -2578,6 +2641,45 @@ def media_job_status(request, job_uuid):
     return JsonResponse({"job": _serialize_media_job(job, live)})
 
 
+@require_POST
+@_media_api_required
+def media_job_stop(request, job_uuid):
+    """Request a worker-acknowledged stop for this file/upload group."""
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    try:
+        jobs, stopping = request_media_job_stop(job.public_id)
+    except ValidationError as exc:
+        message = "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))
+        return JsonResponse({"message": message}, status=409)
+    return JsonResponse({
+        "status": "stopping" if stopping else "cancelled",
+        "jobs": {str(item.public_id): _serialize_media_job(item) for item in jobs},
+    }, status=202)
+
+
+@require_POST
+@_media_api_required
+def media_job_cleanup(request, job_uuid):
+    """Queue full exact-key cleanup after processing has stopped/finished."""
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    try:
+        jobs, queued = request_media_job_cleanup(job.public_id)
+    except ValidationError as exc:
+        message = "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))
+        return JsonResponse({"message": message}, status=409)
+    return JsonResponse({
+        "status": "cleanup_queued" if queued else jobs[0].cleanup_status,
+        "cleanup_not_before": jobs[0].cleanup_not_before.isoformat() if jobs[0].cleanup_not_before else None,
+        "jobs": {str(item.public_id): _serialize_media_job(item) for item in jobs},
+    }, status=202)
+
+
 @_media_api_required
 def media_job_status_batch(request):
     """Return a bounded batch of visible media-job statuses for polling."""
@@ -2647,6 +2749,8 @@ def media_job_retry(request, job_uuid):
     denied = _media_job_visible_or_403(request, job)
     if denied:
         return denied
+    if job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED:
+        return JsonResponse({"message": str(_("This media job is already being cleaned up."))}, status=409)
     if job.status != MediaProcessingStatus.FAILED or not job.source_acknowledged_at:
         return JsonResponse({"message": _("Only failed jobs with a retained source can be retried.")}, status=409)
     try:
@@ -2668,6 +2772,8 @@ def media_job_attachment_retry(request, job_uuid):
     denied = _media_job_visible_or_403(request, job)
     if denied:
         return denied
+    if job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED:
+        return JsonResponse({"message": str(_("This media job is already being cleaned up."))}, status=409)
     try:
         pending = claim_attachment_retry(job.public_id)
         schedule_attachment_retry_after_commit(pending.public_id)
@@ -2738,6 +2844,50 @@ def media_processing_status(request):
         )
     paginator = Paginator(queryset, 25)
     jobs_page = paginator.get_page(request.GET.get("page", "1"))
+    now = timezone.now()
+    terminal_job_statuses = {
+        MediaProcessingStatus.CANCELLED,
+        MediaProcessingStatus.FAILED,
+        MediaProcessingStatus.SUCCEEDED,
+    }
+    cleanup_in_flight_statuses = {MediaCleanupStatus.QUEUED, MediaCleanupStatus.RUNNING}
+    for job in jobs_page.object_list:
+        job.can_stop = (
+            job.status in {
+                MediaProcessingStatus.AWAITING_UPLOAD,
+                MediaProcessingStatus.QUEUED,
+                MediaProcessingStatus.PROCESSING,
+                MediaProcessingStatus.UPLOADING,
+                MediaProcessingStatus.VERIFYING,
+            }
+            and not job.stop_requested_at
+            and job.cleanup_status not in cleanup_in_flight_statuses
+        )
+        job.stop_pending = bool(job.stop_requested_at and not job.cancel_acknowledged_at)
+        job.can_cleanup = (
+            job.status in terminal_job_statuses
+            and job.attachment_status != MediaAttachmentStatus.PENDING
+            and not (is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR)
+            and not (
+                job.status == MediaProcessingStatus.CANCELLED
+                and job.stop_requested_at
+                and not job.cancel_acknowledged_at
+            )
+            and job.cleanup_status not in {
+                MediaCleanupStatus.QUEUED,
+                MediaCleanupStatus.RUNNING,
+                MediaCleanupStatus.COMPLETE,
+            }
+        )
+        job.cleanup_pending = job.cleanup_status in cleanup_in_flight_statuses
+        job.cleanup_waiting_for_upload_url = bool(
+            job.cleanup_status == MediaCleanupStatus.QUEUED
+            and job.cleanup_not_before
+            and job.cleanup_not_before > now
+        )
+        job.publication_pending = bool(
+            is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
+        )
     return render_page(request, "media_processing_status.html", "partials/media_processing_status_content.html", {
         "jobs_page": jobs_page,
         "pagination_query": pagination_query_string(request),
@@ -2748,6 +2898,10 @@ def media_processing_status(request):
         ),
         "phase_labels_json": json.dumps(
             {value: str(label) for value, label in MediaProcessingPhase.choices},
+            ensure_ascii=False,
+        ),
+        "cleanup_status_labels_json": json.dumps(
+            {value: str(label) for value, label in MediaCleanupStatus.choices},
             ensure_ascii=False,
         ),
         "status_filter": status_filter,

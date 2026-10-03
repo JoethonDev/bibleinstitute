@@ -49,6 +49,7 @@ from .media_storage import (
     ERR_STAGING_MISSING,
     ERR_STAGING_SIZE_MISMATCH,
     MediaStorageError,
+    STAGING_UPLOAD_URL_TTL_SECONDS,
     build_staging_key,
     content_type_for_key,
     create_staging_upload_url,
@@ -57,6 +58,7 @@ from .models import (
     AcademicYearLevelMeeting,
     Lesson,
     MediaAttachmentStatus,
+    MediaCleanupStatus,
     MediaProcessingJob,
     PublicationStatus,
     User,
@@ -523,7 +525,7 @@ def lecture_upload(request):
             authorization = create_staging_upload_url(
                 source_key,
                 content_type=content_type_for_key(filename),
-                expires_in=3600,
+                expires_in=STAGING_UPLOAD_URL_TTL_SECONDS,
             )
             prepared.append({
                 "public_id": public_id,
@@ -534,6 +536,9 @@ def lecture_upload(request):
                 "source_key": source_key,
                 "upload_url": authorization["url"],
                 "content_type": authorization["headers"]["Content-Type"],
+                "upload_url_expires_at": (
+                    timezone.now() + dt.timedelta(seconds=STAGING_UPLOAD_URL_TTL_SECONDS)
+                ),
             })
         with transaction.atomic():
             lesson = Lesson.objects.create(
@@ -564,6 +569,7 @@ def lecture_upload(request):
                     attachment_status=MediaAttachmentStatus.PENDING,
                     upload_ack_deadline_at=timezone.now() + dt.timedelta(minutes=30),
                     staging_expires_at=timezone.now() + dt.timedelta(hours=24),
+                    source_upload_url_expires_at=item["upload_url_expires_at"],
                 ))
         return JsonResponse({
             "lesson_id": lesson.pk,
@@ -651,8 +657,19 @@ def media_upload_refresh(request, job_id: uuid.UUID):
         authorization = create_staging_upload_url(
             job.source_key,
             content_type=content_type_for_key(job.original_filename),
-            expires_in=3600,
+            expires_in=STAGING_UPLOAD_URL_TTL_SECONDS,
         )
+        with transaction.atomic():
+            locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
+            if (
+                locked.status != MediaProcessingStatus.AWAITING_UPLOAD
+                or locked.cleanup_status != MediaCleanupStatus.NOT_REQUESTED
+            ):
+                raise AutomationApiError("media_not_ready", 409)
+            locked.source_upload_url_expires_at = (
+                timezone.now() + dt.timedelta(seconds=STAGING_UPLOAD_URL_TTL_SECONDS)
+            )
+            locked.save(update_fields=["source_upload_url_expires_at"])
         return JsonResponse({
             "upload_url": authorization["url"],
             "content_type": authorization["headers"]["Content-Type"],

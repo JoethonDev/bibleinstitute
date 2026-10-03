@@ -10155,6 +10155,93 @@ msgstr "إعادة المحاولة"
 msgid "Retry failed"
 msgstr "فشلت إعادة المحاولة"
 
+msgid "Cleanup queued"
+msgstr "التنظيف في قائمة الانتظار"
+
+msgid "Cleaning up"
+msgstr "جارٍ التنظيف"
+
+msgid "Cleanup failed"
+msgstr "فشل التنظيف"
+
+msgid "Cleanup complete"
+msgstr "اكتمل التنظيف"
+
+msgid "Force stop"
+msgstr "إيقاف إجباري"
+
+msgid "Stop processing this upload and any companion files?"
+msgstr "هل تريد إيقاف معالجة هذا الرفع والملفات المصاحبة له؟"
+
+msgid "Remove this upload’s server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
+msgstr "هل تريد حذف ملفات هذا الرفع من الخادم وR2؟ لن يُحذف الدرس إلا إذا أنشأه هذا الرفع ولم يكن له محتوى آخر أو سجل دراسة للطلاب."
+
+msgid "Clean up upload"
+msgstr "تنظيف الرفع"
+
+msgid "Retry cleanup"
+msgstr "إعادة محاولة التنظيف"
+
+msgid "Stop requested; waiting for the worker."
+msgstr "طُلب الإيقاف؛ جارٍ انتظار عامل المعالجة."
+
+msgid "Cleanup waits for the source upload URL to expire."
+msgstr "سينتظر التنظيف حتى تنتهي صلاحية رابط رفع المصدر."
+
+msgid "Upload cleanup failed. You can retry cleanup."
+msgstr "فشل تنظيف الرفع. يمكنك إعادة محاولة التنظيف."
+
+msgid "The lesson created by this upload was deleted."
+msgstr "حُذف الدرس الذي أنشأه هذا الرفع."
+
+msgid "Some files were kept because they are shared or could not be verified as owned by this upload."
+msgstr "أُبقي على بعض الملفات لأنها مشتركة أو تعذر التحقق من ملكية هذا الرفع لها."
+
+msgid "Stopped by an administrator."
+msgstr "أوقفه مسؤول."
+
+msgid "This upload contains an unexpected number of media jobs."
+msgstr "يحتوي هذا الرفع على عدد غير متوقع من مهام الوسائط."
+
+msgid "This upload is already being cleaned up."
+msgstr "يجري تنظيف هذا الرفع بالفعل."
+
+msgid "No active media processing remains to stop."
+msgstr "لا توجد معالجة وسائط نشطة لإيقافها."
+
+msgid "Stop processing before requesting full cleanup."
+msgstr "أوقف المعالجة قبل طلب التنظيف الكامل."
+
+msgid "The worker has not confirmed that processing stopped."
+msgstr "لم يؤكد عامل المعالجة توقف العملية بعد."
+
+msgid "Wait for the lesson attachment to finish before cleanup."
+msgstr "انتظر انتهاء إرفاق الوسائط بالدرس قبل التنظيف."
+
+msgid "A cleanup request is required before files can be removed."
+msgstr "يلزم طلب التنظيف قبل حذف الملفات."
+
+msgid "A lesson reference could not be verified; cleanup stopped safely."
+msgstr "تعذر التحقق من مراجع الدرس؛ أُوقف التنظيف بأمان."
+
+msgid "The upload jobs do not share one lesson; cleanup stopped safely."
+msgstr "لا تتبع مهام الرفع درسًا واحدًا؛ أُوقف التنظيف بأمان."
+
+msgid "The lesson media links are invalid; cleanup stopped safely."
+msgstr "روابط وسائط الدرس غير صالحة؛ أُوقف التنظيف بأمان."
+
+msgid "One or more media jobs for this upload no longer exist."
+msgstr "لم تعد واحدة أو أكثر من مهام الوسائط لهذا الرفع موجودة."
+
+msgid "The confirmation dialog is unavailable. Reload the page and try again."
+msgstr "نافذة التأكيد غير متاحة. أعد تحميل الصفحة وحاول مرة أخرى."
+
+msgid "Cleanup is queued until the source upload link expires."
+msgstr "وُضع التنظيف في قائمة الانتظار حتى تنتهي صلاحية رابط رفع المصدر."
+
+msgid "Media job action accepted."
+msgstr "تم قبول الإجراء على مهمة الوسائط."
+
 #: .\management_system/templates/media_processing_status.html:81
 #: .\management_system/templates/upload_video.html:25
 msgid "Retry lesson attachment"

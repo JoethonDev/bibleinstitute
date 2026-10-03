@@ -70,6 +70,15 @@ class MediaProcessingPhase(models.TextChoices):
     ATTACH = "attach", _("Attaching to lesson")
     COMPLETE = "complete", _("Complete")
     FAILED = "failed", _("Failed")
+    CANCELLED = "cancelled", _("Cancelled")
+
+
+class MediaCleanupStatus(models.TextChoices):
+    NOT_REQUESTED = "not_requested", _("Not requested")
+    QUEUED = "queued", _("Cleanup queued")
+    RUNNING = "running", _("Cleaning up")
+    FAILED = "failed", _("Cleanup failed")
+    COMPLETE = "complete", _("Cleanup complete")
 
 
 class MediaAttachmentStatus(models.TextChoices):
@@ -2458,11 +2467,28 @@ class MediaProcessingJob(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
     source_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    source_upload_url_expires_at = models.DateTimeField(null=True, blank=True)
     upload_ack_deadline_at = models.DateTimeField()
     last_heartbeat_at = models.DateTimeField(null=True, blank=True)
     last_dispatched_at = models.DateTimeField(null=True, blank=True)
     staging_deleted_at = models.DateTimeField(null=True, blank=True)
     staging_expires_at = models.DateTimeField(null=True, blank=True)
+    stop_requested_at = models.DateTimeField(null=True, blank=True)
+    cancel_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    cleanup_status = models.CharField(
+        max_length=16,
+        choices=MediaCleanupStatus.choices,
+        default=MediaCleanupStatus.NOT_REQUESTED,
+    )
+    cleanup_requested_at = models.DateTimeField(null=True, blank=True)
+    cleanup_not_before = models.DateTimeField(null=True, blank=True)
+    cleanup_last_dispatched_at = models.DateTimeField(null=True, blank=True)
+    cleanup_started_at = models.DateTimeField(null=True, blank=True)
+    cleanup_finished_at = models.DateTimeField(null=True, blank=True)
+    cleanup_attempt_count = models.PositiveSmallIntegerField(default=0)
+    cleanup_preserved_keys = models.JSONField(default=list)
+    cleanup_result = models.JSONField(default=dict)
+    cleanup_group_ids = models.JSONField(default=list)
 
     class Meta:
         indexes = [
@@ -2485,6 +2511,14 @@ class MediaProcessingJob(models.Model):
             models.Index(
                 fields=["lesson", "attachment_status"],
                 name="media_job_lesson_attach_idx",
+            ),
+            models.Index(
+                fields=["cleanup_status", "cleanup_last_dispatched_at"],
+                name="media_cleanup_dispatch_idx",
+            ),
+            models.Index(
+                fields=["cleanup_status", "cleanup_started_at"],
+                name="media_cleanup_state_start_idx",
             ),
         ]
         ordering = ["-created_at", "-pk"]

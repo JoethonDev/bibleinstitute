@@ -23,6 +23,7 @@
     }
     var statusLabels = parseLabels('data-status-labels');
     var phaseLabels = parseLabels('data-phase-labels');
+    var cleanupStatusLabels = parseLabels('data-cleanup-status-labels');
     var batchStatusUrl = root.getAttribute('data-batch-status-url') || '';
     var retryFailed = root.getAttribute('data-trans-retry-failed') || gettext('Retry failed');
     var csrfInput = document.querySelector('#media-status-csrf input[name="csrfmiddlewaretoken"]');
@@ -54,6 +55,78 @@
         });
     });
 
+    function notify(message, type) {
+        var store = window.Alpine && window.Alpine.store
+            ? window.Alpine.store('notifications')
+            : null;
+        if (store && typeof store.add === 'function') store.add(message, type || 'info');
+    }
+
+    function submitConfirmedAction(button, row, url, fallbackMessage) {
+        if (!url || !csrf || button.dataset.pending === '1') return;
+        if (typeof window.appConfirm !== 'function') {
+            notify(gettext('The confirmation dialog is unavailable. Reload the page and try again.'), 'danger');
+            return;
+        }
+        window.appConfirm(button.dataset.mediaConfirmMessage || fallbackMessage, function () {
+            button.dataset.pending = '1';
+            button.disabled = true;
+            return fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+                body: '{}'
+            }).then(function (response) {
+                return response.text().then(function (text) {
+                    var data = {};
+                    try { data = text ? JSON.parse(text) : {}; } catch (error) {}
+                    if (!response.ok) throw new Error(data.message || gettext('The request failed. Please try again.'));
+                    return data;
+                });
+            }).then(function (data) {
+                var waitingForUrl = data.status === 'waiting_for_upload_url_expiry';
+                notify(
+                    waitingForUrl
+                        ? gettext('Cleanup is queued until the source upload link expires.')
+                        : gettext('Media job action accepted.'),
+                    'success'
+                );
+                refreshStatusRegion();
+            }).catch(function (error) {
+                delete button.dataset.pending;
+                button.disabled = false;
+                var errorNode = row && row.querySelector('[data-media-cleanup-error]');
+                if (errorNode) {
+                    errorNode.textContent = error.message || gettext('The request failed. Please try again.');
+                    errorNode.hidden = false;
+                }
+                notify(error.message || gettext('The request failed. Please try again.'), 'danger');
+            });
+        });
+    }
+
+    root.querySelectorAll('[data-media-stop-url]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            submitConfirmedAction(
+                button,
+                button.closest('tr'),
+                button.getAttribute('data-media-stop-url'),
+                gettext('Stop processing this upload and any companion files?')
+            );
+        });
+    });
+
+    root.querySelectorAll('[data-media-cleanup-url]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            submitConfirmedAction(
+                button,
+                button.closest('tr'),
+                button.getAttribute('data-media-cleanup-url'),
+                gettext('Remove this upload’s server files and R2 objects?')
+            );
+        });
+    });
+
     function updateRow(row, job) {
         var status = row.querySelector('[data-media-status-value]');
         var phase = row.querySelector('[data-media-phase-value]');
@@ -65,13 +138,47 @@
         if (bar) bar.style.width = Math.max(0, Math.min(100, Number(job.progress) || 0)) + '%';
         if (value) value.textContent = (Number(job.progress) || 0) + '%';
         if (error) error.textContent = job.error_message || '';
+        var cleanupStatus = row.querySelector('[data-media-cleanup-status]');
+        if (cleanupStatus) {
+            cleanupStatus.textContent = cleanupStatusLabels[job.cleanup_status] || job.cleanup_status || '';
+            cleanupStatus.hidden = !job.cleanup_status || job.cleanup_status === 'not_requested';
+        }
+        var cleanupError = row.querySelector('[data-media-cleanup-error]');
+        if (cleanupError) {
+            cleanupError.textContent = job.cleanup_error_message || '';
+            cleanupError.hidden = !job.cleanup_error_message;
+        }
+        var stopPending = row.querySelector('[data-media-stop-pending]');
+        if (stopPending) stopPending.hidden = !job.stop_requested || job.cancel_acknowledged;
+        row.querySelectorAll('[data-media-stop-url]').forEach(function (button) {
+            button.hidden = !job.can_stop;
+        });
+        row.querySelectorAll('[data-media-cleanup-url]').forEach(function (button) {
+            button.hidden = !job.can_cleanup;
+        });
+        var cleanupWaiting = row.querySelector('[data-media-cleanup-waiting]');
+        if (cleanupWaiting) cleanupWaiting.hidden = !job.cleanup_waiting_for_upload_url;
+        var publicationPending = row.querySelector('[data-media-publication-pending]');
+        if (publicationPending) publicationPending.hidden = !job.publication_pending;
+        var lessonCleanup = row.querySelector('[data-media-cleanup-lesson]');
+        if (lessonCleanup) lessonCleanup.hidden = !(job.cleanup_result && job.cleanup_result.lesson_deleted);
+        var preservedCleanup = row.querySelector('[data-media-cleanup-preserved]');
+        if (preservedCleanup) preservedCleanup.hidden = !(Number(job.cleanup_preserved_count) > 0);
+        row.setAttribute('data-current-media-status', job.status || '');
+        row.setAttribute('data-current-cleanup-status', job.cleanup_status || '');
+        row.setAttribute('data-cleanup-not-before', job.cleanup_not_before || '');
         var progress = row.querySelector('[role="progressbar"]');
         if (progress) progress.setAttribute('aria-valuenow', String(Math.max(0, Math.min(100, Number(job.progress) || 0))));
     }
 
     function pollStatusRows() {
         var rows = Array.from(root.querySelectorAll('[data-media-status-url]')).filter(function (row) {
-            return row.getAttribute('data-media-terminal') !== '1' && row.getAttribute('data-media-job-id');
+            if (row.getAttribute('data-media-terminal') === '1' || !row.getAttribute('data-media-job-id')) return false;
+            if (row.getAttribute('data-current-cleanup-status') === 'queued') {
+                var notBefore = Date.parse(row.getAttribute('data-cleanup-not-before') || '');
+                if (Number.isFinite(notBefore) && notBefore > Date.now() + 5000) return false;
+            }
+            return true;
         });
         if (!rows.length || !batchStatusUrl) return;
         var ids = rows.map(function (row) { return row.getAttribute('data-media-job-id'); });
@@ -82,11 +189,25 @@
                 rows.forEach(function (row) {
                     var job = jobs[row.getAttribute('data-media-job-id')];
                     if (!job) return;
+                    var previousStatus = row.getAttribute('data-current-media-status') || '';
+                    var previousCleanupStatus = row.getAttribute('data-current-cleanup-status') || '';
                     updateRow(row, job);
                     var attachmentPending = job.status === 'succeeded' && job.attachment_status === 'pending';
-                    if ((job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') && !attachmentPending) {
+                    var cleanupPending = job.cleanup_status === 'queued' || job.cleanup_status === 'running';
+                    if (
+                        (job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled')
+                        && !attachmentPending && !cleanupPending
+                    ) {
                         row.setAttribute('data-media-terminal', '1');
-                        if (job.status === 'failed' || (job.status === 'succeeded' && job.attachment_status === 'failed')) {
+                        var cleanupChanged = previousCleanupStatus && previousCleanupStatus !== job.cleanup_status;
+                        var statusChangedToTerminal = (
+                            (job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled')
+                            && previousStatus !== job.status
+                        );
+                        if (
+                            statusChangedToTerminal
+                            || cleanupChanged
+                        ) {
                             refreshStatusRegion();
                         }
                     }

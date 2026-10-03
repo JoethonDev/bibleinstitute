@@ -64,8 +64,11 @@ _MEDIA_CONTENT_TYPES = {
 _MAX_STAGING_FILENAME_LENGTH = 255
 _MAX_KEY_LENGTH = 1024
 _MAX_JOB_UUID_LENGTH = 128
+_MAX_EXACT_DELETE_KEYS = 50_000
+_DELETE_BATCH_SIZE = 1_000
 _DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024
-_DEFAULT_PUT_EXPIRES = 3600  # seconds, one-hour direct PUT authorization
+STAGING_UPLOAD_URL_TTL_SECONDS = 3600
+_DEFAULT_PUT_EXPIRES = STAGING_UPLOAD_URL_TTL_SECONDS
 _MIN_PUT_EXPIRES = 60
 _MAX_PUT_EXPIRES = 3600
 
@@ -79,6 +82,10 @@ class MediaStorageError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+class MediaOperationCancelled(Exception):
+    """Raised by a caller's cooperative cancellation check."""
 
 
 def content_type_for_key(key: str) -> str:
@@ -259,6 +266,7 @@ def download_staging_object(
     bucket: Optional[str] = None,
     expected_size: Optional[int] = None,
     chunk_size: int = _DEFAULT_CHUNK_SIZE,
+    cancellation_check=None,
 ) -> str:
     """
     Stream a staging object to a caller-provided local path.
@@ -289,6 +297,8 @@ def download_staging_object(
         raise MediaStorageError("Expected staging size is invalid.", ERR_DOWNLOAD)
     partial_path = f"{destination_path}.part"
     try:
+        if cancellation_check:
+            cancellation_check()
         response = resolved_client.get_object(Bucket=resolved_bucket, Key=key)
     except Exception as exc:
         _raise_not_found_or_storage(exc, ERR_STAGING_MISSING, "Staging object")
@@ -297,6 +307,8 @@ def download_staging_object(
     try:
         with open(partial_path, "wb") as out_file:
             while True:
+                if cancellation_check:
+                    cancellation_check()
                 chunk = body.read(chunk_size)
                 if not chunk:
                     break
@@ -307,12 +319,17 @@ def download_staging_object(
                         "Downloaded staging object exceeds the verified size.",
                         ERR_DOWNLOAD,
                     )
+        if cancellation_check:
+            cancellation_check()
         if expected_size is not None and bytes_written != expected_size:
             raise MediaStorageError(
                 f"Downloaded staging object size {bytes_written} does not match expected {expected_size}.",
                 ERR_DOWNLOAD,
             )
         os.replace(partial_path, destination_path)
+    except MediaOperationCancelled:
+        _remove_file(partial_path)
+        raise
     except Exception as exc:
         _remove_file(partial_path)
         raise MediaStorageError(
@@ -333,6 +350,7 @@ def upload_output_file(
     content_type: Optional[str] = None,
     client: Any = None,
     bucket: Optional[str] = None,
+    cancellation_check=None,
 ) -> dict:
     """
     Upload a local output file to its exact final key, rejecting collisions.
@@ -353,22 +371,34 @@ def upload_output_file(
     _reject_collision(resolved_client, resolved_bucket, key)
     media_type = content_type or content_type_for_key(key)
     with open(local_path, "rb") as file_obj:
-        _put_output_conditionally(
-            resolved_client,
-            resolved_bucket,
-            key,
-            file_obj,
-            media_type,
-            os.path.getsize(local_path),
-        )
+        body = _CancellationAwareReader(file_obj, cancellation_check) if cancellation_check else file_obj
+        try:
+            _put_output_conditionally(
+                resolved_client,
+                resolved_bucket,
+                key,
+                body,
+                media_type,
+                os.path.getsize(local_path),
+            )
+        except MediaOperationCancelled as exc:
+            # The provider may have accepted the conditional PUT before the
+            # stream noticed cancellation. The generated key was absent at
+            # preflight and If-None-Match prevents deleting a prior object.
+            try:
+                delete_object_exact(key, client=resolved_client, bucket=resolved_bucket)
+            except Exception:
+                setattr(exc, "output_keys", [key])
+            raise
     try:
-        return verify_output_object(
+        metadata = verify_output_object(
             key,
             expected_size=os.path.getsize(local_path),
             expected_content_type=media_type,
             client=resolved_client,
             bucket=resolved_bucket,
         )
+        return metadata
     except Exception:
         try:
             delete_object_exact(key, client=resolved_client, bucket=resolved_bucket)
@@ -459,6 +489,8 @@ def _put_output_conditionally(
         params["ContentLength"] = content_length
     try:
         client.put_object(**params)
+    except MediaOperationCancelled:
+        raise
     except Exception as exc:
         response = getattr(exc, "response", {}) or {}
         status_code = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
@@ -529,6 +561,61 @@ def delete_object_exact(
             return False
         raise MediaStorageError(f"Could not delete object: {exc}", ERR_STORAGE) from exc
     return True
+
+
+def delete_objects_exact(
+    keys: Any,
+    *,
+    client: Any = None,
+    bucket: Optional[str] = None,
+) -> list[str]:
+    """Delete a bounded collection of exact keys in provider-sized batches.
+
+    The caller must supply job-owned keys. This helper never lists or deletes
+    prefixes. Missing objects are idempotent successes; returned errors contain
+    only the exact keys the provider did not delete.
+    """
+    if not isinstance(keys, (list, tuple, set, frozenset)):
+        raise MediaStorageError("Exact object keys must be a bounded collection.", ERR_OUTPUT_KEY)
+    unique_keys = list(dict.fromkeys(_validate_exact_key(key) for key in keys))
+    if len(unique_keys) > _MAX_EXACT_DELETE_KEYS:
+        raise MediaStorageError("The cleanup request contains too many objects.", ERR_OUTPUT_KEY)
+    if not unique_keys:
+        return []
+    resolved_client, resolved_bucket = _resolve_client_bucket(client, bucket)
+    failed = []
+    for offset in range(0, len(unique_keys), _DELETE_BATCH_SIZE):
+        batch = unique_keys[offset:offset + _DELETE_BATCH_SIZE]
+        try:
+            response = resolved_client.delete_objects(
+                Bucket=resolved_bucket,
+                Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
+            )
+        except Exception as exc:
+            raise MediaStorageError(
+                f"Could not delete exact output objects: {exc}", ERR_STORAGE
+            ) from exc
+        failed.extend(
+            str(item.get("Key", ""))
+            for item in response.get("Errors", [])
+            if item.get("Key")
+        )
+    return failed
+
+
+class _CancellationAwareReader:
+    """Check cancellation between chunks streamed into R2 PutObject."""
+
+    def __init__(self, file_obj, cancellation_check):
+        self._file_obj = file_obj
+        self._cancellation_check = cancellation_check
+
+    def read(self, size=-1):
+        self._cancellation_check()
+        return self._file_obj.read(size)
+
+    def __getattr__(self, name):
+        return getattr(self._file_obj, name)
 
 
 # ---------------------------------------------------------------------------

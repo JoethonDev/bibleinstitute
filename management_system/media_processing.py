@@ -10,6 +10,7 @@ import shutil
 import signal
 import subprocess
 import threading
+import time
 import unicodedata
 from contextlib import suppress
 from datetime import timedelta
@@ -25,6 +26,8 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from .media_storage import (
+    MediaOperationCancelled,
+    STAGING_UPLOAD_URL_TTL_SECONDS,
     delete_object_exact,
     download_staging_object,
     upload_output_file,
@@ -36,6 +39,7 @@ from .models import (
     MediaProcessingJob,
     MediaProcessingPhase,
     MediaProcessingStatus,
+    MediaCleanupStatus,
     PublicationStatus,
 )
 from .student_notifications import is_active_published_offering
@@ -66,6 +70,7 @@ MAX_FAILURE_HISTORY = 20
 MAX_ERROR_MESSAGE_LENGTH = 4000
 MAX_STDERR_LENGTH = 8000
 MAX_MEDIA_ATTEMPTS = 3
+MAX_AUTOMATION_UPLOAD_FILES = 2
 ATTEMPT_LIMIT_ERROR = "attempt_limit_exceeded"
 ATTEMPT_LIMIT_MESSAGE = _("The maximum number of media processing attempts has been reached.")
 AUTOMATION_PART_PREFIX = "automation-"
@@ -91,9 +96,9 @@ NON_RETRYABLE_FAILURE_CODES = frozenset({
 ALLOWED_TRANSITIONS = {
     MediaProcessingStatus.AWAITING_UPLOAD: frozenset({MediaProcessingStatus.QUEUED, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
     MediaProcessingStatus.QUEUED: frozenset({MediaProcessingStatus.PROCESSING, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
-    MediaProcessingStatus.PROCESSING: frozenset({MediaProcessingStatus.QUEUED, MediaProcessingStatus.UPLOADING, MediaProcessingStatus.FAILED}),
-    MediaProcessingStatus.UPLOADING: frozenset({MediaProcessingStatus.VERIFYING, MediaProcessingStatus.FAILED}),
-    MediaProcessingStatus.VERIFYING: frozenset({MediaProcessingStatus.SUCCEEDED, MediaProcessingStatus.FAILED}),
+    MediaProcessingStatus.PROCESSING: frozenset({MediaProcessingStatus.QUEUED, MediaProcessingStatus.UPLOADING, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
+    MediaProcessingStatus.UPLOADING: frozenset({MediaProcessingStatus.VERIFYING, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
+    MediaProcessingStatus.VERIFYING: frozenset({MediaProcessingStatus.SUCCEEDED, MediaProcessingStatus.FAILED, MediaProcessingStatus.CANCELLED}),
     MediaProcessingStatus.FAILED: frozenset({MediaProcessingStatus.QUEUED, MediaProcessingStatus.CANCELLED}),
     MediaProcessingStatus.SUCCEEDED: frozenset(),
     MediaProcessingStatus.CANCELLED: frozenset(),
@@ -110,6 +115,17 @@ class MediaJobLeaseLost(Exception):
     """Raised when an older worker attempt no longer owns the job."""
 
     code = "media_job_lease_lost"
+
+
+class MediaJobCancelled(MediaOperationCancelled):
+    """Raised when an administrator requests a cooperative job stop."""
+
+    code = "media_job_cancelled"
+
+    def __init__(self, output_keys: list[str] | None = None):
+        super().__init__("Media job cancellation was requested.")
+        self.output_keys = output_keys or []
+        self.residual_output_keys: list[str] = []
 
 
 def _mark_attempt_limit_locked(job: MediaProcessingJob) -> None:
@@ -340,7 +356,12 @@ def transition_job(
 def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
     """Atomically claim one queued job for a media worker attempt."""
     job = MediaProcessingJob.objects.select_for_update().filter(public_id=public_id).first()
-    if job is None or job.status != MediaProcessingStatus.QUEUED:
+    if (
+        job is None
+        or job.status != MediaProcessingStatus.QUEUED
+        or job.stop_requested_at is not None
+        or job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED
+    ):
         return None
     if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
         _mark_attempt_limit_locked(job)
@@ -364,6 +385,7 @@ def record_job_failure(
     *,
     phase: str = MediaProcessingPhase.FAILED,
     expected_attempt_count: int | None = None,
+    residual_output_keys: list[str] | None = None,
 ) -> MediaProcessingJob:
     """Persist a bounded failure record while retaining the job for retry."""
     job = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
@@ -381,13 +403,18 @@ def record_job_failure(
         "at": timezone.now().isoformat(),
     })
     job.failure_history = history[-MAX_FAILURE_HISTORY:]
+    if residual_output_keys:
+        job.output_keys = list(dict.fromkeys([*(job.output_keys or []), *residual_output_keys]))
     job.error_code = str(error_code)[:80]
     job.error_message = message
     job.status = MediaProcessingStatus.FAILED
     job.phase = phase
     job.finished_at = timezone.now()
     job.staging_expires_at = timezone.now() + timedelta(hours=media_limits()["failed_retention_hours"])
-    job.save(update_fields=["failure_history", "error_code", "error_message", "status", "phase", "finished_at", "staging_expires_at"])
+    job.save(update_fields=[
+        "failure_history", "error_code", "error_message", "status", "phase",
+        "finished_at", "staging_expires_at", "output_keys",
+    ])
     return job
 
 
@@ -427,6 +454,8 @@ def queue_verified_job(
     job = MediaProcessingJob.objects.filter(public_id=public_id).first()
     if job is None:
         raise MediaProcessingJob.DoesNotExist
+    if job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED:
+        raise ValidationError(_("This media job is already being cleaned up."))
     if job.status in {
         MediaProcessingStatus.QUEUED,
         MediaProcessingStatus.PROCESSING,
@@ -449,6 +478,11 @@ def queue_verified_job(
     )
     with transaction.atomic():
         locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
+        if (
+            locked.stop_requested_at is not None
+            or locked.cleanup_status != MediaCleanupStatus.NOT_REQUESTED
+        ):
+            raise ValidationError(_("This media job has been stopped or is being cleaned up."))
         if locked.status in {
             MediaProcessingStatus.QUEUED,
             MediaProcessingStatus.PROCESSING,
@@ -473,10 +507,10 @@ def requeue_stalled_job(
 ) -> MediaProcessingJob | None:
     """Reset one stalled queued/processing job and return its locked row."""
     job = MediaProcessingJob.objects.select_for_update().filter(public_id=public_id).first()
-    if job is None or job.status not in {
-        MediaProcessingStatus.QUEUED,
-        MediaProcessingStatus.PROCESSING,
-    }:
+    recoverable_statuses = {MediaProcessingStatus.QUEUED, MediaProcessingStatus.PROCESSING}
+    if job is not None and job.stop_requested_at is not None:
+        recoverable_statuses.update(ACTIVE_WORKER_STATUSES)
+    if job is None or job.status not in recoverable_statuses:
         return None
     if stale_before is not None:
         marker = (
@@ -486,6 +520,18 @@ def requeue_stalled_job(
         )
         if marker is not None and marker > stale_before:
             return None
+    if job.stop_requested_at is not None:
+        job.status = MediaProcessingStatus.CANCELLED
+        job.phase = MediaProcessingPhase.CANCELLED
+        job.finished_at = timezone.now()
+        job.cancel_acknowledged_at = job.finished_at
+        job.error_code = "cancelled_by_operator"
+        job.error_message = str(_("Stopped by an administrator."))
+        job.save(update_fields=[
+            "status", "phase", "finished_at", "cancel_acknowledged_at",
+            "error_code", "error_message",
+        ])
+        return job
     if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
         _mark_attempt_limit_locked(job)
         return job
@@ -508,14 +554,18 @@ def assert_media_job_lease(job_id: int, attempt_count: int) -> None:
         raise MediaJobLeaseLost
 
 
-def cleanup_job_workdirs(public_id: Any) -> int:
+def cleanup_job_workdirs(public_id: Any, *, raise_on_error: bool = False) -> int:
     """Remove abandoned temporary work directories for one media job only."""
     work_root = getattr(settings, "MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
     prefix = f"media-{public_id}-"
     removed = 0
     try:
         entries = list(os.scandir(work_root))
-    except (FileNotFoundError, NotADirectoryError, OSError):
+    except (FileNotFoundError, NotADirectoryError):
+        return 0
+    except OSError:
+        if raise_on_error:
+            raise
         return 0
     root = os.path.realpath(work_root)
     for entry in entries:
@@ -533,6 +583,8 @@ def cleanup_job_workdirs(public_id: Any) -> int:
             removed += 1
         except OSError:
             logger.warning("Could not remove abandoned media work directory %s", entry.path, exc_info=True)
+            if raise_on_error:
+                raise
     return removed
 
 
@@ -550,6 +602,13 @@ def schedule_attachment_retry_after_commit(public_id: Any) -> None:
     )
 
 
+def schedule_media_cleanup_after_commit(public_id: Any, job_ids: list[str]) -> None:
+    """Dispatch one cleanup task only after its durable request commits."""
+    transaction.on_commit(
+        lambda public_id=public_id, job_ids=job_ids: _enqueue_media_cleanup(public_id, job_ids)
+    )
+
+
 def _enqueue_media_job(public_id: Any) -> None:
     from .media_tasks import enqueue_media_job
 
@@ -560,6 +619,12 @@ def _enqueue_attachment_retry(public_id: Any) -> None:
     from .media_tasks import enqueue_media_attachment_retry
 
     enqueue_media_attachment_retry(public_id)
+
+
+def _enqueue_media_cleanup(public_id: Any, job_ids: list[str]) -> None:
+    from .media_tasks import enqueue_media_cleanup
+
+    enqueue_media_cleanup(public_id, job_ids)
 
 
 def job_is_visible_to(user, job: MediaProcessingJob) -> bool:
@@ -575,6 +640,140 @@ def attachment_requested(job: MediaProcessingJob) -> bool:
 def is_automation_job(job: MediaProcessingJob) -> bool:
     """Return whether the job belongs to the automation-owned media namespace."""
     return bool(job.lesson_id and (job.part_id or "").startswith(AUTOMATION_PART_PREFIX))
+
+
+def media_upload_job_queryset(job: MediaProcessingJob):
+    """Return one browser job or its bounded automation-upload siblings."""
+    saved_group_ids = job.cleanup_group_ids or []
+    if (
+        isinstance(saved_group_ids, list)
+        and 1 <= len(saved_group_ids) <= MAX_AUTOMATION_UPLOAD_FILES
+        and all(isinstance(value, str) and value for value in saved_group_ids)
+    ):
+        return MediaProcessingJob.objects.filter(public_id__in=saved_group_ids)
+    match = re.fullmatch(r"automation-([a-f0-9]{12})-p\d{2}", job.part_id or "")
+    if not job.lesson_id or match is None:
+        return MediaProcessingJob.objects.filter(pk=job.pk)
+    prefix = f"automation-{match.group(1)}-p"
+    return MediaProcessingJob.objects.filter(
+        lesson_id=job.lesson_id,
+        part_id__startswith=prefix,
+    )
+
+
+@transaction.atomic
+def request_media_job_stop(public_id: Any) -> tuple[list[MediaProcessingJob], bool]:
+    """Request cancellation of one job or all files in its automation upload."""
+    root = MediaProcessingJob.objects.filter(public_id=public_id).first()
+    if root is None:
+        raise MediaProcessingJob.DoesNotExist
+    jobs = list(
+        media_upload_job_queryset(root).select_for_update().order_by("pk")[:MAX_AUTOMATION_UPLOAD_FILES + 1]
+    )
+    if not any(job.pk == root.pk for job in jobs):
+        raise MediaProcessingJob.DoesNotExist
+    if len(jobs) > MAX_AUTOMATION_UPLOAD_FILES:
+        raise ValidationError(_("This upload contains an unexpected number of media jobs."))
+    if any(
+        job.cleanup_status in {MediaCleanupStatus.QUEUED, MediaCleanupStatus.RUNNING}
+        for job in jobs
+    ):
+        raise ValidationError(_("This upload is already being cleaned up."))
+
+    now = timezone.now()
+    changed = False
+    stopping = False
+    for job in jobs:
+        if job.status in {MediaProcessingStatus.AWAITING_UPLOAD, MediaProcessingStatus.QUEUED}:
+            job.status = MediaProcessingStatus.CANCELLED
+            job.phase = MediaProcessingPhase.CANCELLED
+            job.finished_at = now
+            job.cancel_acknowledged_at = now
+            job.error_code = "cancelled_by_operator"
+            job.error_message = str(_("Stopped by an administrator."))
+            job.save(update_fields=[
+                "status", "phase", "finished_at", "cancel_acknowledged_at",
+                "error_code", "error_message",
+            ])
+            changed = True
+        elif job.status in ACTIVE_WORKER_STATUSES:
+            stopping = True
+            if job.stop_requested_at is None:
+                job.stop_requested_at = now
+                job.save(update_fields=["stop_requested_at"])
+                changed = True
+
+    if not changed and not stopping:
+        raise ValidationError(_("No active media processing remains to stop."))
+    return jobs, stopping
+
+
+@transaction.atomic
+def request_media_job_cleanup(public_id: Any) -> tuple[list[MediaProcessingJob], bool]:
+    """Queue exact, idempotent cleanup after every job in the upload is terminal."""
+    root = MediaProcessingJob.objects.filter(public_id=public_id).first()
+    if root is None:
+        raise MediaProcessingJob.DoesNotExist
+    jobs = list(
+        media_upload_job_queryset(root).select_for_update().order_by("pk")[:MAX_AUTOMATION_UPLOAD_FILES + 1]
+    )
+    if not any(job.pk == root.pk for job in jobs):
+        raise MediaProcessingJob.DoesNotExist
+    if len(jobs) > MAX_AUTOMATION_UPLOAD_FILES:
+        raise ValidationError(_("This upload contains an unexpected number of media jobs."))
+    terminal_statuses = {
+        MediaProcessingStatus.CANCELLED,
+        MediaProcessingStatus.FAILED,
+        MediaProcessingStatus.SUCCEEDED,
+    }
+    if any(job.status not in terminal_statuses for job in jobs):
+        raise ValidationError(_("Stop processing before requesting full cleanup."))
+    if any(
+        job.status == MediaProcessingStatus.CANCELLED
+        and job.stop_requested_at is not None
+        and job.cancel_acknowledged_at is None
+        for job in jobs
+    ):
+        raise ValidationError(_("The worker has not confirmed that processing stopped."))
+    if any(job.attachment_status == MediaAttachmentStatus.PENDING for job in jobs):
+        raise ValidationError(_("Wait for the lesson attachment to finish before cleanup."))
+    if (
+        all(job.status == MediaProcessingStatus.SUCCEEDED for job in jobs)
+        and any(job.error_code == PUBLICATION_PENDING_ERROR for job in jobs)
+    ):
+        raise ValidationError(_("Wait for lesson publication to finish before cleanup."))
+    if all(job.cleanup_status == MediaCleanupStatus.COMPLETE for job in jobs):
+        return jobs, False
+    if any(job.cleanup_status in {MediaCleanupStatus.QUEUED, MediaCleanupStatus.RUNNING} for job in jobs):
+        return jobs, False
+
+    now = timezone.now()
+    cleanup_not_before = max(
+        (
+            job.source_upload_url_expires_at
+            or job.created_at + timedelta(seconds=STAGING_UPLOAD_URL_TTL_SECONDS)
+            for job in jobs
+        )
+    ) + timedelta(seconds=60)
+    for job in jobs:
+        job.cleanup_status = MediaCleanupStatus.QUEUED
+        job.cleanup_requested_at = now
+        job.cleanup_not_before = cleanup_not_before
+        job.cleanup_last_dispatched_at = now
+        job.cleanup_started_at = None
+        job.cleanup_finished_at = None
+        job.cleanup_preserved_keys = []
+    cleanup_group_ids = [str(job.public_id) for job in jobs]
+    for job in jobs:
+        job.cleanup_group_ids = cleanup_group_ids
+        job.save(update_fields=[
+            "cleanup_status", "cleanup_requested_at", "cleanup_started_at",
+            "cleanup_not_before", "cleanup_last_dispatched_at",
+            "cleanup_finished_at", "cleanup_preserved_keys",
+            "cleanup_group_ids",
+        ])
+    schedule_media_cleanup_after_commit(root.public_id, cleanup_group_ids)
+    return jobs, True
 
 
 def automation_part_id(lesson_token: str, position: int) -> str:
@@ -616,6 +815,7 @@ def is_retryable_failed_job(job: MediaProcessingJob) -> bool:
     """Apply the shared retry gate for retained failed media jobs."""
     return bool(
         job.status == MediaProcessingStatus.FAILED
+        and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
         and job.attempt_count < MAX_MEDIA_ATTEMPTS
         and job.source_acknowledged_at
         and not job.staging_deleted_at
@@ -658,6 +858,8 @@ def publish_attached_lesson(job_id: Any) -> MediaProcessingJob:
         or not job.staging_deleted_at
     ):
         raise MediaProcessingError("Media job is not ready for publication.", PUBLICATION_FAILED_ERROR)
+    if job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED:
+        raise MediaProcessingError("Media upload cleanup has been requested.", PUBLICATION_FAILED_ERROR)
     if not automation_lesson_media_complete(job.lesson_id, exclude_job_id=job.pk):
         # A multi-file lecture publishes once, after every source file is ready.
         raise MediaProcessingError("Media files are still processing.", PUBLICATION_FAILED_ERROR)
@@ -755,9 +957,61 @@ def _binary_command(binary: str, args: list[str]) -> list[str]:
     return [binary, *args]
 
 
-def _run_command(command: list[str], *, timeout: int, progress_callback=None, duration: float = 0.0) -> str:
+def _run_probe_command(command: list[str], *, timeout: int, cancellation_check=None):
+    """Run ffprobe with bounded cancellation polling and process-group cleanup."""
+    if cancellation_check:
+        cancellation_check()
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=(os.name != "nt"),
+            creationflags=creationflags if os.name == "nt" else 0,
+        )
+    except OSError as exc:
+        raise MediaProcessingError(
+            _("The uploaded media could not be inspected."), "ffprobe_failed"
+        ) from exc
+
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            if cancellation_check:
+                cancellation_check()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                _terminate_process(process)
+                raise MediaProcessingError(
+                    _("The uploaded media could not be inspected."), "ffprobe_failed"
+                )
+            try:
+                stdout, stderr = process.communicate(timeout=min(1.0, remaining))
+                return subprocess.CompletedProcess(
+                    command, process.returncode, stdout, stderr
+                )
+            except subprocess.TimeoutExpired:
+                continue
+    except Exception:
+        _terminate_process(process)
+        raise
+
+
+def _run_command(
+    command: list[str],
+    *,
+    timeout: int,
+    progress_callback=None,
+    duration: float = 0.0,
+    cancellation_check=None,
+) -> str:
     """Run a native command without a shell and kill its process group on timeout."""
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    if cancellation_check:
+        cancellation_check()
     try:
         process = subprocess.Popen(
             command,
@@ -784,6 +1038,8 @@ def _run_command(command: list[str], *, timeout: int, progress_callback=None, du
     try:
         assert process.stdout is not None
         for line in process.stdout:
+            if cancellation_check:
+                cancellation_check()
             line = line.strip()
             if "=" not in line:
                 continue
@@ -807,6 +1063,8 @@ def _run_command(command: list[str], *, timeout: int, progress_callback=None, du
         watchdog.cancel()
     if timed_out.is_set():
         raise MediaProcessingError(_("Media processing exceeded the allowed time."), "processing_timeout")
+    if cancellation_check:
+        cancellation_check()
     if return_code:
         raise MediaProcessingError(stderr or _("Native media processing failed."), "ffmpeg_failed")
     if progress_callback:
@@ -831,8 +1089,10 @@ def _terminate_process(process) -> None:
             pass
 
 
-def probe_source(source_path: str, source_kind: str) -> MediaProbe:
+def probe_source(source_path: str, source_kind: str, *, cancellation_check=None) -> MediaProbe:
     """Inspect a downloaded source with ffprobe and enforce basic limits."""
+    if cancellation_check:
+        cancellation_check()
     if source_kind == "document":
         try:
             with open(source_path, "rb") as source:
@@ -845,17 +1105,11 @@ def probe_source(source_path: str, source_kind: str) -> MediaProbe:
     command = _binary_command("ffprobe", [
         "-v", "error", "-print_format", "json", "-show_format", "-show_streams", source_path,
     ])
-    try:
-        completed = subprocess.run(
-            command,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            timeout=media_limits()["job_timeout"],
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise MediaProcessingError(_("The uploaded media could not be inspected."), "ffprobe_failed") from exc
+    completed = _run_probe_command(
+        command,
+        timeout=media_limits()["job_timeout"],
+        cancellation_check=cancellation_check,
+    )
     if completed.returncode:
         raise MediaProcessingError(
             completed.stderr[-MAX_STDERR_LENGTH:] or _("The uploaded media is corrupt."),
@@ -946,6 +1200,7 @@ def _run_hls(
     probe: MediaProbe | None = None,
     rate_scale: float = 1.0,
     segment_seconds: float | None = None,
+    cancellation_check=None,
 ) -> tuple[str, list[str]]:
     """Encode one HLS rendition from a local source.
 
@@ -988,7 +1243,13 @@ def _run_hls(
             "-map", "0:a:0", "-vn", "-c:a", "copy",
             *muxer,
         ]
-    _run_command(command, timeout=limits["job_timeout"], progress_callback=progress_callback, duration=duration)
+    _run_command(
+        command,
+        timeout=limits["job_timeout"],
+        progress_callback=progress_callback,
+        duration=duration,
+        cancellation_check=cancellation_check,
+    )
     names = _hls_segment_names(playlist)
     return playlist, names
 
@@ -1002,6 +1263,7 @@ def _encode_hls_with_size_cap(
     progress_callback=None,
     *,
     probe: MediaProbe | None = None,
+    cancellation_check=None,
 ) -> tuple[str, list[str]]:
     """Encode HLS with an adaptive segment-size target.
 
@@ -1028,6 +1290,8 @@ def _encode_hls_with_size_cap(
     names: list[str] = []
     oversized: list[str] = []
     for attempt, (rate_scale, seconds) in enumerate(attempts):
+        if cancellation_check:
+            cancellation_check()
         if attempt:
             logger.warning(
                 "media_segment_over_cap retrying_adaptive_profile oversized=%s base=%s "
@@ -1047,6 +1311,7 @@ def _encode_hls_with_size_cap(
             probe=probe,
             rate_scale=rate_scale,
             segment_seconds=seconds,
+            cancellation_check=cancellation_check,
         )
         oversized = _oversized_segments(output_dir, names, limits["max_segment_bytes"])
         if not oversized:
@@ -1062,7 +1327,14 @@ def _encode_hls_with_size_cap(
     return playlist, names
 
 
-def _prepare_audio(source_path: str, probe: MediaProbe, work_dir: str, duration: float, progress_callback=None) -> str:
+def _prepare_audio(
+    source_path: str,
+    probe: MediaProbe,
+    work_dir: str,
+    duration: float,
+    progress_callback=None,
+    cancellation_check=None,
+) -> str:
     """Return the AAC audio source used for the audio HLS and MP3 outputs.
 
     Video sources are always re-encoded to the configured AAC bitrate so the
@@ -1078,20 +1350,48 @@ def _prepare_audio(source_path: str, probe: MediaProbe, work_dir: str, duration:
         *audio_encode_args(probe, media_limits()),
         "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output,
     ]
-    _run_command(command, timeout=media_limits()["job_timeout"], progress_callback=progress_callback, duration=duration)
+    _run_command(
+        command,
+        timeout=media_limits()["job_timeout"],
+        progress_callback=progress_callback,
+        duration=duration,
+        cancellation_check=cancellation_check,
+    )
     return output
 
 
-def _make_mp3(audio_path: str, source_path: str, source_kind: str, work_dir: str, duration: float, progress_callback=None) -> str:
+def _copy_file_with_cancellation(source_path: str, output_path: str, cancellation_check=None) -> None:
+    if cancellation_check is None:
+        shutil.copyfile(source_path, output_path)
+        return
+    with open(source_path, "rb") as source, open(output_path, "wb") as output:
+        while True:
+            cancellation_check()
+            chunk = source.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            output.write(chunk)
+
+
+def _make_mp3(
+    audio_path: str,
+    source_path: str,
+    source_kind: str,
+    work_dir: str,
+    duration: float,
+    progress_callback=None,
+    cancellation_check=None,
+) -> str:
     output = os.path.join(work_dir, "downloadable.mp3")
     if source_kind == "audio" and source_path.lower().endswith(".mp3"):
-        shutil.copyfile(source_path, output)
+        _copy_file_with_cancellation(source_path, output, cancellation_check)
         return output
     _run_command(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", audio_path, "-vn", "-c:a", "libmp3lame", "-b:a", media_limits()["mp3_bitrate"], "-progress", "pipe:1", "-nostats", output],
         timeout=media_limits()["job_timeout"],
         progress_callback=progress_callback,
         duration=duration,
+        cancellation_check=cancellation_check,
     )
     return output
 
@@ -1100,16 +1400,40 @@ def _destination_key(folder: str, *parts: str) -> str:
     return "/".join(part for part in (folder, *parts) if part)
 
 
-def _upload_hls_outputs(playlist_path: str, segment_names: list[str], output_dir: str, folder: str, base_name: str, segment_folder: str, created_keys: list[str], progress_callback=None) -> tuple[str, list[str]]:
+def _upload_hls_outputs(
+    playlist_path: str,
+    segment_names: list[str],
+    output_dir: str,
+    folder: str,
+    base_name: str,
+    segment_folder: str,
+    created_keys: list[str],
+    progress_callback=None,
+    cancellation_check=None,
+) -> tuple[str, list[str]]:
     for index, name in enumerate(segment_names, start=1):
+        if cancellation_check:
+            cancellation_check()
         key = _destination_key(folder, segment_folder, name)
-        upload_output_file(key, os.path.join(output_dir, name), content_type="video/mp2t")
+        upload_output_file(
+            key,
+            os.path.join(output_dir, name),
+            content_type="video/mp2t",
+            cancellation_check=cancellation_check,
+        )
         created_keys.append(key)
         if progress_callback:
             progress_callback(round(index / len(segment_names) * 90))
     rewritten = _write_rewritten_playlist(playlist_path, segment_folder)
     manifest_key = _destination_key(folder, f"{base_name}.m3u8")
-    upload_output_file(manifest_key, rewritten, content_type="application/vnd.apple.mpegurl")
+    if cancellation_check:
+        cancellation_check()
+    upload_output_file(
+        manifest_key,
+        rewritten,
+        content_type="application/vnd.apple.mpegurl",
+        cancellation_check=cancellation_check,
+    )
     created_keys.append(manifest_key)
     return manifest_key, [_destination_key(folder, segment_folder, name) for name in segment_names]
 
@@ -1184,6 +1508,8 @@ def _attach_outputs(job: MediaProcessingJob, manifest_key: str, audio_manifest_k
 def claim_attachment_retry(public_id: Any) -> MediaProcessingJob:
     """Mark a successful job's failed lesson attachment as pending retry."""
     job = MediaProcessingJob.objects.select_for_update().get(public_id=public_id)
+    if job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED:
+        raise ValidationError(_("This media job is already being cleaned up."))
     if job.status != MediaProcessingStatus.SUCCEEDED or job.attachment_status != MediaAttachmentStatus.FAILED:
         raise ValidationError(_("Only successful jobs with a failed lesson attachment can be retried."))
     job.attachment_status = MediaAttachmentStatus.PENDING
@@ -1210,29 +1536,53 @@ def finish_attachment_retry(public_id: Any, *, error: Exception | None = None) -
     return job
 
 
-def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_callback=None) -> dict:
+def run_media_job(
+    job: MediaProcessingJob,
+    *,
+    progress_callback=None,
+    heartbeat_callback=None,
+    cancellation_check=None,
+) -> dict:
     """Process one claimed job and return verified output metadata."""
     created_keys: list[str] = []
+    if cancellation_check:
+        cancellation_check()
     folder = validate_requested_folder(job.requested_folder)
     work_root = getattr(settings, "MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
     os.makedirs(work_root, exist_ok=True)
     try:
         with TemporaryDirectory(prefix=f"media-{job.public_id}-", dir=work_root) as work_dir:
             source_path = os.path.join(work_dir, "source")
+            if cancellation_check:
+                cancellation_check()
             verify_staging_object(job.source_key, expected_size=job.source_size)
-            download_staging_object(job.source_key, source_path, expected_size=job.source_size)
+            download_staging_object(
+                job.source_key,
+                source_path,
+                expected_size=job.source_size,
+                cancellation_check=cancellation_check,
+            )
             if heartbeat_callback:
                 heartbeat_callback(MediaProcessingPhase.PROBE, 5)
-            probe = probe_source(source_path, job.source_kind)
+            probe = probe_source(
+                source_path,
+                job.source_kind,
+                cancellation_check=cancellation_check,
+            )
             if heartbeat_callback:
                 heartbeat_callback(MediaProcessingPhase.ENCODE, 10)
             if job.source_kind == "document":
                 output_path = os.path.join(work_dir, f"{job.output_base_name}.pdf")
-                shutil.copyfile(source_path, output_path)
+                _copy_file_with_cancellation(source_path, output_path, cancellation_check)
                 key = _destination_key(folder, f"{job.output_base_name}.pdf")
                 if heartbeat_callback:
                     heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
-                upload_output_file(key, output_path, content_type="application/pdf")
+                upload_output_file(
+                    key,
+                    output_path,
+                    content_type="application/pdf",
+                    cancellation_check=cancellation_check,
+                )
                 created_keys.append(key)
                 manifest_key = ""
                 audio_manifest_key = ""
@@ -1243,6 +1593,7 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
                 manifest_path, video_names = _encode_hls_with_size_cap(
                     source_path, video_output_dir, job.output_base_name, "v:0",
                     probe.duration, progress_callback, probe=probe,
+                    cancellation_check=cancellation_check,
                 ) if probe.has_video else (None, [])
                 if manifest_path:
                     if heartbeat_callback:
@@ -1251,16 +1602,25 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
                         manifest_path, video_names, video_output_dir, folder,
                         job.output_base_name, "Video Segments", created_keys,
                         (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
+                        cancellation_check=cancellation_check,
                     )
                 else:
                     manifest_key = ""
                 audio_manifest_key = ""
                 download_key = ""
                 if probe.has_audio:
-                    audio_path = _prepare_audio(source_path, probe, work_dir, probe.duration, progress_callback)
+                    audio_path = _prepare_audio(
+                        source_path,
+                        probe,
+                        work_dir,
+                        probe.duration,
+                        progress_callback,
+                        cancellation_check,
+                    )
                     audio_playlist, audio_names = _encode_hls_with_size_cap(
                         audio_path, audio_output_dir, f"{job.output_base_name}_audio",
                         "a:0", probe.duration, progress_callback, probe=probe,
+                        cancellation_check=cancellation_check,
                     )
                     if heartbeat_callback:
                         heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
@@ -1268,10 +1628,24 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
                         audio_playlist, audio_names, audio_output_dir, folder,
                         f"{job.output_base_name}_audio", "Audio Segments", created_keys,
                         (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
+                        cancellation_check=cancellation_check,
                     )
-                    mp3_path = _make_mp3(audio_path, source_path, job.source_kind, work_dir, probe.duration, progress_callback)
+                    mp3_path = _make_mp3(
+                        audio_path,
+                        source_path,
+                        job.source_kind,
+                        work_dir,
+                        probe.duration,
+                        progress_callback,
+                        cancellation_check,
+                    )
                     download_key = _destination_key(folder, "Downloadable Files", f"{job.output_base_name}.mp3")
-                    upload_output_file(download_key, mp3_path, content_type="audio/mpeg")
+                    upload_output_file(
+                        download_key,
+                        mp3_path,
+                        content_type="audio/mpeg",
+                        cancellation_check=cancellation_check,
+                    )
                     created_keys.append(download_key)
             if heartbeat_callback:
                 heartbeat_callback(MediaProcessingPhase.VERIFY, 95)
@@ -1281,12 +1655,21 @@ def run_media_job(job: MediaProcessingJob, *, progress_callback=None, heartbeat_
                 "audio_manifest_key": audio_manifest_key,
                 "download_key": download_key,
             }
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, MediaJobCancelled):
+            cancelled_keys = list(created_keys)
+            for key in getattr(exc, "output_keys", []) or []:
+                if isinstance(key, str) and key not in cancelled_keys:
+                    cancelled_keys.append(key)
+            exc.output_keys = cancelled_keys
+        undeleted = []
         for key in created_keys:
             try:
                 delete_object_exact(key)
             except Exception:
-                pass
+                undeleted.append(key)
+        if undeleted:
+            setattr(exc, "residual_output_keys", undeleted)
         raise
 
 
@@ -1300,6 +1683,7 @@ __all__ = [
     "MediaProcessingPhase",
     "MediaProcessingStatus",
     "MediaJobLeaseLost",
+    "MediaJobCancelled",
     "NON_RETRYABLE_FAILURE_CODES",
     "PUBLICATION_ERROR_CODES",
     "PUBLICATION_FAILED_ERROR",
@@ -1326,6 +1710,7 @@ __all__ = [
     "record_job_failure",
     "safe_output_base_name",
     "schedule_attachment_retry_after_commit",
+    "schedule_media_cleanup_after_commit",
     "schedule_media_job_after_commit",
     "source_kind_for_filename",
     "transition_job",

@@ -9739,6 +9739,93 @@ msgstr "Retry"
 msgid "Retry failed"
 msgstr "Retry failed"
 
+msgid "Cleanup queued"
+msgstr "Cleanup queued"
+
+msgid "Cleaning up"
+msgstr "Cleaning up"
+
+msgid "Cleanup failed"
+msgstr "Cleanup failed"
+
+msgid "Cleanup complete"
+msgstr "Cleanup complete"
+
+msgid "Force stop"
+msgstr "Force stop"
+
+msgid "Stop processing this upload and any companion files?"
+msgstr "Stop processing this upload and any companion files?"
+
+msgid "Remove this upload’s server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
+msgstr "Remove this upload’s server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
+
+msgid "Clean up upload"
+msgstr "Clean up upload"
+
+msgid "Retry cleanup"
+msgstr "Retry cleanup"
+
+msgid "Stop requested; waiting for the worker."
+msgstr "Stop requested; waiting for the worker."
+
+msgid "Cleanup waits for the source upload URL to expire."
+msgstr "Cleanup waits for the source upload URL to expire."
+
+msgid "Upload cleanup failed. You can retry cleanup."
+msgstr "Upload cleanup failed. You can retry cleanup."
+
+msgid "The lesson created by this upload was deleted."
+msgstr "The lesson created by this upload was deleted."
+
+msgid "Some files were kept because they are shared or could not be verified as owned by this upload."
+msgstr "Some files were kept because they are shared or could not be verified as owned by this upload."
+
+msgid "Stopped by an administrator."
+msgstr "Stopped by an administrator."
+
+msgid "This upload contains an unexpected number of media jobs."
+msgstr "This upload contains an unexpected number of media jobs."
+
+msgid "This upload is already being cleaned up."
+msgstr "This upload is already being cleaned up."
+
+msgid "No active media processing remains to stop."
+msgstr "No active media processing remains to stop."
+
+msgid "Stop processing before requesting full cleanup."
+msgstr "Stop processing before requesting full cleanup."
+
+msgid "The worker has not confirmed that processing stopped."
+msgstr "The worker has not confirmed that processing stopped."
+
+msgid "Wait for the lesson attachment to finish before cleanup."
+msgstr "Wait for the lesson attachment to finish before cleanup."
+
+msgid "A cleanup request is required before files can be removed."
+msgstr "A cleanup request is required before files can be removed."
+
+msgid "A lesson reference could not be verified; cleanup stopped safely."
+msgstr "A lesson reference could not be verified; cleanup stopped safely."
+
+msgid "The upload jobs do not share one lesson; cleanup stopped safely."
+msgstr "The upload jobs do not share one lesson; cleanup stopped safely."
+
+msgid "The lesson media links are invalid; cleanup stopped safely."
+msgstr "The lesson media links are invalid; cleanup stopped safely."
+
+msgid "One or more media jobs for this upload no longer exist."
+msgstr "One or more media jobs for this upload no longer exist."
+
+msgid "The confirmation dialog is unavailable. Reload the page and try again."
+msgstr "The confirmation dialog is unavailable. Reload the page and try again."
+
+msgid "Cleanup is queued until the source upload link expires."
+msgstr "Cleanup is queued until the source upload link expires."
+
+msgid "Media job action accepted."
+msgstr "Media job action accepted."
+
 #: .\management_system/templates/media_processing_status.html:81 .\management_system/templates/upload_video.html:25
 msgid "Retry lesson attachment"
 msgstr "Retry lesson attachment"
