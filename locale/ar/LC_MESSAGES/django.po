@@ -11795,6 +11795,64 @@ msgstr "تطبيق الأندرويد غير منشور بعد. تحقق لاح�
 msgid "Dismiss announcements"
 msgstr "إخفاء الإعلانات"
 
+msgid "Mobile App Update Policy"
+msgstr "سياسة تحديث تطبيق الهاتف"
+
+msgid "Mobile App Update Policies"
+msgstr "سياسات تحديث تطبيق الهاتف"
+
+msgid "Forced update policy"
+msgstr "سياسة التحديث الإلزامي"
+
+msgid "Builds below the minimum are blocked (HTTP 426) until updated. Builds below the latest see an optional prompt. The update button opens the link below."
+msgstr "يُمنع تشغيل الإصدارات الأقل من الحد الأدنى (HTTP 426) حتى تحديثها. وتظهر مطالبة اختيارية للإصدارات الأقل من أحدث إصدار. يفتح زر التحديث الرابط أدناه."
+
+msgid "Versioning enabled"
+msgstr "تفعيل إدارة الإصدارات"
+
+msgid "Minimum code (force)"
+msgstr "الحد الأدنى لرقم الإصدار (إلزامي)"
+
+msgid "Latest code (optional)"
+msgstr "أحدث رقم إصدار (اختياري)"
+
+msgid "Minimum name"
+msgstr "اسم الحد الأدنى للإصدار"
+
+msgid "Latest name"
+msgstr "اسم أحدث إصدار"
+
+msgid "Update link (https)"
+msgstr "رابط التحديث (HTTPS)"
+
+msgid "Save policy"
+msgstr "حفظ السياسة"
+
+msgid "Choose a valid platform for the update policy."
+msgstr "اختر منصة صالحة لسياسة التحديث."
+
+msgid "Version codes must be zero or a positive number."
+msgstr "يجب أن تكون أرقام الإصدارات صفرًا أو عددًا موجبًا."
+
+msgid "The latest version must be at or above the minimum version."
+msgstr "يجب أن يكون أحدث إصدار مساويًا للإصدار الأدنى أو أعلى منه."
+
+msgid "Latest version must be at or above the minimum version."
+msgstr "يجب أن يكون أحدث إصدار مساويًا للإصدار الأدنى أو أعلى منه."
+
+msgid "A valid https update link is required when versioning is enabled."
+msgstr "يلزم رابط تحديث HTTPS صالح عند تفعيل إدارة الإصدارات."
+
+msgid "The update link must be a valid https URL."
+msgstr "يجب أن يكون رابط التحديث عنوان HTTPS صالحًا."
+
+#, python-format
+msgid "Update policy for %(platform)s saved."
+msgstr "تم حفظ سياسة التحديث لمنصة %(platform)s."
+
+msgid "A new version of the app is required."
+msgstr "يلزم تثبيت إصدار جديد من التطبيق."
+
 msgid "App Releases"
 msgstr "إصدارات التطبيق"
 

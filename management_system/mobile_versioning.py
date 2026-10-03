@@ -18,8 +18,11 @@ from __future__ import annotations
 from functools import wraps
 from urllib.parse import urlsplit
 
+from django.utils import translation
+
 from .mobile_http import json_api_response
 from .models import MobileAppUpdatePolicy
+from .utils.localization import normalize_language
 
 SUPPORTED_PLATFORMS = (
     MobileAppUpdatePolicy.Platform.ANDROID,
@@ -137,12 +140,14 @@ def version_block_response(request):
         return None
     if client_code >= policy.min_version_code:
         return None
+    with translation.override(normalize_language(request)):
+        message = translation.gettext("A new version of the app is required.")
     return json_api_response(
         request,
         {
             "error": {
                 "code": "app_update_required",
-                "message": "A new version of the app is required.",
+                "message": message,
                 "details": {
                     "platform": platform,
                     "min_version_code": policy.min_version_code,

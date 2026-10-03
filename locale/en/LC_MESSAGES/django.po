@@ -10965,6 +10965,64 @@ msgstr "The Android app is not published yet. Please check back later."
 msgid "Dismiss announcements"
 msgstr "Dismiss announcements"
 
+msgid "Mobile App Update Policy"
+msgstr "Mobile App Update Policy"
+
+msgid "Mobile App Update Policies"
+msgstr "Mobile App Update Policies"
+
+msgid "Forced update policy"
+msgstr "Forced update policy"
+
+msgid "Builds below the minimum are blocked (HTTP 426) until updated. Builds below the latest see an optional prompt. The update button opens the link below."
+msgstr "Builds below the minimum are blocked (HTTP 426) until updated. Builds below the latest see an optional prompt. The update button opens the link below."
+
+msgid "Versioning enabled"
+msgstr "Versioning enabled"
+
+msgid "Minimum code (force)"
+msgstr "Minimum code (force)"
+
+msgid "Latest code (optional)"
+msgstr "Latest code (optional)"
+
+msgid "Minimum name"
+msgstr "Minimum name"
+
+msgid "Latest name"
+msgstr "Latest name"
+
+msgid "Update link (https)"
+msgstr "Update link (https)"
+
+msgid "Save policy"
+msgstr "Save policy"
+
+msgid "Choose a valid platform for the update policy."
+msgstr "Choose a valid platform for the update policy."
+
+msgid "Version codes must be zero or a positive number."
+msgstr "Version codes must be zero or a positive number."
+
+msgid "The latest version must be at or above the minimum version."
+msgstr "The latest version must be at or above the minimum version."
+
+msgid "Latest version must be at or above the minimum version."
+msgstr "Latest version must be at or above the minimum version."
+
+msgid "A valid https update link is required when versioning is enabled."
+msgstr "A valid https update link is required when versioning is enabled."
+
+msgid "The update link must be a valid https URL."
+msgstr "The update link must be a valid https URL."
+
+#, python-format
+msgid "Update policy for %(platform)s saved."
+msgstr "Update policy for %(platform)s saved."
+
+msgid "A new version of the app is required."
+msgstr "A new version of the app is required."
+
 msgid "App Releases"
 msgstr "App Releases"
 
