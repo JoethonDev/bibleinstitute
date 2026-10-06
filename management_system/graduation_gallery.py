@@ -14,6 +14,9 @@ from django.utils.translation import gettext as _
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from .models import AcademicYearLevel, GraduationGalleryItem, PromotionHistory
+from .utils.storage_operations import get_r2_client
+
 
 GALLERY_PAGE_SIZE = 30
 GALLERY_DISPLAY_MAX_DIM = 1600
@@ -65,8 +68,6 @@ def graduation_scope_for_year(academic_year) -> object | None:
     graduation_level_id = getattr(academic_year, "graduation_level_id", None)
     if not graduation_level_id:
         return None
-    from .models import AcademicYearLevel
-
     return (
         AcademicYearLevel.objects.filter(
             academic_year_id=academic_year.pk, level_id=graduation_level_id
@@ -82,8 +83,6 @@ def is_scope_graduate(user, scope) -> bool:
         return False
     if is_management_user(user):
         return True
-    from .models import PromotionHistory
-
     graduation_level_id = getattr(
         getattr(scope, "academic_year", None), "graduation_level_id", None
     )
@@ -98,8 +97,6 @@ def is_scope_graduate(user, scope) -> bool:
 
 def graduation_scopes_for_user(user) -> QuerySet:
     """Return graduation scopes the user may browse, newest year first."""
-    from .models import AcademicYearLevel, PromotionHistory
-
     scopes = AcademicYearLevel.objects.filter(
         academic_year__graduation_level_id=F("level_id"),
     ).select_related("academic_year", "level")
@@ -210,8 +207,6 @@ def presigned_gallery_url(key: str, expires_in: int | None = None) -> str | None
     cached = cache.get(cache_key)
     if cached:
         return cached
-    from .utils.storage_operations import get_r2_client
-
     bucket = getattr(settings, "R2_BUCKET_NAME", "") or ""
     client = get_r2_client()
     if client is None or not bucket:
@@ -256,8 +251,6 @@ def invalidate_gallery_urls(*keys: str) -> None:
 
 def album_covers(scope_ids) -> dict:
     """Return the newest gallery item per scope using the gallery ordering index."""
-    from .models import AcademicYearLevel, GraduationGalleryItem
-
     if not scope_ids:
         return {}
     newest_item_ids = AcademicYearLevel.objects.filter(pk__in=scope_ids).annotate(

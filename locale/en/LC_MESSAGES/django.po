@@ -12168,3 +12168,57 @@ msgstr "Regrade saved answers"
 
 msgid "%(count)s saved answers regraded."
 msgstr "%(count)s saved answers regraded."
+
+msgid "Signup Settings"
+msgstr "Signup Settings"
+
+msgid "Signup form is open"
+msgstr "Signup form is open"
+
+msgid "Form title (English)"
+msgstr "Form title (English)"
+
+msgid "Form title (Arabic)"
+msgstr "Form title (Arabic)"
+
+msgid "Form subtitle (English)"
+msgstr "Form subtitle (English)"
+
+msgid "Form subtitle (Arabic)"
+msgstr "Form subtitle (Arabic)"
+
+msgid "Closed page title (English)"
+msgstr "Closed page title (English)"
+
+msgid "Closed page title (Arabic)"
+msgstr "Closed page title (Arabic)"
+
+msgid "Closed page message (English)"
+msgstr "Closed page message (English)"
+
+msgid "Closed page message (Arabic)"
+msgstr "Closed page message (Arabic)"
+
+msgid "Intake academic scope"
+msgstr "Intake academic scope"
+
+msgid "Automatic (active year's lowest level)"
+msgstr "Automatic (active year's lowest level)"
+
+msgid "Accepted applications enroll here. Empty means the active year's lowest level."
+msgstr "Accepted applications enroll here. Empty means the active year's lowest level."
+
+msgid "Select a scope in the active academic year."
+msgstr "Select a scope in the active academic year."
+
+msgid "Signup settings saved."
+msgstr "Signup settings saved."
+
+msgid "Applications are closed"
+msgstr "Applications are closed"
+
+msgid "Application is currently closed. Please apply next year."
+msgstr "Application is currently closed. Please apply next year."
+
+msgid "New applications enroll into:"
+msgstr "New applications enroll into:"

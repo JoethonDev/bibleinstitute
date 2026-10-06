@@ -12162,6 +12162,60 @@ msgstr "تم تسجيله بالفعل"
 #~ msgid "Meeting courses saved."
 #~ msgstr "تم حفظ مقررات أيام الاجتماع."
 
+msgid "Signup Settings"
+msgstr "إعدادات التقديم"
+
+msgid "Signup form is open"
+msgstr "نموذج التقديم مفتوح"
+
+msgid "Form title (English)"
+msgstr "عنوان النموذج (الإنجليزية)"
+
+msgid "Form title (Arabic)"
+msgstr "عنوان النموذج (العربية)"
+
+msgid "Form subtitle (English)"
+msgstr "العنوان الفرعي للنموذج (الإنجليزية)"
+
+msgid "Form subtitle (Arabic)"
+msgstr "العنوان الفرعي للنموذج (العربية)"
+
+msgid "Closed page title (English)"
+msgstr "عنوان صفحة إغلاق التقديم (الإنجليزية)"
+
+msgid "Closed page title (Arabic)"
+msgstr "عنوان صفحة إغلاق التقديم (العربية)"
+
+msgid "Closed page message (English)"
+msgstr "رسالة إغلاق التقديم (الإنجليزية)"
+
+msgid "Closed page message (Arabic)"
+msgstr "رسالة إغلاق التقديم (العربية)"
+
+msgid "Intake academic scope"
+msgstr "النطاق الأكاديمي للدفعة الجديدة"
+
+msgid "Automatic (active year's lowest level)"
+msgstr "تلقائي (أدنى مستوى في السنة النشطة)"
+
+msgid "Accepted applications enroll here. Empty means the active year's lowest level."
+msgstr "تُسجَّل الطلبات المقبولة هنا. تركه فارغًا يعني أدنى مستوى في السنة النشطة."
+
+msgid "Select a scope in the active academic year."
+msgstr "اختر نطاقًا من السنة الأكاديمية النشطة."
+
+msgid "Signup settings saved."
+msgstr "تم حفظ إعدادات التقديم."
+
+msgid "Applications are closed"
+msgstr "التقديم مغلق"
+
+msgid "Application is currently closed. Please apply next year."
+msgstr "التقديم مغلق حاليًا. يرجى التقديم في العام القادم."
+
+msgid "New applications enroll into:"
+msgstr "تُسجَّل الطلبات الجديدة في:"
+
 #~ msgid "Meeting added."
 #~ msgstr "تمت إضافة الاجتماع."
 

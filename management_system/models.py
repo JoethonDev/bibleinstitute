@@ -2102,6 +2102,47 @@ class AttendancePolicy(models.Model):
         return (datetime.combine(date.min, self.exit_time) - timedelta(minutes=self.buffer_minutes)).time()
 
 
+class SignupSettings(models.Model):
+    """Admin control over the public signup form: title, open/close, intake scope."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    is_open = models.BooleanField(default=True)
+    title_en = models.CharField(max_length=200, blank=True, default="")
+    title_ar = models.CharField(max_length=200, blank=True, default="")
+    subtitle_en = models.CharField(max_length=500, blank=True, default="")
+    subtitle_ar = models.CharField(max_length=500, blank=True, default="")
+    closed_title_en = models.CharField(max_length=200, blank=True, default="")
+    closed_title_ar = models.CharField(max_length=200, blank=True, default="")
+    closed_message_en = models.TextField(blank=True, default="")
+    closed_message_ar = models.TextField(blank=True, default="")
+    intake_scope = models.ForeignKey(
+        "AcademicYearLevel",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="signup_intake_settings",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="signup_settings_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Signup Settings")
+        verbose_name_plural = _("Signup Settings")
+
+    def __str__(self):
+        return str(_("Signup Settings"))
+
+    @classmethod
+    def load(cls) -> "SignupSettings":
+        return cls.objects.get_or_create(singleton="default")[0]
+
+
 class AttendanceRecord(models.Model):
     class Action(models.TextChoices):
         ENTRANCE = "entrance", _("Entrance")

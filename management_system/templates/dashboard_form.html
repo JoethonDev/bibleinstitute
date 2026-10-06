@@ -53,7 +53,9 @@
             <div x-data="formValidation()" @htmx:finally:request.window="submitting = false">
                 <form action=""
                       method="post"
+                      enctype="multipart/form-data"
                       hx-post=""
+                      hx-encoding="multipart/form-data"
                       hx-target="#display-page"
                       hx-select="#page-region"
                       hx-select-oob="#toast-stack"

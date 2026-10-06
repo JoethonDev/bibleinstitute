@@ -29,7 +29,7 @@
     <div id="user-edit-form" class="ad-card mb-3" x-show="editing" x-cloak>
         <div class="ad-card-head"><strong>{% translate "Edit user" %}</strong></div>
         <div class="ad-card-body">
-            <form method="post" action="{% url 'user-profile' profile_user.pk %}" hx-post="{% url 'user-profile' profile_user.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+            <form method="post" enctype="multipart/form-data" action="{% url 'user-profile' profile_user.pk %}" hx-post="{% url 'user-profile' profile_user.pk %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                 {% csrf_token %}
                 {{ edit_form|crispy }}
                 <div class="d-flex gap-2 mt-3">

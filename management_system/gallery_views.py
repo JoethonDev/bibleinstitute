@@ -73,10 +73,8 @@ def graduation_gallery_detail(request, scope_id: int):
 
 @capability_required(can_manage_content)
 def graduation_gallery_manage(request):
-    from .models import AcademicYearLevel as Scope
-
     picker = (
-        Scope.objects.filter(academic_year__graduation_level_id=F("level_id"))
+        AcademicYearLevel.objects.filter(academic_year__graduation_level_id=F("level_id"))
         .select_related("academic_year", "level")
         .annotate(items_count=Count("gallery_items"))
         .order_by("-academic_year__ordering", "level__ordering")

@@ -1,0 +1,27 @@
+{% load i18n %}
+{% load crispy_forms_tags %}
+<div class="container-fluid py-3 ad-page" id="content">
+    <div class="ad-pane-head ad-pane-head--bordered justify-content-between">
+        <h4 class="ad-pane-title mb-0"><i class="fas fa-user-plus me-2 ad-page-header-icon"></i>{% translate "Signup Settings" %}<span id="signup-settings-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h4>
+    </div>
+    <div class="ad-card mb-3">
+        <div class="ad-card-body">
+            {% if has_single_active_year %}
+            <p class="mb-0 ps-muted-text">{% translate "New applications enroll into:" %} <strong>{% if effective_scope %}{{ effective_scope }}{% else %}—{% endif %}</strong></p>
+            {% else %}
+            <p class="mb-0 ps-muted-text">{% translate "Exactly one active academic year is required before acceptance." %}</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="ad-card">
+        <div class="ad-card-body">
+            <form method="post" action="{% url 'signup-settings' %}" hx-post="{% url 'signup-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <div class="mt-3">
+                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Save changes" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

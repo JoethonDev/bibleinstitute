@@ -11,6 +11,7 @@ from io import BytesIO
 from django.contrib.auth import authenticate
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import Http404, StreamingHttpResponse
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse, QueryDict
@@ -23,6 +24,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 import qrcode
 
 from .forms import SignupDetailsForm
+from . import graduation_gallery as gg
 from .mobile_auth import (
     MobileBiometricError,
     MobilePushDeliveryInProgress,
@@ -61,6 +63,8 @@ from .models import (
     Grade,
     LectureProgress,
     MobilePushDevice,
+    AcademicYearLevel,
+    GraduationGalleryItem,
     User,
     ViewingSession,
 )
@@ -1141,11 +1145,6 @@ def lesson_progress(request, offering_id, lesson_id):
 @require_http_methods(["GET"])
 def galleries(request):
     """List graduation albums the bearer may view (newest year first)."""
-    from django.db.models import Count
-
-    from . import graduation_gallery as gg
-    from .models import GraduationGalleryItem
-
     scopes = gg.graduation_scopes_for_user(request.user).annotate(
         items_count=Count("gallery_items")
     ).filter(items_count__gt=0)
@@ -1175,9 +1174,6 @@ def galleries(request):
 @require_http_methods(["GET"])
 def gallery_items(request, scope_id: int):
     """List paginated items of one graduation album."""
-    from . import graduation_gallery as gg
-    from .models import AcademicYearLevel, GraduationGalleryItem
-
     scope = AcademicYearLevel.objects.select_related("academic_year", "level").filter(pk=scope_id).first()
     if scope is None:
         return _error(request, "not_found", _("Gallery not found."), 404)

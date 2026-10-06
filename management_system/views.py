@@ -50,7 +50,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm
+from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm, SignupSettingsForm, apply_cleaned_data_to_locked_instance
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
@@ -137,7 +137,9 @@ from .quiz_questions import build_question_instance
 from .quiz_import import parse_quiz_import
 from .public_content import get_institute_copy
 from .study_mode import apply_study_mode_from_city
+from .payments import academic_payment_scopes_for_student
 from .academic_enrollment import (
+    _resolve_intake_scope,
     activate_academic_year,
     accept_application,
     decline_application,
@@ -1384,25 +1386,74 @@ def user_profile(request, user_id):
         User.objects.select_related("role", "decided_by"),
         pk=user_id,
     )
-    form = UserUpdateForm(request.POST or None, instance=user)
+    form = UserUpdateForm(request.POST or None, request.FILES or None, instance=user)
     _restrict_user_update_form(form, request.user)
 
     if request.method == "POST" and form.is_valid():
         original = User.objects.get(pk=user.pk)
         actor_role = getattr(getattr(request.user, "role", None), "role", None)
         desired_status = form.cleaned_data.get("application_status", original.application_status)
+        document_fields = {
+            "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
+            "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
+            "payment": ("payment_key", "payment_preview_key", _("Payment")),
+            "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
+        }
+        uploaded_keys = []
+        uploaded_by_type = {}
+        old_keys = []
+        database_committed = False
         try:
+            for upload_type, (_model_field, _preview_field, document_label) in document_fields.items():
+                uploaded_file = form.cleaned_data.get(upload_type)
+                if not uploaded_file:
+                    continue
+                uploaded = upload_application_file(
+                    CLOUD_CLIENT,
+                    bucket_name,
+                    user.id,
+                    uploaded_file,
+                    upload_type,
+                )
+                if not uploaded:
+                    raise ValidationError(
+                        _("The %(document)s could not be uploaded.")
+                        % {"document": document_label}
+                    )
+                uploaded_by_type[upload_type] = uploaded
+                uploaded_keys.extend(uploaded.keys)
             with transaction.atomic():
                 locked_user = lock_application_status_for_edit(user.pk, original.application_status)
-                form.instance = locked_user
                 if desired_status != original.application_status:
                     form.cleaned_data["application_status"] = original.application_status
+                apply_cleaned_data_to_locked_instance(form, locked_user)
                 updated_user = form.save()
+                for upload_type, (model_field, preview_field, document_label) in document_fields.items():
+                    previous_key = getattr(updated_user, model_field, None)
+                    previous_preview_key = getattr(updated_user, preview_field, None)
+                    if form.cleaned_data.get(f"clear_{upload_type}"):
+                        old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
+                        setattr(updated_user, model_field, None)
+                        setattr(updated_user, preview_field, None)
+                    uploaded = uploaded_by_type.get(upload_type)
+                    if uploaded:
+                        old_keys.extend(
+                            key
+                            for key in (previous_key, previous_preview_key)
+                            if key and key not in uploaded.keys
+                        )
+                        setattr(updated_user, model_field, uploaded.original_key)
+                        setattr(updated_user, preview_field, uploaded.preview_key)
+                updated_user.save()
                 if actor_role == "admin" and desired_status != original.application_status:
                     updated_user, _enrollment = set_application_status(
                         updated_user, request.user, desired_status, original.application_status
                     )
-                if actor_role == "admin" and apply_study_mode_from_city(updated_user):
+                if (
+                    actor_role == "admin"
+                    and form.cleaned_data.get("study_mode", original.study_mode) == original.study_mode
+                    and apply_study_mode_from_city(updated_user)
+                ):
                     updated_user.save(update_fields=["study_mode"])
                 if desired_status == original.application_status and (
                     original.is_active and not updated_user.is_active
@@ -1412,8 +1463,16 @@ def user_profile(request, user_id):
                 scope = form.cleaned_data.get("enrollment_scope")
                 if actor_role == "admin" and scope and desired_status == "active":
                     set_user_normal_enrollment_scope(updated_user, request.user, scope)
+            database_committed = True
+            delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
         except ValidationError as exc:
+            if not database_committed:
+                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
             form.add_error(None, exc)
+        except Exception:
+            if not database_committed:
+                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+            raise
         else:
             if user.pk == request.user.pk and form.cleaned_data.get("password"):
                 update_session_auth_hash(request, updated_user)
@@ -1911,21 +1970,71 @@ class UpdateUser(UserBaseView, UpdateView):
     def form_valid(self, form):
         actor = self.request.user
         actor_role = getattr(getattr(actor, "role", None), "role", None)
+        document_fields = {
+            "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
+            "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
+            "payment": ("payment_key", "payment_preview_key", _("Payment")),
+            "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
+        }
+        uploaded_keys = []
+        uploaded_by_type = {}
+        old_keys = []
+        database_committed = False
         try:
             original = User.objects.get(pk=self.object.pk)
             desired_status = form.cleaned_data.get("application_status", original.application_status)
+            for upload_type, (_model_field, _preview_field, document_label) in document_fields.items():
+                uploaded_file = form.cleaned_data.get(upload_type)
+                if not uploaded_file:
+                    continue
+                uploaded = upload_application_file(
+                    CLOUD_CLIENT,
+                    bucket_name,
+                    self.object.pk,
+                    uploaded_file,
+                    upload_type,
+                )
+                if not uploaded:
+                    raise ValidationError(
+                        _("The %(document)s could not be uploaded.")
+                        % {"document": document_label}
+                    )
+                uploaded_by_type[upload_type] = uploaded
+                uploaded_keys.extend(uploaded.keys)
             with transaction.atomic():
                 locked_user = lock_application_status_for_edit(self.object.pk, original.application_status)
-                form.instance = locked_user
                 self.object = locked_user
                 if desired_status != original.application_status:
                     form.cleaned_data["application_status"] = original.application_status
+                apply_cleaned_data_to_locked_instance(form, locked_user)
+                self.object = form.instance
                 response = super().form_valid(form)
+                for upload_type, (model_field, preview_field, document_label) in document_fields.items():
+                    previous_key = getattr(self.object, model_field, None)
+                    previous_preview_key = getattr(self.object, preview_field, None)
+                    if form.cleaned_data.get(f"clear_{upload_type}"):
+                        old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
+                        setattr(self.object, model_field, None)
+                        setattr(self.object, preview_field, None)
+                    uploaded = uploaded_by_type.get(upload_type)
+                    if uploaded:
+                        old_keys.extend(
+                            key
+                            for key in (previous_key, previous_preview_key)
+                            if key and key not in uploaded.keys
+                        )
+                        setattr(self.object, model_field, uploaded.original_key)
+                        setattr(self.object, preview_field, uploaded.preview_key)
+                self.object.save()
                 if actor_role == "admin" and desired_status != original.application_status:
                     self.object, _enrollment = set_application_status(
                         self.object, actor, desired_status, original.application_status
                     )
-                if actor_role == "admin" and apply_study_mode_from_city(self.object):
+                if (
+                    actor_role == "admin"
+                    and form.cleaned_data.get("study_mode", original.study_mode) == original.study_mode
+                    and apply_study_mode_from_city(self.object)
+                ):
                     self.object.save(update_fields=["study_mode"])
                 if desired_status == original.application_status and (
                     original.is_active and not self.object.is_active
@@ -1935,9 +2044,17 @@ class UpdateUser(UserBaseView, UpdateView):
                 scope = form.cleaned_data.get("enrollment_scope")
                 if actor_role == "admin" and scope and desired_status == "active":
                     set_user_normal_enrollment_scope(self.object, actor, scope)
+            database_committed = True
+            delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
         except ValidationError as exc:
+            if not database_committed:
+                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
             form.add_error(None, exc)
             return self.form_invalid(form)
+        except Exception:
+            if not database_committed:
+                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+            raise
         # If the password field was changed, update the session to keep user logged in
         if self.object.pk == self.request.user.pk and "password" in form.cleaned_data and form.cleaned_data["password"]:
             update_session_auth_hash(self.request, self.object)
@@ -4801,6 +4918,33 @@ def r2_management_dashboard(request):
 def signup(request):
     if request.user.is_authenticated:
         return redirect("view-profile")
+    signup_config = SignupSettings.load()
+    language_is_arabic = (translation.get_language() or "en").lower().startswith("ar")
+    if signup_config is not None and not signup_config.is_open:
+        if language_is_arabic:
+            closed_title = signup_config.closed_title_ar or _("Applications are closed")
+            closed_message = signup_config.closed_message_ar or _(
+                "Application is currently closed. Please apply next year."
+            )
+        else:
+            closed_title = signup_config.closed_title_en or _("Applications are closed")
+            closed_message = signup_config.closed_message_en or _(
+                "Application is currently closed. Please apply next year."
+            )
+        return render(request, "signup_closed.html", {
+            "closed_title": closed_title,
+            "closed_message": closed_message,
+        })
+    if signup_config is not None:
+        if language_is_arabic:
+            page_title = signup_config.title_ar or _("Student Application")
+            page_subtitle = signup_config.subtitle_ar or _("Fill in your details to apply")
+        else:
+            page_title = signup_config.title_en or _("Student Application")
+            page_subtitle = signup_config.subtitle_en or _("Fill in your details to apply")
+    else:
+        page_title = _("Student Application")
+        page_subtitle = _("Fill in your details to apply")
     copy = get_institute_copy(translation.get_language(), "courses")["copy"]
     if request.method == "POST":
         form = SignupForm(request.POST, request.FILES)
@@ -4857,7 +5001,13 @@ def signup(request):
                 if user is not None:
                     user.delete()
                 form.add_error(None, "; ".join(str(message) for message in exc.messages))
-                return render(request, "signup.html", {"form": form, "copy": copy, "egyptian_cities": EGYPTIAN_CITIES})
+                return render(request, "signup.html", {
+                    "form": form,
+                    "copy": copy,
+                    "egyptian_cities": EGYPTIAN_CITIES,
+                    "page_title": page_title,
+                    "page_subtitle": page_subtitle,
+                })
             except Exception:
                 delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
                 if user is not None:
@@ -4867,7 +5017,13 @@ def signup(request):
             return render(request, "signup_success.html")
     else:
         form = SignupForm()
-    return render(request, "signup.html", {"form": form, "copy": copy, "egyptian_cities": EGYPTIAN_CITIES})
+    return render(request, "signup.html", {
+        "form": form,
+        "copy": copy,
+        "egyptian_cities": EGYPTIAN_CITIES,
+        "page_title": page_title,
+        "page_subtitle": page_subtitle,
+    })
 
 def _application_search_query(value):
     return normalized_contains_q(
@@ -4941,8 +5097,35 @@ def applications_dashboard(request):
     return render(request, "applications_dashboard.html", _applications_dashboard_context(request))
 
 @capability_required(can_manage_applications)
+def signup_settings(request):
+    """Admin control over the public signup form and the acceptance intake scope."""
+    settings_row = SignupSettings.load()
+    if request.method == "POST":
+        form = SignupSettingsForm(request.POST, instance=settings_row)
+        if form.is_valid():
+            form.instance.updated_by = request.user
+            form.save()
+            messages.success(request, _("Signup settings saved."))
+            return redirect("signup-settings")
+    else:
+        form = SignupSettingsForm(instance=settings_row)
+    active_years = list(AcademicYear.objects.filter(is_active=True).order_by("pk"))
+    has_single_active_year = len(active_years) == 1
+    effective_scope = _resolve_intake_scope(active_years[0]) if has_single_active_year else None
+    return render_page(request, "signup_settings.html", "partials/signup_settings_content.html", {
+        "form": form,
+        "effective_scope": effective_scope,
+        "has_single_active_year": has_single_active_year,
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Signup Settings"), None),
+        ]),
+    })
+
+@capability_required(can_manage_applications)
 def application_review(request, user_id):
     user = get_object_or_404(User, pk=user_id)
+    original_study_mode = user.study_mode
     document_fields = {
         "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
         "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
@@ -4984,9 +5167,9 @@ def application_review(request, user_id):
                     locked_user = lock_application_status_for_edit(user.pk, original_status)
                     original_role_id = locked_user.role_id
                     original_is_active = locked_user.is_active
-                    form.instance = locked_user
                     if desired_status != original_status:
                         form.cleaned_data["application_status"] = original_status
+                    apply_cleaned_data_to_locked_instance(form, locked_user)
                     user = form.save()
                     for upload_type, (model_field, preview_field, document_label) in document_fields.items():
                         previous_key = getattr(user, model_field, None)
@@ -5015,8 +5198,14 @@ def application_review(request, user_id):
                         or original_is_active and not user.is_active
                     ):
                         revoke_user_mobile_access(user)
-                    if apply_study_mode_from_city(user):
+                    if (
+                        form.cleaned_data.get("study_mode", original_study_mode) == original_study_mode
+                        and apply_study_mode_from_city(user)
+                    ):
                         user.save(update_fields=["study_mode"])
+                    scope = form.cleaned_data.get("enrollment_scope")
+                    if scope and user.application_status == "active":
+                        set_user_normal_enrollment_scope(user, request.user, scope)
                 database_committed = True
                 delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
                 if desired_status != original_status:
@@ -5286,8 +5475,6 @@ def profile_academic_payment(request):
 
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
-            from .payments import academic_payment_scopes_for_student
-
             if not academic_payment_scopes_for_student(user).filter(pk=scope.pk).exists():
                 raise ValidationError(_("The selected academic scope is no longer available for payment."))
             if AcademicPayment.objects.filter(

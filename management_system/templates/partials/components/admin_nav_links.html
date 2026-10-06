@@ -34,6 +34,19 @@
                 <span>{% translate "Applications" %}</span>
             </a>
         </li>
+        <li class="nav-item">
+            <a class="ad-tab"
+               href="{% url 'signup-settings' %}"
+               hx-get="{% url 'signup-settings' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-user-plus"></i>
+                <span>{% translate "Signup Settings" %}</span>
+            </a>
+        </li>
     {% endif %}
     {% if role == 'admin' or role == 'staff' %}
         <li class="nav-item">

@@ -19,6 +19,7 @@ from pathlib import PurePosixPath
 from tempfile import TemporaryDirectory
 from typing import Any
 
+from celery import current_app
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -42,7 +43,7 @@ from .models import (
     MediaCleanupStatus,
     PublicationStatus,
 )
-from .student_notifications import is_active_published_offering
+from .student_notifications import create_lesson_publication_event, is_active_published_offering
 from .utils.decorators import can_manage_content
 
 
@@ -610,21 +611,27 @@ def schedule_media_cleanup_after_commit(public_id: Any, job_ids: list[str]) -> N
 
 
 def _enqueue_media_job(public_id: Any) -> None:
-    from .media_tasks import enqueue_media_job
-
-    enqueue_media_job(public_id)
+    current_app.send_task(
+        "management_system.media_tasks.process_media_job",
+        args=[str(public_id)],
+        queue="media",
+    )
 
 
 def _enqueue_attachment_retry(public_id: Any) -> None:
-    from .media_tasks import enqueue_media_attachment_retry
-
-    enqueue_media_attachment_retry(public_id)
+    current_app.send_task(
+        "management_system.media_tasks.retry_media_attachment",
+        args=[str(public_id)],
+        queue="media",
+    )
 
 
 def _enqueue_media_cleanup(public_id: Any, job_ids: list[str]) -> None:
-    from .media_tasks import enqueue_media_cleanup
-
-    enqueue_media_cleanup(public_id, job_ids)
+    current_app.send_task(
+        "management_system.media_tasks.cleanup_media_upload",
+        args=[str(public_id), job_ids],
+        queue="media",
+    )
 
 
 def job_is_visible_to(user, job: MediaProcessingJob) -> bool:
@@ -897,8 +904,6 @@ def finish_lesson_publication(job_id: Any) -> MediaProcessingJob:
         return job
     lesson = Lesson.objects.get(pk=job.lesson_id)
     try:
-        from .student_notifications import create_lesson_publication_event
-
         create_lesson_publication_event(lesson)
     except Exception:
         mark_publication_failed(job_id)

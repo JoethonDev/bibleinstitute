@@ -1,10 +1,11 @@
 from django.contrib.auth.forms import AuthenticationForm, UsernameField
 from django import forms
+from django.forms.models import construct_instance
 import secrets
 from datetime import date
 
 from django.core.exceptions import ValidationError
-from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, assign_academic_date
+from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, assign_academic_date
 from .utils.validators import normalize_phone, normalize_username, validate_identity_by_type
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -15,6 +16,7 @@ from .utils.countries import country_choices
 from .utils.timezones import parse_application_datetime
 from .utils.quiz_access import eligible_quiz_students
 from .announcements import AnnouncementError, clean_announcement_action
+from .payments import academic_payment_scopes_for_student
 
 
 def _joined_date_field(*, required: bool = True, initial: date | None = None) -> forms.DateField:
@@ -29,6 +31,25 @@ def _joined_date_field(*, required: bool = True, initial: date | None = None) ->
 def _set_password_if_provided(user: User, password: str | None) -> None:
     if password:
         user.set_password(password)
+
+
+def apply_cleaned_data_to_locked_instance(form: forms.ModelForm, locked_user: User) -> User:
+    """Re-apply validated edits onto a freshly locked row.
+
+    ``is_valid()`` copies ``cleaned_data`` onto ``form.instance`` via
+    ``construct_instance()``. Replacing ``form.instance`` with a locked row
+    afterwards discards those in-memory edits, so ``save()`` would persist
+    the unchanged database values. Call this after any ``cleaned_data``
+    overrides and before ``save()`` to carry the edits onto the locked row,
+    using the same field/exclude/disabled semantics as model validation.
+    """
+    exclude = set(getattr(form._meta, "exclude", None) or [])
+    exclude |= {
+        name for name, field in form.fields.items() if getattr(field, "disabled", False)
+    }
+    form.instance = locked_user
+    construct_instance(form, form.instance, form._meta.fields, exclude or None)
+    return locked_user
 
 
 class CanonicalUsernameField(UsernameField):
@@ -158,7 +179,9 @@ class UserUpdateForm(UserCreationForm):
     admin_only_fields = frozenset({
         "role", "time_zone", "application_status", "decision_notes",
         "study_mode", "study_mode_override", "identity_type", "identity_number",
-        "enrollment_scope",
+        "enrollment_scope", "is_active",
+        "identity_front", "identity_back", "payment", "profile",
+        "clear_identity_front", "clear_identity_back", "clear_payment", "clear_profile",
     })
 
     password = forms.CharField(widget=forms.PasswordInput(
@@ -258,6 +281,18 @@ class UserUpdateForm(UserCreationForm):
         required=False,
         label=_("Academic year and level"),
     )
+    is_active = forms.BooleanField(
+        required=False,
+        label=_("Active"),
+    )
+    identity_front = forms.FileField(required=False, label=_("Replace identity front"))
+    identity_back = forms.FileField(required=False, label=_("Replace identity back"))
+    payment = forms.FileField(required=False, label=_("Replace payment receipt (optional)"))
+    profile = forms.FileField(required=False, label=_("Replace profile photo"))
+    clear_identity_front = forms.BooleanField(required=False, label=_("Remove identity front"))
+    clear_identity_back = forms.BooleanField(required=False, label=_("Remove identity back"))
+    clear_payment = forms.BooleanField(required=False, label=_("Remove payment receipt"))
+    clear_profile = forms.BooleanField(required=False, label=_("Remove profile photo"))
 
     class Meta:
         model = User
@@ -265,7 +300,9 @@ class UserUpdateForm(UserCreationForm):
             "first_name", "last_name", "username", "joined_date", "role", "time_zone",
             "email", "phone", "country", "city", "education_or_job", "priest_name", "priest_phone",
             "church", "service", "identity_type", "identity_number", "study_mode",
-            "study_mode_override", "application_status", "decision_notes", "enrollment_scope",
+            "study_mode_override", "is_active", "application_status", "decision_notes", "enrollment_scope",
+            "identity_front", "identity_back", "payment", "profile",
+            "clear_identity_front", "clear_identity_back", "clear_payment", "clear_profile",
         ]
         exclude = []
 
@@ -875,6 +912,11 @@ class ApplicationAdminForm(forms.ModelForm):
     clear_payment = forms.BooleanField(required=False, label=_("Remove payment receipt"))
     clear_profile = forms.BooleanField(required=False, label=_("Remove profile photo"))
     country = forms.ChoiceField(label=_("Country"), choices=country_choices(), required=False)
+    enrollment_scope = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        required=False,
+        label=_("Academic year and level"),
+    )
 
     class Meta:
         model = User
@@ -882,7 +924,7 @@ class ApplicationAdminForm(forms.ModelForm):
             "first_name", "last_name", "username", "email", "joined_date", "phone", "country", "city",
             "education_or_job", "priest_name", "priest_phone", "church", "service", "identity_type",
             "identity_number", "time_zone", "study_mode", "study_mode_override", "role", "is_active",
-            "application_status", "decision_notes",
+            "application_status", "decision_notes", "enrollment_scope",
             "identity_front", "identity_back", "payment", "profile",
             "clear_identity_front", "clear_identity_back", "clear_payment", "clear_profile",
         ]
@@ -936,12 +978,28 @@ class ApplicationAdminForm(forms.ModelForm):
             "phone", "country", "city", "education_or_job", "priest_name",
             "priest_phone", "church", "service", "identity_type", "identity_number",
             "time_zone", "study_mode", "study_mode_override", "role", "is_active",
-            "application_status", "decision_notes", "identity_front", "identity_back",
+            "application_status", "decision_notes", "enrollment_scope",
+            "identity_front", "identity_back",
             "payment", "profile", "clear_identity_front", "clear_identity_back",
             "clear_payment", "clear_profile",
         ])
         self.fields["time_zone"].choices = user_time_zone_choices()
         self.fields["time_zone"].initial = getattr(self.instance, "time_zone", None) or settings.TIME_ZONE
+        self.fields["enrollment_scope"].queryset = AcademicYearLevel.objects.filter(
+            academic_year__is_active=True,
+        ).select_related("academic_year", "level").order_by(
+            "level__ordering", "academic_year__ordering",
+        )
+        if getattr(self.instance, "pk", None):
+            active_enrollment = Enrollment.objects.filter(
+                student=self.instance,
+                academic_year_level__academic_year__is_active=True,
+                enrollment_type=Enrollment.Type.NORMAL,
+                course_offering__isnull=True,
+                status=Enrollment.Status.ACTIVE,
+            ).select_related("academic_year_level").first()
+            if active_enrollment:
+                self.fields["enrollment_scope"].initial = active_enrollment.academic_year_level_id
         current_country = getattr(self.instance, "country", None)
         if current_country and current_country not in dict(country_choices()):
             self.fields["country"].choices = [(current_country, current_country)] + list(self.fields["country"].choices)
@@ -972,6 +1030,13 @@ class ApplicationAdminForm(forms.ModelForm):
             except ValidationError as exc:
                 raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
         return identity_number or None
+
+    def clean(self):
+        cleaned = super().clean()
+        scope = cleaned.get("enrollment_scope")
+        if scope and not scope.academic_year.is_active:
+            self.add_error("enrollment_scope", _("Select a scope in the active academic year."))
+        return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -1216,8 +1281,6 @@ class AcademicPaymentForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.student = student
         if student is not None:
-            from .payments import academic_payment_scopes_for_student
-
             self.fields["academic_year_level"].queryset = academic_payment_scopes_for_student(student)
 
 
@@ -1485,3 +1548,58 @@ class AnnouncementForm(forms.Form):
         cleaned_data["action_label"] = action_label
         cleaned_data["action_url"] = action_url
         return cleaned_data
+
+
+class SignupSettingsForm(forms.ModelForm):
+    """Admin control over the public signup form: open/close, titles, intake scope."""
+
+    intake_scope = forms.ModelChoiceField(
+        queryset=AcademicYearLevel.objects.none(),
+        required=False,
+        label=_("Intake academic scope"),
+        empty_label=_("Automatic (active year's lowest level)"),
+        help_text=_("Accepted applications enroll here. Empty means the active year's lowest level."),
+    )
+
+    class Meta:
+        model = SignupSettings
+        fields = [
+            "is_open",
+            "title_en", "title_ar", "subtitle_en", "subtitle_ar",
+            "closed_title_en", "closed_title_ar",
+            "closed_message_en", "closed_message_ar",
+            "intake_scope",
+        ]
+        widgets = {
+            "title_en": forms.TextInput(attrs={"class": "form-control", "maxlength": 200}),
+            "title_ar": forms.TextInput(attrs={"class": "form-control", "maxlength": 200, "dir": "rtl"}),
+            "subtitle_en": forms.Textarea(attrs={"class": "form-control", "rows": 2, "maxlength": 500}),
+            "subtitle_ar": forms.Textarea(attrs={"class": "form-control", "rows": 2, "maxlength": 500, "dir": "rtl"}),
+            "closed_title_en": forms.TextInput(attrs={"class": "form-control", "maxlength": 200}),
+            "closed_title_ar": forms.TextInput(attrs={"class": "form-control", "maxlength": 200, "dir": "rtl"}),
+            "closed_message_en": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "closed_message_ar": forms.Textarea(attrs={"class": "form-control", "rows": 4, "dir": "rtl"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_open"].label = _("Signup form is open")
+        self.fields["title_en"].label = _("Form title (English)")
+        self.fields["title_ar"].label = _("Form title (Arabic)")
+        self.fields["subtitle_en"].label = _("Form subtitle (English)")
+        self.fields["subtitle_ar"].label = _("Form subtitle (Arabic)")
+        self.fields["closed_title_en"].label = _("Closed page title (English)")
+        self.fields["closed_title_ar"].label = _("Closed page title (Arabic)")
+        self.fields["closed_message_en"].label = _("Closed page message (English)")
+        self.fields["closed_message_ar"].label = _("Closed page message (Arabic)")
+        self.fields["intake_scope"].queryset = AcademicYearLevel.objects.filter(
+            academic_year__is_active=True,
+        ).select_related("academic_year", "level").order_by(
+            "level__ordering", "academic_year__ordering",
+        )
+
+    def clean_intake_scope(self):
+        scope = self.cleaned_data.get("intake_scope")
+        if scope and not scope.academic_year.is_active:
+            raise forms.ValidationError(_("Select a scope in the active academic year."))
+        return scope

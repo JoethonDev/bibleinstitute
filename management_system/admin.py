@@ -23,7 +23,8 @@ class UserAdmin(admin.ModelAdmin):
             original = User.objects.only(
                 "role_id", "application_status", "is_active"
             ).get(pk=obj.pk)
-        apply_study_mode_from_city(obj)
+        if not form or "study_mode" not in form.changed_data:
+            apply_study_mode_from_city(obj)
         super().save_model(request, obj, form, change)
         if original is not None and (
             original.role_id != obj.role_id
@@ -489,6 +490,20 @@ class StudentBannerAdmin(AcademicContentReadOnlyAdmin):
     search_fields = ["title", "body"]
     ordering = ["-created_at", "-pk"]
     list_per_page = 50
+
+
+@admin.register(SignupSettings)
+class SignupSettingsAdmin(AdminOnlyModelAdmin):
+    """Editable fallback for the public signup form controls; edits go through Signup Settings."""
+
+    list_display = ["singleton", "is_open", "intake_scope", "updated_at"]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(MediaProcessingJob)

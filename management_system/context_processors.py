@@ -1,6 +1,9 @@
 from django.conf import settings
 from django.urls import translate_url
 
+from management_system.graduation_gallery import graduation_scopes_for_user
+from management_system.models import StudentBanner
+
 
 def static_asset_version(request):
     """Expose the deployment release key used by cache-busted static URLs."""
@@ -27,8 +30,6 @@ def graduation_gallery_visibility(request):
             return {"show_graduation_gallery": True}
         if role != "student":
             return {"show_graduation_gallery": False}
-        from management_system.graduation_gallery import graduation_scopes_for_user
-
         return {"show_graduation_gallery": graduation_scopes_for_user(user).exists()}
     except Exception:
         return {"show_graduation_gallery": False}
@@ -42,8 +43,6 @@ def student_banners(request):
     try:
         if getattr(getattr(user, "role", None), "role", None) != "student":
             return {"student_banners": []}
-        from management_system.models import StudentBanner
-
         return {
             "student_banners": list(
                 StudentBanner.objects.filter(is_active=True).order_by("-created_at", "-pk")[:3]

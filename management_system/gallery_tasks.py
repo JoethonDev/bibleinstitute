@@ -6,6 +6,7 @@ import logging
 import os
 import tempfile
 import zipfile
+from io import BytesIO
 
 from celery import shared_task
 from django.conf import settings
@@ -13,7 +14,7 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 
 from . import graduation_gallery as gg
-from .models import GraduationGalleryItem
+from .models import GraduationGalleryItem, GraduationGalleryJob
 from .utils.storage_operations import (
     delete_from_bucket,
     get_r2_client,
@@ -40,8 +41,6 @@ def _cache_control() -> str:
 
 
 def _put_bytes(client, bucket: str, key: str, data: bytes, content_type: str) -> None:
-    from io import BytesIO
-
     client.upload_fileobj(
         BytesIO(data),
         bucket,
@@ -58,8 +57,6 @@ def _head_object(client, bucket: str, key: str) -> dict | None:
 
 
 def _claim_job(public_id: str):
-    from .models import GraduationGalleryJob
-
     with transaction.atomic():
         job = (
             GraduationGalleryJob.objects.select_for_update(skip_locked=True)
@@ -103,8 +100,6 @@ def _iter_zip_entries(zf: zipfile.ZipFile):
 )
 def process_gallery_job(self, job_public_id: str):
     """Process one staged gallery upload into public R2 keys + item rows."""
-    from .models import GraduationGalleryJob
-
     job = _claim_job(job_public_id)
     if job is None:
         return {"status": "ignored", "public_id": str(job_public_id)}

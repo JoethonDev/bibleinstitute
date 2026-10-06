@@ -21,6 +21,7 @@ from .models import (
     Level,
     PromotionHistory,
     Role,
+    SignupSettings,
     User,
     HistoricalAcademicSummary,
 )
@@ -57,6 +58,29 @@ def lock_application_status_for_edit(user_id: int, expected_status: str) -> User
 def _require_admin(actor: User) -> None:
     if not actor.is_authenticated or not actor.role or actor.role.role != "admin":
         raise PermissionDenied(_("Only administrators can change academic enrollment state."))
+
+
+def _resolve_intake_scope(active_year: AcademicYear) -> AcademicYearLevel | None:
+    """Return the configured intake scope, or the active year's lowest level."""
+    settings_row = (
+        SignupSettings.objects.select_related(
+            "intake_scope__academic_year", "intake_scope__level"
+        )
+        .filter(singleton="default")
+        .first()
+    )
+    if (
+        settings_row is not None
+        and settings_row.intake_scope_id
+        and settings_row.intake_scope.academic_year_id == active_year.pk
+    ):
+        return settings_row.intake_scope
+    return (
+        AcademicYearLevel.objects.select_related("level")
+        .filter(academic_year=active_year)
+        .order_by("level__ordering", "pk")
+        .first()
+    )
 
 
 def _promotion_formula_snapshot(result: EvaluationResult, course_results=None) -> dict:
@@ -207,12 +231,7 @@ def set_application_status(
     if len(active_years) != 1:
         raise ValidationError(_("Exactly one active academic year is required before acceptance."))
     active_year = active_years[0]
-    scope = (
-        AcademicYearLevel.objects.select_related("level")
-        .filter(academic_year=active_year)
-        .order_by("level__ordering", "pk")
-        .first()
-    )
+    scope = _resolve_intake_scope(active_year)
     if scope is None:
         raise ValidationError(_("The active academic year has no opened level."))
 
@@ -307,12 +326,7 @@ def bulk_set_application_status(
                 })
             eligible = []
         else:
-            scope = (
-                AcademicYearLevel.objects.select_related("level")
-                .filter(academic_year=active_years[0])
-                .order_by("level__ordering", "pk")
-                .first()
-            )
+            scope = _resolve_intake_scope(active_years[0])
             if scope is None:
                 for user in eligible:
                     results["errors"].append({

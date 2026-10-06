@@ -4,7 +4,8 @@
 {% load i18n %}
 
 {% block head_meta %}
-<title>{% translate "Sign Up" %} | {% translate "Bible Institute Coptic" %}</title>
+{% translate "Student Application" as default_signup_title %}
+<title>{{ page_title|default:default_signup_title }} | {% translate "Bible Institute Coptic" %}</title>
 {% endblock %}
 
 {% block style %}
@@ -20,8 +21,10 @@
                 <div class="sd-screen p-4 p-sm-5">
 
                     <div class="text-center mb-4">
-                        <h1 class="sd-section-title">{% translate "Student Application" %}</h1>
-                        <p class="ps-muted-text">{% translate "Fill in your details to apply" %}</p>
+                        {% translate "Student Application" as default_signup_title %}
+                        {% translate "Fill in your details to apply" as default_signup_subtitle %}
+                        <h1 class="sd-section-title">{{ page_title|default:default_signup_title }}</h1>
+                        <p class="ps-muted-text">{{ page_subtitle|default:default_signup_subtitle }}</p>
                     </div>
 
                     <!-- ========== TERMS MODAL ========== -->
