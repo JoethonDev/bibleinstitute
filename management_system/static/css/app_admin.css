@@ -1533,6 +1533,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
    primary content pane at 10- to 12-inch CSS widths. */
 @media (min-width: 992px) and (max-width: 1199.98px) {
     .admin-layout.ad-shell { grid-template-columns: 14rem minmax(0, 1fr); }
+    .admin-layout.ad-shell.is-sidebar-collapsed { grid-template-columns: 4.5rem minmax(0, 1fr); }
     .admin-main-content.ad-panes { padding-inline: 1rem; }
     .ad-pane-title { font-size: 1.35rem; }
     .ad-toolbar { padding-inline: .8rem; }
