@@ -271,6 +271,11 @@ class R2Manager:
         except Exception:
             return False
 
+    @staticmethod
+    def _report_rename_progress(callback, phase: str, done: int, total: int) -> None:
+        if callback is not None:
+            callback(phase, done, total)
+
     def _read_manifest_text(self, m3u8_key: str) -> Optional[str]:
         """Fetch one manifest as UTF-8 text, bounded to 2 MiB."""
         try:
@@ -299,7 +304,7 @@ class R2Manager:
         return text
 
     def rename_m3u8_with_segments(
-        self, old_key: str, new_key: str
+        self, old_key: str, new_key: str, *, progress_callback=None, resume=False
     ) -> Tuple[bool, str, List[str]]:
         """Rename a manifest and rewrite/rename its exact `.ts` children.
 
@@ -328,6 +333,8 @@ class R2Manager:
 
         text = self._read_manifest_text(old_key)
         if text is None:
+            if resume and self._object_exists(new_key):
+                return True, "", [new_key]
             return False, "The manifest could not be read.", []
 
         pairs: List[Tuple[str, str, str, str]] = []
@@ -382,21 +389,25 @@ class R2Manager:
                 new_ref = new_filename
             pairs.append((line, resolved, new_ref, new_resolved))
 
-        if self._object_exists(new_key):
+        if self._object_exists(new_key) and not resume:
             return False, "A file with the new name already exists.", []
         for _, _, _, new_child in pairs:
-            if self._object_exists(new_child):
+            if self._object_exists(new_child) and not resume:
                 return False, f"Segment {new_child.split('/')[-1]} already exists.", []
 
         created: List[str] = []
+        total = len(pairs) + 1
+        self._report_rename_progress(progress_callback, "copying", 0, total)
         try:
-            for _, old_child, _, new_child in pairs:
-                self.client.copy_object(
-                    Bucket=self.bucket_name,
-                    CopySource={"Bucket": self.bucket_name, "Key": old_child},
-                    Key=new_child,
-                )
-                created.append(new_child)
+            for index, (_, old_child, _, new_child) in enumerate(pairs, start=1):
+                if not (resume and self._object_exists(new_child)):
+                    self.client.copy_object(
+                        Bucket=self.bucket_name,
+                        CopySource={"Bucket": self.bucket_name, "Key": old_child},
+                        Key=new_child,
+                    )
+                    created.append(new_child)
+                self._report_rename_progress(progress_callback, "copying", index, total)
             by_old_ref = {ref: new_ref for ref, _, new_ref, _ in pairs}
             rewritten: List[str] = []
             for raw_line in text.splitlines():
@@ -413,8 +424,10 @@ class R2Manager:
                 ContentType="application/vnd.apple.mpegurl",
             )
             created.append(new_key)
+            self._report_rename_progress(progress_callback, "copying", total, total)
         except Exception as e:
             print(f"Error renaming manifest {old_key} to {new_key}: {e}")
+            self._report_rename_progress(progress_callback, "rolling_back", 0, len(created))
             for key in created:
                 try:
                     self.client.delete_object(Bucket=self.bucket_name, Key=key)
@@ -424,19 +437,32 @@ class R2Manager:
 
         # Old children go first so the old parent is removed last.
         old_children = [old_child for _, old_child, _, _ in pairs]
-        if old_children:
-            ok, bad = self.delete_files_batch(old_children)
-            if bad:
-                print(f"Old segments not fully removed for {old_key}: {bad}")
+        self._report_rename_progress(progress_callback, "deleting", 0, total)
+        for start in range(0, len(old_children), 1000):
+            batch = old_children[start:start + 1000]
+            try:
+                response = self.client.delete_objects(
+                    Bucket=self.bucket_name,
+                    Delete={"Objects": [{"Key": key} for key in batch]},
+                )
+            except Exception as e:
+                print(f"Old segments not fully removed for {old_key}: {e}")
+                return False, "Renamed, but some old segment files remain.", created
+            errors = response.get("Errors", [])
+            deleted = len(batch) - len(errors)
+            self._report_rename_progress(progress_callback, "deleting", start + deleted, total)
+            if errors:
+                print(f"Old segments not fully removed for {old_key}: {errors}")
                 return False, "Renamed, but some old segment files remain.", created
         try:
             self.client.delete_object(Bucket=self.bucket_name, Key=old_key)
         except Exception as e:
             print(f"Error removing old manifest {old_key}: {e}")
             return False, "Renamed, but the old manifest remains.", created
+        self._report_rename_progress(progress_callback, "deleting", total, total)
         return True, "", created
 
-    def rename_file(self, old_key: str, new_key: str) -> bool:
+    def rename_file(self, old_key: str, new_key: str, *, progress_callback=None, resume=False) -> bool:
         """
         Rename a file (implemented as copy + delete)
         
@@ -447,23 +473,43 @@ class R2Manager:
         Returns:
             bool: True if successful
         """
+        if old_key == new_key or not self._is_safe_object_key(old_key) or not self._is_safe_object_key(new_key):
+            return False
+        destination_exists = self._object_exists(new_key)
+        if destination_exists and not resume:
+            return False
         try:
-            # Copy to new location
-            self.client.copy_object(
-                Bucket=self.bucket_name,
-                CopySource={'Bucket': self.bucket_name, 'Key': old_key},
-                Key=new_key
-            )
-            
-            # Delete old file
-            self.client.delete_object(Bucket=self.bucket_name, Key=old_key)
-            return True
-        
+            self._report_rename_progress(progress_callback, "copying", 0, 1)
+            if not destination_exists:
+                self.client.copy_object(
+                    Bucket=self.bucket_name,
+                    CopySource={'Bucket': self.bucket_name, 'Key': old_key},
+                    Key=new_key
+                )
+            self._report_rename_progress(progress_callback, "copying", 1, 1)
         except Exception as e:
-            print(f"Error renaming file from {old_key} to {new_key}: {e}")
+            print(f"Error copying file from {old_key} to {new_key}: {e}")
             return False
 
-    def rename_folder(self, old_prefix: str, new_prefix: str) -> bool:
+        try:
+            self._report_rename_progress(progress_callback, "deleting", 0, 1)
+            self.client.delete_object(Bucket=self.bucket_name, Key=old_key)
+            self._report_rename_progress(progress_callback, "deleting", 1, 1)
+        except Exception as e:
+            print(f"New file is ready, but old file {old_key} remains: {e}")
+            self._report_rename_progress(progress_callback, "warning", 1, 1)
+        return True
+
+    def rename_folder(
+        self,
+        old_prefix: str,
+        new_prefix: str,
+        *,
+        progress_callback=None,
+        resume=False,
+        resume_phase="",
+        expected_total=0,
+    ) -> bool:
         """
         Rename a folder by copying all contained objects to a new prefix then deleting the originals.
 
@@ -480,7 +526,21 @@ class R2Manager:
         if not new_prefix.endswith('/'):
             new_prefix += '/'
 
+        if (
+            old_prefix == new_prefix
+            or not self._is_safe_object_key(old_prefix.rstrip('/'))
+            or not self._is_safe_object_key(new_prefix.rstrip('/'))
+            or new_prefix.startswith(old_prefix)
+            or old_prefix.startswith(new_prefix)
+        ):
+            return False
+
         try:
+            self._report_rename_progress(progress_callback, "scanning", 0, 0)
+            if not resume and self.client.list_objects_v2(
+                Bucket=self.bucket_name, Prefix=new_prefix, MaxKeys=1
+            ).get('Contents'):
+                return False
             paginator = self.client.get_paginator('list_objects_v2')
             pages = paginator.paginate(Bucket=self.bucket_name, Prefix=old_prefix)
 
@@ -489,29 +549,131 @@ class R2Manager:
                 for obj in page.get('Contents', []):
                     objects_to_move.append(obj['Key'])
 
+            destination_keys = set()
+            if resume:
+                destination_pages = paginator.paginate(Bucket=self.bucket_name, Prefix=new_prefix)
+                for page in destination_pages:
+                    destination_keys.update(obj['Key'] for obj in page.get('Contents', []))
+                expected_total = max(0, int(expected_total or 0))
+                expected_keys = {
+                    new_prefix + old_key[len(old_prefix):]
+                    for old_key in objects_to_move
+                }
+                if resume_phase == "copying":
+                    if len(objects_to_move) != expected_total or not destination_keys.issubset(expected_keys):
+                        return False
+                elif resume_phase in {"deleting", "updating_references"}:
+                    if len(destination_keys) != expected_total:
+                        return False
+                    if any(
+                        new_prefix + old_key[len(old_prefix):] not in destination_keys
+                        for old_key in objects_to_move
+                    ):
+                        return False
+                else:
+                    return False
+
             if not objects_to_move:
                 # Folder may only be a virtual prefix with no objects — succeed silently
+                if resume and expected_total and len(destination_keys) != expected_total:
+                    return False
+                if resume and expected_total:
+                    self._report_rename_progress(
+                        progress_callback, "deleting", expected_total, expected_total
+                    )
+                else:
+                    self._report_rename_progress(progress_callback, "complete", 0, 0)
                 return True
 
             # Copy each object to new location
-            for old_key in objects_to_move:
+            total = expected_total if resume and expected_total else len(objects_to_move)
+            copied_keys = []
+            if resume_phase == "copying" or not resume:
+                self._report_rename_progress(progress_callback, "copying", 0, total)
+            for index, old_key in enumerate(objects_to_move, start=1):
                 relative = old_key[len(old_prefix):]
                 new_key = new_prefix + relative
-                self.client.copy_object(
-                    Bucket=self.bucket_name,
-                    CopySource={'Bucket': self.bucket_name, 'Key': old_key},
-                    Key=new_key
-                )
+                if new_key not in destination_keys:
+                    self.client.copy_object(
+                        Bucket=self.bucket_name,
+                        CopySource={'Bucket': self.bucket_name, 'Key': old_key},
+                        Key=new_key
+                    )
+                    copied_keys.append(new_key)
+                    destination_keys.add(new_key)
+                if resume_phase == "copying" or not resume:
+                    self._report_rename_progress(progress_callback, "copying", index, total)
 
-            # Batch-delete originals (S3 DeleteObjects supports up to 1000 per call)
-            for i in range(0, len(objects_to_move), 1000):
-                batch = [{'Key': k} for k in objects_to_move[i:i + 1000]]
-                self.client.delete_objects(Bucket=self.bucket_name, Delete={'Objects': batch})
+            # Batch-delete originals only after every destination copy exists.
+            delete_base = max(0, total - len(objects_to_move)) if resume and resume_phase == "deleting" else 0
+            self._report_rename_progress(progress_callback, "deleting", delete_base, total)
+            try:
+                for i in range(0, len(objects_to_move), 1000):
+                    old_batch = objects_to_move[i:i + 1000]
+                    response = self.client.delete_objects(
+                        Bucket=self.bucket_name,
+                        Delete={'Objects': [{'Key': key} for key in old_batch]},
+                    )
+                    errors = response.get('Errors', [])
+                    self._report_rename_progress(
+                        progress_callback,
+                        "deleting",
+                        min(delete_base + i + len(old_batch) - len(errors), total),
+                        total,
+                    )
+                    if errors:
+                        raise RuntimeError("R2 could not remove every source file.")
+            except Exception as delete_error:
+                restored = True
+                restore_keys = {
+                    old_prefix + key[len(new_prefix):]
+                    for key in destination_keys
+                }
+                for old_key in restore_keys:
+                    relative = old_key[len(old_prefix):]
+                    try:
+                        self.client.copy_object(
+                            Bucket=self.bucket_name,
+                            CopySource={'Bucket': self.bucket_name, 'Key': new_prefix + relative},
+                            Key=old_key,
+                        )
+                    except Exception:
+                        restored = False
+                if restored:
+                    rollback_keys = sorted(destination_keys)
+                    for start in range(0, len(rollback_keys), 1000):
+                        try:
+                            self.client.delete_objects(
+                                Bucket=self.bucket_name,
+                                Delete={'Objects': [{'Key': key} for key in rollback_keys[start:start + 1000]]},
+                            )
+                        except Exception:
+                            pass
+                    print(f"Folder rename rolled back after source deletion failed: {delete_error}")
+                    return False
+                print(f"New folder is ready, but some old files remain: {delete_error}")
+                self._report_rename_progress(progress_callback, "warning", total, total)
+                return True
 
+            self._report_rename_progress(progress_callback, "deleting", total, total)
             return True
 
         except Exception as e:
             print(f"Error renaming folder from {old_prefix} to {new_prefix}: {e}")
+            rollback_keys = (
+                sorted(destination_keys)
+                if resume and resume_phase == "copying" and 'destination_keys' in locals()
+                else copied_keys if 'copied_keys' in locals() else []
+            )
+            if rollback_keys:
+                for start in range(0, len(rollback_keys), 1000):
+                    try:
+                        self.client.delete_objects(
+                            Bucket=self.bucket_name,
+                            Delete={'Objects': [{'Key': key} for key in rollback_keys[start:start + 1000]]},
+                        )
+                    except Exception:
+                        pass
             return False
 
     def move_file(self, file_key: str, destination_folder: str) -> Optional[str]:

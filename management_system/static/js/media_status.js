@@ -22,8 +22,6 @@
         }
     }
     var statusLabels = parseLabels('data-status-labels');
-    var phaseLabels = parseLabels('data-phase-labels');
-    var cleanupStatusLabels = parseLabels('data-cleanup-status-labels');
     var batchStatusUrl = root.getAttribute('data-batch-status-url') || '';
     var retryFailed = root.getAttribute('data-trans-retry-failed') || gettext('Retry failed');
     var csrfInput = document.querySelector('#media-status-csrf input[name="csrfmiddlewaretoken"]');
@@ -83,14 +81,9 @@
                     if (!response.ok) throw new Error(data.message || gettext('The request failed. Please try again.'));
                     return data;
                 });
-            }).then(function (data) {
-                var waitingForUrl = data.status === 'waiting_for_upload_url_expiry';
-                notify(
-                    waitingForUrl
-                        ? gettext('Cleanup is queued until the source upload link expires.')
-                        : gettext('Media job action accepted.'),
-                    'success'
-                );
+            }).then(function () {
+                if (button.hasAttribute('data-media-cleanup-url')) notify(gettext('Cleanup scheduled'), 'success');
+                else if (button.hasAttribute('data-media-stop-url')) notify(gettext('Stopping'), 'success');
                 refreshStatusRegion();
             }).catch(function (error) {
                 delete button.dataset.pending;
@@ -134,43 +127,47 @@
         var value = row.querySelector('[data-media-progress-value]');
         var error = row.querySelector('[data-media-error]');
         if (status) status.textContent = statusLabels[job.status] || job.status || '';
-        if (phase) phase.textContent = phaseLabels[job.phase] || job.phase || '';
+        if (phase) phase.textContent = job.current_phase_label || '';
         if (bar) bar.style.width = Math.max(0, Math.min(100, Number(job.progress) || 0)) + '%';
         if (value) value.textContent = (Number(job.progress) || 0) + '%';
-        if (error) error.textContent = job.error_message || '';
-        var cleanupStatus = row.querySelector('[data-media-cleanup-status]');
-        if (cleanupStatus) {
-            cleanupStatus.textContent = cleanupStatusLabels[job.cleanup_status] || job.cleanup_status || '';
-            cleanupStatus.hidden = !job.cleanup_status || job.cleanup_status === 'not_requested';
+        if (error) {
+            error.textContent = job.error_message || '';
+            error.hidden = !job.error_message;
+        }
+        var nextStep = row.querySelector('[data-media-next-step]');
+        if (nextStep) nextStep.textContent = job.next_step_label || '';
+        var completed = row.querySelector('[data-media-completed]');
+        if (completed) {
+            completed.textContent = (job.completed_steps || []).length
+                ? gettext('Done:') + ' ' + job.completed_steps.join(' · ')
+                : '';
+            completed.hidden = !(job.completed_steps || []).length;
         }
         var cleanupError = row.querySelector('[data-media-cleanup-error]');
         if (cleanupError) {
             cleanupError.textContent = job.cleanup_error_message || '';
             cleanupError.hidden = !job.cleanup_error_message;
         }
-        var cleanupReport = row.querySelector('[data-media-cleanup-report]');
-        if (cleanupReport) {
-            cleanupReport.textContent = job.cleanup_report || '';
-            cleanupReport.hidden = !job.cleanup_report;
-        }
-        var stopPending = row.querySelector('[data-media-stop-pending]');
-        if (stopPending) stopPending.hidden = !job.stop_requested || job.cancel_acknowledged;
+        row.querySelectorAll('[data-media-retry-url]').forEach(function (button) {
+            var kind = button.getAttribute('data-media-retry-kind') || 'processing';
+            button.hidden = kind === 'publish'
+                ? !job.can_publish
+                : kind === 'attachment' ? !job.can_retry_attachment : !job.can_retry;
+        });
         row.querySelectorAll('[data-media-stop-url]').forEach(function (button) {
             button.hidden = !job.can_stop;
         });
         row.querySelectorAll('[data-media-cleanup-url]').forEach(function (button) {
             button.hidden = !job.can_cleanup;
         });
-        var cleanupWaiting = row.querySelector('[data-media-cleanup-waiting]');
-        if (cleanupWaiting) cleanupWaiting.hidden = !job.cleanup_waiting_for_upload_url;
-        var publicationPending = row.querySelector('[data-media-publication-pending]');
-        if (publicationPending) publicationPending.hidden = !job.publication_pending;
         var lessonCleanup = row.querySelector('[data-media-cleanup-lesson]');
-        if (lessonCleanup) lessonCleanup.hidden = !(job.cleanup_result && job.cleanup_result.lesson_deleted);
+        if (lessonCleanup) lessonCleanup.hidden = !job.lesson_deleted;
         var preservedCleanup = row.querySelector('[data-media-cleanup-preserved]');
         if (preservedCleanup) preservedCleanup.hidden = !(Number(job.cleanup_preserved_count) > 0);
         row.setAttribute('data-current-media-status', job.status || '');
         row.setAttribute('data-current-cleanup-status', job.cleanup_status || '');
+        row.setAttribute('data-current-publication-pending', job.publication_pending ? 'true' : 'false');
+        row.setAttribute('data-current-can-publish', job.can_publish ? 'true' : 'false');
         row.setAttribute('data-cleanup-not-before', job.cleanup_not_before || '');
         var progress = row.querySelector('[role="progressbar"]');
         if (progress) progress.setAttribute('aria-valuenow', String(Math.max(0, Math.min(100, Number(job.progress) || 0))));
@@ -196,15 +193,19 @@
                     if (!job) return;
                     var previousStatus = row.getAttribute('data-current-media-status') || '';
                     var previousCleanupStatus = row.getAttribute('data-current-cleanup-status') || '';
+                    var previousPublicationPending = row.getAttribute('data-current-publication-pending') === 'true';
+                    var previousCanPublish = row.getAttribute('data-current-can-publish') === 'true';
                     updateRow(row, job);
                     var attachmentPending = job.status === 'succeeded' && job.attachment_status === 'pending';
                     var cleanupPending = job.cleanup_status === 'queued' || job.cleanup_status === 'running';
                     if (
                         (job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled')
-                        && !attachmentPending && !cleanupPending
+                        && !attachmentPending && !cleanupPending && !job.publication_pending
                     ) {
                         row.setAttribute('data-media-terminal', '1');
                         var cleanupChanged = previousCleanupStatus && previousCleanupStatus !== job.cleanup_status;
+                        var publicationChanged = previousPublicationPending !== Boolean(job.publication_pending)
+                            || previousCanPublish !== Boolean(job.can_publish);
                         var statusChangedToTerminal = (
                             (job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled')
                             && previousStatus !== job.status
@@ -212,6 +213,7 @@
                         if (
                             statusChangedToTerminal
                             || cleanupChanged
+                            || publicationChanged
                         ) {
                             refreshStatusRegion();
                         }

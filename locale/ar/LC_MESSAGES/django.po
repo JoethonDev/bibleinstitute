@@ -12510,3 +12510,138 @@ msgstr "إعادة تصحيح الإجابات المحفوظة"
 
 msgid "%(count)s saved answers regraded."
 msgstr "أُعيد تصحيح %(count)s إجابة محفوظة."
+
+msgid "Cleanup scheduled"
+msgstr "تمت جدولة التنظيف"
+
+msgid "Stopping"
+msgstr "جارٍ الإيقاف"
+
+msgid "Publishing lesson"
+msgstr "جارٍ نشر الدرس"
+
+msgid "Lesson publication failed"
+msgstr "فشل نشر الدرس"
+
+msgid "Continue publishing"
+msgstr "متابعة النشر"
+
+msgid "Retry processing"
+msgstr "إعادة المعالجة"
+
+msgid "Waiting for source upload"
+msgstr "بانتظار رفع الملف المصدر"
+
+msgid "No action needed"
+msgstr "لا يلزم إجراء"
+
+msgid "Source uploaded"
+msgstr "تم رفع المصدر"
+
+msgid "Saved to R2"
+msgstr "تم الحفظ في R2"
+
+msgid "Attached to lesson"
+msgstr "تم إرفاقه بالدرس"
+
+msgid "Next:"
+msgstr "التالي:"
+
+msgid "Done:"
+msgstr "تم:"
+
+msgid "Stop"
+msgstr "إيقاف"
+
+msgid "Clean up"
+msgstr "تنظيف"
+
+msgid "Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed."
+msgstr "هل تريد إزالة ملفات هذا الرفع من الخادم وR2؟ ستُزال أيضًا مسودة الدرس التي أنشأها هذا الرفع إذا لم تكن مستخدمة."
+
+msgid "Draft lesson removed."
+msgstr "تمت إزالة مسودة الدرس."
+
+msgid "Shared or unverified files were kept."
+msgstr "تم الاحتفاظ بالملفات المشتركة أو التي تعذر التحقق منها."
+
+msgid "Rename in progress"
+msgstr "جارٍ إعادة التسمية"
+
+msgid "Rename progress"
+msgstr "تقدم إعادة التسمية"
+
+msgid "Finding files"
+msgstr "جارٍ البحث عن الملفات"
+
+msgid "Copying files"
+msgstr "جارٍ نسخ الملفات"
+
+msgid "Removing old files"
+msgstr "جارٍ حذف الملفات القديمة"
+
+msgid "Updating lesson links"
+msgstr "جارٍ تحديث روابط الدرس"
+
+msgid "Cleaning up partial copies"
+msgstr "جارٍ حذف النسخ الجزئية"
+
+msgid "Rename complete"
+msgstr "اكتملت إعادة التسمية"
+
+msgid "Rename queued"
+msgstr "تمت جدولة إعادة التسمية"
+
+msgid "Could not load rename progress"
+msgstr "تعذر تحميل تقدم إعادة التسمية"
+
+msgid "Rename progress was not found"
+msgstr "لم يتم العثور على تقدم إعادة التسمية"
+
+msgid "You do not have permission to view this rename"
+msgstr "ليس لديك إذن لعرض عملية إعادة التسمية هذه"
+
+msgid "The new files are ready, but some old files remain."
+msgstr "الملفات الجديدة جاهزة، لكن بعض الملفات القديمة ما زالت موجودة."
+
+msgid "%(done)s of %(total)s files"
+msgstr "%(done)s من أصل %(total)s ملف"
+
+msgid "Waiting for rename progress"
+msgstr "بانتظار تحديث تقدم إعادة التسمية"
+
+msgid "Rename request was not accepted"
+msgstr "لم يتم قبول طلب إعادة التسمية"
+
+msgid "Wait for the current rename to finish"
+msgstr "انتظر حتى تكتمل إعادة التسمية الحالية"
+
+msgid "Rename failed. Check the source and destination, then try again."
+msgstr "فشلت إعادة التسمية. تحقق من المصدر والوجهة ثم حاول مجددًا."
+
+msgid "Invalid rename request"
+msgstr "طلب إعادة التسمية غير صالح"
+
+msgid "Invalid folder rename"
+msgstr "طلب إعادة تسمية المجلد غير صالح"
+
+msgid "Invalid file key"
+msgstr "مفتاح الملف غير صالح"
+
+msgid "The new name must differ"
+msgstr "يجب أن يختلف الاسم الجديد"
+
+msgid "Both names must be video manifests"
+msgstr "يجب أن يكون الاسمان لملفي قائمة تشغيل فيديو"
+
+msgid "Segment files cannot be renamed directly. Rename the video file instead."
+msgstr "لا يمكن إعادة تسمية ملفات المقاطع مباشرة. أعد تسمية ملف الفيديو بدلًا من ذلك."
+
+msgid "Could not start the rename. Please try again."
+msgstr "تعذر بدء إعادة التسمية. حاول مجددًا."
+
+msgid "Could not start publication. Please try again."
+msgstr "تعذر بدء النشر. حاول مجددًا."
+
+msgid "Upload cleaned up"
+msgstr "تم تنظيف الرفع"

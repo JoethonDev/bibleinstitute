@@ -182,17 +182,21 @@ from .media_processing import (
     initialize_deadlines,
     job_is_visible_to,
     request_media_job_cleanup,
+    request_automation_publication_retry,
     request_media_job_stop,
     queue_verified_job,
     safe_output_base_name,
     schedule_attachment_retry_after_commit,
     schedule_media_job_after_commit,
+    is_retryable_failed_job,
     validate_browser_part_id,
     validate_requested_folder,
     validate_source_descriptor,
     is_automation_job,
+    PUBLICATION_FAILED_ERROR,
     PUBLICATION_PENDING_ERROR,
 )
+from .media_tasks import R2RenameInProgress, get_r2_rename_status, queue_r2_rename
 from .media_storage import (
     MediaStorageError,
     STAGING_UPLOAD_URL_TTL_SECONDS,
@@ -2548,20 +2552,6 @@ def _media_job_visible_or_403(request, job):
     return None
 
 
-def _media_cleanup_report(result):
-    if not result or "objects_checked" not in result:
-        return ""
-    return str(_(
-        "R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, %(missing)s already absent, %(failed)s failed."
-    )) % {
-        "checked": int(result.get("objects_checked", 0) or 0),
-        "found": int(result.get("objects_found", 0) or 0),
-        "deleted": int(result.get("objects_cleaned", 0) or 0),
-        "missing": int(result.get("objects_missing", 0) or 0),
-        "failed": int(result.get("objects_failed", 0) or 0),
-    }
-
-
 def _media_cleanup_error(job):
     if job.cleanup_status != MediaCleanupStatus.FAILED:
         return ""
@@ -2570,17 +2560,157 @@ def _media_cleanup_error(job):
     return str(_("Upload cleanup failed. You can retry cleanup."))
 
 
-def _serialize_media_job(job, live=None):
-    live = live or {}
+def _media_job_ui_state(job, *, phase=None, now=None):
+    now = now or timezone.now()
+    phase = phase or job.phase
+    lesson_status = job.lesson.status if job.lesson_id else None
     terminal_statuses = {
         MediaProcessingStatus.CANCELLED,
         MediaProcessingStatus.FAILED,
         MediaProcessingStatus.SUCCEEDED,
     }
-    cleanup_in_flight = job.cleanup_status in {
-        MediaCleanupStatus.QUEUED,
-        MediaCleanupStatus.RUNNING,
+    cleanup_in_flight = job.cleanup_status in {MediaCleanupStatus.QUEUED, MediaCleanupStatus.RUNNING}
+    cleanup_waiting = bool(
+        job.cleanup_status == MediaCleanupStatus.QUEUED
+        and job.cleanup_not_before
+        and job.cleanup_not_before > now
+    )
+    stop_pending = bool(job.stop_requested_at and not job.cancel_acknowledged_at)
+    publication_pending = bool(
+        is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
+    )
+    can_retry = bool(
+        job.status == MediaProcessingStatus.FAILED
+        and job.source_acknowledged_at
+        and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
+        and is_retryable_failed_job(job)
+    )
+    can_retry_attachment = bool(
+        job.status == MediaProcessingStatus.SUCCEEDED
+        and job.attachment_status == MediaAttachmentStatus.FAILED
+        and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
+    )
+    can_publish = bool(
+        is_automation_job(job)
+        and job.status == MediaProcessingStatus.SUCCEEDED
+        and job.error_code == PUBLICATION_FAILED_ERROR
+        and job.attachment_status == MediaAttachmentStatus.ATTACHED
+        and job.staging_deleted_at
+        and lesson_status in {PublicationStatus.DRAFT, PublicationStatus.PUBLISHED}
+        and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
+    )
+    can_stop = bool(
+        (
+            job.status in ACTIVE_WORKER_STATUSES
+            or job.status in {MediaProcessingStatus.AWAITING_UPLOAD, MediaProcessingStatus.QUEUED}
+        )
+        and not cleanup_in_flight
+        and not job.stop_requested_at
+    )
+    can_cleanup = bool(
+        job.status in terminal_statuses
+        and not (
+            job.status == MediaProcessingStatus.SUCCEEDED
+            and job.attachment_status == MediaAttachmentStatus.PENDING
+        )
+        and not publication_pending
+        and not (
+            job.status == MediaProcessingStatus.CANCELLED
+            and job.stop_requested_at is not None
+            and job.cancel_acknowledged_at is None
+        )
+        and job.cleanup_status not in {
+            MediaCleanupStatus.QUEUED,
+            MediaCleanupStatus.RUNNING,
+            MediaCleanupStatus.COMPLETE,
+        }
+    )
+
+    if cleanup_in_flight or job.cleanup_status in {MediaCleanupStatus.FAILED, MediaCleanupStatus.COMPLETE}:
+        phase_key = (
+            "cleanup_scheduled" if cleanup_waiting else
+            "cleanup_queued" if job.cleanup_status == MediaCleanupStatus.QUEUED else
+            "cleanup_running" if job.cleanup_status == MediaCleanupStatus.RUNNING else
+            "cleanup_failed" if job.cleanup_status == MediaCleanupStatus.FAILED else
+            "cleanup_complete"
+        )
+        current_phase_label = {
+            "cleanup_scheduled": _("Cleanup scheduled"),
+            "cleanup_queued": _("Cleanup queued"),
+            "cleanup_running": _("Cleaning up"),
+            "cleanup_failed": _("Cleanup failed"),
+            "cleanup_complete": _("Cleanup complete"),
+        }[phase_key]
+    elif stop_pending:
+        current_phase_label = _("Stopping")
+    elif publication_pending:
+        current_phase_label = _("Publishing lesson")
+    elif can_publish:
+        current_phase_label = _("Lesson publication failed")
+    elif job.attachment_status == MediaAttachmentStatus.FAILED:
+        current_phase_label = _("Lesson attachment failed")
+    else:
+        current_phase_label = dict(MediaProcessingPhase.choices).get(phase, phase)
+
+    if job.cleanup_status == MediaCleanupStatus.FAILED:
+        next_step_label = _("Retry cleanup")
+    elif cleanup_in_flight:
+        next_step_label = _("Cleanup scheduled") if cleanup_waiting else _("Cleaning up")
+    elif job.cleanup_status == MediaCleanupStatus.COMPLETE:
+        next_step_label = _("Cleanup complete")
+    elif stop_pending:
+        next_step_label = _("Stopping")
+    elif publication_pending:
+        next_step_label = _("Publishing lesson")
+    elif can_publish:
+        next_step_label = _("Continue publishing")
+    elif can_retry_attachment:
+        next_step_label = _("Retry lesson attachment")
+    elif can_retry:
+        next_step_label = _("Retry processing")
+    elif can_cleanup:
+        next_step_label = _("Clean up")
+    elif job.status == MediaProcessingStatus.AWAITING_UPLOAD:
+        next_step_label = _("Waiting for source upload")
+    elif job.status in ACTIVE_WORKER_STATUSES or job.status == MediaProcessingStatus.QUEUED:
+        next_step_label = _("In progress")
+    else:
+        next_step_label = _("No action needed")
+
+    if job.cleanup_status == MediaCleanupStatus.COMPLETE:
+        completed_steps = [str(_("Upload cleaned up"))]
+    else:
+        completed_steps = []
+        if job.source_acknowledged_at:
+            completed_steps.append(str(_("Source uploaded")))
+        if job.output_keys or job.manifest_key or job.audio_manifest_key or job.download_key:
+            completed_steps.append(str(_("Saved to R2")))
+        if job.attachment_status == MediaAttachmentStatus.ATTACHED:
+            completed_steps.append(str(_("Attached to lesson")))
+        if lesson_status == PublicationStatus.PUBLISHED and not publication_pending and job.error_code != PUBLICATION_FAILED_ERROR:
+            completed_steps.append(str(_("Lesson published")))
+
+    return {
+        "can_stop": can_stop,
+        "can_cleanup": can_cleanup,
+        "can_retry": can_retry,
+        "can_retry_attachment": can_retry_attachment,
+        "can_publish": can_publish,
+        "stop_pending": stop_pending,
+        "publication_pending": publication_pending,
+        "cleanup_waiting_for_upload_url": cleanup_waiting,
+        "current_phase_label": str(current_phase_label),
+        "next_step_label": str(next_step_label),
+        "completed_steps": completed_steps,
+        "lesson_status": lesson_status,
+        "lesson_deleted": bool((job.cleanup_result or {}).get("lesson_deleted")),
+        "cleanup_preserved_count": len(job.cleanup_preserved_keys or []),
     }
+
+
+def _serialize_media_job(job, live=None):
+    live = live or {}
+    ui_state = _media_job_ui_state(job, phase=live.get("phase", job.phase))
     return {
         "id": str(job.public_id),
         "filename": job.original_filename,
@@ -2603,9 +2733,7 @@ def _serialize_media_job(job, live=None):
         "staging_deleted": bool(job.staging_deleted_at),
         "stop_requested": bool(job.stop_requested_at),
         "cancel_acknowledged": bool(job.cancel_acknowledged_at),
-        "publication_pending": bool(
-            is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
-        ),
+        "publication_pending": ui_state["publication_pending"],
         "cleanup_status": job.cleanup_status,
         "cleanup_error_message": _media_cleanup_error(job),
         "cleanup_preserved_count": len(job.cleanup_preserved_keys or []),
@@ -2616,34 +2744,8 @@ def _serialize_media_job(job, live=None):
             and job.cleanup_not_before > timezone.now()
         ),
         "cleanup_result": job.cleanup_result or {},
-        "cleanup_report": _media_cleanup_report(job.cleanup_result or {}),
         "cleanup_finished_at": job.cleanup_finished_at.isoformat() if job.cleanup_finished_at else None,
-        "can_stop": (
-            job.status in {
-                MediaProcessingStatus.AWAITING_UPLOAD,
-                MediaProcessingStatus.QUEUED,
-                MediaProcessingStatus.PROCESSING,
-                MediaProcessingStatus.UPLOADING,
-                MediaProcessingStatus.VERIFYING,
-            }
-            and not cleanup_in_flight
-            and not job.stop_requested_at
-        ),
-        "can_cleanup": (
-            job.status in terminal_statuses
-            and job.attachment_status != MediaAttachmentStatus.PENDING
-            and not (is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR)
-            and not (
-                job.status == MediaProcessingStatus.CANCELLED
-                and job.stop_requested_at is not None
-                and job.cancel_acknowledged_at is None
-            )
-            and job.cleanup_status not in {
-                MediaCleanupStatus.QUEUED,
-                MediaCleanupStatus.RUNNING,
-                MediaCleanupStatus.COMPLETE,
-            }
-        ),
+        **ui_state,
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
@@ -2918,6 +3020,29 @@ def media_job_attachment_retry(request, job_uuid):
         return JsonResponse({"message": "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))}, status=409)
     return JsonResponse({"job": _serialize_media_job(pending)}, status=202)
 
+
+@require_POST
+@_media_api_required
+def media_job_publish_retry(request, job_uuid):
+    """Continue a failed automation lesson publication in the media worker."""
+    job = get_object_or_404(MediaProcessingJob, public_id=job_uuid)
+    denied = _media_job_visible_or_403(request, job)
+    if denied:
+        return denied
+    try:
+        jobs = request_automation_publication_retry(job.public_id)
+    except ValidationError as exc:
+        return JsonResponse({
+            "message": "; ".join(str(value) for value in getattr(exc, "messages", [str(exc)]))
+        }, status=409)
+    except Exception:
+        logger.exception(
+            "Could not queue automation publication retry",
+            extra={"event": "automation_publication_retry_dispatch_failed", "public_id": str(job.public_id)},
+        )
+        return JsonResponse({"message": _("Could not start publication. Please try again.")}, status=503)
+    return JsonResponse({"job": _serialize_media_job(jobs[0]), "status": "queued"}, status=202)
+
 @capability_required(can_manage_content)
 def upload_file(request):
     course_offerings = CourseOffering.objects.filter(
@@ -2982,50 +3107,9 @@ def media_processing_status(request):
     paginator = Paginator(queryset, 25)
     jobs_page = paginator.get_page(request.GET.get("page", "1"))
     now = timezone.now()
-    terminal_job_statuses = {
-        MediaProcessingStatus.CANCELLED,
-        MediaProcessingStatus.FAILED,
-        MediaProcessingStatus.SUCCEEDED,
-    }
-    cleanup_in_flight_statuses = {MediaCleanupStatus.QUEUED, MediaCleanupStatus.RUNNING}
     for job in jobs_page.object_list:
-        job.can_stop = (
-            job.status in {
-                MediaProcessingStatus.AWAITING_UPLOAD,
-                MediaProcessingStatus.QUEUED,
-                MediaProcessingStatus.PROCESSING,
-                MediaProcessingStatus.UPLOADING,
-                MediaProcessingStatus.VERIFYING,
-            }
-            and not job.stop_requested_at
-            and job.cleanup_status not in cleanup_in_flight_statuses
-        )
-        job.stop_pending = bool(job.stop_requested_at and not job.cancel_acknowledged_at)
-        job.can_cleanup = (
-            job.status in terminal_job_statuses
-            and job.attachment_status != MediaAttachmentStatus.PENDING
-            and not (is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR)
-            and not (
-                job.status == MediaProcessingStatus.CANCELLED
-                and job.stop_requested_at
-                and not job.cancel_acknowledged_at
-            )
-            and job.cleanup_status not in {
-                MediaCleanupStatus.QUEUED,
-                MediaCleanupStatus.RUNNING,
-                MediaCleanupStatus.COMPLETE,
-            }
-        )
-        job.cleanup_pending = job.cleanup_status in cleanup_in_flight_statuses
-        job.cleanup_waiting_for_upload_url = bool(
-            job.cleanup_status == MediaCleanupStatus.QUEUED
-            and job.cleanup_not_before
-            and job.cleanup_not_before > now
-        )
-        job.publication_pending = bool(
-            is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
-        )
-        job.cleanup_report = _media_cleanup_report(job.cleanup_result or {})
+        for key, value in _media_job_ui_state(job, now=now).items():
+            setattr(job, key, value)
         job.cleanup_error_message = _media_cleanup_error(job)
     return render_page(request, "media_processing_status.html", "partials/media_processing_status_content.html", {
         "jobs_page": jobs_page,
@@ -3033,14 +3117,6 @@ def media_processing_status(request):
         "status_choices": MediaProcessingStatus.choices,
         "status_labels_json": json.dumps(
             {value: str(label) for value, label in MediaProcessingStatus.choices},
-            ensure_ascii=False,
-        ),
-        "phase_labels_json": json.dumps(
-            {value: str(label) for value, label in MediaProcessingPhase.choices},
-            ensure_ascii=False,
-        ),
-        "cleanup_status_labels_json": json.dumps(
-            {value: str(label) for value, label in MediaCleanupStatus.choices},
             ensure_ascii=False,
         ),
         "status_filter": status_filter,
@@ -4459,70 +4535,106 @@ def api_delete_files_batch(request):
 
 @capability_required(can_manage_content)
 def api_rename_file(request):
-    """
-    API endpoint to rename a file
-    """
+    """Queue a tracked R2 rename so large moves do not hold an HTTP request."""
     if request.method != 'POST':
         return JsonResponse({'error': _('Method not allowed')}, status=405)
-    
     try:
-
         data = json.loads(request.body)
+        if not isinstance(data, dict):
+            return JsonResponse({'error': _('Invalid rename request')}, status=400)
         old_key = data.get('old_key')
         new_key = data.get('new_key')
-        is_folder = bool(data.get('is_folder', False))
-        
-        if not old_key or not new_key:
+        is_folder = data.get('is_folder', False)
+        if not isinstance(old_key, str) or not isinstance(new_key, str) or not old_key or not new_key:
             return JsonResponse({'error': _('Both old and new keys required')}, status=400)
-        
-        if is_folder:
-            success = R2_MANAGER.rename_folder(old_key, new_key)
-            if success:
-                updated_count = rewrite_lesson_r2_references(old_key, new_key, is_folder=True)
-                logger.info(f"User {request.user} renamed folder from {old_key} to {new_key}. Updated {updated_count} lesson references.")
-                return JsonResponse({'success': True, 'message': _('Folder renamed successfully and %(count)d database references updated') % {'count': updated_count}, 'new_key': new_key})
-            else:
-                return JsonResponse({'error': _('Failed to rename folder')}, status=500)
+        if not isinstance(is_folder, bool):
+            return JsonResponse({'error': _('Invalid rename request')}, status=400)
 
-        if isinstance(old_key, str) and old_key.lower().endswith('.ts'):
+        if is_folder:
+            old_prefix = old_key.rstrip('/')
+            new_prefix = new_key.rstrip('/')
+            if (
+                not R2_MANAGER._is_safe_object_key(old_prefix)
+                or not R2_MANAGER._is_safe_object_key(new_prefix)
+                or old_prefix == new_prefix
+                or new_prefix.startswith(old_prefix + '/')
+                or old_prefix.startswith(new_prefix + '/')
+            ):
+                return JsonResponse({'error': _('Invalid folder rename')}, status=400)
+            old_key = old_prefix + '/'
+            new_key = new_prefix + '/'
+        else:
+            if not R2_MANAGER._is_safe_object_key(old_key) or not R2_MANAGER._is_safe_object_key(new_key):
+                return JsonResponse({'error': _('Invalid file key')}, status=400)
+            if old_key == new_key:
+                return JsonResponse({'error': _('The new name must differ')}, status=400)
+        if not is_folder and (
+            old_key.lower().endswith('.ts') or new_key.lower().endswith('.ts')
+        ):
             return JsonResponse(
                 {'error': _('Segment files cannot be renamed directly. Rename the video file instead.')},
                 status=400,
             )
+        old_manifest = old_key.lower().endswith('.m3u8')
+        new_manifest = new_key.lower().endswith('.m3u8')
+        if not is_folder and old_manifest != new_manifest:
+            return JsonResponse({'error': _('Both names must be video manifests')}, status=400)
 
-        if (isinstance(old_key, str) and isinstance(new_key, str)
-                and old_key.lower().endswith('.m3u8') and new_key.lower().endswith('.m3u8')):
-            # A manifest rename must move its segment children and rewrite the
-            # playlist references, otherwise the renamed video loses its media.
-            renamed_ok, rename_error, renamed_keys = R2_MANAGER.rename_m3u8_with_segments(old_key, new_key)
-            if renamed_ok:
-                updated_count = rewrite_lesson_r2_references(old_key, new_key)
-                logger.info(f"User {request.user} renamed m3u8 file from {old_key} to {new_key} with {len(renamed_keys)} related files.")
-                return JsonResponse({
-                    'success': True,
-                    'message': _('File renamed successfully and %(count)d database references updated') % {'count': updated_count},
-                    'new_key': new_key,
-                    'renamed_files': renamed_keys,
-                })
-            return JsonResponse({'error': _(rename_error) if rename_error else _('Failed to rename file')}, status=409 if 'already exists' in (rename_error or '') else 500)
+        operation_id = queue_r2_rename(
+            old_key,
+            new_key,
+            is_folder=is_folder,
+            created_by_id=request.user.pk,
+        )
+        status_url = reverse('api-r2-rename-status', args=[operation_id])
+        logger.info(
+            "R2 rename queued",
+            extra={"event": "r2_rename_queued", "operation_id": operation_id, "user_id": request.user.pk},
+        )
+        return JsonResponse({
+            'status': 'queued',
+            'operation_id': operation_id,
+            'status_url': status_url,
+        }, status=202)
+    except R2RenameInProgress as exc:
+        return JsonResponse({'error': str(exc)}, status=409)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': _('Invalid rename request')}, status=400)
+    except Exception:
+        logger.exception("Could not queue R2 rename")
+        return JsonResponse({'error': _('Could not start the rename. Please try again.')}, status=503)
 
-        success = R2_MANAGER.rename_file(old_key, new_key)
-        
-        if success:
-            updated_count = rewrite_lesson_r2_references(old_key, new_key)
 
-            logger.info(f"User {request.user} renamed file from {old_key} to {new_key}. Updated {updated_count} lesson references.")
-            return JsonResponse({
-                'success': True, 
-                'message': _('File renamed successfully and %(count)d database references updated') % {'count': updated_count}, 
-                'new_key': new_key
-            })
-        else:
-            return JsonResponse({'error': _('Failed to rename file')}, status=500)
-    
-    except Exception as e:
-        logger.error(f"Error renaming file: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+@capability_required(can_manage_content)
+def api_r2_rename_status(request, operation_id):
+    if request.method != 'GET':
+        return JsonResponse({'error': _('Method not allowed')}, status=405)
+    status = get_r2_rename_status(str(operation_id))
+    if status is None:
+        return JsonResponse({'error': _('Rename progress was not found')}, status=404)
+    if (
+        getattr(getattr(request.user, "role", None), "role", None) != "admin"
+        and status.get("created_by_id") != request.user.pk
+    ):
+        return JsonResponse({'error': _('You do not have permission to view this rename')}, status=403)
+    warning = status.get("warning", "")
+    if warning == "old_files_remain":
+        warning = str(_("The new files are ready, but some old files remain."))
+    error = (
+        str(_("Rename failed. Check the source and destination, then try again."))
+        if status.get("error_code") == "rename_failed"
+        else ""
+    )
+    return JsonResponse({
+        "operation_id": status.get("operation_id"),
+        "status": status.get("status"),
+        "phase": status.get("phase"),
+        "progress": int(status.get("progress", 0) or 0),
+        "done": int(status.get("done", 0) or 0),
+        "total": int(status.get("total", 0) or 0),
+        "error": error,
+        "warning": warning,
+    })
 
 @capability_required(can_manage_content)
 def api_move_file(request):

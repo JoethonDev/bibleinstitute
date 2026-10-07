@@ -7,6 +7,7 @@
 <div class="ad-page" id="content" x-data="r2Manager()"
      data-r2-download-url="{% url 'api-download-file' %}"
      data-r2-rename-url="{% url 'api-rename-file' %}"
+     data-r2-rename-status-url-template="{% url 'api-r2-rename-status' '00000000-0000-0000-0000-000000000000' %}"
      data-r2-delete-url="{% url 'api-delete-file' %}"
      data-r2-delete-m3u8-url="{% url 'api-delete-m3u8-file' %}"
      data-r2-delete-folder-url="{% url 'api-delete-folder' %}"
@@ -18,6 +19,22 @@
     <div class="ad-pane-head">
         <h2 class="ad-pane-title"><i class="fas fa-cloud me-2"></i>{% translate "R2 Storage Management" %}</h2>
         <p class="ad-pane-desc">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
+    </div>
+
+    <div class="alert alert-info mt-3 d-none" role="status" aria-live="polite" data-r2-rename-progress>
+        <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+                <strong data-r2-rename-heading>{% translate "Rename in progress" %}</strong>
+                <span class="d-block" data-r2-rename-phase></span>
+                <small data-r2-rename-count></small>
+            </div>
+            <button type="button" class="btn-close" aria-label="{% translate 'Close' %}" data-r2-rename-dismiss hidden></button>
+        </div>
+        <div class="progress mt-2" role="progressbar" aria-label="{% translate 'Rename progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-r2-rename-bar-wrap>
+            <div class="progress-bar" style="width: 0%" data-r2-rename-bar></div>
+        </div>
+        <small class="d-block mt-2 text-danger" data-r2-rename-error hidden></small>
+        <small class="d-block mt-2" data-r2-rename-warning hidden></small>
     </div>
 
     <!-- Storage Statistics -->

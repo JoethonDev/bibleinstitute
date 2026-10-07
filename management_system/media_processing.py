@@ -400,6 +400,7 @@ def record_job_failure(
     history.append({
         "attempt": job.attempt_count,
         "code": str(error_code)[:80],
+        "phase": str(phase)[:24],
         "message": message,
         "at": timezone.now().isoformat(),
     })
@@ -603,6 +604,13 @@ def schedule_attachment_retry_after_commit(public_id: Any) -> None:
     )
 
 
+def schedule_automation_publication_retry_after_commit(public_id: Any) -> None:
+    """Dispatch one publication retry only after its state transition commits."""
+    transaction.on_commit(
+        lambda public_id=public_id: _enqueue_automation_publication_retry(public_id)
+    )
+
+
 def schedule_media_cleanup_after_commit(public_id: Any, job_ids: list[str]) -> None:
     """Dispatch one cleanup task only after its durable request commits."""
     transaction.on_commit(
@@ -624,6 +632,26 @@ def _enqueue_attachment_retry(public_id: Any) -> None:
         args=[str(public_id)],
         queue="media",
     )
+
+
+def _enqueue_automation_publication_retry(public_id: Any) -> None:
+    try:
+        current_app.send_task(
+            "management_system.media_tasks.retry_automation_publication",
+            args=[str(public_id)],
+            queue="media",
+        )
+    except Exception:
+        lesson_id = MediaProcessingJob.objects.filter(public_id=public_id).values_list("lesson_id", flat=True).first()
+        if lesson_id:
+            MediaProcessingJob.objects.filter(
+                lesson_id=lesson_id,
+                error_code=PUBLICATION_PENDING_ERROR,
+            ).update(
+                error_code=PUBLICATION_FAILED_ERROR,
+                error_message="Automatic publication failed; retry is required.",
+            )
+        raise
 
 
 def _enqueue_media_cleanup(public_id: Any, job_ids: list[str]) -> None:
@@ -742,7 +770,11 @@ def request_media_job_cleanup(public_id: Any) -> tuple[list[MediaProcessingJob],
         for job in jobs
     ):
         raise ValidationError(_("The worker has not confirmed that processing stopped."))
-    if any(job.attachment_status == MediaAttachmentStatus.PENDING for job in jobs):
+    if any(
+        job.status == MediaProcessingStatus.SUCCEEDED
+        and job.attachment_status == MediaAttachmentStatus.PENDING
+        for job in jobs
+    ):
         raise ValidationError(_("Wait for the lesson attachment to finish before cleanup."))
     if (
         all(job.status == MediaProcessingStatus.SUCCEEDED for job in jobs)
@@ -781,6 +813,40 @@ def request_media_job_cleanup(public_id: Any) -> tuple[list[MediaProcessingJob],
         ])
     schedule_media_cleanup_after_commit(root.public_id, cleanup_group_ids)
     return jobs, True
+
+
+@transaction.atomic
+def request_automation_publication_retry(public_id: Any) -> list[MediaProcessingJob]:
+    """Queue one recoverable publication retry for an automation upload."""
+    root = MediaProcessingJob.objects.filter(public_id=public_id).first()
+    if root is None:
+        raise MediaProcessingJob.DoesNotExist
+    if not is_automation_job(root) or not root.lesson_id:
+        raise ValidationError(_("This upload cannot continue publication."))
+    jobs = list(
+        media_upload_job_queryset(root).select_for_update().order_by("pk")[:MAX_AUTOMATION_UPLOAD_FILES + 1]
+    )
+    if not any(job.pk == root.pk for job in jobs):
+        raise MediaProcessingJob.DoesNotExist
+    if len(jobs) > MAX_AUTOMATION_UPLOAD_FILES:
+        raise ValidationError(_("This upload contains an unexpected number of media jobs."))
+    if root.error_code != PUBLICATION_FAILED_ERROR:
+        raise ValidationError(_("Publication is not ready to retry."))
+    if any(
+        job.status != MediaProcessingStatus.SUCCEEDED
+        or job.attachment_status != MediaAttachmentStatus.ATTACHED
+        or not job.staging_deleted_at
+        or job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED
+        for job in jobs
+    ):
+        raise ValidationError(_("The upload is not ready to continue publication."))
+
+    for job in jobs:
+        job.error_code = PUBLICATION_PENDING_ERROR
+        job.error_message = PUBLICATION_PENDING_MESSAGE
+        job.save(update_fields=["error_code", "error_message"])
+    schedule_automation_publication_retry_after_commit(root.public_id)
+    return jobs
 
 
 def automation_part_id(lesson_token: str, position: int) -> str:
@@ -1415,6 +1481,7 @@ def _upload_hls_outputs(
     created_keys: list[str],
     progress_callback=None,
     cancellation_check=None,
+    output_key_callback=None,
 ) -> tuple[str, list[str]]:
     for index, name in enumerate(segment_names, start=1):
         if cancellation_check:
@@ -1425,6 +1492,7 @@ def _upload_hls_outputs(
             os.path.join(output_dir, name),
             content_type="video/mp2t",
             cancellation_check=cancellation_check,
+            output_key_callback=output_key_callback,
         )
         created_keys.append(key)
         if progress_callback:
@@ -1438,6 +1506,7 @@ def _upload_hls_outputs(
         rewritten,
         content_type="application/vnd.apple.mpegurl",
         cancellation_check=cancellation_check,
+        output_key_callback=output_key_callback,
     )
     created_keys.append(manifest_key)
     return manifest_key, [_destination_key(folder, segment_folder, name) for name in segment_names]
@@ -1547,6 +1616,7 @@ def run_media_job(
     progress_callback=None,
     heartbeat_callback=None,
     cancellation_check=None,
+    output_key_callback=None,
 ) -> dict:
     """Process one claimed job and return verified output metadata."""
     created_keys: list[str] = []
@@ -1587,6 +1657,7 @@ def run_media_job(
                     output_path,
                     content_type="application/pdf",
                     cancellation_check=cancellation_check,
+                    output_key_callback=output_key_callback,
                 )
                 created_keys.append(key)
                 manifest_key = ""
@@ -1608,6 +1679,7 @@ def run_media_job(
                         job.output_base_name, "Video Segments", created_keys,
                         (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
                         cancellation_check=cancellation_check,
+                        output_key_callback=output_key_callback,
                     )
                 else:
                     manifest_key = ""
@@ -1634,6 +1706,7 @@ def run_media_job(
                         f"{job.output_base_name}_audio", "Audio Segments", created_keys,
                         (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
                         cancellation_check=cancellation_check,
+                        output_key_callback=output_key_callback,
                     )
                     mp3_path = _make_mp3(
                         audio_path,
@@ -1650,6 +1723,7 @@ def run_media_job(
                         mp3_path,
                         content_type="audio/mpeg",
                         cancellation_check=cancellation_check,
+                        output_key_callback=output_key_callback,
                     )
                     created_keys.append(download_key)
             if heartbeat_callback:
@@ -1661,14 +1735,14 @@ def run_media_job(
                 "download_key": download_key,
             }
     except Exception as exc:
+        cleanup_keys = list(created_keys)
+        for key in getattr(exc, "output_keys", []) or []:
+            if isinstance(key, str) and key not in cleanup_keys:
+                cleanup_keys.append(key)
         if isinstance(exc, MediaJobCancelled):
-            cancelled_keys = list(created_keys)
-            for key in getattr(exc, "output_keys", []) or []:
-                if isinstance(key, str) and key not in cancelled_keys:
-                    cancelled_keys.append(key)
-            exc.output_keys = cancelled_keys
+            exc.output_keys = cleanup_keys
         undeleted = []
-        for key in created_keys:
+        for key in cleanup_keys:
             try:
                 delete_object_exact(key)
             except Exception:

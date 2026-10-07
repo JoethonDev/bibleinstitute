@@ -12,6 +12,7 @@ from datetime import timedelta
 import redis
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -64,11 +65,21 @@ from .models import (
     TelegramNotificationDelivery,
     ViewingSession,
 )
+from .utils.r2_manager import R2Manager
+from .utils.r2_references import rewrite_lesson_r2_references
+from .utils.storage_operations import get_r2_client
 
 logger = logging.getLogger(__name__)
 
 LIVE_PROGRESS_TTL = 2 * 60 * 60
 HEARTBEAT_INTERVAL_SECONDS = 30
+R2_RENAME_PROGRESS_TTL = 30 * 24 * 60 * 60
+R2_RENAME_LOCK_KEY = "r2:rename:active"
+R2_RENAME_LOCK_TTL = 7 * 24 * 60 * 60
+
+
+class R2RenameInProgress(Exception):
+    """Raised when another R2 rename already owns the storage mutation lock."""
 
 
 def _redis_client():
@@ -88,6 +99,7 @@ class MediaProgressReporter:
         self.job = job
         self.redis = _redis_client()
         self.key = f"media:job:{job.public_id}"
+        self.phase = job.phase
         self.last_db_heartbeat = 0.0
         self.last_lease_heartbeat = 0.0
         self.last_cancel_check = 0.0
@@ -131,6 +143,7 @@ class MediaProgressReporter:
 
     def update(self, phase: str, progress: int) -> None:
         self.check_cancelled()
+        self.phase = phase
         progress = max(0, min(99, int(progress)))
         now = time.time()
         heartbeat_at = timezone.now()
@@ -244,11 +257,26 @@ def process_media_job(self, public_id: str):
                 upload_state["transitioned"] = True
             reporter.update(phase, progress)
 
+        persisted_output_keys = set(job.output_keys or [])
+
+        def persist_output_key(key):
+            if key in persisted_output_keys:
+                return
+            with transaction.atomic():
+                locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
+                if locked.attempt_count != job.attempt_count:
+                    raise MediaJobLeaseLost
+                if key not in (locked.output_keys or []):
+                    locked.output_keys = [*(locked.output_keys or []), key]
+                    locked.save(update_fields=["output_keys"])
+            persisted_output_keys.add(key)
+
         created = run_media_job(
             job,
             progress_callback=lambda progress: reporter.update(MediaProcessingPhase.ENCODE, progress),
             heartbeat_callback=report_phase,
             cancellation_check=reporter.check_cancelled,
+            output_key_callback=persist_output_key,
         )
         reporter.check_cancelled()
         transition_job(
@@ -265,7 +293,9 @@ def process_media_job(self, public_id: str):
                 raise MediaJobLeaseLost
             locked.phase = MediaProcessingPhase.VERIFY
             locked.progress = 96
-            locked.output_keys = created["output_keys"]
+            locked.output_keys = list(dict.fromkeys([
+                *(locked.output_keys or []), *created["output_keys"],
+            ]))
             locked.manifest_key = created["manifest_key"]
             locked.audio_manifest_key = created["audio_manifest_key"]
             locked.download_key = created["download_key"]
@@ -441,6 +471,7 @@ def process_media_job(self, public_id: str):
             job.pk,
             code,
             str(exc),
+            phase=reporter.phase,
             expected_attempt_count=job.attempt_count,
             residual_output_keys=list(getattr(exc, "residual_output_keys", []) or []),
         )
@@ -696,7 +727,11 @@ def _claim_media_cleanup(job_ids: list[uuid.UUID], now):
                 _("Stop processing before requesting full cleanup."),
                 "cleanup_job_active",
             )
-        if any(job.attachment_status == MediaAttachmentStatus.PENDING for job in jobs):
+        if any(
+            job.status == MediaProcessingStatus.SUCCEEDED
+            and job.attachment_status == MediaAttachmentStatus.PENDING
+            for job in jobs
+        ):
             raise MediaProcessingError(
                 _("Wait for the lesson attachment to finish before cleanup."),
                 "cleanup_attachment_pending",
@@ -1130,6 +1165,270 @@ def recover_pending_media_jobs(limit: int = 100):
     return {"queued": queued_count, "failed": failed_count, "cleanup_queued": cleanup_queued_count}
 
 
+def r2_rename_progress_key(operation_id: str) -> str:
+    return f"r2:rename:{operation_id}"
+
+
+def get_r2_rename_status(operation_id: str) -> dict | None:
+    return cache.get(r2_rename_progress_key(operation_id))
+
+
+def queue_r2_rename(old_key: str, new_key: str, *, is_folder: bool, created_by_id: int) -> str:
+    operation_id = str(uuid.uuid4())
+    now = timezone.now().isoformat()
+    if not cache.add(R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL):
+        raise R2RenameInProgress(str(_("Wait for the current rename to finish")))
+    try:
+        cache.set(
+            r2_rename_progress_key(operation_id),
+            {
+                "operation_id": operation_id,
+                "created_by_id": int(created_by_id),
+                "old_key": old_key,
+                "new_key": new_key,
+                "is_folder": bool(is_folder),
+                "status": "queued",
+                "phase": "queued",
+                "progress": 0,
+                "done": 0,
+                "total": 0,
+                "error": "",
+                "warning": "",
+                "created_at": now,
+                "updated_at": now,
+            },
+            timeout=R2_RENAME_PROGRESS_TTL,
+        )
+        try:
+            rename_r2_operation.apply_async(args=[operation_id], queue="media")
+        except Exception:
+            cache.delete(r2_rename_progress_key(operation_id))
+            raise
+    except Exception:
+        _release_r2_rename_lock(operation_id)
+        raise
+    return operation_id
+
+
+def _update_r2_rename_status(operation_id: str, **changes) -> dict | None:
+    key = r2_rename_progress_key(operation_id)
+    status = cache.get(key)
+    if status is None:
+        return None
+    status.update(changes)
+    status["updated_at"] = timezone.now().isoformat()
+    cache.set(key, status, timeout=R2_RENAME_PROGRESS_TTL)
+    return status
+
+
+def _safe_update_r2_rename_status(operation_id: str, **changes) -> None:
+    try:
+        _update_r2_rename_status(operation_id, **changes)
+        if cache.get(R2_RENAME_LOCK_KEY) == operation_id:
+            cache.set(R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL)
+    except Exception:
+        logger.warning(
+            "Could not update R2 rename progress",
+            extra={"event": "r2_rename_progress_update_failed", "operation_id": operation_id},
+            exc_info=True,
+        )
+
+
+def _release_r2_rename_lock(operation_id: str) -> None:
+    try:
+        if cache.get(R2_RENAME_LOCK_KEY) == operation_id:
+            cache.delete(R2_RENAME_LOCK_KEY)
+    except Exception:
+        logger.warning(
+            "Could not release R2 rename lock",
+            extra={"event": "r2_rename_lock_release_failed", "operation_id": operation_id},
+            exc_info=True,
+        )
+
+
+@shared_task(
+    acks_late=True,
+    reject_on_worker_lost=True,
+    name="management_system.media_tasks.rename_r2_operation",
+)
+def rename_r2_operation(operation_id: str):
+    status = get_r2_rename_status(operation_id)
+    if status is None:
+        return {"status": "expired", "operation_id": operation_id}
+    if status.get("status") == "succeeded":
+        return {"status": "succeeded", "operation_id": operation_id}
+    if status.get("status") == "failed" and not status.get("resume_phase"):
+        return {"status": "failed", "operation_id": operation_id}
+
+    lock_owner = cache.get(R2_RENAME_LOCK_KEY)
+    if lock_owner not in (None, operation_id):
+        _safe_update_r2_rename_status(
+            operation_id,
+            status="failed",
+            phase="failed",
+            error_code="rename_failed",
+            error="",
+            resume_phase="",
+        )
+        return {"status": "failed", "operation_id": operation_id}
+    if lock_owner is None and not cache.add(
+        R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL
+    ) and cache.get(R2_RENAME_LOCK_KEY) != operation_id:
+        _safe_update_r2_rename_status(
+            operation_id,
+            status="failed",
+            phase="failed",
+            error_code="rename_failed",
+            error="",
+            resume_phase="",
+        )
+        return {"status": "failed", "operation_id": operation_id}
+    cache.set(R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL)
+
+    retryable_phases = {"copying", "deleting", "updating_references", "rolling_back"}
+    current_phase = status.get("phase", "")
+    resume_phase = (
+        current_phase
+        if status.get("status") == "processing" and current_phase in retryable_phases
+        else status.get("resume_phase", "")
+    )
+    resume = resume_phase in retryable_phases
+    expected_total = max(0, int(status.get("total", 0) or status.get("resume_total", 0) or 0))
+    _safe_update_r2_rename_status(
+        operation_id,
+        status="processing",
+        phase="scanning",
+        resume_phase=resume_phase if resume else "",
+        resume_total=expected_total if resume else 0,
+    )
+    previous = {
+        "phase": None,
+        "done": max(0, int(status.get("done", 0) or 0)),
+        "total": expected_total if resume else 0,
+    }
+    warning = ""
+
+    def report(phase, done, total):
+        nonlocal warning
+        if phase == "warning":
+            warning = "old_files_remain"
+            _safe_update_r2_rename_status(
+                operation_id,
+                warning="old_files_remain",
+            )
+            return
+        done = max(0, int(done or 0))
+        total = max(0, int(total or 0))
+        step = max(1, total // 100)
+        if phase == previous["phase"] and done < total and done - previous["done"] < step:
+            return
+        if phase == "copying":
+            progress = int(45 * done / total) if total else 45
+        elif phase == "deleting":
+            progress = 50 + (int(45 * done / total) if total else 45)
+        elif phase == "updating_references":
+            progress = 98
+        elif phase == "rolling_back":
+            progress = 45
+        else:
+            progress = 0
+        _safe_update_r2_rename_status(
+            operation_id,
+            phase=phase,
+            progress=max(0, min(99, progress)),
+            done=done,
+            total=total,
+        )
+        previous.update({"phase": phase, "done": done, "total": total})
+
+    old_key = status["old_key"]
+    new_key = status["new_key"]
+    is_folder = bool(status["is_folder"])
+    try:
+        manager = R2Manager(get_r2_client(), getattr(settings, "R2_BUCKET_NAME", ""))
+        if is_folder:
+            success = manager.rename_folder(
+                old_key,
+                new_key,
+                progress_callback=report,
+                resume=resume,
+                resume_phase=resume_phase,
+                expected_total=expected_total,
+            )
+            error = "The folder rename failed."
+        elif old_key.lower().endswith(".m3u8"):
+            success, error, renamed_keys = manager.rename_m3u8_with_segments(
+                old_key, new_key, progress_callback=report, resume=resume
+            )
+            if not success and new_key in renamed_keys:
+                success = True
+                report("warning", 0, 0)
+        else:
+            success = manager.rename_file(
+                old_key, new_key, progress_callback=report, resume=resume
+            )
+            error = "The file rename failed."
+        if not success:
+            raise RuntimeError(error or "The rename failed before the old files were removed.")
+
+        total = int(previous["total"] or 0)
+        report("updating_references", total, total)
+        updated_count = rewrite_lesson_r2_references(old_key, new_key, is_folder=is_folder)
+        if warning:
+            _safe_update_r2_rename_status(operation_id, warning=str(warning))
+        _safe_update_r2_rename_status(
+            operation_id,
+            status="succeeded",
+            phase="complete",
+            progress=100,
+            done=total,
+            total=total,
+            updated_references=updated_count,
+            error="",
+            resume_phase="",
+        )
+        return {"status": "succeeded", "operation_id": operation_id}
+    except Exception:
+        logger.exception("R2 rename task failed", extra={"operation_id": operation_id})
+        _safe_update_r2_rename_status(
+            operation_id,
+            status="failed",
+            phase="failed",
+            error_code="rename_failed",
+            error="",
+            resume_phase=(
+                previous["phase"] if previous["phase"] in retryable_phases else ""
+            ),
+            resume_total=(previous["total"] if previous["phase"] in retryable_phases else 0),
+        )
+        return {"status": "failed", "operation_id": operation_id}
+    finally:
+        _release_r2_rename_lock(operation_id)
+
+
+@shared_task(
+    acks_late=True,
+    reject_on_worker_lost=True,
+    name="management_system.media_tasks.retry_automation_publication",
+)
+def retry_automation_publication(public_id: str):
+    job = MediaProcessingJob.objects.filter(
+        public_id=public_id,
+        error_code=PUBLICATION_PENDING_ERROR,
+    ).first()
+    if job is None or not is_automation_job(job):
+        return {"status": "ignored", "public_id": str(public_id)}
+    try:
+        publish_automation_lesson(job.pk)
+    except Exception:
+        logger.exception(
+            "automation publication retry failed",
+            extra={"event": "automation_publication_retry_failed", "public_id": str(public_id)},
+        )
+        return {"status": "failed", "public_id": str(public_id)}
+    return {"status": "published", "public_id": str(public_id)}
+
+
 __all__ = [
     "enqueue_media_job",
     "enqueue_media_attachment_retry",
@@ -1138,4 +1437,8 @@ __all__ = [
     "enqueue_media_cleanup",
     "recover_pending_media_jobs",
     "retry_media_attachment",
+    "queue_r2_rename",
+    "get_r2_rename_status",
+    "rename_r2_operation",
+    "retry_automation_publication",
 ]

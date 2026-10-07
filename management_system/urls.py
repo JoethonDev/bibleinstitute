@@ -141,6 +141,7 @@ urlpatterns = [
     path('api/media/jobs/<uuid:job_uuid>/cleanup/', media_job_cleanup, name="media-job-cleanup"),
     path('api/media/jobs/<uuid:job_uuid>/retry/', media_job_retry, name="media-job-retry"),
     path('api/media/jobs/<uuid:job_uuid>/attachment-retry/', media_job_attachment_retry, name="media-job-attachment-retry"),
+    path('api/media/jobs/<uuid:job_uuid>/publish-retry/', media_job_publish_retry, name="media-job-publish-retry"),
     path('dashboard/media-processing/', media_processing_status, name="media-processing-status"),
     
     # R2 File Management
@@ -150,6 +151,7 @@ urlpatterns = [
     path('api/r2/files/delete-m3u8/', api_delete_m3u8_file, name="api-delete-m3u8-file"),
     path('api/r2/files/delete-batch/', api_delete_files_batch, name="api-delete-files-batch"),
     path('api/r2/files/rename/', api_rename_file, name="api-rename-file"),
+    path('api/r2/files/rename/<uuid:operation_id>/status/', api_r2_rename_status, name="api-r2-rename-status"),
     path('api/r2/files/move/', api_move_file, name="api-move-file"),
     path('api/r2/files/metadata/', api_get_file_metadata, name="api-get-file-metadata"),
     path('api/r2/files/download/', api_download_file, name="api-download-file"),

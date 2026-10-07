@@ -353,6 +353,7 @@ def upload_output_file(
     client: Any = None,
     bucket: Optional[str] = None,
     cancellation_check=None,
+    output_key_callback=None,
 ) -> dict:
     """
     Upload a local output file to its exact final key, rejecting collisions.
@@ -392,6 +393,15 @@ def upload_output_file(
             except Exception:
                 setattr(exc, "output_keys", [key])
             raise
+        if output_key_callback:
+            try:
+                output_key_callback(key)
+            except Exception as exc:
+                try:
+                    delete_object_exact(key, client=resolved_client, bucket=resolved_bucket)
+                except Exception:
+                    setattr(exc, "output_keys", [key])
+                raise
     try:
         metadata = verify_output_object(
             key,

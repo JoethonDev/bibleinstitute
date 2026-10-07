@@ -12222,3 +12222,138 @@ msgstr "Application is currently closed. Please apply next year."
 
 msgid "New applications enroll into:"
 msgstr "New applications enroll into:"
+
+msgid "Cleanup scheduled"
+msgstr "Cleanup scheduled"
+
+msgid "Stopping"
+msgstr "Stopping"
+
+msgid "Publishing lesson"
+msgstr "Publishing lesson"
+
+msgid "Lesson publication failed"
+msgstr "Lesson publication failed"
+
+msgid "Continue publishing"
+msgstr "Continue publishing"
+
+msgid "Retry processing"
+msgstr "Retry processing"
+
+msgid "Waiting for source upload"
+msgstr "Waiting for source upload"
+
+msgid "No action needed"
+msgstr "No action needed"
+
+msgid "Source uploaded"
+msgstr "Source uploaded"
+
+msgid "Saved to R2"
+msgstr "Saved to R2"
+
+msgid "Attached to lesson"
+msgstr "Attached to lesson"
+
+msgid "Next:"
+msgstr "Next:"
+
+msgid "Done:"
+msgstr "Done:"
+
+msgid "Stop"
+msgstr "Stop"
+
+msgid "Clean up"
+msgstr "Clean up"
+
+msgid "Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed."
+msgstr "Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed."
+
+msgid "Draft lesson removed."
+msgstr "Draft lesson removed."
+
+msgid "Shared or unverified files were kept."
+msgstr "Shared or unverified files were kept."
+
+msgid "Rename in progress"
+msgstr "Rename in progress"
+
+msgid "Rename progress"
+msgstr "Rename progress"
+
+msgid "Finding files"
+msgstr "Finding files"
+
+msgid "Copying files"
+msgstr "Copying files"
+
+msgid "Removing old files"
+msgstr "Removing old files"
+
+msgid "Updating lesson links"
+msgstr "Updating lesson links"
+
+msgid "Cleaning up partial copies"
+msgstr "Cleaning up partial copies"
+
+msgid "Rename complete"
+msgstr "Rename complete"
+
+msgid "Rename queued"
+msgstr "Rename queued"
+
+msgid "Could not load rename progress"
+msgstr "Could not load rename progress"
+
+msgid "Rename progress was not found"
+msgstr "Rename progress was not found"
+
+msgid "You do not have permission to view this rename"
+msgstr "You do not have permission to view this rename"
+
+msgid "The new files are ready, but some old files remain."
+msgstr "The new files are ready, but some old files remain."
+
+msgid "%(done)s of %(total)s files"
+msgstr "%(done)s of %(total)s files"
+
+msgid "Waiting for rename progress"
+msgstr "Waiting for rename progress"
+
+msgid "Rename request was not accepted"
+msgstr "Rename request was not accepted"
+
+msgid "Wait for the current rename to finish"
+msgstr "Wait for the current rename to finish"
+
+msgid "Rename failed. Check the source and destination, then try again."
+msgstr "Rename failed. Check the source and destination, then try again."
+
+msgid "Invalid rename request"
+msgstr "Invalid rename request"
+
+msgid "Invalid folder rename"
+msgstr "Invalid folder rename"
+
+msgid "Invalid file key"
+msgstr "Invalid file key"
+
+msgid "The new name must differ"
+msgstr "The new name must differ"
+
+msgid "Both names must be video manifests"
+msgstr "Both names must be video manifests"
+
+msgid "Segment files cannot be renamed directly. Rename the video file instead."
+msgstr "Segment files cannot be renamed directly. Rename the video file instead."
+
+msgid "Could not start the rename. Please try again."
+msgstr "Could not start the rename. Please try again."
+
+msgid "Could not start publication. Please try again."
+msgstr "Could not start publication. Please try again."
+
+msgid "Upload cleaned up"
+msgstr "Upload cleaned up"
