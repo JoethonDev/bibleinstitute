@@ -28,6 +28,11 @@ function progressTracker() {
         pageExitHandler: null,
         progressUpdateHandler: null,
         visibilityHandler: null,
+        positionHandler: null,
+        resumeSeconds: 0,
+        resumeApplied: false,
+        lastPositionBroadcastAt: 0,
+        suppressPositionBroadcastUntil: 0,
 
         init() {
             this.offeringId = this.$el.dataset.offeringId;
@@ -49,6 +54,10 @@ function progressTracker() {
                 this.setProgressPercent(detail.percent);
             };
             window.addEventListener('lecture-progress-updated', this.progressUpdateHandler);
+            // Paired audio/video of one lesson part share one backend progress
+            // row. Mirror the seek slider between them so both stay aligned.
+            this.positionHandler = event => this.applyPeerPosition(event.detail || {});
+            window.addEventListener('lecture-position-updated', this.positionHandler);
             this.mediaAuthErrorHandler = event => {
                 const detail = event.detail || {};
                 if (
@@ -84,10 +93,75 @@ function progressTracker() {
             if (this.progressUpdateHandler) {
                 window.removeEventListener('lecture-progress-updated', this.progressUpdateHandler);
             }
+            if (this.positionHandler) {
+                window.removeEventListener('lecture-position-updated', this.positionHandler);
+            }
             if (this.mediaAuthErrorHandler) {
                 this.$el.removeEventListener('media-auth-expired', this.mediaAuthErrorHandler);
             }
             this.sendHeartbeat(true);
+        },
+
+        applyPeerPosition(detail) {
+            if (detail.lessonId === undefined || detail.partId === undefined) return;
+            if (
+                String(detail.lessonId) !== String(this.lessonId)
+                || String(detail.partId) !== String(this.partId)
+            ) return;
+            const media = this.$el.querySelector('video, audio');
+            if (!media || media === detail.element) return;
+            // Never disturb a peer that is actually playing; only align the
+            // slider of an idle pair.
+            if (media.paused !== true) return;
+            const target = Number(detail.time);
+            if (!Number.isFinite(target) || target < 0) return;
+            const current = Number(media.currentTime) || 0;
+            if (Math.abs(current - target) <= 2) return;
+            this.suppressPositionBroadcastUntil = performance.now() + 700;
+            try {
+                const player = media.player;
+                if (player && typeof player.currentTime === 'function') player.currentTime(target);
+                else media.currentTime = target;
+            } catch (_) { /* a source swap may own the element; skip this tick */ }
+        },
+
+        broadcastPosition(media) {
+            if (!media || !Number.isFinite(media.currentTime)) return;
+            const now = performance.now();
+            if (now < this.suppressPositionBroadcastUntil) return;
+            if (now - this.lastPositionBroadcastAt < 800) return;
+            this.lastPositionBroadcastAt = now;
+            window.dispatchEvent(new CustomEvent('lecture-position-updated', {
+                detail: {
+                    lessonId: this.lessonId,
+                    partId: this.partId,
+                    time: media.currentTime,
+                    element: media,
+                },
+            }));
+        },
+
+        applyResumePosition(media) {
+            if (!media || this.resumeApplied || this.resumeSeconds <= 0) return;
+            const target = this.resumeSeconds;
+            const seek = () => {
+                if (this.resumeApplied || this.destroyed) return;
+                this.resumeApplied = true;
+                media.removeEventListener('loadedmetadata', seek);
+                try {
+                    const player = media.player;
+                    const hasPlayer = player && typeof player.currentTime === 'function';
+                    const current = hasPlayer ? Number(player.currentTime()) : Number(media.currentTime);
+                    // Only jump forward to the saved point; never rewind an
+                    // already-positioned player.
+                    if (!Number.isFinite(current) || current < target - 1) {
+                        if (hasPlayer) player.currentTime(target);
+                        else media.currentTime = target;
+                    }
+                } catch (_) { /* metadata may still be settling */ }
+            };
+            media.addEventListener('loadedmetadata', seek);
+            window.setTimeout(seek, 2000);
         },
 
         async startSession({refresh = false} = {}) {
@@ -106,10 +180,16 @@ function progressTracker() {
                 this.setProgressPercent(data.progress_percent);
                 this.publishProgress();
             }
+            if (typeof data.resume_seconds === 'number' && Number.isFinite(data.resume_seconds)) {
+                this.resumeSeconds = Math.max(0, Math.floor(data.resume_seconds));
+            }
             this.mediaUrl = `${data.manifest_url}?session_id=${encodeURIComponent(data.session_id)}&token=${encodeURIComponent(data.token)}`;
             const media = this.$el.querySelector('video, audio');
             const source = media?.querySelector('source');
             if (media && source) {
+                // On the very first session, continue from the last verified
+                // second. Token refreshes keep the live position instead.
+                if (!refresh && !hadSession) this.applyResumePosition(media);
                 source.src = this.mediaUrl;
                 media.dispatchEvent(new CustomEvent('media-session-ready', {
                     bubbles: true,
@@ -168,6 +248,7 @@ function progressTracker() {
             if (!media || !Number.isFinite(media.currentTime)) return;
 
             this.samplePlayback(media);
+            this.broadcastPosition(media);
 
             if (media.played && media.played.length) {
                 const ranges = [];
@@ -179,7 +260,11 @@ function progressTracker() {
                     }
                 }
                 this.playedRanges = ranges;
-            } else {
+            } else if (!media.paused) {
+                // Some browsers report an empty played list while playing.
+                // Never synthesise a range for a paused player (e.g. a seek on
+                // the idle paired audio/video track): a paused seek plays
+                // nothing and must not be credited.
                 this.playedRanges = [[media.currentTime, media.currentTime + 5]];
             }
         },

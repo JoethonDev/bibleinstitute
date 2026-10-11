@@ -3388,9 +3388,23 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     gap: .5rem;
 }
 
-.quiz-import-loading {
-    display: inline-flex;
+.quiz-import-loading.htmx-indicator {
+    /* admin_panel sets includeIndicatorCSS:false, so the shared app.css
+       .htmx-indicator { display:none } rule is the only one hiding this.
+       Keep this rule's specificity above it, otherwise the spinner would be
+       permanently visible. */
+    display: none;
     align-items: center;
+}
+
+.quiz-import-loading.htmx-indicator.htmx-request {
+    display: inline-flex;
+}
+
+/* Insurance when the requesting button (not the indicator) receives the
+   htmx-request class: reveal the spinner while any sibling request runs. */
+.quiz-import-actions-row:has(.htmx-request) .quiz-import-loading.htmx-indicator {
+    display: inline-flex;
 }
 
 .quiz-import-result {

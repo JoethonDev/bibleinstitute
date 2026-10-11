@@ -2223,6 +2223,10 @@ class ViewingSession(models.Model):
         default=AccessChannel.WEB,
     )
     part_id = models.CharField(max_length=100)
+    # Exact manifest object key of the file the session was opened for. Paired
+    # video/audio share a part_id but can have different segment timelines, so
+    # progress verification must read the played file's own playlist.
+    media_key = models.CharField(max_length=500, blank=True, default="")
     session_id = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField()
     last_heartbeat = models.DateTimeField(default=timezone.now)
@@ -2336,6 +2340,10 @@ class LectureProgress(models.Model):
     part_id = models.CharField(max_length=100)
     merged_ranges = models.JSONField(default=list)
     unique_seconds = models.PositiveIntegerField(default=0)
+    # Furthest verified playback point for this exact lesson part. Video and
+    # audio links that share a part_id share this row, so resuming either one
+    # continues from the same second.
+    last_position_seconds = models.PositiveIntegerField(default=0)
     percent = models.PositiveSmallIntegerField(default=0)
     completed_at = models.DateTimeField(null=True, blank=True)
     activity_tracking_started_at = models.DateTimeField(default=timezone.now, editable=False)

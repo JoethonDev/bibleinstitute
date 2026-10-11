@@ -1,4 +1,9 @@
 {% load i18n %}
+{% if include_older_sentinel and messages_page_obj and messages_page_obj.has_previous %}
+<li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
+    data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
+    aria-hidden="true"></li>
+{% endif %}
 {% for message in message_items %}
 <li class="tg-chat-msg tg-chat-msg--{{ message.direction }}" data-msg-pk="{{ message.pk }}">
     <div class="tg-chat-msg-head">
@@ -30,8 +35,3 @@
 {% empty %}
 {% if show_empty %}<li class="ad-empty"><i class="fas fa-inbox" aria-hidden="true"></i>{% translate "No messages yet." %}</li>{% endif %}
 {% endfor %}
-{% if include_older_sentinel and messages_page_obj and messages_page_obj.has_previous %}
-<li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
-    data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
-    aria-hidden="true"></li>
-{% endif %}

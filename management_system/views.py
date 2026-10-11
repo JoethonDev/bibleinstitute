@@ -7131,9 +7131,10 @@ def delete_attendance(request, record_id):
 # PHASE 6 — Online Lecture Progress Tracking
 # ============================================================================
 
-def create_viewing_session(student, lesson, part_id, *, mobile_session=None):
+def create_viewing_session(student, lesson, part_id, *, mobile_session=None, media_key=""):
     session_id = secrets.token_urlsafe(32)
-    expires_at = timezone.now() + timedelta(hours=2)
+    session_hours = max(1, int(getattr(settings, "MEDIA_VIEWING_SESSION_HOURS", 3) or 3))
+    expires_at = timezone.now() + timedelta(hours=session_hours)
     access_channel = ViewingSession.AccessChannel.MOBILE if mobile_session is not None else ViewingSession.AccessChannel.WEB
     if mobile_session is not None and mobile_session.user_id != student.pk:
         raise PermissionDenied(_("The viewing session is invalid."))
@@ -7143,6 +7144,7 @@ def create_viewing_session(student, lesson, part_id, *, mobile_session=None):
         mobile_session=mobile_session,
         access_channel=access_channel,
         part_id=part_id,
+        media_key=media_key or "",
         session_id=session_id,
         expires_at=expires_at,
     )
@@ -7201,7 +7203,9 @@ def _record_progress_event(
 
 MEDIA_TOKEN_VERSION = "v2"
 MEDIA_AUDIENCES = frozenset({"web", "mobile"})
-MEDIA_SEGMENT_TOKEN_LIFETIME = timedelta(minutes=10)
+MEDIA_SEGMENT_TOKEN_LIFETIME = timedelta(
+    minutes=max(1, int(getattr(settings, "MEDIA_SEGMENT_TOKEN_MINUTES", 180) or 180))
+)
 
 
 def _media_binding(audience, mobile_session_id=None):
@@ -7296,13 +7300,15 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
     part_id = file_info.get("part_id", "")
     # Each player/tab gets an independent authorization session and sequence.
     # Logical study sessions are shared and serialized by the progress row lock.
-    session = create_viewing_session(request.user, lesson, part_id)
+    session = create_viewing_session(request.user, lesson, part_id, media_key=file_info.get("id", ""))
     token = sign_session(session.session_id, session.expires_at, audience="web")
-    progress_percent = LectureProgress.objects.filter(
+    progress_row = LectureProgress.objects.filter(
         student=request.user,
         lesson=lesson,
         part_id=part_id,
-    ).values_list("percent", flat=True).first() or 0
+    ).values("percent", "last_position_seconds").first()
+    progress_percent = int(progress_row["percent"] or 0) if progress_row else 0
+    resume_seconds = int(progress_row["last_position_seconds"] or 0) if progress_row else 0
     return JsonResponse({
         "session_id": session.session_id,
         "token": token,
@@ -7310,6 +7316,7 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         "segment_token_lifetime_seconds": int(MEDIA_SEGMENT_TOKEN_LIFETIME.total_seconds()),
         "manifest_url": reverse("lesson-manifest", args=[offering.pk, lesson.pk, file_index]),
         "progress_percent": progress_percent,
+        "resume_seconds": resume_seconds,
     })
 
 @login_required
@@ -7347,6 +7354,10 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
     if session.access_channel != expected_channel:
         return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
     if not _valid_session_token(token, session, audience=audience):
+        return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
+    # The session is opened for one exact file. Reject a manifest request for a
+    # different file so progress is never verified against the wrong timeline.
+    if session.media_key and session.media_key != key:
         return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
     try:
         response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
@@ -7578,11 +7589,14 @@ def progress_heartbeat(request, *, allow_management=False):
     if not verified:
         return progress_response(_("No verified segments yet"))
 
-    # Get segment time ranges from lesson and filter to verified ones
+    # Get segment time ranges from the played file's own playlist. Paired
+    # video/audio share a part_id but can have different segment timelines, so
+    # the session's media_key (when present) selects the exact manifest.
     lesson_segments = get_lesson_segments(
         session.lesson,
         CLOUD_CLIENT,
         bucket_name,
+        media_key=session.media_key or None,
         requested_part_id=session.part_id,
     ).get(session.part_id, [])
     all_ranges = [
@@ -7623,6 +7637,15 @@ def progress_heartbeat(request, *, allow_management=False):
         progress.merged_ranges = merged
         progress.percent = percent
         progress.unique_seconds = int(round(unique_secs))
+        if merged:
+            # Resume point = furthest verified second reached for this part.
+            # Video and audio of the same part share this row, so either one
+            # resumes to the same position on the next visit.
+            furthest = max(float(end) for _start, end in merged)
+            progress.last_position_seconds = max(
+                int(progress.last_position_seconds or 0),
+                int(furthest),
+            )
         if not progress.completed_at and percent >= 80:
             progress.completed_at = timezone.now()
         progress.save()

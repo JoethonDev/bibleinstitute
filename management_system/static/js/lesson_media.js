@@ -64,10 +64,47 @@
         );
     }
 
+    function mediaWrapper(media) {
+        return media?.closest?.('.sd-live-player') || media?.parentElement || null;
+    }
+
+    function showMediaReloader(media) {
+        const wrapper = mediaWrapper(media);
+        if (!wrapper) return;
+        let overlay = wrapper.querySelector('.media-reload-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'media-reload-overlay';
+            overlay.setAttribute('role', 'status');
+            overlay.setAttribute('aria-live', 'polite');
+            const spinner = document.createElement('div');
+            spinner.className = 'media-reload-spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+            const label = document.createElement('span');
+            label.className = 'media-reload-label';
+            label.textContent = translate('reloading', 'Loading...');
+            overlay.appendChild(spinner);
+            overlay.appendChild(label);
+            wrapper.appendChild(overlay);
+        }
+        wrapper.classList.add('is-media-reloading');
+    }
+
+    function hideMediaReloader(media) {
+        const wrapper = mediaWrapper(media);
+        if (!wrapper) return;
+        wrapper.classList.remove('is-media-reloading');
+        const overlay = wrapper.querySelector('.media-reload-overlay');
+        if (overlay) overlay.remove();
+    }
+
     function requestMediaRefresh(media) {
         const source = media?.querySelector('source');
         const url = media?._mediaSourceUrl || source?.src;
         if (!media || !url) return;
+        // Playback can outlive the signed token. Swap in a fresh session behind
+        // a spinner instead of surfacing the player error to the student.
+        showMediaReloader(media);
         media.dispatchEvent(new CustomEvent('media-auth-expired', {
             bubbles: true,
             detail: {element: media, sourceUrl: url},
@@ -78,8 +115,9 @@
         const error = player?.error?.() || media?.error;
         const status = mediaErrorStatus(error);
         // Video.js/VHS reports failed segment requests as a generic network
-        // MediaError on some browsers, without exposing the HTTP status.
-        if (status === 401 || error?.code === 2 || media?.error?.code === 2) {
+        // MediaError on some browsers, without exposing the HTTP status. The
+        // Worker answers an expired/invalid signed URL with 401 or 403.
+        if (status === 401 || status === 403 || error?.code === 2 || media?.error?.code === 2) {
             requestMediaRefresh(media);
         }
     }
@@ -500,11 +538,25 @@
     }
 
     document.addEventListener('media-session-ready', event => {
+        const media = event.detail?.element;
         attachMediaSource(
-            event.detail?.element,
+            media,
             event.detail?.url,
             Boolean(event.detail?.refresh),
         );
+        if (media) {
+            const settle = () => {
+                media.removeEventListener('loadeddata', settle);
+                media.removeEventListener('canplay', settle);
+                media.removeEventListener('playing', settle);
+                hideMediaReloader(media);
+            };
+            media.addEventListener('loadeddata', settle);
+            media.addEventListener('canplay', settle);
+            media.addEventListener('playing', settle);
+            // Absolute fallback so a spinner can never outlive a stalled load.
+            window.setTimeout(() => hideMediaReloader(media), 12000);
+        }
     });
 
     function swapTarget(event) {

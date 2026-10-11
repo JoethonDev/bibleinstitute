@@ -2,10 +2,10 @@
 <div id="telegram-conversation-list"
      class="tg-chat-list"
      data-loaded-pages="1"
-     data-scroll-armed="false"
-     data-poll-url="{{ conversation_list_url }}?fragment=1{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
+     data-poll-url="{{ conversation_list_url }}?fragment=items{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
      x-data="{
          autoRefresh: true,
+         polling: false,
          _timer: null,
          init() {
              this.$watch('autoRefresh', (value) => value ? this._start() : this._stop());
@@ -15,15 +15,22 @@
          _start() { if (!this._timer) this._timer = setInterval(() => this._poll(), 15000); },
          _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
          _poll() {
+             if (document.hidden || this.polling) return;
              const el = this.$el;
-             if (document.hidden) return;
              if (!el.dataset.pollUrl) return;
+             // Once older pages are appended, a page-1 poll would drop them.
              if (Number(el.dataset.loadedPages || '1') > 1) return;
+             const list = el.querySelector('.tg-chat-conv-list');
+             if (!list) return;
              if (!window.telegramChatBeginRequest?.(el)) return;
-             el.dataset.scrollArmed = 'false';
-             htmx.ajax('GET', el.dataset.pollUrl, { target: el, swap: 'innerMorph' })
+             this.polling = true;
+             // Morph only the rows so avatars and row state are preserved and
+             // the message thread is never touched by this refresh.
+             htmx.ajax('GET', el.dataset.pollUrl, { target: list, swap: 'innerMorph' })
+                 .then(() => window.telegramChatRebind?.(el))
                  .catch(() => {})
                  .finally(() => {
+                     this.polling = false;
                      window.telegramChatEndRequest?.(el);
                  });
          }

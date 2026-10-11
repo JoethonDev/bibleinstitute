@@ -298,6 +298,12 @@ MEDIA_WORK_DIR = os.getenv("MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
 MEDIA_MAX_SOURCE_SIZE = int(os.getenv("MEDIA_MAX_SOURCE_SIZE", str(2 * 1024 ** 3)))
 MEDIA_MAX_DURATION_SECONDS = int(os.getenv("MEDIA_MAX_DURATION_SECONDS", str(3 * 60 * 60)))
 MEDIA_JOB_TIMEOUT_SECONDS = int(os.getenv("MEDIA_JOB_TIMEOUT_SECONDS", str(2 * 60 * 60)))
+# Signed playback capability lifetime. The viewing session token and the
+# per-segment manifest tokens are both minted for this window; the client still
+# renews proactively at 80% of the segment-token lifetime so an expired token
+# never interrupts playback. Default 3 hours.
+MEDIA_VIEWING_SESSION_HOURS = int(os.getenv("MEDIA_VIEWING_SESSION_HOURS", "3"))
+MEDIA_SEGMENT_TOKEN_MINUTES = int(os.getenv("MEDIA_SEGMENT_TOKEN_MINUTES", "180"))
 MEDIA_SEGMENT_SECONDS = int(os.getenv("MEDIA_SEGMENT_SECONDS", "6"))
 MEDIA_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_SOURCE_RETENTION_HOURS", "24"))
 MEDIA_FAILED_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_FAILED_SOURCE_RETENTION_HOURS", "72"))

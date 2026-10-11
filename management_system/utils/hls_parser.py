@@ -2,11 +2,40 @@ import json
 import re
 from logging import getLogger
 
+from django.core.cache import cache
+
 from ..utils.storage_operations import download_from_bucket
 
 logger = getLogger(__name__)
 
 SEGMENT_NUMBER_RE = re.compile(r"(?:^|[_-])(?P<number>\d+)\.ts(?:[?#].*)?$", re.IGNORECASE)
+
+# Parsed manifests are immutable (the media pipeline writes a new key for every
+# re-encode), so the segment timeline can be cached. This removes the per-
+# heartbeat R2 GET that would otherwise run for every active student.
+SEGMENTS_CACHE_TTL_SECONDS = 3600
+
+
+def _segments_for_key(cloud_client, bucket_name, key):
+    """Return the parsed segment timeline for one manifest key, cached briefly."""
+    cache_key = f"hls:segments:{key}"
+    try:
+        cached = cache.get(cache_key)
+    except Exception:  # a cache outage must not break progress tracking
+        cached = None
+    if cached is not None:
+        return cached
+    content = download_from_bucket(cloud_client, bucket_name, key)
+    if not content:
+        # Never cache a miss: a transient storage error would otherwise pin an
+        # empty timeline for the whole TTL.
+        return []
+    segments = parse_hls_segments(content.read().decode())
+    try:
+        cache.set(cache_key, segments, SEGMENTS_CACHE_TTL_SECONDS)
+    except Exception:
+        pass
+    return segments
 
 
 def get_segment_number(segment_key: str):
@@ -60,9 +89,5 @@ def get_lesson_segments(
             candidates[part_id] = item
 
     for part_id, item in candidates.items():
-        content = download_from_bucket(cloud_client, bucket_name, item["id"])
-        if not content:
-            continue
-        playlist = content.read().decode()
-        result[part_id] = parse_hls_segments(playlist)
+        result[part_id] = _segments_for_key(cloud_client, bucket_name, item["id"])
     return result

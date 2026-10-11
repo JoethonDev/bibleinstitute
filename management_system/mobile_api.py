@@ -888,10 +888,13 @@ def media_session(request, offering_id, lesson_id, file_index):
         lesson,
         part_id,
         mobile_session=request.mobile_session,
+        media_key=link.get("id", ""),
     )
-    progress_percent = LectureProgress.objects.filter(
+    progress_row = LectureProgress.objects.filter(
         student=request.user, lesson=lesson, part_id=part_id
-    ).values_list("percent", flat=True).first() or 0
+    ).values("percent", "last_position_seconds").first()
+    progress_percent = int(progress_row["percent"] or 0) if progress_row else 0
+    resume_seconds = int(progress_row["last_position_seconds"] or 0) if progress_row else 0
     return json_api_response(request, {
         "session_id": session.session_id,
         "token": sign_session(
@@ -904,6 +907,7 @@ def media_session(request, offering_id, lesson_id, file_index):
         "expires_at": session.expires_at.isoformat(),
         "manifest_url": request.build_absolute_uri(reverse("mobile-v1:media-manifest", kwargs={"offering_id": offering_id, "lesson_id": lesson_id, "file_index": file_index})),
         "progress_percent": max(0, min(int(progress_percent), 100)),
+        "resume_seconds": max(0, resume_seconds),
     })
 
 
