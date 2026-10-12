@@ -243,6 +243,20 @@ cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_accoun
 PromotionRuleFormSet = formset_factory(PromotionRuleForm, extra=0, can_delete=True)
 
 
+def _lesson_part_base(link_id) -> str:
+    """Canonical grouping key so a video manifest and its `_audio` sibling share one part.
+
+    The key (an R2 object key) is lowercased, its extension is dropped, and a
+    trailing `_audio` is stripped: `.../lecture3_2.m3u8` and
+    `.../lecture3_2_audio.m3u8` both reduce to the same base. A bare `audio`
+    name falls back to the full key so it still gets its own part.
+    """
+    stem = str(link_id or "").rsplit(".", 1)[0].lower()
+    if stem.endswith("_audio"):
+        stem = stem[: -len("_audio")]
+    return stem or str(link_id or "").lower()
+
+
 def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
     """Build lesson link metadata while preserving downloadable MP3 siblings."""
     videos = request.POST.getlist("videos", [])
@@ -257,6 +271,15 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
         for link in existing_links
         if isinstance(link, dict) and link.get("id") and link.get("part_id")
     }
+    # Reconciliation map: an already-paired base keeps its part when a key is
+    # re-uploaded or renamed. First stored pairing wins deterministically.
+    existing_base_part_ids = {}
+    for link in existing_links:
+        if isinstance(link, dict) and link.get("id") and link.get("part_id"):
+            existing_base_part_ids.setdefault(_lesson_part_base(link["id"]), link["part_id"])
+    # Links submitted together that share a base (video + its `_audio`
+    # sibling) are paired under one freshly generated part.
+    new_base_part_ids = {}
     links = []
     for index, video_key in enumerate(videos):
         download_key = download_ids[index].strip() if index < len(download_ids) else ""
@@ -266,11 +289,19 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
                 raise ValidationError(errors or [_('Downloadable audio key is invalid.')])
             if files_type[index] == "book":
                 raise ValidationError(_("Book media cannot have a downloadable audio file."))
+        base = _lesson_part_base(video_key)
+        part_id = (
+            existing_part_ids.get(video_key)
+            or existing_base_part_ids.get(base)
+            or new_base_part_ids.get(base)
+            or secrets.token_urlsafe(8)
+        )
+        new_base_part_ids.setdefault(base, part_id)
         link = {
             "file_type": files_type[index],
             "name": videos_name[index],
             "id": video_key,
-            "part_id": existing_part_ids.get(video_key) or secrets.token_urlsafe(8),
+            "part_id": part_id,
         }
         if download_key:
             link["download_id"] = download_key
@@ -1368,12 +1399,13 @@ def user_dashboard(request):
         ],
         "sort_fields": {
             "username": "username",
-            "name": ("last_name", "first_name"),
+            "name": ("last_name", "first_name", "username"),
             "role": "role__role",
             "joined_date": "joined_date",
             "last_login": "last_login",
         },
-        "default_sort": "joined_date",
+        "default_sort": "name",
+        "default_ordering": ["last_name", "first_name", "username", "pk"],
         "options" : [_('Choose Role'), *Role.get_readable_values()],
         "search_placeholder": _("Search username, email, name, phone, or national ID"),
         "table_scope": scope,
@@ -1552,7 +1584,7 @@ def historical_intake(request):
         # NOT be sliced: ModelMultipleChoiceField validates by filtering it,
         # and filtering a sliced queryset fails every submitted value.
         posted_ids = [int(value) for value in request.POST.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
-        student_options = base_students.filter(pk__in=posted_ids).order_by("username")
+        student_options = base_students.filter(pk__in=posted_ids).order_by("last_name", "first_name", "username", "pk")
         existing_form = HistoricalExistingBulkForm(request.POST, student_options=student_options)
     else:
         existing_form = HistoricalExistingBulkForm(
@@ -1779,14 +1811,14 @@ def historical_intake(request):
         picker_ids = [int(value) for value in request.POST.getlist("students") if value.isdigit()][: MAX_EXISTING_BULK_STUDENTS + 5]
     else:
         picker_ids = []
-    picker_selected = list(base_students.filter(pk__in=picker_ids).order_by("username")[: MAX_EXISTING_BULK_STUDENTS + 5])
+    picker_selected = list(base_students.filter(pk__in=picker_ids).order_by("last_name", "first_name", "username", "pk")[: MAX_EXISTING_BULK_STUDENTS + 5])
     picker_results: list = []
     if existing_q:
         search_filter = normalized_contains_q(("username", "email", "first_name", "last_name"), existing_q)
         if existing_q.isdigit():
             search_filter |= Q(pk=int(existing_q))
         picker_results = list(
-            base_students.filter(search_filter).exclude(pk__in=[user.pk for user in picker_selected]).order_by("username")[:20]
+            base_students.filter(search_filter).exclude(pk__in=[user.pk for user in picker_selected]).order_by("last_name", "first_name", "username", "pk")[:20]
         )
     summaries = HistoricalAcademicSummary.objects.select_related(
         "student", "academic_year_level__academic_year", "academic_year_level__level", "promotion_history__actor"
@@ -2113,6 +2145,7 @@ def course_dashboard(request):
             "instructor": "instructor",
         },
         "default_sort": "name",
+        "default_ordering": ["name", "pk"],
         "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
         "table_scope": scope,
     }
@@ -2345,7 +2378,8 @@ def lesson_dashboard(request):
             "academic_year": "course_offering__academic_year_level__academic_year__ordering",
             "updated_date": "updated_date",
         },
-        "default_sort": "name",
+        "default_sort": "updated_date",
+        "default_ordering": ["-updated_date", "name", "pk"],
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
@@ -3092,7 +3126,7 @@ def media_processing_status(request):
     valid_statuses = {value for value, _label in MediaProcessingStatus.choices}
     if status_filter not in valid_statuses:
         status_filter = ""
-    queryset = MediaProcessingJob.objects.select_related("lesson", "created_by")
+    queryset = MediaProcessingJob.objects.select_related("lesson", "created_by").order_by("-created_at", "-pk")
     if getattr(getattr(request.user, "role", None), "role", None) != "admin":
         queryset = queryset.filter(created_by=request.user)
     if status_filter:
@@ -3507,7 +3541,8 @@ def quiz_dashboard(request):
             "closing_date": "closing_date",
             "submissions": "submissions_count",
         },
-        "default_sort": "name",
+        "default_sort": "opening_date",
+        "default_ordering": ["-opening_date", "name", "pk"],
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
@@ -3761,9 +3796,6 @@ def update_quiz(request, quiz_id):
 
                 removed_ids = set(current_questions) - set(questions_id)
                 previous_status = quiz.status
-                previous_opening_date = quiz.opening_date
-                previous_closing_date = quiz.closing_date
-                previous_offering_id = quiz.course_offering_id
                 quiz.name = requested_name
                 quiz.opening_date = requested_opening_date
                 quiz.closing_date = requested_closing_date
@@ -3787,16 +3819,14 @@ def update_quiz(request, quiz_id):
                         reset_manual_ids=reset_manual_ids,
                         clamp_manual_ids=clamp_manual_ids,
                     )
-                published_window_changed = (
-                    previous_opening_date != quiz.opening_date
-                    or previous_closing_date != quiz.closing_date
-                    or previous_offering_id != quiz.course_offering_id
-                )
-                if publication_status == PublicationStatus.PUBLISHED and (
-                    previous_status != PublicationStatus.PUBLISHED or published_window_changed
-                ):
+                # Notifications fire only on first publication: a newly
+                # published quiz, or a draft/archived quiz switching to
+                # published. Editing an already-published quiz (questions,
+                # dates, offering) never re-notifies and never cancels the
+                # already-queued opening notifications.
+                if publication_status == PublicationStatus.PUBLISHED and previous_status != PublicationStatus.PUBLISHED:
                     schedule_quiz_opening_events(quiz, locked=True)
-                elif previous_status == PublicationStatus.PUBLISHED:
+                elif previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
                     cancel_future_quiz_opening_events(quiz)
 
             logger.info(
@@ -4128,11 +4158,12 @@ def submission_dashboard(request, quiz_id):
             {"label": _("Submission Date"), "key": "submitted_at"},
         ],
         "sort_fields": {
-            "name": "user__username",
+            "name": ("user__last_name", "user__first_name", "user__username"),
             "grades": "total_grade",
             "submitted_at": "submitted_at",
         },
-        "default_sort": "submitted_at",
+        "default_sort": "name",
+        "default_ordering": ["user__last_name", "user__first_name", "user__username", "pk"],
         "options" : [_("Choose Academic Year"), *[str(value) for value in available_years]],
         "submission_user" : True,
         "can_delete_submission": can_manage_academic_setup(request.user),
@@ -5153,8 +5184,10 @@ def _applications_dashboard_context(request):
             default=1,
             output_field=IntegerField(),
         ),
-        "-date_joined",
-        "-pk",
+        "last_name",
+        "first_name",
+        "username",
+        "pk",
     ]
     if status_filter == "all":
         users = User.objects.filter(
@@ -5973,7 +6006,7 @@ def academic_setup(request):
             offerings = offerings.filter(status=offering_status)
         else:
             offering_status = "all"
-    offering_page_obj = Paginator(offerings.order_by("course__name"), 15).get_page(request.GET.get("offering_page", 1))
+    offering_page_obj = Paginator(offerings.order_by("course__name", "pk"), 15).get_page(request.GET.get("offering_page", 1))
     scope_courses = Course.objects.filter(level=selected_scope.level).order_by("name") if selected_scope else Course.objects.none()
     year_form = AcademicYearForm(level_choices=course_levels)
     offering_form = CourseOfferingForm()
@@ -7734,7 +7767,7 @@ def progress_dashboard(request):
 
     progress = progress.select_related(
         "student", "lesson", "lesson__course_offering__course",
-    ).order_by("-lesson__name", "student__username", "pk")
+    ).order_by("student__last_name", "student__first_name", "student__username", "lesson__name", "pk")
 
     detail_id = request.GET.get("activity_detail")
     detail_day = request.GET.get("activity_day")

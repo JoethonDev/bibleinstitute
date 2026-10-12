@@ -144,23 +144,65 @@ function progressTracker() {
         applyResumePosition(media) {
             if (!media || this.resumeApplied || this.resumeSeconds <= 0) return;
             const target = this.resumeSeconds;
+            let attempts = 0;
+            const maxAttempts = 4;
+            const readPosition = () => {
+                try {
+                    const player = media.player;
+                    if (player && typeof player.currentTime === 'function') {
+                        return Number(player.currentTime());
+                    }
+                    return Number(media.currentTime);
+                } catch (_) {
+                    return NaN;
+                }
+            };
+            const isSettled = () => {
+                const current = readPosition();
+                return Number.isFinite(current) && current >= target - 2;
+            };
+            const stopListening = () => {
+                media.removeEventListener('loadedmetadata', seek);
+                media.removeEventListener('canplay', seek);
+            };
             const seek = () => {
                 if (this.resumeApplied || this.destroyed) return;
-                this.resumeApplied = true;
-                media.removeEventListener('loadedmetadata', seek);
+                if (isSettled()) {
+                    this.resumeApplied = true;
+                    stopListening();
+                    return;
+                }
+                if (attempts >= maxAttempts) {
+                    this.resumeApplied = true;
+                    stopListening();
+                    console.warn('progressTracker: resume seek did not settle', {
+                        target: target,
+                        attempts: attempts,
+                    });
+                    return;
+                }
+                attempts += 1;
                 try {
                     const player = media.player;
                     const hasPlayer = player && typeof player.currentTime === 'function';
                     const current = hasPlayer ? Number(player.currentTime()) : Number(media.currentTime);
-                    // Only jump forward to the saved point; never rewind an
-                    // already-positioned player.
                     if (!Number.isFinite(current) || current < target - 1) {
                         if (hasPlayer) player.currentTime(target);
                         else media.currentTime = target;
                     }
-                } catch (_) { /* metadata may still be settling */ }
+                } catch (_) { /* tech may still be settling */ }
+                // The first metadata event can precede a seekable tech (the
+                // tracker sets source.src and Video.js then loads the same URL
+                // through its own tech). Latching blindly here is exactly how
+                // a resume gets lost, so re-enter seek shortly after: it
+                // latches when settled, warns when attempts run out, and
+                // otherwise chains the next attempt.
+                window.setTimeout(() => {
+                    if (!this.resumeApplied && !this.destroyed) seek();
+                }, 600);
             };
             media.addEventListener('loadedmetadata', seek);
+            media.addEventListener('canplay', seek);
             window.setTimeout(seek, 2000);
         },
 

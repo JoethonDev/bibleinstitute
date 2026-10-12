@@ -3,10 +3,20 @@
 
     var timer = null;
     var cleanup = null;
+    var actionsDelegated = false;
     function init() {
+    // A previous media page may have left its poller behind when the new page
+    // has no media root, so the old timer is always cleared first.
+    if (cleanup) { cleanup(); cleanup = null; }
     var root = document.getElementById('content');
     if (!root || !root.hasAttribute('data-status-labels')) return;
-    if (cleanup) cleanup();
+    if (!actionsDelegated) {
+        actionsDelegated = true;
+        // One delegated listener serves every action button on this and every
+        // future media table: per-button bindings would miss nodes added by
+        // HTMX morph refreshes and would double-bind after outerHTML swaps.
+        document.addEventListener('click', onMediaActionClick);
+    }
     function refreshStatusRegion() {
         if (window.htmx) {
             htmx.ajax('GET', window.location.pathname + window.location.search, { target: '#content', select: '#content', swap: 'outerMorph' });
@@ -24,11 +34,17 @@
     var statusLabels = parseLabels('data-status-labels');
     var batchStatusUrl = root.getAttribute('data-batch-status-url') || '';
     var retryFailed = root.getAttribute('data-trans-retry-failed') || gettext('Retry failed');
-    var csrfInput = document.querySelector('#media-status-csrf input[name="csrfmiddlewaretoken"]');
-    var csrf = csrfInput ? csrfInput.value : '';
-    root.querySelectorAll('[data-media-retry-url]').forEach(function (button) {
-        button.addEventListener('click', function () {
+
+    function onMediaActionClick(event) {
+        var button = event.target && event.target.closest
+            ? event.target.closest('[data-media-retry-url],[data-media-stop-url],[data-media-cleanup-url]')
+            : null;
+        if (!button || button.disabled) return;
+        if (button.hasAttribute('data-media-retry-url')
+                && !button.hasAttribute('data-media-stop-url')
+                && !button.hasAttribute('data-media-cleanup-url')) {
             var url = button.getAttribute('data-media-retry-url');
+            var csrf = readCsrf();
             if (!url || !csrf) {
                 return;
             }
@@ -50,8 +66,26 @@
                 button.setAttribute('aria-label', error.message);
                 window.alert(error.message);
             });
-        });
-    });
+            return;
+        }
+        if (button.hasAttribute('data-media-stop-url')) {
+            submitConfirmedAction(
+                button,
+                button.closest('tr'),
+                button.getAttribute('data-media-stop-url'),
+                gettext('Stop processing this upload and any companion files?')
+            );
+            return;
+        }
+        if (button.hasAttribute('data-media-cleanup-url')) {
+            submitConfirmedAction(
+                button,
+                button.closest('tr'),
+                button.getAttribute('data-media-cleanup-url'),
+                gettext('Remove this upload’s server files and R2 objects?')
+            );
+        }
+    }
 
     function notify(message, type) {
         var store = window.Alpine && window.Alpine.store
@@ -60,7 +94,13 @@
         if (store && typeof store.add === 'function') store.add(message, type || 'info');
     }
 
+    function readCsrf() {
+        var csrfInput = document.querySelector('#media-status-csrf input[name="csrfmiddlewaretoken"]');
+        return csrfInput ? csrfInput.value : '';
+    }
+
     function submitConfirmedAction(button, row, url, fallbackMessage) {
+        var csrf = readCsrf();
         if (!url || !csrf || button.dataset.pending === '1') return;
         if (typeof window.appConfirm !== 'function') {
             notify(gettext('The confirmation dialog is unavailable. Reload the page and try again.'), 'danger');
@@ -97,28 +137,6 @@
             });
         });
     }
-
-    root.querySelectorAll('[data-media-stop-url]').forEach(function (button) {
-        button.addEventListener('click', function () {
-            submitConfirmedAction(
-                button,
-                button.closest('tr'),
-                button.getAttribute('data-media-stop-url'),
-                gettext('Stop processing this upload and any companion files?')
-            );
-        });
-    });
-
-    root.querySelectorAll('[data-media-cleanup-url]').forEach(function (button) {
-        button.addEventListener('click', function () {
-            submitConfirmedAction(
-                button,
-                button.closest('tr'),
-                button.getAttribute('data-media-cleanup-url'),
-                gettext('Remove this upload’s server files and R2 objects?')
-            );
-        });
-    });
 
     function updateRow(row, job) {
         var status = row.querySelector('[data-media-status-value]');

@@ -83,11 +83,13 @@ function lessonForm() {
             const name = titleEl ? titleEl.textContent.trim() : id;
             if (!name) return;
 
-            // Auto-detect file type from name
-            let fileType = 'book';
+            // Auto-detect file type from name: audio always wins; a name
+            // containing "lecture" (without "audio") defaults to video;
+            // anything else stays a book.
             const nameLower = name.toLowerCase();
+            let fileType = 'book';
+            if (nameLower.includes('video') || nameLower.includes('lecture')) fileType = 'video';
             if (nameLower.includes('audio')) fileType = 'audio';
-            if (nameLower.includes('video')) fileType = 'video';
 
             // Create video card HTML
             const videoCard = `

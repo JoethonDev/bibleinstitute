@@ -485,7 +485,7 @@ def telegram_conversations(request):
     ).order_by("pk")
     linked_users = linked_users.annotate(
         active_conversation_id=Subquery(active_conversation.values("pk")[:1]),
-    ).order_by("user__username", "user__pk")
+    ).order_by("user__first_name", "user__last_name", "user__username", "user__pk")
     context.update({
         "start_search": start_search,
         "linked_user_page_obj": Paginator(linked_users, 10).get_page(

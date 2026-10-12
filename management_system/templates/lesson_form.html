@@ -200,6 +200,7 @@
                                         
                                          <!-- Empty State -->
                                          <div x-show="selectedLectureCount === 0"
+                                              x-cloak
                                               class="text-center text-muted py-5">
                                              <i class="fas fa-folder-open fa-3x mb-3"></i>
                                              <p>{% translate "No lectures selected yet" %}</p>
@@ -220,7 +221,7 @@
                                 <i class="fas fa-save me-2"></i>
                                 {% translate "Submit" %}
                             </span>
-                            <span x-show="submitting" :class="{ 'd-flex align-items-center justify-content-center': submitting }">
+                            <span x-show="submitting" x-cloak :class="{ 'd-flex align-items-center justify-content-center': submitting }">
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                 {% translate "Submitting..." %}
                             </span>

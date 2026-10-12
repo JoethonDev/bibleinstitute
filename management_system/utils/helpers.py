@@ -133,15 +133,42 @@ def pagination_query_string(request, exclude=("page",)):
     return params.urlencode()
 
 
-def apply_table_sorting(queryset, request, sort_fields, default_sort):
+def apply_table_sorting(
+    queryset,
+    request,
+    sort_fields,
+    default_sort,
+    default_order="asc",
+    default_ordering=None,
+):
     """Apply a whitelisted, deterministic ordering to an admin table queryset."""
+    if not request.GET.get("sort") and default_ordering:
+        return (
+            queryset.order_by(*default_ordering),
+            default_sort,
+            "desc" if str(default_ordering[0]).startswith("-") else "asc",
+        )
+
     if not sort_fields or default_sort not in sort_fields:
         return queryset, "", "asc"
 
     sort_key = request.GET.get("sort", "")
+    requested_order = request.GET.get("order")
     if sort_key not in sort_fields:
+        # Unknown keys fall back to the locked default list, including its
+        # direction, so a hand-crafted ?sort= can never flip a date-DESC
+        # list to oldest-first.
         sort_key = default_sort
-    direction = "desc" if request.GET.get("order") == "desc" else "asc"
+        if requested_order == "desc":
+            direction = "desc"
+        elif requested_order == "asc":
+            direction = "asc"
+        elif default_ordering:
+            direction = "desc" if str(default_ordering[0]).startswith("-") else "asc"
+        else:
+            direction = default_order
+    else:
+        direction = "desc" if requested_order == "desc" else "asc"
     fields = sort_fields[sort_key]
     if isinstance(fields, str):
         fields = (fields,)
@@ -207,6 +234,8 @@ def render_dashboard(request, obj, view, context, parameters=[]):
             request,
             sort_fields,
             context.get("default_sort", next(iter(sort_fields), "")),
+            default_order=context.get("default_order", "asc"),
+            default_ordering=context.get("default_ordering"),
         )
         context["sort_key"] = sort_key
         context["sort_order"] = sort_order

@@ -15,6 +15,15 @@
         Alpine.data('progressTracker', progressTracker);
     });
 
+    // Mobile offcanvas: one canonical close used by the click path and by
+    // every HTMX page navigation, so closing never depends on which page
+    // issued the navigation request.
+    function closeAdminMenu() {
+        var menu = document.getElementById('mobileAdminMenu');
+        if (!menu || typeof bootstrap === 'undefined' || !bootstrap.Offcanvas) return;
+        bootstrap.Offcanvas.getOrCreateInstance(menu).hide();
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         // HTMX 4 does not use localStorage for history snapshots by default.
         // Alpine owns client state, so every restored URL is authoritative.
@@ -29,19 +38,42 @@
         }, true);
 
         var offcanvas = document.getElementById('mobileAdminMenu');
-        function closeMenu() {
-            if (!offcanvas || typeof bootstrap === 'undefined' || !bootstrap.Offcanvas) return;
-            bootstrap.Offcanvas.getOrCreateInstance(offcanvas).hide();
-        }
         if (offcanvas) {
             // The shared admin links use .ad-tab, not Bootstrap's .nav-link.
             // Delegation also covers links added by an HTMX fragment.
             offcanvas.addEventListener('click', function (event) {
-                if (event.target.closest && event.target.closest('a.ad-tab')) closeMenu();
+                if (event.target.closest && event.target.closest('a.ad-tab')) closeAdminMenu();
             });
         }
         document.addEventListener('htmx:before:request', function (event) {
-            if (offcanvas && event.target && offcanvas.contains(event.target)) closeMenu();
+            if (offcanvas && event.target instanceof Element && offcanvas.contains(event.target)) closeAdminMenu();
+        });
+        // Page-navigation uniformity: after every HTMX page-region swap the
+        // mobile menu is closed, Alpine settles the new tree, and a subtle
+        // transition runs. Narrow filter/table swaps target other regions and
+        // are intentionally left untouched, so this behavior never depends on
+        // which page issued the navigation request.
+        document.addEventListener('htmx:after:swap', function (event) {
+            var target = event.target;
+            if (!target || !(target instanceof Element)) return;
+            if (target.id !== 'display-page' && target.id !== 'page-region') return;
+            closeAdminMenu();
+            try {
+                if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                    window.Alpine.initTree(target);
+                }
+            } catch (error) { /* Alpine owns its scope; a missed tree stays as-is. */ }
+            var region = target.id === 'page-region' ? target : target.querySelector('#page-region');
+            if (region && typeof region.animate === 'function'
+                    && window.matchMedia
+                    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                try {
+                    region.animate(
+                        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+                        { duration: 140, easing: 'ease-out' }
+                    );
+                } catch (error) { /* The transition is decorative only. */ }
+            }
         });
     });
 

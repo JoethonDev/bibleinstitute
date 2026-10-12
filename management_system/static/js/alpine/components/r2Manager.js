@@ -288,12 +288,25 @@ function r2Manager() {
 
             const body = JSON.stringify({ old_key: oldKey, new_key: newKey, is_folder: this.renameIsFolder });
 
+            let csrf = '';
+            try {
+                csrf = this.getCSRFToken();
+            } catch (error) {
+                const errorEl = document.getElementById('rename-file-error');
+                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
+                return;
+            }
+            if (!csrf) {
+                const errorEl = document.getElementById('rename-file-error');
+                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
+                return;
+            }
             this.renameActive = true;
             fetch(this.routes.rename, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCSRFToken()
+                    'X-CSRFToken': csrf
                 },
                 body
             })
@@ -427,7 +440,11 @@ function r2Manager() {
             const execute = () => {
                 if (this.mutationPending) return;
                 this.mutationPending = true;
-                return Promise.resolve(callback()).finally(() => { this.mutationPending = false; });
+                // Resolve first so a synchronous throw inside the mutation
+                // still reaches `finally`: otherwise one failed action would
+                // leave the guard set and silently block every later
+                // delete/rename until a full page reload.
+                return Promise.resolve().then(() => callback()).finally(() => { this.mutationPending = false; });
             };
             if (typeof window.appConfirm === 'function') window.appConfirm(message, execute);
             else execute();

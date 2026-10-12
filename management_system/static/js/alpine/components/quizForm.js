@@ -43,6 +43,12 @@ function quizForm() {
             this.$el.addEventListener('blur', this.boundHandlers.blur, true);
             this.$el.addEventListener('keydown', this.boundHandlers.keydown);
 
+            this.normalizeClosingTime();
+            const hostForm = this.$el.querySelector('form');
+            if (hostForm) {
+                hostForm.addEventListener('submit', () => this.normalizeClosingTime());
+            }
+
             this.reindexQuestions();
         },
 
@@ -460,7 +466,26 @@ function quizForm() {
             }
         },
 
+        /**
+         * Default a midnight closing time to end-of-day 23:59, keeping the
+         * picked day. Only an exact 00:00 is treated as "day picked, time
+         * untouched"; any other explicit time is left alone for later edits.
+         */
+        normalizeClosingTime() {
+            const input = this.$el.querySelector('#closing_date');
+            if (!input || typeof input.value !== 'string') return;
+            const match = input.value.match(/^(\d{4}-\d{2}-\d{2})T00:00(?::00)?$/);
+            if (match) input.value = `${match[1]}T23:59`;
+        },
+
         handleChange(event) {
+            const closingInput = event.target && event.target.closest
+                ? event.target.closest('#closing_date')
+                : null;
+            if (closingInput) {
+                this.normalizeClosingTime();
+            }
+
             const selectElement = event.target.closest('.question-type');
             if (selectElement) {
                 this.changeQuestionType(selectElement);
