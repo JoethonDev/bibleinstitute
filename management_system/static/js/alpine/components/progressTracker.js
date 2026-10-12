@@ -146,6 +146,7 @@ function progressTracker() {
             const target = this.resumeSeconds;
             let attempts = 0;
             const maxAttempts = 4;
+            const giveUpAt = Date.now() + 9000;
             const readPosition = () => {
                 try {
                     const player = media.player;
@@ -165,41 +166,53 @@ function progressTracker() {
                 media.removeEventListener('loadedmetadata', seek);
                 media.removeEventListener('canplay', seek);
             };
-            const seek = () => {
-                if (this.resumeApplied || this.destroyed) return;
-                if (isSettled()) {
-                    this.resumeApplied = true;
-                    stopListening();
-                    return;
-                }
-                if (attempts >= maxAttempts) {
-                    this.resumeApplied = true;
-                    stopListening();
+            const latch = (warn) => {
+                this.resumeApplied = true;
+                stopListening();
+                if (warn) {
                     console.warn('progressTracker: resume seek did not settle', {
                         target: target,
                         attempts: attempts,
                     });
+                }
+            };
+            const seek = () => {
+                if (this.resumeApplied || this.destroyed) return;
+                if (isSettled()) {
+                    latch(false);
                     return;
                 }
-                attempts += 1;
-                try {
-                    const player = media.player;
-                    const hasPlayer = player && typeof player.currentTime === 'function';
-                    const current = hasPlayer ? Number(player.currentTime()) : Number(media.currentTime);
-                    if (!Number.isFinite(current) || current < target - 1) {
-                        if (hasPlayer) player.currentTime(target);
-                        else media.currentTime = target;
-                    }
-                } catch (_) { /* tech may still be settling */ }
+                const seeking = Boolean(media.seeking);
+                if (Date.now() > giveUpAt || (attempts >= maxAttempts && !seeking)) {
+                    latch(true);
+                    return;
+                }
+                // A seeking tech is already working toward the point: issuing
+                // another seek would abort its in-flight segment load (this is
+                // what strands far resumes at 00:00 on slow networks). Only
+                // re-issue when the tech is idle; otherwise wait for it.
+                if (!seeking) {
+                    attempts += 1;
+                    try {
+                        const player = media.player;
+                        const hasPlayer = player && typeof player.currentTime === 'function';
+                        const current = hasPlayer ? Number(player.currentTime()) : Number(media.currentTime);
+                        // Only jump forward to the saved point; never rewind
+                        // an already-positioned player.
+                        if (!Number.isFinite(current) || current < target - 1) {
+                            if (hasPlayer) player.currentTime(target);
+                            else media.currentTime = target;
+                        }
+                    } catch (_) { /* tech may still be settling */ }
+                }
                 // The first metadata event can precede a seekable tech (the
                 // tracker sets source.src and Video.js then loads the same URL
-                // through its own tech). Latching blindly here is exactly how
-                // a resume gets lost, so re-enter seek shortly after: it
-                // latches when settled, warns when attempts run out, and
-                // otherwise chains the next attempt.
+                // through its own tech). Re-enter shortly after: it latches
+                // when settled, warns when out of time/attempts, and otherwise
+                // chains the next check.
                 window.setTimeout(() => {
                     if (!this.resumeApplied && !this.destroyed) seek();
-                }, 600);
+                }, seeking ? 900 : 600);
             };
             media.addEventListener('loadedmetadata', seek);
             media.addEventListener('canplay', seek);
