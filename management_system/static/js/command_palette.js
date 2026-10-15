@@ -30,17 +30,29 @@
       localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 8)));
     } catch (e) {}
   }
-  function togglePin(r) {
+  function flipStar(btn, pinned) {
+    // Optimistic in-place update: no list rebuild, no fetch, no modal flash.
+    btn.textContent = pinned ? "★" : "☆";
+    btn.classList.toggle("text-warning", pinned);
+    btn.classList.toggle("text-muted", !pinned);
+    var label = pinned ? t("Unpin") : t("Pin");
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
+  function togglePin(r, btn) {
     if (!r || r.type !== "user" || !r.url) return;
+    var pinned = false;
     try {
-      var pins = loadPins().filter(function (x) { return x.url !== r.url; });
-      if (pins.length === loadPins().length) {
+      var before = loadPins();
+      var pins = before.filter(function (x) { return x.url !== r.url; });
+      if (pins.length === before.length) {
         pins.unshift({ type: r.type, label: r.label, sub: r.sub || "", url: r.url });
         pins = pins.slice(0, MAX_PINS);
+        pinned = true;
       }
       localStorage.setItem(PIN_KEY, JSON.stringify(pins));
     } catch (e) {}
-    rerender();
+    if (btn) flipStar(btn, pinned);
   }
   function pinUrls() {
     var set = {};
@@ -51,15 +63,26 @@
     var map = { user: "Users", offering: "Courses", lesson: "Lessons", quiz: "Quizzes", media: "Media", telegram: "Telegram" };
     return t(map[type] || type);
   }
+  function syncHint() {
+    // One muted helper line: visible on empty field, hidden while writing.
+    var hint = document.getElementById("command-palette-hint");
+    if (!hint || !input) return;
+    if (input.value.trim().length >= 2) hint.classList.add("d-none");
+    else hint.classList.remove("d-none");
+  }
   function open() {
     if (!ensure()) return;
+    try {
+      var oc = document.getElementById("mobileAdminMenu");
+      if (oc && oc.classList.contains("show") && window.bootstrap) bootstrap.Offcanvas.getOrCreateInstance(oc).hide();
+    } catch (e) {}
     var m = document.getElementById("commandPaletteModal");
     if (window.bootstrap && m) bootstrap.Modal.getOrCreateInstance(m).show();
     typeFilter = null;
     gArmedAt = 0;
     input.value = "";
     try { input.setAttribute("placeholder", t("Search")); } catch (e) {}
-    setTimeout(function () { input.focus(); input.select(); renderRecents(); }, 50);
+    setTimeout(function () { input.focus(); input.select(); renderRecents(); syncHint(); }, 50);
   }
   function headerEl(text) {
     var h = document.createElement("div");
@@ -70,12 +93,12 @@
   function starBtn(r, pinned) {
     var b = document.createElement("button");
     b.type = "button";
-    b.className = "btn btn-sm btn-link p-0 flex-shrink-0 " + (pinned ? "text-warning" : "text-muted");
+    b.className = "btn btn-sm btn-link p-0 flex-shrink-0 cmd-star " + (pinned ? "text-warning" : "text-muted");
     b.textContent = pinned ? "★" : "☆";
     var label = pinned ? t("Unpin") : t("Pin");
     b.setAttribute("aria-label", label);
     b.title = label;
-    b.addEventListener("click", function (ev) { ev.preventDefault(); ev.stopPropagation(); togglePin(r); });
+    b.addEventListener("click", function (ev) { ev.preventDefault(); ev.stopPropagation(); togglePin(r, b); });
     return b;
   }
   function rowEl(r, i, pinned) {
@@ -87,9 +110,14 @@
     a.href = r.url;
     a.className = "flex-grow-1 text-reset text-decoration-none";
     var b = document.createElement("div");
-    b.className = "d-flex justify-content-between gap-2";
+    b.className = "d-flex justify-content-between align-items-center gap-2";
     var s1 = document.createElement("span");
-    s1.textContent = "[" + r.type + "] " + r.label;
+    s1.className = "d-flex align-items-center gap-2";
+    var pill = document.createElement("span");
+    pill.className = "cmd-type";
+    pill.textContent = r.type;
+    s1.appendChild(pill);
+    s1.appendChild(document.createTextNode(r.label));
     var s2 = document.createElement("small");
     s2.className = "text-muted text-truncate";
     s2.textContent = r.sub || "";
@@ -181,6 +209,7 @@
   }
   function search() {
     if (!ensure()) return;
+    syncHint();
     var parsed = parseQuery();
     if (parsed.q.length < 2) { if (aborter) aborter.abort(); renderRecents(); return; }
     if (aborter) aborter.abort();
@@ -247,18 +276,25 @@
       }
       if (e.key === "Escape") return;
     }
-    if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(items.length - 1, active + 1); rerenderKeep(); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(0, active - 1); rerenderKeep(); }
+    if (e.key === "ArrowDown") { e.preventDefault(); active = items.length ? (active + 1) % items.length : 0; rerenderKeep(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = items.length ? (active - 1 + items.length) % items.length : 0; rerenderKeep(); }
     else if (e.key === "Enter" && items[active]) { pick(active); }
     else if (e.key === "Escape" && typeFilter) { typeFilter = null; input.setAttribute("placeholder", t("Search")); search(); }
   });
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
   function rerenderKeep() {
-    // Move highlight without refetching: toggle classes on current rows.
+    // Move highlight without refetching: toggle classes on current rows,
+    // then glide the active row into view when it leaves the visible area.
     if (!box || !items.length) return;
     var rows = box.querySelectorAll('[role="option"]');
     for (var i = 0; i < rows.length; i++) {
       if (i === active) { rows[i].classList.add("active"); rows[i].setAttribute("aria-selected", "true"); }
       else { rows[i].classList.remove("active"); rows[i].removeAttribute("aria-selected"); }
+    }
+    var row = rows[active];
+    if (row && row.scrollIntoView) {
+      try { row.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" }); } catch (e) {}
     }
   }
   document.addEventListener("input", function (e) {
@@ -266,6 +302,10 @@
       clearTimeout(timer);
       timer = setTimeout(search, 200);
     }
+  });
+  document.addEventListener("click", function (e) {
+    var trigger = e.target && e.target.closest ? e.target.closest("[data-open-palette]") : null;
+    if (trigger) { e.preventDefault(); open(); }
   });
   window.openCommandPalette = open;
 })();

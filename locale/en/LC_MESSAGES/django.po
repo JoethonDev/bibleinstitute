@@ -11267,6 +11267,10 @@ msgstr "Unpin"
 msgid "Open all"
 msgstr "Open all"
 
+
+msgid "No playable content"
+msgstr "No playable content"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

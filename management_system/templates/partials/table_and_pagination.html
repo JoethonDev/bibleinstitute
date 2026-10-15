@@ -265,6 +265,17 @@
                                 <i class="fas fa-eye me-1"></i>
                                 <span>{% translate "View" %}</span>
                             </a>
+                            <a class="ad-btn ad-btn--teal ad-btn--sm"
+                               href="{% url 'student-overview' values.id %}"
+                               hx-get="{% url 'student-overview' values.id %}"
+                               hx-swap="innerHTML"
+                               hx-target="#display-page"
+                               hx-trigger="click"
+                               hx-push-url="true"
+                               hx-select="#page-region">
+                                <i class="fas fa-id-card me-1"></i>
+                                <span>{% translate "Overview" %}</span>
+                            </a>
                             {% endif %}
                             <button class="ad-btn ad-btn--ghost ad-btn--sm"
                                     hx-get="{{ values.url }}update/"

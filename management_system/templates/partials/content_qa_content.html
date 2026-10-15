@@ -1,7 +1,7 @@
 {% load i18n %}
 <div class="ad-pane-head ad-pane-head--bordered">
   <h4 class="mb-0">{% translate "Content QA" %}</h4>
-  <span class="ad-page-info">{% translate "Read-only checks. Open rows in their dashboards to fix." %}</span>
+  <p class="ad-pane-desc">{% translate "Read-only checks. Open rows in their dashboards to fix." %}</p>
 </div>
 <div class="ad-stats mb-4">
   <div class="ad-stat"><i class="fas fa-video ad-stat-ic"></i><div><b>{{ counts.empty_lessons }}</b><span>{% translate "Lessons" %}: {% translate "No data" %}</span></div></div>
@@ -15,7 +15,7 @@
     {% for l in samples.empty_lessons %}<div class="ad-activity"><div class="ad-activity-name"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></div><div class="ad-activity-meta">{{ l.course_offering.course.name|default:"" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
   </div></div>
   <div class="ad-card"><div class="ad-card-body">
-    <div class="d-flex justify-content-between align-items-center gap-2"><h6 class="ad-section-title mb-0">{% translate "Total Lessons" %}: {% translate "No data" %} ({{ samples.published_no_media|length }})</h6>{% if samples.published_no_media %}<button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-open-all>{% translate "Open all" %}</button>{% endif %}</div>
+    <div class="d-flex justify-content-between align-items-center gap-2"><h6 class="ad-section-title mb-0">{% translate "No playable content" %} ({{ samples.published_no_media|length }})</h6>{% if samples.published_no_media %}<button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-open-all>{% translate "Open all" %}</button>{% endif %}</div>
     {% for l in samples.published_no_media %}<div class="ad-activity"><div class="ad-activity-name"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></div><div class="ad-activity-meta">{{ l.course_offering.course.name|default:"" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
   </div></div>
   <div class="ad-card"><div class="ad-card-body">

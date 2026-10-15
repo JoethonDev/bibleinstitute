@@ -12097,6 +12097,10 @@ msgstr "إلغاء التثبيت"
 msgid "Open all"
 msgstr "فتح الكل"
 
+
+msgid "No playable content"
+msgstr "لا يوجد محتوى قابل للتشغيل"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

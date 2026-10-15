@@ -3747,3 +3747,20 @@ details.ad-collapse > summary::-webkit-details-marker { display: none; }
 details.ad-collapse > summary:focus-visible { outline: 2px solid var(--ps-teal); outline-offset: .25rem; }
 .ad-collapse-toggle { transition: transform .15s ease; }
 details.ad-collapse[open] .ad-collapse-toggle { transform: rotate(180deg); }
+
+/* Fix batch: icons, filter bar, palette, QA (no hard restyles elsewhere). */
+i.ad-stat-ic { display: grid; place-items: center; }
+.ad-filters { align-items: center; }
+.ad-filters .ad-btn--sm { min-height: 38px; display: inline-flex; align-items: center; }
+#ad-preset-wrap { margin: 0; }
+button.ad-tab { background: none; border: none; width: 100%; text-align: start; font: inherit; color: inherit; cursor: pointer; }
+.ad-kbd { font-size: .68rem; background: var(--ps-teal-soft); color: var(--ps-teal); border-radius: 999px; padding: .1rem .55rem; white-space: nowrap; }
+.cmd-star { transition: transform .12s ease; }
+.cmd-star:active { transform: scale(1.35); }
+.cmd-palette .modal-content { border: none; border-radius: 1rem; }
+#command-palette-results { border-radius: .75rem; overflow: hidden; }
+#command-palette-results .list-group-item { border-inline: none; border-top: none; border-bottom: 1px solid var(--ps-line); }
+#command-palette-results .list-group-item:last-child { border-bottom: none; }
+#command-palette-results .list-group-item-secondary { background: var(--ps-teal-soft); color: var(--ps-muted); border: none; }
+#command-palette-results .list-group-item.active { background: var(--ps-teal-soft); color: var(--ps-ink); border-color: transparent; }
+.cmd-type { font-size: .68rem; font-weight: 700; background: var(--ps-teal-soft); color: var(--ps-teal); border-radius: 999px; padding: .05rem .55rem; white-space: nowrap; }

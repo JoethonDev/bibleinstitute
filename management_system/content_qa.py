@@ -65,7 +65,14 @@ def qa_samples() -> dict:
             and link.get("id")
             for link in links
         )
-        if not has_playable and len(no_media) < SAMPLE:
+        # A book-only lesson is legitimate content, not a defect.
+        has_book = any(
+            isinstance(link, dict)
+            and link.get("file_type") == "book"
+            and link.get("id")
+            for link in links
+        )
+        if not has_playable and not has_book and len(no_media) < SAMPLE:
             no_media.append(lesson)
         bad = any(
             not isinstance(link, dict) or not link.get("id") or not link.get("part_id")

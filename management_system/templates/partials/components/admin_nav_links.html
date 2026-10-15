@@ -3,6 +3,13 @@
 <!-- Admin Navigation Links -->
 <ul class="nav flex-column ad-rail-groups">
     <li class="nav-item">
+        <button type="button" class="ad-tab ad-cmd-trigger w-100" data-open-palette>
+            <i class="fas fa-search"></i>
+            <span>{% translate "Quick jump" %}</span>
+            <kbd class="ad-kbd ms-auto">Ctrl K</kbd>
+        </button>
+    </li>
+    <li class="nav-item">
         <a class="ad-tab" href="{% url 'admin-panel' %}"
            hx-get="{% url 'admin-panel' %}"
            hx-target="#display-page"

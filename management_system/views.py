@@ -8276,5 +8276,12 @@ def student_overview(request, user_id):
 @capability_required(can_manage_content)
 def content_qa_dashboard(request):
     """Read-only content QA: counts + bounded samples, no writes/R2."""
-    context = {"counts": qa_counts(), "samples": qa_samples()}
+    context = {
+        "counts": qa_counts(),
+        "samples": qa_samples(),
+        "breadcrumb_items": generate_breadcrumb([
+            (_("Admin"), reverse("admin-panel")),
+            (_("Content QA"), None),
+        ]),
+    }
     return render_page(request, "content_qa.html", "partials/content_qa_content.html", context)
