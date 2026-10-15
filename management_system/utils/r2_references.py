@@ -35,7 +35,9 @@ def rewrite_lesson_r2_references(old_key, new_key, is_folder=False):
 
     updated_count = 0
     with transaction.atomic():
-        lessons = Lesson.objects.filter(links__contains=search_key)
+        # ponytail: row-lock so concurrent renames touching the same lesson
+        # cannot lose each other's link rewrite (last-write-wins race).
+        lessons = Lesson.objects.select_for_update().filter(links__contains=search_key)
         for lesson in lessons:
             links = json.loads(lesson.links)
             rewritten = rewrite_r2_keys(links, old_key, new_key, is_folder)

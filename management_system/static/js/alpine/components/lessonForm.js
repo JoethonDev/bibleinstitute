@@ -18,11 +18,21 @@ function lessonForm() {
             // Initialize on page load and after HTMX swaps
             this.initializeDriveFiles();
             this.updateSelectedLectureCount();
-            
+            this.reindexParts();
+
             // Listen for HTMX afterSwap events
             this.$el.addEventListener('htmx:after:swap', () => {
                 this.initializeDriveFiles();
             });
+        },
+
+        escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         },
 
         /**
@@ -37,6 +47,8 @@ function lessonForm() {
                 book: root?.dataset.lessonBook,
                 moveUp: root?.dataset.lessonMoveUp,
                 moveDown: root?.dataset.lessonMoveDown,
+                part: root?.dataset.lessonPart,
+                download: root?.dataset.lessonDownload,
             };
             return translations[key] || key;
         },
@@ -91,21 +103,35 @@ function lessonForm() {
             if (nameLower.includes('video') || nameLower.includes('lecture')) fileType = 'video';
             if (nameLower.includes('audio')) fileType = 'audio';
 
+            // Escape the key/name before interpolating them into markup: an R2
+            // key is admin-supplied but must not be able to break out of an
+            // attribute or inject a node.
+            const safeId = this.escapeHtml(id);
+            const safeName = this.escapeHtml(name);
+
             // Create video card HTML
             const videoCard = `
                 <div class="card video-container mb-3">
-                    <input type="hidden" name="videos" value="${id}">
-                    <input type="hidden" name="videos_name" value="${name}">
-                    <input type="hidden" name="download_ids" value="">
+                    <input type="hidden" name="videos" value="${safeId}">
+                    <input type="hidden" name="videos_name" value="${safeName}">
                     <div class="card-body p-3">
                         <button type="button" class="btn-close position-absolute top-0 end-0 m-2" 
                                 @click="removeFile($event)" aria-label="${this.getTranslation('close')}"></button>
-                        <p class="fw-bold mb-2 text-primary">${name}</p>
-                        <select name="files_type" class="form-select form-select-sm">
+                        <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2">
+                            <span class="text-break">${safeName}</span>
+                            <span class="badge text-bg-secondary part-badge flex-shrink-0" hidden></span>
+                        </p>
+                        <select name="files_type" class="form-select form-select-sm" @change="toggleDownloadInput($event)">
                             <option value="video" ${fileType === 'video' ? 'selected' : ''}>${this.getTranslation('video')}</option>
                             <option value="audio" ${fileType === 'audio' ? 'selected' : ''}>${this.getTranslation('audioRecording')}</option>
                             <option value="book" ${fileType === 'book' ? 'selected' : ''}>${this.getTranslation('book')}</option>
                         </select>
+                        <div class="download-key-field mt-2${fileType === 'audio' ? '' : ' d-none'}">
+                            <label class="form-label small mb-1">${this.getTranslation('download')}</label>
+                            <input type="text" name="download_ids" class="form-control form-control-sm download-key-input"
+                                   value="" placeholder="Downloadable Files/name.mp3"
+                                   aria-label="${this.getTranslation('download')}">
+                        </div>
                     </div>
                     <div class="card-footer bg-light p-1 text-end">
                         <button type="button" class="btn btn-sm btn-outline-secondary border-0" 
@@ -128,6 +154,7 @@ function lessonForm() {
             tempDiv.innerHTML = videoCard;
             container.appendChild(tempDiv.firstElementChild);
             this.updateSelectedLectureCount();
+            this.reindexParts();
         },
 
         /**
@@ -136,6 +163,7 @@ function lessonForm() {
         removeFile(event) {
             event.currentTarget.closest('.video-container').remove();
             this.updateSelectedLectureCount();
+            this.reindexParts();
         },
 
         /**
@@ -147,6 +175,7 @@ function lessonForm() {
             
             if (prev) {
                 container.parentNode.insertBefore(container, prev);
+                this.reindexParts();
             }
         },
 
@@ -159,6 +188,80 @@ function lessonForm() {
             
             if (next) {
                 container.parentNode.insertBefore(next, container);
+                this.reindexParts();
+            }
+        },
+
+        /**
+         * Grouping base for a media key: lowercase, extension dropped and a
+         * trailing `_audio` stripped, so a video manifest and its `_audio`
+         * sibling resolve to one part. Mirrors the server's _lesson_part_base.
+         */
+        partBase(id) {
+            const raw = String(id || '');
+            const slash = raw.lastIndexOf('/');
+            let name = (slash >= 0 ? raw.slice(slash + 1) : raw).toLowerCase();
+            const dot = name.lastIndexOf('.');
+            if (dot > 0) name = name.slice(0, dot);
+            return name.endsWith('_audio') ? name.slice(0, -6) : name;
+        },
+
+        /**
+         * Show a shared "Part N" badge on every selected card and colour the
+         * card's leading edge with the same colour, so a video and its audio
+         * sibling are visibly one group. A card with no usable key gets no
+         * badge or colour.
+         */
+        reindexParts() {
+            const container = document.getElementById('videos-input');
+            if (!container) return;
+            const palette = ['#2f5d73', '#b4853a', '#5a7d4c', '#7a4c7a', '#b45a3a'];
+            const numbers = new Map();
+            container.querySelectorAll('.video-container').forEach(card => {
+                const idInput = card.querySelector('input[name="videos"]');
+                const badge = card.querySelector('.part-badge');
+                if (!badge) return;
+                const base = this.partBase(idInput ? idInput.value : '');
+                let number = 0;
+                if (base) {
+                    if (!numbers.has(base)) numbers.set(base, numbers.size + 1);
+                    number = numbers.get(base);
+                }
+                if (number) {
+                    const color = palette[(number - 1) % palette.length];
+                    card.style.borderInlineStartWidth = '4px';
+                    card.style.borderInlineStartStyle = 'solid';
+                    card.style.borderInlineStartColor = color;
+                    badge.hidden = false;
+                    badge.textContent = this.getTranslation('part') + ' ' + number;
+                    badge.style.backgroundColor = color;
+                    badge.style.color = '#fff';
+                } else {
+                    card.style.removeProperty('border-inline-start-width');
+                    card.style.removeProperty('border-inline-start-style');
+                    card.style.removeProperty('border-inline-start-color');
+                    badge.hidden = true;
+                    badge.textContent = '';
+                    badge.style.removeProperty('background-color');
+                    badge.style.removeProperty('color');
+                }
+            });
+        },
+
+        /**
+         * Only an audio link has a downloadable MP3, so the download-key field
+         * is shown for audio and hidden (and emptied) for video/book.
+         */
+        toggleDownloadInput(event) {
+            const card = event.currentTarget.closest('.video-container');
+            if (!card) return;
+            const field = card.querySelector('.download-key-field');
+            if (!field) return;
+            const isAudio = event.currentTarget.value === 'audio';
+            field.classList.toggle('d-none', !isAudio);
+            if (!isAudio) {
+                const input = field.querySelector('.download-key-input');
+                if (input) input.value = '';
             }
         }
     };

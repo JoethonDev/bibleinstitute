@@ -54,7 +54,13 @@
         // are intentionally left untouched, so this behavior never depends on
         // which page issued the navigation request.
         document.addEventListener('htmx:after:swap', function (event) {
-            var target = event.target;
+            // HTMX 4 dispatches htmx:after:swap on the triggering element
+            // (event.target is the clicked nav link), not the swapped region.
+            // The real swapped region lives on the request context, so the
+            // old event.target check always bailed and page navigations never
+            // ran closeAdminMenu() or Alpine.initTree() on fresh content.
+            var ctx = event.detail && event.detail.ctx;
+            var target = (ctx && ctx.target) || event.target;
             if (!target || !(target instanceof Element)) return;
             if (target.id !== 'display-page' && target.id !== 'page-region') return;
             closeAdminMenu();
@@ -176,7 +182,12 @@
     var lastTrigger = null;
 
     function showConfirmation(question, action, onCancel) {
-        if (!question || typeof action !== 'function' || confirming) return false;
+        if (!question || typeof action !== 'function') return false;
+        // Only block while an actual confirmation modal is on screen. A stale
+        // `confirming` flag (e.g. an HTMX swap hid the modal without firing
+        // hidden.bs.modal) must not disable every later confirmation until a
+        // full page refresh.
+        if (confirming && modal.classList.contains('show')) return false;
         confirming = true;
         pendingAction = action;
         pendingCancel = typeof onCancel === 'function' ? onCancel : null;

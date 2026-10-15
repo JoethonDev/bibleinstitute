@@ -226,7 +226,13 @@ CELERY_IMPORTS = (
     "management_system.gallery_tasks",
 )
 CELERY_TASK_ROUTES = {
-    "management_system.media_tasks.*": {"queue": "media"},
+    # The dedicated single-concurrency media worker must only run tasks that
+    # need FFmpeg or its private work directory. Every such task sets
+    # queue="media" explicitly when it is enqueued, except the beat-scheduled
+    # recover_pending_media_jobs, which is routed here. Everything else in
+    # media_tasks (notably rename_r2_operation, which is pure R2/DB work) runs
+    # on the general worker and therefore never queues behind a media job.
+    "management_system.media_tasks.recover_pending_media_jobs": {"queue": "media"},
 }
 CELERY_BEAT_SCHEDULE = {
     "recover-pending-media-jobs": {

@@ -188,7 +188,7 @@ from .media_processing import (
     safe_output_base_name,
     schedule_attachment_retry_after_commit,
     schedule_media_job_after_commit,
-    is_retryable_failed_job,
+    MAX_MEDIA_ATTEMPTS,
     validate_browser_part_id,
     validate_requested_folder,
     validate_source_descriptor,
@@ -196,7 +196,7 @@ from .media_processing import (
     PUBLICATION_FAILED_ERROR,
     PUBLICATION_PENDING_ERROR,
 )
-from .media_tasks import R2RenameInProgress, get_r2_rename_status, queue_r2_rename
+from .media_tasks import get_r2_rename_status, queue_r2_rename
 from .media_storage import (
     MediaStorageError,
     STAGING_UPLOAD_URL_TTL_SECONDS,
@@ -284,8 +284,11 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
     for index, video_key in enumerate(videos):
         download_key = download_ids[index].strip() if index < len(download_ids) else ""
         if download_key:
+            # The operator may point the download at a differently named MP3
+            # (a mis-named or relocated file), so only the key shape is
+            # validated here, not equality with the canonical sibling name.
             valid, errors = validate_downloadable_audio_key(download_key)
-            if not valid or download_key != downloadable_audio_key(video_key):
+            if not valid:
                 raise ValidationError(errors or [_('Downloadable audio key is invalid.')])
             if files_type[index] == "book":
                 raise ValidationError(_("Book media cannot have a downloadable audio file."))
@@ -2484,6 +2487,23 @@ def update_lesson(request, lesson_id):
             course_offerings = CourseOffering.objects.filter(
                 Q(academic_year_level__academic_year__is_active=True) | Q(pk=lesson.course_offering_id)
             ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
+            lesson_videos = json.loads(lesson.links)
+            if not isinstance(lesson_videos, list):
+                lesson_videos = []
+            part_numbers: dict[str, int] = {}
+            for video in lesson_videos:
+                part_id = video.get("part_id") or ""
+                if part_id and part_id not in part_numbers:
+                    part_numbers[part_id] = len(part_numbers) + 1
+            for video in lesson_videos:
+                part_id = video.get("part_id") or ""
+                video["part_number"] = part_numbers.get(part_id, 0)
+                if video.get("file_type") == "audio":
+                    video["download_key"] = (
+                        video.get("download_id")
+                        or downloadable_audio_key(video.get("id", ""))
+                        or ""
+                    )
             return render(request, "lesson_form.html", {
                 "course_offerings" : course_offerings,
                 "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
@@ -2491,7 +2511,7 @@ def update_lesson(request, lesson_id):
                 "selected_offering_id" : lesson.course_offering_id,
                 "lesson_name" : lesson.name,
                 "lesson_description": lesson.description or "",
-                "videos" : json.loads(lesson.links),
+                "videos" : lesson_videos,
                 "content_status" : lesson.status,
                 "content_status_display" : lesson.get_status_display(),
                 "publication_statuses" : PublicationStatus.choices,
@@ -2613,11 +2633,16 @@ def _media_job_ui_state(job, *, phase=None, now=None):
     publication_pending = bool(
         is_automation_job(job) and job.error_code == PUBLICATION_PENDING_ERROR
     )
+    # Offer retry for any failed job that still has its retained source (not
+    # only the non-retryable error codes): the operator may have fixed the
+    # cause (e.g. an output collision or a mis-named file) and wants to rerun
+    # without cleanup. Structurally impossible retries stay hidden.
     can_retry = bool(
         job.status == MediaProcessingStatus.FAILED
         and job.source_acknowledged_at
         and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
-        and is_retryable_failed_job(job)
+        and job.attempt_count < MAX_MEDIA_ATTEMPTS
+        and not job.staging_deleted_at
     )
     can_retry_attachment = bool(
         job.status == MediaProcessingStatus.SUCCEEDED
@@ -4627,8 +4652,6 @@ def api_rename_file(request):
             'operation_id': operation_id,
             'status_url': status_url,
         }, status=202)
-    except R2RenameInProgress as exc:
-        return JsonResponse({'error': str(exc)}, status=409)
     except json.JSONDecodeError:
         return JsonResponse({'error': _('Invalid rename request')}, status=400)
     except Exception:

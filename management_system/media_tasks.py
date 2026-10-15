@@ -74,12 +74,6 @@ logger = logging.getLogger(__name__)
 LIVE_PROGRESS_TTL = 2 * 60 * 60
 HEARTBEAT_INTERVAL_SECONDS = 30
 R2_RENAME_PROGRESS_TTL = 30 * 24 * 60 * 60
-R2_RENAME_LOCK_KEY = "r2:rename:active"
-R2_RENAME_LOCK_TTL = 7 * 24 * 60 * 60
-
-
-class R2RenameInProgress(Exception):
-    """Raised when another R2 rename already owns the storage mutation lock."""
 
 
 def _redis_client():
@@ -1176,36 +1170,31 @@ def get_r2_rename_status(operation_id: str) -> dict | None:
 def queue_r2_rename(old_key: str, new_key: str, *, is_folder: bool, created_by_id: int) -> str:
     operation_id = str(uuid.uuid4())
     now = timezone.now().isoformat()
-    if not cache.add(R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL):
-        raise R2RenameInProgress(str(_("Wait for the current rename to finish")))
+    cache.set(
+        r2_rename_progress_key(operation_id),
+        {
+            "operation_id": operation_id,
+            "created_by_id": int(created_by_id),
+            "old_key": old_key,
+            "new_key": new_key,
+            "is_folder": bool(is_folder),
+            "status": "queued",
+            "phase": "queued",
+            "progress": 0,
+            "done": 0,
+            "total": 0,
+            "error": "",
+            "warning": "",
+            "created_at": now,
+            "updated_at": now,
+        },
+        timeout=R2_RENAME_PROGRESS_TTL,
+    )
     try:
-        cache.set(
-            r2_rename_progress_key(operation_id),
-            {
-                "operation_id": operation_id,
-                "created_by_id": int(created_by_id),
-                "old_key": old_key,
-                "new_key": new_key,
-                "is_folder": bool(is_folder),
-                "status": "queued",
-                "phase": "queued",
-                "progress": 0,
-                "done": 0,
-                "total": 0,
-                "error": "",
-                "warning": "",
-                "created_at": now,
-                "updated_at": now,
-            },
-            timeout=R2_RENAME_PROGRESS_TTL,
-        )
-        try:
-            rename_r2_operation.apply_async(args=[operation_id], queue="media")
-        except Exception:
-            cache.delete(r2_rename_progress_key(operation_id))
-            raise
+        # ponytail: default queue so renames run parallel to media FFmpeg jobs
+        rename_r2_operation.apply_async(args=[operation_id])
     except Exception:
-        _release_r2_rename_lock(operation_id)
+        cache.delete(r2_rename_progress_key(operation_id))
         raise
     return operation_id
 
@@ -1224,24 +1213,10 @@ def _update_r2_rename_status(operation_id: str, **changes) -> dict | None:
 def _safe_update_r2_rename_status(operation_id: str, **changes) -> None:
     try:
         _update_r2_rename_status(operation_id, **changes)
-        if cache.get(R2_RENAME_LOCK_KEY) == operation_id:
-            cache.set(R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL)
     except Exception:
         logger.warning(
             "Could not update R2 rename progress",
             extra={"event": "r2_rename_progress_update_failed", "operation_id": operation_id},
-            exc_info=True,
-        )
-
-
-def _release_r2_rename_lock(operation_id: str) -> None:
-    try:
-        if cache.get(R2_RENAME_LOCK_KEY) == operation_id:
-            cache.delete(R2_RENAME_LOCK_KEY)
-    except Exception:
-        logger.warning(
-            "Could not release R2 rename lock",
-            extra={"event": "r2_rename_lock_release_failed", "operation_id": operation_id},
             exc_info=True,
         )
 
@@ -1259,31 +1234,6 @@ def rename_r2_operation(operation_id: str):
         return {"status": "succeeded", "operation_id": operation_id}
     if status.get("status") == "failed" and not status.get("resume_phase"):
         return {"status": "failed", "operation_id": operation_id}
-
-    lock_owner = cache.get(R2_RENAME_LOCK_KEY)
-    if lock_owner not in (None, operation_id):
-        _safe_update_r2_rename_status(
-            operation_id,
-            status="failed",
-            phase="failed",
-            error_code="rename_failed",
-            error="",
-            resume_phase="",
-        )
-        return {"status": "failed", "operation_id": operation_id}
-    if lock_owner is None and not cache.add(
-        R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL
-    ) and cache.get(R2_RENAME_LOCK_KEY) != operation_id:
-        _safe_update_r2_rename_status(
-            operation_id,
-            status="failed",
-            phase="failed",
-            error_code="rename_failed",
-            error="",
-            resume_phase="",
-        )
-        return {"status": "failed", "operation_id": operation_id}
-    cache.set(R2_RENAME_LOCK_KEY, operation_id, timeout=R2_RENAME_LOCK_TTL)
 
     retryable_phases = {"copying", "deleting", "updating_references", "rolling_back"}
     current_phase = status.get("phase", "")
@@ -1402,8 +1352,6 @@ def rename_r2_operation(operation_id: str):
             resume_total=(previous["total"] if previous["phase"] in retryable_phases else 0),
         )
         return {"status": "failed", "operation_id": operation_id}
-    finally:
-        _release_r2_rename_lock(operation_id)
 
 
 @shared_task(

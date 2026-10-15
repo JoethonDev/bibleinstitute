@@ -22,9 +22,7 @@ function r2Manager() {
         renameFileOldName: '',
         renameFileNewName: '',
         renameIsFolder: false,
-        renameOperationId: '',
         renamePollTimer: null,
-        renameActive: false,
         statsLoaded: false,
         mutationPending: false,
         is_root: true, // Will be set by x-init in template
@@ -167,8 +165,6 @@ function r2Manager() {
 
         watchRenameProgress(operationId) {
             if (this.renamePollTimer) window.clearTimeout(this.renamePollTimer);
-            this.renameOperationId = operationId;
-            this.renameActive = true;
             const panel = this.$el.querySelector('[data-r2-rename-progress]');
             if (panel) delete panel.dataset.refreshed;
             try { window.localStorage.setItem('r2-rename-operation-id', operationId); } catch (error) {}
@@ -226,7 +222,6 @@ function r2Manager() {
                     }
                     if (dismiss) dismiss.hidden = !terminal;
                     if (terminal) {
-                        this.renameActive = false;
                         if (data.status === 'succeeded' && panel.dataset.refreshed !== '1') {
                             panel.dataset.refreshed = '1';
                             this.refreshFileList();
@@ -249,8 +244,6 @@ function r2Manager() {
         dismissRenameProgress() {
             if (this.renamePollTimer) window.clearTimeout(this.renamePollTimer);
             this.renamePollTimer = null;
-            this.renameOperationId = '';
-            this.renameActive = false;
             try { window.localStorage.removeItem('r2-rename-operation-id'); } catch (error) {}
             this.$el.querySelector('[data-r2-rename-progress]')?.classList.add('d-none');
         },
@@ -259,11 +252,8 @@ function r2Manager() {
          * Rename file (or folder) via API
          */
         renameFile() {
-            if (this.renameActive) {
-                const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = gettext('Wait for the current rename to finish'); errorEl.classList.remove('d-none'); }
-                return;
-            }
+            // ponytail: no single-flight guard - the server queues renames
+            // independently, so a second rename must not be blocked.
             if (!this.renameFileNewName.trim() || this.renameFileNewName === this.renameFileOldName) {
                 const errorEl = document.getElementById('rename-file-error');
                 if (errorEl) { errorEl.textContent = gettext('Please enter a different name'); errorEl.classList.remove('d-none'); }
@@ -301,7 +291,6 @@ function r2Manager() {
                 if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
                 return;
             }
-            this.renameActive = true;
             fetch(this.routes.rename, {
                 method: 'POST',
                 headers: {
@@ -318,13 +307,11 @@ function r2Manager() {
                 if (data.operation_id) {
                     this._hideModal(document.getElementById('renameFileModal'), () => this.watchRenameProgress(data.operation_id));
                 } else {
-                    this.renameActive = false;
                     const errorEl = document.getElementById('rename-file-error');
                     if (errorEl) { errorEl.textContent = gettext('Rename request was not accepted'); errorEl.classList.remove('d-none'); }
                 }
             })
             .catch(error => {
-                this.renameActive = false;
                 console.error('Error renaming:', error);
                 const errorEl = document.getElementById('rename-file-error');
                 if (errorEl) { errorEl.textContent = error.message || gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
