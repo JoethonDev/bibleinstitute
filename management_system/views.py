@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils import formats
 from django.utils.dateparse import parse_date
 from django.utils.timezone import now
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.forms import formset_factory
 import hashlib
@@ -77,7 +77,10 @@ from .application_analytics import (
     iter_analytics_csv_rows,
 )
 from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
-from .utils.student_data import student_course_progress_data
+from .utils.student_data import student_course_progress_data, student_next_actions
+from .command_palette import PALETTE_TYPES, palette_results
+from .student_overview import build_student_overview
+from .content_qa import qa_counts, qa_samples
 from .utils.r2_filters import FileFilterConfig, filter_preset_choices, get_filter_preset
 from .utils.r2_manager import R2Manager
 from .utils.cloudflare_provider import CloudflareR2Client
@@ -132,7 +135,7 @@ from .admin_tables import (
     user_queryset,
     user_scope,
 )
-from .utils.quiz_access import grant_quiz_openings, quiz_window
+from .utils.quiz_access import answers_releasable, grant_quiz_openings, quiz_window
 from .quiz_questions import build_question_instance
 from .quiz_import import parse_quiz_import
 from .public_content import get_institute_copy
@@ -891,6 +894,11 @@ class ProfileDetail(LoginProtection, DetailView):
         if not initials:
             initials = user.username[0].upper() if user.username else "?"
         context['initials'] = initials
+        if user == self.request.user:
+            try:
+                context["next_actions"] = student_next_actions(user)
+            except Exception:
+                context["next_actions"] = {"resume": None, "next_quizzes": [], "gaps": []}
 
         return context
 
@@ -1125,6 +1133,15 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 questions = [q.serialize_student() for q in query_set]
             else:
                 questions = [q.serialize() for q in query_set]
+                if not user_has_management_role(user):
+                    # ponytail: graded view hides keys until this student's
+                    # effective window closes, protecting peers with open
+                    # exceptional windows.
+                    if not answers_releasable(quiz, user, grade):
+                        for q in questions:
+                            q.pop("correct_answer", None)
+                            q.pop("answer_payload", None)
+                            q.pop("answer_payload_json", None)
 
             return render(request, "display_quiz.html", {
                 "quiz_name": quiz.name,
@@ -8199,3 +8216,65 @@ def sitemap_xml(request):
         "</urlset>"
     )
     return HttpResponse(xml, content_type="application/xml")
+
+
+# ---- Smooth/easy batch: command palette, 360, content QA ----
+
+@login_required(login_url=LOGIN_URL)
+@require_GET
+def command_palette_search(request):
+    """Management-only JSON jump search for the Ctrl+K palette (GET only)."""
+    if not user_has_management_role(request.user):
+        raise PermissionDenied
+    raw_type = str(request.GET.get("type", "") or "").strip().lower()
+    type_filter = raw_type if raw_type in PALETTE_TYPES else None
+    return JsonResponse({"results": palette_results(
+        request.GET.get("q", ""),
+        type_filter=type_filter,
+        show_phone=can_manage_academic_setup(request.user),
+    )})
+
+
+@login_required(login_url=LOGIN_URL)
+def student_overview(request, user_id):
+    """Management 360 page: enrollments, grades, attendance, progress, Telegram, notifications, devices.
+
+    Read-only by construction (no POST branch, no mutations). Every view is
+    audit-logged; Telegram phone numbers are masked for non-admin viewers
+    (Telegram data is otherwise admin-only).
+    """
+    if not (can_view_reports(request.user) or can_manage_applications(request.user)):
+        raise PermissionDenied
+    payload = build_student_overview(user_id)
+    if payload is None:
+        raise Http404
+    student = payload["student"]
+    logger.info(
+        "event=student_360_view actor=%s actor_id=%s student=%s student_id=%s",
+        getattr(request.user, "username", "?"),
+        getattr(request.user, "pk", "?"),
+        getattr(student, "username", "?"),
+        student.pk,
+    )
+    show_phone = can_manage_academic_setup(request.user)
+    payload["show_phone"] = show_phone
+    account = payload.get("telegram_account")
+    if account is not None and getattr(account, "phone", None) and not show_phone:
+        digits = "".join(ch for ch in str(account.phone) if ch.isdigit())
+        payload["telegram_phone_display"] = ("•••" + digits[-4:]) if digits else "•••"
+    else:
+        payload["telegram_phone_display"] = getattr(account, "phone", "") if account is not None else ""
+    payload["breadcrumb_items"] = generate_breadcrumb([
+        (_("Admin"), reverse("admin-panel")),
+        (_("Users"), reverse("user-dashboard")),
+        (student.get_full_name() or student.username, reverse("user-profile", args=[student.pk])),
+        (_("Overview"), None),
+    ])
+    return render_page(request, "student_overview.html", "partials/student_overview_content.html", payload)
+
+
+@capability_required(can_manage_content)
+def content_qa_dashboard(request):
+    """Read-only content QA: counts + bounded samples, no writes/R2."""
+    context = {"counts": qa_counts(), "samples": qa_samples()}
+    return render_page(request, "content_qa.html", "partials/content_qa_content.html", context)

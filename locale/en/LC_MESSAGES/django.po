@@ -11170,6 +11170,103 @@ msgstr "No banners yet."
 msgid "Student banner messages"
 msgstr "Student banner messages"
 
+
+msgid "Quick jump"
+msgstr "Quick jump"
+
+msgid "Content QA"
+msgstr "Content QA"
+
+msgid "Next actions"
+msgstr "Next actions"
+
+msgid "Continue"
+msgstr "Continue"
+
+msgid "No results found."
+msgstr "No results found."
+
+msgid "Saved filters"
+msgstr "Saved filters"
+
+msgid "Name this filter"
+msgstr "Name this filter"
+
+
+msgid "Recent"
+msgstr "Recent"
+
+msgid "Telegram"
+msgstr "Telegram"
+
+msgid "Searching…"
+msgstr "Searching…"
+
+msgid "Search failed. Try again."
+msgstr "Search failed. Try again."
+
+msgid "Type to search. Prefix with u, o, l, q, m, t to scope."
+msgstr "Type to search. Prefix with u, o, l, q, m, t to scope."
+
+msgid "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope."
+msgstr "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope."
+
+msgid "Promotion history"
+msgstr "Promotion history"
+
+msgid "Evaluation results"
+msgstr "Evaluation results"
+
+msgid "Telegram account"
+msgstr "Telegram account"
+
+msgid "Student view"
+msgstr "Student view"
+
+msgid "Read-only preview"
+msgstr "Read-only preview"
+
+msgid "What the student sees. Actions are disabled in preview."
+msgstr "What the student sees. Actions are disabled in preview."
+
+msgid "Access to this page is logged."
+msgstr "Access to this page is logged."
+
+msgid "Aggregate"
+msgstr "Aggregate"
+
+
+msgid "Keyboard shortcuts"
+msgstr "Keyboard shortcuts"
+
+msgid "Focus search"
+msgstr "Focus search"
+
+msgid "Show this help"
+msgstr "Show this help"
+
+msgid "Go to"
+msgstr "Go to"
+
+msgid "then"
+msgstr "then"
+
+msgid "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
+msgstr "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
+
+
+msgid "Pinned"
+msgstr "Pinned"
+
+msgid "Pin"
+msgstr "Pin"
+
+msgid "Unpin"
+msgstr "Unpin"
+
+msgid "Open all"
+msgstr "Open all"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
 

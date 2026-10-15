@@ -12,6 +12,12 @@
                 <h4 class="ad-detail-title mb-1">{% translate "User details" %}</h4>
                 <p class="mb-0 text-white-50">{{ profile_user.get_full_name|default:profile_user.username }}</p>
             </div>
+            <div class="d-flex gap-2">
+            <a class="ad-btn ad-btn--teal" href="{% url 'student-overview' profile_user.pk %}"
+               hx-get="{% url 'student-overview' profile_user.pk %}"
+               hx-target="#display-page" hx-swap="innerHTML" hx-push-url="true" hx-select="#page-region">
+                <i class="fas fa-id-card me-1" aria-hidden="true"></i>{% translate "Overview" %}
+            </a>
             {% if can_edit_user %}
             <button type="button"
                     class="ad-btn ad-btn--ghost"
@@ -22,6 +28,7 @@
                 <i class="fas fa-edit me-1" aria-hidden="true"></i>{% translate "Edit" %}
             </button>
             {% endif %}
+            </div>
         </div>
     </div>
 

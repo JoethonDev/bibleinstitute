@@ -1,0 +1,31 @@
+{% load i18n %}
+<div class="modal fade" id="shortcutsHelpModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-keyboard me-1"></i>{% translate "Keyboard shortcuts" %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+      </div>
+      <div class="modal-body">
+        <p class="form-text mt-0">{% translate "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too." %}</p>
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr><td><kbd>Ctrl/⌘ + K</kbd></td><td>{% translate "Quick jump" %}</td></tr>
+            <tr><td><kbd>/</kbd></td><td>{% translate "Focus search" %}</td></tr>
+            <tr><td><kbd>?</kbd></td><td>{% translate "Show this help" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>d</kbd></td><td>{% translate "Go to" %} {% translate "Dashboard" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>u</kbd></td><td>{% translate "Go to" %} {% translate "Users" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>a</kbd></td><td>{% translate "Go to" %} {% translate "Applications" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>c</kbd></td><td>{% translate "Go to" %} {% translate "Courses" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>l</kbd></td><td>{% translate "Go to" %} {% translate "Lessons" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>q</kbd></td><td>{% translate "Go to" %} {% translate "Quizzes" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>m</kbd></td><td>{% translate "Go to" %} {% translate "Media processing" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>r</kbd></td><td>{% translate "Go to" %} {% translate "R2 Storage" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>s</kbd></td><td>{% translate "Go to" %} {% translate "Scanner" %}</td></tr>
+            <tr><td><kbd>g</kbd> {% translate "then" %} <kbd>p</kbd></td><td>{% translate "Go to" %} {% translate "Progress" %}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

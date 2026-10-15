@@ -271,6 +271,10 @@ urlpatterns = [
     path('dashboard/banners/<int:banner_id>/toggle/', portal_extra_views.banner_toggle, name="banner-toggle"),
     path('dashboard/banners/<int:banner_id>/delete/', portal_extra_views.banner_delete, name="banner-delete"),
 
+    path('dashboard/command-palette/search/', command_palette_search, name="command-palette-search"),
+    path('dashboard/users/<int:user_id>/overview/', student_overview, name="student-overview"),
+    path('dashboard/content-qa/', content_qa_dashboard, name="content-qa"),
+
     # Logout
     path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
 

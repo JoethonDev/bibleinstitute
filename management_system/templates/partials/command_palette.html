@@ -1,0 +1,18 @@
+{% load i18n %}
+<div class="modal fade" id="commandPaletteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-search me-1"></i>{% translate "Quick jump" %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+      </div>
+      <div class="modal-body">
+        <input id="command-palette-input" type="search" class="form-control" autocomplete="off"
+               placeholder="{% translate 'Search' %}" aria-label="{% translate 'Search' %}"
+               data-search-url="{% url 'command-palette-search' %}">
+        <div id="command-palette-results" class="list-group mt-2" role="listbox" aria-label="{% translate 'Search' %}"></div>
+        <div class="form-text mt-2">{% translate "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope." %}</div>
+      </div>
+    </div>
+  </div>
+</div>

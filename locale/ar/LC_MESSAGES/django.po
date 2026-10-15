@@ -12000,6 +12000,103 @@ msgstr "لا توجد أشرطة بعد."
 msgid "Student banner messages"
 msgstr "رسائل شريط الطلاب"
 
+
+msgid "Quick jump"
+msgstr "انتقال سريع"
+
+msgid "Content QA"
+msgstr "فحص المحتوى"
+
+msgid "Next actions"
+msgstr "الخطوات التالية"
+
+msgid "Continue"
+msgstr "تابع"
+
+msgid "No results found."
+msgstr "لا توجد نتائج."
+
+msgid "Saved filters"
+msgstr "عوامل التصفية المحفوظة"
+
+msgid "Name this filter"
+msgstr "سم هذا المرشح"
+
+
+msgid "Recent"
+msgstr "الأخيرة"
+
+msgid "Telegram"
+msgstr "تيليجرام"
+
+msgid "Searching…"
+msgstr "جارٍ البحث…"
+
+msgid "Search failed. Try again."
+msgstr "فشل البحث. حاول مرة أخرى."
+
+msgid "Type to search. Prefix with u, o, l, q, m, t to scope."
+msgstr "اكتب للبحث. أضف u أو o أو l أو q أو m أو t في البداية للتخصيص."
+
+msgid "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope."
+msgstr "المستخدمون والدورات والدروس والاختبارات ومهام الوسائط وتيليجرام. أضف u أو o أو l أو q أو m أو t في البداية أو اضغط g ثم حرفا للتخصيص."
+
+msgid "Promotion history"
+msgstr "سجل الترقية"
+
+msgid "Evaluation results"
+msgstr "نتائج التقييم"
+
+msgid "Telegram account"
+msgstr "حساب تيليجرام"
+
+msgid "Student view"
+msgstr "عرض الطالب"
+
+msgid "Read-only preview"
+msgstr "معاينة للقراءة فقط"
+
+msgid "What the student sees. Actions are disabled in preview."
+msgstr "ما يراه الطالب. الإجراءات معطلة في المعاينة."
+
+msgid "Access to this page is logged."
+msgstr "يتم تسجيل الوصول إلى هذه الصفحة."
+
+msgid "Aggregate"
+msgstr "إجمالي"
+
+
+msgid "Keyboard shortcuts"
+msgstr "اختصارات لوحة المفاتيح"
+
+msgid "Focus search"
+msgstr "التركيز على البحث"
+
+msgid "Show this help"
+msgstr "عرض هذه المساعدة"
+
+msgid "Go to"
+msgstr "انتقال إلى"
+
+msgid "then"
+msgstr "ثم"
+
+msgid "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
+msgstr "Ctrl في ويندوز و⌘ في ماك. اختصارات الحروف تعتمد على موضع الزر، لذا تعمل مع لوحة المفاتيح العربية أيضا."
+
+
+msgid "Pinned"
+msgstr "مثبتة"
+
+msgid "Pin"
+msgstr "تثبيت"
+
+msgid "Unpin"
+msgstr "إلغاء التثبيت"
+
+msgid "Open all"
+msgstr "فتح الكل"
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

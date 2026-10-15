@@ -31,6 +31,27 @@
     </div>
     {% endif %}
 
+    {% if next_actions %}
+    <div class="sd-panel-card mb-3" role="status" aria-label="{% translate 'Next actions' %}">
+        <div class="sd-panel-head"><i class="fas fa-compass"></i> {% translate "Next actions" %}</div>
+        <div class="p-3">
+            {% if next_actions.resume %}
+            <a class="sd-btn sd-btn--teal sd-btn--sm mb-2" href="{% url 'lesson-details' next_actions.resume.offering_id next_actions.resume.lesson_id %}">
+                <i class="fas fa-play"></i> {% translate "Continue" %}: {{ next_actions.resume.lesson_name }} ({{ next_actions.resume.percent }}%)
+            </a>
+            {% endif %}
+            {% for q in next_actions.next_quizzes %}
+            <a class="sd-btn sd-btn--gold sd-btn--sm mb-2" href="{% url 'quiz-details' q.offering_id q.id %}">
+                <i class="fas fa-list-check"></i> {{ q.name }}{% if q.course_name %} · {{ q.course_name }}{% endif %}
+            </a>
+            {% endfor %}
+            {% if not next_actions.resume and not next_actions.next_quizzes %}
+            <span class="text-muted">{% translate "No data" %}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="sd-profile">
 
         <!-- ===== LEFT: Profile card ===== -->

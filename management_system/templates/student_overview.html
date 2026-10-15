@@ -1,0 +1,8 @@
+{% extends 'admin_panel.html' %}
+{% load i18n %}
+{% block breadcrumbs %}{% include 'partials/breadcrumbs.html' %}{% endblock %}
+{% block body %}
+<div class="ad-pane is-active" id="content">
+{% include 'partials/student_overview_content.html' %}
+</div>
+{% endblock %}

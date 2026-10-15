@@ -353,6 +353,20 @@
 
         <li class="nav-item">
             <a class="ad-tab"
+               href="{% url 'content-qa' %}"
+               hx-get="{% url 'content-qa' %}"
+               hx-trigger="click"
+               hx-target="#display-page"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-select="#page-region">
+                <i class="fas fa-stethoscope"></i>
+                <span>{% translate "Content QA" %}</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="ad-tab"
                href="{% url 'report-dashboard' %}"
                hx-get="{% url 'report-dashboard' %}"
                hx-trigger="click"

@@ -1,0 +1,69 @@
+{% load i18n %}
+<div class="ad-pane-head ad-pane-head--bordered">
+  <h4 class="mb-0">{{ student.get_full_name|default:student.username }} — {% translate "Overview" %}</h4>
+  <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{% url 'user-profile' student.pk %}">{% translate "User details" %}</a>
+</div>
+<div class="ad-grid-2 mb-3">
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Enrollments" %} ({{ enrollments|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for e in enrollments %}<div class="ad-activity"><div class="ad-activity-name">{{ e.academic_year_level.level.display_name }} — {{ e.academic_year_level.academic_year.name }}</div><div class="ad-activity-meta">{{ e.course_offering.course.name|default:e.enrollment_type }} · {{ e.status }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Grades matrix" %} ({{ grades|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for g in grades %}<div class="ad-activity"><div class="ad-activity-name">{{ g.quiz.name }} — {{ g.total_grade }}</div><div class="ad-activity-meta">{{ g.submitted_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Progress" %} ({{ progress|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for p in progress %}<div class="ad-activity"><div class="ad-activity-name">{{ p.lesson.name }} — {{ p.percent }}%</div><div class="ad-activity-meta">{{ p.part_id }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Attendance" %} ({{ attendance|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for r in attendance %}<div class="ad-activity"><div class="ad-activity-name">{{ r.attendance_date }} — {{ r.action }}</div><div class="ad-activity-meta">{{ r.course_offering.course.name|default:"" }} · {{ r.source }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Telegram Chat" %} ({{ conversations|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for c in conversations %}<div class="ad-activity"><div class="ad-activity-name">#{{ c.pk }} — {{ c.status }}</div><div class="ad-activity-meta">{{ c.last_message_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Notifications" %} ({{ notifications|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for n in notifications %}<div class="ad-activity"><div class="ad-activity-name">{{ n.title_en|default:n.title_ar }}</div><div class="ad-activity-meta">{{ n.notification_type }} · {{ n.created_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Devices" %} ({{ devices|length }}/{{ sessions|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for d in devices %}<div class="ad-activity"><div class="ad-activity-name">{{ d.platform }} — {{ d.installation_id|slice:":8" }}</div><div class="ad-activity-meta">{% if d.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Payments matrix" %} ({{ payments|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for p in payments %}<div class="ad-activity"><div class="ad-activity-name">{{ p.academic_year_level.level.display_name }} — {{ p.academic_year_level.academic_year.name }}</div><div class="ad-activity-meta">{{ p.uploaded_at|date:"Y-m-d" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Telegram account" %}</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% if telegram_account %}<div class="ad-activity"><div class="ad-activity-name">{{ telegram_phone_display|default:"—" }}</div><div class="ad-activity-meta">{% if telegram_account.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %} · {{ telegram_account.linked_at|date:"Y-m-d" }}</div></div>{% else %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endif %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Promotion history" %} ({{ promotion_history|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for h in promotion_history %}<div class="ad-activity"><div class="ad-activity-name">{{ h.source_year_level.level.display_name }} → {{ h.destination_year_level.level.display_name|default:"—" }} · {{ h.outcome }}</div><div class="ad-activity-meta">{{ h.created_at|date:"Y-m-d" }} · {{ h.actor.username|default:"" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+  <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+    <h6 class="ad-section-title mb-0">{% translate "Evaluation results" %} ({{ evaluation_results|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+  </summary><div class="ad-card-body pt-0">
+    {% for r in evaluation_results %}<div class="ad-activity"><div class="ad-activity-name">{{ r.formula.academic_year_level.level.display_name }} · {{ r.computed_status }} → {{ r.final_status }} · {{ r.computed_score }}</div><div class="ad-activity-meta">{{ r.course_offering.course.name|default:_("Aggregate") }} · {{ r.saved_at|date:"Y-m-d" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+  </div></details>
+</div>
+<details class="ad-card ad-collapse mt-3" id="student-view" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
+  <h6 class="ad-section-title mb-0">{% translate "Student view" %} — {% translate "Read-only preview" %}</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
+</summary><div class="ad-card-body pt-0">
+  <p class="ad-empty-state">{% translate "What the student sees. Actions are disabled in preview." %}</p>
+  {% for o in readonly_offerings %}<div class="ad-activity"><div class="ad-activity-name">{{ o.course.name }} — {{ o.academic_year_level.level.display_name }}</div><div class="ad-activity-meta">{{ o.published_lesson_count }} {% translate "Lessons" %} · {{ o.published_quiz_count }} {% translate "Quizzes" %}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+</div></details>
+<p class="form-text mt-2">{% translate "Access to this page is logged." %}</p>

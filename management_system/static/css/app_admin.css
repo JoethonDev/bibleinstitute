@@ -3740,3 +3740,10 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
         padding: .7rem;
     }
 }
+
+/* Collapsible admin cards (360 overview): native details/summary, no JS. */
+details.ad-collapse > summary { list-style: none; cursor: pointer; }
+details.ad-collapse > summary::-webkit-details-marker { display: none; }
+details.ad-collapse > summary:focus-visible { outline: 2px solid var(--ps-teal); outline-offset: .25rem; }
+.ad-collapse-toggle { transition: transform .15s ease; }
+details.ad-collapse[open] .ad-collapse-toggle { transform: rotate(180deg); }

@@ -36,6 +36,7 @@ from ..models import (
 )
 from .attendance import DAY_GRADE_NONE, grade_attendance_day, pair_attendance_records
 from .progress_merge import unique_seconds
+from .quiz_access import answers_releasable
 from .timezones import ensure_aware
 
 
@@ -346,7 +347,13 @@ def _question_payload(question: Question, mode: str) -> dict:
     return payload
 
 
-def _submitted_question_payload(question: Question, submission: Submission | None, quiz_grade: Grade | None) -> dict:
+def _submitted_question_payload(
+    question: Question,
+    submission: Submission | None,
+    quiz_grade: Grade | None,
+    *,
+    show_answers: bool = False,
+) -> dict:
     payload = _question_payload(question, "view")
     payload.update({
         "submitted_answer": (
@@ -357,7 +364,7 @@ def _submitted_question_payload(question: Question, submission: Submission | Non
         "grade_awarded": submission.grade if submission is not None and submission.is_graded else None,
         "is_graded": bool(submission is not None and submission.is_graded),
     })
-    if quiz_grade is not None and (question.auto_grade or question.question_type in Question.STRUCTURED_QUESTION_TYPES):
+    if show_answers and quiz_grade is not None and (question.auto_grade or question.question_type in Question.STRUCTURED_QUESTION_TYPES):
         payload["correct_answer"] = question.get_correct_answer_payload()
     return payload
 
@@ -398,12 +405,15 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
     )
     mode = _quiz_mode(quiz, grade, opening, can_write)
     questions = list(Question.objects.filter(quiz=quiz).order_by("pk"))
+    # ponytail: answers release only after this student's effective closing
+    # (+30min buffer) so peers with open exceptional windows stay protected.
+    show_answers = answers_releasable(quiz, user, grade, opening=opening)
     if grade:
         submitted = {
             row.question_id: row
             for row in Submission.objects.filter(user=user, question__quiz=quiz).select_related("question")
         }
-        question_data = [_submitted_question_payload(question, submitted.get(question.pk), grade) for question in questions]
+        question_data = [_submitted_question_payload(question, submitted.get(question.pk), grade, show_answers=show_answers) for question in questions]
     else:
         question_data = [_question_payload(question, mode) for question in questions]
     return {
@@ -412,6 +422,7 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
         "grade": grade.total_grade if grade else None,
         "effective_opening_at": opening.opening_date.isoformat(),
         "effective_closing_at": opening.closing_date.isoformat(),
+        "answers_released": show_answers,
         "questions": question_data,
     }
 
@@ -926,3 +937,72 @@ def notification_payload(notification: StudentNotification, language: str) -> di
         "read_at": notification.read_at.isoformat() if notification.read_at else None,
         "created_at": notification.created_at.isoformat(),
     }
+
+
+def student_next_actions(user: User) -> dict:
+    """Canonical next-action card: resume + next quizzes + gaps.
+
+    Bounded (1 resume row, <=5 quizzes); reuses authorized offerings and the
+    existing profile-gap signals. No per-row queries beyond the bounded sets.
+    """
+    resume = (
+        LectureProgress.objects.filter(student=user, last_position_seconds__gt=0)
+        .select_related("lesson", "lesson__course_offering__course")
+        .order_by("-id")
+        .first()
+    )
+    resume_data = None
+    if resume is not None and resume.lesson_id:
+        offering = resume.lesson.course_offering
+        resume_data = {
+            "lesson_id": resume.lesson_id,
+            "lesson_name": resume.lesson.name,
+            "offering_id": offering.pk if offering else None,
+            "course_name": offering.course.name if offering and offering.course_id else "",
+            "part_id": resume.part_id,
+            "position": resume.last_position_seconds,
+            "percent": resume.percent,
+        }
+    offerings = list(student_offerings_queryset(user)[:PAGE_SIZE])
+    offering_ids = [o.pk for o in offerings]
+    next_quizzes: list[dict] = []
+    if offering_ids:
+        current = now()
+        quizzes = list(
+            Quiz.objects.filter(
+                course_offering_id__in=offering_ids,
+                status=PublicationStatus.PUBLISHED,
+            )
+            .select_related("course_offering__course")
+            .order_by("closing_date", "pk")[:50]
+        )
+        graded_ids = set(
+            Grade.objects.filter(user=user, quiz_id__in=[q.pk for q in quizzes]).values_list("quiz_id", flat=True)
+        )
+        for quiz in quizzes:
+            if quiz.pk in graded_ids:
+                continue
+            opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first() or quiz
+            try:
+                closing = ensure_aware(opening.closing_date) if opening.closing_date else None
+            except Exception:
+                closing = None
+            if closing is not None and closing + timedelta(minutes=30) < current:
+                continue
+            next_quizzes.append({
+                "id": quiz.pk,
+                "name": quiz.name,
+                "offering_id": quiz.course_offering_id,
+                "course_name": quiz.course_offering.course.name if quiz.course_offering_id else "",
+                "closing_at": opening.closing_date.isoformat() if opening.closing_date else None,
+            })
+            if len(next_quizzes) >= 5:
+                break
+    gaps: list[str] = []
+    for field in ("phone", "city", "education_or_job"):
+        if not getattr(user, field, None):
+            gaps.append(field)
+    for doc_field in ("identity_front_key", "profile_image_key", "payment_key"):
+        if not getattr(user, doc_field, None):
+            gaps.append(doc_field)
+    return {"resume": resume_data, "next_quizzes": next_quizzes, "gaps": gaps}
