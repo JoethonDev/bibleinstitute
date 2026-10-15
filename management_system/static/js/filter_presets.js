@@ -72,7 +72,9 @@
   document.addEventListener("DOMContentLoaded", init);
   // Re-run init (not just sync): an HTMX page swap replaces the filter bar,
   // so the preset controls must be re-created, then matched to the new URL.
-  if (window.htmx) document.addEventListener("htmx:after:swap", function () { init(); });
+  // No window.htmx guard: this file loads (defer) before the HTMX runtime,
+  // so the guard would always be false and the listener never attached.
+  document.addEventListener("htmx:after:swap", function () { init(); });
   init();
   window.syncFilterPresets = sync;
 })();

@@ -42,7 +42,7 @@ def build_student_overview(student_id: int) -> dict | None:
     )
     grades = list(
         Grade.objects.filter(user_id=student_id)
-        .select_related("quiz", "quiz__course_offering__course")
+        .select_related("quiz", "quiz__course_offering__course", "quiz__quiz_type")
         .order_by("-submitted_at")[:BOUND]
     )
     progress = list(

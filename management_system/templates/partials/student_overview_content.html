@@ -12,7 +12,7 @@
   <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
     <h6 class="ad-section-title mb-0">{% translate "Grades matrix" %} ({{ grades|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
   </summary><div class="ad-card-body pt-0">
-    {% for g in grades %}<div class="ad-activity"><div class="ad-activity-name">{{ g.quiz.name }} — {{ g.total_grade }}</div><div class="ad-activity-meta">{{ g.submitted_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+    {% for g in grades %}<div class="ad-activity"><div class="ad-activity-name">{{ g.quiz.name }}</div><div class="ad-activity-meta"><span class="cmd-type">{{ g.total_grade }} / {{ g.quiz.total_grade }}</span>{% if g.quiz.quiz_type %} · {% if request.LANGUAGE_CODE == 'ar' %}{{ g.quiz.quiz_type.name_ar|default:g.quiz.quiz_type.name_en }}{% else %}{{ g.quiz.quiz_type.name_en|default:g.quiz.quiz_type.name_ar }}{% endif %}{% endif %} · <a href="{% url 'submission-user' g.quiz.pk student.pk %}">{% translate "View" %}</a></div><div class="ad-activity-meta">{{ g.submitted_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
   </div></details>
   <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
     <h6 class="ad-section-title mb-0">{% translate "Progress" %} ({{ progress|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
@@ -27,7 +27,7 @@
   <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
     <h6 class="ad-section-title mb-0">{% translate "Telegram Chat" %} ({{ conversations|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
   </summary><div class="ad-card-body pt-0">
-    {% for c in conversations %}<div class="ad-activity"><div class="ad-activity-name">#{{ c.pk }} — {{ c.status }}</div><div class="ad-activity-meta">{{ c.last_message_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
+    {% for c in conversations %}<div class="ad-activity"><div class="ad-activity-name"><a href="{% url 'telegram-conversation-detail' c.pk %}">#{{ c.pk }} — {{ c.status }}</a></div><div class="ad-activity-meta">{{ c.last_message_at|date:"Y-m-d H:i" }}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
   </div></details>
   <details class="ad-card ad-collapse" open><summary class="ad-card-body d-flex justify-content-between align-items-center">
     <h6 class="ad-section-title mb-0">{% translate "Notifications" %} ({{ notifications|length }})</h6><i class="fas fa-chevron-down ad-collapse-toggle" aria-hidden="true"></i>
@@ -67,3 +67,73 @@
   {% for o in readonly_offerings %}<div class="ad-activity"><div class="ad-activity-name">{{ o.course.name }} — {{ o.academic_year_level.level.display_name }}</div><div class="ad-activity-meta">{{ o.published_lesson_count }} {% translate "Lessons" %} · {{ o.published_quiz_count }} {% translate "Quizzes" %}</div></div>{% empty %}<p class="ad-empty-state mb-0">{% translate "No data" %}</p>{% endfor %}
 </div></details>
 <p class="form-text mt-2">{% translate "Access to this page is logged." %}</p>
+<script>
+(function () {
+  // ponytail: client-side 10-row pager for long 360 cards (all rows are
+  // already in the DOM, <=25 each, so no queries). Prev/Next only, no numbers.
+  var SIZE = 10;
+  function t(s) { try { return (typeof gettext === "function") ? gettext(s) : s; } catch (e) { return s; } }
+  function rowsOf(box) {
+    var out = [], kids = box.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].classList && kids[i].classList.contains("ad-activity")) out.push(kids[i]);
+    }
+    return out;
+  }
+  function pageOf(box) { return parseInt(box.getAttribute("data-page") || "0", 10) || 0; }
+  function ensureBar(box) {
+    var bar = box.querySelector("[data-pager-bar]");
+    if (bar) return bar;
+    bar = document.createElement("div");
+    bar.setAttribute("data-pager-bar", "");
+    bar.className = "d-flex align-items-center gap-2 mt-2";
+    var prev = document.createElement("button");
+    prev.type = "button";
+    prev.setAttribute("data-pager-prev", "");
+    prev.className = "ad-btn ad-btn--ghost ad-btn--sm";
+    prev.textContent = t("Previous");
+    var next = document.createElement("button");
+    next.type = "button";
+    next.setAttribute("data-pager-next", "");
+    next.className = "ad-btn ad-btn--ghost ad-btn--sm";
+    next.textContent = t("Next");
+    var info = document.createElement("span");
+    info.setAttribute("data-pager-info", "");
+    info.className = "form-text text-muted mb-0";
+    bar.appendChild(prev); bar.appendChild(next); bar.appendChild(info);
+    box.appendChild(bar);
+    return bar;
+  }
+  function paint(box) {
+    var rows = rowsOf(box);
+    var bar = ensureBar(box);
+    var pages = Math.max(1, Math.ceil(rows.length / SIZE));
+    var p = Math.min(Math.max(pageOf(box), 0), pages - 1);
+    box.setAttribute("data-page", String(p));
+    for (var i = 0; i < rows.length; i++) rows[i].style.display = (Math.floor(i / SIZE) === p) ? "" : "none";
+    bar.style.display = rows.length > SIZE ? "" : "none";
+    var prev = bar.querySelector("[data-pager-prev]");
+    var next = bar.querySelector("[data-pager-next]");
+    var info = bar.querySelector("[data-pager-info]");
+    if (prev) prev.disabled = (p === 0);
+    if (next) next.disabled = (p >= pages - 1);
+    if (info) info.textContent = rows.length ? ((p * SIZE + 1) + "–" + Math.min(rows.length, (p + 1) * SIZE) + " / " + rows.length) : "";
+  }
+  function boot() {
+    var boxes = document.querySelectorAll("#content details.ad-collapse > div");
+    for (var i = 0; i < boxes.length; i++) paint(boxes[i]);
+  }
+  if (!window.__overviewPagerBound) {
+    window.__overviewPagerBound = true;
+    document.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest("[data-pager-prev],[data-pager-next]") : null;
+      if (!btn) return;
+      var box = btn.closest("details.ad-collapse > div");
+      if (!box) return;
+      box.setAttribute("data-page", String(pageOf(box) + (btn.hasAttribute("data-pager-prev") ? -1 : 1)));
+      paint(box);
+    });
+  }
+  boot();
+})();
+</script>

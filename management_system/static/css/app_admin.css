@@ -3745,8 +3745,14 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 details.ad-collapse > summary { list-style: none; cursor: pointer; }
 details.ad-collapse > summary::-webkit-details-marker { display: none; }
 details.ad-collapse > summary:focus-visible { outline: 2px solid var(--ps-teal); outline-offset: .25rem; }
-.ad-collapse-toggle { transition: transform .15s ease; }
+.ad-collapse-toggle { transition: transform .28s ease; }
 details.ad-collapse[open] .ad-collapse-toggle { transform: rotate(180deg); }
+details.ad-collapse[open] > div { animation: ad-collapse-in .28s ease; }
+@keyframes ad-collapse-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ad-collapse-toggle { transition: none; }
+  details.ad-collapse[open] > div { animation: none; }
+}
 
 /* Fix batch: icons, filter bar, palette, QA (no hard restyles elsewhere). */
 i.ad-stat-ic { display: grid; place-items: center; }
