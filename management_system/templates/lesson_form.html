@@ -169,7 +169,7 @@
                                                          class="btn-close position-absolute top-0 end-0 m-2"
                                                          @click="removeFile($event)"
                                                          aria-label="{% translate 'Close' %}"></button>
-                                                 <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2">
+                                                 <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2 pe-5">
                                                      <span class="text-break">{{ video.name }}</span>
                                                      <span class="badge text-bg-secondary part-badge flex-shrink-0"
                                                            {% if not video.part_number %}hidden{% endif %}>{% translate "Part" %} {{ video.part_number }}</span>
@@ -193,6 +193,15 @@
                                                             value="{% if video.file_type == 'audio' %}{{ video.download_key|default:'' }}{% else %}{{ video.download_id|default:'' }}{% endif %}"
                                                             placeholder="Downloadable Files/name.mp3"
                                                             aria-label="{% translate 'Download' %}">
+                                                 </div>
+                                                 <div class="d-flex align-items-center gap-2 mt-2">
+                                                     <label class="form-label small mb-0">{% translate "Part" %}</label>
+                                                     <input type="number" min="1" name="part_groups"
+                                                            class="form-control form-control-sm part-group-input"
+                                                            style="max-width:6rem"
+                                                            value="{% if video.part_number %}{{ video.part_number }}{% endif %}"
+                                                            @input="reindexParts()"
+                                                            aria-label="{% translate 'Part' %}">
                                                  </div>
                                              </div>
                                              <div class="card-footer bg-light p-1 text-end">

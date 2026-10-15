@@ -263,6 +263,7 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
     videos_name = request.POST.getlist("videos_name", [])
     files_type = request.POST.getlist("files_type", [])
     download_ids = request.POST.getlist("download_ids", [])
+    part_groups = request.POST.getlist("part_groups", [])
     if not videos or len(videos) != len(videos_name) or len(videos) != len(files_type):
         raise ValidationError(_("Lesson files are incomplete."))
 
@@ -277,8 +278,29 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
     for link in existing_links:
         if isinstance(link, dict) and link.get("id") and link.get("part_id"):
             existing_base_part_ids.setdefault(_lesson_part_base(link["id"]), link["part_id"])
-    # Links submitted together that share a base (video + its `_audio`
-    # sibling) are paired under one freshly generated part.
+
+    # Explicit grouping from the lesson editor: every card submits a part
+    # number, and cards sharing a number become one part (so the operator can
+    # merge or split video/audio directly). A group keeps an existing part id
+    # when one of its members already had it; otherwise it gets a fresh one.
+    group_tokens: dict[str, str] = {}
+    used_tokens: set[str] = set()
+    for index, video_key in enumerate(videos):
+        group = part_groups[index].strip() if index < len(part_groups) else ""
+        if not group or group in group_tokens:
+            continue
+        preferred = (
+            existing_part_ids.get(video_key)
+            or existing_base_part_ids.get(_lesson_part_base(video_key))
+        )
+        token = preferred if (preferred and preferred not in used_tokens) else ""
+        while not token or token in used_tokens:
+            token = secrets.token_urlsafe(8)
+        group_tokens[group] = token
+        used_tokens.add(token)
+
+    # Cards without an explicit group still pair by filename base (video + its
+    # `_audio` sibling), which is the no-JavaScript fallback.
     new_base_part_ids = {}
     links = []
     for index, video_key in enumerate(videos):
@@ -292,14 +314,19 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
                 raise ValidationError(errors or [_('Downloadable audio key is invalid.')])
             if files_type[index] == "book":
                 raise ValidationError(_("Book media cannot have a downloadable audio file."))
-        base = _lesson_part_base(video_key)
-        part_id = (
-            existing_part_ids.get(video_key)
-            or existing_base_part_ids.get(base)
-            or new_base_part_ids.get(base)
-            or secrets.token_urlsafe(8)
-        )
-        new_base_part_ids.setdefault(base, part_id)
+        group = part_groups[index].strip() if index < len(part_groups) else ""
+        if group:
+            part_id = group_tokens[group]
+        else:
+            base = _lesson_part_base(video_key)
+            part_id = (
+                existing_part_ids.get(video_key)
+                or existing_base_part_ids.get(base)
+                or new_base_part_ids.get(base)
+            )
+            while not part_id or part_id in used_tokens:
+                part_id = secrets.token_urlsafe(8)
+            new_base_part_ids.setdefault(base, part_id)
         link = {
             "file_type": files_type[index],
             "name": videos_name[index],
@@ -2492,10 +2519,14 @@ def update_lesson(request, lesson_id):
                 lesson_videos = []
             part_numbers: dict[str, int] = {}
             for video in lesson_videos:
+                if not isinstance(video, dict):
+                    continue
                 part_id = video.get("part_id") or ""
                 if part_id and part_id not in part_numbers:
                     part_numbers[part_id] = len(part_numbers) + 1
             for video in lesson_videos:
+                if not isinstance(video, dict):
+                    continue
                 part_id = video.get("part_id") or ""
                 video["part_number"] = part_numbers.get(part_id, 0)
                 if video.get("file_type") == "audio":

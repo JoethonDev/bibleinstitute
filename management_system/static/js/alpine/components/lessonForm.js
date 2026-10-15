@@ -117,7 +117,7 @@ function lessonForm() {
                     <div class="card-body p-3">
                         <button type="button" class="btn-close position-absolute top-0 end-0 m-2" 
                                 @click="removeFile($event)" aria-label="${this.getTranslation('close')}"></button>
-                        <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2">
+                        <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2 pe-5">
                             <span class="text-break">${safeName}</span>
                             <span class="badge text-bg-secondary part-badge flex-shrink-0" hidden></span>
                         </p>
@@ -131,6 +131,12 @@ function lessonForm() {
                             <input type="text" name="download_ids" class="form-control form-control-sm download-key-input"
                                    value="" placeholder="Downloadable Files/name.mp3"
                                    aria-label="${this.getTranslation('download')}">
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <label class="form-label small mb-0">${this.getTranslation('part')}</label>
+                            <input type="number" min="1" name="part_groups" class="form-control form-control-sm part-group-input"
+                                   style="max-width:6rem" value="" @input="reindexParts()"
+                                   aria-label="${this.getTranslation('part')}">
                         </div>
                     </div>
                     <div class="card-footer bg-light p-1 text-end">
@@ -152,7 +158,9 @@ function lessonForm() {
 
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = videoCard;
-            container.appendChild(tempDiv.firstElementChild);
+            const card = tempDiv.firstElementChild;
+            container.appendChild(card);
+            this.assignDefaultGroup(card);
             this.updateSelectedLectureCount();
             this.reindexParts();
         },
@@ -207,27 +215,49 @@ function lessonForm() {
         },
 
         /**
+         * Default the part number for a newly added card: reuse the number of
+         * an existing card with the same file base (so a video and its `_audio`
+         * sibling join one part), otherwise take the next free number.
+         */
+        assignDefaultGroup(card) {
+            const input = card.querySelector('.part-group-input');
+            if (!input || input.value) return;
+            const container = document.getElementById('videos-input');
+            if (!container) return;
+            const idInput = card.querySelector('input[name="videos"]');
+            const base = this.partBase(idInput ? idInput.value : '');
+            let siblingNumber = 0;
+            let max = 0;
+            container.querySelectorAll('.video-container').forEach(other => {
+                const otherInput = other.querySelector('.part-group-input');
+                const value = otherInput ? (parseInt(otherInput.value, 10) || 0) : 0;
+                if (value > max) max = value;
+                if (other !== card && base) {
+                    const otherId = other.querySelector('input[name="videos"]');
+                    if (value && this.partBase(otherId ? otherId.value : '') === base) {
+                        siblingNumber = value;
+                    }
+                }
+            });
+            input.value = String(siblingNumber || max + 1);
+        },
+
+        /**
          * Show a shared "Part N" badge on every selected card and colour the
-         * card's leading edge with the same colour, so a video and its audio
-         * sibling are visibly one group. A card with no usable key gets no
-         * badge or colour.
+         * card's leading edge with the same colour. The number comes from the
+         * editable `part_groups` input, so the operator changes the relation by
+         * giving two files the same number (or a new one to split them).
          */
         reindexParts() {
             const container = document.getElementById('videos-input');
             if (!container) return;
             const palette = ['#2f5d73', '#b4853a', '#5a7d4c', '#7a4c7a', '#b45a3a'];
-            const numbers = new Map();
             container.querySelectorAll('.video-container').forEach(card => {
-                const idInput = card.querySelector('input[name="videos"]');
+                const input = card.querySelector('.part-group-input');
                 const badge = card.querySelector('.part-badge');
                 if (!badge) return;
-                const base = this.partBase(idInput ? idInput.value : '');
-                let number = 0;
-                if (base) {
-                    if (!numbers.has(base)) numbers.set(base, numbers.size + 1);
-                    number = numbers.get(base);
-                }
-                if (number) {
+                const number = input ? (parseInt(input.value, 10) || 0) : 0;
+                if (number > 0) {
                     const color = palette[(number - 1) % palette.length];
                     card.style.borderInlineStartWidth = '4px';
                     card.style.borderInlineStartStyle = 'solid';
