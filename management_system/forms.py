@@ -17,6 +17,11 @@ from .utils.timezones import parse_application_datetime
 from .utils.quiz_access import eligible_quiz_students
 from .announcements import AnnouncementError, clean_announcement_action
 from .payments import academic_payment_scopes_for_student
+from .utils.grouped_choices import (
+    GroupedByLevelModelChoiceField,
+    GroupedByLevelModelMultipleChoiceField,
+    level_of_offering,
+)
 
 
 def _joined_date_field(*, required: bool = True, initial: date | None = None) -> forms.DateField:
@@ -662,8 +667,9 @@ class HistoricalExistingBulkForm(forms.Form):
 class OfferingCopyForm(forms.Form):
     source_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none(), label=_("Source academic scope"))
     target_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none(), label=_("Target academic scope"))
-    offerings = forms.ModelMultipleChoiceField(
+    offerings = GroupedByLevelModelMultipleChoiceField(
         queryset=CourseOffering.objects.none(),
+        level_of=level_of_offering,
         widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
         required=True,
         label=_("Offerings to copy"),
@@ -696,7 +702,9 @@ class OfferingCopyForm(forms.Form):
             try:
                 self.fields["offerings"].queryset = CourseOffering.objects.filter(
                     academic_year_level_id=int(source_id)
-                ).select_related("course").order_by("course__name")
+                ).select_related(
+                    "course", "academic_year_level__level"
+                ).order_by("academic_year_level__level__ordering", "course__name", "pk")
             except (TypeError, ValueError):
                 pass
 
@@ -741,10 +749,11 @@ class PromotionFormulaForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"}),
         label=_("Academic year and level"),
     )
-    course_offering = forms.ModelChoiceField(
+    course_offering = GroupedByLevelModelChoiceField(
         queryset=CourseOffering.objects.filter(academic_year_level__academic_year__is_active=True)
         .select_related("course", "academic_year_level__level")
-        .order_by("course__name"),
+        .order_by("academic_year_level__level__ordering", "course__name", "pk"),
+        level_of=level_of_offering,
         required=False,
         empty_label=_("All courses"),
         widget=forms.Select(attrs={"class": "form-select"}),

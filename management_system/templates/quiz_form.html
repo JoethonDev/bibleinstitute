@@ -182,10 +182,12 @@
                             </label>
                             <select class="form-select" id="course_offering" name="course_offering" required>
                                 <option value="">{% translate "Select Course Offering" %}</option>
-                                {% for offering in course_offerings %}
-                                <option value="{{ offering.pk }}" {% if offering.pk == selected_offering_id %}selected{% endif %}>
-                                    {{ offering.course.name }} — {{ offering.academic_year_level.level.display_name }} — {{ offering.academic_year_level.academic_year.name }}
-                                </option>
+                                {% for group in offering_groups %}
+                                <optgroup label="{{ group.label }}">
+                                    {% for offering in group.options %}
+                                    <option value="{{ offering.value }}" {% if offering.value == selected_offering_id|stringformat:'s' %}selected{% endif %}>{{ offering.label }}</option>
+                                    {% endfor %}
+                                </optgroup>
                                 {% endfor %}
                             </select>
                             <div class="form-text">{% translate "The offering determines the course, level, and academic year." %}</div>

@@ -92,7 +92,9 @@ def course_queryset(scope: dict[str, Any]) -> QuerySet:
     level_ordering = _int_or_none(scope.get("level"))
     if level_ordering is not None:
         query &= Q(level__ordering=level_ordering)
-    return Course.objects.filter(query)
+    # select_related avoids an N+1 when serialize_pagination reads each
+    # course's level (the dashboard groups and orders by level).
+    return Course.objects.select_related("level").filter(query)
 
 
 def content_scope(request, *, year_id: int) -> dict[str, Any]:

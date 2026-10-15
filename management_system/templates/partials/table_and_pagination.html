@@ -193,6 +193,11 @@
                 {% endfor %}
                 {% else %}
                 {% for values in page_obj %}
+                {% if group_by_level and values.level %}
+                {% ifchanged values.level %}
+                <tr class="ad-level-group"><td colspan="{% if table_columns %}{{ table_columns|length|add:2 }}{% else %}{{ columns|length|add:2 }}{% endif %}">{{ values.level }}</td></tr>
+                {% endifchanged %}
+                {% endif %}
                 <tr data-id="{{ values.id }}">
                     <td class="column-checkbox">
                         <input type="checkbox"

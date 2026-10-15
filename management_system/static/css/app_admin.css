@@ -407,6 +407,12 @@
 .ad-table tbody tr { transition: background-color var(--ps-motion); }
 .ad-table tbody tr:hover { background: var(--ps-gold-soft); }
 .ad-table tbody tr:last-child td { border-bottom: 0; }
+.ad-table tbody tr.ad-level-group td {
+    background: var(--ps-gold-soft);
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+.ad-table tbody tr.ad-level-group:hover td { background: var(--ps-gold-soft); }
 .ad-table .ad-num { font-variant-numeric: tabular-nums; font-weight: 700; }
 
 /* ---------------- Pills / statuses / meters / KV ---------------- */

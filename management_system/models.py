@@ -1277,6 +1277,7 @@ class Course(models.Model):
     def serialize_pagination(self):
         return {
             "id" : self.pk,
+            "level" : self.level.display_name,
             "rows" : [self.name, self.description, self.level.display_name, self.instructor],
             "url" : reverse_lazy("course-view", args=[self.pk,])
         }
@@ -2442,6 +2443,7 @@ class Lesson(models.Model):
         offering = self.course_offering
         return {
             "id" : self.pk,
+            "level" : offering.academic_year_level.level.display_name,
             "rows" : [
                 self.name,
                 offering.course.name,
@@ -2631,6 +2633,7 @@ class Quiz(models.Model):
         offering = self.course_offering
         return {
             "id" : self.pk,
+            "level" : offering.academic_year_level.level.display_name,
             "rows" : [
                 self.name,
                 offering.course.name,

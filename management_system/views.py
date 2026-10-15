@@ -176,6 +176,7 @@ from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings,
 from .mobile_auth import revoke_user_mobile_access
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
+from .utils.grouped_choices import offering_option_groups
 from .media_processing import (
     ACTIVE_WORKER_STATUSES,
     claim_attachment_retry,
@@ -2175,7 +2176,8 @@ def course_dashboard(request):
             "instructor": "instructor",
         },
         "default_sort": "name",
-        "default_ordering": ["name", "pk"],
+        "default_ordering": ["level__ordering", "name", "pk"],
+        "group_by_level": True,
         "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
         "table_scope": scope,
     }
@@ -2203,26 +2205,18 @@ class DeleteCourse(CourseBaseView, DeleteView):
 
 
 def _content_offering_filter_options(academic_year_id=None):
+    """Grouped-by-level offering options for the lesson/quiz course filter."""
     offerings = CourseOffering.objects.select_related(
         "course", "academic_year_level__level", "academic_year_level__academic_year"
     ).order_by(
-        "course__name",
         "academic_year_level__level__ordering",
+        "course__name",
         "academic_year_level__academic_year__ordering",
+        "pk",
     )
     if academic_year_id is not None:
         offerings = offerings.filter(academic_year_level__academic_year_id=academic_year_id)
-    return [
-        {
-            "value": str(offering.pk),
-            "label": (
-                f"{offering.course.name} — "
-                f"{offering.academic_year_level.level.display_name} — "
-                f"{offering.academic_year_level.academic_year.name}"
-            ),
-        }
-        for offering in offerings
-    ]
+    return offering_option_groups(offerings)
 
 
 def _requested_publication_status(request):
@@ -2409,7 +2403,13 @@ def lesson_dashboard(request):
             "updated_date": "updated_date",
         },
         "default_sort": "updated_date",
-        "default_ordering": ["-updated_date", "name", "pk"],
+        "default_ordering": [
+            "course_offering__academic_year_level__level__ordering",
+            "course_offering__course__name",
+            "name",
+            "pk",
+        ],
+        "group_by_level": True,
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
@@ -2425,10 +2425,15 @@ def create_lesson(request):
     if request.method == "GET":
         course_offerings = CourseOffering.objects.filter(
             academic_year_level__academic_year__is_active=True
-        ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
+        ).select_related(
+            "course", "academic_year_level__level", "academic_year_level__academic_year"
+        ).order_by(
+            "academic_year_level__level__ordering", "course__name",
+            "academic_year_level__academic_year__ordering", "pk",
+        )
 
         return render(request, "lesson_form.html", {
-            "course_offerings" : course_offerings,
+            "offering_groups" : offering_option_groups(course_offerings, include_year=True),
             "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
             "is_root" : True,
             "content_status" : PublicationStatus.DRAFT,
@@ -2513,7 +2518,12 @@ def update_lesson(request, lesson_id):
             lesson = get_object_or_404(Lesson, pk=lesson_id)
             course_offerings = CourseOffering.objects.filter(
                 Q(academic_year_level__academic_year__is_active=True) | Q(pk=lesson.course_offering_id)
-            ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
+            ).select_related(
+                "course", "academic_year_level__level", "academic_year_level__academic_year"
+            ).order_by(
+                "academic_year_level__level__ordering", "course__name",
+                "academic_year_level__academic_year__ordering", "pk",
+            )
             lesson_videos = json.loads(lesson.links)
             if not isinstance(lesson_videos, list):
                 lesson_videos = []
@@ -3598,7 +3608,14 @@ def quiz_dashboard(request):
             "submissions": "submissions_count",
         },
         "default_sort": "opening_date",
-        "default_ordering": ["-opening_date", "name", "pk"],
+        "default_ordering": [
+            "course_offering__academic_year_level__level__ordering",
+            "course_offering__course__name",
+            "opening_date",
+            "name",
+            "pk",
+        ],
+        "group_by_level": True,
         "academic_year_filter": True,
         "academic_years": academic_years,
         "selected_academic_year_id": selected_year.pk,
@@ -3642,10 +3659,15 @@ def create_quiz(request):
     if request.method == "GET":
         course_offerings = CourseOffering.objects.filter(
             academic_year_level__academic_year__is_active=True
-        ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
+        ).select_related(
+            "course", "academic_year_level__level", "academic_year_level__academic_year"
+        ).order_by(
+            "academic_year_level__level__ordering", "course__name",
+            "academic_year_level__academic_year__ordering", "pk",
+        )
 
         return render(request, "quiz_form.html", {
-            "course_offerings" : course_offerings,
+            "offering_groups" : offering_option_groups(course_offerings, include_year=True),
             "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
             "question_types" : Question.QUESTION_TYPES,
             "questions" : request.session.pop("questions", []),
@@ -3741,9 +3763,14 @@ def update_quiz(request, quiz_id):
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             course_offerings = CourseOffering.objects.filter(
                 Q(academic_year_level__academic_year__is_active=True) | Q(pk=quiz.course_offering_id)
-            ).select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
+            ).select_related(
+                "course", "academic_year_level__level", "academic_year_level__academic_year"
+            ).order_by(
+                "academic_year_level__level__ordering", "course__name",
+                "academic_year_level__academic_year__ordering", "pk",
+            )
             return render(request, "quiz_form.html", {
-                "course_offerings" : course_offerings,
+                "offering_groups" : offering_option_groups(course_offerings, include_year=True),
                 "selected_offering_id" : quiz.course_offering_id,
                 "selected_quiz_type_id" : quiz.quiz_type_id,
                 "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
