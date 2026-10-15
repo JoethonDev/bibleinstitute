@@ -1323,7 +1323,17 @@ def rename_r2_operation(operation_id: str):
 
         total = int(previous["total"] or 0)
         report("updating_references", total, total)
-        updated_count = rewrite_lesson_r2_references(old_key, new_key, is_folder=is_folder)
+        # The R2 object is already renamed at this point, so the lesson-link
+        # update is best-effort: an old key that is absent from the database,
+        # a malformed row, or any DB error must not fail the rename.
+        try:
+            updated_count = rewrite_lesson_r2_references(old_key, new_key, is_folder=is_folder)
+        except Exception:
+            logger.exception(
+                "R2 rename reference update failed",
+                extra={"operation_id": operation_id},
+            )
+            updated_count = 0
         if warning:
             _safe_update_r2_rename_status(operation_id, warning=str(warning))
         _safe_update_r2_rename_status(

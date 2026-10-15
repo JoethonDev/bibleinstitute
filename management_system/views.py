@@ -4768,7 +4768,13 @@ def api_move_file(request):
         new_key = R2_MANAGER.move_file(file_key, destination_folder)
         
         if new_key:
-            updated_count = rewrite_lesson_r2_references(file_key, new_key)
+            # The move has already happened; the DB reference update is
+            # best-effort and must not turn a successful move into a failure.
+            try:
+                updated_count = rewrite_lesson_r2_references(file_key, new_key)
+            except Exception:
+                logger.exception("File-move reference update failed")
+                updated_count = 0
             logger.info(f"User {request.user} moved file from {file_key} to {new_key}. Updated {updated_count} lesson references.")
             return JsonResponse({'success': True, 'message': _('File moved successfully and %(count)d database references updated') % {'count': updated_count}, 'new_key': new_key})
         else:

@@ -41,7 +41,11 @@ def rewrite_lesson_r2_references(old_key, new_key, is_folder=False):
         # cannot lose each other's link rewrite (last-write-wins race).
         lessons = Lesson.objects.select_for_update().filter(links__contains=search_key)
         for lesson in lessons:
-            links = json.loads(lesson.links)
+            try:
+                links = json.loads(lesson.links)
+            except (TypeError, ValueError):
+                # A malformed row must not fail the rename; skip it.
+                continue
             rewritten = rewrite_r2_keys(links, old_key, new_key, is_folder)
             if rewritten != links:
                 lesson.links = json.dumps(rewritten)
