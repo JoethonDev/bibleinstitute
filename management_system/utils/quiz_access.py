@@ -1,12 +1,8 @@
-from datetime import timedelta
-
 from django.core.exceptions import ValidationError
 from django.db.models import Exists, OuterRef
-from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
-from ..models import Enrollment, QuizStudentOpening, User
-from .timezones import ensure_aware
+from ..models import Enrollment, Grade, QuizStudentOpening, User
 
 
 def eligible_quiz_students(quiz):
@@ -41,23 +37,16 @@ def quiz_window(quiz, user=None):
     return quiz.opening_date, quiz.closing_date
 
 
-def answers_releasable(quiz, user=None, grade=None, opening=None) -> bool:
-    """Canonical answer-release rule: graded AND effective window closed.
+def answers_releasable(grade: Grade | None) -> bool:
+    """Canonical answer-release rule: solved students see the correct answers.
 
-    Peers may still have an open exceptional window, so correct answers are
-    exposed only after this student's effective closing (+30min buffer).
-    Management preview callers bypass this and must gate separately.
-    Pass `opening` (QuizStudentOpening or Quiz) to avoid an extra lookup.
+    Answers are released as soon as this student has a submitted grade, even
+    while the quiz is still open for peers. A closed-and-unsolved student never
+    receives answers (web renders ``serialize_student`` and the mobile payload
+    omits ``correct_answer``). Management preview/correction callers bypass this
+    rule and must gate separately.
     """
-    if grade is None:
-        return False
-    if opening is None:
-        _opening, closing = quiz_window(quiz, user)
-    else:
-        closing = getattr(opening, "closing_date", None)
-    if not closing:
-        return False
-    return now() > ensure_aware(closing) + timedelta(minutes=30)
+    return grade is not None
 
 
 def grant_quiz_openings(quiz, students, opening_date, closing_date, granted_by) -> int:

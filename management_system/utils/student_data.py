@@ -405,9 +405,9 @@ def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str)
     )
     mode = _quiz_mode(quiz, grade, opening, can_write)
     questions = list(Question.objects.filter(quiz=quiz).order_by("pk"))
-    # ponytail: answers release only after this student's effective closing
-    # (+30min buffer) so peers with open exceptional windows stay protected.
-    show_answers = answers_releasable(quiz, user, grade, opening=opening)
+    # Solved students receive the answer key; closed-and-unsolved students do
+    # not (their payload is built without correct_answer below).
+    show_answers = answers_releasable(grade)
     if grade:
         submitted = {
             row.question_id: row

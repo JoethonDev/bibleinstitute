@@ -1134,10 +1134,10 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             else:
                 questions = [q.serialize() for q in query_set]
                 if not user_has_management_role(user):
-                    # ponytail: graded view hides keys until this student's
-                    # effective window closes, protecting peers with open
-                    # exceptional windows.
-                    if not answers_releasable(quiz, user, grade):
+                    # Solved students see the answer keys. Closed-and-unsolved
+                    # students render through serialize_student() above, which
+                    # strips every answer field.
+                    if not answers_releasable(grade):
                         for q in questions:
                             q.pop("correct_answer", None)
                             q.pop("answer_payload", None)
