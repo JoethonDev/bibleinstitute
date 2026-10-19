@@ -17,6 +17,10 @@
         viewKey: '{{ view|default:'default'|escapejs }}',
          bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}',
         selectionToken: '{{ bulk_selection_token|default:''|escapejs }}',
+        {% if view == 'quiz' and request.user.role.role == 'admin' %}
+        quizRecalculateUrl: '{% url "quiz-recalculate" %}',
+        operatorId: '{{ request.user.pk }}',
+        {% endif %}
         tableTotal: {{ page_obj.paginator.count|default:0 }},
         pageSize: {{ page_obj.paginator.per_page|default:15 }}
      }" class="ad-table-shell">
@@ -40,10 +44,28 @@
                 <i class="fas fa-times me-1"></i>
                 <span>{% translate "Clear" %}</span>
             </button>
+            {% if view == 'quiz' and request.user.role.role == 'admin' %}
+            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm"
+                    @click="recalculateQuizzes('selected')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+                {% translate "Recalculate selected quizzes" %}
+            </button>
+            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" @click="recalculateQuizzes('selected', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+                {% translate "Reconcile selected quizzes" %}
+            </button>
+            {% endif %}
         </div>
 
         <!-- Column Visibility Toggle -->
         <div class="column-controls">
+            {% if view == 'quiz' and request.user.role.role == 'admin' %}
+            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm"
+                    @click="recalculateQuizzes('all')" :disabled="!tableTotal || recalculationBusy || !!recalculationStatusUrl">
+                {% translate "Recalculate all matching quizzes" %}
+            </button>
+            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" @click="recalculateQuizzes('all', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+                {% translate "Reconcile all matching quizzes" %}
+            </button>
+            {% endif %}
             <div class="dropdown">
                 <button class="btn ad-btn ad-btn--ghost ad-btn--sm dropdown-toggle"
                         type="button"
@@ -87,6 +109,15 @@
 {% endif %}
 
     <!-- Responsive Table -->
+    {% if view == 'quiz' and request.user.role.role == 'admin' %}
+    <div class="ad-alert ad-alert--info" x-show="!!recalculationStatus" x-cloak role="status" aria-live="polite">
+        <span x-text="recalculationStatus"></span>
+        <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm"
+                x-show="!!recalculationStatusUrl && !recalculationBusy" @click="pollRecalculation()">
+            {% translate "Refresh recalculation status" %}
+        </button>
+    </div>
+    {% endif %}
     <div class="ad-table-wrap">
         <table class="ad-table{% if view == 'application' %} mb-0{% endif %}">
             <thead>
@@ -276,6 +307,18 @@
                                 <i class="fas fa-id-card me-1"></i>
                                 <span>{% translate "Overview" %}</span>
                             </a>
+                            {% endif %}
+                            {% if view == 'quiz' and request.user.role.role == 'admin' %}
+                            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm"
+                                    @click="recalculateQuizzes('single', {{ values.id }})"
+                                    :disabled="recalculationBusy || !!recalculationStatusUrl">
+                                <i class="fas fa-calculator me-1" aria-hidden="true"></i>{% translate "Recalculate submissions" %}
+                            </button>
+                                <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm"
+                                    @click="recalculateQuizzes('single', {{ values.id }}, 'reconcile')"
+                                    :disabled="recalculationBusy || !!recalculationStatusUrl">
+                                    {% translate "Reconcile snapshots" %}
+                                </button>
                             {% endif %}
                             <button class="ad-btn ad-btn--ghost ad-btn--sm"
                                     hx-get="{{ values.url }}update/"

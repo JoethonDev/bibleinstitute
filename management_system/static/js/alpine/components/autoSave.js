@@ -20,7 +20,15 @@ function autoSave(formKey) {
         beforeUnloadHandler: null,
         
         initAutoSave() {
-            this.loadDraft();
+            if (this.$el.dataset.draftReadonly === 'true') {
+                this.clearDraft();
+                return;
+            }
+            if (this.$el.dataset.draftSaved === 'true' || this.$el.dataset.formErrors === 'true') {
+                this.clearDraft();
+            } else {
+                this.loadDraft();
+            }
             
             // Track changes
             this.inputHandler = () => {
@@ -63,21 +71,23 @@ function autoSave(formKey) {
         saveDraft() {
             // A debounced input save can still run after an HTMX swap removed
             // the form; never resurrect a draft that destroy() just cleared.
-            if (!this.$el || !this.$el.isConnected) {
+            if (!this.$el || !this.$el.isConnected || this.$el.dataset.draftReadonly === 'true') {
                 return;
             }
             this.isSaving = true;
-            const data = {};
+            const data = {version: 2, fields: Object.create(null), rows: null};
             const form = this.$el.querySelector('form');
             
             if (form) {
-                const formData = new FormData(form);
-                for (let [key, value] of formData.entries()) {
-                    if (isSensitiveDraftField(key) || typeof value !== 'string') {
-                        continue;
-                    }
-                    data[key] = value;
+                if (typeof this.beforeDraftSave === 'function') this.beforeDraftSave();
+                for (const field of form.elements) {
+                    if (!field.name || field.matches(':disabled') || isSensitiveDraftField(field.name)
+                        || ['file', 'submit', 'reset', 'button'].includes(field.type)) continue;
+                    const values = data.fields[field.name] || (data.fields[field.name] = []);
+                    values.push({type: field.type, value: field.value, checked: field.checked,
+                        selected: field.multiple ? Array.from(field.selectedOptions, option => option.value) : null});
                 }
+                if (typeof this.captureDraftRows === 'function') data.rows = this.captureDraftRows();
                 
                 try {
                     localStorage.setItem(this.draftKey, JSON.stringify(data));
@@ -105,6 +115,18 @@ function autoSave(formKey) {
             if (draft) {
                 try {
                     this.formData = JSON.parse(draft);
+                    // Old drafts lost repeated values and cannot be restored safely.
+                    if (this.formData.version !== 2 || !this.formData.fields || typeof this.formData.fields !== 'object'
+                        || Array.isArray(this.formData.fields)) {
+                        this.clearDraft();
+                        return;
+                    }
+                    if (Object.values(this.formData.fields).some(values => !Array.isArray(values)
+                        || values.some(value => !value || typeof value.type !== 'string' || typeof value.value !== 'string'
+                            || (value.selected !== null && (!Array.isArray(value.selected)
+                                || value.selected.some(option => typeof option !== 'string')))))) {
+                        throw new Error('Invalid form draft');
+                    }
                     
                     // Auto-restore draft if content exists and show notification
                     if (Object.keys(this.formData).length > 0) {
@@ -125,18 +147,35 @@ function autoSave(formKey) {
         restoreDraft() {
             const form = this.$el.querySelector('form');
             if (form && this.formData) {
-                Object.keys(this.formData).forEach(key => {
+                if (this.formData.rows && typeof this.restoreDraftRows === 'function') {
+                    this.restoreDraftRows(this.formData.rows);
+                }
+                Object.keys(this.formData.fields).forEach(key => {
                     if (isSensitiveDraftField(key)) {
                         return;
                     }
-                    const field = form.querySelector(`[name="${CSS.escape(key)}"]`);
-                    if (field) {
-                        field.value = this.formData[key];
-                        
-                        // Trigger change event for reactive updates
-                        field.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
+                    const fields = Array.from(form.querySelectorAll(`[name="${CSS.escape(key)}"]`));
+                    const saved = this.formData.fields[key];
+                    if (!Array.isArray(saved) || fields.length !== saved.length) return;
+                    fields.forEach((field, index) => {
+                        const value = saved[index];
+                        if (field.matches(':disabled') || field.readOnly || field.type !== value.type || field.type === 'file') return;
+                        if (field.type === 'checkbox' || field.type === 'radio') {
+                            if (field.value === value.value) field.checked = value.checked === true;
+                        } else if (field.multiple) {
+                            for (const option of field.options) option.selected = (value.selected || []).includes(option.value);
+                        } else {
+                            // A removed offering must not erase the current valid selection.
+                            if (field.tagName === 'SELECT' && !Array.from(field.options).some(option => option.value === value.value)) return;
+                            field.value = value.value;
+                        }
+                        if (!field.closest('.video-container, .question-card')) {
+                            field.dispatchEvent(new Event('input', { bubbles: true }));
+                            field.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
                 });
+                if (typeof this.afterDraftRestore === 'function') this.afterDraftRestore();
                 
                 if (window.Alpine && Alpine.store('notifications')) {
                     Alpine.store('notifications').add(gettext('Draft restored'), 'info');
@@ -210,18 +249,6 @@ function formValidation() {
             }
             
             this.submitting = true;
-
-            // Best-effort: clear saved draft from the outer autoSave scope.
-            // Wrapped in try-catch so a failure never prevents form submission.
-            try {
-                const outerEl = document.getElementById('content');
-                if (outerEl && outerEl._x_dataStack) {
-                    const outerScope = outerEl._x_dataStack[0];
-                    if (outerScope && typeof outerScope.clearDraft === 'function') {
-                        outerScope.clearDraft();
-                    }
-                }
-            } catch (e) { /* clearDraft is optional */ }
 
             // HTMX forms swap the response fragment into the page region; htmx
             // issues the request and Django remains the validation authority.

@@ -3,6 +3,8 @@
 
      {% block body %}
 <div id="content" class="admin-form-page lesson-editor ad-page"
+     data-form-errors="{{ has_form_errors|yesno:'true,false' }}"
+     data-draft-saved="{{ draft_saved|yesno:'true,false' }}"
      data-lesson-close="{% translate 'Close' %}"
      data-lesson-video="{% translate 'Video' %}"
      data-lesson-audio-recording="{% translate 'Audio Recording' %}"
@@ -54,7 +56,7 @@
             <div class="ad-card-head">
                 <h4 class="mb-0">
                     <i class="fas fa-book-open me-2"></i>
-                    {% if lesson_name %}
+                    {% if is_edit %}
                         {% translate "Edit Lesson" %}
                     {% else %}
                         {% translate "Create New Lesson" %}
@@ -65,6 +67,12 @@
                 
                 <form action="" method="post" class="admin-form" x-data="formValidation()" @submit="handleSubmit($event)" @htmx:finally:request.window="submitting = false" novalidate hx-post="" hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
+                    {% if editor_form.errors %}
+                    <div class="ad-alert ad-alert--danger" role="alert">
+                        {% for field in editor_form %}{% for message in field.errors %}<div>{{ field.label }}: {{ message }}</div>{% endfor %}{% endfor %}
+                        {% for message in editor_form.non_field_errors %}<div>{{ message }}</div>{% endfor %}
+                    </div>
+                    {% endif %}
                     
                     <!-- Form Layout: Responsive Grid -->
                      <div class="lesson-editor__grid">

@@ -4,6 +4,9 @@
 
 {% block body %}
 <div id="content" class="admin-form-page ad-page"
+     data-form-errors="{{ form_errors|yesno:'true,false' }}"
+     data-draft-readonly="{{ quiz_editable|yesno:'false,true' }}"
+     data-draft-saved="{{ draft_saved|yesno:'true,false' }}"
      x-data="{
          ...autoSave('quiz-form-{{ request.resolver_match.kwargs.quiz_id|default:'new' }}'),
          ...quizForm(),
@@ -155,6 +158,10 @@
                         {% translate "Quiz Details" %}
                     </h5>
                     
+                    {% if not quiz_editable %}
+                    <div class="ad-alert ad-alert--info" role="status">{% translate "Only the status can be changed for this quiz. An administrator can edit its content." %}</div>
+                    {% endif %}
+                    <fieldset {% if not quiz_editable %}disabled{% endif %}>
                     <div class="form-row">
                         <!-- Quiz Name -->
                         <div class="form-group" @focusout="validateField($event)">
@@ -211,6 +218,7 @@
                         </div>
                     </div>
 
+                    </fieldset>
                         <!-- Publication Status -->
                         <div class="form-group mt-3">
                             <label for="quiz-status" class="form-label">{% translate "Status" %}</label>
@@ -221,6 +229,7 @@
                             </select>
                         </div>
 
+                    <fieldset {% if not quiz_editable %}disabled{% endif %}>
                      <div class="form-row">
                         <!-- Opening Date -->
                         <div class="form-group" @focusout="validateField($event)">
@@ -277,8 +286,8 @@
                             </button>
                         </div>
                     </div>
+                    </fieldset>
                 </div>
-
                 <!-- Form Actions -->
                 <div class="form-actions">
                     <button type="submit"

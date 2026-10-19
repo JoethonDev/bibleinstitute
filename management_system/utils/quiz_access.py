@@ -1,8 +1,12 @@
+from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.db.models import Exists, OuterRef
 from django.utils.translation import gettext_lazy as _
 
 from ..models import Enrollment, Grade, QuizStudentOpening, User
+
+
+QUIZ_SUBMISSION_GRACE = timedelta(minutes=30)
 
 
 def eligible_quiz_students(quiz):

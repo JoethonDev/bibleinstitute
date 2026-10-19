@@ -23,9 +23,127 @@ function tableManager() {
         allMatching: false,
         excluded: [],
         pageSize: 15,
+        quizRecalculateUrl: '',
+        operatorId: '',
+        recalculationBusy: false,
+        recalculationStatus: '',
+        recalculationStatusUrl: '',
+        recalculationTimer: null,
+        jobStartedHandler: null,
+        discoveryTimer: null,
 
         init() {
             this.loadColumnPreferences();
+            if (this.quizRecalculateUrl) {
+                this.jobStartedHandler = event => {
+                    if (String(event.detail.operator) !== String(this.operatorId) || !this.$root.isConnected) return;
+                    this.recalculationStatusUrl = event.detail.url;
+                    this.pollRecalculation();
+                };
+                window.addEventListener('quiz-operation-started', this.jobStartedHandler);
+                try {
+                    const url = sessionStorage.getItem(this.recalculationKey());
+                    if (url && url.startsWith(this.quizRecalculateUrl)) {
+                        this.recalculationStatusUrl = url;
+                        this.pollRecalculation();
+                    }
+                } catch (error) { /* Storage is optional; the job runs on the worker. */ }
+                this.discoverJob();
+                this.discoveryTimer = setInterval(() => this.discoverJob(), 5000);
+            }
+        },
+
+        destroy() {
+            clearTimeout(this.recalculationTimer);
+            clearInterval(this.discoveryTimer);
+            if (this.jobStartedHandler) window.removeEventListener("quiz-operation-started", this.jobStartedHandler);
+        },
+
+        async discoverJob() {
+            if (!this.$root.isConnected || this.recalculationBusy || this.recalculationStatusUrl) return;
+            try {
+                const response = await fetch(this.quizRecalculateUrl, {cache: 'no-store'});
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!data.status_url || !this.$root.isConnected || this.recalculationStatusUrl) return;
+                let completed = '';
+                try { completed = sessionStorage.getItem(this.recalculationKey() + '-completed'); } catch (error) { /* Optional. */ }
+                if (data.status_url === completed) return;
+                this.recalculationStatusUrl = data.status_url;
+                this.pollRecalculation();
+            } catch (error) { /* Discovery retries while this table is visible. */ }
+        },
+
+        recalculationKey() {
+            return `admin-quiz-recalculation-${this.operatorId}`;
+        },
+
+        recalculateQuizzes(mode, quizId = null, kind = 'recalculate') {
+            if (!this.quizRecalculateUrl || this.recalculationBusy || this.recalculationStatusUrl) return;
+            const all = mode === 'all' || (mode === 'selected' && this.allMatching);
+            const ids = mode === 'single' ? [quizId] : (all ? [] : this.selected);
+            const count = mode === 'single' ? 1 : (mode === 'all' ? this.tableTotal : this.selectionCount());
+            if (!count) return;
+            const payload = {kind, selection_token: this.selectionToken, select_all: all,
+                ids: ids.map(Number), excluded_ids: mode === 'selected' && all ? this.excluded.map(Number) : []};
+            const message = interpolate(kind === 'reconcile' ? gettext('Submit saved snapshots after the grace period for %(count)s quizzes?') : gettext('Recalculate saved submissions for %(count)s quizzes? Manually awarded grades will be preserved.'), {count}, true);
+            const start = () => this.startRecalculation(payload);
+            if (typeof window.appConfirm === 'function') window.appConfirm(message, start);
+            else start();
+        },
+
+        async startRecalculation(payload) {
+            if (this.recalculationBusy || this.recalculationStatusUrl) return;
+            this.recalculationBusy = true;
+            this.recalculationStatus = gettext('Starting quiz operation…');
+            const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+            try {
+                const response = await fetch(this.quizRecalculateUrl, {method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify(payload)});
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || gettext('Unable to start quiz operation.'));
+                this.recalculationStatusUrl = data.status_url;
+                try { sessionStorage.setItem(this.recalculationKey(), data.status_url); } catch (error) { /* Optional. */ }
+                window.dispatchEvent(new CustomEvent("quiz-operation-started", {detail: {operator: this.operatorId, url: data.status_url}}));
+            } catch (error) {
+                this.recalculationStatus = error.message || gettext('Unable to start quiz operation.');
+                this.recalculationBusy = false;
+            }
+        },
+
+        async pollRecalculation() {
+            if (!this.recalculationStatusUrl || !this.$root.isConnected) return;
+            this.recalculationBusy = true;
+            clearTimeout(this.recalculationTimer);
+            try {
+                const response = await fetch(this.recalculationStatusUrl, {cache: 'no-store'});
+                if (response.status === 404) {
+                    this.recalculationStatusUrl = '';
+                    try { sessionStorage.removeItem(this.recalculationKey()); } catch (error) { /* Optional. */ }
+                    throw new Error(gettext('The selection has expired. Reload the list and try again.'));
+                }
+                if (!response.ok) throw new Error(gettext('Unable to read quiz operation progress. Refresh the status to try again.'));
+                const data = await response.json();
+                if (!this.$root.isConnected) return;
+                const progress = interpolate(data.kind === 'reconcile' ? gettext('%(done)s / %(total)s quizzes; %(answers)s snapshots submitted.') : gettext('%(done)s / %(total)s quizzes; %(answers)s answers recalculated.'),
+                    {done: data.processed, total: data.total, answers: data.answers}, true);
+                this.recalculationStatus = data.status === 'queued' ? gettext('Quiz operation is queued.') : progress;
+                if (data.status === 'completed' || data.status === 'failed') {
+                    this.recalculationStatus = data.status === 'failed' ? `${data.error} ${progress}`
+                        : `${gettext('Quiz operation completed.')} ${progress} `
+                          + interpolate(gettext('%(count)s quizzes no longer matched the selection.'), {count: data.skipped}, true);
+                    try { sessionStorage.setItem(this.recalculationKey() + '-completed', this.recalculationStatusUrl); } catch (error) { /* Optional. */ }
+                    this.recalculationBusy = false;
+                    this.recalculationStatusUrl = '';
+                    try { sessionStorage.removeItem(this.recalculationKey()); } catch (error) { /* Optional. */ }
+                } else {
+                    this.recalculationTimer = setTimeout(() => this.pollRecalculation(), 2000);
+                }
+            } catch (error) {
+                this.recalculationStatus = error.message;
+                this.recalculationBusy = false;
+            }
         },
 
         rowCheckboxes() {

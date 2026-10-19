@@ -564,6 +564,13 @@ def quiz_detail(request, offering_id, quiz_id):
     data = student_quiz_data(request.user, offering_id, quiz_id, normalize_language(request))
     if data is None:
         return _error(request, "forbidden", _("You do not have access to this quiz."), 403)
+    from .models import QuizAnswerSnapshot
+    snapshot = QuizAnswerSnapshot.objects.filter(quiz_id=quiz_id, user=request.user).first()
+    data["snapshot"] = {"answers": snapshot.answers if snapshot else {}, "revision": snapshot.revision if snapshot else 0}
+    from django.utils.dateparse import parse_datetime
+    from .utils.quiz_access import QUIZ_SUBMISSION_GRACE
+    data["reconcile_required"] = bool(snapshot and data["mode"] == "closed_unsolved"
+        and timezone.now() > parse_datetime(data["effective_closing_at"]) + QUIZ_SUBMISSION_GRACE)
     return json_api_response(request, data)
 
 
@@ -586,6 +593,9 @@ def quiz_submit(request, offering_id, quiz_id):
     data = student_quiz_data(request.user, offering_id, quiz_id, normalize_language(request))
     if data is None:
         return _error(request, "forbidden", _("You do not have access to this quiz."), 403)
+    if data["mode"] == "closed_unsolved":
+        from .quiz_attempts import reconcile_snapshots
+        reconcile_snapshots(quiz_id, user_id=request.user.pk)
     if data["mode"] != "exam":
         with transaction.atomic():
             User.objects.select_for_update().get(pk=request.user.pk)
@@ -1210,3 +1220,11 @@ def gallery_items(request, scope_id: int):
             **_paginated_payload(page_obj, rows),
         },
     )
+
+
+@csrf_exempt
+@require_mobile_session
+@require_POST
+def quiz_snapshot_save(request, offering_id, quiz_id):
+    from .views import quiz_snapshot
+    return quiz_snapshot(request, offering_id, quiz_id)

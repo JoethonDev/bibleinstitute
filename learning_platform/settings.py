@@ -235,6 +235,8 @@ CELERY_TASK_ROUTES = {
     "management_system.media_tasks.recover_pending_media_jobs": {"queue": "media"},
 }
 CELERY_BEAT_SCHEDULE = {
+    "recover-quiz-operations": {"task": "management_system.tasks.recover_quiz_operations", "schedule": 60.0},
+    "reconcile-closed-quiz-snapshots": {"task": "management_system.tasks.reconcile_closed_quiz_snapshots", "schedule": 60.0},
     "recover-pending-media-jobs": {
         "task": "management_system.media_tasks.recover_pending_media_jobs",
         "schedule": 60.0,

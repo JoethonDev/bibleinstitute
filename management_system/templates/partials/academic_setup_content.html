@@ -394,24 +394,48 @@
         var source = document.getElementById('id_source_year_level');
         var offerings = document.getElementById('id_offerings');
         if (!source || !offerings) return;
+        var submit = source.closest('form').querySelector('[type="submit"]');
+        var revision = 0;
+        var controller = null;
+        function placeholder(message) {
+            offerings.replaceChildren(new Option(message, ''));
+            offerings.options[0].disabled = true;
+        }
         source.addEventListener('change', function() {
-            offerings.innerHTML = '<option>{% translate "Loading…" %}</option>';
+            var current = ++revision;
+            if (controller) controller.abort();
+            offerings.disabled = true;
+            submit.disabled = true;
+            if (!source.value) {
+                offerings.replaceChildren();
+                return;
+            }
+            controller = new AbortController();
+            placeholder('{% translate "Loading…"|escapejs %}');
             var url = '{% url "academic-offerings-by-scope" 0 %}'.replace('/0/', '/' + source.value + '/');
-            fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-                .then(function(response) { return response.json(); })
-                .then(function(data) {
-                    offerings.innerHTML = '';
-                    data.offerings.forEach(function(offering) {
-                        var option = document.createElement('option');
-                        option.value = offering.id;
-                        option.textContent = offering.name;
-                        offerings.appendChild(option);
-                    });
+            fetch(url, {signal: controller.signal, headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                .then(function(response) {
+                    if (!response.ok) throw new Error('Unable to load offerings');
+                    return response.json();
                 })
-                .catch(function() {
-                    offerings.innerHTML = '<option>{% translate "Unable to load offerings" %}</option>';
+                .then(function(data) {
+                    if (current !== revision || !source.isConnected) return;
+                    offerings.replaceChildren();
+                    data.offerings.forEach(function(offering) {
+                        offerings.appendChild(new Option(offering.name, offering.id));
+                    });
+                    offerings.disabled = false;
+                    submit.disabled = !data.offerings.length;
+                })
+                .catch(function(error) {
+                    if (current !== revision || error.name === 'AbortError' || !source.isConnected) return;
+                    placeholder('{% translate "Unable to load offerings"|escapejs %}');
                 });
         });
+        // No copy is possible until a source has loaded eligible offerings.
+        offerings.disabled = true;
+        submit.disabled = true;
+        if (source.value) source.dispatchEvent(new Event('change'));
     })();
     </script>
 </div>

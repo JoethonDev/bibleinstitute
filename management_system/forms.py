@@ -5,7 +5,8 @@ import secrets
 from datetime import date
 
 from django.core.exceptions import ValidationError
-from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, assign_academic_date
+from django.db.models import Q
+from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, assign_academic_date
 from .utils.validators import normalize_phone, normalize_username, validate_identity_by_type
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -355,6 +356,21 @@ class UserUpdateForm(UserCreationForm):
             except ValidationError as exc:
                 raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
         return identity_number
+
+class LessonEditorForm(forms.Form):
+    lesson_name = forms.CharField(max_length=255, label=_("Lesson Name"))
+    description = forms.CharField(required=False, label=_("Lesson Description"))
+    course_offering = forms.ModelChoiceField(queryset=CourseOffering.objects.none(), label=_("Course Offering"))
+    status = forms.ChoiceField(choices=PublicationStatus.choices, label=_("Status"))
+
+    def __init__(self, *args, current_offering_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["course_offering"].queryset = CourseOffering.objects.filter(
+            Q(academic_year_level__academic_year__is_active=True) | Q(pk=current_offering_id)
+        ).select_related(
+            "course", "academic_year_level__level", "academic_year_level__academic_year"
+        ).order_by("academic_year_level__level__ordering", "course__name", "academic_year_level__academic_year__ordering", "pk")
+
 
 class CourseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):

@@ -12458,3 +12458,127 @@ msgstr "Could not start publication. Please try again."
 
 msgid "Upload cleaned up"
 msgstr "Upload cleaned up"
+
+msgid "%(count)s quizzes no longer matched the selection."
+msgstr "%(count)s quizzes no longer matched the selection."
+
+msgid "%(done)s / %(total)s quizzes; %(answers)s answers recalculated."
+msgstr "%(done)s / %(total)s quizzes; %(answers)s answers recalculated."
+
+msgid ""
+"Only the status can be changed for this quiz. An administrator can edit its "
+"content."
+msgstr ""
+"Only the status can be changed for this quiz. An administrator can edit its "
+"content."
+
+msgid "Quiz recalculation completed."
+msgstr "Quiz recalculation completed."
+
+msgid ""
+"Quiz recalculation failed. Completed quizzes remain saved; retry the "
+"remaining quizzes."
+msgstr ""
+"Quiz recalculation failed. Completed quizzes remain saved; retry the "
+"remaining quizzes."
+
+msgid "Quiz recalculation is queued."
+msgstr "Quiz recalculation is queued."
+
+msgid "Recalculate all matching quizzes"
+msgstr "Recalculate all matching quizzes"
+
+msgid ""
+"Recalculate saved submissions for %(count)s quizzes? Manually awarded grades"
+" will be preserved."
+msgstr ""
+"Recalculate saved submissions for %(count)s quizzes? Manually awarded grades"
+" will be preserved."
+
+msgid "Recalculate selected quizzes"
+msgstr "Recalculate selected quizzes"
+
+msgid "Recalculate submissions"
+msgstr "Recalculate submissions"
+
+msgid "Refresh recalculation status"
+msgstr "Refresh recalculation status"
+
+msgid "Select valid quizzes from the current list."
+msgstr "Select valid quizzes from the current list."
+
+msgid "Starting quiz recalculation…"
+msgstr "Starting quiz recalculation…"
+
+msgid ""
+"Unable to read recalculation progress. Refresh the status to try again."
+msgstr ""
+"Unable to read recalculation progress. Refresh the status to try again."
+
+msgid "Unable to start quiz recalculation."
+msgstr "Unable to start quiz recalculation."
+
+msgid "Unable to start quiz recalculation. Check the worker and try again."
+msgstr "Unable to start quiz recalculation. Check the worker and try again."
+
+msgid "Reconcile snapshots"
+msgstr "Reconcile snapshots"
+
+msgid "Running"
+msgstr "Running"
+
+msgid "Invalid quiz answers."
+msgstr "Invalid quiz answers."
+
+msgid "Answers changed in another window. Reload before saving."
+msgstr "Answers changed in another window. Reload before saving."
+
+msgid "Quiz operation failed. Completed work remains saved."
+msgstr "Quiz operation failed. Completed work remains saved."
+
+msgid "Invalid quiz operation."
+msgstr "Invalid quiz operation."
+
+msgid "Recovering saved answers…"
+msgstr "Recovering saved answers…"
+
+msgid "Recovery could not finish. Reload to try again."
+msgstr "Recovery could not finish. Reload to try again."
+
+msgid "Answers could not be saved. Keep this page open and retry."
+msgstr "Answers could not be saved. Keep this page open and retry."
+
+msgid "Answers saved."
+msgstr "Answers saved."
+
+msgid "Saving answers…"
+msgstr "Saving answers…"
+
+msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
+msgstr "Submit saved snapshots after the grace period for %(count)s quizzes?"
+
+msgid "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
+msgstr "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
+
+msgid "Quiz operation is queued."
+msgstr "Quiz operation is queued."
+
+msgid "Quiz operation completed."
+msgstr "Quiz operation completed."
+
+msgid "Reconcile selected quizzes"
+msgstr "Reconcile selected quizzes"
+
+msgid "Reconcile all matching quizzes"
+msgstr "Reconcile all matching quizzes"
+
+msgid "Starting quiz operation…"
+msgstr "Starting quiz operation…"
+
+msgid "Unable to start quiz operation."
+msgstr "Unable to start quiz operation."
+
+msgid ""
+"Unable to read quiz operation progress. Refresh the status to try again."
+msgstr ""
+"Unable to read quiz operation progress. Refresh the status to try again."

@@ -12,6 +12,7 @@ from . import mobile_api
 app_name = "mobile-v1"
 
 urlpatterns = [
+    path("courses/<int:offering_id>/quizzes/<int:quiz_id>/snapshot/", mobile_api.quiz_snapshot_save, name="quiz-snapshot"),
     path("auth/login/", mobile_api.login, name="login"),
     path("auth/otp/request/", mobile_api.otp_request, name="otp-request"),
     path("auth/otp/verify/", mobile_api.otp_verify, name="otp-verify"),

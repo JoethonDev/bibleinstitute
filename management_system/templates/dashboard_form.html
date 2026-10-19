@@ -4,6 +4,8 @@
 
 {% block body %}
 <div id="content" class="ad-pane is-active ad-form-page"
+     data-form-errors="{{ form.errors|yesno:'true,false' }}"
+     data-draft-saved="{{ draft_saved|yesno:'true,false' }}"
      x-data="autoSave('{{ view_name }}-form-{{ object_id }}')"
      x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">

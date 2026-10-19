@@ -37,6 +37,7 @@ from management_system import gallery_views as graduation_gallery_views
 from management_system import portal_views as portal_extra_views
 
 urlpatterns = [
+    path("offerings/<int:offering_id>/quizzes/<int:quiz_id>/snapshot/", quiz_snapshot, name="quiz-snapshot"),
     path(
         'login/',
         LoginView.as_view(
@@ -108,6 +109,8 @@ urlpatterns = [
 
     # Quiz Dashboard
     path('dashboard/quizzez/', quiz_dashboard, name="quiz-dashboard"),
+    path('dashboard/quizzez/recalculate/', recalculate_quizzes, name="quiz-recalculate"),
+    path('dashboard/quizzez/recalculate/<uuid:job_id>/', quiz_recalculation_status, name="quiz-recalculation-status"),
     path('dashboard/quizzez/import/preview/', quiz_json_preview, name="quiz-json-preview"),
     path('dashboard/quizzez/<int:quiz_id>/', quiz_detail, name="quiz-view"),
     path('dashboard/quizzez/<int:quiz_id>/questions/<int:question_id>/regrade/', regrade_quiz_question, name="quiz-question-regrade"),

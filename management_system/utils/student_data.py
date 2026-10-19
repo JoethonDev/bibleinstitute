@@ -36,7 +36,7 @@ from ..models import (
 )
 from .attendance import DAY_GRADE_NONE, grade_attendance_day, pair_attendance_records
 from .progress_merge import unique_seconds
-from .quiz_access import answers_releasable
+from .quiz_access import QUIZ_SUBMISSION_GRACE, answers_releasable
 from .timezones import ensure_aware
 
 
@@ -379,7 +379,7 @@ def _quiz_mode(
         return "view"
     if quiz.status == PublicationStatus.PUBLISHED and can_write:
         current = now()
-        if ensure_aware(opening.opening_date) <= current <= ensure_aware(opening.closing_date) + timedelta(minutes=30):
+        if ensure_aware(opening.opening_date) <= current <= ensure_aware(opening.closing_date) + QUIZ_SUBMISSION_GRACE:
             return "exam"
     return "closed_unsolved"
 
@@ -987,7 +987,7 @@ def student_next_actions(user: User) -> dict:
                 closing = ensure_aware(opening.closing_date) if opening.closing_date else None
             except Exception:
                 closing = None
-            if closing is not None and closing + timedelta(minutes=30) < current:
+            if closing is not None and closing + QUIZ_SUBMISSION_GRACE < current:
                 continue
             next_quizzes.append({
                 "id": quiz.pk,

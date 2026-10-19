@@ -24,6 +24,8 @@ function quizForm() {
             }
             this.questionsContainer = this.$el.querySelector('.questions-container');
 
+            if (this.$el.dataset.draftReadonly === 'true') return;
+
             if (!this.questionsContainer) {
                 console.error('quizForm: .questions-container not found');
                 return;
@@ -82,6 +84,54 @@ function quizForm() {
 
         getQuestionContainer() {
             return this.questionsContainer || this.$el.querySelector('.questions-container');
+        },
+
+        captureDraftRows() {
+            return {kind: 'quiz', rows: this.getQuestionCards().map(card => ({
+                type: card.querySelector('.question-type').value,
+                choices: Array.from(card.querySelectorAll('[data-choice-row] input'), input => input.value),
+                items: Array.from(card.querySelectorAll('[data-structured-value="order_events"]'), input => input.value),
+                pairs: Array.from(card.querySelectorAll('[data-structured-row="match_related"]'), row => ({
+                    left: row.querySelector('[data-structured-left]').value,
+                    right: row.querySelector('[data-structured-right]').value,
+                })),
+            }))};
+        },
+
+        beforeDraftSave() {
+            this.getQuestionCards().forEach(card => this.syncStructuredQuestionConfig(card));
+        },
+
+        restoreDraftRows(data) {
+            if (data.kind !== 'quiz' || !Array.isArray(data.rows) || data.rows.length > 500
+                || data.rows.some(row => !['mcq', 'written', 'complete', 'order_events', 'match_related'].includes(row.type)
+                    || !Array.isArray(row.choices) || row.choices.some(value => typeof value !== 'string')
+                    || !Array.isArray(row.items) || row.items.some(value => typeof value !== 'string')
+                    || !Array.isArray(row.pairs) || row.pairs.some(pair => !pair
+                        || typeof pair.left !== 'string' || typeof pair.right !== 'string'))) {
+                throw new Error('Invalid quiz draft');
+            }
+            const container = this.getQuestionContainer();
+            container.innerHTML = '';
+            data.rows.forEach((row, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = this.buildQuestionCard(index, row.type);
+                const card = wrapper.firstElementChild;
+                const choices = card.querySelector('[data-choice-list]');
+                if (choices) choices.innerHTML = row.choices.map(value => this.buildChoiceRow(index, value)).join('');
+                const items = card.querySelector('[data-structured-list="order_events"]');
+                if (items) items.innerHTML = row.items.map(value => this.buildOrderEventRow(value)).join('');
+                const pairs = card.querySelector('[data-structured-list="match_related"]');
+                if (pairs) pairs.innerHTML = row.pairs.map(pair => this.buildMatchPairRow(pair.left, pair.right)).join('');
+                container.appendChild(card);
+            });
+            this.reindexQuestions();
+        },
+
+        afterDraftRestore() {
+            this.reindexQuestions();
+            this.getQuestionCards().forEach(card => this.syncStructuredQuestionConfig(card));
+            this.hasChanges = false;
         },
 
         escapeHtml(value) {
@@ -422,6 +472,7 @@ function quizForm() {
         },
 
         handleClick(event) {
+            this.hasChanges = true;
             const addQuestionButton = event.target.closest('[data-action="add-question"]');
             if (addQuestionButton) {
                 event.preventDefault();

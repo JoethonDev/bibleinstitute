@@ -1,6 +1,6 @@
 # Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpResponse, FileResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, FileResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse, StreamingHttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _
@@ -14,12 +14,13 @@ from django.contrib.messages import success, error, info
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core import signing
+from django.core.cache import cache
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from django.utils import formats
 from django.utils.dateparse import parse_date
 from django.utils.timezone import now
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.forms import formset_factory
 import hashlib
@@ -50,7 +51,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm, SignupSettingsForm, apply_cleaned_data_to_locked_instance
+from .forms import LessonEditorForm, CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm, SignupSettingsForm, apply_cleaned_data_to_locked_instance
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
@@ -63,6 +64,10 @@ from .grade_matrix import (
     grade_matrix_workbook,
 )
 from .quiz_grading import regrade_quiz_submissions
+from .tasks import recalculate_quizzes_task
+from .models import QuizAnswerSnapshot, QuizOperationJob
+from .utils.quiz_access import QUIZ_SUBMISSION_GRACE
+from .quiz_attempts import submit_answers, save_snapshot, reconcile_snapshots
 from .attendance_matrix import (
     ATTENDANCE_MATRIX_PAGE_SIZE,
     ATTENDANCE_MATRIX_STATUS_VALUES,
@@ -92,7 +97,7 @@ from .utils.file_validator import (
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, download_from_bucket, generate_unique_url, get_r2_client
 from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
-from .utils.decorators import capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
+from .utils.decorators import ajax_login_required, capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_status_notification
 from .progress_activity import (
     format_active_duration,
@@ -126,6 +131,8 @@ from .utils.timezones import ensure_aware, format_user_datetime
 from .utils.validators import normalize_username
 from .utils.search import normalize_search_text, normalized_contains_q
 from .admin_tables import (
+    load_selection_token,
+    MAX_EXPLICIT_SELECTION,
     bulk_delete_records,
     content_scope,
     course_queryset,
@@ -270,6 +277,8 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
     part_groups = request.POST.getlist("part_groups", [])
     if not videos or len(videos) != len(videos_name) or len(videos) != len(files_type):
         raise ValidationError(_("Lesson files are incomplete."))
+    if any(file_type not in {"video", "audio", "book"} for file_type in files_type):
+        raise ValidationError(_("Lesson files are incomplete."))
 
     existing_part_ids = {
         link["id"]: link["part_id"]
@@ -408,11 +417,15 @@ class FormBase(AdminPermissionView, FormView):
         """If the form is invalid, render the invalid form.
            Display error_message 
         """
+        self.request.session["saved_dashboard_form"] = str(self.view_name)
         success(self.request, self.get_success_msg(), extra_tags="alert-success")
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["draft_saved"] = self.request.session.get("saved_dashboard_form") == str(self.view_name)
+        if context["draft_saved"]:
+            self.request.session.pop("saved_dashboard_form", None)
         context["view_name"] = self.view_name  # Example shared context
         context["action"] = self.action
         context["object_id"] = self.object.pk if self.object else 'new'
@@ -1143,7 +1156,11 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                             q.pop("answer_payload", None)
                             q.pop("answer_payload_json", None)
 
+            snapshot = QuizAnswerSnapshot.objects.filter(quiz=quiz, user=user).first() if not preview_requested and not grade else None
             return render(request, "display_quiz.html", {
+                "snapshot_data": {"answers": snapshot.answers if snapshot else {}, "revision": snapshot.revision if snapshot else 0},
+                "snapshot_url": reverse("quiz-snapshot", args=[offering_id, quiz_id]),
+                "snapshot_reconcile": bool(snapshot and quiz_mode == "closed_unsolved" and now() > ensure_aware(effective_closing_date) + QUIZ_SUBMISSION_GRACE),
                 "quiz_name": quiz.name,
                 "username": request.user.username,
                 "questions": questions,
@@ -1168,69 +1185,8 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 
                 questions_data, not_used = unpack_quiz_form(request.POST)
                 try:
-                    with transaction.atomic():
-                        locked_quiz = Quiz.objects.select_for_update().get(pk=quiz_id)
-                        if locked_quiz.course_offering_id != offering.pk:
-                            raise PermissionDenied
-                        if not user_has_management_role(user) and locked_quiz.status != PublicationStatus.PUBLISHED:
-                            raise PermissionDenied
-                        if not is_quiz_open(locked_quiz, now(), user) or not is_quiz_in_user_window(locked_quiz, user):
-                            return HttpResponse(_("Invalid Request, submission is closed!"))
-                        locked_user = User.objects.select_for_update().get(pk=user.pk)
-                        if Grade.objects.filter(user=locked_user, quiz=locked_quiz).exists():
-                            return redirect(reverse("quiz-details", args=[offering_id, quiz_id]))
-
-                        question_by_id = {
-                            question.pk: question
-                            for question in Question.objects.filter(quiz_id=quiz_id)
-                        }
-                        valid_question_ids = set(question_by_id)
-                        submissions = []
-                        repeated_submissions = set()
-                        total_grade = 0
-                        for data in questions_data.values():
-                            question_id = int(data['id'])
-                            if question_id not in valid_question_ids or question_id in repeated_submissions:
-                                continue
-                            repeated_submissions.add(question_id)
-                            submission = Submission(
-                                question=question_by_id[question_id],
-                                submitted_answer=data.get("answer", ""),
-                                user=locked_user,
-                            )
-                            submission.assign_grade()
-                            total_grade += submission.grade
-                            submissions.append(submission)
-
-                        unanswered_questions = valid_question_ids - repeated_submissions
-                        for qid in unanswered_questions:
-                            submission = Submission(
-                                question=question_by_id[qid],
-                                submitted_answer="-",
-                                user=locked_user,
-                            )
-                            submission.assign_grade()
-                            submissions.append(submission)
-                        Submission.objects.bulk_create(submissions)
-                        Grade.objects.create(
-                            quiz=locked_quiz,
-                            user=locked_user,
-                            submitted_at=submission_datetime,
-                            total_grade=total_grade,
-                        )
-                    submission_counts = (total_grade, len(submissions), len(unanswered_questions))
-                    logger.info(
-                        "quiz submitted",
-                        extra={
-                            "event": "quiz_submitted",
-                            "quiz_id": quiz.pk,
-                            "offering_id": offering.pk,
-                            "student_id": locked_user.pk,
-                            "total_grade": submission_counts[0],
-                            "submission_count": submission_counts[1],
-                            "unanswered_count": submission_counts[2],
-                        },
-                    )
+                    answers = {str(data["id"]): data.get("answer", "") for data in questions_data.values()}
+                    submit_answers(quiz_id, user, answers)
                     success(request, _("Quiz is sent successfully!"), extra_tags="alert-success") # Translate
 
                 except PermissionDenied:
@@ -1254,6 +1210,33 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
         
     except Http404:
         raise Http404
+
+@require_POST
+@ajax_login_required
+def quiz_snapshot(request, offering_id, quiz_id):
+    if len(request.body) > 1100000:
+        return JsonResponse({"error": _("Invalid quiz answers.")}, status=400)
+    try:
+        payload = json.loads(request.body)
+        if not isinstance(payload, dict):
+            raise ValueError
+        reconcile = payload.get("reconcile") is True
+        offering = get_accessible_offering_or_403(request.user, offering_id, write=not reconcile)
+        quiz = get_object_or_404(Quiz, pk=quiz_id, course_offering=offering, status=PublicationStatus.PUBLISHED)
+        if reconcile:
+            count, _more = reconcile_snapshots(quiz.pk, user_id=request.user.pk)
+            submitted = Grade.objects.filter(quiz=quiz, user=request.user).exists()
+            return JsonResponse({"submitted": submitted})
+        revision = payload.get("revision")
+        if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+            raise ValueError
+        snapshot = save_snapshot(quiz.pk, request.user, payload.get("answers"), revision)
+        return JsonResponse({"submitted": snapshot is None, "revision": snapshot.revision if snapshot else 0})
+    except ValidationError as exc:
+        return JsonResponse({"error": "; ".join(exc.messages)}, status=409 if getattr(exc, "code", None) == "snapshot_conflict" else 400)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return JsonResponse({"error": _("Invalid quiz answers.")}, status=400)
+
 
 # Admin Views
 @capability_required(can_manage_content)
@@ -2337,6 +2320,90 @@ def regrade_quiz_question(request, quiz_id, question_id):
     return redirect(reverse("quiz-view", args=[quiz_id]))
 
 
+@require_http_methods(["GET", "POST"])
+@ajax_login_required
+@capability_required(can_manage_academic_setup)
+def recalculate_quizzes(request):
+    if request.method == "GET":
+        jobs = QuizOperationJob.objects.filter(actor=request.user)
+        job = jobs.filter(status__in=[QuizOperationJob.Status.QUEUED, QuizOperationJob.Status.RUNNING]).order_by("created_at").first()
+        job = job or jobs.order_by("-created_at").first()
+        response = JsonResponse({"status_url": reverse("quiz-recalculation-status", args=[job.pk]) if job else None})
+        response["Cache-Control"] = "no-store"
+        return response
+    if len(request.body) > 65536:
+        return JsonResponse({"error": _("The selection has invalid types.")}, status=400)
+    try:
+        payload = json.loads(request.body)
+        if not isinstance(payload, dict):
+            raise ValueError
+        selection = load_selection_token(str(payload.get("selection_token", "")), view="quiz", actor_id=request.user.pk)
+    except signing.BadSignature:
+        return JsonResponse({"error": _("The selection has expired. Reload the list and try again.")}, status=409)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return JsonResponse({"error": _("Invalid JSON")}, status=400)
+    if selection.get("actor") != request.user.pk or selection.get("view") != "quiz" or not isinstance(selection.get("scope"), dict):
+        return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=403)
+    try:
+        select_all = payload.get("select_all", False)
+        if not isinstance(select_all, bool):
+            raise ValueError
+        lists = []
+        for name in ("ids", "excluded_ids"):
+            raw = payload.get(name, [])
+            if not isinstance(raw, list) or len(raw) > MAX_EXPLICIT_SELECTION:
+                raise ValueError
+            if any(isinstance(value, bool) or not isinstance(value, (str, int))
+                   or not re.fullmatch(r"[0-9]{1,19}", str(value)) for value in raw):
+                raise ValueError
+            values = set(int(value) for value in raw)
+            if any(value < 1 or value > 9223372036854775807 for value in values):
+                raise ValueError
+            lists.append(sorted(values))
+        ids, excluded_ids = lists
+        target = quiz_queryset(selection["scope"])
+        if select_all:
+            target = target.exclude(pk__in=excluded_ids)
+        else:
+            target = target.filter(pk__in=ids)
+            if target.count() != len(ids):
+                raise ValueError
+        total = target.count()
+        if not total:
+            raise ValueError
+    except (ValueError, TypeError):
+        return JsonResponse({"error": _("Select valid quizzes from the current list.")}, status=400)
+    upper_pk = target.order_by("-pk").values_list("pk", flat=True).first()
+    kind = payload.get("kind", QuizOperationJob.Kind.RECALCULATE)
+    if kind not in QuizOperationJob.Kind.values:
+        return JsonResponse({"error": _("Invalid quiz operation.")}, status=400)
+    job = QuizOperationJob.objects.create(actor=request.user, kind=kind, total=total, upper_pk=upper_pk,
+        selection={"scope": selection["scope"], "ids": ids, "excluded_ids": excluded_ids, "select_all": select_all},
+        language=translation.get_language() or "en")
+    try:
+        recalculate_quizzes_task.delay(str(job.pk))
+    except Exception:
+        # The durable queued record is picked up by recovery when the broker returns.
+        logger.exception("Quiz operation %s awaits worker recovery", job.pk)
+    return JsonResponse({"status_url": reverse("quiz-recalculation-status", args=[job.pk])}, status=202)
+
+
+@require_GET
+@ajax_login_required
+@capability_required(can_manage_academic_setup)
+def quiz_recalculation_status(request, job_id):
+    job = get_object_or_404(QuizOperationJob, pk=job_id, actor=request.user)
+    if job.status == job.Status.QUEUED or (job.status == job.Status.RUNNING and job.lease_until and job.lease_until <= timezone.now()):
+        try:
+            recalculate_quizzes_task.delay(str(job.pk))
+        except Exception:
+            logger.warning("Quiz operation recovery awaits broker", exc_info=True)
+    response = JsonResponse({key: getattr(job, key) for key in
+        ("status", "kind", "total", "processed", "answers", "skipped", "error", "updated_at")})
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 @require_POST
 @capability_required(can_manage_academic_setup)
 def quiz_exceptional_opening(request, quiz_id):
@@ -2437,72 +2504,91 @@ def lesson_dashboard(request):
 
     return render_dashboard(request, lessons, view, context)
 
+def _render_lesson_editor(request: HttpRequest, lesson: Lesson | None, form: LessonEditorForm) -> HttpResponse:
+    if form.is_bound:
+        keys = request.POST.getlist("videos")
+        names = request.POST.getlist("videos_name")
+        types = request.POST.getlist("files_type")
+        downloads = request.POST.getlist("download_ids")
+        groups = request.POST.getlist("part_groups")
+        videos = [{
+            "id": key,
+            "name": names[index] if index < len(names) else key,
+            "file_type": types[index] if index < len(types) else "video",
+            "download_key": downloads[index] if index < len(downloads) else "",
+            "part_number": groups[index] if index < len(groups) else "",
+        } for index, key in enumerate(keys)]
+    else:
+        videos = json.loads(lesson.links or "[]") if lesson else []
+        if not isinstance(videos, list):
+            videos = []
+        videos = [dict(video) for video in videos if isinstance(video, dict)]
+        part_numbers = {}
+        for video in videos:
+            part_id = video.get("part_id")
+            if part_id:
+                part_numbers.setdefault(part_id, len(part_numbers) + 1)
+            video["part_number"] = part_numbers.get(part_id, 0)
+            if video.get("file_type") == "audio":
+                video["download_key"] = video.get("download_id") or downloadable_audio_key(video.get("id", "")) or ""
+    form_key = f"lesson-{lesson.pk if lesson else 'new'}"
+    draft_saved = request.session.get("saved_content_form") == form_key
+    if draft_saved:
+        request.session.pop("saved_content_form", None)
+    return render(request, "lesson_form.html", {
+        "offering_groups": offering_option_groups(form.fields["course_offering"].queryset, include_year=True),
+        "drive": list_current_folder(CLOUD_CLIENT, bucket_name)[0],
+        "is_root": True,
+        "is_edit": lesson is not None,
+        "selected_offering_id": form["course_offering"].value(),
+        "lesson_name": form["lesson_name"].value() or "",
+        "lesson_description": form["description"].value() or "",
+        "videos": videos,
+        "content_status": form["status"].value(),
+        "publication_statuses": PublicationStatus.choices,
+        "editor_form": form,
+        "has_form_errors": form.is_bound,
+        "draft_saved": draft_saved,
+    })
+
+
+def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResponse:
+    initial = {
+        "lesson_name": lesson.name if lesson else "",
+        "description": lesson.description if lesson else "",
+        "course_offering": lesson.course_offering_id if lesson else None,
+        "status": lesson.status if lesson else PublicationStatus.DRAFT,
+    }
+    form = LessonEditorForm(request.POST if request.method == "POST" else None,
+                            initial=initial, current_offering_id=lesson.course_offering_id if lesson else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                saved = Lesson.objects.select_for_update().get(pk=lesson.pk) if lesson else Lesson()
+                links = _lesson_links_from_form(request, json.loads(saved.links or "[]") if saved.pk else [])
+                previous_status = saved.status
+                saved.name = form.cleaned_data["lesson_name"]
+                saved.description = form.cleaned_data["description"] or None
+                saved.course_offering = form.cleaned_data["course_offering"]
+                saved.links = json.dumps(links)
+                saved.status = form.cleaned_data["status"]
+                publish = saved.status == PublicationStatus.PUBLISHED and (not saved.pk or previous_status != PublicationStatus.PUBLISHED)
+                if publish:
+                    saved.publication_event_version += 1
+                saved.save()
+                if publish:
+                    create_lesson_publication_event(saved)
+            request.session["saved_content_form"] = f"lesson-{lesson.pk if lesson else 'new'}"
+            success(request, _("Lesson is updated successfully") if lesson else _("Lesson is created successfully"), extra_tags="alert-success")
+            return redirect(reverse("lesson-update", args=[lesson.pk]) if lesson else reverse("lesson-create"))
+        except ValidationError as exc:
+            form.add_error(None, exc)
+    return _render_lesson_editor(request, lesson, form)
+
+
 @capability_required(can_manage_content)
 def create_lesson(request):
-    if request.method == "GET":
-        course_offerings = CourseOffering.objects.filter(
-            academic_year_level__academic_year__is_active=True
-        ).select_related(
-            "course", "academic_year_level__level", "academic_year_level__academic_year"
-        ).order_by(
-            "academic_year_level__level__ordering", "course__name",
-            "academic_year_level__academic_year__ordering", "pk",
-        )
-
-        return render(request, "lesson_form.html", {
-            "offering_groups" : offering_option_groups(course_offerings, include_year=True),
-            "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
-            "is_root" : True,
-            "content_status" : PublicationStatus.DRAFT,
-            "content_status_display" : PublicationStatus.DRAFT.label,
-            "lesson_description": "",
-            "publication_statuses" : PublicationStatus.choices,
-        })
-    elif request.method == "POST":
-        publication_status = _requested_publication_status(request)
-        if publication_status is None:
-            error(request, _("Invalid publication status."), extra_tags="alert-danger")
-            return redirect(reverse("lesson-create"))
-        lesson_name = request.POST.get("lesson_name", "")
-        lesson_description = request.POST.get("description", "").strip()
-        offering_id = request.POST.get("course_offering")
-        videos = request.POST.getlist("videos", [])
-        if lesson_name and offering_id and videos:
-            try:
-                links = _lesson_links_from_form(request)
-
-                course_offering = get_object_or_404(
-                    CourseOffering,
-                    pk=offering_id,
-                    academic_year_level__academic_year__is_active=True,
-                )
-                with transaction.atomic():
-                    lesson = Lesson.objects.create(
-                        name=lesson_name,
-                        description=lesson_description or None,
-                        course_offering=course_offering,
-                        links=json.dumps(links),
-                        status=publication_status,
-                        publication_event_version=1 if publication_status == PublicationStatus.PUBLISHED else 0,
-                    )
-                    if publication_status == PublicationStatus.PUBLISHED:
-                        create_lesson_publication_event(lesson)
-                success(request, _("Lesson is created successfully"), extra_tags="alert-success") # Translate
-                logger.info(
-                    "Lesson %s is added in offering %s with media length of %s",
-                    lesson_name,
-                    course_offering.pk,
-                    len(links),
-                )
-
-            except (Http404, ValidationError) as exc:
-                error(request, _("Create lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
-                logger.error("Lesson link validation failed: %s", exc)
-                logger.error("Offering %s is not found to create a lesson!", offering_id)
-        else:
-            error(request, _("Create lesson has failed, offering, name, and files are required!"), extra_tags="alert-danger")
-
-        return redirect(reverse("lesson-create"))
+    return _edit_lesson(request)
 
 @capability_required(can_manage_content)
 def navigate_folder(request, folder_id=None):
@@ -2530,99 +2616,7 @@ def navigate_folder(request, folder_id=None):
 
 @capability_required(can_manage_content)
 def update_lesson(request, lesson_id):
-    if request.method == "GET":
-        try:
-            lesson = get_object_or_404(Lesson, pk=lesson_id)
-            course_offerings = CourseOffering.objects.filter(
-                Q(academic_year_level__academic_year__is_active=True) | Q(pk=lesson.course_offering_id)
-            ).select_related(
-                "course", "academic_year_level__level", "academic_year_level__academic_year"
-            ).order_by(
-                "academic_year_level__level__ordering", "course__name",
-                "academic_year_level__academic_year__ordering", "pk",
-            )
-            lesson_videos = json.loads(lesson.links)
-            if not isinstance(lesson_videos, list):
-                lesson_videos = []
-            part_numbers: dict[str, int] = {}
-            for video in lesson_videos:
-                if not isinstance(video, dict):
-                    continue
-                part_id = video.get("part_id") or ""
-                if part_id and part_id not in part_numbers:
-                    part_numbers[part_id] = len(part_numbers) + 1
-            for video in lesson_videos:
-                if not isinstance(video, dict):
-                    continue
-                part_id = video.get("part_id") or ""
-                video["part_number"] = part_numbers.get(part_id, 0)
-                if video.get("file_type") == "audio":
-                    video["download_key"] = (
-                        video.get("download_id")
-                        or downloadable_audio_key(video.get("id", ""))
-                        or ""
-                    )
-            return render(request, "lesson_form.html", {
-                "course_offerings" : course_offerings,
-                "drive" : list_current_folder(CLOUD_CLIENT, bucket_name)[0],
-                "is_root" : True,
-                "selected_offering_id" : lesson.course_offering_id,
-                "lesson_name" : lesson.name,
-                "lesson_description": lesson.description or "",
-                "videos" : lesson_videos,
-                "content_status" : lesson.status,
-                "content_status_display" : lesson.get_status_display(),
-                "publication_statuses" : PublicationStatus.choices,
-            })
-        except Http404:
-            logger.error(f"Lesson with id : {lesson_id} is not found!")
-            return redirect(reverse("lesson-dashboard"))
-
-    elif request.method == "POST":
-        publication_status = _requested_publication_status(request)
-        if publication_status is None:
-            error(request, _("Invalid publication status."), extra_tags="alert-danger")
-            return redirect(reverse("lesson-update", args=[lesson_id]))
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
-        lesson_name = request.POST.get("lesson_name", "")
-        lesson_description = request.POST.get("description", "").strip()
-        offering_id = request.POST.get("course_offering")
-        videos = request.POST.getlist("videos", [])
-        if lesson_name and offering_id and videos:
-            try:
-                links = _lesson_links_from_form(request, json.loads(lesson.links or "[]"))
-
-                previous_status = lesson.status
-                lesson.name = lesson_name
-                lesson.description = lesson_description or None
-                lesson.course_offering = get_object_or_404(
-                    CourseOffering, pk=offering_id
-                )
-                lesson.links = json.dumps(links)
-                lesson.status = publication_status
-                with transaction.atomic():
-                    if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                        lesson.publication_event_version += 1
-                    lesson.save()
-                    if previous_status != PublicationStatus.PUBLISHED and publication_status == PublicationStatus.PUBLISHED:
-                        create_lesson_publication_event(lesson)
-
-                logger.info(
-                    "Lesson %s is updated successfully in offering %s with media length of %s",
-                    lesson_name,
-                    offering_id,
-                    len(links),
-                )
-                success(request, _("Lesson is updated successfully"), extra_tags="alert-success") # Translate
-
-            except (Http404, ValidationError) as exc:
-                error(request, _("Update lesson has failed, Try again Please!"), extra_tags="alert-danger") # Translate
-                logger.error("Lesson link validation failed: %s", exc)
-            logger.error("Offering %s or Lesson with id %s was not found", offering_id, lesson_id)
-        else:
-            error(request, _("Update lesson has failed, offering, name, and files are required!"), extra_tags="alert-danger")
-
-        return redirect(reverse("lesson-update", args=[lesson_id]))
+    return _edit_lesson(request, get_object_or_404(Lesson, pk=lesson_id))
 
 class DeleteLesson(LessonBaseView, DeleteView):
     def dispatch(self, request, *args, **kwargs):
@@ -3671,6 +3665,40 @@ def quiz_json_preview(request):
     })
 
 
+def _rejected_quiz_context(request, key):
+    raw = request.session.pop(key, None)
+    if not raw:
+        return {}
+    from django.http import QueryDict
+    post = QueryDict("", mutable=True)
+    for name, values in raw.items():
+        post.setlist(name, values)
+    # Unpack without letting an invalid numeric grade discard the remaining input.
+    questions = {}
+    fields = {}
+    for name in post:
+        match = re.fullmatch(r"questions\[([^]]+)\]\[([^]]+)\]", name)
+        if match:
+            index, field = match.groups()
+            value = post.getlist(name) if field == "choices" else post.get(name)
+            questions.setdefault(index, {})[field] = value
+        else:
+            fields[name] = post.get(name)
+    rows = []
+    for row in questions.values():
+        try:
+            config = json.loads(row.get("config") or "{}")
+            if not isinstance(config, dict):
+                config = {}
+        except (ValueError, TypeError):
+            config = {}
+        rows.append({**row, "config": config, "config_json": json.dumps(config),
+                     "correct_answer": row.get("answer", ""), "answer_payload_json": row.get("answer", "")})
+    return {**{key: fields.get(key, "") for key in ("quiz_name", "opening_date", "closing_date")}, "questions": rows, "selected_offering_id": fields.get("course_offering"),
+            "selected_quiz_type_id": int(fields["quiz_type"]) if str(fields.get("quiz_type", "")).isdigit() else None,
+            "content_status": fields.get("status", PublicationStatus.DRAFT), "form_errors": True}
+
+
 @capability_required(can_manage_content)
 def create_quiz(request):
     if request.method == "GET":
@@ -3687,22 +3715,23 @@ def create_quiz(request):
             "offering_groups" : offering_option_groups(course_offerings, include_year=True),
             "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
             "question_types" : Question.QUESTION_TYPES,
-            "questions" : request.session.pop("questions", []),
-            **request.session.pop("quiz", {}),
+            "questions" : [],
             "content_status" : PublicationStatus.DRAFT,
             "content_status_display" : PublicationStatus.DRAFT.label,
             "publication_statuses" : PublicationStatus.choices,
             "quiz_editable" : True,
             "quiz_mode" : "create",
+            "draft_saved": request.session.pop("saved_content_form", None) == "quiz-new",
+            **_rejected_quiz_context(request, "rejected-quiz-new"),
         })
     elif request.method == "POST":
+        request.session["rejected-quiz-new"] = {name: request.POST.getlist(name) for name in request.POST if name != "csrfmiddlewaretoken"}
         publication_status = _requested_publication_status(request)
         if publication_status is None:
             error(request, _("Invalid publication status."), extra_tags="alert-danger")
             return redirect(reverse("quiz-create"))
-        questions, quiz = unpack_quiz_form(request.POST)
-
         try:
+            questions, quiz = unpack_quiz_form(request.POST)
             opening_date = get_datetime(quiz.get("opening_date", ""))
             closing_date = get_datetime(quiz.get("closing_date", ""))
             
@@ -3742,8 +3771,6 @@ def create_quiz(request):
                 raise_exception = True
 
             if raise_exception:
-                request.session['questions'] = [question.serialize() for question in questions_obj]
-                request.session['quiz'] = quiz.serialize()
                 raise Exception(*exceptions_messages)
             
             with transaction.atomic():
@@ -3760,6 +3787,8 @@ def create_quiz(request):
                     course_offering.pk,
                     len(questions_obj),
                 )
+                request.session.pop("rejected-quiz-new", None)
+                request.session["saved_content_form"] = "quiz-new"
                 success(request, _("Quiz is created successfully"), extra_tags="alert-success") # Translate
 
         except Http404:
@@ -3802,18 +3831,21 @@ def update_quiz(request, quiz_id):
                     or can_manage_academic_setup(request.user)
                 ),
                 "quiz_mode" : "update",
+                "draft_saved": request.session.pop("saved_content_form", None) == f"quiz-{quiz_id}",
+                **_rejected_quiz_context(request, f"rejected-quiz-{quiz_id}"),
             })
         except Http404:
             logger.error(f"Quiz with id : {quiz_id} is not found!")
             return redirect(reverse("quiz-dashboard"))
 
     elif request.method == "POST":
+        request.session[f"rejected-quiz-{quiz_id}"] = {name: request.POST.getlist(name) for name in request.POST if name != "csrfmiddlewaretoken"}
         publication_status = _requested_publication_status(request)
         if publication_status is None:
             error(request, _("Invalid publication status."), extra_tags="alert-danger")
             return redirect(reverse("quiz-update", args=[quiz_id]))
-        questions, quiz_data = unpack_quiz_form(request.POST)
         try:
+            questions, quiz_data = unpack_quiz_form(request.POST)
             # Update Quiz
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             can_edit_published_quiz = can_manage_academic_setup(request.user)
@@ -3831,11 +3863,15 @@ def update_quiz(request, quiz_id):
                             cancel_future_quiz_opening_events(quiz)
                         elif publication_status == PublicationStatus.PUBLISHED:
                             schedule_quiz_opening_events(quiz, locked=True)
+                        request.session.pop(f"rejected-quiz-{quiz_id}", None)
+                        request.session["saved_content_form"] = f"quiz-{quiz_id}"
                         success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
                         return redirect(reverse("quiz-update", args=[quiz_id]))
             requested_name = quiz_data['quiz_name']
             requested_opening_date = get_datetime(quiz_data['opening_date'])
             requested_closing_date = get_datetime(quiz_data['closing_date'])
+            if requested_closing_date <= requested_opening_date:
+                raise ValidationError(_("Closing date must be after opening date."))
             requested_total_grade = quiz_data['total_grade']
             quiz_type_id = request.POST.get("quiz_type")
             requested_quiz_type = get_object_or_404(QuizType, pk=quiz_type_id, code__in=QUIZ_TYPE_CODES)
@@ -3936,6 +3972,8 @@ def update_quiz(request, quiz_id):
                 len(questions_obj),
                 len(questions_exists),
             )
+            request.session.pop(f"rejected-quiz-{quiz_id}", None)
+            request.session["saved_content_form"] = f"quiz-{quiz_id}"
             success(request, _("Quiz is updated successfully"), extra_tags="alert-success") # Translate
 
         except Http404:
@@ -4287,8 +4325,7 @@ def delete_quiz_submission(request, quiz_id, grade_id):
     try:
         with transaction.atomic():
             Quiz.objects.select_for_update().only("pk").get(pk=quiz_id)
-            # Match take_exam's student-row serialization so deleting an attempt
-            # cannot race a duplicate submission for the same student and quiz.
+            # The quiz lock serializes deletion with submission and reconciliation.
             User.objects.select_for_update().get(pk=student_id)
             grade = Grade.objects.select_for_update().filter(
                 pk=grade_id,

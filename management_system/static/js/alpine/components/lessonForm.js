@@ -103,6 +103,34 @@ function lessonForm() {
             if (nameLower.includes('video') || nameLower.includes('lecture')) fileType = 'video';
             if (nameLower.includes('audio')) fileType = 'audio';
 
+            this.appendLessonFile(id, name, fileType);
+            this.hasChanges = true;
+        },
+
+        captureDraftRows() {
+            return {kind: 'lesson', rows: Array.from(this.$el.querySelectorAll('.video-container'), card => ({
+                id: card.querySelector('[name="videos"]').value,
+                name: card.querySelector('[name="videos_name"]').value,
+                type: card.querySelector('[name="files_type"]').value,
+            }))};
+        },
+
+        restoreDraftRows(data) {
+            if (data.kind !== 'lesson' || !Array.isArray(data.rows) || data.rows.length > 500
+                || data.rows.some(row => typeof row.id !== 'string' || typeof row.name !== 'string'
+                    || !['video', 'audio', 'book'].includes(row.type))) throw new Error('Invalid lesson draft');
+            this.$el.querySelectorAll('.video-container').forEach(card => card.remove());
+            data.rows.forEach(row => this.appendLessonFile(row.id, row.name, row.type));
+        },
+
+        afterDraftRestore() {
+            this.updateSelectedLectureCount();
+            this.reindexParts();
+            this.hasChanges = false;
+        },
+
+        appendLessonFile(id, name, fileType) {
+
             // Escape the key/name before interpolating them into markup: an R2
             // key is admin-supplied but must not be able to break out of an
             // attribute or inject a node.
@@ -172,12 +200,14 @@ function lessonForm() {
             event.currentTarget.closest('.video-container').remove();
             this.updateSelectedLectureCount();
             this.reindexParts();
+            this.hasChanges = true;
         },
 
         /**
          * Move file up in order
          */
         moveUp(event) {
+            this.hasChanges = true;
             const container = event.currentTarget.closest('.video-container');
             const prev = container.previousElementSibling;
             
@@ -191,6 +221,7 @@ function lessonForm() {
          * Move file down in order
          */
         moveDown(event) {
+            this.hasChanges = true;
             const container = event.currentTarget.closest('.video-container');
             const next = container.nextElementSibling;
             

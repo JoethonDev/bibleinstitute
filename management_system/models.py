@@ -3018,3 +3018,47 @@ class MobileDownloadPolicy(models.Model):
     @classmethod
     def load(cls) -> "MobileDownloadPolicy":
         return cls.objects.get_or_create(singleton="default")[0]
+
+
+class QuizAnswerSnapshot(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="answer_snapshots", db_index=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    answers = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["quiz", "user"], name="unique_quiz_answer_snapshot")]
+
+
+class QuizOperationJob(models.Model):
+    class Kind(models.TextChoices):
+        RECALCULATE = "recalculate", _("Recalculate submissions")
+        RECONCILE = "reconcile", _("Reconcile snapshots")
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        RUNNING = "running", _("Running")
+        COMPLETED = "completed", _("Completed")
+        FAILED = "failed", _("Failed")
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(User, on_delete=models.CASCADE)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    selection = models.JSONField(default=dict)
+    language = models.CharField(max_length=16, default="en")
+    upper_pk = models.PositiveBigIntegerField()
+    last_pk = models.PositiveBigIntegerField(default=0)
+    total = models.PositiveIntegerField()
+    processed = models.PositiveIntegerField(default=0)
+    answers = models.PositiveIntegerField(default=0)
+    skipped = models.PositiveIntegerField(default=0)
+    lease_token = models.UUIDField(null=True, editable=False)
+    lease_until = models.DateTimeField(null=True)
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "lease_until"], name="quiz_job_recovery_idx")]

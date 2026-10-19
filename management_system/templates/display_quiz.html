@@ -127,10 +127,26 @@
     </div>
 
     
+    {% if snapshot_url and mode == "exam" %}
+    {{ snapshot_data|json_script:"quiz-answer-snapshot" }}
+    <p id="snapshot-status" role="status" aria-live="polite" class="text-center"></p>
+    {% endif %}
+    {% if snapshot_reconcile %}
+    <div hidden>{% csrf_token %}</div>
+    <p id="snapshot-reconcile-status" role="status" class="text-center">{% translate "Recovering saved answers…" %}</p>
+    <script>
+    (() => {
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+        fetch('{{ snapshot_url|escapejs }}', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify({reconcile: true})})
+            .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+            .then(data => { if (data.submitted) location.reload(); else throw new Error(); })
+            .catch(() => { document.getElementById('snapshot-reconcile-status').textContent = '{% translate "Recovery could not finish. Reload to try again."|escapejs %}'; });
+    })();
+    </script>
+    {% endif %}
     {% if mode == "exam" or mode == "preview" %}
         <script>
             (() => {
-                // NOTE: All JavaScript logic has been preserved as requested.
                 const jsTranslations_quiz = {
                     'graded': '{% translate "Question graded"|escapejs %}',
                     'underReview': '{% translate "Question under review"|escapejs %}',
@@ -154,9 +170,72 @@
 
                 const isPreview = '{{ mode|escapejs }}' === 'preview';
                 let timerEl = document.querySelector("#timer span");
-                const startTime = Math.floor(Date.now() / 1000);
                 const endTime = parseInt('{{ closing_date|escapejs }}'.split(",")[0]);
                 const form = document.querySelector("#quiz-form");
+                const snapshot = JSON.parse(document.getElementById('quiz-answer-snapshot')?.textContent || '{"answers":{},"revision":0}');
+                let snapshotRevision = snapshot.revision;
+                let snapshotDirty = false, snapshotSaving = false, snapshotBlocked = false, snapshotTimer;
+                let pendingSnapshot = null;
+                const snapshotStatus = document.getElementById('snapshot-status');
+                const snapshotUrl = '{{ snapshot_url|default:""|escapejs }}';
+                const statusText = text => { if (snapshotStatus) snapshotStatus.textContent = text; };
+                function collectAnswers() {
+                    const answers = {};
+                    form.querySelectorAll('[data-question-card]').forEach(card => {
+                        const id = card.querySelector('input[name$="[id]"]')?.value;
+                        const structured = card.querySelector('[data-structured-answer]');
+                        if (structured) structured.value = serializeStructuredAnswer(card);
+                        const field = structured || card.querySelector('input[type="radio"]:checked, textarea, .answers-section input:not([type="radio"]):not([type="hidden"])');
+                        if (id) answers[id] = field?.value || '';
+                    });
+                    return answers;
+                }
+                async function persistSnapshot() {
+                    if (!snapshotUrl || isPreview || (!snapshotDirty && !pendingSnapshot) || snapshotSaving || snapshotBlocked) return;
+                    snapshotSaving = true;
+                    if (!pendingSnapshot) {
+                        pendingSnapshot = JSON.stringify({revision: snapshotRevision, answers: collectAnswers()});
+                        snapshotDirty = false;
+                    }
+                    // A lost acknowledgement must retry the same revision and answers,
+                    // before newer edits can use the server's acknowledged revision.
+                    const body = pendingSnapshot;
+                    const controller = new AbortController();
+                    const requestTimeout = setTimeout(() => controller.abort(), 15000);
+                    const csrf = form.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+                    try {
+                        // Browsers reject keepalive bodies larger than about 64 KB.
+                        const response = await fetch(snapshotUrl, {method: 'POST', keepalive: new Blob([body]).size <= 60000,
+                            signal: controller.signal,
+                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body});
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            if (response.status === 409 || response.status === 403) snapshotBlocked = true;
+                            if (response.status === 400) {
+                                // Definitive validation failure: let corrected input replace it.
+                                pendingSnapshot = null;
+                                snapshotDirty = true;
+                            }
+                            throw new Error(data.error || '{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}');
+                        }
+                        if (!Number.isSafeInteger(data.revision) || data.revision < 0 || typeof data.submitted !== 'boolean') {
+                            throw new Error('{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}');
+                        }
+                        snapshotRevision = data.revision;
+                        pendingSnapshot = null;
+                        if (data.submitted) snapshotBlocked = true;
+                        statusText(snapshotDirty ? '{% translate "Saving answers…"|escapejs %}' : '{% translate "Answers saved."|escapejs %}');
+                    } catch (error) {
+                        statusText(error.name === 'AbortError'
+                            ? '{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}' : error.message);
+                    } finally {
+                        clearTimeout(requestTimeout);
+                        snapshotSaving = false;
+                        if ((snapshotDirty || pendingSnapshot) && !snapshotBlocked) {
+                            snapshotTimer = setTimeout(persistSnapshot, 2000);
+                        }
+                    }
+                }
 
                 function formatRemainingTime(totalSeconds) {
                     let remaining = Math.max(0, Math.floor(totalSeconds));
@@ -255,9 +334,9 @@
                 }
 
                 function setupInitialAnswers() {
-                    const storedQuestions = localStorage.getItem("answers");
+                    const storedQuestions = Object.entries(snapshot.answers).map(([question_id, answer]) => ({question_id, answer}));
                     if (storedQuestions) {
-                        const answersArr = JSON.parse(storedQuestions);
+                        const answersArr = storedQuestions;
                         answersArr.forEach(val => {
                             const questionIDInput = document.querySelector(`input[type="hidden"][name$="[id]"][value="${val.question_id}"]`);
                             if (!questionIDInput) return;
@@ -288,7 +367,7 @@
                 }
 
                 function countDown() {
-                    let currentEpoch = Math.floor(performance.now() / 1000) + startTime;
+                    let currentEpoch = Math.floor(Date.now() / 1000);
                     let remainingTime = endTime - currentEpoch;
 
                     if (remainingTime <= 0) {
@@ -305,32 +384,13 @@
                     if (isPreview) {
                         return;
                     }
-                    let answers = localStorage.getItem("answers") ? JSON.parse(localStorage.getItem("answers")) : [];
-                    let element = event.target;
-                    let isFound = false;
-
-                    let questionCard = element.closest('.card-body');
-                    let questionID = questionCard.querySelector("input[type='hidden']").value;
-                    const structuredAnswerInput = questionCard.querySelector('[data-structured-answer]');
-                    let answer = element.value;
-
-                    if (structuredAnswerInput) {
-                        structuredAnswerInput.value = serializeStructuredAnswer(questionCard);
-                        answer = structuredAnswerInput.value;
-                    }
-
-                    answers.forEach(val => {
-                        if (val.question_id == questionID) {
-                            val.answer = answer;
-                            isFound = true;
-                        }
-                    });
-
-                    if (!isFound) {
-                        answers.push({ "question_id": questionID, "answer": answer });
-                    }
-
-                    localStorage.setItem("answers", JSON.stringify(answers));
+                    const questionCard = event.target.closest('.card-body');
+                    const structuredAnswerInput = questionCard?.querySelector('[data-structured-answer]');
+                    if (structuredAnswerInput) structuredAnswerInput.value = serializeStructuredAnswer(questionCard);
+                    snapshotDirty = true;
+                    statusText('{% translate "Saving answers…"|escapejs %}');
+                    clearTimeout(snapshotTimer);
+                    snapshotTimer = setTimeout(persistSnapshot, 1000);
                 }
 
                 function moveOrderItem(button, direction) {
@@ -463,9 +523,12 @@
                             reviewFallbackButton.addEventListener("click", () => unansweredFallbackDialog.close());
                         }
 
-                        form.addEventListener("submit", () => localStorage.clear());
+                        form.addEventListener("submit", persistSnapshot);
+                        document.addEventListener('visibilitychange', () => { if (document.hidden) persistSnapshot(); });
+                        window.addEventListener('pagehide', persistSnapshot);
                         document.querySelectorAll(".answers-section input, .answers-section textarea, .answers-section select").forEach(field => {
                             field.addEventListener("change", saveAnswer);
+                            field.addEventListener("input", saveAnswer);
                         });
                     }
                     form.querySelectorAll('[data-action="move-order-up"], [data-action="move-order-down"]').forEach((button) => {

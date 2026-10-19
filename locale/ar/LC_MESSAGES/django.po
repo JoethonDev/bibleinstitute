@@ -12746,3 +12746,126 @@ msgstr "تعذر بدء النشر. حاول مجددًا."
 
 msgid "Upload cleaned up"
 msgstr "تم تنظيف الرفع"
+
+msgid "%(count)s quizzes no longer matched the selection."
+msgstr "لم يعد %(count)s من الاختبارات مطابقًا للتحديد."
+
+msgid "%(done)s / %(total)s quizzes; %(answers)s answers recalculated."
+msgstr "أُعيد حساب %(done)s من %(total)s اختبارًا، و%(answers)s إجابة."
+
+msgid ""
+"Only the status can be changed for this quiz. An administrator can edit its "
+"content."
+msgstr "يمكن تغيير حالة هذا الاختبار فقط. يستطيع المسؤول تعديل محتواه."
+
+msgid "Quiz recalculation completed."
+msgstr "اكتملت إعادة حساب الاختبارات."
+
+msgid ""
+"Quiz recalculation failed. Completed quizzes remain saved; retry the "
+"remaining quizzes."
+msgstr ""
+"فشلت إعادة حساب الاختبارات. حُفظت الاختبارات المكتملة؛ أعد المحاولة "
+"للاختبارات المتبقية."
+
+msgid "Quiz recalculation is queued."
+msgstr "إعادة حساب الاختبارات في قائمة الانتظار."
+
+msgid "Recalculate all matching quizzes"
+msgstr "إعادة حساب كل الاختبارات المطابقة"
+
+msgid ""
+"Recalculate saved submissions for %(count)s quizzes? Manually awarded grades"
+" will be preserved."
+msgstr ""
+"هل تريد إعادة حساب الإجابات المحفوظة لعدد %(count)s من الاختبارات؟ ستُحفظ "
+"الدرجات الممنوحة يدويًا."
+
+msgid "Recalculate selected quizzes"
+msgstr "إعادة حساب الاختبارات المحددة"
+
+msgid "Recalculate submissions"
+msgstr "إعادة حساب الإجابات"
+
+msgid "Refresh recalculation status"
+msgstr "تحديث حالة إعادة الحساب"
+
+msgid "Select valid quizzes from the current list."
+msgstr "حدد اختبارات صالحة من القائمة الحالية."
+
+msgid "Starting quiz recalculation…"
+msgstr "جارٍ بدء إعادة حساب الاختبارات…"
+
+msgid ""
+"Unable to read recalculation progress. Refresh the status to try again."
+msgstr "تعذر قراءة تقدم إعادة الحساب. حدّث الحالة للمحاولة مرة أخرى."
+
+msgid "Unable to start quiz recalculation."
+msgstr "تعذر بدء إعادة حساب الاختبارات."
+
+msgid "Unable to start quiz recalculation. Check the worker and try again."
+msgstr "تعذر بدء إعادة حساب الاختبارات. تحقق من خدمة المهام ثم حاول مرة أخرى."
+
+msgid "Reconcile snapshots"
+msgstr "تسليم الإجابات المحفوظة"
+
+msgid "Running"
+msgstr "قيد التنفيذ"
+
+msgid "Invalid quiz answers."
+msgstr "إجابات الاختبار غير صالحة."
+
+msgid "Answers changed in another window. Reload before saving."
+msgstr "تغيرت الإجابات في نافذة أخرى. أعد تحميل الصفحة قبل الحفظ."
+
+msgid "Quiz operation failed. Completed work remains saved."
+msgstr "فشلت عملية الاختبار. تم الاحتفاظ بالعمل المكتمل."
+
+msgid "Invalid quiz operation."
+msgstr "عملية الاختبار غير صالحة."
+
+msgid "Recovering saved answers…"
+msgstr "جارٍ استعادة الإجابات المحفوظة…"
+
+msgid "Recovery could not finish. Reload to try again."
+msgstr "تعذرت إكمال الاستعادة. أعد تحميل الصفحة للمحاولة مرة أخرى."
+
+msgid "Answers could not be saved. Keep this page open and retry."
+msgstr "تعذر حفظ الإجابات. اترك هذه الصفحة مفتوحة وحاول مرة أخرى."
+
+msgid "Answers saved."
+msgstr "تم حفظ الإجابات."
+
+msgid "Saving answers…"
+msgstr "جارٍ حفظ الإجابات…"
+
+msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
+msgstr ""
+"هل تريد تسليم الإجابات المحفوظة بعد مهلة السماح لعدد %(count)s من "
+"الاختبارات؟"
+
+msgid "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
+msgstr ""
+"%(done)s / %(total)s اختبار؛ تم تسليم %(answers)s من الإجابات المحفوظة."
+
+msgid "Quiz operation is queued."
+msgstr "عملية الاختبار في قائمة الانتظار."
+
+msgid "Quiz operation completed."
+msgstr "اكتملت عملية الاختبار."
+
+msgid "Reconcile selected quizzes"
+msgstr "تسليم الإجابات المحفوظة للاختبارات المحددة"
+
+msgid "Reconcile all matching quizzes"
+msgstr "تسليم الإجابات المحفوظة لكل الاختبارات المطابقة"
+
+msgid "Starting quiz operation…"
+msgstr "جارٍ بدء عملية الاختبار…"
+
+msgid "Unable to start quiz operation."
+msgstr "تعذر بدء عملية الاختبار."
+
+msgid ""
+"Unable to read quiz operation progress. Refresh the status to try again."
+msgstr "تعذر قراءة تقدم عملية الاختبار. حدّث الحالة للمحاولة مرة أخرى."

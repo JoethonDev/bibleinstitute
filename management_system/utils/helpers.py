@@ -21,7 +21,7 @@ from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade
 from management_system.academic_access import user_can_write_offering_activity
 from management_system.admin_tables import TABLE_VIEWS, create_selection_token
 from .timezones import ensure_aware, parse_application_datetime
-from .quiz_access import quiz_window
+from .quiz_access import QUIZ_SUBMISSION_GRACE, quiz_window
 
 logger = getLogger(__name__)
 
@@ -119,7 +119,7 @@ def get_student_quiz_status(quiz, user, current_time=None):
 def is_quiz_open(quiz, current_time=None, user=None) -> bool:
     opening_date, closing_date = quiz_window(quiz, user)
     current_time = ensure_aware(current_time or now())
-    return ensure_aware(opening_date) <= current_time <= ensure_aware(closing_date) + timedelta(minutes=30)
+    return ensure_aware(opening_date) <= current_time <= ensure_aware(closing_date) + QUIZ_SUBMISSION_GRACE
 
 
 def pagination_query_string(request, exclude=("page",)):
