@@ -62,14 +62,15 @@
 /* ---------------- Consistory shell: rail + panes ---------------- */
 .ad-shell {
     display: grid;
-    grid-template-columns: 16.5rem 1fr;
+    grid-template-columns: 16.5rem minmax(0, 1fr);
+    grid-template-areas: "sidebar main";
     align-items: start;
     transition: grid-template-columns var(--ps-motion);
 }
 
 /* Collapsed sidebar — narrow rail shows icons only */
 .ad-shell.is-sidebar-collapsed {
-    grid-template-columns: 4.5rem 1fr;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
 }
 
 .ad-shell.is-sidebar-collapsed .ad-rail {
@@ -1435,6 +1436,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 /* Neutralize legacy fixed sidebar — use Psalmodia full-height sticky rail geometry */
 .admin-sidebar.ad-rail {
+    grid-area: sidebar;
     display: flex;
     flex-direction: column;
     position: sticky;
@@ -1454,6 +1456,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 /* Remove legacy margin-left on main content — use Psalmodia grid auto-flow */
 .admin-main-content.ad-panes {
+    grid-area: main;
     margin-inline-start: 0;
     padding: 1rem 1.5rem 2rem;
     background: var(--ps-page-bg);
@@ -1484,7 +1487,10 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 /* ---------------- Responsive ---------------- */
 @media (max-width: 991.98px) {
     .admin-layout.ad-shell,
-    .admin-layout.ad-shell.is-sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+    .admin-layout.ad-shell.is-sidebar-collapsed {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "main";
+    }
     /* The desktop rail is hidden at this breakpoint; make the remaining pane
        span the grid explicitly so RTL auto-placement cannot leave it in the
        desktop 16.5rem track. */
