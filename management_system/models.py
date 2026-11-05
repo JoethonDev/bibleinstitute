@@ -302,7 +302,7 @@ class TelegramAccount(models.Model):
 
 
 class TelegramLinkToken(models.Model):
-    """A permanent-until-used one-time LMS-to-Telegram linking token."""
+    """A short-lived (15 min) one-time LMS-to-Telegram linking token."""
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_link_tokens")
     token_digest = models.CharField(max_length=64, unique=True)
@@ -949,6 +949,8 @@ class TelegramMessage(models.Model):
         PHOTO = "photo", _("Photo")
         DOCUMENT = "document", _("Document")
         VIDEO = "video", _("Video")
+        VOICE = "voice", _("Voice")
+        AUDIO = "audio", _("Audio")
         DIGEST = "digest", _("Digest")
         UNSUPPORTED = "unsupported", _("Unsupported")
 
@@ -1024,7 +1026,9 @@ class TelegramAttachment(models.Model):
     """Controlled R2 metadata for a supported Telegram attachment."""
 
     message = models.ForeignKey(TelegramMessage, on_delete=models.CASCADE, related_name="attachments")
-    telegram_file_id = models.CharField(max_length=255)
+    # Empty for files uploaded from the admin dashboard: those are stored in R2
+    # first and Telegram never returns a reusable file_id for them.
+    telegram_file_id = models.CharField(max_length=255, blank=True, default="")
     media_type = models.CharField(max_length=16)
     r2_key = models.CharField(max_length=1024, blank=True, default="")
     original_name = models.CharField(max_length=255, blank=True, default="")
@@ -1039,6 +1043,7 @@ class TelegramAttachment(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["message", "telegram_file_id"],
+                condition=~models.Q(telegram_file_id=""),
                 name="telegram_attachment_file_unique",
             ),
         ]
@@ -2190,6 +2195,12 @@ class AttendanceRecord(models.Model):
             models.Index(
                 fields=["student", "course_offering", "attendance_date"],
                 name="attendance_student_off_idx",
+            ),
+            # Date-only reads (today's counters, daily reconciliation) have no
+            # leading date column in the two indexes above.
+            models.Index(
+                fields=["attendance_date", "action"],
+                name="attendance_date_action_idx",
             ),
         ]
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-import mimetypes
 import os
+import re
 import secrets
 from urllib.parse import urlencode
 
@@ -16,9 +16,10 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, OuterRef, Q, Subquery
 from django.core.paginator import Paginator
-from django.http import FileResponse, Http404, HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import content_disposition_header
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -31,7 +32,6 @@ from .models import (
     TelegramAccount,
     TelegramBotConfig,
     TelegramBroadcast,
-    TelegramBroadcastRecipient,
     TelegramConversation,
     TelegramMessage,
     TelegramWebhookUpdate,
@@ -48,6 +48,7 @@ from .telegram.configuration import (
     webhook_secret,
 )
 from .utils.search import normalized_contains_q, normalize_search_text
+from .telegram.attachments import inline_attachment_mime_type
 from .telegram.linking import unlink_telegram_account
 from .telegram.support import (
     SupportReplyError,
@@ -56,6 +57,7 @@ from .telegram.support import (
     mark_conversation_read,
     processed_conversation_filter,
     reply_to_conversation,
+    reply_with_attachment_to_conversation,
     start_conversation,
     unread_conversation_filter,
 )
@@ -596,7 +598,7 @@ def telegram_conversation_detail(request, conversation_id):
 @require_POST
 def telegram_conversation_reply(request, conversation_id):
     conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
-    form = TelegramSupportReplyForm(request.POST)
+    form = TelegramSupportReplyForm(request.POST, request.FILES)
     panel_request = request.GET.get("fragment") == "panel"
     if not form.is_valid():
         context = _conversation_detail_context(request, conversation, form)
@@ -617,14 +619,26 @@ def telegram_conversation_reply(request, conversation_id):
         return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
     try:
         bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
-        reply_to_conversation(
-            bot,
-            admin=request.user,
-            conversation_id=conversation.pk,
-            text=form.cleaned_data["message"],
-            reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
-            origin=TelegramMessage.Origin.WEB,
-        )
+        attachment = form.cleaned_data.get("attachment")
+        if attachment is not None:
+            reply_with_attachment_to_conversation(
+                bot,
+                admin=request.user,
+                conversation_id=conversation.pk,
+                text=form.cleaned_data["message"],
+                uploaded_file=attachment,
+                reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
+                origin=TelegramMessage.Origin.WEB,
+            )
+        else:
+            reply_to_conversation(
+                bot,
+                admin=request.user,
+                conversation_id=conversation.pk,
+                text=form.cleaned_data["message"],
+                reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
+                origin=TelegramMessage.Origin.WEB,
+            )
     except SupportReplyError as exc:
         form.add_error(None, str(exc))
         if not panel_request:
@@ -725,31 +739,59 @@ def telegram_admin_unlink(request, user_id):
     return redirect("user-profile", user_id=user.pk)
 
 
+def _attachment_chunks(body):
+    """Stream one R2 body in bounded chunks and always close it."""
+    try:
+        yield from body.iter_chunks(chunk_size=64 * 1024)
+    finally:
+        try:
+            body.close()
+        except Exception:
+            pass
+
+
 @capability_required(can_manage_academic_setup)
 def telegram_attachment(request, attachment_id):
-    attachment = get_object_or_404(
-        TelegramAttachment.objects.select_related("message__conversation"),
-        pk=attachment_id,
-    )
+    """Stream one support attachment with byte-range support for media playback."""
+    attachment = get_object_or_404(TelegramAttachment, pk=attachment_id)
     if not attachment.is_available or not attachment.r2_key:
         raise Http404
     bucket = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
     if not bucket:
         raise Http404
     client = get_r2_client()
+    if client is None:
+        raise Http404
+    range_header = request.headers.get("Range", "").strip()
+    if range_header and not re.fullmatch(r"bytes=(?:\d+-\d*|-\d+)", range_header):
+        return HttpResponse(status=416)
+    params = {"Bucket": bucket, "Key": attachment.r2_key}
+    if range_header:
+        params["Range"] = range_header
     try:
-        storage_response = client.get_object(Bucket=bucket, Key=attachment.r2_key)
+        storage_response = client.get_object(**params)
     except Exception as exc:
+        status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if status == 416:
+            return HttpResponse(status=416)
         raise Http404 from exc
+
     filename = os.path.basename(attachment.original_name or attachment.r2_key) or "attachment"
-    response = FileResponse(
-        storage_response["Body"],
-        content_type=attachment.mime_type or mimetypes.guess_type(filename)[0] or "application/octet-stream",
-        as_attachment=request.GET.get("download") == "1",
-        filename=filename,
+    content_type = inline_attachment_mime_type(attachment.mime_type) or "application/octet-stream"
+    as_attachment = request.GET.get("download") == "1" or content_type == "application/octet-stream"
+    response = StreamingHttpResponse(
+        _attachment_chunks(storage_response["Body"]),
+        status=206 if storage_response.get("ContentRange") else 200,
+        content_type=content_type,
     )
+    response["Accept-Ranges"] = "bytes"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store" if as_attachment else "private, max-age=300"
+    response["Content-Disposition"] = content_disposition_header(as_attachment, filename)
     if storage_response.get("ContentLength") is not None:
         response["Content-Length"] = str(storage_response["ContentLength"])
+    if storage_response.get("ContentRange"):
+        response["Content-Range"] = storage_response["ContentRange"]
     return response
 
 

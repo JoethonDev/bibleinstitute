@@ -2907,6 +2907,57 @@ msgstr "تخزين الدعم غير متاح."
 msgid "The attachment could not be stored."
 msgstr "تعذر تخزين المرفق."
 
+# Telegram support voice playback and dashboard attachment replies.
+msgid "Voice"
+msgstr "رسالة صوتية"
+
+msgid "Voice message"
+msgstr "رسالة صوتية"
+
+msgid "Audio message"
+msgstr "ملف صوتي"
+
+msgid "The attachment could not be read."
+msgstr "تعذر قراءة المرفق."
+
+msgid "Attachments support a message of 1,024 characters or fewer."
+msgstr "تدعم المرفقات رسالة لا تتجاوز 1,024 حرفًا."
+
+msgid "Images must be 10 MB or smaller."
+msgstr "يجب ألا يتجاوز حجم الصور 10 ميجابايت."
+
+msgid "Videos and PDF files must be 50 MB or smaller."
+msgstr "يجب ألا يتجاوز حجم مقاطع الفيديو وملفات PDF 50 ميجابايت."
+
+msgid "The attachment must be a JPEG, PNG, MP4, or PDF file."
+msgstr "يجب أن يكون المرفق ملف JPEG أو PNG أو MP4 أو PDF."
+
+msgid "The attachment content does not match its file type."
+msgstr "لا يتطابق محتوى المرفق مع نوع ملفه."
+
+msgid "A reply message or an attachment is required."
+msgstr "مطلوب رسالة رد أو مرفق."
+
+msgid ""
+"This message type is not supported. Text, photos, documents, videos, and "
+"voice messages are accepted."
+msgstr "نوع الرسالة هذا غير مدعوم. تُقبل الرسائل النصية والصور والمستندات ومقاطع الفيديو والرسائل الصوتية."
+
+msgid ""
+"Send your message to support. You can send text, photos, documents, videos, "
+"or voice messages."
+msgstr "أرسل رسالتك إلى الدعم. يمكنك إرسال نص أو صور أو مستندات أو مقاطع فيديو أو رسائل صوتية."
+
+msgid "Attach a file"
+msgstr "إرفاق ملف"
+
+msgid ""
+"JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
+msgstr "JPEG أو PNG أو MP4 أو PDF. الصور حتى 10 ميجابايت، والملفات الأخرى حتى 50 ميجابايت."
+
+msgid "Attachment unavailable"
+msgstr "المرفق غير متاح."
+
 #: .\management_system\telegram\support.py:255
 msgid "[media message]"
 msgstr "[رسالة وسائط]"
@@ -12869,3 +12920,65 @@ msgstr "تعذر بدء عملية الاختبار."
 msgid ""
 "Unable to read quiz operation progress. Refresh the status to try again."
 msgstr "تعذر قراءة تقدم عملية الاختبار. حدّث الحالة للمحاولة مرة أخرى."
+
+#: Password reset flow (2026-10-21)
+
+msgid "Reset password"
+msgstr "إعادة تعيين كلمة المرور"
+
+msgid "Enter the email address on your account and we will send you a link to set a new password."
+msgstr "أدخل البريد الإلكتروني المسجّل في حسابك وسنرسل إليك رابطًا لتعيين كلمة مرور جديدة."
+
+msgid "Send reset link"
+msgstr "إرسال رابط إعادة التعيين"
+
+msgid "Back to login"
+msgstr "العودة إلى تسجيل الدخول"
+
+msgid "Reset link sent"
+msgstr "تم إرسال رابط إعادة التعيين"
+
+msgid "Check your inbox"
+msgstr "تحقّق من بريدك الوارد"
+
+msgid "If an account exists for that email address, a password reset link is on its way. The link expires in 15 minutes."
+msgstr "إذا كان هناك حساب بهذا البريد الإلكتروني فسيصلك رابط لإعادة تعيين كلمة المرور. تنتهي صلاحية الرابط بعد ١٥ دقيقة."
+
+msgid "Set a new password"
+msgstr "تعيين كلمة مرور جديدة"
+
+msgid "Save new password"
+msgstr "حفظ كلمة المرور الجديدة"
+
+msgid "This reset link is invalid or has expired. Request a new one to continue."
+msgstr "رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا للمتابعة."
+
+msgid "Request a new link"
+msgstr "طلب رابط جديد"
+
+msgid "Password updated"
+msgstr "تم تحديث كلمة المرور"
+
+msgid "Your password has been changed. Sign in with your new password to continue."
+msgstr "تم تغيير كلمة المرور. سجّل الدخول بكلمة المرور الجديدة للمتابعة."
+
+msgid "Forgot password?"
+msgstr "هل نسيت كلمة المرور؟"
+
+msgid "Reset your password"
+msgstr "إعادة تعيين كلمة المرور"
+
+msgid "We received a request to reset the password for your Bible Institute account."
+msgstr "تلقّينا طلبًا لإعادة تعيين كلمة المرور لحسابك في معهد الكتاب المقدس."
+
+msgid "This link expires in 15 minutes and can only be used once."
+msgstr "تنتهي صلاحية هذا الرابط بعد ١٥ دقيقة، ولا يمكن استخدامه إلا مرة واحدة."
+
+msgid "If you did not request this change, you can safely ignore this email; your password will stay the same."
+msgstr "إذا لم تطلب هذا التغيير فيمكنك تجاهل هذه الرسالة بأمان، وستبقى كلمة المرور كما هي."
+
+msgid "Reset your Bible Institute password"
+msgstr "إعادة تعيين كلمة المرور لمعهد الكتاب المقدس"
+
+msgid "Link your Telegram account from your profile page, then try again."
+msgstr "اربط حساب تيليجرام من صفحة ملفك الشخصي ثم حاول مرة أخرى."

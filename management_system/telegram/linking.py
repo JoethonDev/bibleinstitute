@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from datetime import timedelta
 from urllib.parse import quote
 
 from django.db import IntegrityError, transaction
@@ -14,6 +15,17 @@ from ..models import TelegramAccount, TelegramBotConfig, TelegramLinkToken, User
 from ..utils.validators import normalize_phone
 from .configuration import decrypt_secret, encrypt_secret
 from .policy import TELEGRAM_LINKABLE_ROLES
+
+
+#: Linking tokens are only valid for a short window after issue, so a leaked
+#: or shoulder-surfed deep link cannot be replayed days later.
+LINK_TOKEN_TTL = timedelta(minutes=15)
+
+
+def link_token_expired(link_token: TelegramLinkToken, *, now=None) -> bool:
+    """Return True when a linking token is older than the TTL."""
+    now = now or timezone.now()
+    return link_token.created_at is None or link_token.created_at + LINK_TOKEN_TTL <= now
 
 
 class TelegramLinkError(Exception):
@@ -51,7 +63,7 @@ def _lock_user(user_id: int) -> User:
 
 @transaction.atomic
 def ensure_current_link_token(user: User) -> tuple[TelegramLinkToken, str]:
-    """Return the permanent current token, creating it exactly once if absent."""
+    """Return a short-lived current token, rotating it once its TTL elapsed."""
     locked_user = _lock_user(user.pk)
     if not is_eligible_user(locked_user):
         raise TelegramLinkError(_("This LMS account is not eligible for Telegram linking."))
@@ -60,6 +72,10 @@ def ensure_current_link_token(user: User) -> tuple[TelegramLinkToken, str]:
         .filter(user=locked_user, used_at__isnull=True, revoked_at__isnull=True)
         .first()
     )
+    if current and link_token_expired(current):
+        current.revoked_at = timezone.now()
+        current.save(update_fields=["revoked_at"])
+        current = None
     if current:
         return current, decrypt_secret(current.token_ciphertext)
     try:
@@ -70,7 +86,7 @@ def ensure_current_link_token(user: User) -> tuple[TelegramLinkToken, str]:
 
 @transaction.atomic
 def regenerate_link_token(user: User) -> tuple[TelegramLinkToken, str]:
-    """Revoke the unused token and issue one new permanent-until-used token."""
+    """Revoke the unused token and issue one new short-lived token."""
     locked_user = _lock_user(user.pk)
     if not is_eligible_user(locked_user):
         raise TelegramLinkError(_("This LMS account is not eligible for Telegram linking."))
@@ -128,6 +144,7 @@ def link_with_token(
         or not secrets.compare_digest(token_digest, link_token.token_digest)
         or link_token.used_at
         or link_token.revoked_at
+        or link_token_expired(link_token)
     ):
         raise TelegramLinkError(_("This Telegram link has already been used or revoked. Please request a new link."))
 

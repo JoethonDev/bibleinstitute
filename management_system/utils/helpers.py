@@ -17,11 +17,11 @@ from django.utils.timezone import now
 from logging import getLogger
 from urllib.parse import unquote, urlsplit
 from management_system.utils.decorators import check_role_permission
-from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade
+from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade, QuizStudentOpening
 from management_system.academic_access import user_can_write_offering_activity
 from management_system.admin_tables import TABLE_VIEWS, create_selection_token
 from .timezones import ensure_aware, parse_application_datetime
-from .quiz_access import QUIZ_SUBMISSION_GRACE, quiz_window
+from .quiz_access import QUIZ_SUBMISSION_GRACE, quiz_status_from, quiz_window
 
 logger = getLogger(__name__)
 
@@ -103,17 +103,56 @@ def get_student_quiz_status(quiz, user, current_time=None):
     """
     Return the student's current quiz mode using the same rule set everywhere.
     """
+    current_time = ensure_aware(current_time or now())
     grade = Grade.objects.filter(user=user, quiz=quiz).first()
-    if grade:
-        return "view", grade
+    if grade is not None:
+        return quiz_status_from(quiz, grade, None, current_time, False)
 
-    current_time = current_time or now()
-    quiz_open = is_quiz_open(quiz, current_time, user)
+    return quiz_status_from(
+        quiz,
+        None,
+        QuizStudentOpening.objects.filter(quiz=quiz, student=user).first(),
+        current_time,
+        is_quiz_in_user_window(quiz, user),
+    )
 
-    if quiz_open and is_quiz_in_user_window(quiz, user):
-        return "exam", None
 
-    return "closed_unsolved", None
+def get_student_quiz_status_map(quizzes, user, current_time=None) -> dict:
+    """Return ``{quiz_id: (mode, grade)}`` for many quizzes.
+
+    Replaces the per-quiz Grade + QuizStudentOpening queries of
+    ``get_student_quiz_status`` with two queries plus one access check per
+    offering, while applying the identical mode rule.
+    """
+    quizzes = list(quizzes)
+    if not quizzes:
+        return {}
+
+    quiz_ids = [quiz.pk for quiz in quizzes]
+    current_time = ensure_aware(current_time or now())
+    grades = {
+        row.quiz_id: row for row in Grade.objects.filter(user=user, quiz_id__in=quiz_ids)
+    }
+    openings = {
+        row.quiz_id: row
+        for row in QuizStudentOpening.objects.filter(student=user, quiz_id__in=quiz_ids)
+    }
+    can_write_by_offering: dict = {}
+    statuses = {}
+    for quiz in quizzes:
+        offering_id = quiz.course_offering_id
+        if offering_id not in can_write_by_offering:
+            can_write_by_offering[offering_id] = bool(
+                offering_id and is_quiz_in_user_window(quiz, user)
+            )
+        statuses[quiz.pk] = quiz_status_from(
+            quiz,
+            grades.get(quiz.pk),
+            openings.get(quiz.pk),
+            current_time,
+            can_write_by_offering[offering_id],
+        )
+    return statuses
 
 
 def is_quiz_open(quiz, current_time=None, user=None) -> bool:

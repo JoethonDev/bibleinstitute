@@ -110,7 +110,9 @@ def _active_offering(user, offering_id: str):
         pk = int(offering_id)
     except (TypeError, ValueError):
         return None
-    return active_year_published_offerings_for_user(user).filter(pk=pk).first()
+    return active_year_published_offerings_for_user(user).select_related(
+        "course", "academic_year_level__academic_year", "academic_year_level__level"
+    ).filter(pk=pk).first()
 
 
 def _active_lesson(user, offering_id: str, lesson_id: str):
@@ -307,12 +309,12 @@ def _handle_callback(bot, callback: dict) -> None:
             text, keyboard = format_home(user), home_keyboard()
         elif action == "support":
             text = _(
-                "Send your message to support. You can send text, photos, documents, or videos."
+                "Send your message to support. You can send text, photos, documents, videos, or voice messages."
             )
             keyboard = back_home_keyboard("home")
         elif action == "offerings":
             offerings, current, page_count = _page(
-                active_year_published_offerings_for_user(user).order_by("course__name", "pk"),
+                active_year_published_offerings_for_user(user).select_related("course").order_by("course__name", "pk"),
                 parts[0],
             )
             text = _list_text(

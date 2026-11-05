@@ -27,6 +27,7 @@ import hashlib
 import hmac
 import io
 import math
+import tempfile
 import secrets
 import uuid
 import random
@@ -96,7 +97,7 @@ from .utils.file_validator import (
     FileValidator,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, download_from_bucket, generate_unique_url, get_r2_client
-from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
+from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, get_student_quiz_status_map, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import ajax_login_required, capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_status_notification
 from .progress_activity import (
@@ -182,7 +183,8 @@ from .academic_evaluation import (
     save_formula_and_results,
 )
 from .evaluation_export import build_evaluation_workbook, xlsx_safe_cell
-from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
+from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, get_accessible_offering_or_403, user_can_write_offering_activity
+from .course_content import course_navigation, with_offering_content_counts
 from .mobile_auth import revoke_user_mobile_access
 from .utils.hls_parser import get_lesson_segments, get_segment_number
 from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
@@ -503,262 +505,6 @@ def index(request):
 def portal(request):
     return redirect("home")
 
-@login_required(login_url=LOGIN_URL)
-def student_ui_proposal(request):
-    """Read-only design proposal page presenting all student screens with the Psalmodia theme."""
-    return render(request, "theme_showcase/student_proposal.html")
-
-
-@login_required(login_url=LOGIN_URL)
-def admin_ui_proposal(request):
-    """Interactive admin-dashboard design proposal with live bounded data (admin only)."""
-    role = getattr(getattr(request.user, "role", None), "role", "")
-    if role != "admin":
-        raise PermissionDenied
-
-    today = timezone.localdate()
-
-    # --- People ---
-    role_counts = {
-        row["role__role"]: row["n"]
-        for row in User.objects.values("role__role").annotate(n=Count("id"))
-    }
-    pending_applications = User.objects.filter(application_status="pending")
-    recent_users = User.objects.select_related("role").order_by("-date_joined")[:6]
-
-    # --- Content ---
-    courses = (
-        Course.objects.select_related("level")
-        .annotate(
-            offering_count=Count("offerings", distinct=True),
-            lesson_count=Count("offerings__lessons", distinct=True),
-            quiz_count=Count("offerings__quizzes", distinct=True),
-        )
-        .order_by("level__ordering", "name")[:8]
-    )
-    lesson_status_counts = {
-        row["status"]: row["n"]
-        for row in Lesson.objects.values("status").annotate(n=Count("id"))
-    }
-    recent_lessons = (
-        Lesson.objects.select_related(
-            "course_offering__course",
-            "course_offering__academic_year_level__level",
-        )
-        .order_by("-updated_date")[:6]
-    )
-    quiz_status_counts = {
-        row["status"]: row["n"]
-        for row in Quiz.objects.values("status").annotate(n=Count("id"))
-    }
-    recent_quizzes = (
-        Quiz.objects.select_related("course_offering__course", "quiz_type")
-        .annotate(question_count=Count("questions", distinct=True))
-        .order_by("-created_date")[:6]
-    )
-    draft_lessons = (
-        Lesson.objects.filter(status=PublicationStatus.DRAFT)
-        .select_related("course_offering__course")
-        .order_by("-updated_date")[:5]
-    )
-    lessons_total = Lesson.objects.count()
-    lessons_with_media = sum(
-        1 for links in Lesson.objects.values_list("links", flat=True) if links
-    )
-
-    # --- Academic setup ---
-    levels = (
-        Level.objects.order_by("ordering")
-        .annotate(
-            course_count=Count("courses", distinct=True),
-            offering_count=Count("courses__offerings", distinct=True),
-            enrollment_count=Count("year_links__enrollments", distinct=True),
-        )
-    )
-    years = (
-        AcademicYear.objects.annotate(
-            scope_count=Count("level_links", distinct=True),
-            offering_count=Count("level_links__course_offerings", distinct=True),
-            enrollment_count=Count("level_links__enrollments", distinct=True),
-        ).order_by("-ordering")
-    )
-    weekday_labels = [str(label) for label in (
-        _("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
-        _("Friday"), _("Saturday"), _("Sunday"),
-    )]
-    active_year = AcademicYear.objects.filter(is_active=True).first()
-    active_scopes = (
-        AcademicYearLevel.objects.filter(academic_year__is_active=True)
-        .select_related("academic_year", "level")
-        .order_by("level__ordering")
-    )
-    calendar_scopes = [
-        {
-            "scope": scope,
-            "weekdays": [
-                weekday_labels[i] for i in (scope.meeting_weekdays or [])
-                if 0 <= i < 7
-            ],
-        }
-        for scope in active_scopes
-    ]
-    holidays = (
-        AcademicHoliday.objects.filter(academic_year__is_active=True)
-        .order_by("date")[:6]
-    )
-
-    meeting_weekday_numbers = sorted({
-        weekday
-        for scope in active_scopes
-        for weekday in (scope.meeting_weekdays or [])
-    })
-    month_holidays = {
-        holiday.date: holiday.name
-        for holiday in AcademicHoliday.objects.filter(
-            academic_year__is_active=True,
-            date__year=today.year,
-            date__month=today.month,
-        )
-    }
-    calendar_cells = []
-    for week in py_calendar.Calendar(firstweekday=6).monthdatescalendar(
-        today.year, today.month
-    ):
-        for day in week:
-            in_year = bool(
-                active_year and active_year.starts_on <= day <= active_year.ends_on
-            )
-            calendar_cells.append({
-                "day": day.day,
-                "in_month": day.month == today.month,
-                "is_today": day == today,
-                "is_meeting": in_year and day.weekday() in meeting_weekday_numbers,
-                "holiday_name": month_holidays.get(day, ""),
-            })
-    calendar_month = today.replace(day=1)
-
-    detail_offering = (
-        CourseOffering.objects.filter(status=PublicationStatus.PUBLISHED)
-        .select_related(
-            "course", "academic_year_level__level",
-            "academic_year_level__academic_year",
-        )
-        .prefetch_related("lessons", "quizzes")
-        .order_by("course__name")
-        .first()
-    )
-
-    # --- Participation ---
-    attendance_by_action = {
-        row["action"]: row["n"]
-        for row in AttendanceRecord.objects.values("action").annotate(n=Count("id"))
-    }
-    recent_attendance = (
-        AttendanceRecord.objects.select_related("student", "course_offering__course")
-        .order_by("-scanned_at")[:6]
-    )
-    progress_total = LectureProgress.objects.count()
-    progress_avg = LectureProgress.objects.aggregate(avg=Avg("percent"))["avg"] or 0
-    progress_completed = LectureProgress.objects.filter(
-        completed_at__isnull=False
-    ).count()
-    recent_progress = (
-        LectureProgress.objects.select_related("student", "lesson")
-        .order_by("-id")[:5]
-    )
-
-    # --- Analytics ---
-    formulas = (
-        PromotionFormula.objects.select_related(
-            "academic_year_level", "academic_year_level__level",
-            "academic_year_level__academic_year", "course_offering__course",
-        )
-        .annotate(rule_count=Count("rules", distinct=True))
-        .order_by("-updated_at")[:5]
-    )
-    result_counts = {
-        row["final_status"]: row["n"]
-        for row in EvaluationResult.objects.values("final_status").annotate(n=Count("id"))
-    }
-    recent_history = (
-        PromotionHistory.objects.select_related("student")
-        .order_by("-id")[:5]
-    )
-    report_scopes = []
-    for scope in active_scopes:
-        report_scopes.append({
-            "scope": scope,
-            "students": Enrollment.objects.filter(
-                academic_year_level=scope,
-                enrollment_type=Enrollment.Type.NORMAL,
-            ).count(),
-            "grade_avg": Grade.objects.filter(
-                quiz__course_offering__academic_year_level=scope
-            ).aggregate(avg=Avg("total_grade"))["avg"],
-        })
-    recent_grades = (
-        Grade.objects.select_related(
-            "user", "quiz", "quiz__course_offering__course",
-        )
-        .order_by("-submitted_at")[:6]
-    )
-    grades_average = Grade.objects.aggregate(avg=Avg("total_grade"))["avg"] or 0
-
-    context = {
-        "users_total": User.objects.count(),
-        "role_counts": role_counts,
-        "pending_applications": pending_applications[:5],
-        "pending_applications_count": pending_applications.count(),
-        "recent_users": recent_users,
-        "courses_total": Course.objects.count(),
-        "courses": courses,
-        "offerings_total": CourseOffering.objects.count(),
-        "offerings_published": CourseOffering.objects.filter(
-            status=PublicationStatus.PUBLISHED,
-        ).count(),
-        "lessons_total": lessons_total,
-        "lesson_status_counts": lesson_status_counts,
-        "recent_lessons": recent_lessons,
-        "quizzes_total": Quiz.objects.count(),
-        "quiz_status_counts": quiz_status_counts,
-        "recent_quizzes": recent_quizzes,
-        "draft_lessons": draft_lessons,
-        "lessons_with_media": lessons_with_media,
-        "levels": levels,
-        "years": years,
-        "calendar_scopes": calendar_scopes,
-        "holidays": holidays,
-        "calendar_cells": calendar_cells,
-        "calendar_month": calendar_month,
-        "meeting_weekday_numbers": meeting_weekday_numbers,
-        "detail_offering": detail_offering,
-        "enrollments_total": Enrollment.objects.count(),
-        "recent_enrollments": (
-            Enrollment.objects.select_related(
-                "student", "academic_year_level", "academic_year_level__level",
-            ).order_by("-enrolled_at")[:5]
-        ),
-        "grades_total": Grade.objects.count(),
-        "submissions_total": Submission.objects.count(),
-        "attendance_by_action": attendance_by_action,
-        "attendance_today": AttendanceRecord.objects.filter(
-            attendance_date=today,
-        ).count(),
-        "recent_attendance": recent_attendance,
-        "students_with_qr": User.objects.filter(qr_token__isnull=False).count(),
-        "progress_total": progress_total,
-        "progress_avg": progress_avg,
-        "progress_completed": progress_completed,
-        "recent_progress": recent_progress,
-        "formulas": formulas,
-        "result_counts": result_counts,
-        "recent_history": recent_history,
-        "report_scopes": report_scopes,
-        "recent_grades": recent_grades,
-        "grades_average": grades_average,
-    }
-    return render(request, "theme_showcase/admin_proposal.html", context)
-
 def about_page(request):
     return render(request, "about.html", get_institute_copy(translation.get_language(), "about"))
 
@@ -834,7 +580,9 @@ class ProfileDetail(LoginProtection, DetailView):
                 academic_year_level__academic_year__is_active=True,
             ).order_by("academic_year_level__level__ordering", "course__name")
         else:
-            offerings = accessible_offerings(user).order_by(
+            offerings = accessible_offerings(user).select_related(
+                "course", "academic_year_level__academic_year", "academic_year_level__level"
+            ).order_by(
                 "academic_year_level__academic_year__ordering",
                 "academic_year_level__level__ordering",
                 "course__name",
@@ -952,9 +700,14 @@ class ProfileDetail(LoginProtection, DetailView):
 # Course Routes
 @login_required(login_url=LOGIN_URL)
 def view_courses(request, course_id=None):
-    user = User.objects.get(pk=request.user.pk)
+    user = request.user
     management_preview = user_has_management_role(user)
-    offerings_queryset = accessible_offerings(user, include_management=management_preview).order_by(
+    offerings_queryset = with_offering_content_counts(
+        accessible_offerings(user, include_management=management_preview),
+        include_drafts=management_preview,
+    ).select_related(
+        "course", "academic_year_level__academic_year", "academic_year_level__level"
+    ).order_by(
         "-academic_year_level__academic_year__ordering",
         "-academic_year_level__level__ordering",
         "course__name",
@@ -964,14 +717,12 @@ def view_courses(request, course_id=None):
         offerings_queryset = offerings_queryset.filter(course_id=course_id)
     offerings = list(offerings_queryset)
     normal_scopes = set()
-    targeted_offerings = set()
     if not management_preview:
-        enrollments = Enrollment.objects.filter(
+        normal_scopes = set(Enrollment.objects.filter(
             student=user,
-            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-        ).values_list("enrollment_type", "academic_year_level_id", "course_offering_id")
-        normal_scopes = {scope_id for enrollment_type, scope_id, _ in enrollments if enrollment_type == Enrollment.Type.NORMAL}
-        targeted_offerings = {offering_id for enrollment_type, _, offering_id in enrollments if enrollment_type != Enrollment.Type.NORMAL and offering_id}
+            status__in=READABLE_ENROLLMENT_STATUSES,
+            enrollment_type=Enrollment.Type.NORMAL,
+        ).values_list("academic_year_level_id", flat=True))
 
     grouped = defaultdict(list)
     for offering in offerings:
@@ -1001,38 +752,32 @@ def view_courses(request, course_id=None):
 
 @login_required(login_url=LOGIN_URL)
 def view_course_details(request, offering_id):
-    user = User.objects.get(pk=request.user.pk)
+    user = request.user
     offering = get_accessible_offering_or_403(user, offering_id)
     management_preview = user_has_management_role(user)
-    lessons = offering.lessons.all() if management_preview else offering.lessons.filter(status=PublicationStatus.PUBLISHED)
-    quizzes = offering.quizzes.all() if management_preview else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
     return render(request, "course_detail.html", {
         "offering": offering,
         "offering_id": offering.pk,
         "course": offering.course,
-        "lessons": lessons,
-        "quizzes": quizzes,
+        **course_navigation(offering, include_drafts=management_preview),
         "management_preview": management_preview,
     })
 
 @login_required(login_url=LOGIN_URL)
 def view_lesson_details(request, offering_id, lesson_id):
-    user = User.objects.get(pk=request.user.pk)
+    user = request.user
     offering = get_accessible_offering_or_403(user, offering_id)
     lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
     if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
         raise PermissionDenied(_("You do not have access to this lesson."))
     management_preview = user_has_management_role(user)
-    lessons = offering.lessons.all() if management_preview else offering.lessons.filter(status=PublicationStatus.PUBLISHED)
-    quizzes = offering.quizzes.all() if management_preview else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
     lesson_links = json.loads(lesson.links)
     return render(request, "lesson_stream.html", {
         "offering": offering,
         "offering_id": offering.pk,
         "course": offering.course,
         "lesson_id": lesson_id,
-        "lessons": lessons,
-        "quizzes": quizzes,
+        **course_navigation(offering, include_drafts=management_preview),
         "management_preview": management_preview,
         "links": [{
             "url": reverse(
@@ -1239,9 +984,39 @@ def quiz_snapshot(request, offering_id, quiz_id):
 
 
 # Admin Views
+#: The dashboard runs ~20 population aggregates. One short cache window keeps a
+#: refresh storm (and the blue/green healthcheck) from re-scanning the whole
+#: database while still showing fresh-enough numbers to an operator.
+ADMIN_PANEL_KPI_CACHE_SECONDS = 60
+
+
+def _admin_panel_cache_key(today) -> str:
+    return f"admin-panel:kpis:v1:{today.isoformat()}"
+
+
+def _admin_panel_cached_context(cache_key: str):
+    try:
+        return cache.get(cache_key)
+    except Exception:
+        logger.warning("admin dashboard cache read failed", extra={"event": "admin_dashboard_cache_error"})
+        return None
+
+
+def _admin_panel_store_context(cache_key: str, context: dict) -> None:
+    try:
+        cache.set(cache_key, context, ADMIN_PANEL_KPI_CACHE_SECONDS)
+    except Exception:
+        logger.warning("admin dashboard cache write failed", extra={"event": "admin_dashboard_cache_error"})
+
+
 @capability_required(can_manage_content)
 def admin_panel(request):
     today = timezone.now().date()
+    cache_key = _admin_panel_cache_key(today)
+    cached_context = _admin_panel_cached_context(cache_key)
+    if cached_context is not None:
+        return render(request, "admin_panel.html", cached_context)
+
     first_of_month = today.replace(day=1)
     week_ago = today - timedelta(days=7)
 
@@ -1287,7 +1062,7 @@ def admin_panel(request):
         CourseOffering.objects.values('status').annotate(count=Count('id'))
     )
     academic_years_total = AcademicYear.objects.count()
-    current_academic_years = AcademicYear.objects.filter(is_active=True)
+    current_academic_years = list(AcademicYear.objects.filter(is_active=True))
 
     # ====== 4. ENROLLMENT ANALYTICS ======
     enrollments_total = Enrollment.objects.count()
@@ -1342,15 +1117,15 @@ def admin_panel(request):
     )
 
     # ====== 8. RECENT ACTIVITY ======
-    recent_enrollments = Enrollment.objects.select_related(
+    recent_enrollments = list(Enrollment.objects.select_related(
         'student', 'academic_year_level__academic_year'
-    ).order_by('-enrolled_at')[:5]
+    ).order_by('-enrolled_at')[:5])
 
-    recent_submissions = Grade.objects.select_related(
+    recent_submissions = list(Grade.objects.select_related(
         'user', 'quiz__course_offering__course'
-    ).order_by('-submitted_at')[:5]
+    ).order_by('-submitted_at')[:5])
 
-    return render(request, "admin_panel.html", {
+    context = {
         "today": today,
         "admin_metrics": {
             "users": users_total,
@@ -1396,7 +1171,9 @@ def admin_panel(request):
         # Recent Activity
         "recent_enrollments": recent_enrollments,
         "recent_submissions": recent_submissions,
-    })
+    }
+    _admin_panel_store_context(cache_key, context)
+    return render(request, "admin_panel.html", context)
 
 @capability_required(can_manage_content)
 def export_users_csv(request):
@@ -4169,6 +3946,12 @@ def payments_matrix_dashboard(request):
         }
         for level in levels
     ]
+    # One aggregate replaces three population COUNTs on every render.
+    payment_counts = all_students.aggregate(
+        all_count=Count("pk"),
+        paid_count=Count("pk", filter=Q(payment_uploaded=True)),
+        unpaid_count=Count("pk", filter=Q(payment_uploaded=False)),
+    )
     context = {
         "title": _("Payments matrix"),
         "years": years,
@@ -4182,9 +3965,7 @@ def payments_matrix_dashboard(request):
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
         "student_count": page_obj.paginator.count,
-        "all_count": all_students.count(),
-        "paid_count": all_students.filter(payment_uploaded=True).count(),
-        "unpaid_count": all_students.filter(payment_uploaded=False).count(),
+        **payment_counts,
     }
     return render_page(request, "payment_matrix.html", "partials/payment_matrix_content.html", context)
 
@@ -5031,13 +4812,15 @@ def api_quiz_status(request, offering_id):
         offering = get_accessible_offering_or_403(user, offering_id)
 
         current_time = now()
-        quizzes = offering.quizzes.all() if user_has_management_role(user) else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
-        result = []
-
-        for quiz in quizzes:
-            status, _status_detail = get_student_quiz_status(quiz, user, current_time)
-
-            result.append({"id": quiz.pk, "status": status})
+        quizzes = list(
+            offering.quizzes.all()
+            if user_has_management_role(user)
+            else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
+        )
+        statuses = get_student_quiz_status_map(quizzes, user, current_time)
+        result = [
+            {"id": quiz.pk, "status": statuses[quiz.pk][0]} for quiz in quizzes
+        ]
 
         return JsonResponse({"quizzes": result})
 
@@ -8135,13 +7918,18 @@ def export_report_xlsx(request):
                     AttendanceDayStatus(attendance.status).label, attendance.grade,
                 ]])
 
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
+    # The daily sheet alone can reach ~2M rows. Spool the workbook to disk once
+    # it passes 8 MB and stream it, instead of holding (and copying) it in RAM.
+    workbook_file = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+    wb.save(workbook_file)
+    workbook_file.seek(0)
     safe_name = _safe_filename(scope.academic_year.name)
-    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-    return response
+    return FileResponse(
+        workbook_file,
+        as_attachment=True,
+        filename=f'report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @capability_required(can_view_reports)

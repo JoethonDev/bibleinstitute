@@ -18,7 +18,6 @@ from .models import MobileOtpChallenge, TelegramAccount, TelegramBotConfig, User
 from .mobile_auth import mobile_installation_conflict
 from .mobile_otp_tasks import send_mobile_otp
 from .telegram.configuration import decrypt_secret, encrypt_secret
-from .telegram.linking import current_telegram_link
 from .utils.validators import normalize_phone
 
 
@@ -87,14 +86,13 @@ def _eligible_mobile_user(phone: str) -> tuple[User, TelegramAccount]:
         raise MobileOtpError("otp_unavailable", _("OTP login is unavailable for this number."))
     account = TelegramAccount.objects.filter(user=user, is_active=True).first()
     if account is None:
-        try:
-            _account, link_url = current_telegram_link(user)
-        except Exception:
-            link_url = None
+        # This endpoint is unauthenticated. It must never mint or return a
+        # Telegram linking capability: anyone holding the phone number could
+        # claim the account by opening the link in their own chat. The link is
+        # offered only from the authenticated profile page.
         raise MobileOtpError(
             "telegram_link_required",
-            _("Link your Telegram account before using OTP login."),
-            details={"link_url": link_url} if link_url else None,
+            _("Link your Telegram account from your profile page, then try again."),
         )
     return user, account
 

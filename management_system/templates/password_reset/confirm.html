@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block head_meta %}
+<title>{% translate 'Set a new password' %} | {% translate "Bible Institute Coptic" %}</title>
+{% endblock %}
+
+{% block body %}
+<section class="login-page sd-page">
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-11 col-sm-8 col-md-6 col-lg-5 col-xl-4">
+            <div class="sd-frame login-card">
+                <div class="sd-screen p-4 p-sm-5">
+                    <div class="text-center mb-4">
+                        <a href="{% url 'home' %}"><img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Logo' %}" class="login-logo"></a>
+                        <h5 class="sd-serious mt-3">{% translate 'Set a new password' %}</h5>
+                    </div>
+{% if validlink %}
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="sd-btn sd-btn--teal btn-lg w-100">
+                                <i class="fas fa-key me-2"></i>{% translate "Save new password" %}
+                            </button>
+                        </div>
+                    </form>
+{% else %}
+                    <p class="ps-muted-text text-center">{% translate "This reset link is invalid or has expired. Request a new one to continue." %}</p>
+                    <div class="d-grid mt-4">
+                        <a href="{% url 'password_reset' %}" class="sd-btn sd-btn--teal btn-lg w-100">{% translate "Request a new link" %}</a>
+                    </div>
+{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+{% endblock %}

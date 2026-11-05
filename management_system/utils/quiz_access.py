@@ -1,9 +1,11 @@
 from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.db.models import Exists, OuterRef
+from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
 from ..models import Enrollment, Grade, QuizStudentOpening, User
+from .timezones import ensure_aware
 
 
 QUIZ_SUBMISSION_GRACE = timedelta(minutes=30)
@@ -39,6 +41,28 @@ def quiz_window(quiz, user=None):
         if opening:
             return opening.opening_date, opening.closing_date
     return quiz.opening_date, quiz.closing_date
+
+
+def quiz_status_from(quiz, grade, opening, current_time, can_write):
+    """Canonical quiz-mode decision for one quiz with grade/opening pre-loaded.
+
+    The single-quiz reader, the batched reader, and the mobile reader all call
+    this function, so a page cannot drift from another page.
+    """
+    if grade is not None:
+        return "view", grade
+
+    opening_date = opening.opening_date if opening is not None else quiz.opening_date
+    closing_date = opening.closing_date if opening is not None else quiz.closing_date
+    if (
+        can_write
+        and ensure_aware(opening_date)
+        <= current_time
+        <= ensure_aware(closing_date) + QUIZ_SUBMISSION_GRACE
+    ):
+        return "exam", None
+
+    return "closed_unsolved", None
 
 
 def answers_releasable(grade: Grade | None) -> bool:

@@ -59,10 +59,12 @@
 
     <form method="post"
           action="{{ reply_url }}"
+          enctype="multipart/form-data"
           class="tg-chat-reply-form tg-chat-composer"
           hx-post="{{ reply_url }}?fragment=panel"
           hx-target="#telegram-chat-panel"
           hx-swap="innerHTML"
+          hx-config='{"timeout": 900000}'
           x-on:keydown.enter.exact.prevent="$event.target.form.requestSubmit()">
         {% csrf_token %}
         {% if reply_form.non_field_errors %}
@@ -85,6 +87,20 @@
                 <span class="visually-hidden">{% translate "Send Message" %}</span>
             </button>
         </div>
+
+        <div class="tg-chat-composer-attach">
+            <label class="tg-chat-file-label" for="{{ reply_form.attachment.id_for_label }}">
+                <i class="fas fa-paperclip" aria-hidden="true"></i>
+                {% translate "Attach a file" %}
+            </label>
+            {{ reply_form.attachment }}
+            <span id="telegram-support-attachment-help" class="tg-chat-file-hint">
+                {% translate "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB." %}
+            </span>
+        </div>
+        {% if reply_form.attachment.errors %}
+        <div class="text-danger mt-1">{{ reply_form.attachment.errors }}</div>
+        {% endif %}
 
         {{ reply_form.reply_to_telegram_message_id }}
         {% if reply_form.reply_to_telegram_message_id.errors %}

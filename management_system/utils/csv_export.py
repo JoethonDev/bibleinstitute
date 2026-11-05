@@ -3,7 +3,7 @@ import io
 import json
 import re
 from collections import defaultdict
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.translation import gettext as _
 from django.utils import timezone
 from ..models import User, Quiz, Submission, Question, Grade
@@ -12,14 +12,11 @@ from .timezones import format_application_datetime
 
 def export_users_to_csv():
     """
-    Export all users to CSV format.
-    Returns HttpResponse with CSV data.
+    Stream every user as CSV.
+
+    The row iterator keeps one page of users in memory, and the single
+    select_related removes the per-row role lookup the old loop performed.
     """
-    # Create CSV buffer
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Write header row
     headers = [
         f"  {_('Username')}  ",
         f"  {_('First Name')}  ",
@@ -30,27 +27,34 @@ def export_users_to_csv():
         f"  {_('Last Login')}  ",
         f"  {_('Is Active')}  "
     ]
-    writer.writerow(headers)
-    
-    # Write user data
-    users = User.objects.all().order_by('joined_date')
-    for user in users:
-        writer.writerow([
-            f"  {_csv_safe_cell(user.username)}  ",
-            f"  {_csv_safe_cell(user.first_name)}  ",
-            f"  {_csv_safe_cell(user.last_name)}  ",
-            f"  {_csv_safe_cell(user.email)}  ",
-            f"  {_csv_safe_cell(user.role.get_role_display() if user.role else '')}  ",
-            f"  {_csv_safe_cell(user.joined_date.strftime('%Y-%m-%d %H:%M:%S') if user.joined_date else '')}  ",
-            f"  {_csv_safe_cell(user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '')}  ",
-            f"  {_csv_safe_cell(_('Yes') if user.is_active else _('No'))}  "
-        ])
-    
-    # Create HTTP response
-    output.seek(0)
-    response = HttpResponse(output.read(), content_type='text/csv')
+
+    def csv_rows():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        yield output.getvalue()
+        users = (
+            User.objects.select_related("role")
+            .order_by("joined_date", "pk")
+            .iterator(chunk_size=500)
+        )
+        for user in users:
+            output.seek(0)
+            output.truncate(0)
+            writer.writerow([
+                f"  {_csv_safe_cell(user.username)}  ",
+                f"  {_csv_safe_cell(user.first_name)}  ",
+                f"  {_csv_safe_cell(user.last_name)}  ",
+                f"  {_csv_safe_cell(user.email)}  ",
+                f"  {_csv_safe_cell(user.role.get_role_display() if user.role else '')}  ",
+                f"  {_csv_safe_cell(user.joined_date.strftime('%Y-%m-%d %H:%M:%S') if user.joined_date else '')}  ",
+                f"  {_csv_safe_cell(user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '')}  ",
+                f"  {_csv_safe_cell(_('Yes') if user.is_active else _('No'))}  "
+            ])
+            yield output.getvalue()
+
+    response = StreamingHttpResponse(csv_rows(), content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="users_export_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-    
     return response
 
 

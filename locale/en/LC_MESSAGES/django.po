@@ -2763,6 +2763,52 @@ msgstr "Support storage is unavailable."
 msgid "The attachment could not be stored."
 msgstr "The attachment could not be stored."
 
+# Telegram support voice playback and dashboard attachment replies.
+msgid "Voice"
+msgstr "Voice"
+
+msgid "Voice message"
+msgstr "Voice message"
+
+msgid "Audio message"
+msgstr "Audio message"
+
+msgid "The attachment could not be read."
+msgstr "The attachment could not be read."
+
+msgid "Attachments support a message of 1,024 characters or fewer."
+msgstr "Attachments support a message of 1,024 characters or fewer."
+
+msgid "Images must be 10 MB or smaller."
+msgstr "Images must be 10 MB or smaller."
+
+msgid "Videos and PDF files must be 50 MB or smaller."
+msgstr "Videos and PDF files must be 50 MB or smaller."
+
+msgid "The attachment must be a JPEG, PNG, MP4, or PDF file."
+msgstr "The attachment must be a JPEG, PNG, MP4, or PDF file."
+
+msgid "The attachment content does not match its file type."
+msgstr "The attachment content does not match its file type."
+
+msgid "A reply message or an attachment is required."
+msgstr "A reply message or an attachment is required."
+
+msgid "This message type is not supported. Text, photos, documents, videos, and voice messages are accepted."
+msgstr "This message type is not supported. Text, photos, documents, videos, and voice messages are accepted."
+
+msgid "Send your message to support. You can send text, photos, documents, videos, or voice messages."
+msgstr "Send your message to support. You can send text, photos, documents, videos, or voice messages."
+
+msgid "Attach a file"
+msgstr "Attach a file"
+
+msgid "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
+msgstr "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
+
+msgid "Attachment unavailable"
+msgstr "Attachment unavailable."
+
 #: .\management_system\telegram\support.py:255
 #
 #| msgid "Media coverage"

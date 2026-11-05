@@ -1,4 +1,6 @@
+from django.contrib.auth import views as auth_views
 from django.urls import path
+from management_system import password_reset as password_reset_views
 from management_system.views import *
 from management_system.forms import UserLoginForm
 from management_system.telegram_views import (
@@ -45,7 +47,31 @@ urlpatterns = [
             authentication_form=UserLoginForm
             ),
         name='user_login'
-    ),       
+    ),
+    path(
+        'password-reset/',
+        password_reset_views.PasswordResetView.as_view(),
+        name='password_reset',
+    ),
+    path(
+        'password-reset/sent/',
+        auth_views.PasswordResetDoneView.as_view(
+            template_name="password_reset/done.html"
+        ),
+        name='password_reset_done',
+    ),
+    path(
+        'password-reset/complete/',
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name="password_reset/complete.html"
+        ),
+        name='password_reset_complete',
+    ),
+    path(
+        'password-reset/<uidb64>/<token>/',
+        password_reset_views.PasswordResetConfirmView.as_view(),
+        name='password_reset_confirm',
+    ),
     path('', index, name="home"),
     path('portal/', portal, name="student-portal"),
     path('about/', about_page, name="about"),
@@ -56,8 +82,6 @@ urlpatterns = [
     path('profile/academic-payment/', profile_academic_payment, name="profile-academic-payment"),
     path('profile/telegram/unlink/', telegram_unlink, name="telegram-unlink"),
     path('courses/', view_courses, name="courses"),
-    # path('design/student-ui/', student_ui_proposal, name="student-ui-proposal"),
-    # path('design/admin-ui/', admin_ui_proposal, name="admin-ui-proposal"),
     path('offerings/<int:offering_id>/', view_course_details, name="course-details"),
     path('offerings/<int:offering_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),

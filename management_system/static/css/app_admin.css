@@ -2719,6 +2719,46 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     background: var(--ps-gold-soft);
 }
 
+.tg-chat-attachment-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.tg-chat-attachment--error {
+    color: var(--ps-danger);
+    background: var(--ps-danger-soft);
+    border-color: var(--ps-danger);
+}
+
+/* Voice notes and audio files play inline in the support thread. */
+.tg-chat-audio {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 24rem;
+    direction: ltr;
+}
+
+.tg-chat-photo img {
+    display: block;
+    max-width: 100%;
+    max-height: 14rem;
+    border: 1px solid var(--ps-line);
+    border-radius: .6rem;
+    background: var(--ps-mist);
+}
+
+.tg-chat-video {
+    display: block;
+    max-width: 100%;
+    max-height: 16rem;
+    border-radius: .6rem;
+    background: #000;
+}
+
 /* ── Message meta (delivery state, errors, reply affordance) ── */
 .tg-chat-msg-meta {
     display: flex;
@@ -2925,6 +2965,57 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     flex: 0 0 auto;
     min-height: 3.5rem;
     padding-inline: 1.1rem;
+}
+
+/* ── Optional attachment row inside the composer ── */
+.tg-chat-composer-attach {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.tg-chat-file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--ps-teal);
+    cursor: pointer;
+}
+
+.tg-chat-file-label:hover,
+.tg-chat-file-label:focus-visible {
+    color: var(--ps-gold-deep);
+    text-decoration: underline;
+}
+
+.tg-chat-reply-form .tg-chat-file-input {
+    flex: 1 1 14rem;
+    min-width: 0;
+    max-width: 100%;
+    font-size: .78rem;
+    color: var(--ps-muted);
+}
+
+.tg-chat-reply-form .tg-chat-file-input::file-selector-button {
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .45rem;
+    background: var(--ps-mist);
+    color: var(--ps-ink);
+    font-size: .78rem;
+    padding: .3rem .6rem;
+    margin-inline-end: .5rem;
+}
+
+.tg-chat-file-hint {
+    flex: 1 1 100%;
+    font-size: .72rem;
+    color: var(--ps-muted);
 }
 
 /* ── Compact composer pinned to the thread bottom ── */
