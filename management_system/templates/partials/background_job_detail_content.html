@@ -1,0 +1,40 @@
+{% load i18n %}
+<div id="content" class="ad-page" x-data="backgroundJobsMonitor" data-job-detail="true" data-job-status-url="{% url 'background-job-status-batch' %}" data-unavailable-label="{% translate 'Unavailable' %}">
+    <div class="container-fluid py-3">
+        <div class="ad-pane-head flex-wrap gap-2">
+            <h1 class="ad-page-title">{{ job.label }}</h1>
+            <div class="d-flex flex-wrap gap-2">
+                {% include "partials/background_polling_toggle.html" %}
+                <a class="ad-btn ad-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "History" %}</a>
+                <a class="ad-btn ad-btn--ghost" href="{{ job.detail_url }}" hx-get="{{ job.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML">{% translate "Refresh" %}</a>
+            </div>
+        </div>
+        <p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
+        <div class="ad-card ad-card-body" data-job-record data-primary-job="true" data-family="{{ job.family }}" data-id="{{ job.id }}" data-active="{{ job.active|yesno:'true,false' }}" data-next-poll-at="{{ job.next_poll|date:'c' }}">
+            <dl class="row">
+                <dt class="col-sm-3">{% translate "Job category" %}</dt><dd class="col-sm-9">{{ job.family_label }}</dd>
+                <dt class="col-sm-3">{% translate "Reference" %}</dt><dd class="col-sm-9 text-break" dir="ltr">{{ job.id }}</dd>
+                <dt class="col-sm-3">{% translate "Requested by" %}</dt><dd class="col-sm-9">{{ job.actor }}</dd>
+                <dt class="col-sm-3">{% translate "Target" %}</dt><dd class="col-sm-9 text-break">{{ job.target }}</dd>
+                <dt class="col-sm-3">{% translate "Status" %}</dt><dd class="col-sm-9" data-job-field="status_label" aria-live="polite">{{ job.status_label }}</dd>
+                <dt class="col-sm-3">{% translate "Created" %}</dt><dd class="col-sm-9">{{ job.created|date:"SHORT_DATETIME_FORMAT" }}</dd>
+                <dt class="col-sm-3">{% translate "Updated" %}</dt><dd class="col-sm-9" data-job-field="updated_label">{{ job.updated_label }}</dd>
+                {% if job.succeeded != None %}<dt class="col-sm-3">{% translate "Succeeded" %}</dt><dd class="col-sm-9" data-job-field="succeeded">{{ job.succeeded }}</dd>{% endif %}
+                {% if job.failed != None %}<dt class="col-sm-3">{% translate "Failed" %}</dt><dd class="col-sm-9" data-job-field="failed">{{ job.failed }}</dd>{% endif %}
+                {% if job.skipped != None %}<dt class="col-sm-3">{% translate "Skipped" %}</dt><dd class="col-sm-9" data-job-field="skipped">{{ job.skipped }}</dd>{% endif %}
+            </dl>
+            <progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress>
+            <p data-job-field="progress_label">{{ job.progress_label }}</p>
+            <p class="small text-muted" data-job-field="phase_label">{{ job.phase_label }}</p>
+            <p class="text-danger text-break" data-job-field="error"{% if not job.error %} hidden{% endif %}>{{ job.error }}</p>
+            {% if warning %}<p class="text-warning text-break">{{ warning }}</p>{% endif %}
+            {% if row_errors %}
+            <h2 class="h6">{% translate "First 20 row errors" %}</h2>
+            <ul>{% for error in row_errors %}<li class="text-break">{{ error.row }}: {{ error.message }}</li>{% endfor %}</ul>
+            {% endif %}
+            {% if download_url %}<a class="ad-btn ad-btn--teal align-self-start" href="{{ download_url }}">{% translate "Download result" %}</a>{% endif %}
+        </div>
+        {% if notification_content %}{% include "partials/notification_delivery_content.html" %}{% endif %}
+        {% if content_unavailable %}<p class="text-muted">{% translate "The original notification is no longer available." %}</p>{% endif %}
+    </div>
+</div>

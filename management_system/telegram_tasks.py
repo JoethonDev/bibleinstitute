@@ -195,7 +195,7 @@ def _list_text(title: str, rows, empty_text: str, page: int = 1, page_count: int
     if page_count > 1:
         lines.append(_("Page %(current)s of %(total)s") % {"current": page, "total": page_count})
     if rows:
-        lines.extend(f"• {row}" for row in rows)
+        lines.extend(f"- {row}" for row in rows)
     else:
         lines.append(empty_text)
     return "\n".join(lines)

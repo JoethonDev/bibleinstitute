@@ -1,0 +1,3 @@
+{% load i18n %}
+<button type="button" class="ad-btn ad-btn--ghost" @click="togglePolling()" :aria-pressed="(!pollingEnabled).toString()" aria-pressed="false" data-pause-label="{% translate 'Pause updates' %}" data-resume-label="{% translate 'Resume updates' %}" x-text="pollingEnabled ? $el.dataset.pauseLabel : $el.dataset.resumeLabel">{% translate "Pause updates" %}</button>
+<span class="small text-muted align-self-center" aria-live="polite" data-live-label="{% translate 'Live updates' %}" data-paused-label="{% translate 'Updates paused' %}" x-text="pollingEnabled ? $el.dataset.liveLabel : $el.dataset.pausedLabel"></span>

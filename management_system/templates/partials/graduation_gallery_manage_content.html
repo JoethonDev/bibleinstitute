@@ -10,7 +10,7 @@
                     <label class="form-label" for="gallery-scope">{% translate "Album (academic year and level)" %}</label>
                     <select id="gallery-scope" class="form-select" name="scope" hx-get="{% url 'graduation-gallery-manage' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#gallery-manage-loading" hx-trigger="change">
                         {% for option in picker %}
-                        <option value="{{ option.pk }}"{% if scope and option.pk == scope.pk %} selected{% endif %}>{{ option.academic_year.name }} — {{ option.level.display_name }} ({{ option.items_count }})</option>
+                        <option value="{{ option.pk }}"{% if scope and option.pk == scope.pk %} selected{% endif %}>{{ option.academic_year.name }} - {{ option.level.display_name }} ({{ option.items_count }})</option>
                         {% empty %}
                         <option value="">{% translate "No graduation albums configured yet." %}</option>
                         {% endfor %}

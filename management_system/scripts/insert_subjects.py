@@ -1,10 +1,10 @@
+"""Seed the starter subject catalog idempotently; never deletes existing rows."""
 from datetime import date
 
 from management_system.models import Course, Level, AcademicYear, AcademicYearLevel
 
+
 def run():
-    courses = []
-    Course.objects.all().delete()
     # Ensure levels 1..3 exist
     level_objs = {}
     for ordering in range(1, 4):
@@ -36,9 +36,9 @@ def run():
 
     text = """
 3 مادة عهد قديم
-العهد الجديد ترم اول – 1
-العهد الجديد ترم اول – 2
-العهد القديم ترم الاول – 1
+العهد الجديد ترم اول - 1
+العهد الجديد ترم اول - 2
+العهد القديم ترم الاول - 1
 مادة الابائيات
 مادة الابائيات 2
 مادة الاتصال
@@ -48,20 +48,21 @@ def run():
 مادة العهد الجديد 4
 مادة العهد القديم 2
 مادة العهد القديم 4
-مادة العهد القديم الترم الاول – 2
+مادة العهد القديم الترم الاول - 2
 مادة الفنون الكتابية 1
 مادة الفنون الكتابية 2
-مادة القراءات الكنسية – القطمارس
+مادة القراءات الكنسية - القطمارس
 مادة تاريخ الكتاب المقدس
 """
     level_idx = 0
     level_list = [level_objs[1], level_objs[2], level_objs[3]]
+    created = 0
     for line in text.split("\n"):
-        if line:
-            name = line.strip()
-            courses.append(
-                Course(name=name, level=level_list[level_idx % len(level_list)])
-            )
-            level_idx += 1
-    
-    Course.objects.bulk_create(courses)
+        if not line.strip():
+            continue
+        name = line.strip()
+        level = level_list[level_idx % len(level_list)]
+        _course, was_created = Course.objects.get_or_create(name=name, level=level)
+        created += 1 if was_created else 0
+        level_idx += 1
+    return {"catalog_entries": level_idx, "created": created}

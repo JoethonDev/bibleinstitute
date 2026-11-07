@@ -29,6 +29,19 @@
     
     {% if role == 'admin' %}
         <li class="nav-item">
+            <a class="ad-tab" href="{% url 'background-jobs' %}" hx-get="{% url 'background-jobs' %}"
+               hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-push-url="true">
+                <i class="fas fa-tasks" aria-hidden="true"></i>
+                <span>{% translate "Background jobs" %}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="ad-tab" href="{% url 'notification-history' %}" hx-get="{% url 'notification-history' %}"
+               hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-push-url="true">
+                <i class="fas fa-bell" aria-hidden="true"></i><span>{% translate "Notification history" %}</span>
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="ad-tab"
                href="{% url 'applications-dashboard' %}"
                hx-get="{% url 'applications-dashboard' %}"

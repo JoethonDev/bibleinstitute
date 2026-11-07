@@ -7,7 +7,7 @@
     <div class="ad-card mb-3">
         <div class="ad-card-body">
             {% if has_single_active_year %}
-            <p class="mb-0 ps-muted-text">{% translate "New applications enroll into:" %} <strong>{% if effective_scope %}{{ effective_scope }}{% else %}—{% endif %}</strong></p>
+            <p class="mb-0 ps-muted-text">{% translate "New applications enroll into:" %} <strong>{% if effective_scope %}{{ effective_scope }}{% else %}-{% endif %}</strong></p>
             {% else %}
             <p class="mb-0 ps-muted-text">{% translate "Exactly one active academic year is required before acceptance." %}</p>
             {% endif %}

@@ -1,5 +1,5 @@
 /* ================================================================================
-   APP — STUDENT REALM (Psalmodia)
+   APP - STUDENT REALM (Psalmodia)
    Student `.sd-*` classes approved by the operator via student_proposal.css.
    Consumes role tokens from psalmodia.css. No literal hex colour values.
    RTL-safe with logical properties. Responsive.
@@ -50,7 +50,7 @@ main:has(.sd-page) {
 }
 
 .sd-halo::before {
-    content: "\2723"; /* ✣ */
+    content: "\2723"; /* - */
     font-size: 16rem;
     line-height: 1;
     margin-top: -2.2rem;
@@ -276,7 +276,7 @@ main:has(.sd-page) {
     color: var(--ps-ink);
 }
 
-/* ================= SCREEN 01 — COURSES ================= */
+/* ================= SCREEN 01 - COURSES ================= */
 .sd-group { margin-bottom: 1.75rem; }
 
 .sd-group-head {
@@ -385,7 +385,7 @@ main:has(.sd-page) {
 
 .sd-level-tag { font-size: .76rem; font-weight: 700; color: var(--ps-teal); }
 
-/* ================= SCREEN 02 — COURSE DETAIL / LESSON ================= */
+/* ================= SCREEN 02 - COURSE DETAIL / LESSON ================= */
 .sd-learn-head {
     display: flex;
     align-items: center;
@@ -660,7 +660,6 @@ main:has(.sd-page) {
 .sd-audio-body {
     display: flex;
     align-items: center;
-    gap: 1rem;
     padding: .9rem 1rem;
     background: linear-gradient(120deg, var(--ps-gold-soft), var(--ps-paper));
 }
@@ -703,7 +702,7 @@ main:has(.sd-page) {
     margin-inline-start: auto;
 }
 
-/* Live-player video wrapper — dark ink background matching proposal video placeholder */
+/* Live-player video wrapper - dark ink background matching proposal video placeholder */
 .sd-live-player {
     position: relative;
     width: 100%;
@@ -729,7 +728,7 @@ main:has(.sd-page) {
     object-fit: contain;
 }
 
-/* Video-js control bar — Psalmodia gold/teal skin over vjs-theme-city */
+/* Video-js control bar - Psalmodia gold/teal skin over vjs-theme-city */
 .sd-live-player .video-js .vjs-control-bar {
     background: linear-gradient(180deg, transparent 0%, rgba(23, 48, 58, .92) 100%);
     padding-bottom: .35rem;
@@ -880,7 +879,7 @@ main:has(.sd-page) {
     background: linear-gradient(180deg, rgba(23, 48, 58, .98), rgba(16, 38, 46, .98));
 }
 
-/* Audio body in the live template — proposal-consistent golden gradient */
+/* Audio body in the live template - proposal-consistent golden gradient */
 .sd-audio-body {
     display: flex;
     flex-direction: column;
@@ -894,12 +893,12 @@ main:has(.sd-page) {
     padding: .5rem 0 0;
 }
 
-/* Audio download button — consistent gold-outline treatment */
+/* Audio download button - consistent gold-outline treatment */
 .sd-audio-body .sd-btn--teal {
     min-width: 10rem;
 }
 
-/* Progress download bar inside audio card — proposal-compatible */
+/* Progress download bar inside audio card - proposal-compatible */
 .sd-audio-body .download-progress .progress {
     height: .55rem;
     border-radius: 999px;
@@ -911,7 +910,7 @@ main:has(.sd-page) {
     background: linear-gradient(90deg, var(--ps-gold), var(--ps-teal));
 }
 
-/* Progress track bar — native <progress> element styled via Psalmodia tokens */
+/* Progress track bar - native <progress> element styled via Psalmodia tokens */
 .sd-track-bar {
     -webkit-appearance: none;
     appearance: none;
@@ -938,7 +937,7 @@ main:has(.sd-page) {
     border-radius: 999px;
 }
 
-/* Progress track inside the video live-player — light text on dark background */
+/* Progress track inside the video live-player - light text on dark background */
 .sd-live-player .sd-track {
     padding: .5rem 1rem .65rem;
 }
@@ -1038,7 +1037,7 @@ main:has(.sd-page) {
     white-space: nowrap;
 }
 
-/* PDF viewer within media card — card-consistent paper background */
+/* PDF viewer within media card - card-consistent paper background */
 .sd-pdf-viewer {
     width: min(100%, 56rem);
     min-width: 0;
@@ -1185,7 +1184,7 @@ body.pdf-fs-open {
     }
 }
 
-/* ================= SCREEN 03 — QUIZ ================= */
+/* ================= SCREEN 03 - QUIZ ================= */
 .sd-quiz-head {
     display: flex;
     flex-wrap: wrap;
@@ -1335,7 +1334,7 @@ body.pdf-fs-open {
 
 .sd-note i { color: var(--ps-gold); }
 
-/* ================= SCREEN 04 — CALENDAR ================= */
+/* ================= SCREEN 04 - CALENDAR ================= */
 .sd-cal-top {
     display: flex;
     align-items: center;
@@ -1514,7 +1513,7 @@ body.pdf-fs-open {
 .sd-legend .lg-hol { background: var(--ps-gold); }
 .sd-legend .lg-today { border: 2px solid var(--ps-gold-deep); }
 
-/* ================= SCREEN 05 — PROFILE + QR ================= */
+/* ================= SCREEN 05 - PROFILE + QR ================= */
 .sd-profile {
     display: grid;
     grid-template-columns: 19rem 1fr;
@@ -1709,7 +1708,7 @@ body.pdf-fs-open {
     display: none;
 }
 
-/* Accordion button reset inside student cards — keep collapse JS, use sd skin */
+/* Accordion button reset inside student cards - keep collapse JS, use sd skin */
 .sd-panel-card .accordion-button:not(.collapsed) {
     background: transparent;
     box-shadow: none;
@@ -1719,7 +1718,7 @@ body.pdf-fs-open {
     box-shadow: none;
 }
 
-/* Crispy forms inside sd-id-card — keep bootstrap form-control, skin labels */
+/* Crispy forms inside sd-id-card - keep bootstrap form-control, skin labels */
 .sd-id-card .form-label {
     font-size: .85rem;
     font-weight: 600;
@@ -1764,7 +1763,7 @@ body.pdf-fs-open {
     position: relative;
 }
 
-/* sd-panel-card inside accordion context — no double border on first item */
+/* sd-panel-card inside accordion context - no double border on first item */
 .sd-panel-card .sd-acc:first-of-type {
     border-top: 0;
 }
@@ -1775,8 +1774,8 @@ body.pdf-fs-open {
 
 /* ---------------- Collapse / accordion state indicator ---------------- */
 /* Replaces Bootstrap's hidden ::after chevron with a Font Awesome icon.
-   LTR: collapsed → icon rotates -90deg (points right), expanded → points down.
-   RTL: collapsed → icon rotates 90deg (points left), expanded → points down. */
+   LTR: collapsed -> icon rotates -90deg (points right), expanded -> points down.
+   RTL: collapsed -> icon rotates 90deg (points left), expanded -> points down. */
 .sd-collapse-indicator {
     transition: transform var(--ps-motion);
     font-size: .78rem;
@@ -2216,7 +2215,7 @@ body.pdf-fs-open {
     gap: .5rem;
 }
 
-/* Locked weekdays — gold left-border accent, paste surface, wraps safely */
+/* Locked weekdays - gold left-border accent, paste surface, wraps safely */
 .sd-calendar-locked-days {
     font-size: .82rem;
     padding: .35rem .65rem;

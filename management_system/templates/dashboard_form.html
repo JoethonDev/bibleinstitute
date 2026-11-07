@@ -28,8 +28,8 @@
 
     <!-- Back Navigation -->
     <div class="ad-toolbar">
-        {% with dynamic_view=view_name %}
-        <a hx-get="{% url dynamic_view|add:'-dashboard' %}"
+        {% with dynamic_view=view_name dynamic_slug=view_slug %}
+        <a hx-get="{% url dynamic_slug|add:'-dashboard' %}"
            hx-select="#page-region"
            hx-push-url="true"
            hx-trigger="click"

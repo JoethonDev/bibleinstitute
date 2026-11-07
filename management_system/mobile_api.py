@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from datetime import timedelta
 from io import BytesIO
 
 from django.contrib.auth import authenticate
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Count
-from django.http import Http404, StreamingHttpResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, StreamingHttpResponse
 from django.db import IntegrityError, transaction
-from django.http import HttpResponse, QueryDict
 from django.urls import reverse
 from django.utils import timezone
 from django.utils import translation
@@ -23,13 +21,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 import qrcode
 
+from .academic_access import get_accessible_offering_or_403
 from .forms import SignupDetailsForm
 from . import graduation_gallery as gg
 from .mobile_auth import (
     MobileBiometricError,
     MobilePushDeliveryInProgress,
     enroll_mobile_biometric,
-    get_mobile_session,
     issue_mobile_session,
     clear_mobile_login_failures,
     normalize_mobile_installation_id,
@@ -61,6 +59,8 @@ from .mobile_downloads import (
 )
 from .models import (
     Grade,
+    PublicationStatus,
+    Quiz,
     LectureProgress,
     MobilePushDevice,
     AcademicYearLevel,
@@ -68,9 +68,9 @@ from .models import (
     User,
     ViewingSession,
 )
+from .utils.client_identity import client_ip
 from .utils.student_data import (
     PAGE_SIZE,
-    _authorized_lesson,
     notification_payload,
     page_metadata,
     student_calendar_data,
@@ -89,17 +89,18 @@ from .utils.student_data import (
 )
 from .utils.helpers import build_scan_url
 from .utils.validators import normalize_username
-from .views import (
-    CLOUD_CLIENT,
-    bucket_name,
+from .media_delivery import (
+    MediaAccessError,
+    build_manifest_playlist,
     create_viewing_session,
-    generate_audio_download,
-    lesson_manifest,
-    progress_heartbeat as existing_progress_heartbeat,
+    open_book_document,
+    resolve_audio_download,
+    resolve_media_link,
     sign_session,
-    take_exam,
-    _valid_session_token,
+    valid_session_token,
 )
+from .progress_activity import ProgressHeartbeatError, apply_progress_heartbeat
+from .views import CLOUD_CLIENT, bucket_name
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ def login(request):
         return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
     username = payload.get("username")
     password = payload.get("password")
-    remote_addr = request.META.get("REMOTE_ADDR", "")
+    remote_addr = client_ip(request)
     username = normalize_username(username) if isinstance(username, str) else ""
     username_key = username
     if mobile_login_rate_limited(username_key, remote_addr):
@@ -234,7 +235,7 @@ def otp_request(request):
         challenge = request_mobile_otp(
             payload.get("phone_number", ""),
             payload.get("installation_id", ""),
-            request.META.get("REMOTE_ADDR", ""),
+            client_ip(request),
         )
     except MobileOtpError as exc:
         logger.warning(
@@ -391,7 +392,7 @@ def biometric_unlock(request):
         token, session, user = unlock_mobile_biometric(
             installation_id,
             payload.get("credential"),
-            request.META.get("REMOTE_ADDR", ""),
+            client_ip(request),
         )
     except MobileBiometricError as exc:
         logger.warning(
@@ -590,21 +591,41 @@ def quiz_submit(request, offering_id, quiz_id):
     payload = _json_body(request)
     if payload is None or not isinstance(payload.get("answers"), (list, dict)):
         return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
-    data = student_quiz_data(request.user, offering_id, quiz_id, normalize_language(request))
-    if data is None:
+    # Mobile and web share the same finalization operation; only the JSON
+    # parsing/response adapter lives here.
+    from .quiz_attempts import reconcile_snapshots, submit_answers
+    from .utils.helpers import (
+        get_student_quiz_status,
+        is_quiz_in_user_window,
+        is_quiz_open,
+        user_has_management_role,
+    )
+
+    try:
+        offering = get_accessible_offering_or_403(
+            request.user, offering_id, write=True, allow_management=True
+        )
+        quiz_filters = {"pk": quiz_id, "course_offering": offering}
+        if not user_has_management_role(request.user):
+            quiz_filters["status"] = PublicationStatus.PUBLISHED
+        quiz = Quiz.objects.get(**quiz_filters)
+    except (Http404, PermissionDenied, Quiz.DoesNotExist):
         return _error(request, "forbidden", _("You do not have access to this quiz."), 403)
-    if data["mode"] == "closed_unsolved":
-        from .quiz_attempts import reconcile_snapshots
-        reconcile_snapshots(quiz_id, user_id=request.user.pk)
-    if data["mode"] != "exam":
-        with transaction.atomic():
-            User.objects.select_for_update().get(pk=request.user.pk)
-            existing_grade = Grade.objects.filter(
-                user=request.user,
-                quiz_id=quiz_id,
-            ).values("total_grade", "submitted_at").first()
-        if existing_grade is not None:
-            return json_api_response(request, {"status": "submitted", "grade": existing_grade})
+
+    submission_time = timezone.now()
+    mode, grade = get_student_quiz_status(quiz, request.user, submission_time)
+    if grade is None and mode != "exam":
+        # Only previously accepted server snapshots can finalize after grace.
+        reconcile_snapshots(quiz.pk, user_id=request.user.pk)
+        grade = Grade.objects.filter(user=request.user, quiz=quiz).first()
+    if grade is not None:
+        return json_api_response(request, {
+            "status": "submitted",
+            "grade": {"total_grade": grade.total_grade, "submitted_at": grade.submitted_at},
+        })
+    if mode != "exam" or not is_quiz_open(quiz, submission_time, request.user) or not is_quiz_in_user_window(
+        quiz, request.user
+    ):
         return _error(request, "submission_closed", _("The quiz is closed or already submitted."), 400)
 
     answers = payload["answers"]
@@ -615,24 +636,26 @@ def quiz_submit(request, offering_id, quiz_id):
     if len(answer_rows) > 500 or any(not isinstance(row, dict) for row in answer_rows):
         return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
 
-    query = QueryDict("", mutable=True)
-    for index, row in enumerate(answer_rows):
+    normalized_answers = {}
+    for row in answer_rows:
         question_id = row.get("id")
         if not str(question_id).isdigit():
             return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
         answer = row.get("answer", "")
         if isinstance(answer, (dict, list)):
             answer = json.dumps(answer, ensure_ascii=False)
-        query[f"questions[{index}][id]"] = str(question_id)
-        query[f"questions[{index}][answer]"] = str(answer)
-    request.POST = query
-    response = take_exam(request, offering_id, quiz_id, allow_management=True)
-    if getattr(response, "status_code", 0) in {301, 302, 303, 307, 308}:
-        grade = Grade.objects.filter(user=request.user, quiz_id=quiz_id).values("total_grade", "submitted_at").first()
-        if grade is None:
-            return _error(request, "submission_failed", _("The quiz could not be submitted."), 400)
-        return json_api_response(request, {"status": "submitted", "grade": grade})
-    return _error(request, "submission_failed", _("The quiz could not be submitted."), 400)
+        normalized_answers[str(question_id)] = answer if isinstance(answer, str) else str(answer)
+
+    try:
+        grade = submit_answers(quiz.pk, request.user, normalized_answers)
+    except PermissionDenied:
+        return _error(request, "submission_closed", _("The quiz is closed or already submitted."), 400)
+    except ValidationError:
+        return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
+    return json_api_response(request, {
+        "status": "submitted",
+        "grade": {"total_grade": grade.total_grade, "submitted_at": grade.submitted_at},
+    })
 
 
 @require_mobile_session
@@ -864,44 +887,37 @@ def push_device_deactivate(request):
     return json_api_response(request, {"status": "deactivated", "updated": updated})
 
 
-def _media_link(request, offering_id, lesson_id, file_index):
-    lesson = _authorized_lesson(request.user, offering_id, lesson_id)
-    if lesson is None:
-        return None, None
-    try:
-        links = json.loads(lesson.links or "[]")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return lesson, None
-    if not isinstance(links, list):
-        return lesson, None
-    if file_index < 0 or file_index >= len(links) or not isinstance(links[file_index], dict):
-        return lesson, None
-    return lesson, links[file_index]
-
-
 @csrf_exempt
 @require_mobile_session
 @require_POST
 def media_session(request, offering_id, lesson_id, file_index):
-    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
-    if lesson is None:
-        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
-    if not link or link.get("file_type") not in {"video", "audio"} or not link.get("id"):
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("video", "audio"),
+        )
+    except MediaAccessError as exc:
+        if exc.code == "forbidden":
+            return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
+        if exc.code == "not_found":
+            return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
         return _error(request, "invalid_media", _("Invalid media file."), 400)
     payload = _json_body(request)
     if payload is None:
         return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
-    part_id = link.get("part_id", "")
     # Keep heartbeat sequences isolated per player/tab, including token refresh.
     session = create_viewing_session(
         request.user,
-        lesson,
-        part_id,
+        media.lesson,
+        media.part_id,
         mobile_session=request.mobile_session,
-        media_key=link.get("id", ""),
+        media_key=media.media_key,
     )
     progress_row = LectureProgress.objects.filter(
-        student=request.user, lesson=lesson, part_id=part_id
+        student=request.user, lesson=media.lesson, part_id=media.part_id
     ).values("percent", "last_position_seconds").first()
     progress_percent = int(progress_row["percent"] or 0) if progress_row else 0
     resume_seconds = int(progress_row["last_position_seconds"] or 0) if progress_row else 0
@@ -942,7 +958,7 @@ def media_manifest(request, offering_id, lesson_id, file_index):
         return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
     if timezone.now() >= session.expires_at:
         return _error(request, "viewing_session_expired", _("Viewing session expired."), 401)
-    if not _valid_session_token(
+    if not valid_session_token(
         token,
         session,
         audience="mobile",
@@ -951,26 +967,42 @@ def media_manifest(request, offering_id, lesson_id, file_index):
         return _error(request, "invalid_viewing_session", _("Invalid viewing session token."), 403)
     request.user = session.student
     request.media_audience = "mobile"
-    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
-    if lesson is None:
-        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
+    try:
+        media = resolve_media_link(
+            user=session.student,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("video", "audio"),
+        )
+    except MediaAccessError as exc:
+        if exc.code in {"forbidden", "not_found"}:
+            return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
+        return _error(request, "invalid_viewing_session", _("The viewing session is invalid."), 403)
     if (
-        not link
-        or link.get("file_type") not in {"video", "audio"}
-        or session.lesson_id != lesson.pk
-        or session.part_id != link.get("part_id", "")
+        session.lesson_id != media.lesson.pk
+        or session.part_id != media.part_id
+        or (session.media_key and session.media_key != media.media_key)
     ):
         return _error(request, "invalid_viewing_session", _("The viewing session is invalid."), 403)
     # The signed viewing session is the media credential. Native HLS requests
     # must not carry the mobile bearer token to the media host.
-    response = lesson_manifest(request, offering_id, lesson_id, file_index)
-    if response.status_code >= 400:
-        return _error(
-            request,
-            "media_unavailable" if response.status_code == 404 else "invalid_viewing_session",
-            _("The media is unavailable.") if response.status_code == 404 else _("The viewing session is invalid."),
-            response.status_code,
+    try:
+        playlist = build_manifest_playlist(
+            user=session.student,
+            media=media,
+            session=session,
+            audience="mobile",
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
         )
+    except MediaAccessError as exc:
+        if exc.code == "expired":
+            return _error(request, "viewing_session_expired", _("Viewing session expired."), 401)
+        if exc.code == "forbidden":
+            return _error(request, "invalid_viewing_session", _("The viewing session is invalid."), 403)
+        return _error(request, "media_unavailable", _("The media is unavailable."), 404)
+    response = HttpResponse(playlist, content_type="application/vnd.apple.mpegurl")
     response["Cache-Control"] = "private, no-store"
     return response
 
@@ -982,16 +1014,31 @@ def lesson_audio(request, offering_id, lesson_id):
         file_index = int(request.GET.get("file_index", "-1"))
     except (TypeError, ValueError):
         return _error(request, "invalid_media", _("Invalid media file."), 400)
-    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
-    if lesson is None:
-        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
-    if not link or link.get("file_type") != "audio":
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("audio",),
+        )
+    except MediaAccessError as exc:
+        if exc.code in {"forbidden", "not_found"}:
+            return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
         return _error(request, "invalid_media", _("Invalid audio file."), 400)
-    response = generate_audio_download(request, offering_id, lesson_id)
-    if response.status_code in {301, 302, 303, 307, 308}:
-        response["Cache-Control"] = "private, no-store"
-        return response
-    return _error(request, "audio_unavailable", _("Audio download is temporarily unavailable."), 503)
+    try:
+        download = resolve_audio_download(
+            media=media,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "unavailable":
+            return _error(request, "audio_unavailable", _("Audio download is temporarily unavailable."), 503)
+        return _error(request, "invalid_media", _("Invalid audio file."), 400)
+    response = HttpResponseRedirect(download.url)
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @require_mobile_session
@@ -1002,47 +1049,45 @@ def lesson_media_resource(request, offering_id, lesson_id, file_index):
     The returned URL is a temporary capability. The mobile client must keep it
     only in memory and must not forward its bearer token to the storage host.
     """
-    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
-    if lesson is None:
-        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
-    file_type = (link or {}).get("file_type") or (link or {}).get("type")
-    if not link or file_type != "audio" or not link.get("id"):
-        return _error(request, "invalid_media", _("Invalid media file."), 400)
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("audio",),
+        )
+    except MediaAccessError as exc:
+        if exc.code in {"forbidden", "not_found"}:
+            return _error(request, "forbidden", _localized(request, "You do not have access to this lesson."), 403)
+        return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
 
     blocked = enforce_download_purpose(request)
     if blocked is not None:
         return blocked
 
     try:
-        response = generate_audio_download(
-            request,
-            offering_id,
-            lesson_id,
+        download = resolve_audio_download(
+            media=media,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
             expires_in=MEDIA_RESOURCE_URL_TTL,
-            file_index=file_index,
         )
-        if response.status_code not in {301, 302, 303, 307, 308}:
-            return _error(
-                request,
-                "audio_unavailable",
-                _localized(request, "Audio download is temporarily unavailable."),
-                503,
-            )
-        url = response.headers.get("Location")
-        media_type = "audio/mpeg"
-    except PermissionDenied:
-        return _error(request, "forbidden", _localized(request, "You do not have access to this lesson."), 403)
-    except Http404:
-        return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return _error(request, "media_unavailable", _localized(request, "The media is unavailable."), 503)
-
-    if not isinstance(url, str) or not url.startswith("https://"):
+    except MediaAccessError as exc:
+        if exc.code == "invalid_media":
+            return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
+        return _error(
+            request,
+            "audio_unavailable",
+            _localized(request, "Audio download is temporarily unavailable."),
+            503,
+        )
+    if not isinstance(download.url, str) or not download.url.startswith("https://"):
         return _error(request, "media_unavailable", _localized(request, "The media is unavailable."), 503)
     result = json_api_response(request, {
-        "url": url,
+        "url": download.url,
         "expires_at": (timezone.now() + timedelta(seconds=MEDIA_RESOURCE_URL_TTL)).isoformat(),
-        "media_type": media_type,
+        "media_type": "audio/mpeg",
     })
     result["Cache-Control"] = "private, no-store"
     return result
@@ -1052,12 +1097,17 @@ def lesson_media_resource(request, offering_id, lesson_id, file_index):
 @require_http_methods(["GET"])
 def lesson_book_document(request, offering_id, lesson_id, file_index):
     """Range-stream one authorized PDF without exposing an object-store URL."""
-    lesson, link = _media_link(request, offering_id, lesson_id, file_index)
-    if lesson is None:
-        return _error(request, "forbidden", _("You do not have access to this lesson."), 403)
-    file_type = (link or {}).get("file_type") or (link or {}).get("type")
-    file_key = (link or {}).get("id")
-    if file_type != "book" or not isinstance(file_key, str) or not file_key:
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("book",),
+        )
+    except MediaAccessError as exc:
+        if exc.code in {"forbidden", "not_found"}:
+            return _error(request, "forbidden", _localized(request, "You do not have access to this lesson."), 403)
         return _error(request, "invalid_media", _localized(request, "Invalid media file."), 400)
 
     # The online reader sends no purpose, so reading keeps working while
@@ -1067,20 +1117,17 @@ def lesson_book_document(request, offering_id, lesson_id, file_index):
     if blocked is not None:
         return blocked
 
-    range_header = request.headers.get("Range", "").strip()
-    if range_header and (
-        not re.fullmatch(r"bytes=(?:\d+-\d*|-\d+)", range_header)
-    ):
-        return _error(request, "invalid_range", _localized(request, "Invalid media file."), 400)
-
     try:
-        params = {"Bucket": bucket_name, "Key": file_key}
-        if range_header:
-            params["Range"] = range_header
-        storage_response = CLOUD_CLIENT.get_object(**params)
-    except Exception as exc:
-        status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get("HTTPStatusCode")
-        if status == 416:
+        document = open_book_document(
+            media=media,
+            range_header=request.headers.get("Range", ""),
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "invalid_range":
+            return _error(request, "invalid_range", _localized(request, "Invalid media file."), 400)
+        if exc.code == "range_not_satisfiable":
             return HttpResponse(status=416)
         return _error(
             request,
@@ -1089,7 +1136,7 @@ def lesson_book_document(request, offering_id, lesson_id, file_index):
             503,
         )
 
-    body = storage_response["Body"]
+    body = document.body
 
     def stream_chunks():
         try:
@@ -1099,17 +1146,17 @@ def lesson_book_document(request, offering_id, lesson_id, file_index):
 
     response = StreamingHttpResponse(
         stream_chunks(),
-        status=206 if storage_response.get("ContentRange") else 200,
-        content_type="application/pdf",
+        status=document.status_code,
+        content_type=document.content_type,
     )
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
-    response["Accept-Ranges"] = "bytes"
+    response["Accept-Ranges"] = document.accept_ranges
     response["Content-Disposition"] = "inline"
-    if storage_response.get("ContentLength") is not None:
-        response["Content-Length"] = str(storage_response["ContentLength"])
-    if storage_response.get("ContentRange"):
-        response["Content-Range"] = storage_response["ContentRange"]
+    if document.content_length is not None:
+        response["Content-Length"] = str(document.content_length)
+    if document.content_range:
+        response["Content-Range"] = document.content_range
     return response
 
 
@@ -1131,21 +1178,31 @@ def _call_existing_progress(request, lesson_id=None, offering_id=None):
         offering_id is not None and session.lesson.course_offering_id != offering_id
     ):
         return _error(request, "forbidden", _("You do not have access to this viewing session."), 403)
-    if not _valid_session_token(
+    if not valid_session_token(
         viewing_token,
         session,
         audience="mobile",
         mobile_session_id=request.mobile_session.pk,
     ):
         return _error(request, "forbidden", _("You do not have access to this viewing session."), 403)
-    response = existing_progress_heartbeat(request, allow_management=True)
     try:
-        data = json.loads(response.content)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return _error(request, "progress_failed", _("Progress could not be saved."), response.status_code)
-    if response.status_code >= 400:
-        return _error(request, "progress_failed", _("Progress could not be saved."), response.status_code)
-    return json_api_response(request, data, response.status_code)
+        result = apply_progress_heartbeat(
+            user=request.user,
+            payload=payload,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+            allow_management=True,
+            session=session,
+        )
+    except ProgressHeartbeatError as exc:
+        status = {
+            "unauthenticated": 401,
+            "forbidden": 403,
+            "expired": 403,
+            "session_not_found": 404,
+        }.get(exc.code, 400)
+        return _error(request, "progress_failed", _("Progress could not be saved."), status)
+    return json_api_response(request, result.as_payload())
 
 
 @csrf_exempt

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -11,6 +12,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext as _
 
 from .models import (
+    AdminOperationJob,
     AcademicYear,
     AcademicYearLevel,
     AcademicPayment,
@@ -19,6 +21,7 @@ from .models import (
     EvaluationResult,
     PublicationStatus,
     Level,
+    PromotionFormula,
     PromotionHistory,
     Role,
     SignupSettings,
@@ -36,6 +39,100 @@ PROMOTABLE_HISTORICAL_OUTCOMES = frozenset({
     HistoricalAcademicSummary.Outcome.PARTIAL,
 })
 APPLICATION_STATUS_VALUES = frozenset(value for value, _label in User.APPLICATION_STATUSES)
+
+
+@dataclass(frozen=True)
+class PromotionFacts:
+    """Stable per-batch reads reused by each student's locked promotion."""
+
+    results: Mapping[int, EvaluationResult]
+    formulas: Mapping[int, PromotionFormula]
+    course_results: Mapping[tuple[int, int], list]
+    max_level_ordering: int
+    destination_scopes: Mapping[tuple[int, int], AcademicYearLevel]
+    offerings: Mapping[tuple[int, int], CourseOffering]
+    active_years: tuple[AcademicYear, ...]
+    incomplete_scopes: frozenset[int]
+    payments: frozenset[tuple[int, int]]
+    destination_enrollments: frozenset[tuple[int, int]]
+
+
+def load_promotion_facts(result_ids) -> PromotionFacts:
+    """Load the bounded, reusable facts for one promotion chunk."""
+
+    results = list(
+        EvaluationResult.objects.filter(pk__in=result_ids).select_related(
+            "formula__academic_year_level__academic_year",
+            "formula__academic_year_level__level",
+            "enrollment__student",
+            "enrollment__academic_year_level__academic_year",
+            "enrollment__academic_year_level__level",
+        )
+    )
+    result_map = {result.pk: result for result in results}
+    formula_ids = {result.formula_id for result in results}
+    formulas = {
+        formula.pk: formula
+        for formula in PromotionFormula.objects.filter(pk__in=formula_ids).select_related(
+            "academic_year_level__academic_year", "academic_year_level__level"
+        ).prefetch_related("rules")
+    }
+    course_results: dict[tuple[int, int], list] = defaultdict(list)
+    if result_map:
+        rows = EvaluationResult.objects.filter(
+            formula_id__in=formula_ids,
+            enrollment_id__in={result.enrollment_id for result in results},
+            course_offering__isnull=False,
+        ).select_related("course_offering__course")
+        for row in rows:
+            course_results[(row.formula_id, row.enrollment_id)].append(row)
+    max_level_ordering = (
+        Level.objects.aggregate(max_ordering=Max("ordering"))["max_ordering"] or 0
+    )
+    active_scopes = list(
+        AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("level")
+    )
+    destination_scopes = {
+        (scope.academic_year_id, scope.level.ordering): scope for scope in active_scopes
+    }
+    offerings = {
+        (offering.academic_year_level_id, offering.course_id): offering
+        for offering in CourseOffering.objects.filter(
+            academic_year_level__academic_year__is_active=True,
+            status=PublicationStatus.PUBLISHED,
+        ).select_related("course")
+    }
+    student_ids = {result.enrollment.student_id for result in results}
+    scope_ids = {result.formula.academic_year_level_id for result in results}
+    payments = frozenset(
+        AcademicPayment.objects.filter(
+            student_id__in=student_ids,
+            academic_year_level__academic_year__is_active=True,
+        ).values_list("student_id", "academic_year_level_id")
+    )
+    destination_enrollments = frozenset(
+        Enrollment.objects.filter(
+            student_id__in=student_ids,
+            course_offering__isnull=True,
+            academic_year_level__academic_year__is_active=True,
+        ).values_list("student_id", "academic_year_level_id")
+    )
+    active_years = tuple(
+        AcademicYear.objects.filter(is_active=True).order_by("ordering", "pk")
+    )
+    return PromotionFacts(
+        results=result_map,
+        formulas=formulas,
+        course_results=course_results,
+        max_level_ordering=max_level_ordering,
+        destination_scopes=destination_scopes,
+        offerings=offerings,
+        active_years=active_years,
+        incomplete_scopes=frozenset(_incomplete_formula_scope_ids(scope_ids)),
+        payments=payments,
+        destination_enrollments=destination_enrollments,
+    )
+
 
 
 def _validate_expected_application_status(current_status: str, expected_status: str) -> None:
@@ -83,8 +180,8 @@ def _resolve_intake_scope(active_year: AcademicYear) -> AcademicYearLevel | None
     )
 
 
-def _promotion_formula_snapshot(result: EvaluationResult, course_results=None) -> dict:
-    formula = result.formula
+def _promotion_formula_snapshot(result: EvaluationResult, course_results=None, formula=None) -> dict:
+    formula = formula or result.formula
     return {
         "formula_id": formula.pk,
         "course_offering_id": formula.course_offering_id,
@@ -100,7 +197,7 @@ def _promotion_formula_snapshot(result: EvaluationResult, course_results=None) -
                 "minimum_percent": str(rule.minimum_percent),
                 "ordering": rule.ordering,
             }
-            for rule in formula.rules.order_by("ordering")
+            for rule in formula.rules.all()
         ],
         "metric_snapshot": result.metric_snapshot,
         "course_results": [
@@ -150,14 +247,21 @@ def _destination_scope(source_scope, destination_year, level_ordering):
     ).first()
 
 
-def _failed_destination_offerings(source_scope, destination_scope, failed_results):
+def _failed_destination_offerings(source_scope, destination_scope, failed_results, preloaded=None):
     course_ids = [result.course_offering.course_id for result in failed_results]
-    offerings = list(CourseOffering.objects.select_for_update().select_related("course").filter(
-        academic_year_level=destination_scope,
-        course_id__in=course_ids,
-        status=PublicationStatus.PUBLISHED,
-    ))
-    by_course = {offering.course_id: offering for offering in offerings}
+    if preloaded is not None:
+        by_course = {
+            course_id: preloaded[(destination_scope.pk, course_id)]
+            for course_id in course_ids
+            if (destination_scope.pk, course_id) in preloaded
+        }
+    else:
+        offerings = list(CourseOffering.objects.select_for_update().select_related("course").filter(
+            academic_year_level=destination_scope,
+            course_id__in=course_ids,
+            status=PublicationStatus.PUBLISHED,
+        ))
+        by_course = {offering.course_id: offering for offering in offerings}
     missing = sorted(set(course_ids) - set(by_course))
     if missing:
         raise ValidationError(
@@ -428,7 +532,7 @@ def bulk_set_application_status(
                 results["changed_users"].append(user)
             user.application_status = status
             user.is_active = False
-            user.decided_by_id = actor if status == "declined" else None
+            user.decided_by_id = actor.pk if status == "declined" else None
             user.decided_at = decision_time if status == "declined" else None
 
     results["success"] = [user.pk for user in eligible]
@@ -531,46 +635,83 @@ def set_user_normal_enrollment_scope(
 
 
 @transaction.atomic
-def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistory:
+def promote_evaluation_result(
+    *,
+    result_id: int,
+    actor: User,
+    facts: PromotionFacts | None = None,
+) -> PromotionHistory:
     """Consume an aggregate result and apply course-aware promotion rules."""
     _require_admin(actor)
-    EvaluationResult.objects.select_for_update().get(pk=result_id)
-    result = EvaluationResult.objects.select_related(
+    result = EvaluationResult.objects.select_for_update().select_related(
         "formula__academic_year_level__academic_year",
         "formula__academic_year_level__level",
         "enrollment__student",
         "enrollment__academic_year_level__academic_year",
         "enrollment__academic_year_level__level",
     ).get(pk=result_id)
+    formula = (facts.formulas.get(result.formula_id) if facts is not None else None) or result.formula
     if result.course_offering_id:
         raise ValidationError(_("Only the aggregate evaluation result can be promoted."))
-    existing_history_id = PromotionHistory.objects.filter(evaluation_result_id=result_id).values_list("pk", flat=True).first()
+    if facts is not None:
+        if formula.academic_year_level_id in facts.incomplete_scopes:
+            raise ValidationError(
+                _("The formula calculation for this academic scope is incomplete. Finish it before promotion.")
+            )
+    else:
+        assert_formula_calculation_complete(formula.academic_year_level)
+    existing_history_id = PromotionHistory.objects.filter(
+        evaluation_result_id=result_id
+    ).values_list("pk", flat=True).first()
     if existing_history_id:
         raise ValidationError(_("This evaluation result has already been processed."))
 
     source = Enrollment.objects.select_related(
         "student", "academic_year_level__academic_year", "academic_year_level__level"
     ).select_for_update().get(pk=result.enrollment_id)
-    if result.formula.academic_year_level_id != source.academic_year_level_id:
+    if formula.academic_year_level_id != source.academic_year_level_id:
         raise ValidationError(_("The evaluation formula and enrollment scopes do not match."))
-    if result.formula.course_offering_id:
+    if formula.course_offering_id:
         raise ValidationError(_("An offering-specific formula cannot make an aggregate promotion decision."))
     if source.enrollment_type != Enrollment.Type.NORMAL or source.course_offering_id:
         raise ValidationError(_("Only a normal enrollment can be promoted."))
     if source.status not in (Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED):
         raise ValidationError(_("Only active or completed enrollments can be promoted."))
 
-    course_results = _course_results_for(result, lock=True)
+    if facts is not None:
+        course_results = list(
+            facts.course_results.get((result.formula_id, result.enrollment_id), [])
+        )
+    else:
+        course_results = _course_results_for(result, lock=True)
     failed_results = _promotion_failure_state(result, course_results)
     source_scope = source.academic_year_level
     source_year = source_scope.academic_year
-    active_years = list(AcademicYear.objects.select_for_update().filter(is_active=True).order_by("ordering", "pk"))
+    if facts is not None and facts.active_years:
+        active_years = list(
+            AcademicYear.objects.select_for_update()
+            .filter(pk__in=[year.pk for year in facts.active_years])
+            .order_by("ordering", "pk")
+        )
+    else:
+        active_years = list(AcademicYear.objects.select_for_update().filter(is_active=True).order_by("ordering", "pk"))
     if len(active_years) != 1 or active_years[0].ordering <= source_year.ordering:
         raise ValidationError(_("Activate a higher academic year before promotion."))
     destination_year = active_years[0]
-    is_last_level = not Level.objects.filter(ordering__gt=source_scope.level.ordering).exists()
+    if facts is not None:
+        is_last_level = source_scope.level.ordering >= facts.max_level_ordering
+    else:
+        is_last_level = not Level.objects.filter(ordering__gt=source_scope.level.ordering).exists()
+
+    def destination_scope_for(ordering):
+        if facts is not None:
+            scope = facts.destination_scopes.get((destination_year.pk, ordering))
+            if scope is not None:
+                return scope
+        return _destination_scope(source_scope, destination_year, ordering)
+
     passed = not failed_results
-    threshold = result.formula.failed_courses_repeat_threshold
+    threshold = formula.failed_courses_repeat_threshold
     partial_failure = bool(failed_results) and len(failed_results) < threshold
 
     destination_scope = None
@@ -579,42 +720,54 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
         if is_last_level:
             outcome = "graduated"
         else:
-            destination_scope = _destination_scope(source_scope, destination_year, source_scope.level.ordering + 1)
+            destination_scope = destination_scope_for(source_scope.level.ordering + 1)
             create_normal_destination = True
             outcome = "passed"
     elif is_last_level and partial_failure:
-        destination_scope = _destination_scope(source_scope, destination_year, source_scope.level.ordering)
+        destination_scope = destination_scope_for(source_scope.level.ordering)
         outcome = "last_level_exceptional"
     else:
-        destination_scope = _destination_scope(
-            source_scope,
-            destination_year,
-            source_scope.level.ordering if not partial_failure else source_scope.level.ordering + 1,
+        destination_scope = destination_scope_for(
+            source_scope.level.ordering if not partial_failure else source_scope.level.ordering + 1
         )
         create_normal_destination = True
         outcome = "repeated" if not partial_failure else "passed_with_exceptions"
 
     if destination_scope is None and outcome != "graduated":
         raise ValidationError(_("The destination academic level is not open in the active year."))
-    if destination_scope is not None and not AcademicPayment.objects.filter(
-        student=source.student,
-        academic_year_level=destination_scope,
-    ).exists():
-        raise ValidationError(
-            _("Upload the payment receipt for the destination academic year before promotion.")
-        )
+    if destination_scope is not None:
+        if facts is not None:
+            paid = (source.student_id, destination_scope.pk) in facts.payments
+        else:
+            paid = AcademicPayment.objects.filter(
+                student=source.student,
+                academic_year_level=destination_scope,
+            ).exists()
+        if not paid:
+            raise ValidationError(
+                _("Upload the payment receipt for the destination academic year before promotion.")
+            )
 
     exceptional_offerings = []
     if failed_results and partial_failure:
-        exceptional_offerings = _failed_destination_offerings(source_scope, destination_scope, failed_results)
+        exceptional_offerings = _failed_destination_offerings(
+            source_scope,
+            destination_scope,
+            failed_results,
+            preloaded=facts.offerings if facts is not None else None,
+        )
 
     destination = None
     if create_normal_destination:
-        if Enrollment.objects.filter(
-            student=source.student,
-            academic_year_level=destination_scope,
-            course_offering__isnull=True,
-        ).exists():
+        if facts is not None:
+            destination_exists = (source.student_id, destination_scope.pk) in facts.destination_enrollments
+        else:
+            destination_exists = Enrollment.objects.filter(
+                student=source.student,
+                academic_year_level=destination_scope,
+                course_offering__isnull=True,
+            ).exists()
+        if destination_exists:
             raise ValidationError(_("A destination normal enrollment already exists for this student."))
         destination = Enrollment.objects.create(
             student=source.student,
@@ -660,7 +813,7 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
         override_note=result.override_note,
         override_actor_id=result.overridden_by_id,
         exceptional_offering_ids=[enrollment.course_offering_id for enrollment in created_exceptional],
-        formula_snapshot=_promotion_formula_snapshot(result, course_results),
+        formula_snapshot=_promotion_formula_snapshot(result, course_results, formula=formula),
         promotion_method=PromotionHistory.Method.SYSTEM,
         reason="",
         actor=actor,
@@ -680,36 +833,137 @@ def promote_evaluation_result(*, result_id: int, actor: User) -> PromotionHistor
     return history
 
 
-def promote_evaluation_results(*, result_ids: list[int], actor: User) -> tuple[list[PromotionHistory], list[dict]]:
-    """Process at most 1,000 aggregate results with isolated transactions."""
-    _require_admin(actor)
-    requested_ids = list(dict.fromkeys(result_ids))
-    if len(requested_ids) > 1000:
-        raise ValidationError(_("Select no more than 1,000 students at a time."))
-    histories, errors = [], []
-    for result_id in requested_ids:
-        try:
-            histories.append(promote_evaluation_result(result_id=result_id, actor=actor))
-        except (EvaluationResult.DoesNotExist, ValidationError, PermissionDenied) as exc:
-            errors.append({"result_id": result_id, "message": str(exc)})
-            logger.warning(
-                "promotion rejected",
-                extra={
-                    "event": "promotion_rejected",
-                    "result_id": result_id,
-                    "reason": str(exc)[:200],
-                },
-            )
-    logger.info(
-        "promotion batch completed",
-        extra={
-            "event": "promotion_bulk_completed",
-            "requested": len(requested_ids),
-            "succeeded": len(histories),
-            "failed": len(errors),
+def execute_bulk_promotion(job, token) -> dict:
+    """J01 executor: promote the frozen selected results with a committed cursor.
+
+    Each student still uses the canonical atomic `promote_evaluation_result`;
+    already-promoted rows are skipped idempotently, and row failures are
+    bounded and reported without stopping the remaining selection.
+    """
+
+    from .admin_operations import AdminOperationError, assert_admin_operation_progress, require_admin_operation_actor
+
+    require_admin_operation_actor(job)
+    _require_admin(job.actor)
+    raw_ids = (job.input or {}).get("result_ids") or []
+    if not isinstance(raw_ids, list) or not raw_ids or len(raw_ids) > 1000:
+        raise AdminOperationError("invalid_selection", _("Select between one and 1,000 students."))
+    try:
+        result_ids = sorted({int(value) for value in raw_ids})
+    except (TypeError, ValueError):
+        raise AdminOperationError("invalid_selection", _("Select between one and 1,000 students."))
+
+    cursor_index = max(0, int((job.cursor or {}).get("index", 0) or 0))
+    succeeded = int(job.succeeded or 0)
+    failed = int(job.failed or 0)
+    skipped = int(job.skipped or 0)
+    errors = list((job.result or {}).get("row_errors") or [])[:100]
+    total = len(result_ids)
+
+    chunk_size = 100
+    for chunk_start in range(cursor_index, total, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, total)
+        chunk_ids = result_ids[chunk_start:chunk_end]
+        # One bounded set of stable fact reads supplies the whole chunk.
+        chunk_facts = load_promotion_facts(chunk_ids)
+        # One bounded read supplies the idempotency check for the whole chunk.
+        already_promoted = set(
+            PromotionHistory.objects.filter(evaluation_result_id__in=chunk_ids)
+            .values_list("evaluation_result_id", flat=True)
+        )
+        # Preload the incomplete-calculation guard for the chunk so a stopped
+        # formula generation rejects every affected student up front.
+        chunk_scopes = {
+            result_id: result.formula.academic_year_level_id
+            for result_id, result in chunk_facts.results.items()
+        }
+        incomplete_scopes = _incomplete_formula_scope_ids(set(chunk_scopes.values()))
+        for index in range(chunk_start, chunk_end):
+            with transaction.atomic():
+                result_id = result_ids[index]
+                if result_id in already_promoted:
+                    skipped += 1
+                elif chunk_scopes.get(result_id) in incomplete_scopes:
+                    failed += 1
+                    if len(errors) < 100:
+                        errors.append({
+                            "result_id": result_id,
+                            "message": str(_("The formula calculation for this academic scope is incomplete. Finish it before promotion.")),
+                        })
+                else:
+                    try:
+                        promote_evaluation_result(
+                            result_id=result_id,
+                            actor=job.actor,
+                            facts=chunk_facts,
+                        )
+                        succeeded += 1
+                    except (EvaluationResult.DoesNotExist, ValidationError, PermissionDenied) as exc:
+                        failed += 1
+                        if len(errors) < 100:
+                            errors.append({"result_id": result_id, "message": str(exc)[:300]})
+                assert_admin_operation_progress(
+                    job.pk,
+                    token,
+                    processed=index + 1,
+                    succeeded=succeeded,
+                    failed=failed,
+                    skipped=skipped,
+                    total=total,
+                    cursor={"index": index + 1},
+                    result={"row_errors": errors} if errors else None,
+                )
+
+    status = AdminOperationJob.Status.PARTIAL if failed else AdminOperationJob.Status.COMPLETED
+    return {
+        "status": status,
+        "result": {
+            "promoted": succeeded,
+            "skipped": skipped,
+            "failed": failed,
+            "row_errors": errors,
         },
+    }
+
+
+def is_last_academic_level(level: Level) -> bool:
+    """Return whether no configured level has a higher canonical ordering.
+
+    A configured level counts even when no academic year has opened it, so
+    preview and apply agree on whether a destination is required.
+    """
+
+    return not Level.objects.filter(ordering__gt=level.ordering).exists()
+
+
+def _incomplete_formula_scope_ids(scope_ids) -> set[int]:
+    """Return scopes whose latest formula calculation has not completed."""
+
+    latest_status: dict[int, str] = {}
+    rows = (
+        AdminOperationJob.objects.filter(
+            kind=AdminOperationJob.Kind.FORMULA_RECALCULATION,
+            academic_year_level_id__in=list(scope_ids),
+        )
+        .order_by("academic_year_level_id", "-created_at", "-updated_at")
+        .values_list("academic_year_level_id", "status")
     )
-    return histories, errors
+    for scope_id, status in rows:
+        latest_status.setdefault(scope_id, status)
+    return {
+        scope_id
+        for scope_id, status in latest_status.items()
+        if status != AdminOperationJob.Status.COMPLETED
+    }
+
+
+def assert_formula_calculation_complete(scope) -> None:
+    """Block promotion while the scope's calculation is incomplete or stale."""
+
+    if scope.pk in _incomplete_formula_scope_ids({scope.pk}):
+        raise ValidationError(
+            _("The formula calculation for this academic scope is incomplete. Finish it before promotion.")
+        )
 
 
 @transaction.atomic
@@ -735,7 +989,7 @@ def promote_historical_summary(
         raise ValidationError(_("Review the historical outcome before promotion."))
     if not summary.reviewed_by_id or not summary.reviewed_at:
         raise ValidationError(_("A reviewed historical outcome is required before promotion."))
-    is_last_level = not Level.objects.filter(ordering__gt=summary.academic_year_level.level.ordering).exists()
+    is_last_level = is_last_academic_level(summary.academic_year_level.level)
     destination = None
     if destination_scope_id:
         destination = AcademicYearLevel.objects.select_for_update().select_related(

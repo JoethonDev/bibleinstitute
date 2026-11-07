@@ -7,8 +7,8 @@ import random
 from datetime import date, datetime
 
 from django.core.paginator import Page, Paginator
-from django.db.models import Count, F, Prefetch, Q, QuerySet, Window
-from django.db.models.functions import RowNumber
+from django.db.models import Count, DateTimeField, Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Window
+from django.db.models.functions import Coalesce, RowNumber
 from django.utils.timezone import localdate, now
 
 from ..academic_access import (
@@ -37,7 +37,6 @@ from ..models import (
 from .attendance import DAY_GRADE_NONE, grade_attendance_day, pair_attendance_records
 from .progress_merge import unique_seconds
 from .quiz_access import QUIZ_SUBMISSION_GRACE, answers_releasable, quiz_status_from
-from .timezones import ensure_aware
 
 
 PAGE_SIZE = 20
@@ -844,6 +843,7 @@ def student_notifications_queryset(user: User) -> QuerySet:
     """
     return StudentNotification.objects.filter(
         student=user,
+        inbox_visible=True,
         cancelled_at__isnull=True,
         scheduled_for__lte=now(),
     )
@@ -920,8 +920,13 @@ def student_next_actions(user: User) -> dict:
     Bounded (1 resume row, <=5 quizzes); reuses authorized offerings and the
     existing profile-gap signals. No per-row queries beyond the bounded sets.
     """
+    readable_offerings = student_offerings_queryset(user).values("pk").order_by()
     resume = (
-        LectureProgress.objects.filter(student=user, last_position_seconds__gt=0)
+        LectureProgress.objects.filter(
+            student=user,
+            last_position_seconds__gt=0,
+            lesson__course_offering__in=readable_offerings,
+        )
         .select_related("lesson", "lesson__course_offering__course")
         .order_by("-id")
         .first()
@@ -938,47 +943,39 @@ def student_next_actions(user: User) -> dict:
             "position": resume.last_position_seconds,
             "percent": resume.percent,
         }
-    offerings = list(student_offerings_queryset(user)[:PAGE_SIZE])
-    offering_ids = [o.pk for o in offerings]
     next_quizzes: list[dict] = []
-    if offering_ids:
-        current = now()
-        quizzes = list(
-            Quiz.objects.filter(
-                course_offering_id__in=offering_ids,
-                status=PublicationStatus.PUBLISHED,
-            )
-            .select_related("course_offering__course")
-            .order_by("closing_date", "pk")[:50]
+    current = now()
+    effective_closing = Coalesce(
+        Subquery(
+            QuizStudentOpening.objects.filter(
+                quiz=OuterRef("pk"), student=user
+            ).values("closing_date")[:1],
+            output_field=DateTimeField(),
+        ),
+        F("closing_date"),
+    )
+    candidates = (
+        Quiz.objects.filter(
+            course_offering__in=readable_offerings,
+            status=PublicationStatus.PUBLISHED,
         )
-        quiz_ids = [quiz.pk for quiz in quizzes]
-        graded_ids = set(
-            Grade.objects.filter(user=user, quiz_id__in=quiz_ids).values_list("quiz_id", flat=True)
+        .annotate(effective_closing=effective_closing)
+        .filter(
+            Q(effective_closing__isnull=True)
+            | Q(effective_closing__gte=current - QUIZ_SUBMISSION_GRACE)
         )
-        # One query for every per-student opening instead of one per quiz.
-        openings = {
-            row.quiz_id: row
-            for row in QuizStudentOpening.objects.filter(student=user, quiz_id__in=quiz_ids)
-        }
-        for quiz in quizzes:
-            if quiz.pk in graded_ids:
-                continue
-            opening = openings.get(quiz.pk) or quiz
-            try:
-                closing = ensure_aware(opening.closing_date) if opening.closing_date else None
-            except Exception:
-                closing = None
-            if closing is not None and closing + QUIZ_SUBMISSION_GRACE < current:
-                continue
-            next_quizzes.append({
-                "id": quiz.pk,
-                "name": quiz.name,
-                "offering_id": quiz.course_offering_id,
-                "course_name": quiz.course_offering.course.name if quiz.course_offering_id else "",
-                "closing_at": opening.closing_date.isoformat() if opening.closing_date else None,
-            })
-            if len(next_quizzes) >= 5:
-                break
+        .exclude(Exists(Grade.objects.filter(quiz_id=OuterRef("pk"), user=user)))
+        .select_related("course_offering__course")
+        .order_by(F("effective_closing").asc(nulls_last=True), "pk")[:5]
+    )
+    for quiz in candidates:
+        next_quizzes.append({
+            "id": quiz.pk,
+            "name": quiz.name,
+            "offering_id": quiz.course_offering_id,
+            "course_name": quiz.course_offering.course.name if quiz.course_offering_id else "",
+            "closing_at": quiz.effective_closing.isoformat() if quiz.effective_closing else None,
+        })
     gaps: list[str] = []
     for field in ("phone", "city", "education_or_job"):
         if not getattr(user, field, None):

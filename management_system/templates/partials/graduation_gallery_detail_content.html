@@ -2,7 +2,7 @@
 <div class="sd-page sd-graduates-page" id="content">
 <div class="container py-4">
   <nav aria-label="{% translate 'Breadcrumb' %}"><a class="gg-back" href="{% url 'graduates' %}"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></i> {% translate "Graduates" %}</a></nav>
-  <h1 class="sd-calendar-title mt-2">{{ scope.academic_year.name }} — {{ scope.level.display_name }}</h1>
+  <h1 class="sd-calendar-title mt-2">{{ scope.academic_year.name }} - {{ scope.level.display_name }}</h1>
   {% if page_obj and page_obj.object_list %}
   <div class="gg-grid" id="gallery-grid" role="list">
     {% for item in page_obj.object_list %}

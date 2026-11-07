@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -7,21 +9,28 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, F, IntegerField, OuterRef, Q, Subquery, Sum, Value
+from django.db.models import Count, Exists, F, IntegerField, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from .academic_formula import save_promotion_formula
+from .admin_operations import (
+    AdminOperationError,
+    create_admin_operation,
+    assert_admin_operation_progress,
+    require_admin_operation_actor,
+)
 from .models import (
+    AdminOperationJob,
     AcademicYearLevel,
     AttendancePolicy,
-    AttendanceRecord,
     CourseOffering,
     Enrollment,
     EvaluationResult,
     Lesson,
     PromotionFormula,
+    PromotionHistory,
     PromotionRule,
     PublicationStatus,
     Question,
@@ -43,34 +52,6 @@ class EvaluationPlan:
     quiz_possible_points: dict[int, int]
     grading_errors: tuple[str, ...]
     attendance_policy: AttendancePolicy | None = None
-
-
-def applicable_formula(scope: AcademicYearLevel, offering: CourseOffering) -> PromotionFormula | None:
-    """Return the specific offering formula, falling back to all courses."""
-    specific = PromotionFormula.objects.filter(
-        academic_year_level=scope,
-        course_offering=offering,
-    ).prefetch_related("rules").first()
-    if specific:
-        return specific
-    return PromotionFormula.objects.filter(
-        academic_year_level=scope,
-        course_offering__isnull=True,
-    ).prefetch_related("rules").first()
-
-
-def evaluation_offerings(formula: PromotionFormula):
-    """Return the published offerings evaluated by a formula."""
-    if formula.course_offering_id:
-        return CourseOffering.objects.filter(
-            pk=formula.course_offering_id,
-            academic_year_level=formula.academic_year_level,
-            status=PublicationStatus.PUBLISHED,
-        ).select_related("course", "academic_year_level__academic_year", "academic_year_level__level")
-    return CourseOffering.objects.filter(
-        academic_year_level=formula.academic_year_level,
-        status=PublicationStatus.PUBLISHED,
-    ).select_related("course", "academic_year_level__academic_year", "academic_year_level__level").order_by("course__name", "pk")
 
 
 def _quiz_scope(rule: PromotionRule, offering: CourseOffering, starts_on: date, ends_on: date) -> Q:
@@ -286,10 +267,17 @@ def evaluate_enrollment(enrollment, plan: EvaluationPlan, attendance_score: Deci
         errors.append(_("This course has no published lectures."))
 
     applicable = [metric for metric in metrics if metric["metric"] != PromotionRule.Metric.ATTENDANCE or not online]
+    applicable_rule_ids = {metric["rule_id"] for metric in applicable}
+    total_weight = sum(
+        (rule.weight_percent for rule in plan.rules if rule.pk in applicable_rule_ids),
+        Decimal("0"),
+    )
     weighted_score = Decimal("0")
-    if applicable:
-        applicable_rule_ids = {metric["rule_id"] for metric in applicable}
-        total_weight = sum(rule.weight_percent for rule in plan.rules if rule.pk in applicable_rule_ids)
+    if not applicable or total_weight <= Decimal("0"):
+        # Never invent a zero/fail score: the configuration does not apply to
+        # this student mode, so the result is explicitly unevaluable.
+        errors.append(_("No applicable promotion rules for this student's study mode."))
+    else:
         for metric in applicable:
             rule = next(rule for rule in plan.rules if rule.pk == metric["rule_id"])
             weighted_score += metric["percent"] * rule.weight_percent / total_weight
@@ -297,7 +285,7 @@ def evaluate_enrollment(enrollment, plan: EvaluationPlan, attendance_score: Deci
     if errors:
         status = EvaluationResult.Status.UNEVALUABLE
     else:
-        passed = bool(applicable) and all(metric["passed"] for metric in applicable) and weighted_score >= plan.formula.overall_pass_percent
+        passed = all(metric["passed"] for metric in applicable) and weighted_score >= plan.formula.overall_pass_percent
         status = EvaluationResult.Status.PASS if passed else EvaluationResult.Status.FAIL
     return {
         "enrollment": enrollment,
@@ -341,7 +329,7 @@ def _normal_enrollment_ids(scope):
     ).values("pk")
 
 
-def _persist_course_result_batch(formula, plan, enrollments) -> tuple[int, int]:
+def _persist_course_result_batch(formula, plan, enrollments, *, preserve_overrides=False) -> tuple[int, int]:
     enrollment_ids = [enrollment.pk for enrollment in enrollments]
     consumed_enrollment_ids = set(EvaluationResult.objects.filter(
         formula=formula,
@@ -368,11 +356,12 @@ def _persist_course_result_batch(formula, plan, enrollments) -> tuple[int, int]:
         if result:
             result.computed_score = row["computed_score"]
             result.computed_status = row["computed_status"]
-            result.final_status = row["computed_status"]
             result.metric_snapshot = _metric_snapshot(row)
-            result.override_note = ""
-            result.overridden_by = None
-            result.overridden_at = None
+            if not (preserve_overrides and result.overridden_at is not None):
+                result.final_status = row["computed_status"]
+                result.override_note = ""
+                result.overridden_by = None
+                result.overridden_at = None
             changed_results.append(result)
         else:
             new_results.append(EvaluationResult(
@@ -398,13 +387,19 @@ def _persist_course_result_batch(formula, plan, enrollments) -> tuple[int, int]:
     return len(new_results), len(changed_results)
 
 
-def _persist_aggregate_batch(formula, results_by_enrollment):
+def _persist_aggregate_batch(formula, results_by_enrollment, *, preserve_overrides=False):
+    # Annotate the consumed flag in the same query so promotion-history
+    # immutability does not trigger one reverse lookup per student.
     existing = {
         result.enrollment_id: result
         for result in EvaluationResult.objects.filter(
             formula=formula,
             course_offering__isnull=True,
             enrollment_id__in=list(results_by_enrollment),
+        ).annotate(
+            consumed_by_promotion=Exists(
+                PromotionHistory.objects.filter(evaluation_result=OuterRef("pk"))
+            )
         )
     }
     new_results = []
@@ -435,15 +430,16 @@ def _persist_aggregate_batch(formula, results_by_enrollment):
         }
         result = existing.get(enrollment_id)
         if result:
-            if hasattr(result, "promotion_history"):
+            if result.consumed_by_promotion:
                 continue
             result.computed_score = score.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             result.computed_status = status
-            result.final_status = status
             result.metric_snapshot = snapshot
-            result.override_note = ""
-            result.overridden_by = None
-            result.overridden_at = None
+            if not (preserve_overrides and result.overridden_at is not None):
+                result.final_status = status
+                result.override_note = ""
+                result.overridden_by = None
+                result.overridden_at = None
             changed_results.append(result)
         else:
             new_results.append(EvaluationResult(
@@ -467,41 +463,89 @@ def _persist_aggregate_batch(formula, results_by_enrollment):
         )
 
 
-def _recalculate_scope_results(scope) -> tuple[int, int]:
-    """Recalculate effective course formulas and the all-course aggregate in batches."""
-    formulas = list(PromotionFormula.objects.select_for_update().filter(
-        academic_year_level=scope,
-    ).prefetch_related("rules", "course_offering"))
+def _scope_batch_total(scope, offerings, global_formula, specific_formulas) -> int:
+    """Bounded progress total: normal enrollments x offerings that will run."""
+
+    enrollment_total = _normal_enrollment_ids(scope).count()
+    offering_total = sum(
+        1 for offering in offerings
+        if specific_formulas.get(offering.pk) or global_formula is not None
+    )
+    total = enrollment_total * offering_total
+    if global_formula is not None:
+        total += enrollment_total
+    return total
+
+
+def _recalculate_scope_batches(scope, *, progress=None, preserve_overrides=False, guard=None) -> tuple[int, int]:
+    """Recalculate course and aggregate results, committing one student batch at a time.
+
+    Each batch mutation and the caller's progress update share one transaction,
+    so a killed worker never advances progress past committed results. Failed
+    runs keep earlier committed batches; a retry recalculates the whole scope.
+    """
+
+    formulas = list(
+        PromotionFormula.objects.filter(academic_year_level=scope).prefetch_related(
+            "rules", "course_offering"
+        )
+    )
     global_formula = next((formula for formula in formulas if formula.course_offering_id is None), None)
     specific_formulas = {
         formula.course_offering_id: formula
         for formula in formulas
         if formula.course_offering_id is not None
     }
-    offerings = list(CourseOffering.objects.filter(
-        academic_year_level=scope,
-        status=PublicationStatus.PUBLISHED,
-    ).select_related("course", "academic_year_level__academic_year", "academic_year_level__level").order_by("course__name", "pk"))
+    offerings = list(
+        CourseOffering.objects.filter(
+            academic_year_level=scope,
+            status=PublicationStatus.PUBLISHED,
+        )
+        .select_related("course", "academic_year_level__academic_year", "academic_year_level__level")
+        .order_by("course__name", "pk")
+    )
     if not offerings:
         raise ValidationError(_("No published course offerings are available for this formula."))
     if global_formula is None and not specific_formulas:
         return 0, 0
 
     active_formula_ids = [formula.pk for formula in formulas]
-    current_enrollments = _normal_enrollment_ids(scope)
-    EvaluationResult.objects.filter(
-        formula_id__in=active_formula_ids,
-        course_offering__isnull=False,
-        promotion_history__isnull=True,
-    ).exclude(enrollment_id__in=current_enrollments).delete()
-    if global_formula is not None and specific_formulas:
+    with transaction.atomic():
+        if guard:
+            guard()
+        current_enrollments = _normal_enrollment_ids(scope)
         EvaluationResult.objects.filter(
-            formula=global_formula,
-            course_offering_id__in=list(specific_formulas),
+            formula_id__in=active_formula_ids,
+            course_offering__isnull=False,
             promotion_history__isnull=True,
-        ).delete()
+        ).exclude(enrollment_id__in=current_enrollments).delete()
+        if global_formula is not None and specific_formulas:
+            EvaluationResult.objects.filter(
+                formula=global_formula,
+                course_offering_id__in=list(specific_formulas),
+                promotion_history__isnull=True,
+            ).delete()
 
+    total_units = _scope_batch_total(scope, offerings, global_formula, specific_formulas)
+    processed = 0
     total_created = total_updated = 0
+
+    def commit_course_batch(formula, plan, batch):
+        nonlocal processed, total_created, total_updated
+        with transaction.atomic():
+            created, updated = _persist_course_result_batch(
+                formula, plan, batch, preserve_overrides=preserve_overrides
+            )
+            processed += len(batch)
+            total_created += created
+            total_updated += updated
+            if progress:
+                progress(
+                    processed=processed,
+                    total=total_units,
+                    succeeded=total_created + total_updated,
+                )
+
     for offering in offerings:
         effective_formula = specific_formulas.get(offering.pk) or global_formula
         if effective_formula is None:
@@ -511,82 +555,179 @@ def _recalculate_scope_results(scope) -> tuple[int, int]:
         for enrollment in evaluation_enrollments(plan).order_by("pk").iterator(chunk_size=500):
             batch.append(enrollment)
             if len(batch) >= 500:
-                created, updated = _persist_course_result_batch(effective_formula, plan, batch)
-                total_created += created
-                total_updated += updated
-                batch.clear()
+                commit_course_batch(effective_formula, plan, batch)
+                batch = []
         if batch:
-            created, updated = _persist_course_result_batch(effective_formula, plan, batch)
-            total_created += created
-            total_updated += updated
+            commit_course_batch(effective_formula, plan, batch)
 
     if global_formula is not None:
+        def commit_aggregate_batch(batch_enrollment_ids):
+            nonlocal processed
+            with transaction.atomic():
+                course_results = EvaluationResult.objects.filter(
+                    formula_id__in=active_formula_ids,
+                    enrollment_id__in=batch_enrollment_ids,
+                    course_offering__isnull=False,
+                ).select_related("course_offering__course")
+                grouped = {enrollment_id: [] for enrollment_id in batch_enrollment_ids}
+                for course_result in course_results:
+                    grouped[course_result.enrollment_id].append(course_result)
+                _persist_aggregate_batch(
+                    global_formula, grouped, preserve_overrides=preserve_overrides
+                )
+                processed += len(batch_enrollment_ids)
+                if progress:
+                    progress(
+                        processed=processed,
+                        total=total_units,
+                        succeeded=total_created + total_updated,
+                    )
+
         enrollment_ids = []
         for enrollment_row in _normal_enrollment_ids(scope).order_by("pk").iterator(chunk_size=500):
             enrollment_ids.append(enrollment_row["pk"])
             if len(enrollment_ids) >= 500:
-                course_results = EvaluationResult.objects.filter(
-                    formula_id__in=active_formula_ids,
-                    enrollment_id__in=enrollment_ids,
-                    course_offering__isnull=False,
-                ).select_related("course_offering__course")
-                grouped = {enrollment_id: [] for enrollment_id in enrollment_ids}
-                for course_result in course_results:
-                    grouped[course_result.enrollment_id].append(course_result)
-                _persist_aggregate_batch(global_formula, grouped)
-                enrollment_ids.clear()
+                commit_aggregate_batch(enrollment_ids)
+                enrollment_ids = []
         if enrollment_ids:
-            course_results = EvaluationResult.objects.filter(
-                formula_id__in=active_formula_ids,
-                enrollment_id__in=enrollment_ids,
-                course_offering__isnull=False,
-            ).select_related("course_offering__course")
-            grouped = {enrollment_id: [] for enrollment_id in enrollment_ids}
-            for course_result in course_results:
-                grouped[course_result.enrollment_id].append(course_result)
-            _persist_aggregate_batch(global_formula, grouped)
+            commit_aggregate_batch(enrollment_ids)
     else:
-        EvaluationResult.objects.filter(
-            formula_id__in=active_formula_ids,
-            course_offering__isnull=True,
-            promotion_history__isnull=True,
-        ).delete()
+        with transaction.atomic():
+            if guard:
+                guard()
+            EvaluationResult.objects.filter(
+                formula_id__in=active_formula_ids,
+                course_offering__isnull=True,
+                promotion_history__isnull=True,
+            ).delete()
     return total_created, total_updated
 
 
-@transaction.atomic
-def save_formula_and_results(
-    *, scope, course_offering, overall_pass_percent, evaluation_starts_on,
-    evaluation_ends_on, failed_courses_repeat_threshold, rules, actor,
+def formula_rules_hash(formula) -> str:
+    """Stable fingerprint of the immutable rule set for one calculation run."""
+
+    payload = [
+        {
+            "metric": rule.metric,
+            "quiz_type_id": rule.quiz_type_id,
+            "weight": str(rule.weight_percent),
+            "minimum": str(rule.minimum_percent),
+            "ordering": rule.ordering,
+        }
+        for rule in formula.rules.order_by("ordering")
+    ]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def formula_calculation_active(scope) -> bool:
+    return AdminOperationJob.objects.filter(
+        kind=AdminOperationJob.Kind.FORMULA_RECALCULATION,
+        academic_year_level=scope,
+        status__in=[AdminOperationJob.Status.QUEUED, AdminOperationJob.Status.RUNNING],
+    ).exists()
+
+
+def save_formula_and_enqueue(
+    *,
+    scope,
+    course_offering,
+    overall_pass_percent,
+    evaluation_starts_on,
+    evaluation_ends_on,
+    failed_courses_repeat_threshold,
+    rules,
+    actor,
+    language: str = "ar",
 ):
-    """Replace one formula and recalculate effective course/aggregate results."""
-    formula = save_promotion_formula(
-        scope=scope,
-        course_offering=course_offering,
-        overall_pass_percent=overall_pass_percent,
-        evaluation_starts_on=evaluation_starts_on,
-        evaluation_ends_on=evaluation_ends_on,
-        failed_courses_repeat_threshold=failed_courses_repeat_threshold,
-        rules=rules,
-        actor=actor,
-    )
-    PromotionFormula.objects.select_for_update().get(pk=formula.pk)
-    locked_formula = PromotionFormula.objects.select_related(
-        "academic_year_level", "course_offering"
-    ).get(pk=formula.pk)
-    counts = _recalculate_scope_results(scope)
+    """Save the validated formula and queue one scope-wide recalculation job."""
+
+    with transaction.atomic():
+        # Serialize submissions for one scope so two admins cannot replace the
+        # rules while a calculation is running.
+        AcademicYearLevel.objects.select_for_update().get(pk=scope.pk)
+        if formula_calculation_active(scope):
+            raise ValidationError(_("A formula calculation is already in progress for this academic scope."))
+        formula = save_promotion_formula(
+            scope=scope,
+            course_offering=course_offering,
+            overall_pass_percent=overall_pass_percent,
+            evaluation_starts_on=evaluation_starts_on,
+            evaluation_ends_on=evaluation_ends_on,
+            failed_courses_repeat_threshold=failed_courses_repeat_threshold,
+            rules=rules,
+            actor=actor,
+        )
+        job = create_admin_operation(
+            actor=actor,
+            kind=AdminOperationJob.Kind.FORMULA_RECALCULATION,
+            input={"formula_id": formula.pk, "rules_hash": formula_rules_hash(formula)},
+            conflict_key=f"formula:{scope.pk}",
+            scope=scope,
+            offering=formula.course_offering,
+            language=language,
+        )
     logger.info(
-        "promotion formula saved",
+        "promotion formula queued",
         extra={
-            "event": "formula_saved",
-            "formula_id": locked_formula.pk,
-            "scope_id": locked_formula.academic_year_level_id,
-            "offering_id": locked_formula.course_offering_id,
-            "results_created": counts[0],
-            "results_updated": counts[1],
+            "event": "formula_queued",
+            "formula_id": formula.pk,
+            "scope_id": scope.pk,
+            "job_id": str(job.pk),
         },
     )
-    return locked_formula, counts
+    return formula, job
+
+
+def execute_formula_recalculation(job, token) -> dict:
+    """J01 executor: recalculate the frozen formula generation in bounded batches."""
+
+    require_admin_operation_actor(job)
+    scope = AcademicYearLevel.objects.filter(pk=job.academic_year_level_id).first()
+    if scope is None:
+        raise AdminOperationError("scope_missing", _("The academic scope no longer exists."))
+    formula = PromotionFormula.objects.filter(
+        pk=(job.input or {}).get("formula_id"),
+        academic_year_level=scope,
+    ).first()
+    if formula is None:
+        raise AdminOperationError("formula_missing", _("The promotion formula no longer exists."))
+    expected_hash = (job.input or {}).get("rules_hash")
+    if expected_hash and formula_rules_hash(formula) != expected_hash:
+        raise AdminOperationError(
+            "formula_changed",
+            _("The formula changed after this calculation was queued. Review the formula and try again."),
+        )
+
+    def progress(*, processed, total, succeeded):
+        assert_admin_operation_progress(
+            job.pk,
+            token,
+            processed=processed,
+            succeeded=succeeded,
+            failed=0,
+            skipped=0,
+            total=total,
+            cursor={"processed": processed},
+        )
+        job.processed = processed
+        job.succeeded = succeeded
+        job.cursor = {"processed": processed}
+
+    def guard():
+        assert_admin_operation_progress(
+            job.pk, token, processed=job.processed, succeeded=job.succeeded,
+            failed=job.failed, skipped=job.skipped, cursor=job.cursor or {},
+        )
+
+    guard()
+    retry = bool(int((job.cursor or {}).get("processed", 0) or 0) or int(job.processed or 0))
+    created, updated = _recalculate_scope_batches(
+        scope, progress=progress, preserve_overrides=retry, guard=guard
+    )
+    return {
+        "status": AdminOperationJob.Status.COMPLETED,
+        "result": {"created": created, "updated": updated, "formula_id": formula.pk},
+    }
 
 
 @transaction.atomic
@@ -595,6 +736,12 @@ def override_evaluation_result(*, result_id: int, final_status: str, note: str, 
         raise PermissionError(_("Only administrators can override evaluation results."))
     if final_status not in EvaluationResult.Status.values:
         raise ValueError(_("Invalid evaluation status."))
+    scope_id = EvaluationResult.objects.values_list(
+        "formula__academic_year_level_id", flat=True,
+    ).get(pk=result_id)
+    AcademicYearLevel.objects.select_for_update().get(pk=scope_id)
+    if formula_calculation_active(scope_id):
+        raise ValidationError(_("A formula calculation is already in progress for this academic scope."))
     result = EvaluationResult.objects.select_for_update().select_related("formula").get(pk=result_id)
     if hasattr(result, "promotion_history"):
         raise ValidationError(_("A promoted result is immutable and cannot be overridden."))

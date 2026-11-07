@@ -64,7 +64,7 @@
         </ul>
     </nav>
     <div class="ad-page-info">
-        {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktranslate %}{% if item_label %} {{ item_label }}{% endif %}
+        {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }}{% endblocktranslate %}{% if item_label %} {{ item_label }}{% endif %}
     </div>
 </div>
 {% endif %}

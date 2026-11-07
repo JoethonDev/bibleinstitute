@@ -19,7 +19,7 @@
         {% if selected_scope_id %}<input type="hidden" name="scope" value="{{ selected_scope_id }}">{% elif selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
         <div class="col-auto">
             <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
-            <input type="search" id="year-search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search years…" %}" value="{{ search }}" hx-preserve
+            <input type="search" id="year-search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search years..." %}" value="{{ search }}" hx-preserve
                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
         </div>
         <div class="col-auto">
@@ -98,7 +98,7 @@
     {% if year_level_links %}
     <div class="ad-card mb-4">
         <div class="ad-card-head d-flex justify-content-between align-items-center">
-            <span>{% translate "Year Levels" %} — {{ year_level_links.0.academic_year.name }}</span>
+            <span>{% translate "Year Levels" %} - {{ year_level_links.0.academic_year.name }}</span>
         </div>
         <div class="ad-card-body">
             {% for ayl in year_level_links %}
@@ -143,14 +143,14 @@
     {# --- Course Offerings Section --- #}
     {% if selected_scope %}
     <div class="ad-pane-head">
-        <h5 class="ad-pane-title">{% translate "Course Offerings" %} — {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h5>
+        <h5 class="ad-pane-title">{% translate "Course Offerings" %} - {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h5>
     </div>
     <div class="ad-filters mb-3">
         <form method="get" action="{% url 'academic-setup' %}" class="d-flex align-items-end gap-2 flex-wrap"
               hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#setup-loading">
             <input type="hidden" name="scope" value="{{ selected_scope_id }}">
             <label for="offering-search" class="visually-hidden">{% translate "Search offerings" %}</label>
-            <input type="search" id="offering-search" name="offering_q" class="form-control form-control-sm" placeholder="{% translate "Search offerings…" %}" value="{{ offering_search }}" hx-preserve
+            <input type="search" id="offering-search" name="offering_q" class="form-control form-control-sm" placeholder="{% translate "Search offerings..." %}" value="{{ offering_search }}" hx-preserve
                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
             <select name="offering_status" id="offering-status" class="form-select form-select-sm ad-width-auto"
                     hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
@@ -183,7 +183,7 @@
                     {% for o in offering_page_obj.object_list %}
                     <tr>
                         <td>{{ o.course.name }}</td>
-                        <td>{{ o.instructor|default:"—" }}</td>
+                        <td>{{ o.instructor|default:"-" }}</td>
                         <td><span class="ad-pill {% if o.status == 'draft' %}ad-pill--warning{% elif o.status == 'published' %}ad-pill--success{% elif o.status == 'archived' %}ad-pill--muted{% endif %}">{{ o.get_status_display }}</span></td>
                         <td>
                             <div class="ad-actions">
@@ -221,7 +221,7 @@
                         <div class="mb-3">
                             <label class="form-label" for="create-offering-course">{% translate "Course" %}</label>
                             <select name="course" id="create-offering-course" class="form-select" required>
-                                <option value="">{% translate "Select course…" %}</option>
+                                <option value="">{% translate "Select course..." %}</option>
                                 {% for c in scope_courses %}
                                 <option value="{{ c.id }}">{{ c.name }}</option>
                                 {% endfor %}
@@ -342,6 +342,10 @@
         </div>
     </div>
 
+    {% if copy_job %}
+    {% include "partials/admin_operation_status.html" with operation_job=copy_job status_url=copy_status_url status=copy_job.status total=copy_job.total processed=copy_job.processed %}
+    {% endif %}
+
     {# --- Copy Offerings Modal --- #}
     <div class="modal fade" id="copyModal" tabindex="-1" aria-labelledby="copyModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -411,7 +415,7 @@
                 return;
             }
             controller = new AbortController();
-            placeholder('{% translate "Loading…"|escapejs %}');
+            placeholder('{% translate "Loading..."|escapejs %}');
             var url = '{% url "academic-offerings-by-scope" 0 %}'.replace('/0/', '/' + source.value + '/');
             fetch(url, {signal: controller.signal, headers: {'X-Requested-With': 'XMLHttpRequest'}})
                 .then(function(response) {

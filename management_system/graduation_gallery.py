@@ -46,6 +46,8 @@ MAX_SINGLE_IMAGE_BYTES = 25 * 1024 * 1024
 MAX_SINGLE_VIDEO_BYTES = 500 * 1024 * 1024
 MAX_ZIP_BYTES = 2 * 1024 * 1024 * 1024
 MAX_ZIP_ENTRIES = 2000
+# Aggregate decompressed-byte budget for one ZIP upload.
+MAX_ZIP_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
 
 
 def is_management_user(user) -> bool:
@@ -126,11 +128,6 @@ def _slug_year_name(name: str) -> str:
     while "--" in slug:
         slug = slug.replace("--", "-")
     return slug.strip("-") or "year"
-
-
-def slug_year_name(name: str) -> str:
-    """Public slug used for gallery R2 prefixes."""
-    return _slug_year_name(name)
 
 
 def human_slug(filename: str, fallback: str) -> str:

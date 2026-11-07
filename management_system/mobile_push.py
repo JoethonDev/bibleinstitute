@@ -11,8 +11,8 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef, Prefetch, Window
-from django.db.models.functions import RowNumber
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Subquery, Window
+from django.db.models.functions import Coalesce, RowNumber
 from django.utils import timezone
 
 from .models import MobilePushDevice, PushDelivery, StudentNotification
@@ -162,21 +162,43 @@ def _notification_payload(delivery: PushDelivery) -> dict:
     }
 
 
-def _materialize_due_deliveries(limit: int) -> int:
-    now = timezone.now()
-    scan_limit = max(1, min(int(limit), DELIVERY_SCAN_LIMIT))
-    # Exclude fully-materialized notifications in SQL. Without this, the
-    # bounded [:scan_limit] window keeps returning the oldest already-covered
-    # rows and starves newer notifications once the delivered backlog exceeds
-    # the scan window. The nested anti-join keeps notifications that still
-    # have at least one active device without a delivery, so late-registered
-    # devices and partial batches are still picked up.
-    missing_device_exists = (
+def _missing_device_exists():
+    """Devices still uncovered for a notification, restricted to the ranked scope.
+
+    Materialization only ever uses each student's newest MAX_DEVICES_PER_STUDENT
+    devices. The anti-join must use that same ranked scope, otherwise an older
+    notification whose coverage gap exists only on an 11th (never materialized)
+    device keeps occupying the bounded scan window without producing rows and
+    starves newer notifications.
+    """
+
+    ranked_newer_devices = (
+        MobilePushDevice.objects.filter(
+            user_id=OuterRef("user_id"),
+            is_active=True,
+            disabled_at__isnull=True,
+        )
+        .filter(
+            Q(last_seen_at__gt=OuterRef("last_seen_at"))
+            | Q(last_seen_at=OuterRef("last_seen_at"), pk__gt=OuterRef("pk"))
+        )
+        .values("user_id")
+        .annotate(total=Count("pk"))
+        .values("total")
+    )
+    return (
         MobilePushDevice.objects.filter(
             user_id=OuterRef("student_id"),
             is_active=True,
             disabled_at__isnull=True,
         )
+        .annotate(
+            newer_device_count=Coalesce(
+                Subquery(ranked_newer_devices[:1]),
+                0,
+            )
+        )
+        .filter(newer_device_count__lt=MAX_DEVICES_PER_STUDENT)
         .annotate(_sn_notif_id=OuterRef("pk"))
         .filter(
             ~Exists(
@@ -187,20 +209,35 @@ def _materialize_due_deliveries(limit: int) -> int:
             )
         )
     )
-    active_devices = MobilePushDevice.objects.filter(
-        is_active=True,
-        disabled_at__isnull=True,
-    ).annotate(
-        mobile_device_row=Window(
-            expression=RowNumber(),
-            partition_by=[F("user_id")],
-            order_by=[F("last_seen_at").desc(), F("pk").desc()],
-        )
-    ).filter(mobile_device_row__lte=MAX_DEVICES_PER_STUDENT).only(
+
+
+def active_push_devices():
+    """The bounded per-student device scope shared by normal and manual sends."""
+    return MobilePushDevice.objects.filter(
+        is_active=True, disabled_at__isnull=True,
+    ).annotate(mobile_device_row=Window(
+        expression=RowNumber(), partition_by=[F("user_id")],
+        order_by=[F("last_seen_at").desc(), F("pk").desc()],
+    )).filter(mobile_device_row__lte=MAX_DEVICES_PER_STUDENT)
+
+
+@transaction.atomic
+def _materialize_due_deliveries(limit: int) -> int:
+    now = timezone.now()
+    scan_limit = max(1, min(int(limit), DELIVERY_SCAN_LIMIT))
+    # Exclude fully-materialized notifications in SQL. Without this, the
+    # bounded [:scan_limit] window keeps returning the oldest already-covered
+    # rows and starves newer notifications once the delivered backlog exceeds
+    # the scan window. The nested anti-join keeps notifications that still
+    # have at least one active device without a delivery, so late-registered
+    # devices and partial batches are still picked up.
+    missing_device_exists = _missing_device_exists()
+    active_devices = active_push_devices().only(
         "id", "user_id", "expo_push_token", "is_active", "disabled_at"
     )
     notifications = list(
-        StudentNotification.objects.filter(
+        StudentNotification.objects.select_for_update(skip_locked=True, of=("self",)).filter(
+            is_manual_redelivery=False,
             scheduled_for__lte=now,
             push_expires_at__gt=now,
             cancelled_at__isnull=True,
@@ -345,6 +382,22 @@ def _expire_pending_deliveries(limit: int = DELIVERY_SCAN_LIMIT) -> int:
 def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     if not deliveries:
         return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": 0}
+    manual_skipped = 0
+    manual_ids = {d.notification_id for d in deliveries if d.notification.is_manual_redelivery}
+    if manual_ids:
+        from .notification_redelivery import eligible_redelivery_notification_ids, redelivery_source_queryset
+
+        allowed = eligible_redelivery_notification_ids(list(redelivery_source_queryset().filter(pk__in=manual_ids)))
+        rejected = [d.pk for d in deliveries if d.notification_id in manual_ids and d.notification_id not in allowed]
+        PushDelivery.objects.filter(pk__in=rejected, status="sending").update(
+            status="skipped", error_code="redelivery_not_authorized",
+            error_message="The notification is no longer eligible for redelivery.", updated_at=timezone.now(),
+        )
+        rejected_ids = set(rejected)
+        manual_skipped = len(rejected_ids)
+        deliveries = [d for d in deliveries if d.pk not in rejected_ids]
+        if not deliveries:
+            return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(rejected)}
     now = timezone.now()
     owned_ids = set(
         PushDelivery.objects.filter(
@@ -367,7 +420,7 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
         )
         deliveries = [delivery for delivery in deliveries if delivery.pk in owned_ids]
     if not deliveries:
-        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(reassigned)}
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(reassigned) + manual_skipped}
     expired = [delivery for delivery in deliveries if delivery.notification.push_expires_at <= now]
     if expired:
         PushDelivery.objects.filter(pk__in=[delivery.pk for delivery in expired]).update(
@@ -379,7 +432,7 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
         )
         deliveries = [delivery for delivery in deliveries if delivery not in expired]
     if not deliveries:
-        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(expired) + len(reassigned)}
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(expired) + len(reassigned) + manual_skipped}
     outcome, data = _provider_post(
         settings.EXPO_PUSH_SEND_URL,
         [_notification_payload(delivery) for delivery in deliveries],
@@ -388,14 +441,14 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     if outcome != "ok":
         if outcome == "network_error" or outcome == "invalid_response" or outcome.startswith("http_5") or outcome == "http_429":
             _mark_retryable(deliveries, outcome, now)
-            return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired) + len(reassigned)}
+            return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired) + len(reassigned) + manual_skipped}
         _mark_permanent_failure(deliveries, outcome, "Expo rejected the push request.", now)
-        return {"ticketed": 0, "failed": len(deliveries), "retried": 0, "deactivated": 0, "skipped": len(expired) + len(reassigned)}
+        return {"ticketed": 0, "failed": len(deliveries), "retried": 0, "deactivated": 0, "skipped": len(expired) + len(reassigned) + manual_skipped}
 
     tickets = data.get("data") if isinstance(data, dict) else None
     if not isinstance(tickets, list) or len(tickets) != len(deliveries):
         _mark_retryable(deliveries, "invalid_response", now)
-        return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired) + len(reassigned)}
+        return {"ticketed": 0, "failed": 0, "retried": len(deliveries), "deactivated": 0, "skipped": len(expired) + len(reassigned) + manual_skipped}
 
     deactivated_ids: set[int] = set()
     retryable: list[PushDelivery] = []
@@ -453,7 +506,7 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
         "failed": failed,
         "retried": retried,
         "deactivated": len(deactivated_ids),
-        "skipped": len(expired) + len(reassigned),
+        "skipped": len(expired) + len(reassigned) + manual_skipped,
     }
 
 

@@ -43,6 +43,12 @@ from .models import (
     MediaCleanupStatus,
     PublicationStatus,
 )
+from .storage_coordination import (
+    assert_storage_namespace_available,
+    lock_storage_namespace,
+    reserve_media_output_folder,
+)
+from .storage_ownership import is_private_storage_key
 from .student_notifications import create_lesson_publication_event, is_active_published_offering
 from .utils.decorators import can_manage_content
 
@@ -258,7 +264,7 @@ def validate_requested_folder(folder: Any) -> str:
     parts = folder.split("/")
     if any(not part or part in {".", ".."} for part in parts):
         raise ValidationError(_("Requested folder is invalid."))
-    if parts[0] == "Raw Files":
+    if parts[0] == "Raw Files" or is_private_storage_key(folder):
         raise ValidationError(_("This storage folder is reserved."))
     return folder
 
@@ -478,7 +484,7 @@ def queue_verified_job(
         expected_size=job.source_size,
         expected_etag=expected_etag,
     )
-    with transaction.atomic():
+    with reserve_media_output_folder(job.requested_folder):
         locked = MediaProcessingJob.objects.select_for_update().get(pk=job.pk)
         if (
             locked.stop_requested_at is not None
@@ -749,6 +755,8 @@ def request_media_job_cleanup(public_id: Any) -> tuple[list[MediaProcessingJob],
     root = MediaProcessingJob.objects.filter(public_id=public_id).first()
     if root is None:
         raise MediaProcessingJob.DoesNotExist
+    lock_storage_namespace(root.requested_folder)
+    root = MediaProcessingJob.objects.select_for_update().get(pk=root.pk)
     jobs = list(
         media_upload_job_queryset(root).select_for_update().order_by("pk")[:MAX_AUTOMATION_UPLOAD_FILES + 1]
     )
@@ -786,6 +794,10 @@ def request_media_job_cleanup(public_id: Any) -> tuple[list[MediaProcessingJob],
     if any(job.cleanup_status in {MediaCleanupStatus.QUEUED, MediaCleanupStatus.RUNNING} for job in jobs):
         return jobs, False
 
+    assert_storage_namespace_available(
+        root.requested_folder,
+        ignore_media_job_ids=tuple(job.pk for job in jobs),
+    )
     now = timezone.now()
     cleanup_not_before = max(
         (

@@ -1,5 +1,5 @@
 /* ================================================================================
-   ADMIN CONSISTORY — UI PROPOSAL DESIGN SYSTEM
+   ADMIN CONSISTORY - UI PROPOSAL DESIGN SYSTEM
    Companion to the student "Psalmodia" theme: same ink + liturgical gold on
    parchment, oriented for an admins' study-desk. Scoped (.ad-*).
    Pure custom CSS. No Tailwind, no Bootstrap utilities required.
@@ -492,7 +492,7 @@
 }
 
 /* ================================================================================
-   COMPONENT WINGS — buttons, actions, pagination, modal, alerts, drive, calendar
+   COMPONENT WINGS - buttons, actions, pagination, modal, alerts, drive, calendar
    ================================================================================ */
 
 /* ---------------- Themed scrollbars ---------------- */

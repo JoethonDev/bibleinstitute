@@ -23,7 +23,7 @@
             <li>
                 <a class="dropdown-item ad-action-link"
                    href="#"
-                   @click.prevent="downloadFile('{{ item.id|escapejs }}', '{{ item.name|escapejs }}')">
+                   @click.prevent="downloadFile('{{ item.id|escapejs }}')">
                     <i class="fas fa-download me-2"></i>{% translate "Download" %}
                 </a>
             </li>

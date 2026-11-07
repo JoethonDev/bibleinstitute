@@ -24,7 +24,7 @@
                         data-bs-target="#course-section-collapse-{{ forloop.counter }}"
                         aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
                     <span class="d-flex align-items-center gap-2 flex-wrap w-100">
-                        <span class="sd-serious">{{ section.academic_year.name }} — {{ section.level_name }}</span>
+                        <span class="sd-serious">{{ section.academic_year.name }} - {{ section.level_name }}</span>
                         {% if section.access_kind == 'current' %}
                         <span class="sd-pill sd-pill--current"><i class="fas fa-circle"></i> {% translate "Current" %}</span>
                         {% elif section.access_kind == 'historical' %}

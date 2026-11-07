@@ -1,6 +1,6 @@
 /* ================================================================================
-   STUDENT EXPERIENCE — UI PROPOSAL DESIGN SYSTEM
-   Theme: "Psalmodia" — holy, simple, modern.
+   STUDENT EXPERIENCE - UI PROPOSAL DESIGN SYSTEM
+   Theme: "Psalmodia" - holy, simple, modern.
    Ink + liturgical gold on parchment. Serif display, generous air, soft motion.
    Scoped to the proposal page (.sd-*). No webfonts, no dependencies.
    ================================================================================ */
@@ -58,7 +58,7 @@
 }
 
 .sd-halo::before {
-    content: "\2723"; /* ✣ */
+    content: "\2723"; /* - */
     font-size: 16rem;
     line-height: 1;
     margin-top: -2.2rem;
@@ -331,7 +331,7 @@
     color: var(--sd-ink);
 }
 
-/* ================= SCREEN 01 — COURSES ================= */
+/* ================= SCREEN 01 - COURSES ================= */
 .sd-group { margin-bottom: 1.75rem; }
 
 .sd-group-head {
@@ -440,7 +440,7 @@
 
 .sd-level-tag { font-size: .76rem; font-weight: 700; color: var(--sd-teal); }
 
-/* ================= SCREEN 02 — COURSE DETAIL / LESSON ================= */
+/* ================= SCREEN 02 - COURSE DETAIL / LESSON ================= */
 .sd-learn-head {
     display: flex;
     align-items: center;
@@ -706,7 +706,7 @@
     opacity: .75;
 }
 
-/* ================= SCREEN 03 — QUIZ ================= */
+/* ================= SCREEN 03 - QUIZ ================= */
 .sd-quiz-head {
     display: flex;
     flex-wrap: wrap;
@@ -854,7 +854,7 @@
 
 .sd-note i { color: var(--sd-gold); }
 
-/* ================= SCREEN 04 — CALENDAR ================= */
+/* ================= SCREEN 04 - CALENDAR ================= */
 .sd-cal-top {
     display: flex;
     align-items: center;
@@ -970,7 +970,7 @@
 .sd-legend .lg-hol { background: var(--sd-gold); }
 .sd-legend .lg-today { border: 2px solid var(--sd-gold-deep); }
 
-/* ================= SCREEN 05 — PROFILE + QR ================= */
+/* ================= SCREEN 05 - PROFILE + QR ================= */
 .sd-profile {
     display: grid;
     grid-template-columns: 19rem 1fr;

@@ -6,9 +6,9 @@ def run():
     junior = Role.objects.get(role="junior")
     senior = Role.objects.get(role="senior")
     teacher = Role.objects.get(role="teacher")
-    user_junior = User.objects.create(username="junior_user", role=junior, joined_date=date.today().replace(year=2024, month=8))
-    user_senior = User.objects.create(username="senior_user", role=senior, joined_date=date.today().replace(year=2023, month=8))
-    user_teacher = User.objects.create(username="teacher_user", role=teacher)
+    User.objects.create(username="junior_user", role=junior, joined_date=date.today().replace(year=2024, month=8))
+    User.objects.create(username="senior_user", role=senior, joined_date=date.today().replace(year=2023, month=8))
+    User.objects.create(username="teacher_user", role=teacher)
 
     # Creating Courses
     course_1 = Course.objects.create(name="First Year Course", level=1)

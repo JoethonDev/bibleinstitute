@@ -7,7 +7,6 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
-from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from logging import getLogger
 from management_system.models import MANAGEMENT_ROLES, User

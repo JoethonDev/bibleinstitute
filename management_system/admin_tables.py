@@ -22,6 +22,7 @@ from django.utils.translation import gettext as _
 
 from .models import Course, CourseOffering, Lesson, Level, Quiz, Role, User
 from .utils.search import normalized_contains_q, normalize_search_text
+from .utils.validators import parse_strict_bool
 
 BULK_SELECTION_SALT = "bulk-table-selection"
 SELECTION_MAX_AGE_SECONDS = 3600
@@ -160,11 +161,25 @@ def create_selection_token(*, view: str, scope: dict[str, Any], actor_id: int) -
 
 
 def load_selection_token(token: str, *, view: str, actor_id: int) -> dict[str, Any]:
-    """Return the signed selection scope or raise signing.BadSignature."""
+    """Return the normalized signed selection bound to this view and actor.
+
+    The token is the only trusted source for the filter scope. A valid token
+    signed for another view, another operator, or with a malformed scope is
+    rejected so callers do not each re-implement the binding checks.
+
+    Raises ``signing.BadSignature`` for missing/expired/tampered/foreign tokens
+    and ``ValueError`` when the signed payload has the wrong shape.
+    """
+
     selection = signing.loads(token, salt=BULK_SELECTION_SALT, max_age=SELECTION_MAX_AGE_SECONDS)
     if not isinstance(selection, dict):
         raise signing.BadSignature("Invalid selection")
-    return selection
+    if selection.get("view") != view or selection.get("actor") != int(actor_id):
+        raise signing.BadSignature("Selection is not valid for this view and operator")
+    scope = selection.get("scope")
+    if not isinstance(scope, dict):
+        raise ValueError("Selection scope is not an object")
+    return {"view": view, "actor": int(actor_id), "scope": scope}
 
 
 def bulk_delete_records(request, view: str) -> JsonResponse:
@@ -189,21 +204,24 @@ def bulk_delete_records(request, view: str) -> JsonResponse:
             {"error": _("The selection has expired. Reload the list and try again.")},
             status=409,
         )
-    if selection.get("view") != view:
-        return JsonResponse({"error": _("The selection does not match this list.")}, status=400)
-    if selection.get("actor") != request.user.pk:
-        return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=403)
-    scope = selection.get("scope")
-    if not isinstance(scope, dict):
-        return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=403)
+    except ValueError:
+        return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=400)
+    scope = selection["scope"]
 
     explicit_ids = payload.get("ids", [])
     excluded_ids = payload.get("excluded_ids", [])
     if not isinstance(explicit_ids, list) or not isinstance(excluded_ids, list):
         return JsonResponse({"error": _("The selection has invalid types.")}, status=400)
+    def _strict_id(value):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError
+        if value <= 0 or value > 2_147_483_647:
+            raise ValueError
+        return value
+
     try:
-        explicit_ids = [int(value) for value in explicit_ids]
-        excluded_ids = {int(value) for value in excluded_ids}
+        explicit_ids = [_strict_id(value) for value in explicit_ids]
+        excluded_ids = {_strict_id(value) for value in excluded_ids}
     except (TypeError, ValueError):
         return JsonResponse({"error": _("The selection has invalid types.")}, status=400)
     if len(explicit_ids) > MAX_EXPLICIT_SELECTION or len(excluded_ids) > MAX_EXPLICIT_SELECTION:
@@ -218,7 +236,10 @@ def bulk_delete_records(request, view: str) -> JsonResponse:
         return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=400)
 
     stale: list[int] = []
-    select_all = bool(payload.get("select_all"))
+    try:
+        select_all = parse_strict_bool(payload.get("select_all"))
+    except ValueError:
+        return JsonResponse({"error": _("The selection has invalid types.")}, status=400)
     if select_all:
         target = scoped.exclude(pk__in=excluded_ids)
         requested = scoped.count()

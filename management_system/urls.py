@@ -2,6 +2,8 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from management_system import password_reset as password_reset_views
 from management_system.views import *
+from management_system.admin_operation_views import admin_operation_download, admin_operation_status
+from management_system.job_monitor_views import background_jobs, background_job_detail, background_job_status_batch, notification_redelivery
 from management_system.forms import UserLoginForm
 from management_system.telegram_views import (
     telegram_account_unlink,
@@ -13,7 +15,6 @@ from management_system.telegram_views import (
     telegram_broadcast_cancel,
     telegram_broadcast_create,
     telegram_broadcast_detail,
-    telegram_broadcast_retry,
     telegram_broadcasts,
     telegram_config,
     telegram_conversation_detail,
@@ -39,6 +40,11 @@ from management_system import gallery_views as graduation_gallery_views
 from management_system import portal_views as portal_extra_views
 
 urlpatterns = [
+    path('dashboard/background-jobs/', background_jobs, name='background-jobs'),
+    path('dashboard/notification-history/', background_jobs, {"notifications_only": True}, name='notification-history'),
+    path('dashboard/notification-history/<str:source>/<int:source_id>/redeliver/', notification_redelivery, name='notification-redelivery'),
+    path('dashboard/background-jobs/status/', background_job_status_batch, name='background-job-status-batch'),
+    path('dashboard/background-jobs/<str:family>/<str:job_id>/', background_job_detail, name='background-job-detail'),
     path("offerings/<int:offering_id>/quizzes/<int:quiz_id>/snapshot/", quiz_snapshot, name="quiz-snapshot"),
     path(
         'login/',
@@ -135,6 +141,8 @@ urlpatterns = [
     path('dashboard/quizzez/', quiz_dashboard, name="quiz-dashboard"),
     path('dashboard/quizzez/recalculate/', recalculate_quizzes, name="quiz-recalculate"),
     path('dashboard/quizzez/recalculate/<uuid:job_id>/', quiz_recalculation_status, name="quiz-recalculation-status"),
+    path('api/admin-operations/<uuid:job_id>/status/', admin_operation_status, name="admin-operation-status"),
+    path('api/admin-operations/<uuid:job_id>/download/', admin_operation_download, name="admin-operation-download"),
     path('dashboard/quizzez/import/preview/', quiz_json_preview, name="quiz-json-preview"),
     path('dashboard/quizzez/<int:quiz_id>/', quiz_detail, name="quiz-view"),
     path('dashboard/quizzez/<int:quiz_id>/questions/<int:question_id>/regrade/', regrade_quiz_question, name="quiz-question-regrade"),
@@ -178,7 +186,6 @@ urlpatterns = [
     path('api/r2/files/delete-m3u8/', api_delete_m3u8_file, name="api-delete-m3u8-file"),
     path('api/r2/files/delete-batch/', api_delete_files_batch, name="api-delete-files-batch"),
     path('api/r2/files/rename/', api_rename_file, name="api-rename-file"),
-    path('api/r2/files/rename/<uuid:operation_id>/status/', api_r2_rename_status, name="api-r2-rename-status"),
     path('api/r2/files/move/', api_move_file, name="api-move-file"),
     path('api/r2/files/metadata/', api_get_file_metadata, name="api-get-file-metadata"),
     path('api/r2/files/download/', api_download_file, name="api-download-file"),
@@ -231,7 +238,6 @@ urlpatterns = [
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/confirm/', telegram_broadcast_confirm_page, name="telegram-broadcast-confirm-page"),
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/confirm/send/', telegram_broadcast_confirm, name="telegram-broadcast-confirm"),
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/cancel/', telegram_broadcast_cancel, name="telegram-broadcast-cancel"),
-    path('dashboard/telegram/broadcasts/<int:broadcast_id>/retry/', telegram_broadcast_retry, name="telegram-broadcast-retry"),
     path('dashboard/telegram/broadcasts/<int:broadcast_id>/', telegram_broadcast_detail, name="telegram-broadcast-detail"),
 
     # App notifications (admin composer and sent history)
@@ -239,7 +245,7 @@ urlpatterns = [
     path('dashboard/notifications/recipient-count/', notifications_recipient_count, name="notifications-recipient-count"),
     path('dashboard/notifications/<int:announcement_id>/retry/', announcement_retry, name="announcement-retry"),
 
-    # Phase 3 — Student Applications
+    # Phase 3 - Student Applications
     path('signup/', signup, name="signup"),
     path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
     path('dashboard/signup-settings/', signup_settings, name="signup-settings"),
@@ -249,7 +255,7 @@ urlpatterns = [
     path('dashboard/applications/<int:user_id>/<str:decision>/', application_decision, name="application-decision"),
     path('api/bulk-application-decision/', bulk_application_decision, name="bulk-application-decision"),
 
-    # Phase 5 — Attendance Calendar, QR, and Scanning
+    # Phase 5 - Attendance Calendar, QR, and Scanning
     path('dashboard/calendar/', calendar_management, name="calendar-management"),
     path('dashboard/calendar/meeting/add/', add_meeting, name="add-meeting"),
     path('dashboard/calendar/meeting/<int:meeting_id>/delete/', delete_meeting, name="delete-meeting"),
@@ -268,14 +274,14 @@ urlpatterns = [
     path('dashboard/attendance/<int:record_id>/correct/', attendance_correction, name="attendance-correction"),
     path('dashboard/attendance/<int:record_id>/delete/', delete_attendance, name="attendance-delete"),
 
-    # Phase 6 — Online Lecture Progress Tracking
+    # Phase 6 - Online Lecture Progress Tracking
     path('api/offerings/<int:offering_id>/lesson/<int:lesson_id>/start-session/<int:file_index>/', start_viewing_session, name="start-viewing-session"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/manifest/<int:file_index>/', lesson_manifest, name="lesson-manifest"),
     path('api/worker/receipt/', worker_receipt, name="worker-receipt"),
     path('api/progress/heartbeat/', progress_heartbeat, name="progress-heartbeat"),
     path('dashboard/progress/', progress_dashboard, name="progress-dashboard"),
 
-    # Phase 7 — Reports and Exports
+    # Phase 7 - Reports and Exports
     path('dashboard/reports/', report_dashboard, name="report-dashboard"),
     path('dashboard/reports/export-csv/', export_report_csv, name="export-report-csv"),
     path('dashboard/reports/export-xlsx/', export_report_xlsx, name="export-report-xlsx"),
@@ -305,7 +311,7 @@ urlpatterns = [
     # Logout
     path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
 
-    # P8-T04 — SEO
+    # P8-T04 - SEO
     path('robots.txt', robots_txt, name="robots-txt"),
     path('sitemap.xml', sitemap_xml, name="sitemap-xml"),
 ]

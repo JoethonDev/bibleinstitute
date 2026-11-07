@@ -1,7 +1,6 @@
 from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.db.models import Exists, OuterRef
-from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
 from ..models import Enrollment, Grade, QuizStudentOpening, User

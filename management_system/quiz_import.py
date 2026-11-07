@@ -19,14 +19,11 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext as _
 
 from .models import CourseOffering, PublicationStatus, QUIZ_TYPE_CODES, Question, QuizType
-from .quiz_questions import build_question_instance
+from .quiz_questions import MAX_QUESTION_GRADE, MAX_QUESTION_TITLE, MAX_QUESTIONS, build_question_instance
 from .utils.timezones import ensure_aware, format_application_datetime
 
 MAX_PAYLOAD_BYTES = 512 * 1024
-MAX_QUESTIONS = 200
-MAX_QUESTION_TITLE = 255
 MAX_QUIZ_NAME = 64
-MAX_QUESTION_GRADE = 1000
 MAX_TOTAL_GRADE = 32767
 
 QUESTION_TYPE_ALIASES = {
@@ -225,8 +222,8 @@ def _parse_int_text(value: Any, *, max_digits: int) -> int | None:
 def offering_label(offering: CourseOffering) -> str:
     """The exact offering label rendered by the quiz form select options."""
     return (
-        f"{offering.course.name} — "
-        f"{offering.academic_year_level.level.display_name} — "
+        f"{offering.course.name} - "
+        f"{offering.academic_year_level.level.display_name} - "
         f"{offering.academic_year_level.academic_year.name}"
     )
 
@@ -274,7 +271,7 @@ def _parse_quiz_block(
         if quiz_type is not None:
             client["quiz_type"] = quiz_type.pk
             display["quiz_type_label"] = (
-                f"{quiz_type.name_en} — {quiz_type.name_ar}"
+                f"{quiz_type.name_en} - {quiz_type.name_ar}"
                 if quiz_type.name_ar
                 else quiz_type.name_en
             )

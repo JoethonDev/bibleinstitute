@@ -1,13 +1,13 @@
 /* ================================================================================
-   PSALMODIA — Design System Tokens & Shared Primitives
+   PSALMODIA - Design System Tokens & Shared Primitives
    Source of truth for the Bible Institute LMS visual identity.
-   Ink #17303A · Teal #2F5D73 · Gold #B4853A · Parchment #F7F3EA
+   Ink #17303A - Teal #2F5D73 - Gold #B4853A - Parchment #F7F3EA
    Loaded sitewide before realm stylesheets (app_student.css / app_admin.css).
    ================================================================================ */
 
 /* ---------------- 1. Light role tokens ---------------- */
 :root {
-    /* ── Literal colour tokens (one canonical hex map) ── */
+    /* -- Literal colour tokens (one canonical hex map) -- */
     --ps-ink:           #17303A;
     --ps-ink-deep:      #10262E;
     --ps-ink-black:     #0B1D23;
@@ -39,22 +39,22 @@
     --ps-warning:       #A36A1B;
     --ps-warning-soft:  #F8EFDD;
 
-    /* ── Spacing & shape ── */
+    /* -- Spacing & shape -- */
     --ps-radius:        1rem;
     --ps-radius-lg:     1.5rem;
 
-    /* ── Shadows (ink-channel alpha) ── */
+    /* -- Shadows (ink-channel alpha) -- */
     --ps-shadow:        0 2px 10px rgba(23, 48, 58, .05);
     --ps-shadow-md:     0 14px 34px rgba(23, 48, 58, .10);
     --ps-shadow-xl:     0 26px 60px rgba(23, 48, 58, .16);
 
-    /* ── Motion ── */
+    /* -- Motion -- */
     --ps-motion:        .22s cubic-bezier(.22, .61, .36, 1);
 
-    /* ── Display font stack (system serifs — no webfonts) ── */
+    /* -- Display font stack (system serifs - no webfonts) -- */
     --ps-display:       Georgia, "Times New Roman", "Sakkal Majalla", "Traditional Arabic", serif;
 
-    /* ── Semantic role tokens (consumed by components) ── */
+    /* -- Semantic role tokens (consumed by components) -- */
     --ps-surface:       var(--ps-paper);          /* card/sheet surface */
     --ps-text:          var(--ps-ink);             /* body text */
     /* `--ps-line` and `--ps-muted` are already role tokens and literal map keys. */
@@ -62,7 +62,7 @@
     --ps-accent-strong: var(--ps-gold-deep);       /* strong/hover accent */
     --ps-page-bg:       var(--ps-cream);           /* page background */
 
-    /* ── Status tokens (aliases for readability) ── */
+    /* -- Status tokens (aliases for readability) -- */
     --ps-status-good:       var(--ps-success);
     --ps-status-good-soft:  var(--ps-success-soft);
     --ps-status-bad:        var(--ps-danger);
@@ -75,10 +75,10 @@
 /* ---------------- 2. Dark-theme placeholder (future) ---------------- */
 /*
 [data-ps-theme="dark"] {
-    --ps-ink:           …;
-    --ps-teal:          …;
-    --ps-gold:          …;
-    --ps-cream:         …;
+    --ps-ink:           ...;
+    --ps-teal:          ...;
+    --ps-gold:          ...;
+    --ps-cream:         ...;
     ...
 
     Only re-map literal tokens above; component CSS (consumer role tokens)
@@ -169,7 +169,7 @@ html::-webkit-scrollbar-thumb {
 }
 
 .modal-header .btn-close::before {
-    content: "\2715"; /* ✕ */
+    content: "\2715"; /* - */
     font-size: .85rem;
 }
 

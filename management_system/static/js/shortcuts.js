@@ -48,7 +48,7 @@
   }
   document.addEventListener("keydown", function (e) {
     var mod = e.ctrlKey || e.metaKey;
-    // Help: ? (no modifiers) or Ctrl/Cmd + / — not while typing, not in palette.
+    // Help: ? (no modifiers) or Ctrl/Cmd + / - not while typing, not in palette.
     if (!mod && e.key === "?" && !typing() && !modalOpen("commandPaletteModal")) {
       e.preventDefault();
       toggleHelp();

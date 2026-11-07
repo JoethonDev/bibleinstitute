@@ -312,13 +312,13 @@ def grade_matrix_workbook(
         for student in batch:
             row = [
                 _safe_xlsx_cell(
-                    f"{student.get_full_name().strip() or student.username} ({student.username} · #{student.pk})"
+                    f"{student.get_full_name().strip() or student.username} ({student.username} - #{student.pk})"
                 )
             ]
             for course in courses:
                 for quiz in course["quizzes"]:
                     grade = grades.get((student.pk, quiz["id"]))
-                    row.append("—" if grade is None else f"{grade}/{quiz['total']}")
+                    row.append("-" if grade is None else f"{grade}/{quiz['total']}")
                 for key in COURSE_KEYS:
                     quizzes = course[f"{key}_quizzes"]
                     submitted = [
@@ -326,9 +326,9 @@ def grade_matrix_workbook(
                         for quiz in quizzes
                         if (student.pk, quiz["id"]) in grades
                     ]
-                    earned = sum(submitted) if submitted else "—"
+                    earned = sum(submitted) if submitted else "-"
                     total = sum(quiz["total"] for quiz in quizzes)
-                    row.append(f"{earned}/{total}" if total else "—")
+                    row.append(f"{earned}/{total}" if total else "-")
             sheet.append(row)
 
     result = SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b")

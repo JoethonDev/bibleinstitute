@@ -18,7 +18,7 @@
     <div class="p-3 p-lg-4">
       <ul class="sd-meta mb-0">
         <li><b>{% translate "Username" %}</b><span>{{ student.username }}</span></li>
-        <li><b>{% translate "Study Mode" %}</b><span>{{ student.get_study_mode_display|default:"—" }}</span></li>
+        <li><b>{% translate "Study Mode" %}</b><span>{{ student.get_study_mode_display|default:"-" }}</span></li>
         {% if academic_year %}
           <li><b>{% translate "Academic Year" %}</b><span>{{ academic_year }}</span></li>
         {% endif %}
@@ -34,7 +34,7 @@
     </div>
     <div class="p-3 p-lg-4">
       {% if scheduled_offering %}
-        <p class="mb-0"><strong>{{ scheduled_offering.course.name }}</strong> — {{ scheduled_offering.academic_year_level.level.display_name }}</p>
+        <p class="mb-0"><strong>{{ scheduled_offering.course.name }}</strong> - {{ scheduled_offering.academic_year_level.level.display_name }}</p>
         <p class="sd-section-note mb-0">{% translate "This course was taken from today's calendar." %}</p>
       {% elif can_record %}
         <p class="mb-0">{% translate "No course is registered in today's calendar. The scan will be saved pending course assignment." %}</p>
@@ -104,7 +104,7 @@
             btn.classList.remove('btn-success', 'btn-warning', 'sd-btn--teal', 'sd-btn--gold');
             btn.classList.add('btn-secondary', 'sd-btn--gold-outline');
             var statusBox = document.getElementById('record-status');
-            statusBox.textContent = gettext('Recorded at') + ' ' + (data.scanned_at || '') + (data.source === 'scan' ? '' : ' — ' + data.source);
+            statusBox.textContent = gettext('Recorded at') + ' ' + (data.scanned_at || '') + (data.source === 'scan' ? '' : ' - ' + data.source);
             statusBox.classList.remove('d-none');
           }
         })

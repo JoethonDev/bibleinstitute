@@ -141,7 +141,7 @@ def _short_label(text: str, limit: int = 40) -> str:
     value = (text or "").strip()
     if len(value) <= limit:
         return value
-    return value[: limit - 1].rstrip() + "…"
+    return value[: limit - 1].rstrip() + "..."
 
 
 def _pagination_row(action: str, page: int, page_count: int, offering_id: int | None = None) -> list:
@@ -471,7 +471,7 @@ def format_lesson(lesson, audio_available: bool, user) -> str:
 def format_quiz(quiz, user, opening=None, closing=None) -> str:
     """Arabic detail text for one already-authorized quiz.
 
-    ``opening``/``closing`` are the effective quiz window datetimes — pass the
+    ``opening``/``closing`` are the effective quiz window datetimes - pass the
     result of ``utils.quiz_access.quiz_window(quiz, user)`` when available so
     per-student exceptional openings are reflected. When omitted, the
     already-loaded ``quiz.opening_date``/``quiz.closing_date`` are used. This

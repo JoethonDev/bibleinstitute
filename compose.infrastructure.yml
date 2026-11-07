@@ -1,5 +1,5 @@
 services:
-  # ── PostgreSQL 18 ───────────────────────────────────────────────
+  # -- PostgreSQL 18 -----------------------------------------------
   postgres:
     image: postgres:18
     restart: unless-stopped
@@ -24,7 +24,7 @@ services:
     mem_limit: 2G
     shm_size: 256M
 
-  # ── Redis (Celery broker & Django cache backend) ───────────────
+  # -- Redis (Celery broker & Django cache backend) ---------------
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
@@ -42,11 +42,11 @@ services:
     cpus: 0.25
     mem_limit: 512M
 
-  # ── Nginx proxy (static serving + blue/green app routing) ──────
+  # -- Nginx proxy (static serving + blue/green app routing) ------
   # The active application slot is controlled by the runtime bind-mounted
   # nginx-active-upstream.conf file. The setup/deployment scripts write a safe
   # Nginx `set $lms_app_upstream ...` directive there and reloads Nginx.
-  # LMS_RUNTIME_DIR defaults to ./runtime — the setup script
+  # LMS_RUNTIME_DIR defaults to ./runtime - the setup script
   # must create that directory and the state file before Nginx starts.
   # TLS certificate directory must contain fullchain.pem and privkey.pem;
   # on a production server point NGINX_TLS_CERT_DIR to the Let's Encrypt
@@ -77,7 +77,7 @@ services:
     cpus: 0.25
     mem_limit: 256M
 
-  # ── Dozzle live Docker log viewer (read-only) ────────────────
+  # -- Dozzle live Docker log viewer (read-only) ----------------
   # Lightweight authenticated container log viewer exposed ONLY through the
   # existing Nginx HTTPS server on the dedicated monitor.<primary-domain>
   # host at the site root (https://monitor.<primary-domain>/). No host port
@@ -127,7 +127,7 @@ services:
     cpus: 0.25
     mem_limit: 256M
 
-  # ── Docker socket proxy (minimal read-only API gateway) ──────
+  # -- Docker socket proxy (minimal read-only API gateway) ------
   # Grants Dozzle only the Docker API access it needs (container list/logs,
   # info, events, ping, version). POST and every other endpoint stay
   # disabled, so no action/shell/container-mutation route exists. The proxy

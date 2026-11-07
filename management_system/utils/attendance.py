@@ -7,8 +7,7 @@ import logging
 import zoneinfo
 
 from django.conf import settings
-from django.core.paginator import Paginator
-from django.db import connection, transaction
+from django.db import transaction
 from django.db.models import Exists, OuterRef, TextChoices
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -19,13 +18,10 @@ from ..models import (
     AcademicYearLevelMeeting,
     AttendancePolicy,
     AttendanceRecord,
-    Course,
     CourseOffering,
     Enrollment,
     Lesson,
-    Level,
     PublicationStatus,
-    Role,
     User,
 )
 
@@ -151,213 +147,6 @@ def merge_attendance_pairs(pairs: dict) -> dict:
     return merged
 
 
-def attendance_roster_page(
-    *,
-    academic_year_id: int,
-    starts_on,
-    ends_on,
-    level_id: int | None = None,
-    offering_id: int | None = None,
-    student_search: str = "",
-    action: str = "",
-    source: str = "",
-    scan_status: str = "",
-    page_number: int = 1,
-    per_page: int = 25,
-    policy: AttendancePolicy,
-):
-    """Return one SQL-paginated row per eligible student and calendar meeting.
-
-    Calendar meetings define the attendance days. Offline normal enrollments
-    provide the roster, while both attendance actions are optional left joins
-    so absent students remain visible without materializing a cross-product in
-    Python.
-    """
-    quote_name = connection.ops.quote_name
-    tables = {
-        "meeting": quote_name(AcademicYearLevelMeeting._meta.db_table),
-        "scope": quote_name(AcademicYearLevel._meta.db_table),
-        "level": quote_name(Level._meta.db_table),
-        "offering": quote_name(CourseOffering._meta.db_table),
-        "course": quote_name(Course._meta.db_table),
-        "enrollment": quote_name(Enrollment._meta.db_table),
-        "user": quote_name(User._meta.db_table),
-        "role": quote_name(Role._meta.db_table),
-        "record": quote_name(AttendanceRecord._meta.db_table),
-    }
-
-    meeting_source_filter = ""
-    if source:
-        meeting_source_filter = " AND {alias}.source = %s"
-
-    student_filter = ""
-    if student_search:
-        student_filter = """
-            AND (
-                lms_arabic_search_normalize(u.username) LIKE %s
-                OR lms_arabic_search_normalize(u.first_name) LIKE %s
-                OR lms_arabic_search_normalize(u.last_name) LIKE %s
-                OR lms_arabic_search_normalize(u.email) LIKE %s
-            )
-        """
-    scope_filter = ""
-    if level_id:
-        scope_filter += " AND ayl.level_id = %s"
-    if offering_id:
-        scope_filter += " AND m.course_offering_id = %s"
-
-    base_sql = f"""
-        WITH roster AS (
-            SELECT
-                m.id AS meeting_id,
-                m.meeting_date,
-                ayl.id AS scope_id,
-                lvl.id AS level_id,
-                COALESCE(NULLIF(lvl.name_en, ''), NULLIF(lvl.name_ar, ''), CAST(lvl.ordering AS TEXT)) AS level_name,
-                co.id AS offering_id,
-                c.name AS course_name,
-                u.id AS student_id,
-                u.username,
-                u.first_name,
-                u.last_name,
-                er.id AS entrance_id,
-                er.scanned_at AS entrance_scanned_at,
-                er.source AS entrance_source,
-                er.scanned_by_id AS entrance_scanned_by_id,
-                er.corrected_at AS entrance_corrected_at,
-                eu.username AS entrance_scanned_by_username,
-                eu.first_name AS entrance_scanned_by_first_name,
-                eu.last_name AS entrance_scanned_by_last_name,
-                xr.id AS exit_id,
-                xr.scanned_at AS exit_scanned_at,
-                xr.source AS exit_source,
-                xr.scanned_by_id AS exit_scanned_by_id,
-                xr.corrected_at AS exit_corrected_at,
-                xu.username AS exit_scanned_by_username,
-                xu.first_name AS exit_scanned_by_first_name,
-                xu.last_name AS exit_scanned_by_last_name
-            FROM {tables['meeting']} m
-            JOIN {tables['scope']} ayl ON ayl.id = m.academic_year_level_id
-            JOIN {tables['level']} lvl ON lvl.id = ayl.level_id
-            JOIN {tables['offering']} co ON co.id = m.course_offering_id
-            JOIN {tables['course']} c ON c.id = co.course_id
-            JOIN {tables['enrollment']} en
-              ON en.academic_year_level_id = m.academic_year_level_id
-             AND en.enrollment_type = %s
-             AND en.status IN (%s, %s)
-             AND en.course_offering_id IS NULL
-            JOIN {tables['user']} u ON u.id = en.student_id
-            JOIN {tables['role']} role ON role.id = u.role_id AND role.role = %s
-            LEFT JOIN {tables['record']} er
-              ON er.student_id = u.id
-             AND er.course_offering_id = m.course_offering_id
-             AND er.attendance_date = m.meeting_date
-             AND er.action = %s
-             {meeting_source_filter.format(alias='er')}
-            LEFT JOIN {tables['user']} eu ON eu.id = er.scanned_by_id
-            LEFT JOIN {tables['record']} xr
-              ON xr.student_id = u.id
-             AND xr.course_offering_id = m.course_offering_id
-             AND xr.attendance_date = m.meeting_date
-             AND xr.action = %s
-             {meeting_source_filter.format(alias='xr')}
-            LEFT JOIN {tables['user']} xu ON xu.id = xr.scanned_by_id
-            WHERE ayl.academic_year_id = %s
-              AND m.meeting_date BETWEEN %s AND %s
-              AND u.study_mode = %s
-              AND u.application_status = %s
-              {scope_filter}
-              {student_filter}
-            GROUP BY
-                m.id, m.meeting_date, ayl.id, lvl.id,
-                COALESCE(NULLIF(lvl.name_en, ''), NULLIF(lvl.name_ar, ''), CAST(lvl.ordering AS TEXT)),
-                co.id, c.name, u.id, u.username, u.first_name, u.last_name,
-                er.id, er.scanned_at, er.source, er.scanned_by_id,
-                er.corrected_at, eu.username, eu.first_name, eu.last_name,
-                xr.id, xr.scanned_at, xr.source, xr.scanned_by_id,
-                xr.corrected_at, xu.username, xu.first_name, xu.last_name
-        )
-        SELECT * FROM roster
-    """
-
-    # The SQL text order is: enrollment type/status, role, record actions and
-    # optional source filters, then year/date/study/application filters.
-    sql_params = [
-        "normal", "active", "completed", "student",
-        AttendanceRecord.Action.ENTRANCE,
-    ]
-    if source:
-        sql_params.append(source)
-    sql_params.append(AttendanceRecord.Action.EXIT)
-    if source:
-        sql_params.append(source)
-    sql_params.extend([academic_year_id, starts_on, ends_on, "offline", "active"])
-    if level_id:
-        sql_params.append(level_id)
-    if offering_id:
-        sql_params.append(offering_id)
-    if student_search:
-        sql_params.extend([f"%{student_search}%"] * 4)
-
-    where = []
-    if action == AttendanceRecord.Action.ENTRANCE:
-        where.append("entrance_id IS NOT NULL")
-    elif action == AttendanceRecord.Action.EXIT:
-        where.append("exit_id IS NOT NULL")
-    if scan_status in {"scanned", "not_scanned", "complete", "incomplete", "absent"}:
-        if scan_status == "scanned":
-            where.append("(entrance_id IS NOT NULL OR exit_id IS NOT NULL)")
-        elif scan_status in {"not_scanned", "absent"}:
-            where.append("entrance_id IS NULL AND exit_id IS NULL")
-        elif scan_status == "complete":
-            where.append("entrance_id IS NOT NULL AND exit_id IS NOT NULL")
-        else:
-            where.append("(entrance_id IS NOT NULL) <> (exit_id IS NOT NULL)")
-    if where:
-        base_sql += " WHERE " + " AND ".join(where)
-
-    try:
-        page_number = int(page_number)
-    except (TypeError, ValueError):
-        page_number = 1
-
-    with connection.cursor() as cursor:
-        cursor.execute(f"SELECT COUNT(*) FROM ({base_sql}) attendance_roster", sql_params)
-        total = cursor.fetchone()[0]
-        offset = max(page_number - 1, 0) * per_page
-        cursor.execute(
-            base_sql + " ORDER BY meeting_date DESC, level_name, course_name, last_name, first_name, username, student_id LIMIT %s OFFSET %s",
-            [*sql_params, per_page, offset],
-        )
-        columns = [column[0] for column in cursor.description]
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    source_labels = dict(AttendanceRecord.Source.choices)
-    for row in rows:
-        entrance = (
-            {"source": row["entrance_source"], "scanned_at": row["entrance_scanned_at"]}
-            if row["entrance_id"] else None
-        )
-        exit_record = (
-            {"source": row["exit_source"], "scanned_at": row["exit_scanned_at"]}
-            if row["exit_id"] else None
-        )
-        day = grade_attendance_day(entrance, exit_record, policy)
-        row.update({
-            "day_grade": day.grade,
-            "day_status": day.status,
-            "day_status_label": AttendanceDayStatus(day.status).label,
-            "entrance_source_label": source_labels.get(row["entrance_source"], "—"),
-            "exit_source_label": source_labels.get(row["exit_source"], "—"),
-        })
-
-    paginator = Paginator([], per_page)
-    paginator.count = total
-    page = paginator.get_page(max(page_number, 1))
-    page.object_list = rows
-    return page
-
-
 def attendance_scores_for_students(
     *,
     student_ids,
@@ -383,52 +172,198 @@ def attendance_scores_for_students(
     return scores
 
 
-def reconcile_missing_exits(target_date=None, *, actor=None) -> int:
-    """Record the missing exit for every entrance of one day.
+RECONCILE_BATCH_SIZE = 500
+
+
+def execute_attendance_reconcile(job, token) -> dict:
+    """J01 executor: bounded, resumable manual reconciliation for one date."""
+
+    from django.utils.translation import gettext
+
+    from ..admin_operations import AdminOperationError, assert_admin_operation_progress
+    from ..models import AdminOperationJob
+    from .decorators import can_correct_attendance
+
+    from ..admin_operations import require_admin_operation_actor
+
+    require_admin_operation_actor(job)
+    if not can_correct_attendance(job.actor):
+        raise AdminOperationError(
+            "not_permitted",
+            gettext("You are no longer allowed to reconcile attendance."),
+        )
+    raw_date = str((job.input or {}).get("date") or "")
+    try:
+        target_date = date.fromisoformat(raw_date)
+    except (TypeError, ValueError) as exc:
+        raise AdminOperationError(
+            "invalid_date",
+            gettext("The reconciliation date is not valid."),
+        ) from exc
+
+    def progress(*, created, total, cursor):
+        assert_admin_operation_progress(
+            job.pk,
+            token,
+            processed=created,
+            succeeded=created,
+            failed=0,
+            skipped=0,
+            total=total,
+            cursor=cursor,
+        )
+
+    created, _cursor = reconcile_missing_exits(
+        target_date,
+        actor=job.actor,
+        progress=progress,
+        resume=job.cursor or {},
+    )
+    return {
+        "status": AdminOperationJob.Status.COMPLETED,
+        "result": {"date": target_date.isoformat(), "created": created},
+    }
+
+
+def _missing_exit_entrances(target_date, *, unassigned: bool):
+    """Return the day's entrances that still have no matching exit, by pk.
+
+    Assigned and unassigned legacy rows use different uniqueness rules, so they
+    are resolved as two disjoint querysets instead of comparing a nullable key
+    with ``=`` inside one anti-join.
+    """
+
+    if unassigned:
+        exit_exists = AttendanceRecord.objects.filter(
+            student_id=OuterRef("student_id"),
+            attendance_date=target_date,
+            action=AttendanceRecord.Action.EXIT,
+            course_offering__isnull=True,
+        )
+    else:
+        exit_exists = AttendanceRecord.objects.filter(
+            student_id=OuterRef("student_id"),
+            course_offering_id=OuterRef("course_offering_id"),
+            attendance_date=target_date,
+            action=AttendanceRecord.Action.EXIT,
+        )
+    return (
+        AttendanceRecord.objects.filter(
+            attendance_date=target_date,
+            action=AttendanceRecord.Action.ENTRANCE,
+            course_offering__isnull=unassigned,
+        )
+        .filter(~Exists(exit_exists))
+        .order_by("pk")
+    )
+
+
+def _reconcile_missing_phase(queryset, *, target_date, source, actor, after_pk: int, phase: str, commit) -> int:
+    """Insert missing exits for one keyset phase in bounded batches."""
+
+    while True:
+        rows = list(
+            queryset.filter(pk__gt=after_pk).values("pk", "student_id", "course_offering_id")[:RECONCILE_BATCH_SIZE]
+        )
+        if not rows:
+            return after_pk
+        after_pk = rows[-1]["pk"]
+        records = [
+            AttendanceRecord(
+                student_id=row["student_id"],
+                course_offering_id=row["course_offering_id"],
+                attendance_date=target_date,
+                action=AttendanceRecord.Action.EXIT,
+                source=source,
+                scanned_by=actor,
+            )
+            for row in rows
+        ]
+        with transaction.atomic():
+            AttendanceRecord.objects.bulk_create(
+                records,
+                batch_size=RECONCILE_BATCH_SIZE,
+                ignore_conflicts=True,
+            )
+            commit(phase, after_pk, len(records))
+        if len(rows) < RECONCILE_BATCH_SIZE:
+            return after_pk
+
+
+def reconcile_missing_exits(target_date=None, *, actor=None, progress=None, resume=None) -> tuple[int, dict]:
+    """Record the missing exit for every entrance of one day, in bounded batches.
 
     Automatic reconciliation (no actor) stores the run time with an ``auto``
     source; the manual fallback records the acting administrator and a
-    ``manual`` source. The operation is idempotent.
+    ``manual`` source. The operation is idempotent: the unique
+    student/offering/date/action constraint and ``ignore_conflicts`` absorb
+    concurrent scans, and a re-run finds no remaining missing exits. The
+    returned count is the number of exits this run attempted to insert; a
+    concurrent duplicate scan can therefore make it slightly higher than the
+    number of newly created rows.
+
+    ``resume`` carries the previous ``{"phase", "after_pk", "created"}`` cursor
+    so a killed worker continues after the last committed batch, and
+    ``progress`` receives the cursor in the same transaction as each insert.
     """
+
     target_date = target_date or timezone.localdate()
-    entrances = AttendanceRecord.objects.filter(
-        attendance_date=target_date,
-        action=AttendanceRecord.Action.ENTRANCE,
-    ).values("student_id", "course_offering_id")
-    existing = set(
-        AttendanceRecord.objects.filter(
-            attendance_date=target_date,
-            action=AttendanceRecord.Action.EXIT,
-        ).values_list("student_id", "course_offering_id")
-    )
+    resume = resume or {}
     source = AttendanceRecord.Source.MANUAL if actor is not None else AttendanceRecord.Source.AUTO
-    missing = [
-        AttendanceRecord(
-            student_id=row["student_id"],
-            course_offering_id=row["course_offering_id"],
-            attendance_date=target_date,
-            action=AttendanceRecord.Action.EXIT,
+    start_unassigned = resume.get("phase") == "unassigned"
+    after_pk = max(0, int(resume.get("after_pk") or 0))
+    created_total = max(0, int(resume.get("created") or 0))
+
+    assigned = _missing_exit_entrances(target_date, unassigned=False)
+    unassigned = _missing_exit_entrances(target_date, unassigned=True)
+    remaining = unassigned.filter(pk__gt=after_pk).count() if start_unassigned else (
+        assigned.filter(pk__gt=after_pk).count() + unassigned.count()
+    )
+    total = created_total + remaining
+
+    def commit(phase: str, last_pk: int, count: int) -> None:
+        nonlocal created_total
+        created_total += count
+        if progress is not None:
+            progress(
+                created=created_total,
+                total=total,
+                cursor={"phase": phase, "after_pk": last_pk, "created": created_total},
+            )
+
+    if not start_unassigned:
+        after_pk = _reconcile_missing_phase(
+            assigned,
+            target_date=target_date,
             source=source,
-            scanned_by=actor,
+            actor=actor,
+            after_pk=after_pk,
+            phase="assigned",
+            commit=commit,
         )
-        for row in entrances
-        if (row["student_id"], row["course_offering_id"]) not in existing
-    ]
-    if not missing:
-        return 0
-    with transaction.atomic():
-        AttendanceRecord.objects.bulk_create(missing, batch_size=500, ignore_conflicts=True)
+        # Publish the phase boundary even when nothing was inserted so a crash
+        # between the two phases never rescans the assigned keyspace.
+        commit("unassigned", 0, 0)
+    _reconcile_missing_phase(
+        unassigned,
+        target_date=target_date,
+        source=source,
+        actor=actor,
+        after_pk=after_pk if start_unassigned else 0,
+        phase="unassigned",
+        commit=commit,
+    )
     logger.info(
         "missing exits reconciled",
         extra={
             "event": "attendance_reconciled",
             "on_date": target_date.isoformat(),
-            "count": len(missing),
+            "count": created_total,
             "source": source,
             "actor_id": actor.pk if actor is not None else None,
         },
     )
-    return len(missing)
+    return created_total, {"phase": "done", "after_pk": 0, "created": created_total}
 
 
 def get_student_attendance_context(student, check_date):
@@ -535,7 +470,7 @@ def get_course_attendance_summary(student, course_offering, through_date=None, s
     """Return graded attendance against the offering's current published lesson count.
 
     ``valid`` counts full days, ``invalid`` partial days, and ``attendance_rate``
-    uses the graded points (full + 0.5 × partial) over the published lessons.
+    uses the graded points (full + 0.5 x partial) over the published lessons.
     """
     if student.study_mode == "online":
         return {

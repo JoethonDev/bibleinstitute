@@ -24,8 +24,8 @@
     <div class="sd-panel-card mb-4">
       <div class="sd-panel-head">
         <i class="fas fa-calendar-alt"></i>
-        <strong>{{ scope.academic_year }} — {{ scope.level.display_name }}</strong>
-        <span class="sd-panel-sub">{{ scope.academic_year.starts_on|date }} – {{ scope.academic_year.ends_on|date }}</span>
+        <strong>{{ scope.academic_year }} - {{ scope.level.display_name }}</strong>
+        <span class="sd-panel-sub">{{ scope.academic_year.starts_on|date }} - {{ scope.academic_year.ends_on|date }}</span>
       </div>
       <div class="sd-screen">
         {% if month_grid %}
@@ -87,7 +87,7 @@
             <ul class="sd-holiday-list">
               {% for h in holidays %}
                 <li class="sd-holiday-item">
-                  <span class="sd-holiday-date">{{ h.date }}</span> – {{ h.name }}
+                  <span class="sd-holiday-date">{{ h.date }}</span> - {{ h.name }}
                 </li>
               {% endfor %}
             </ul>

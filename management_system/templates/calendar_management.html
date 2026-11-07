@@ -30,14 +30,14 @@
             <select id="year-select" name="academic_year" class="form-select"
                     onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
               {% for y in years %}
-              <option value="{{ y.id }}" {% if y.id == year_id %}selected{% endif %}>{{ y.name }}{% if y.is_active %} · {% translate "Active" %}{% endif %}</option>
+              <option value="{{ y.id }}" {% if y.id == year_id %}selected{% endif %}>{{ y.name }}{% if y.is_active %} - {% translate "Active" %}{% endif %}</option>
               {% endfor %}
             </select>
           </form>
         </div>
         <div class="ad-calendar-year-meta">
           {% if year.is_active %}<span class="ad-pill ad-pill--success">{% translate "Active" %}</span>{% endif %}
-          <span class="ad-calendar-year-range">{{ year.starts_on|date }} – {{ year.ends_on|date }}</span>
+          <span class="ad-calendar-year-range">{{ year.starts_on|date }} - {{ year.ends_on|date }}</span>
           <span class="ad-calendar-year-counts">
             <span>{{ year_scope_count }} {% translate "Levels" %}</span>
             <span>{{ year_offering_count }} {% translate "Offerings" %}</span>
@@ -133,7 +133,7 @@
       </div>
     </div>
 
-    {# Calendar grid — canonical shared partial (read-only variant is used on the student calendar) #}
+    {# Calendar grid - canonical shared partial (read-only variant is used on the student calendar) #}
     {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
 
     {# Phone-only agenda of the days that carry a meeting or holiday #}

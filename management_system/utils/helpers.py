@@ -4,7 +4,6 @@ Provides reusable utilities for common operations.
 """
 import json
 import re
-from datetime import date, datetime, timedelta
 from django.conf import settings
 from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -20,7 +19,7 @@ from management_system.utils.decorators import check_role_permission
 from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade, QuizStudentOpening
 from management_system.academic_access import user_can_write_offering_activity
 from management_system.admin_tables import TABLE_VIEWS, create_selection_token
-from .timezones import ensure_aware, parse_application_datetime
+from .timezones import ensure_aware
 from .quiz_access import QUIZ_SUBMISSION_GRACE, quiz_status_from, quiz_window
 
 logger = getLogger(__name__)
@@ -57,19 +56,6 @@ def build_scan_url(request, token: str) -> str:
         ):
             return f"{configured_domain}{scan_path}"
     return request.build_absolute_uri(scan_path)
-
-
-def get_datetime(datetime_string):
-    """
-    Parse datetime string in format YYYY-MM-DDTHH:MM to datetime object.
-    
-    Args:
-        datetime_string: String in format "YYYY-MM-DDTHH:MM"
-    
-    Returns:
-        datetime object
-    """
-    return parse_application_datetime(datetime_string)
 
 
 def parse_json_value(value, default=None):

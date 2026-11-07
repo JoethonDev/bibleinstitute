@@ -54,12 +54,12 @@
                     <div class="ad-table-wrap">
                     <table class="ad-table">
                         <tr><th>{% translate "Username" %}</th><td>{{ app_user.username }}</td></tr>
-                        <tr><th>{% translate "Full Name" %}</th><td>{{ app_user.get_full_name|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Email" %}</th><td>{{ app_user.email|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Phone" %}</th><td>{{ app_user.phone|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Country" %}</th><td>{{ app_user.country|default:"—" }}</td></tr>
-                        <tr><th>{% translate "City" %}</th><td>{{ app_user.city|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Educational qualification / occupation" %}</th><td>{{ app_user.education_or_job|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Full Name" %}</th><td>{{ app_user.get_full_name|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Email" %}</th><td>{{ app_user.email|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Phone" %}</th><td>{{ app_user.phone|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Country" %}</th><td>{{ app_user.country|default:"-" }}</td></tr>
+                        <tr><th>{% translate "City" %}</th><td>{{ app_user.city|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Educational qualification / occupation" %}</th><td>{{ app_user.education_or_job|default:"-" }}</td></tr>
                     </table>
                     </div>
                 </div>
@@ -71,10 +71,10 @@
                 <div class="ad-card-body">
                     <div class="ad-table-wrap">
                     <table class="ad-table">
-                        <tr><th>{% translate "Confessor Name" %}</th><td>{{ app_user.priest_name|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Confessor Phone" %}</th><td>{{ app_user.priest_phone|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Church" %}</th><td>{{ app_user.church|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Service (if any)" %}</th><td>{{ app_user.service|default:"—" }}</td></tr>
+                        <tr><th>{% translate "Confessor Name" %}</th><td>{{ app_user.priest_name|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Confessor Phone" %}</th><td>{{ app_user.priest_phone|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Church" %}</th><td>{{ app_user.church|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Service (if any)" %}</th><td>{{ app_user.service|default:"-" }}</td></tr>
                     </table>
                     </div>
                 </div>
@@ -89,10 +89,10 @@
                 <div class="ad-card-body">
                     <div class="ad-table-wrap">
                     <table class="ad-table">
-                        <tr><th>{% translate "Identity Type" %}</th><td>{{ app_user.get_identity_type_display|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Identity Number" %}</th><td>{{ app_user.identity_number|default:"—" }}</td></tr>
-                        <tr><th>{% translate "Identity Front" %}</th><td>{% if app_user.identity_front_key %}<code>{{ app_user.identity_front_key }}</code>{% else %}—{% endif %}</td></tr>
-                        <tr><th>{% translate "Identity Back" %}</th><td>{% if app_user.identity_back_key %}<code>{{ app_user.identity_back_key }}</code>{% else %}—{% endif %}</td></tr>
+                        <tr><th>{% translate "Identity Type" %}</th><td>{{ app_user.get_identity_type_display|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Identity Number" %}</th><td>{{ app_user.identity_number|default:"-" }}</td></tr>
+                        <tr><th>{% translate "Identity Front" %}</th><td>{% if app_user.identity_front_key %}<code>{{ app_user.identity_front_key }}</code>{% else %}-{% endif %}</td></tr>
+                        <tr><th>{% translate "Identity Back" %}</th><td>{% if app_user.identity_back_key %}<code>{{ app_user.identity_back_key }}</code>{% else %}-{% endif %}</td></tr>
                     </table>
                     </div>
                 </div>
@@ -178,7 +178,7 @@
     <div class="ad-alert ad-alert--info mt-3">
         <i class="fas fa-info-circle"></i>
         <div>
-            <small>{% translate "Decided by" %}: {{ app_user.decided_by.get_full_name|default:app_user.decided_by.username }} — {{ app_user.decided_at|date:"Y-m-d H:i" }}</small>
+            <small>{% translate "Decided by" %}: {{ app_user.decided_by.get_full_name|default:app_user.decided_by.username }} - {{ app_user.decided_at|date:"Y-m-d H:i" }}</small>
         </div>
     </div>
     {% endif %}

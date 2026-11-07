@@ -60,14 +60,14 @@
                     <div class="ad-card-body">
                         <dl class="row mb-0">
                             <dt class="col-sm-5">{% translate "Username" %}</dt><dd class="col-sm-7">{{ profile_user.username }}</dd>
-                            <dt class="col-sm-5">{% translate "First name" %}</dt><dd class="col-sm-7">{{ profile_user.first_name|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Last name" %}</dt><dd class="col-sm-7">{{ profile_user.last_name|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Email" %}</dt><dd class="col-sm-7">{{ profile_user.email|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Role" %}</dt><dd class="col-sm-7">{{ profile_user.role.get_role_display|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "First name" %}</dt><dd class="col-sm-7">{{ profile_user.first_name|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Last name" %}</dt><dd class="col-sm-7">{{ profile_user.last_name|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Email" %}</dt><dd class="col-sm-7">{{ profile_user.email|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Role" %}</dt><dd class="col-sm-7">{{ profile_user.role.get_role_display|default:"-" }}</dd>
                             <dt class="col-sm-5">{% translate "Active" %}</dt><dd class="col-sm-7">{% if profile_user.is_active %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd>
-                            <dt class="col-sm-5">{% translate "Joined date" %}</dt><dd class="col-sm-7">{{ profile_user.joined_date|date:"Y-m-d"|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Last login" %}</dt><dd class="col-sm-7">{{ profile_user.last_login|date:"Y-m-d H:i"|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Time zone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.time_zone|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Joined date" %}</dt><dd class="col-sm-7">{{ profile_user.joined_date|date:"Y-m-d"|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Last login" %}</dt><dd class="col-sm-7">{{ profile_user.last_login|date:"Y-m-d H:i"|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Time zone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.time_zone|default:"-" }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -77,11 +77,11 @@
                     <div class="ad-card-head"><strong>{% translate "Personal information" %}</strong></div>
                     <div class="ad-card-body">
                         <dl class="row mb-0">
-                            <dt class="col-sm-5">{% translate "Phone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.phone|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Country" %}</dt><dd class="col-sm-7">{{ profile_user.country|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "City" %}</dt><dd class="col-sm-7">{{ profile_user.city|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Educational qualification / occupation" %}</dt><dd class="col-sm-7">{{ profile_user.education_or_job|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Study mode" %}</dt><dd class="col-sm-7">{{ profile_user.get_study_mode_display|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Phone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.phone|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Country" %}</dt><dd class="col-sm-7">{{ profile_user.country|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "City" %}</dt><dd class="col-sm-7">{{ profile_user.city|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Educational qualification / occupation" %}</dt><dd class="col-sm-7">{{ profile_user.education_or_job|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Study mode" %}</dt><dd class="col-sm-7">{{ profile_user.get_study_mode_display|default:"-" }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -89,10 +89,10 @@
                     <div class="ad-card-head"><strong>{% translate "Church information" %}</strong></div>
                     <div class="ad-card-body">
                         <dl class="row mb-0">
-                            <dt class="col-sm-5">{% translate "Confessor name" %}</dt><dd class="col-sm-7">{{ profile_user.priest_name|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Confessor phone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.priest_phone|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Church" %}</dt><dd class="col-sm-7">{{ profile_user.church|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Service (if any)" %}</dt><dd class="col-sm-7">{{ profile_user.service|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Confessor name" %}</dt><dd class="col-sm-7">{{ profile_user.priest_name|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Confessor phone" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.priest_phone|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Church" %}</dt><dd class="col-sm-7">{{ profile_user.church|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Service (if any)" %}</dt><dd class="col-sm-7">{{ profile_user.service|default:"-" }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -135,13 +135,13 @@
                         <dl class="row mb-0">
                             <dt class="col-sm-5">{% translate "Application status" %}</dt>
                             <dd class="col-sm-7"><span class="ad-pill {% if profile_user.application_status == 'active' %}ad-pill--success{% elif profile_user.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ profile_user.get_application_status_display }}</span></dd>
-                            <dt class="col-sm-5">{% translate "Identity type" %}</dt><dd class="col-sm-7">{{ profile_user.get_identity_type_display|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "National ID / passport number" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.identity_number|default:"—" }}</dd>
-                            <dt class="col-sm-5">{% translate "Decision notes" %}</dt><dd class="col-sm-7">{{ profile_user.decision_notes|default:"—"|linebreaksbr }}</dd>
-                            <dt class="col-sm-5">{% translate "Decided by" %}</dt><dd class="col-sm-7">{% if profile_user.decided_by %}{{ profile_user.decided_by.get_full_name|default:profile_user.decided_by.username }}{% else %}—{% endif %}</dd>
-                            <dt class="col-sm-5">{% translate "Decided at" %}</dt><dd class="col-sm-7">{{ profile_user.decided_at|date:"Y-m-d H:i"|default:"—" }}</dd>
+                            <dt class="col-sm-5">{% translate "Identity type" %}</dt><dd class="col-sm-7">{{ profile_user.get_identity_type_display|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "National ID / passport number" %}</dt><dd class="col-sm-7" dir="ltr">{{ profile_user.identity_number|default:"-" }}</dd>
+                            <dt class="col-sm-5">{% translate "Decision notes" %}</dt><dd class="col-sm-7">{{ profile_user.decision_notes|default:"-"|linebreaksbr }}</dd>
+                            <dt class="col-sm-5">{% translate "Decided by" %}</dt><dd class="col-sm-7">{% if profile_user.decided_by %}{{ profile_user.decided_by.get_full_name|default:profile_user.decided_by.username }}{% else %}-{% endif %}</dd>
+                            <dt class="col-sm-5">{% translate "Decided at" %}</dt><dd class="col-sm-7">{{ profile_user.decided_at|date:"Y-m-d H:i"|default:"-" }}</dd>
                             <dt class="col-sm-5">{% translate "Active enrollment" %}</dt>
-                            <dd class="col-sm-7">{% if active_enrollment %}{{ active_enrollment.academic_year_level.academic_year.name }} — {{ active_enrollment.academic_year_level.level.display_name }}{% else %}{% translate "None" %}{% endif %}</dd>
+                            <dd class="col-sm-7">{% if active_enrollment %}{{ active_enrollment.academic_year_level.academic_year.name }} - {{ active_enrollment.academic_year_level.level.display_name }}{% else %}{% translate "None" %}{% endif %}</dd>
                         </dl>
                     </div>
                 </div>

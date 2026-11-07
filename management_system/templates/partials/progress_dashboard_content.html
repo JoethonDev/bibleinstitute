@@ -15,7 +15,7 @@
             <select id="progress-scope" name="academic_year" class="form-select" hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#progress-loading">
                 <option value="">{% translate "Academic year..." %}</option>
                 {% for scope in scopes %}
-                <option value="{{ scope.id }}" {% if selected_year == scope.id %}selected{% endif %}>{{ scope.academic_year.name }} — {{ scope.level.display_name }}</option>
+                <option value="{{ scope.id }}" {% if selected_year == scope.id %}selected{% endif %}>{{ scope.academic_year.name }} - {{ scope.level.display_name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -37,7 +37,7 @@
             <label for="progress-student-search">{% translate "Student" %}</label>
             <input id="progress-student-search" type="search" name="student" class="form-control" value="{{ selected_student|default:'' }}" placeholder="{% translate 'Search student name...' %}" hx-preserve hx-get="{% url 'progress-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#progress-loading">
         </div>
-        {% if selected_year %}<div class="ad-progress-window">{% translate "Activity window" %}<strong>{% blocktranslate with start=progress_window_start|date:"DATE_FORMAT" end=progress_window_end|date:"DATE_FORMAT" %}{{ start }} – {{ end }}{% endblocktranslate %}</strong></div>{% endif %}
+        {% if selected_year %}<div class="ad-progress-window">{% translate "Activity window" %}<strong>{% blocktranslate with start=progress_window_start|date:"DATE_FORMAT" end=progress_window_end|date:"DATE_FORMAT" %}{{ start }} - {{ end }}{% endblocktranslate %}</strong></div>{% endif %}
         </form>
     </div>
 
@@ -51,7 +51,7 @@
                     <span class="ad-progress-avatar" aria-hidden="true"><i class="fas fa-user-graduate"></i></span>
                     <div class="ad-progress-ident-text">
                         <h5 id="progress-row-title-{{ p.pk }}" class="ad-progress-student">{{ p.student.get_full_name|default:p.student.username }}</h5>
-                        <div class="ad-progress-content-title">{{ p.lesson.name }} <span aria-hidden="true">·</span> {{ p.part_display_name }}</div>
+                        <div class="ad-progress-content-title">{{ p.lesson.name }} <span aria-hidden="true">-</span> {{ p.part_display_name }}</div>
                         <div class="ad-progress-part-id"><code>{{ p.part_id }}</code></div>
                     </div>
                 </div>
@@ -72,25 +72,25 @@
                 <div class="ad-progress-metric">
                     <span class="ad-progress-metric-icon ad-progress-icon--gold" aria-hidden="true"><i class="far fa-calendar-check"></i></span>
                     <span class="ad-progress-metric-copy">
-                        <strong>{% if activity.available %}{{ activity.active_days }}{% else %}—{% endif %}</strong>
+                        <strong>{% if activity.available %}{{ activity.active_days }}{% else %}-{% endif %}</strong>
                         <span>{% translate "Active days" %}</span>
                     </span>
                 </div>
                 <div class="ad-progress-metric">
                     <span class="ad-progress-metric-icon" aria-hidden="true"><i class="far fa-clock"></i></span>
                     <span class="ad-progress-metric-copy">
-                        <strong>{% if activity.available %}{{ activity.active_duration }}{% else %}—{% endif %}</strong>
+                        <strong>{% if activity.available %}{{ activity.active_duration }}{% else %}-{% endif %}</strong>
                         <span title="{% translate 'Playback time is credited only while visible playback is advancing; paused and idle time is excluded.' %}">{% translate "Active watch time" %}</span>
                     </span>
                 </div>
                 <div class="ad-progress-date">
                     <span>{% translate "First started" %}</span>
-                    <strong>{% if activity.first_started_at %}{{ activity.first_started_at|date:"DATE_FORMAT" }}{% else %}—{% endif %}</strong>
+                    <strong>{% if activity.first_started_at %}{{ activity.first_started_at|date:"DATE_FORMAT" }}{% else %}-{% endif %}</strong>
                     {% if activity.first_started_at %}<small>{{ activity.first_started_at|date:"TIME_FORMAT" }}</small>{% endif %}
                 </div>
                 <div class="ad-progress-date">
                     <span>{% if p.completed_at %}{% translate "Completed" context "progress" %}{% else %}{% translate "Last active" %}{% endif %}</span>
-                    <strong>{% if p.completed_at %}{{ p.completed_at|date:"DATE_FORMAT" }}{% elif activity.available %}{{ activity.last_active_at|date:"DATE_FORMAT" }}{% else %}—{% endif %}</strong>
+                    <strong>{% if p.completed_at %}{{ p.completed_at|date:"DATE_FORMAT" }}{% elif activity.available %}{{ activity.last_active_at|date:"DATE_FORMAT" }}{% else %}-{% endif %}</strong>
                     {% if p.completed_at %}<small>{{ p.completed_at|date:"TIME_FORMAT" }}</small>{% elif activity.available %}<small>{{ activity.last_active_at|date:"TIME_FORMAT" }}</small>{% endif %}
                 </div>
                     <span class="ad-progress-toggle" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
@@ -105,7 +105,7 @@
                                 </div>
                             </div>
                             <ol class="ad-progress-heatmap" aria-label="{% translate 'Daily active playback over the last 30 days' %}">
-                                {% for day in activity.timeline %}<li class="is-{{ day.intensity }}" title="{{ day.date|date:'DATE_FORMAT' }} · {{ day.duration }}"><span class="ad-progress-heatmap-cell"></span><span class="ad-progress-heatmap-date">{% if forloop.first %}{{ day.date|date:"M" }}<br>{% endif %}{{ day.date|date:"j" }}</span><span class="visually-hidden">{{ day.date|date:'DATE_FORMAT' }}: {{ day.duration }}</span></li>{% endfor %}
+                                {% for day in activity.timeline %}<li class="is-{{ day.intensity }}" title="{{ day.date|date:'DATE_FORMAT' }} - {{ day.duration }}"><span class="ad-progress-heatmap-cell"></span><span class="ad-progress-heatmap-date">{% if forloop.first %}{{ day.date|date:"M" }}<br>{% endif %}{{ day.date|date:"j" }}</span><span class="visually-hidden">{{ day.date|date:'DATE_FORMAT' }}: {{ day.duration }}</span></li>{% endfor %}
                             </ol>
                             <div class="ad-progress-timeline-ends"><span>{{ activity.window_start|date:"DATE_FORMAT" }}</span><span>{{ activity.window_end|date:"DATE_FORMAT" }}</span></div>
                         </section>
@@ -131,8 +131,8 @@
                             </div>
                             {% else %}<p class="ad-progress-no-activity">{% translate "No active study days in this period." %}</p>{% endif %}
                             <div class="ad-progress-highlights">
-                                <div><span>{% translate "Most active day" %}</span><strong>{% if activity.most_active_day %}{{ activity.most_active_day.date|date:"DATE_FORMAT" }} · {{ activity.most_active_day.duration }}{% else %}—{% endif %}</strong></div>
-                                <div><span>{% translate "Most progress" %}</span><strong>{% if activity.most_progress_day and activity.most_progress_day.progress_gain %}{{ activity.most_progress_day.date|date:"DATE_FORMAT" }} · +{{ activity.most_progress_day.progress_gain }}%{% else %}—{% endif %}</strong></div>
+                                <div><span>{% translate "Most active day" %}</span><strong>{% if activity.most_active_day %}{{ activity.most_active_day.date|date:"DATE_FORMAT" }} - {{ activity.most_active_day.duration }}{% else %}-{% endif %}</strong></div>
+                                <div><span>{% translate "Most progress" %}</span><strong>{% if activity.most_progress_day and activity.most_progress_day.progress_gain %}{{ activity.most_progress_day.date|date:"DATE_FORMAT" }} - +{{ activity.most_progress_day.progress_gain }}%{% else %}-{% endif %}</strong></div>
                             </div>
                         </section>
                         <div class="ad-progress-span-note">

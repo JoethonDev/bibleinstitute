@@ -3,7 +3,7 @@ Storage operations for file management.
 Provides common interface for file operations with R2/Cloud storage.
 """
 import io
-import os
+from contextlib import nullcontext
 from typing import Optional
 from urllib.parse import unquote
 from logging import getLogger
@@ -141,7 +141,7 @@ def list_current_folder_page(
     caller so the UI/API can request the next page without materializing a
     whole folder in memory.
     
-    The ``folder_name`` param is an R2 key prefix — a slash-delimited path.
+    The ``folder_name`` param is an R2 key prefix - a slash-delimited path.
     (Previously it used ``-`` as a segment separator, which broke on any
     folder name containing a hyphen.)
     
@@ -248,8 +248,12 @@ def download_from_bucket(cloud_client, bucket_name, file_name):
     try:
         in_memory = io.BytesIO()
         response = cloud_client.get_object(Bucket=bucket_name, Key=file_name)
-        # Write incoming data
-        in_memory.write(response['Body'].read())
+        body = response['Body']
+        try:
+            # Write incoming data, then release the provider connection.
+            in_memory.write(body.read())
+        finally:
+            body.close()
         in_memory.seek(0)
         
         logger.info(f"Downloaded file from bucket: {file_name}")
@@ -303,16 +307,25 @@ def upload_to_bucket(cloud_client, bucket_name, file_data, file_key, content_typ
         Boolean indicating success
     """
     try:
+        from ..storage_ownership import is_operation_artifact_key
+        from ..storage_coordination import guarded_storage_write
+
         extra_args = {}
         if content_type:
             extra_args['ContentType'] = content_type
-        
-        cloud_client.upload_fileobj(
-            file_data,
-            bucket_name,
-            file_key,
-            ExtraArgs=extra_args
+
+        guard = (
+            guarded_storage_write(str(file_key))
+            if not is_operation_artifact_key(str(file_key))
+            else nullcontext()
         )
+        with guard:
+            cloud_client.upload_fileobj(
+                file_data,
+                bucket_name,
+                file_key,
+                ExtraArgs=extra_args
+            )
         
         logger.info(f"Uploaded file to bucket: {file_key}")
         return True
@@ -335,12 +348,25 @@ def delete_from_bucket(cloud_client, bucket_name, file_key):
         Boolean indicating success
     """
     try:
-        cloud_client.delete_object(Bucket=bucket_name, Key=file_key)
+        from ..storage_ownership import is_operation_artifact_key
+        from ..storage_coordination import guarded_storage_write
+
+        guard = (
+            guarded_storage_write(str(file_key))
+            if not is_operation_artifact_key(str(file_key))
+            else nullcontext()
+        )
+        with guard:
+            cloud_client.delete_object(Bucket=bucket_name, Key=file_key)
         logger.info(f"Deleted file from bucket: {file_key}")
         return True
         
-    except Exception as e:
-        logger.error(f"Error deleting file from bucket: {e}")
+    except Exception:
+        logger.warning(
+            "bucket delete failed",
+            extra={"event": "bucket_delete_failed", "file_key": file_key},
+            exc_info=True,
+        )
         return False
 
 
@@ -359,7 +385,7 @@ def check_file_exists(cloud_client, bucket_name, file_key):
     try:
         cloud_client.head_object(Bucket=bucket_name, Key=file_key)
         return True
-    except:
+    except Exception:
         return False
 
 

@@ -25,7 +25,7 @@
         <div class="sd-profile-banner-copy">
             <strong>{% translate "Your profile is almost ready" %}</strong>
             <span>{% translate "Complete these last details so your student record stays ready for every academic step:" %}</span>
-            <span class="sd-profile-banner-list">{% for item in missing_profile_items %}{{ item }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+            <span class="sd-profile-banner-list">{% for item in missing_profile_items %}{{ item }}{% if not forloop.last %} - {% endif %}{% endfor %}</span>
         </div>
         <a href="#profile" class="sd-btn sd-btn--gold sd-btn--sm"><i class="fas fa-arrow-down"></i> {% translate "Complete now" %}</a>
     </div>
@@ -42,7 +42,7 @@
             {% endif %}
             {% for q in next_actions.next_quizzes %}
             <a class="sd-btn sd-btn--gold sd-btn--sm mb-2" href="{% url 'quiz-details' q.offering_id q.id %}">
-                <i class="fas fa-list-check"></i> {{ q.name }}{% if q.course_name %} · {{ q.course_name }}{% endif %}
+                <i class="fas fa-list-check"></i> {{ q.name }}{% if q.course_name %} - {{ q.course_name }}{% endif %}
             </a>
             {% endfor %}
             {% if not next_actions.resume and not next_actions.next_quizzes %}
@@ -188,7 +188,7 @@
                                 {% for payment in academic_payments %}
                                 <li class="sd-mini-row">
                                     <i class="fas fa-circle-check"></i>
-                                    <span class="w-100">{{ payment.academic_year_level.level.display_name }} — {{ payment.academic_year_level.academic_year.name }}</span>
+                                    <span class="w-100">{{ payment.academic_year_level.level.display_name }} - {{ payment.academic_year_level.academic_year.name }}</span>
                                     <a href="{% url 'academic-payment-document' payment.pk %}" target="_blank" rel="noopener noreferrer" class="sd-btn sd-btn--gold-outline btn-sm">{% translate "View" %}</a>
                                 </li>
                                 {% endfor %}
@@ -293,7 +293,7 @@
                                             data-bs-toggle="collapse"
                                             data-bs-target="#collapse-{{ forloop.counter }}"
                                             aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
-                                        <span>{{ level.section_name|default:level.level_name }}{% if not level.section_name and level.academic_year_name %} — {{ level.academic_year_name }}{% endif %}</span>
+                                        <span>{{ level.section_name|default:level.level_name }}{% if not level.section_name and level.academic_year_name %} - {{ level.academic_year_name }}{% endif %}</span>
                                         <span class="sd-acc-count">{{ level.offerings|length }}</span>
                                         <i class="fas fa-chevron-down sd-collapse-indicator"></i>
                                     </button>
@@ -326,11 +326,11 @@
                                                         {% endif %}
                                                         <span class="d-block ps-muted-text mt-1">
                                                             {% translate "Weekly quizzes" %}: {{ offering.profile_progress.weekly_taken }}/{{ offering.profile_progress.weekly_total }}
-                                                            {% if offering.profile_progress.weekly_grades %} — {% for grade in offering.profile_progress.weekly_grades %}{{ grade.name }}: {{ grade.score }}/{{ grade.total }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                                                            {% if offering.profile_progress.weekly_grades %} - {% for grade in offering.profile_progress.weekly_grades %}{{ grade.name }}: {{ grade.score }}/{{ grade.total }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
                                                         </span>
                                                         <span class="d-block ps-muted-text">
                                                             {% translate "Final quizzes" %}: {{ offering.profile_progress.final_taken }}/{{ offering.profile_progress.final_total }}
-                                                            {% if offering.profile_progress.final_grades %} — {% for grade in offering.profile_progress.final_grades %}{{ grade.name }}: {{ grade.score }}/{{ grade.total }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                                                            {% if offering.profile_progress.final_grades %} - {% for grade in offering.profile_progress.final_grades %}{{ grade.name }}: {{ grade.score }}/{{ grade.total }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
                                                         </span>
                                                     </span>
                                                 </span>
@@ -365,7 +365,7 @@
                         <i class="fas fa-clipboard-check"></i>
                         <span>
                             <span class="fw-semibold">{{ grade.quiz.name }}</span>
-                            <br><span class="ps-muted-text sd-result-meta">{% if grade.quiz.course_offering %}{{ grade.quiz.course_offering.course.name }} · {% endif %}{{ grade.submitted_at|date:"d/m/Y" }}</span>
+                            <br><span class="ps-muted-text sd-result-meta">{% if grade.quiz.course_offering %}{{ grade.quiz.course_offering.course.name }} - {% endif %}{{ grade.submitted_at|date:"d/m/Y" }}</span>
                         </span>
                         <span class="sd-score sd-score--good flex-shrink-0">{{ grade.total_grade }}/{{ grade.quiz.total_grade }}</span>
                     </div>

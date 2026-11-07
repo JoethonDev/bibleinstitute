@@ -1,4 +1,4 @@
-"""Canonical Student 360 aggregation — one bounded read per section.
+"""Canonical Student 360 aggregation - one bounded read per section.
 
 Reused by the admin 360 page only. No writes, no R2, no provider calls.
 Every list is bounded (<=25) with select_related; counts use SQL aggregation.

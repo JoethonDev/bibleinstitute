@@ -1,33 +1,45 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal
+from typing import Iterator
 
-from django.db.models import Count, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import Q
 
 from ..models import AttendancePolicy, AttendanceRecord, Enrollment, Grade, Lesson, PublicationStatus
 from .attendance import (
     DAY_GRADE_FULL,
     DAY_GRADE_PARTIAL,
-    get_expected_dates,
     grade_attendance_day,
     merge_attendance_pairs,
     pair_attendance_records,
 )
 from .search import normalized_contains_q
 
+REPORT_BATCH_SIZE = 500
 
-def _grade_scope_filter(academic_year_level, course_offering_id=None) -> Q:
-    query = Q(quiz__course_offering__academic_year_level=academic_year_level)
-    if course_offering_id:
-        query &= Q(quiz__course_offering_id=course_offering_id)
-    return query
+
+@dataclass(frozen=True)
+class ReportFacts:
+    """Scope-wide report facts loaded once per bounded run or page."""
+
+    policy: AttendancePolicy
+    expected_count: int
+
+
+@dataclass(frozen=True)
+class ReportBatch:
+    """One bounded enrollment page plus the facts needed to render its sheets."""
+
+    rows: list
+    attendance_by_student: dict
+    facts: ReportFacts
 
 
 def report_enrollments(academic_year_level, student_search=None, study_mode=None, course_offering_id=None):
     """Return one SQL-backed normal-enrollment row per student in a scope."""
-    grade_filter = Q(student__submitted_quizzes__quiz__course_offering__academic_year_level=academic_year_level)
-    if course_offering_id:
-        grade_filter &= Q(student__submitted_quizzes__quiz__course_offering_id=course_offering_id)
+    # Totals are computed by the canonical row builder from the bounded grade
+    # detail query; annotating them here duplicated that work and made the
+    # paginator/count SQL more expensive without any consumer.
     enrollments = Enrollment.objects.filter(
         academic_year_level=academic_year_level,
         enrollment_type=Enrollment.Type.NORMAL,
@@ -35,9 +47,6 @@ def report_enrollments(academic_year_level, student_search=None, study_mode=None
         status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
     ).select_related(
         "student", "student__role", "academic_year_level__academic_year", "academic_year_level__level"
-    ).annotate(
-        grade_earned=Coalesce(Sum("student__submitted_quizzes__total_grade", filter=grade_filter), Value(0)),
-        grade_available=Coalesce(Sum("student__submitted_quizzes__quiz__total_grade", filter=grade_filter), Value(0)),
     )
     if student_search:
         search_filter = normalized_contains_q(
@@ -80,17 +89,28 @@ def get_grade_summary(student, academic_year_level, course_offering_id=None):
     }
 
 
-def build_report_page_rows(enrollments, academic_year_level, course_offering_id=None):
-    """Build rows for an already SQL-paginated enrollment page.
+def load_report_facts(academic_year_level, course_offering_id=None) -> ReportFacts:
+    """Load the scope-wide policy and lesson denominator once per report run."""
 
-    Grades and attendance are loaded in two bounded queries for the complete
-    page, never once per student.
-    """
+    lesson_counts = Lesson.objects.filter(
+        course_offering__academic_year_level=academic_year_level,
+        status=PublicationStatus.PUBLISHED,
+    )
+    if course_offering_id:
+        lesson_counts = lesson_counts.filter(course_offering_id=course_offering_id)
+    return ReportFacts(
+        policy=AttendancePolicy.load(),
+        expected_count=lesson_counts.count(),
+    )
+
+
+def _build_report_batch(enrollments, academic_year_level, course_offering_id, facts: ReportFacts) -> ReportBatch:
+    """Load one bounded student batch's grades and attendance exactly once."""
+
     enrollments = list(enrollments)
     if not enrollments:
-        return []
+        return ReportBatch(rows=[], attendance_by_student={}, facts=facts)
     student_ids = [enrollment.student_id for enrollment in enrollments]
-    grade_filter = _grade_scope_filter(academic_year_level, course_offering_id)
     grades = Grade.objects.filter(
         user_id__in=student_ids,
         quiz__course_offering__academic_year_level=academic_year_level,
@@ -116,16 +136,8 @@ def build_report_page_rows(enrollments, academic_year_level, course_offering_id=
     if course_offering_id:
         records = records.filter(course_offering_id=course_offering_id)
     records = records.values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
-    policy = AttendancePolicy.load()
     attendance_by_student = merge_attendance_pairs(pair_attendance_records(records))
 
-    lesson_counts = Lesson.objects.filter(
-        course_offering__academic_year_level=academic_year_level,
-        status=PublicationStatus.PUBLISHED,
-    )
-    if course_offering_id:
-        lesson_counts = lesson_counts.filter(course_offering_id=course_offering_id)
-    expected_count = lesson_counts.count()
     rows = []
     for enrollment in enrollments:
         student = enrollment.student
@@ -140,16 +152,16 @@ def build_report_page_rows(enrollments, academic_year_level, course_offering_id=
             full = partial = 0
             attendance_score = Decimal("0")
             for pair in days.values():
-                day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
+                day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), facts.policy)
                 attendance_score += day.grade
                 if day.grade == DAY_GRADE_FULL:
                     full += 1
                 elif day.grade == DAY_GRADE_PARTIAL:
                     partial += 1
-            expected = expected_count
+            expected = facts.expected_count
             valid = full
             invalid = partial
-            absent = max(expected_count - full - partial, 0)
+            absent = max(facts.expected_count - full - partial, 0)
         rows.append({
             "student_id": student.pk,
             "username": student.username,
@@ -170,7 +182,49 @@ def build_report_page_rows(enrollments, academic_year_level, course_offering_id=
             "absence_rate": round(absent / expected * 100, 1) if expected else 0,
             "grade_details": details,
         })
-    return rows
+    return ReportBatch(rows=rows, attendance_by_student=attendance_by_student, facts=facts)
+
+
+def build_report_page_rows(enrollments, academic_year_level, course_offering_id=None, facts=None):
+    """Build rows for an already SQL-paginated enrollment page.
+
+    Grades, attendance, policy and the lesson denominator are loaded once for
+    the complete page, never once per student.
+    """
+    enrollments = list(enrollments)
+    if not enrollments:
+        return []
+    facts = facts or load_report_facts(academic_year_level, course_offering_id)
+    return _build_report_batch(enrollments, academic_year_level, course_offering_id, facts).rows
+
+
+def iter_report_batches(
+    academic_year_level,
+    student_id=None,
+    study_mode=None,
+    course_offering_id=None,
+    facts=None,
+) -> Iterator[ReportBatch]:
+    """Yield bounded enrollment batches with their loaded facts exactly once.
+
+    Report headings and all three workbook sheets consume these batches; the
+    policy and lesson denominator are read once for the whole run, and only
+    when the population is non-empty.
+    """
+    search = str(student_id) if student_id else None
+    queryset = report_enrollments(academic_year_level, search, study_mode, course_offering_id)
+    page = []
+    for enrollment in queryset.iterator(chunk_size=REPORT_BATCH_SIZE):
+        page.append(enrollment)
+        if len(page) >= REPORT_BATCH_SIZE:
+            if facts is None:
+                facts = load_report_facts(academic_year_level, course_offering_id)
+            yield _build_report_batch(page, academic_year_level, course_offering_id, facts)
+            page = []
+    if page:
+        if facts is None:
+            facts = load_report_facts(academic_year_level, course_offering_id)
+        yield _build_report_batch(page, academic_year_level, course_offering_id, facts)
 
 
 def build_report_data(academic_year_level, student_id=None, study_mode=None, course_offering_id=None):
@@ -180,13 +234,10 @@ def build_report_data(academic_year_level, student_id=None, study_mode=None, cou
 
 def iter_report_data(academic_year_level, student_id=None, study_mode=None, course_offering_id=None):
     """Yield report rows in bounded pages for streaming and workbook exports."""
-    search = str(student_id) if student_id else None
-    queryset = report_enrollments(academic_year_level, search, study_mode, course_offering_id)
-    page = []
-    for enrollment in queryset.iterator(chunk_size=500):
-        page.append(enrollment)
-        if len(page) == 500:
-            yield from build_report_page_rows(page, academic_year_level, course_offering_id)
-            page.clear()
-    if page:
-        yield from build_report_page_rows(page, academic_year_level, course_offering_id)
+    for batch in iter_report_batches(
+        academic_year_level,
+        student_id=student_id,
+        study_mode=study_mode,
+        course_offering_id=course_offering_id,
+    ):
+        yield from batch.rows

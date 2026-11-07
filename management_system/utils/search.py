@@ -60,14 +60,17 @@ class NormalizedContains(Lookup):
         normalized_value = normalize_search_text(self.rhs)
         if not normalized_value:
             return "1 = 0", []
+        # Escape LIKE metacharacters so a literal "%", "_" or "\" in the search
+        # text matches itself instead of acting as a wildcard.
+        pattern = f"%{connection.ops.prep_for_like_query(normalized_value)}%"
         if connection.vendor != "postgresql":
             # PostgreSQL is authoritative and owns the indexed function. Keep
             # non-PostgreSQL tooling/tests executable without pretending that
             # it has the same stored-value equivalence semantics.
-            return f"{lhs_sql} LIKE %s", [*lhs_params, f"%{normalized_value}%"]
+            return f"{lhs_sql} LIKE %s", [*lhs_params, pattern]
         return (
             f"lms_arabic_search_normalize({lhs_sql}) LIKE %s",
-            [*lhs_params, f"%{normalized_value}%"],
+            [*lhs_params, pattern],
         )
 
 

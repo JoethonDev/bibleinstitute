@@ -233,54 +233,40 @@ def _send_delivery(
             links = audio_links(json.loads(delivery.lesson.links))
         except (TypeError, ValueError, json.JSONDecodeError):
             links = []
-        return bot.send_message(
-            delivery.telegram_account.telegram_chat_id,
-            "\n\n".join(
-                (
-                    _("Lesson published"),
-                    format_lesson(delivery.lesson, bool(links), delivery.user),
-                )
-            ),
-            reply_markup=lesson_detail_keyboard(
-                delivery.lesson.course_offering_id,
-                delivery.lesson.pk,
-                links,
-            ),
-        )
-    if delivery.notification_type == TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT:
+        text = "\n\n".join((_("Lesson published"), format_lesson(delivery.lesson, bool(links), delivery.user)))
+        markup = lesson_detail_keyboard(delivery.lesson.course_offering_id, delivery.lesson.pk, links)
+    elif delivery.notification_type == TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT:
         announcement = delivery.announcement
         if announcement is None:
             raise ValueError("Announcement delivery has no source.")
-        reply_markup = None
+        markup = None
         if announcement.action_label and announcement.action_url.startswith(("http://", "https://")):
-            reply_markup = telebot.types.InlineKeyboardMarkup()
-            reply_markup.add(
-                telebot.types.InlineKeyboardButton(
-                    announcement.action_label,
-                    url=announcement.action_url,
-                )
-            )
-        return bot.send_message(
-            delivery.telegram_account.telegram_chat_id,
-            f"{announcement.title}\n\n{announcement.body}",
-            reply_markup=reply_markup,
+            markup = telebot.types.InlineKeyboardMarkup()
+            markup.add(telebot.types.InlineKeyboardButton(announcement.action_label, url=announcement.action_url))
+        text = f"{announcement.title}\n\n{announcement.body}"
+    else:
+        opening, closing = exceptional_windows.get(
+            (delivery.quiz_id, delivery.user_id), (delivery.quiz.opening_date, delivery.quiz.closing_date),
         )
-    opening, closing = exceptional_windows.get(
-        (delivery.quiz_id, delivery.user_id),
-        (delivery.quiz.opening_date, delivery.quiz.closing_date),
-    )
-    return bot.send_message(
-        delivery.telegram_account.telegram_chat_id,
-        "\n\n".join(
-            (
-                _("Exam opening"),
-                format_quiz(delivery.quiz, delivery.user, opening, closing),
-            )
-        ),
-        reply_markup=quiz_detail_keyboard(delivery.quiz.course_offering_id, delivery.quiz.pk),
-    )
+        text = "\n\n".join((_("Exam opening"), format_quiz(delivery.quiz, delivery.user, opening, closing)))
+        markup = quiz_detail_keyboard(delivery.quiz.course_offering_id, delivery.quiz.pk)
+    if delivery.content_snapshot:
+        text = delivery.content_snapshot
+    else:
+        stored = TelegramNotificationDelivery.objects.filter(
+            pk=delivery.pk, status=TelegramNotificationDelivery.Status.SENDING, content_snapshot="",
+        ).update(content_snapshot=text)
+        if not stored:
+            text = TelegramNotificationDelivery.objects.filter(
+                pk=delivery.pk, status=TelegramNotificationDelivery.Status.SENDING,
+            ).values_list("content_snapshot", flat=True).first()
+            if not text:
+                raise ValueError("Notification delivery is no longer claimed.")
+        delivery.content_snapshot = text
+    return bot.send_message(delivery.telegram_account.telegram_chat_id, text, reply_markup=markup)
 
 
+@transaction.atomic
 def _materialize_due_deliveries(limit: int) -> int:
     """Create Telegram delivery rows at due time for eligible students.
 
@@ -303,7 +289,8 @@ def _materialize_due_deliveries(limit: int) -> int:
         idempotency_key=OuterRef("idempotency_key"),
     )
     notifications = list(
-        StudentNotification.objects.filter(
+        StudentNotification.objects.select_for_update(skip_locked=True, of=("self",)).filter(
+            is_manual_redelivery=False,
             scheduled_for__lte=now,
             cancelled_at__isnull=True,
             notification_type__in=(
@@ -432,6 +419,14 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
         )
     }
     authorized_ids = _authorized_delivery_ids(deliveries)
+    manual_ids = {d.student_notification_id for d in delivery_list
+                  if d.student_notification is not None and d.student_notification.is_manual_redelivery}
+    if manual_ids:
+        from ..notification_redelivery import eligible_redelivery_notification_ids, redelivery_source_queryset
+
+        allowed_manual = eligible_redelivery_notification_ids(list(redelivery_source_queryset().filter(pk__in=manual_ids)))
+        authorized_ids.difference_update(d.pk for d in delivery_list
+                                        if d.student_notification_id in manual_ids and d.student_notification_id not in allowed_manual)
     counts = {"sent": 0, "skipped": 0, "failed": 0}
     outbound_account_ids = set()
     for delivery in delivery_list:

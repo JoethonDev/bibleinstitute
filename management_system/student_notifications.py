@@ -96,6 +96,40 @@ def _eligible_students_for_offering(offering) -> QuerySet[User]:
     )
 
 
+def eligible_student_offering_pairs(
+    candidates: Iterable[tuple[int, int, int]],
+) -> set[tuple[int, int]]:
+    """Resolve current access for bounded (student, offering, scope) candidates."""
+
+    pairs = set(candidates)
+    if not pairs:
+        return set()
+    student_ids = {student_id for student_id, _offering_id, _scope_id in pairs}
+    offering_ids = {offering_id for _student_id, offering_id, _scope_id in pairs}
+    scope_ids = {scope_id for _student_id, _offering_id, scope_id in pairs}
+    active_enrollments = Enrollment.objects.filter(
+        student_id__in=student_ids,
+        status=Enrollment.Status.ACTIVE,
+        student__role__role="student",
+        student__is_active=True,
+        student__application_status="active",
+    )
+    normal_access = set(active_enrollments.filter(
+        enrollment_type=Enrollment.Type.NORMAL,
+        academic_year_level_id__in=scope_ids,
+    ).values_list("student_id", "academic_year_level_id"))
+    targeted_access = set(active_enrollments.filter(
+        enrollment_type__in=TARGETED_ENROLLMENT_TYPES,
+        course_offering_id__in=offering_ids,
+    ).values_list("student_id", "course_offering_id"))
+    return {
+        (student_id, offering_id)
+        for student_id, offering_id, scope_id in pairs
+        if (student_id, scope_id) in normal_access
+        or (student_id, offering_id) in targeted_access
+    }
+
+
 def _telegram_account_ids_for_offering(offering) -> dict[int, int]:
     """Return linked Telegram accounts for the same authorized offering scope."""
     return dict(

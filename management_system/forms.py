@@ -2,12 +2,11 @@ from django.contrib.auth.forms import AuthenticationForm, UsernameField
 from django import forms
 from django.forms.models import construct_instance
 import secrets
-from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import User, Role, Course, Lesson, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, assign_academic_date
-from .utils.validators import normalize_phone, normalize_username, validate_identity_by_type
+from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, assign_academic_date
+from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 from django.utils import timezone
@@ -25,7 +24,9 @@ from .utils.grouped_choices import (
 )
 
 
-def _joined_date_field(*, required: bool = True, initial: date | None = None) -> forms.DateField:
+def _joined_date_field(*, required: bool = True, initial=None) -> forms.DateField:
+    """Build the joined-date field; ``initial`` may be a date or a callable."""
+
     return forms.DateField(
         input_formats=["%Y-%m-%d"],
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
@@ -93,8 +94,6 @@ class UserLoginForm(AuthenticationForm):
     ), strip=False)
     
 class UserCreationForm(forms.ModelForm):
-    date = assign_academic_date()
-    
     def __init__(self, *args, **kwargs):
         super(UserCreationForm, self).__init__(*args, **kwargs)
         self.fields['username'].label = _("Username") # Localized
@@ -131,7 +130,7 @@ class UserCreationForm(forms.ModelForm):
         required=False
     )
 
-    joined_date = _joined_date_field(required=False, initial=date)
+    joined_date = _joined_date_field(required=False, initial=assign_academic_date)
 
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={
@@ -338,12 +337,7 @@ class UserUpdateForm(UserCreationForm):
         phone = self.cleaned_data.get("phone")
         if not phone:
             return None
-        phone = normalize_phone(phone)
-        if not phone:
-            raise forms.ValidationError(_("Enter a valid international phone number."))
-        if User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError(_("This phone number is already in use."))
-        return phone
+        return validate_unique_phone(phone, exclude_user_id=self.instance.pk)
 
     def clean_identity_number(self):
         identity_number = self.cleaned_data.get("identity_number")
@@ -609,7 +603,7 @@ class ExceptionalCourseAssignmentForm(forms.Form):
 
 
 class HistoricalExistingBulkForm(forms.Form):
-    """Find-mode bulk intake for existing students (1–50 per run)."""
+    """Find-mode bulk intake for existing students (1-50 per run)."""
 
     students = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
@@ -852,7 +846,7 @@ class PromotionRuleForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["quiz_type"].label_from_instance = lambda quiz_type: (
-            f"{quiz_type.name_en} — {quiz_type.name_ar}" if quiz_type.name_ar else quiz_type.name_en
+            f"{quiz_type.name_en} - {quiz_type.name_ar}" if quiz_type.name_ar else quiz_type.name_en
         )
 
     def clean(self):
@@ -893,7 +887,7 @@ class QuizExceptionalOpeningForm(forms.Form):
     @staticmethod
     def _student_label(student):
         full_name = student.get_full_name().strip()
-        return f"{student.username} — {full_name}" if full_name else student.username
+        return f"{student.username} - {full_name}" if full_name else student.username
 
     def _parse_datetime(self, value):
         try:
@@ -1039,12 +1033,7 @@ class ApplicationAdminForm(forms.ModelForm):
         phone = self.cleaned_data.get("phone")
         if not phone:
             return None
-        phone = normalize_phone(phone)
-        if not phone:
-            raise forms.ValidationError(_("Enter a valid international phone number."))
-        if User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError(_("This phone number is already in use."))
-        return phone
+        return validate_unique_phone(phone, exclude_user_id=self.instance.pk)
 
     def clean_identity_number(self):
         identity_number = self.cleaned_data.get("identity_number")
@@ -1182,15 +1171,7 @@ class SignupForm(forms.ModelForm):
         phone = self.cleaned_data.get("phone")
         if not phone:
             return phone
-        phone = normalize_phone(phone)
-        if not phone:
-            raise forms.ValidationError(_("Enter a valid international phone number."))
-        qs = User.objects.filter(phone=phone)
-        if self.instance and self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise forms.ValidationError(_("This phone number is already in use."))
-        return phone
+        return validate_unique_phone(phone, exclude_user_id=self.instance.pk)
 
     def clean_identity_number(self):
         identity_number = self.cleaned_data.get("identity_number")
@@ -1433,15 +1414,7 @@ class SignupDetailsForm(forms.ModelForm):
         phone = self.cleaned_data.get("phone")
         if not phone:
             return phone
-        phone = normalize_phone(phone)
-        if not phone:
-            raise forms.ValidationError(_("Enter a valid international phone number."))
-        qs = User.objects.filter(phone=phone)
-        if self.instance and self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise forms.ValidationError(_("This phone number is already in use."))
-        return phone
+        return validate_unique_phone(phone, exclude_user_id=self.instance.pk)
 
     def clean_identity_number(self):
         identity_number = self.cleaned_data.get("identity_number")

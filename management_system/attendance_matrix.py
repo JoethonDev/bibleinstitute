@@ -6,7 +6,7 @@ from django.core.paginator import Page
 from django.db.models import Count, Q, QuerySet
 
 from .academic_access import READABLE_ENROLLMENT_STATUSES
-from .models import AcademicYearLevel, AcademicYearLevelMeeting, AttendanceRecord, CourseOffering, Enrollment, User
+from .models import AcademicYearLevel, AcademicYearLevelMeeting, AttendanceRecord, Enrollment, User
 from .utils.attendance import AttendanceDayStatus, grade_attendance_day
 from .utils.search import normalized_contains_q, normalize_search_text
 
@@ -107,13 +107,13 @@ def attendance_matrix_student_queryset(
 
 def _record_source_label(record: AttendanceRecord | None) -> str:
     if record is None:
-        return "—"
+        return "-"
     return str(dict(AttendanceRecord.Source.choices).get(record.source, record.source))
 
 
 def _record_by_label(record: AttendanceRecord | None) -> str:
     if record is None:
-        return "—"
+        return "-"
     actor = getattr(record, "scanned_by", None)
     if getattr(record, "scanned_by_id", None) and actor:
         return actor.get_full_name() or actor.username

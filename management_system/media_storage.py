@@ -419,68 +419,6 @@ def upload_output_file(
         raise
 
 
-def upload_output_fileobj(
-    output_key: Any,
-    file_obj: Any,
-    *,
-    content_type: Optional[str] = None,
-    client: Any = None,
-    bucket: Optional[str] = None,
-) -> dict:
-    """
-    Upload an output file object to its exact final key, rejecting collisions.
-
-    Same collision contract as :func:`upload_output_file`; the object is
-    streamed from its current file-like source with a provider-side
-    ``If-None-Match: *`` condition and a MIME ``ContentType``. Intended for
-    tests and small generated objects.
-    """
-    key = _validate_exact_key(output_key)
-    resolved_client, resolved_bucket = _resolve_client_bucket(client, bucket)
-    if file_obj is None or not hasattr(file_obj, "read"):
-        raise MediaStorageError(
-            "Output source must be a readable file object.", ERR_STORAGE
-        )
-    try:
-        file_obj.seek(0)
-    except Exception:
-        pass
-    _reject_collision(resolved_client, resolved_bucket, key)
-    media_type = content_type or content_type_for_key(key)
-    expected_size = None
-    try:
-        file_obj.seek(0, 2)
-        expected_size = file_obj.tell()
-        file_obj.seek(0)
-    except Exception:
-        try:
-            file_obj.seek(0)
-        except Exception:
-            pass
-    _put_output_conditionally(
-        resolved_client,
-        resolved_bucket,
-        key,
-        file_obj,
-        media_type,
-        expected_size,
-    )
-    try:
-        return verify_output_object(
-            key,
-            expected_size=expected_size,
-            expected_content_type=media_type,
-            client=resolved_client,
-            bucket=resolved_bucket,
-        )
-    except Exception:
-        try:
-            delete_object_exact(key, client=resolved_client, bucket=resolved_bucket)
-        except Exception:
-            pass
-        raise
-
-
 def _put_output_conditionally(
     client: Any,
     bucket: str,

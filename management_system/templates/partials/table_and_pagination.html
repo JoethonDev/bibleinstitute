@@ -187,8 +187,8 @@
                 <tr>
                     <td class="column-checkbox"><input type="checkbox" class="user-checkbox" value="{{ u.id }}" aria-label="{% blocktranslate with name=u.get_full_name|default:u.username %}Select {{ name }}{% endblocktranslate %}"></td>
                     <td>{{ u.get_full_name|default:u.username }}</td>
-                    <td>{{ u.phone|default:"—" }}</td>
-                    <td>{{ u.city|default:"—" }}</td>
+                    <td>{{ u.phone|default:"-" }}</td>
+                    <td>{{ u.city|default:"-" }}</td>
                     <td><span class="ad-pill {% if u.application_status == 'active' %}ad-pill--success{% elif u.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ u.get_application_status_display }}</span></td>
                     <td>
                         <div class="ad-actions">

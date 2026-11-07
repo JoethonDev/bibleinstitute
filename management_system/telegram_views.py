@@ -80,7 +80,6 @@ from .telegram.broadcasts import (
     confirm_broadcast,
     create_broadcast_draft,
     recipient_queryset,
-    retry_failed_broadcast,
 )
 from .telegram_forms import TelegramBotConfigForm, TelegramBroadcastForm, TelegramSupportReplyForm
 from .utils.decorators import can_manage_academic_setup, capability_required
@@ -948,16 +947,21 @@ def telegram_broadcast_detail(request, broadcast_id):
     )
     recipients = broadcast.recipients.order_by("pk")
     recipient_page_obj = Paginator(recipients, 50).get_page(request.GET.get("page", 1))
+    from .job_monitor import monitored_jobs, readable_job
+
+    monitor_row = monitored_jobs(family="telegram", selection={"telegram": [str(broadcast.pk)]}).first()
     return render(
         request,
         "telegram_broadcast_detail.html",
         {
             "broadcast": broadcast,
+            "monitor_job": readable_job(monitor_row) if monitor_row else None,
+            "job_status_url": reverse("background-job-status-batch"),
             "target_label": _broadcast_target_label(broadcast),
             "attachments": broadcast.attachments.all(),
             "recipient_page_obj": recipient_page_obj,
             "broadcast_list_url": reverse("telegram-broadcasts"),
-            "retry_url": reverse("telegram-broadcast-retry", kwargs={"broadcast_id": broadcast.pk}),
+            "redelivery_url": reverse("notification-redelivery", args=["telegram", broadcast.pk]),
             "confirm_url": reverse("telegram-broadcast-confirm-page", kwargs={"broadcast_id": broadcast.pk}),
             "cancel_url": reverse("telegram-broadcast-cancel", kwargs={"broadcast_id": broadcast.pk}),
             "breadcrumb_items": generate_breadcrumb([
@@ -967,18 +971,6 @@ def telegram_broadcast_detail(request, broadcast_id):
             ]),
         },
     )
-
-
-@capability_required(can_manage_academic_setup)
-@require_POST
-def telegram_broadcast_retry(request, broadcast_id):
-    try:
-        broadcast = retry_failed_broadcast(broadcast_id, request.user)
-    except (BroadcastError, TelegramBroadcast.DoesNotExist) as exc:
-        messages.error(request, str(exc) or _("Failed broadcast deliveries could not be retried."))
-        return redirect("telegram-broadcast-detail", broadcast_id=broadcast_id)
-    messages.success(request, _("Failed broadcast deliveries were queued again."))
-    return redirect("telegram-broadcast-detail", broadcast_id=broadcast.pk)
 
 
 TELEGRAM_ACCOUNTS_PAGE_SIZE = 25

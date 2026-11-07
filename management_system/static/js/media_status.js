@@ -82,7 +82,7 @@
                 button,
                 button.closest('tr'),
                 button.getAttribute('data-media-cleanup-url'),
-                gettext('Remove this upload’s server files and R2 objects?')
+                gettext('Remove this upload\'s server files and R2 objects?')
             );
         }
     }
@@ -157,7 +157,7 @@
         var completed = row.querySelector('[data-media-completed]');
         if (completed) {
             completed.textContent = (job.completed_steps || []).length
-                ? gettext('Done:') + ' ' + job.completed_steps.join(' · ')
+                ? gettext('Done:') + ' ' + job.completed_steps.join(' - ')
                 : '';
             completed.hidden = !(job.completed_steps || []).length;
         }

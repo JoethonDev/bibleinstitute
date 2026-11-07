@@ -2505,8 +2505,8 @@ msgstr "تفاصيل نشاط الدراسة"
 msgid "Study timeline"
 msgstr "الخط الزمني للدراسة"
 
-msgid "Meaningful daily playback activity · last 30 days"
-msgstr "نشاط المشاهدة الفعلي يوميًا · آخر 30 يومًا"
+msgid "Meaningful daily playback activity - last 30 days"
+msgstr "نشاط المشاهدة الفعلي يوميًا - آخر 30 يومًا"
 
 msgid "Activity intensity legend"
 msgstr "دليل كثافة النشاط"
@@ -3251,8 +3251,8 @@ msgid "Search years"
 msgstr "البحث في السنوات"
 
 #: .\management_system\templates\academic_setup.html:37
-msgid "Search years…"
-msgstr "البحث في السنوات…"
+msgid "Search years..."
+msgstr "البحث في السنوات..."
 
 #: .\management_system\templates\academic_setup.html:40
 msgid "Filter by status"
@@ -3412,10 +3412,10 @@ msgstr "الصفحة التالية"
 #, python-format
 msgid ""
 "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s "
-"(%(start)s–%(end)s of %(total)s)"
+"(%(start)s-%(end)s of %(total)s)"
 msgstr ""
 "الصفحة %(year_page_obj.number)s من %(year_page_obj.paginator.num_pages)s "
-"(%(start)s–%(end)s من %(total)s)"
+"(%(start)s-%(end)s من %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:157
 msgid "Year Levels"
@@ -3450,8 +3450,8 @@ msgid "Search offerings"
 msgstr "البحث في المقررات"
 
 #: .\management_system\templates\academic_setup.html:207
-msgid "Search offerings…"
-msgstr "البحث في المقررات…"
+msgid "Search offerings..."
+msgstr "البحث في المقررات..."
 
 #: .\management_system\templates\academic_setup.html:215
 msgid "New Offering"
@@ -3477,18 +3477,18 @@ msgstr "التنقل بين صفحات المقررات"
 #, python-format
 msgid ""
 "Page %(offering_page_obj.number)s of "
-"%(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
+"%(offering_page_obj.paginator.num_pages)s (%(start)s-%(end)s of %(total)s)"
 msgstr ""
 "الصفحة %(offering_page_obj.number)s من "
-"%(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s من %(total)s)"
+"%(offering_page_obj.paginator.num_pages)s (%(start)s-%(end)s من %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:314
 msgid "New Course Offering"
 msgstr "مقرر دراسي جديد"
 
 #: .\management_system\templates\academic_setup.html:319
-msgid "Select course…"
-msgstr "اختر المقرر…"
+msgid "Select course..."
+msgstr "اختر المقرر..."
 
 #: .\management_system\templates\academic_setup.html:339
 #: .\management_system\templates\academic_setup.html:378
@@ -3582,8 +3582,8 @@ msgid "Copy"
 msgstr "نسخ"
 
 #: .\management_system\templates\academic_setup.html:507
-msgid "Loading…"
-msgstr "جارٍ التحميل…"
+msgid "Loading..."
+msgstr "جارٍ التحميل..."
 
 msgid "Load more notifications"
 msgstr "تحميل المزيد من الإشعارات"
@@ -4028,11 +4028,11 @@ msgstr "تحديد كل السجلات المطابقة"
 #, python-format
 msgid ""
 "\n"
-"                    Showing %(start)s–%(end)s of %(total)s\n"
+"                    Showing %(start)s-%(end)s of %(total)s\n"
 "                    "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s نتيجة\n"
+"                عرض %(start)s-%(end)s من %(total)s نتيجة\n"
 "            "
 
 #: .\management_system\templates\applications_dashboard.html:97
@@ -4091,8 +4091,8 @@ msgid "New Action"
 msgstr "الإجراء الجديد"
 
 #: .\management_system\templates\attendance_correction.html:56
-msgid "— Keep current —"
-msgstr "— الإبقاء على الحالي —"
+msgid "- Keep current -"
+msgstr "- الإبقاء على الحالي -"
 
 #: .\management_system\templates\attendance_correction.html:62
 msgid "Save Correction"
@@ -4210,10 +4210,10 @@ msgstr "التنقل بين صفحات الحضور"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "            "
-msgid "Showing %(start)s–%(end)s of %(total)s"
-msgstr "عرض %(start)s–%(end)s من %(total)s نتيجة"
+msgid "Showing %(start)s-%(end)s of %(total)s"
+msgstr "عرض %(start)s-%(end)s من %(total)s نتيجة"
 
 #: .\management_system\templates\attendance_management.html:157
 msgid "Choose a filter to load results"
@@ -4236,8 +4236,8 @@ msgstr "معهد الكتاب المقدس القبطي"
 
 #: .\management_system\templates\base.html:12
 #: .\management_system\templates\base.html:20
-msgid "Bible Institute Coptic — Online theological education"
-msgstr "معهد الكتاب المقدس القبطي — تعليم لاهوتي عبر الإنترنت"
+msgid "Bible Institute Coptic - Online theological education"
+msgstr "معهد الكتاب المقدس القبطي - تعليم لاهوتي عبر الإنترنت"
 
 #: .\management_system\templates\base.html:13
 msgid "Bible institute, Coptic, theological education, online learning, Egypt"
@@ -4262,8 +4262,8 @@ msgid "Bible Institute"
 msgstr "معهد الكتاب المقدس"
 
 #: .\management_system\templates\base.html:78
-msgid "Maadi · Academic study with an ecclesial spirit"
-msgstr "المعادي · دراسة أكاديمية بروح كنسية"
+msgid "Maadi - Academic study with an ecclesial spirit"
+msgstr "المعادي - دراسة أكاديمية بروح كنسية"
 
 #: .\management_system\templates\base.html:80
 msgid "Toggle navigation"
@@ -4367,8 +4367,8 @@ msgid "Institute Headquarters"
 msgstr "مقر المعهد"
 
 #: .\management_system\templates\base.html:206
-msgid "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
-msgstr "كنيسة الشهيد العظيم مارجرجس بكوتسكا – المعادي – مصر"
+msgid "Church of the Great Martyr Mar Girgis, Kotsika - Maadi - Egypt"
+msgstr "كنيسة الشهيد العظيم مارجرجس بكوتسكا - المعادي - مصر"
 
 #: .\management_system\templates\base.html:213
 msgid "All rights reserved to the Bible Institute in Maadi"
@@ -4628,8 +4628,8 @@ msgstr "(بدون اسم)"
 #: .\management_system\templates\content_detail.html:297
 #: .\management_system\templates\content_detail.html:298
 #: .\management_system\templates\content_detail.html:299
-msgid "—"
-msgstr "—"
+msgid "-"
+msgstr "-"
 
 #: .\management_system\templates\content_detail.html:308
 msgid "No file links have been added to this lesson yet."
@@ -4758,17 +4758,6 @@ msgstr "عوامل التصفية"
 #: .\management_system\templates\telegram_conversations.html:82
 msgid "Clear"
 msgstr "مسح"
-
-#: .\management_system\templates\dashboard.html:92
-#: .\management_system\templates\naming_filter.html:7
-#: .\management_system\templates\partials\components\loading_overlay.html:20
-#: .\management_system\templates\partials\components\loading_overlay.html:22
-#: .\management_system\templates\r2_management.html:217
-#: .\management_system\templates\submission_dashboard.html:77
-#: .\management_system\templates\upload_video.html:9
-#: .\management_system\templates\upload_video.html:111
-msgid "Loading..."
-msgstr "جاري التحميل..."
 
 #: .\management_system\templates\dashboard_form.html:15
 #: .\management_system\templates\lesson_form.html:22
@@ -4966,8 +4955,8 @@ msgid "May God bless you,"
 msgstr "بارك الله فيك،"
 
 #: .\management_system\templates\emails\base_email.html:16
-msgid "Bible Institute — Light for every nation"
-msgstr "معهد الكتاب المقدس — نور لكل الأمم"
+msgid "Bible Institute - Light for every nation"
+msgstr "معهد الكتاب المقدس - نور لكل الأمم"
 
 #: .\management_system\templates\historical_intake.html:8
 #| msgid "Total Academic Years"
@@ -5642,7 +5631,7 @@ msgid ""
 "            "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s طالبًا\n"
+"                عرض %(start)s-%(end)s من %(total)s طالبًا\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_broadcast_list.html:6
@@ -5679,11 +5668,11 @@ msgstr "التنقل بين صفحات قائمة الإعلانات"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s broadcasts\n"
+"                Showing %(start)s-%(end)s of %(total)s broadcasts\n"
 "            "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s إعلانًا\n"
+"                عرض %(start)s-%(end)s من %(total)s إعلانًا\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_chat_panel.html:18
@@ -5752,15 +5741,15 @@ msgstr "التنقل بين صفحات قائمة المحادثات"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "                "
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s conversations\n"
+"                Showing %(start)s-%(end)s of %(total)s conversations\n"
 "            "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s نتيجة\n"
+"                عرض %(start)s-%(end)s من %(total)s نتيجة\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_linked_user_list.html:35
@@ -5786,11 +5775,11 @@ msgstr "ترقيم صفحات المستخدمين المرتبطين"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s linked users\n"
+"                Showing %(start)s-%(end)s of %(total)s linked users\n"
 "            "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من أصل %(total)s من المستخدمين "
+"                عرض %(start)s-%(end)s من أصل %(total)s من المستخدمين "
 "المرتبطين\n"
 "            "
 
@@ -5814,15 +5803,15 @@ msgstr "التنقل بين صفحات سجل الرسائل"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "                "
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s messages\n"
+"                Showing %(start)s-%(end)s of %(total)s messages\n"
 "            "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s نتيجة\n"
+"                عرض %(start)s-%(end)s من %(total)s نتيجة\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_message_list.html:129
@@ -6009,8 +5998,8 @@ msgid "Select Academic Scope"
 msgstr "اختر النطاق الدراسي"
 
 #: .\management_system\templates\promotion_evaluation.html:41
-msgid "Select a scope…"
-msgstr "اختر نطاقًا…"
+msgid "Select a scope..."
+msgstr "اختر نطاقًا..."
 
 #: .\management_system\templates\promotion_evaluation.html:60
 msgid ""
@@ -6039,8 +6028,8 @@ msgstr ""
 #: .\management_system\templates\promotion_evaluation.html:95
 #: .\management_system\templates\promotion_evaluation.html:641
 #: .\management_system\templates\promotion_history.html:25
-msgid "Name or email…"
-msgstr "الاسم أو البريد الإلكتروني…"
+msgid "Name or email..."
+msgstr "الاسم أو البريد الإلكتروني..."
 
 #: .\management_system\templates\promotion_evaluation.html:98
 #: .\management_system\templates\promotion_evaluation.html:174
@@ -6143,8 +6132,8 @@ msgid "Override status"
 msgstr "حالة التعديل اليدوي"
 
 #: .\management_system\templates\promotion_evaluation.html:299
-msgid "Select…"
-msgstr "اختر…"
+msgid "Select..."
+msgstr "اختر..."
 
 #: .\management_system\templates\promotion_evaluation.html:304
 msgid "Note (optional)"
@@ -6171,11 +6160,11 @@ msgstr "مستخدمة"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
+"                Showing %(start)s-%(end)s of %(total)s results\n"
 "                "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s نتيجة\n"
+"                عرض %(start)s-%(end)s من %(total)s نتيجة\n"
 "            "
 
 #: .\management_system\templates\promotion_evaluation.html:389
@@ -6343,11 +6332,11 @@ msgstr "المقاييس"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s students\n"
+"                Showing %(start)s-%(end)s of %(total)s students\n"
 "                "
 msgstr ""
 "\n"
-"                عرض %(start)s–%(end)s من %(total)s نتيجة\n"
+"                عرض %(start)s-%(end)s من %(total)s نتيجة\n"
 "            "
 
 #: .\management_system\templates\promotion_evaluation.html:779
@@ -7174,8 +7163,8 @@ msgid "Search linked users"
 msgstr "البحث عن المستخدمين المرتبطين"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:6
-msgid "Admin Consistory — UI Proposal"
-msgstr "المجلس الإداري — مقترح الواجهة"
+msgid "Admin Consistory - UI Proposal"
+msgstr "المجلس الإداري - مقترح الواجهة"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:20
 #: .\management_system\templates\theme_showcase\student_proposal.html:21
@@ -7188,10 +7177,10 @@ msgstr "منضدة المجلس الإداري"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:22
 msgid ""
-"One calm desk for all seventeen dashboard tabs — same ink and liturgical "
+"One calm desk for all seventeen dashboard tabs - same ink and liturgical "
 "gold as the student pages, with live data from the running system."
 msgstr ""
-"منضدة هادئة واحدة لعلامات لوحة التحكم السبعة عشر — بنفس الحبر والذهب الطقسي "
+"منضدة هادئة واحدة لعلامات لوحة التحكم السبعة عشر - بنفس الحبر والذهب الطقسي "
 "مثل صفحات الطالب، وببيانات حية من النظام العامل."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:24
@@ -7314,8 +7303,8 @@ msgid "Years, scopes and offerings"
 msgstr "سنوات ونطاقات وطرح مواد"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:92
-msgid "Buttons, tables, modals…"
-msgstr "أزرار وجداول ونوافذ…"
+msgid "Buttons, tables, modals..."
+msgstr "أزرار وجداول ونوافذ..."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:97
 msgid "Latest enrollments"
@@ -7326,12 +7315,12 @@ msgstr "أحدث التسجيلات"
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:88
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:223
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:90
-msgid "Live · last 5"
-msgstr "مباشر · آخر 5"
+msgid "Live - last 5"
+msgstr "مباشر - آخر 5"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:107
-msgid "New hearts knocking on the door — review, accept, decline."
-msgstr "قلوب جديدة تقرع الباب — راجع واقبل وأرفض."
+msgid "New hearts knocking on the door - review, accept, decline."
+msgstr "قلوب جديدة تقرع الباب - راجع واقبل وأرفض."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:112
 msgid "Total registered users"
@@ -7360,8 +7349,8 @@ msgid "Search users"
 msgstr "ابحث عن مستخدمين"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:136
-msgid "Live · last 6 joined"
-msgstr "مباشر · آخر 6 انضمامات"
+msgid "Live - last 6 joined"
+msgstr "مباشر - آخر 6 انضمامات"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:156
 msgid "Delete lesson?"
@@ -7382,9 +7371,9 @@ msgstr "الإجراءات الهدامة تبقى دائمًا مؤكدة من 
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:170
 msgid ""
-"This is a live-data design proposal — no existing dashboard behavior was "
+"This is a live-data design proposal - no existing dashboard behavior was "
 "changed."
-msgstr "هذا مقترح تصميم ببيانات حية — لم يتغير أي سلوك قائم في لوحة التحكم."
+msgstr "هذا مقترح تصميم ببيانات حية - لم يتغير أي سلوك قائم في لوحة التحكم."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:170
 msgid "See the student proposal"
@@ -7392,8 +7381,8 @@ msgstr "شاهد مقترح الطالب"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:5
 msgid ""
-"Scope-level academic health: enrollments and grade averages per year–level."
-msgstr "صحة أكاديمية على مستوى النطاق: تسجيلات ومتوسطات درجات لكل سنة–مستوى."
+"Scope-level academic health: enrollments and grade averages per year-level."
+msgstr "صحة أكاديمية على مستوى النطاق: تسجيلات ومتوسطات درجات لكل سنة-مستوى."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:9
 msgid "Active-year scope report"
@@ -7419,15 +7408,15 @@ msgstr "لا سنة أكاديمية نشطة."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:32
 msgid ""
-"Same SQL aggregation the production report uses — paginated, never one query "
+"Same SQL aggregation the production report uses - paginated, never one query "
 "per student."
 msgstr ""
-"نفس تجميع SQL الذي يستخدمه التقرير الإنتاجي — مقسّم على صفحات، ولا استعلام "
+"نفس تجميع SQL الذي يستخدمه التقرير الإنتاجي - مقسّم على صفحات، ولا استعلام "
 "لكل طالب أبدًا."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:39
-msgid "Official grade sheets — running totals per student, per course."
-msgstr "كشوف الدرجات الرسمية — مجاميع تراكمية لكل طالب ولكل مادة."
+msgid "Official grade sheets - running totals per student, per course."
+msgstr "كشوف الدرجات الرسمية - مجاميع تراكمية لكل طالب ولكل مادة."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:47
 msgid "Latest recorded grades"
@@ -7437,8 +7426,8 @@ msgstr "أحدث الدرجات المسجلة"
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:129
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:173
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:14
-msgid "Live · last 6"
-msgstr "مباشر · آخر 6"
+msgid "Live - last 6"
+msgstr "مباشر - آخر 6"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:78
 msgid "Formulas, saved course results and the immutable promotion ledger."
@@ -7502,9 +7491,9 @@ msgstr "لا طلبات معلّقة حاليًا."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:5
 msgid ""
-"The library shelves — every course with its offerings, lessons and quizzes "
+"The library shelves - every course with its offerings, lessons and quizzes "
 "in one quiet row."
-msgstr "أرفف المكتبة — كل مادة بطرحها ودروسها واختباراتها في صف واحد هادئ."
+msgstr "أرفف المكتبة - كل مادة بطرحها ودروسها واختباراتها في صف واحد هادئ."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:10
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:15
@@ -7516,8 +7505,8 @@ msgid "Course catalog"
 msgstr "فهرس المواد"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:14
-msgid "Live · 8 rows"
-msgstr "مباشر · 8 صفوف"
+msgid "Live - 8 rows"
+msgstr "مباشر - 8 صفوف"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:40
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:87
@@ -7532,8 +7521,8 @@ msgid "Offering detail anatomy"
 msgstr "هيكل صفحة تفاصيل الطرح"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:53
-msgid "Live — first published offering"
-msgstr "مباشر — أول طرح منشور"
+msgid "Live - first published offering"
+msgstr "مباشر - أول طرح منشور"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:119
 msgid "Every lecture, with its publication status calm as a wax seal."
@@ -7567,9 +7556,9 @@ msgstr "أحدث الاختبارات"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:214
 msgid ""
-"The media workshop — scheduled drafts wait quietly until their HLS "
+"The media workshop - scheduled drafts wait quietly until their HLS "
 "segmentation is verified."
-msgstr "ورشة الوسائط — المسودات المجدولة تنتظر بهدوء حتى يُتحقق من تجزئة HLS."
+msgstr "ورشة الوسائط - المسودات المجدولة تنتظر بهدوء حتى يُتحقق من تجزئة HLS."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:218
 msgid "Draft lessons"
@@ -7608,9 +7597,9 @@ msgstr ""
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:250
 msgid ""
-"The archives — database-linked media inventory, without touching live "
+"The archives - database-linked media inventory, without touching live "
 "storage billing."
-msgstr "الأرشيف — جرد وسائط مرتبط بقاعدة البيانات، دون لمس فوترة التخزين الحي."
+msgstr "الأرشيف - جرد وسائط مرتبط بقاعدة البيانات، دون لمس فوترة التخزين الحي."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:258
 msgid "Media coverage"
@@ -7643,10 +7632,10 @@ msgstr "ملفات"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:315
 msgid ""
-"Icon+name grid with hover actions — replaces tall truncated cards; folder-"
+"Icon+name grid with hover actions - replaces tall truncated cards; folder-"
 "first on wide screens, 2-column on phones."
 msgstr ""
-"شبكة أيقونة+اسم بإجراءات عند التحويم — بديل عن البطاقات الطويلة المقتطعة؛ "
+"شبكة أيقونة+اسم بإجراءات عند التحويم - بديل عن البطاقات الطويلة المقتطعة؛ "
 "المجلدات أولًا في الشاشات الواسعة، وعمودان في الهواتف."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_enrollments_table.html:10
@@ -7659,11 +7648,11 @@ msgstr "لا تسجيلات بعد."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:5
 msgid ""
-"Every working component the dashboard tabs share — buttons, table actions, "
-"pagination, filters, alerts, toasts, modal and scroll — all interactive."
+"Every working component the dashboard tabs share - buttons, table actions, "
+"pagination, filters, alerts, toasts, modal and scroll - all interactive."
 msgstr ""
-"كل مكوّن عامل تشترك فيه علامات لوحة التحكم — أزرار وإجراءات جداول وترقيم "
-"صفحات ومرشحات وتنبيهات وإشعارات ونوافذ وتمرير — كلها تفاعلية."
+"كل مكوّن عامل تشترك فيه علامات لوحة التحكم - أزرار وإجراءات جداول وترقيم "
+"صفحات ومرشحات وتنبيهات وإشعارات ونوافذ وتمرير - كلها تفاعلية."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:6
 msgid "Shared components"
@@ -7686,8 +7675,8 @@ msgid "Table with row actions"
 msgstr "جدول بإجراءات الصفوف"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:23
-msgid "Edit · duplicate · delete"
-msgstr "تحرير · نسخ · حذف"
+msgid "Edit - duplicate - delete"
+msgstr "تحرير - نسخ - حذف"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:35
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:19
@@ -7717,16 +7706,16 @@ msgid "Last"
 msgstr "الأخير"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:71
-msgid "Page 2 of 5 · 25 rows per page"
-msgstr "صفحة 2 من 5 · 25 صفًا في الصفحة"
+msgid "Page 2 of 5 - 25 rows per page"
+msgstr "صفحة 2 من 5 - 25 صفًا في الصفحة"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:77
 msgid "Filter pills & search"
 msgstr "مرشحات وبحث"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:79
-msgid "Search…"
-msgstr "ابحث…"
+msgid "Search..."
+msgstr "ابحث..."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:91
 msgid "Alerts & toasts"
@@ -7766,8 +7755,8 @@ msgid "The segment did not match the manifest checksum."
 msgstr "المقطع لا يطابق بصمة قائمة التشغيل."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:97
-msgid "Attendance recorded — welcome in."
-msgstr "سُجّل الحضور — أهلًا بك."
+msgid "Attendance recorded - welcome in."
+msgstr "سُجّل الحضور - أهلًا بك."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:97
 msgid "Show toast"
@@ -7873,8 +7862,8 @@ msgid "Correct record"
 msgstr "صحّح السجل"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:44
-msgid "No attendance scans yet — the year starts soon."
-msgstr "لا تسجيلات حضور بعد — تبدأ السنة قريبًا."
+msgid "No attendance scans yet - the year starts soon."
+msgstr "لا تسجيلات حضور بعد - تبدأ السنة قريبًا."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:55
 msgid "The gate: scan a QR, preview the student, record entrance or exit."
@@ -7909,8 +7898,8 @@ msgid "Step 3"
 msgstr "الخطوة ٣"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:68
-msgid "Record entrance or exit — duplicates are refused by the database"
-msgstr "سجّل الدخول أو الخروج — قاعدة البيانات ترفض التكرار"
+msgid "Record entrance or exit - duplicates are refused by the database"
+msgstr "سجّل الدخول أو الخروج - قاعدة البيانات ترفض التكرار"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:71
 msgid "Entrance recorded."
@@ -7966,9 +7955,9 @@ msgstr "الدرجة"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:27
 msgid ""
-"Academic years, their opened scopes and offerings — the frame of the whole "
+"Academic years, their opened scopes and offerings - the frame of the whole "
 "institution."
-msgstr "السنوات الأكاديمية ونطاقاتها المفتوحة وطرحها — إطار المعهد كله."
+msgstr "السنوات الأكاديمية ونطاقاتها المفتوحة وطرحها - إطار المعهد كله."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:31
 msgid "Academic years"
@@ -7984,10 +7973,10 @@ msgstr "النطاقات"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:67
 msgid ""
-"A true month grid— meeting days in teal, holy days in gold, and holiday "
+"A true month grid- meeting days in teal, holy days in gold, and holiday "
 "actions one click away."
 msgstr ""
-"شبكة شهر حقيقية — أيام الاجتماع بالأزرق المخضر، والأعياد بالذهبي، وإجراءات "
+"شبكة شهر حقيقية - أيام الاجتماع بالأزرق المخضر، والأعياد بالذهبي، وإجراءات "
 "الأعياد على بُعد نقرة."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:76
@@ -8132,9 +8121,9 @@ msgstr "الجغرافيا"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:42
 msgid ""
-"The lands of the Bible — rivers, mountains and trade roads that carried "
+"The lands of the Bible - rivers, mountains and trade roads that carried "
 "salvation history."
-msgstr "أراضي الكتاب المقدس — أنهار وجبال وطرق قوافل حملت تاريخ الخلاص."
+msgstr "أراضي الكتاب المقدس - أنهار وجبال وطرق قوافل حملت تاريخ الخلاص."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:56
 #: .\management_system\templates\theme_showcase\partials\proposal_profile.html:62
@@ -8143,9 +8132,9 @@ msgstr "التاريخ"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:57
 msgid ""
-"Between the Testaments and through the early Church — how God guided His "
+"Between the Testaments and through the early Church - how God guided His "
 "people."
-msgstr "بين العهدين وعبر الكنيسة الأولى — كيف قاد الله شعبه."
+msgstr "بين العهدين وعبر الكنيسة الأولى - كيف قاد الله شعبه."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:75
 msgid "2 courses"
@@ -8159,9 +8148,9 @@ msgstr "العهد الجديد"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:82
 msgid ""
-"The promise fulfilled — the Gospels, the Pauline corpus and the early "
+"The promise fulfilled - the Gospels, the Pauline corpus and the early "
 "apostolic word."
-msgstr "اكتمال الوعد — الأناجيل والرسائل البولسية والكلمة الرسولية الأولى."
+msgstr "اكتمال الوعد - الأناجيل والرسائل البولسية والكلمة الرسولية الأولى."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:96
 #: .\management_system\templates\theme_showcase\partials\proposal_profile.html:72
@@ -8286,8 +8275,8 @@ msgid "Isaac"
 msgstr "إسحق"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_quiz.html:58
-msgid "Choose…"
-msgstr "اختر…"
+msgid "Choose..."
+msgstr "اختر..."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_quiz.html:63
 msgid "Submit Answers"
@@ -8304,13 +8293,13 @@ msgstr "رموز التصميم"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:6
 msgid ""
-"The small palette behind every screen — nothing added that the screens do "
+"The small palette behind every screen - nothing added that the screens do "
 "not use."
-msgstr "اللوحة الصغيرة خلف كل شاشة — لا شيء أُضيف إلا ما تستخدمه الشاشات."
+msgstr "اللوحة الصغيرة خلف كل شاشة - لا شيء أُضيف إلا ما تستخدمه الشاشات."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:12
 msgid "Psalmodia theme"
-msgstr "نُسق «Psalmodia»"
+msgstr "نُسق \"Psalmodia\""
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:17
 msgid "Deep Ink"
@@ -8342,18 +8331,18 @@ msgstr "خط عناوين كلاسيكي"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:27
 msgid ""
-"Georgia/Sakkal Majalla headings — an illuminated-manuscript voice, system "
+"Georgia/Sakkal Majalla headings - an illuminated-manuscript voice, system "
 "fonts only."
 msgstr ""
-"عناوين بخط Georgia وSakkal Majalla — نبرة مخطوط منوَّر، بخطوط النظام فقط."
+"عناوين بخط Georgia وSakkal Majalla - نبرة مخطوط منوَّر، بخطوط النظام فقط."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:30
 msgid "Quiet sacred marks"
 msgstr "علامات مقدسة هادئة"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:30
-msgid "A faint cross glyph and halo gradients — present, never loud."
-msgstr "صليب خافت وتدرجات هالة — حاضر دون ضجيج."
+msgid "A faint cross glyph and halo gradients - present, never loud."
+msgstr "صليب خافت وتدرجات هالة - حاضر دون ضجيج."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:33
 msgid "Soft motion"
@@ -8379,8 +8368,8 @@ msgstr ""
 "اليسار."
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:6
-msgid "Student Experience — UI Proposal"
-msgstr "تجربة الطالب — مقترح الواجهة"
+msgid "Student Experience - UI Proposal"
+msgstr "تجربة الطالب - مقترح الواجهة"
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:22
 msgid "A Calm, Sacred Space to Study"
@@ -8388,11 +8377,11 @@ msgstr "مساحة هادئة ومقدّسة للدراسة"
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:23
 msgid ""
-"A smoother, more modern home for every student screen — quiet parchment "
+"A smoother, more modern home for every student screen - quiet parchment "
 "surfaces, liturgical gold on deep ink, and generous room for the Word. Same "
 "flows, softer soul."
 msgstr ""
-"موطن أحدث وأكثر سلاسة لكل شاشات الطالب — أسطح هادئة كلون الرُّق، وذهبٌ طقسي فوق "
+"موطن أحدث وأكثر سلاسة لكل شاشات الطالب - أسطح هادئة كلون الرُّق، وذهبٌ طقسي فوق "
 "حبر عميق، وفسحة رحبة لكلمة الله. المسارات نفسها، بروح أرقّ."
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:25
@@ -8895,7 +8884,7 @@ msgstr "يجب ألا يحتوي مفتاح كائن HLS على مكونات م�
 #: .\management_system\utils\file_validator.py:264
 #, python-format
 msgid "File type \"%(ext)s\" is not allowed. Allowed HLS types: .m3u8, .ts"
-msgstr "نوع الملف \"%(ext)s\" غير مسموح به. أنواع HLS المسموح بها: ‎.m3u8 و‎.ts"
+msgstr "نوع الملف \"%(ext)s\" غير مسموح به. أنواع HLS المسموح بها: .m3u8 و.ts"
 
 #: .\management_system\utils\file_validator.py:276
 msgid ""
@@ -8931,7 +8920,7 @@ msgid "National ID must be exactly 14 digits."
 msgstr "يجب أن يتكون الرقم القومي من 14 رقمًا بالضبط."
 
 #: .\management_system\utils\validators.py:12
-msgid "Passport number must be 6–20 alphanumeric characters."
+msgid "Passport number must be 6-20 alphanumeric characters."
 msgstr "يجب أن يتكون رقم جواز السفر من 6 إلى 20 حرفًا أو رقمًا."
 
 #: .\management_system\views.py:150
@@ -10224,7 +10213,7 @@ msgstr "إيقاف إجباري"
 msgid "Stop processing this upload and any companion files?"
 msgstr "هل تريد إيقاف معالجة هذا الرفع والملفات المصاحبة له؟"
 
-msgid "Remove this upload’s server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
+msgid "Remove this upload's server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
 msgstr "هل تريد حذف ملفات هذا الرفع من الخادم وR2؟ لن يُحذف الدرس إلا إذا أنشأه هذا الرفع ولم يكن له محتوى آخر أو سجل دراسة للطلاب."
 
 msgid "Clean up upload"
@@ -10761,8 +10750,8 @@ msgstr "رسائل"
 msgid "Load more files"
 msgstr "تحميل المزيد من الملفات"
 
-msgid "Loading more files…"
-msgstr "جارٍ تحميل المزيد من الملفات…"
+msgid "Loading more files..."
+msgstr "جارٍ تحميل المزيد من الملفات..."
 
 msgid "Unread"
 msgstr "غير مقروء"
@@ -10842,7 +10831,7 @@ msgid "Toggle import panel"
 msgstr "إظهار/إخفاء لوحة الاستيراد"
 
 msgid "Paste a JSON payload or open a .json file, then preview it."
-msgstr "الصق محتوى JSON أو افتح ملف ‎.json ثم اضغط معاينة."
+msgstr "الصق محتوى JSON أو افتح ملف .json ثم اضغط معاينة."
 
 msgid "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft."
 msgstr "تتحقق المعاينة من المحتوى وتعرض الأسئلة ثم تُحمّلها في هذا النموذج. أرسل النموذج لحفظ الاختبار كمسودة."
@@ -11144,7 +11133,6 @@ msgstr "صورة"
 
 msgid "All files"
 msgstr "كل الملفات"
-
 
 msgid "Attendance Policy"
 msgstr "سياسة الحضور"
@@ -11918,17 +11906,17 @@ msgstr "نعم. يعرض أندرويد تحذيرًا لأي تطبيق يُث�
 msgid "Installation steps"
 msgstr "خطوات التثبيت"
 
-msgid "Tap “Download the app” above and wait until the file finishes downloading."
-msgstr "اضغط «تحميل التطبيق» أعلاه وانتظر حتى يكتمل التنزيل."
+msgid "Tap \"Download the app\" above and wait until the file finishes downloading."
+msgstr "اضغط \"تحميل التطبيق\" أعلاه وانتظر حتى يكتمل التنزيل."
 
 msgid "Open the downloaded file from your browser downloads or the Files app."
 msgstr "افتح الملف المُنزّل من تنزيلات المتصفح أو تطبيق الملفات."
 
-msgid "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install."
-msgstr "عندما يطلب أندرويد، اسمح بـ «تثبيت التطبيقات غير المعروفة» لمتصفح كروم أو الملفات، ثم اضغط تثبيت."
+msgid "When Android asks, allow \"Install unknown apps\" for Chrome or Files, then tap Install."
+msgstr "عندما يطلب أندرويد، اسمح بـ \"تثبيت التطبيقات غير المعروفة\" لمتصفح كروم أو الملفات، ثم اضغط تثبيت."
 
-msgid "Open “Bible Institute” and sign in with your website account."
-msgstr "افتح «Bible Institute» وسجّل الدخول بحسابك على الموقع."
+msgid "Open \"Bible Institute\" and sign in with your website account."
+msgstr "افتح \"Bible Institute\" وسجّل الدخول بحسابك على الموقع."
 
 msgid "After updates, repeat the same steps; your account and data stay unchanged."
 msgstr "بعد التحديثات، كرر نفس الخطوات؛ حسابك وبياناتك لا تتغير."
@@ -12051,7 +12039,6 @@ msgstr "لا توجد أشرطة بعد."
 msgid "Student banner messages"
 msgstr "رسائل شريط الطلاب"
 
-
 msgid "Quick jump"
 msgstr "انتقال سريع"
 
@@ -12073,15 +12060,14 @@ msgstr "عوامل التصفية المحفوظة"
 msgid "Name this filter"
 msgstr "سم هذا المرشح"
 
-
 msgid "Recent"
 msgstr "الأخيرة"
 
 msgid "Telegram"
 msgstr "تيليجرام"
 
-msgid "Searching…"
-msgstr "جارٍ البحث…"
+msgid "Searching..."
+msgstr "جارٍ البحث..."
 
 msgid "Search failed. Try again."
 msgstr "فشل البحث. حاول مرة أخرى."
@@ -12116,7 +12102,6 @@ msgstr "يتم تسجيل الوصول إلى هذه الصفحة."
 msgid "Aggregate"
 msgstr "إجمالي"
 
-
 msgid "Keyboard shortcuts"
 msgstr "اختصارات لوحة المفاتيح"
 
@@ -12132,9 +12117,8 @@ msgstr "انتقال إلى"
 msgid "then"
 msgstr "ثم"
 
-msgid "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
-msgstr "Ctrl في ويندوز و⌘ في ماك. اختصارات الحروف تعتمد على موضع الزر، لذا تعمل مع لوحة المفاتيح العربية أيضا."
-
+msgid "Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
+msgstr "Ctrl في ويندوز وCmd في ماك. اختصارات الحروف تعتمد على موضع الزر، لذا تعمل مع لوحة المفاتيح العربية أيضا."
 
 msgid "Pinned"
 msgstr "مثبتة"
@@ -12148,171 +12132,14 @@ msgstr "إلغاء التثبيت"
 msgid "Open all"
 msgstr "فتح الكل"
 
-
 msgid "No playable content"
 msgstr "لا يوجد محتوى قابل للتشغيل"
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 
-#, python-format
-#~ msgid "Cannot decline a %(status)s application."
-#~ msgstr "لا يمكن رفض طلب حالته %(status)s."
-
-#~ msgid "Claim conversation"
-#~ msgstr "تولّي المحادثة"
-
-#~ msgid "Send all messages"
-#~ msgstr "إرسال كل الرسائل"
-
-#~ msgid "This conversation is already claimed or handled."
-#~ msgstr "هذه المحادثة مُتولاّة أو معالجة بالفعل."
-
-#~ msgid "The reply could not be delivered; the conversation remains claimed."
-#~ msgstr "تعذر تسليم الرد؛ تظل المحادثة مُتولاّة."
-
-#~ msgid "Messages sent to administrators."
-#~ msgstr "تم إرسال الرسائل إلى المسؤولين."
-
-#~ msgid "Conversation claimed."
-#~ msgstr "تم تولّي المحادثة."
-
-#~ msgid "Checking for new conversations"
-#~ msgstr "جارٍ البحث عن محادثات جديدة"
-
-#~ msgid "Telegram support conversations"
-#~ msgstr "محادثات دعم تيليجرام"
-
-#~ msgid "Messages"
-#~ msgstr "الرسائل"
-
-#~ msgid "Last Activity"
-#~ msgstr "آخر نشاط"
-
-#~ msgid "Checking for new messages"
-#~ msgstr "جارٍ البحث عن رسائل جديدة"
-
-#, python-format
-#~ msgid "Claimed by %(name)s"
-#~ msgstr "تولّى المحادثة: %(name)s"
-
-#~ msgid "Send a Reply"
-#~ msgstr "إرسال رد"
-
-#~ msgid "You are replying to a specific message in this conversation."
-#~ msgstr "أنت ترد على رسالة محددة في هذه المحادثة."
-
-#~ msgid "Replies are delivered to the student anonymously as Admin."
-#~ msgstr "تُسلَّم الردود إلى الطالب بشكل مجهول باسم المسؤول."
-
-#~ msgid "Send Reply"
-#~ msgstr "إرسال الرد"
-
-#~ msgid ""
-#~ "View, claim, and reply to student support conversations received through "
-#~ "Telegram."
-#~ msgstr "اعرض محادثات دعم الطلاب الواردة عبر تيليجرام وتولَّها وردّ عليها."
-
-#~ msgid "Student name, username, or message text"
-#~ msgstr "اسم الطالب أو اسم المستخدم أو نص الرسالة"
-
-#~ msgid "Filter conversations by status"
-#~ msgstr "تصفية المحادثات حسب الحالة"
-
-#~ msgid "All required application documents must be uploaded."
-#~ msgstr "يجب رفع جميع المستندات المطلوبة."
-
-#~ msgid "Graduated students cannot receive exceptional course enrollments."
-#~ msgstr "لا يمكن للطلاب المتخرجين الحصول على تسجيلات مقررات استثنائية."
-
-#~ msgid "Priest Name"
-#~ msgstr "اسم الكاهن"
-
-#~ msgid "Priest Phone"
-#~ msgstr "هاتف الكاهن"
-
-#~ msgid "ID Front"
-#~ msgstr "الوجه الأمامي للهوية"
-
-#~ msgid "ID Back"
-#~ msgstr "الوجه الخلفي للهوية"
-
-#~ msgid "Attendance records"
-#~ msgstr "سجلات الحضور"
-
-#~ msgid ""
-#~ "Date when the evaluation is performed. Must fall within the academic year."
-#~ msgstr "تاريخ إجراء التقييم. يجب أن يقع داخل السنة الدراسية."
-
-#~ msgid "Preview results pagination"
-#~ msgstr "التنقل بين صفحات نتائج المعاينة"
-
 msgid "Already recorded"
 msgstr "تم تسجيله بالفعل"
-
-#~ msgid "Some actions already recorded for today."
-#~ msgstr "تم تسجيل بعض الإجراءات اليوم بالفعل."
-
-#~ msgid "By submitting this application, you agree to the following terms:"
-#~ msgstr "بإرسال هذا الطلب، توافق على الشروط التالية:"
-
-#~ msgid "All information provided must be accurate and complete."
-#~ msgstr "يجب أن تكون جميع البيانات المقدمة دقيقة وكاملة."
-
-#~ msgid ""
-#~ "You commit to attending scheduled classes and completing required "
-#~ "coursework."
-#~ msgstr "تلتزم بحضور الفصول المقررة وإتمام المقررات المطلوبة."
-
-#~ msgid ""
-#~ "The institute reserves the right to modify schedules, curriculum, and "
-#~ "policies as needed."
-#~ msgstr "يحتفظ المعهد بحقه في تعديل الجداول والمنهج والسياسات عند الحاجة."
-
-#~ msgid ""
-#~ "Your personal data will be used solely for institute administrative "
-#~ "purposes."
-#~ msgstr "ستُستخدم بياناتك الشخصية لأغراض إدارة المعهد فقط."
-
-#~ msgid ""
-#~ "You agree to abide by the institute's code of conduct and academic "
-#~ "integrity policies."
-#~ msgstr "توافق على الالتزام بمدونة سلوك المعهد وسياسات النزاهة الأكاديمية."
-
-#~ msgid "selected"
-#~ msgstr "محدد"
-
-#~ msgid "items (Frontend Only)"
-#~ msgstr "عناصر (واجهة فقط)"
-
-#~ msgid "Saved changes"
-#~ msgstr "تم حفظ التغييرات"
-
-#~ msgid "View Submission"
-#~ msgstr "عرض التقديم"
-
-#, python-format
-#~ msgid "Update %(view_name)s"
-#~ msgstr "تحديث %(view_name)s"
-
-#~ msgid "Item deleted successfully."
-#~ msgstr "تم حذف العنصر بنجاح."
-
-#~ msgid "No Data Here!"
-#~ msgstr "لا توجد بيانات هنا!"
-
-#~ msgid "No active enrollment."
-#~ msgstr "لا يوجد تسجيل نشط."
-
-#~ msgid ""
-#~ "Meeting days for every opened year–level scope and the year's holy days."
-#~ msgstr "أيام الاجتماع لكل نطاق سنة–مستوى مفتوح، وأعياد السنة."
-
-#~ msgid "No meeting days configured."
-#~ msgstr "لم يتم إعداد أيام اجتماعات."
-
-#~ msgid "Meeting courses saved."
-#~ msgstr "تم حفظ مقررات أيام الاجتماع."
 
 msgid "Signup Settings"
 msgstr "إعدادات التقديم"
@@ -12367,65 +12194,6 @@ msgstr "التقديم مغلق حاليًا. يرجى التقديم في ال�
 
 msgid "New applications enroll into:"
 msgstr "تُسجَّل الطلبات الجديدة في:"
-
-#~ msgid "Meeting added."
-#~ msgstr "تمت إضافة الاجتماع."
-
-#~ msgid "Invalid part ID."
-#~ msgstr "معرّف الجزء غير صالح."
-
-#~ msgid "Teacher"
-#~ msgstr "مصحح"
-
-#~ msgid "Second Year"
-#~ msgstr "سنة ثانية"
-
-#~ msgid "Bulk Create from CSV"
-#~ msgstr "إنشاء بالجملة من CSV"
-
-#~ msgid "Back to"
-#~ msgstr "العودة إلى"
-
-#~ msgid "Update"
-#~ msgstr "تحديث"
-
-#~ msgid "authorized"
-#~ msgstr "مصرح به"
-
-#~ msgid "Quiz is closed, You can not take it anymore!"
-#~ msgstr "الامتحان مغلق، لا يمكنك التقدم إليه بعد الآن!"
-
-#~ msgid "Choose Course"
-#~ msgstr "اختر الكورس"
-
-#~ msgid "unauthorized!"
-#~ msgstr "غير مصرح به!"
-
-#~ msgid "Correct answer is not in choices"
-#~ msgstr "الإجابة الصحيحة ليست ضمن الخيارات"
-
-#~ msgid "Page navigation example"
-#~ msgstr "مثال على التنقل بين الصفحات"
-
-#~ msgid ""
-#~ "HLS segment key must have a folder prefix and a \"Video Segments\" or "
-#~ "\"Audio Segments\" media folder."
-#~ msgstr ""
-#~ "يجب أن يحتوي مفتاح مقطع HLS على بادئة مجلد ومجلد وسائط \"Video Segments\" "
-#~ "أو \"Audio Segments\"."
-
-#~ msgid ""
-#~ "HLS segment key must have a non-empty folder prefix before the \"Video "
-#~ "Segments\" or \"Audio Segments\" folder."
-#~ msgstr ""
-#~ "يجب أن يحتوي مفتاح مقطع HLS على بادئة مجلد غير فارغة قبل مجلد \"Video "
-#~ "Segments\" أو \"Audio Segments\"."
-
-#~ msgid "Today's records:"
-#~ msgstr "سجلات اليوم:"
-
-#~ msgid "Replace payment receipt"
-#~ msgstr "استبدال إيصال الدفع"
 
 msgid "Delete this holiday?"
 msgstr "حذف هذا العيد؟"
@@ -12708,7 +12476,7 @@ msgstr "إيقاف"
 msgid "Clean up"
 msgstr "تنظيف"
 
-msgid "Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed."
+msgid "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed."
 msgstr "هل تريد إزالة ملفات هذا الرفع من الخادم وR2؟ ستُزال أيضًا مسودة الدرس التي أنشأها هذا الرفع إذا لم تكن مستخدمة."
 
 msgid "Draft lesson removed."
@@ -12844,8 +12612,8 @@ msgstr "تحديث حالة إعادة الحساب"
 msgid "Select valid quizzes from the current list."
 msgstr "حدد اختبارات صالحة من القائمة الحالية."
 
-msgid "Starting quiz recalculation…"
-msgstr "جارٍ بدء إعادة حساب الاختبارات…"
+msgid "Starting quiz recalculation..."
+msgstr "جارٍ بدء إعادة حساب الاختبارات..."
 
 msgid ""
 "Unable to read recalculation progress. Refresh the status to try again."
@@ -12875,8 +12643,8 @@ msgstr "فشلت عملية الاختبار. تم الاحتفاظ بالعمل
 msgid "Invalid quiz operation."
 msgstr "عملية الاختبار غير صالحة."
 
-msgid "Recovering saved answers…"
-msgstr "جارٍ استعادة الإجابات المحفوظة…"
+msgid "Recovering saved answers..."
+msgstr "جارٍ استعادة الإجابات المحفوظة..."
 
 msgid "Recovery could not finish. Reload to try again."
 msgstr "تعذرت إكمال الاستعادة. أعد تحميل الصفحة للمحاولة مرة أخرى."
@@ -12887,8 +12655,8 @@ msgstr "تعذر حفظ الإجابات. اترك هذه الصفحة مفتو�
 msgid "Answers saved."
 msgstr "تم حفظ الإجابات."
 
-msgid "Saving answers…"
-msgstr "جارٍ حفظ الإجابات…"
+msgid "Saving answers..."
+msgstr "جارٍ حفظ الإجابات..."
 
 msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
 msgstr ""
@@ -12911,8 +12679,8 @@ msgstr "تسليم الإجابات المحفوظة للاختبارات الم
 msgid "Reconcile all matching quizzes"
 msgstr "تسليم الإجابات المحفوظة لكل الاختبارات المطابقة"
 
-msgid "Starting quiz operation…"
-msgstr "جارٍ بدء عملية الاختبار…"
+msgid "Starting quiz operation..."
+msgstr "جارٍ بدء عملية الاختبار..."
 
 msgid "Unable to start quiz operation."
 msgstr "تعذر بدء عملية الاختبار."
@@ -12982,3 +12750,783 @@ msgstr "إعادة تعيين كلمة المرور لمعهد الكتاب ال
 
 msgid "Link your Telegram account from your profile page, then try again."
 msgstr "اربط حساب تيليجرام من صفحة ملفك الشخصي ثم حاول مرة أخرى."
+
+msgid "Saving in the app is disabled."
+msgstr "الحفظ داخل التطبيق معطّل."
+
+msgid "Saving on the device is disabled."
+msgstr "الحفظ على الجهاز معطّل."
+
+msgid "Online students would have no applicable weight. Add a quiz rule or lower the attendance weight."
+msgstr "لن يكون لدى طلاب التعليم الإلكتروني أي وزن قابل للتطبيق. أضف قاعدة اختبار أو خفّض وزن الحضور."
+
+msgid "No applicable promotion rules for this student's study mode."
+msgstr "لا توجد قواعد ترقية قابلة للتطبيق على طريقة دراسة هذا الطالب."
+
+msgid "The question text is required."
+msgstr "نص السؤال مطلوب."
+
+msgid "The question text must be at most %(limit)s characters."
+msgstr "يجب ألا يزيد نص السؤال عن %(limit)s حرفًا."
+
+msgid "Unsupported question type \"%(type)s\". Allowed types: %(allowed)s."
+msgstr "نوع السؤال \"%(type)s\" غير مدعوم. الأنواع المسموحة: %(allowed)s."
+
+msgid "The question grade must be a whole number."
+msgstr "درجة السؤال يجب أن تكون عددًا صحيحًا."
+
+msgid "The question grade must be between 0 and %(limit)s."
+msgstr "درجة السؤال يجب أن تكون بين 0 و%(limit)s."
+
+msgid "Multiple choice questions need at least 2 choices."
+msgstr "أسئلة الاختيار من متعدد تحتاج إلى خيارين على الأقل."
+
+msgid "Multiple choice questions can have at most %(limit)s choices."
+msgstr "يمكن أن تحتوي أسئلة الاختيار من متعدد على %(limit)s خيارات كحد أقصى."
+
+msgid "The grading form contains a question that does not belong to this submission."
+msgstr "تتضمن استمارة التصحيح سؤالًا لا يتبع هذا التسليم."
+
+msgid "Question %(question)s: enter a whole number."
+msgstr "السؤال %(question)s: أدخل عددًا صحيحًا."
+
+msgid "Question %(question)s: the grade must be between 0 and %(maximum)s."
+msgstr "السؤال %(question)s: يجب أن تكون الدرجة بين 0 و%(maximum)s."
+
+msgid "Grades could not be saved. No changes were made."
+msgstr "تعذر حفظ الدرجات. لم يتم إجراء أي تغييرات."
+
+msgid "%(count)s more grading errors were not shown."
+msgstr "لم يتم عرض %(count)s أخطاء تصحيح إضافية."
+
+msgid "%(count)s question grade(s) saved."
+msgstr "تم حفظ درجة %(count)s سؤال."
+
+msgid "You do not have permission to manage this storage key."
+msgstr "ليس لديك إذن لإدارة مفتاح التخزين هذا."
+
+msgid "Select at most %(limit)s files per request."
+msgstr "اختر %(limit)s ملفات كحد أقصى في كل طلب."
+
+msgid "Every file key must be a non-empty string."
+msgstr "يجب أن يكون كل مفتاح ملف نصًا غير فارغ."
+
+msgid "Invalid selection flags."
+msgstr "علامات اختيار غير صالحة."
+
+msgid "Invalid folder request."
+msgstr "طلب مجلد غير صالح."
+
+msgid "Invalid rename request."
+msgstr "طلب إعادة تسمية غير صالح."
+
+msgid "A formula calculation is already in progress for this academic scope."
+msgstr "يجري بالفعل حساب معادلة لهذا النطاق الأكاديمي."
+
+msgid "The promotion formula no longer exists."
+msgstr "معادلة الترقية لم تعد موجودة."
+
+msgid "The academic scope no longer exists."
+msgstr "النطاق الأكاديمي لم يعد موجودًا."
+
+msgid "The formula changed after this calculation was queued. Review the formula and try again."
+msgstr "تغيّرت المعادلة بعد إدراج هذا الحساب. راجع المعادلة وحاول مرة أخرى."
+
+msgid "Promotion formula saved. Recalculation was queued; promotion stays blocked until it completes."
+msgstr "تم حفظ معادلة الترقية. تم إدراج إعادة الحساب؛ تبقى الترقية موقوفة حتى تكتمل."
+
+msgid "The formula calculation for this academic scope is incomplete. Finish it before promotion."
+msgstr "حساب المعادلة لهذا النطاق الأكاديمي غير مكتمل. أكمل الحساب قبل الترقية."
+
+msgid "This management operation has not been enabled yet."
+msgstr "هذه العملية الإدارية لم تُفعّل بعد."
+
+msgid "The operation failed. Review the results and try again."
+msgstr "فشلت العملية. راجع النتائج وحاول مرة أخرى."
+
+msgid "Invalid management operation."
+msgstr "عملية إدارية غير صالحة."
+
+msgid "The archive exceeds the expanded-size budget; remaining files were skipped."
+msgstr "يتجاوز الأرشيف حد الحجم بعد فك الضغط؛ تم تخطي الملفات المتبقية."
+
+msgid "A course with this name already exists in the target level."
+msgstr "يوجد مقرر بهذا الاسم بالفعل في المستوى المستهدف."
+
+msgid "Applying queues one row at a time; a failing row is reported without stopping the remaining rows."
+msgstr "التطبيق يضع الصفوف في قائمة المعالجة صفًا واحدًا في كل مرة؛ يُبلَّغ عن الصف الفاشل دون إيقاف بقية الصفوف."
+
+msgid "Attendance reconciliation for %(date)s was queued. Missing exits are recorded in bounded batches."
+msgstr "تمت جدولة تسوية الحضور ليوم %(date)s. تُسجَّل حالات الخروج الناقصة في دفعات محدودة."
+
+msgid "Copying %(count)d offering(s) as drafts was queued. Progress is available while it runs; the copy commits all offerings together."
+msgstr "تمت جدولة نسخ %(count)d من المقررات المطروحة كمسودات. يمكن متابعة التقدم أثناء التنفيذ؛ ويُحفظ النسخ لجميع المقررات معًا."
+
+msgid "Course duplication was queued. The source offering content is copied as drafts and progress is available while it runs."
+msgstr "تمت جدولة تكرار المقرر. يُنسخ محتوى المقرر المطروح المصدر كمسودات ويمكن متابعة التقدم أثناء التنفيذ."
+
+msgid "Historical intake was queued for %(count)d row(s). Rows are applied one at a time; review progress below."
+msgstr "تمت جدولة الإدخال التاريخي لعدد %(count)d صفًا. تُطبق الصفوف واحدًا تلو الآخر؛ راجع التقدم أدناه."
+
+msgid "Invalid copy option."
+msgstr "خيار نسخ غير صالح."
+
+msgid "Invalid folder request"
+msgstr "طلب مجلد غير صالح"
+
+msgid "Invalid management operation cursor."
+msgstr "مؤشر عملية إدارية غير صالح."
+
+msgid "Invalid management operation status."
+msgstr "حالة عملية إدارية غير صالحة."
+
+msgid "Line"
+msgstr "السطر"
+
+msgid "Line %(line)d: User '%(username)s' appears more than once in this file."
+msgstr "السطر %(line)d: المستخدم '%(username)s' مكرر أكثر من مرة في هذا الملف."
+
+msgid "Line %(line)d: Username is required."
+msgstr "السطر %(line)d: اسم المستخدم مطلوب."
+
+msgid "New course name is too long."
+msgstr "اسم المقرر الجديد طويل جدًا."
+
+msgid "No users were created because the file has %(count)d invalid row(s)."
+msgstr "لم يُنشأ أي مستخدم لأن الملف يحتوي على %(count)d صفًا غير صالح."
+
+msgid "No users were created because the file has %(count)d invalid row(s). Correct the file and try again."
+msgstr "لم يُنشأ أي مستخدم لأن الملف يحتوي على %(count)d صفًا غير صالح. صحح الملف وحاول مرة أخرى."
+
+msgid "One or more roles no longer exist."
+msgstr "دور واحد أو أكثر لم يعد موجودًا."
+
+msgid "One or more usernames were created after this file was validated. No users were created; review the file and try again."
+msgstr "تم إنشاء اسم مستخدم واحد أو أكثر بعد التحقق من هذا الملف. لم يُنشأ أي مستخدم؛ راجع الملف وحاول مرة أخرى."
+
+msgid "Only content managers can duplicate a course."
+msgstr "يمكن لمديري المحتوى فقط تكرار المقرر."
+
+msgid "Private import storage is not available. Try again later."
+msgstr "مخزن الاستيراد الخاص غير متاح. حاول مرة أخرى لاحقًا."
+
+msgid "Promotion was queued for %(count)d student(s). Progress is available while it runs."
+msgstr "تمت جدولة الترقية لعدد %(count)d طالبًا. يمكن متابعة التقدم أثناء التنفيذ."
+
+msgid "Queue reviewed upload"
+msgstr "ضع الرفع المراجع في قائمة المعالجة"
+
+msgid "Row errors"
+msgstr "أخطاء الصفوف"
+
+msgid "Scanned"
+msgstr "تم المسح"
+
+msgid "Select a valid target academic scope."
+msgstr "اختر نطاقًا أكاديميًا مستهدفًا صالحًا."
+
+msgid "Select at least one student result."
+msgstr "اختر نتيجة طالب واحدة على الأقل."
+
+msgid "Select between one and 200 offerings to copy."
+msgstr "اختر بين مقرر مطروح واحد و200 مقرر للنسخ."
+
+msgid "Select the source offering to duplicate."
+msgstr "اختر المقرر المطروح المصدر للتكرار."
+
+msgid "Storage statistics are unavailable right now."
+msgstr "إحصاءات التخزين غير متاحة الآن."
+
+msgid "The frozen copy request is not valid."
+msgstr "طلب النسخ المجمّد غير صالح."
+
+msgid "The frozen import input is not valid."
+msgstr "مدخلات الاستيراد المجمّدة غير صالحة."
+
+msgid "The frozen intake input is not valid."
+msgstr "مدخلات الإدخال المجمّدة غير صالحة."
+
+msgid "The import file changed after it was queued."
+msgstr "تغيّر ملف الاستيراد بعد جدولته."
+
+msgid "The import file is no longer available."
+msgstr "ملف الاستيراد لم يعد متاحًا."
+
+msgid "The intake file could not be identified."
+msgstr "تعذر التعرف على ملف الإدخال."
+
+msgid "The private import file could not be stored. Try again later."
+msgstr "تعذر تخزين ملف الاستيراد الخاص. حاول مرة أخرى لاحقًا."
+
+msgid "The source offering does not belong to this course."
+msgstr "المقرر المطروح المصدر لا يتبع هذا المقرر."
+
+msgid "The source offering level does not match the target academic scope."
+msgstr "مستوى المقرر المطروح المصدر لا يطابق النطاق الأكاديمي المستهدف."
+
+msgid "The source offering no longer exists."
+msgstr "المقرر المطروح المصدر لم يعد موجودًا."
+
+msgid "The student role is not configured."
+msgstr "دور الطالب غير مهيأ."
+
+msgid "The target scope already contains conflicting content."
+msgstr "النطاق المستهدف يحتوي بالفعل على محتوى متعارض."
+
+msgid "The uploaded file is empty."
+msgstr "الملف المرفوع فارغ."
+
+msgid "The uploaded file is too large."
+msgstr "الملف المرفوع أكبر من الحد المسموح."
+
+msgid "The user CSV file has no data rows."
+msgstr "ملف CSV للمستخدمين لا يحتوي على صفوف بيانات."
+
+msgid "The user CSV file is empty."
+msgstr "ملف CSV للمستخدمين فارغ."
+
+msgid "The user CSV file is too large."
+msgstr "ملف CSV للمستخدمين أكبر من الحد المسموح."
+
+msgid "The user CSV file must be UTF-8 encoded."
+msgstr "يجب أن يكون ملف CSV للمستخدمين بترميز UTF-8."
+
+msgid "The user CSV file must contain at most 1,000 data rows."
+msgstr "يجب ألا يزيد ملف CSV للمستخدمين عن 1,000 صف بيانات."
+
+msgid "The user import was queued for %(count)d row(s). Accounts are created only after the whole file validates; progress is available below."
+msgstr "تمت جدولة استيراد المستخدمين لعدد %(count)d صفًا. لا تُنشأ الحسابات إلا بعد التحقق من الملف بالكامل؛ التقدم متاح أدناه."
+
+msgid "The whole file is validated first. Any invalid row creates no accounts at all; the import runs on the management worker."
+msgstr "يُتحقق من الملف بالكامل أولًا. أي صف غير صالح يمنع إنشاء أي حساب؛ ويعمل الاستيراد على عامل الإدارة."
+
+msgid "This media job is already being cleaned up."
+msgstr "تجري بالفعل عملية تنظيف مهمة الوسائط هذه."
+
+msgid "You are no longer allowed to copy academic offerings."
+msgstr "لم يعد مسموحًا لك بنسخ المقررات الأكاديمية."
+
+msgid "You are no longer allowed to duplicate a course."
+msgstr "لم يعد مسموحًا لك بتكرار المقرر."
+
+msgid "You are no longer allowed to import user accounts."
+msgstr "لم يعد مسموحًا لك باستيراد حسابات المستخدمين."
+
+msgid "You are no longer allowed to run historical intake."
+msgstr "لم يعد مسموحًا لك بتشغيل الإدخال التاريخي."
+
+msgid "The intake file could not be read."
+msgstr "تعذر قراءة ملف الإدخال."
+
+msgid "The user CSV file could not be read."
+msgstr "تعذر قراءة ملف CSV للمستخدمين."
+
+msgid "The operation was taken over by another worker."
+msgstr "تم تولي العملية من قبل عامل آخر."
+
+msgid "%(title)s (part %(number)d)"
+msgstr "%(title)s (الجزء %(number)d)"
+
+msgid "Evaluation export was queued. The download link appears here when it is ready."
+msgstr "تم وضع تصدير التقييم في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون جاهزًا."
+
+msgid "Start a whole-scope export from the promotion formula page."
+msgstr "ابدأ تصدير النطاق الكامل من صفحة صيغة الترقية."
+
+msgid "The export is not ready yet."
+msgstr "التصدير ليس جاهزًا بعد."
+
+msgid "This export has expired. Start a new export."
+msgstr "انتهت صلاحية هذا التصدير. ابدأ تصديرًا جديدًا."
+
+msgid "Private export storage is not available. Try again later."
+msgstr "مساحة تخزين التصدير الخاصة غير متاحة. حاول مرة أخرى لاحقًا."
+
+msgid "The export file could not be stored. Try again later."
+msgstr "تعذر تخزين ملف التصدير. حاول مرة أخرى لاحقًا."
+
+msgid "This export is no longer available."
+msgstr "هذا التصدير لم يعد متاحًا."
+
+msgid "You are no longer allowed to export evaluation results."
+msgstr "لم يعد مسموحًا لك بتصدير نتائج التقييم."
+
+msgid "Download result"
+msgstr "تنزيل النتيجة"
+
+msgid "Operation progress"
+msgstr "تقدم العملية"
+
+msgid "Evaluation export"
+msgstr "تصدير التقييم"
+
+msgid "Grades report export"
+msgstr "تصدير تقرير الدرجات"
+
+msgid "Completed with failures"
+msgstr "اكتمل مع أخطاء"
+
+msgid "Report export was queued. The download link appears here when it is ready."
+msgstr "تم وضع تصدير التقرير في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون جاهزًا."
+
+msgid "Start the report export from the reports page."
+msgstr "ابدأ تصدير التقرير من صفحة التقارير."
+
+msgid "The selected course offering does not belong to this academic scope."
+msgstr "عرض المقرر المحدد لا يتبع هذا النطاق الأكاديمي."
+
+msgid "You are no longer allowed to export reports."
+msgstr "لم يعد مسموحًا لك بتصدير التقارير."
+
+msgid "Invalid study mode."
+msgstr "طريقة دراسة غير صالحة."
+
+msgid "Storage is not available right now."
+msgstr "التخزين غير متاح الآن."
+
+msgid "Another storage operation is already using these folders."
+msgstr "هناك عملية تخزين أخرى تستخدم هذه المجلدات بالفعل."
+
+msgid "A storage path is required."
+msgstr "مسار التخزين مطلوب."
+
+msgid "Storage has reached its active operation limit. Try again shortly."
+msgstr "وصل التخزين إلى الحد الأقصى للعمليات النشطة. حاول مرة أخرى بعد قليل."
+
+msgid "A media upload or cleanup is already using this storage folder."
+msgstr "يوجد رفع وسائط أو تنظيف يستخدم مجلد التخزين هذا حاليا."
+
+msgid "A graduation gallery upload is using this storage folder."
+msgstr "يوجد رفع جارٍ في معرض التخرج يستخدم مجلد التخزين هذا."
+
+msgid "A record already uses a destination file name."
+msgstr "يوجد سجل يستخدم اسم ملف الوجهة بالفعل."
+
+msgid "You are no longer allowed to manage storage."
+msgstr "لم يعد مسموحًا لك بإدارة التخزين."
+
+msgid "You are no longer allowed to delete storage."
+msgstr "لم يعد مسموحًا لك بحذف التخزين."
+
+msgid "The destination folder is not empty."
+msgstr "المجلد الوجهة ليس فارغًا."
+
+msgid "The folder copy failed before any old file was removed."
+msgstr "فشل نسخ المجلد قبل إزالة أي ملف قديم."
+
+msgid "The renamed copy is incomplete; old files were not removed."
+msgstr "النسخة المعاد تسميتها غير مكتملة؛ لم تتم إزالة الملفات القديمة."
+
+msgid "The copied file could not be verified, so the original was kept."
+msgstr "تعذر التحقق من الملف المنسوخ، لذا تم الاحتفاظ بالأصل."
+
+msgid "The old file could not be removed."
+msgstr "تعذر إزالة الملف القديم."
+
+msgid "Some files changed during the rename and were not moved."
+msgstr "تغيّرت بعض الملفات أثناء إعادة التسمية ولم تُنقل."
+
+msgid "The files were renamed, but lesson links were not updated."
+msgstr "تمت إعادة تسمية الملفات، لكن روابط الدروس لم تُحدّث."
+
+msgid "The files were renamed, but some record links were not updated."
+msgstr "تمت إعادة تسمية الملفات، لكن بعض روابط السجلات لم تُحدّث."
+
+msgid "The file rename failed."
+msgstr "فشلت إعادة تسمية الملف."
+
+msgid "The rename failed."
+msgstr "فشلت إعادة التسمية."
+
+msgid "The file could not be removed."
+msgstr "تعذر إزالة الملف."
+
+msgid "The file is still linked to a record and was kept."
+msgstr "ما زال الملف مرتبطا بسجل وتم الاحتفاظ به."
+
+msgid "File is still linked to a record and cannot be deleted."
+msgstr "ما زال الملف مرتبطا بسجل ولا يمكن حذفه."
+
+msgid "The folder contains files still linked to application records."
+msgstr "يحتوي المجلد على ملفات ما زالت مرتبطة بسجلات الطلبات."
+
+msgid "Some files remain in the folder."
+msgstr "بقيت بعض الملفات في المجلد."
+
+msgid "Folder deletion was queued."
+msgstr "تم وضع حذف المجلد في قائمة الانتظار."
+
+msgid "Storage operation"
+msgstr "عملية التخزين"
+
+msgid "Storage operation progress"
+msgstr "تقدم عملية التخزين"
+
+msgid "Storage operation complete"
+msgstr "اكتملت عملية التخزين"
+
+msgid "Storage operation completed with warnings"
+msgstr "اكتملت عملية التخزين مع تحذيرات"
+
+msgid "Storage operation failed"
+msgstr "فشلت عملية التخزين"
+
+msgid "Storage operation queued"
+msgstr "عملية التخزين في قائمة الانتظار"
+
+msgid "Storage operation in progress"
+msgstr "عملية التخزين قيد التنفيذ"
+
+msgid "Verifying copies"
+msgstr "التحقق من النسخ"
+
+msgid "Could not load storage operation progress"
+msgstr "تعذر تحميل تقدم عملية التخزين"
+
+msgid "Waiting for storage operation progress"
+msgstr "بانتظار تقدم عملية التخزين"
+
+msgid "The operation failed."
+msgstr "فشلت العملية."
+
+msgid "%(done)s files"
+msgstr "%(done)s ملف"
+
+msgid "The folder rename failed and the original files were restored."
+msgstr "فشلت إعادة تسمية المجلد وتمت استعادة الملفات الأصلية."
+
+msgid "Start the quiz export from the submissions page."
+msgstr "ابدأ تصدير الاختبار من صفحة التسليمات."
+
+msgid "Quiz export was queued. The download link appears here when it is ready."
+msgstr "تم وضع تصدير الاختبار في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون جاهزًا."
+
+msgid "You are no longer allowed to export quiz submissions."
+msgstr "لم يعد مسموحًا لك بتصدير تسليمات الاختبار."
+
+msgid "The quiz no longer exists."
+msgstr "الاختبار لم يعد موجودًا."
+
+msgid "You are no longer allowed to run this operation."
+msgstr "لم يعد مسموحا لك بتنفيذ هذه العملية."
+
+msgid "Another operation with different input is already running. Wait for it to finish."
+msgstr "توجد عملية قيد التنفيذ ببيانات مختلفة. انتظر حتى تنتهي."
+
+msgid "Last updated"
+msgstr "آخر تحديث"
+
+msgid "%(processed)s of %(total)s"
+msgstr "%(processed)s من %(total)s"
+
+msgid "Announcement delivery"
+msgstr "إرسال الإعلانات"
+
+msgid "Background job pages"
+msgstr "صفحات المهام الخلفية"
+
+msgid "Background jobs"
+msgstr "المهام الخلفية"
+
+msgid "Choose an operation in the selected category."
+msgstr "اختر عملية من الفئة المحددة."
+
+msgid "Cleanup: %(status)s"
+msgstr "التنظيف: %(status)s"
+
+msgid "Created from"
+msgstr "تاريخ الإنشاء من"
+
+msgid "Created through"
+msgstr "تاريخ الإنشاء حتى"
+
+msgid "Details"
+msgstr "التفاصيل"
+
+msgid "First 20 row errors"
+msgstr "أول 20 خطأ في الصفوف"
+
+msgid "Gallery uploads"
+msgstr "رفع ملفات المعرض"
+
+msgid "Job category"
+msgstr "فئة المهمة"
+
+msgid "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
+msgstr "يتم تحديث المهام المعروضة تلقائيا. حدث الصفحة لعرض المهام الجديدة. لا تظهر أعمال الصيانة المجدولة التي لا تحتفظ بسجل."
+
+msgid "Lesson attachment: %(status)s"
+msgstr "الإرفاق بالدرس: %(status)s"
+
+msgid "Management operations"
+msgstr "العمليات الإدارية"
+
+msgid "Management, quizzes, media, gallery uploads, announcements and Telegram batches."
+msgstr "العمليات الإدارية والاختبارات والوسائط ورفع ملفات المعرض والإعلانات والإرسال الجماعي عبر تيليجرام."
+
+msgid "Matching jobs: %(count)s"
+msgstr "المهام المطابقة: %(count)s"
+
+msgid "No background jobs match these filters."
+msgstr "لا توجد مهام خلفية تطابق عوامل التصفية."
+
+msgid "No progress reported"
+msgstr "لم يتم تسجيل تقدم بعد"
+
+msgid "Not specified"
+msgstr "غير محدد"
+
+msgid "Operation"
+msgstr "العملية"
+
+msgid "Progress updates are temporarily unavailable. Retrying..."
+msgstr "تحديثات التقدم غير متاحة مؤقتا. جار إعادة المحاولة..."
+
+msgid "Quiz operations"
+msgstr "عمليات الاختبارات"
+
+msgid "Reference"
+msgstr "المرجع"
+
+msgid "Requested by"
+msgstr "طلب بواسطة"
+
+msgid "Search and filter"
+msgstr "بحث وتصفية"
+
+msgid "Search jobs"
+msgstr "البحث في المهام"
+
+msgid "Selected submissions"
+msgstr "التسليمات المحددة"
+
+msgid "The end date must be on or after the start date."
+msgstr "يجب أن يكون تاريخ النهاية في تاريخ البداية أو بعده."
+
+msgid "View details"
+msgstr "عرض التفاصيل"
+
+msgid "All storage"
+msgstr "كل مساحة التخزين"
+
+msgid "Formula recalculation"
+msgstr "إعادة حساب النتائج"
+
+msgid "Bulk promotion"
+msgstr "الترقية الجماعية"
+
+msgid "Historical intake"
+msgstr "إدخال السجل الدراسي السابق"
+
+msgid "Legacy user import"
+msgstr "استيراد المستخدمين القدامى"
+
+msgid "Quiz detail export"
+msgstr "تصدير تفاصيل الاختبارات"
+
+msgid "Quiz summary export"
+msgstr "تصدير ملخص الاختبارات"
+
+msgid "Course copy"
+msgstr "نسخ المقرر"
+
+msgid "Attendance reconcile"
+msgstr "تسوية الحضور"
+
+msgid "Storage rename"
+msgstr "إعادة تسمية ملفات التخزين"
+
+msgid "Storage delete"
+msgstr "حذف ملفات التخزين"
+
+msgid "Storage usage refresh"
+msgstr "تحديث إحصاءات التخزين"
+
+msgid "A redelivery for this notification is already in progress."
+msgstr "توجد عملية إعادة إرسال قيد التنفيذ لهذا الإشعار بالفعل."
+
+msgid "Accepted, waiting for receipt"
+msgstr "تم قبول الإرسال، وبانتظار إيصال الاستلام"
+
+msgid "Action button"
+msgstr "زر الإجراء"
+
+msgid "Announcement generation"
+msgstr "إنشاء الإعلانات"
+
+msgid "Arabic content"
+msgstr "المحتوى العربي"
+
+msgid "Audience"
+msgstr "المستلمون"
+
+msgid "Channel delivery attempts"
+msgstr "محاولات التسليم عبر القنوات"
+
+msgid "Delivery attempt pages"
+msgstr "صفحات محاولات التسليم"
+
+msgid "Device"
+msgstr "الجهاز"
+
+msgid "English content"
+msgstr "المحتوى الإنجليزي"
+
+msgid "Exact Telegram message text"
+msgstr "النص الدقيق لرسالة تيليجرام"
+
+msgid "Exact text was not recorded for older Telegram attempts. The saved notification content is shown above."
+msgstr "لم يُسجل النص الدقيق لمحاولات تيليجرام القديمة. يظهر محتوى الإشعار المحفوظ أعلاه."
+
+msgid "Finish notification generation before resending."
+msgstr "أكمل إنشاء الإشعارات قبل إعادة الإرسال."
+
+msgid "Has failed deliveries"
+msgstr "لديه عمليات تسليم فاشلة"
+
+msgid "Inbox generation; view notification history for delivery receipts."
+msgstr "إنشاء صندوق الوارد؛ اعرض سجل الإشعارات لمتابعة إيصالات التسليم."
+
+msgid "Invalid notification redelivery selection."
+msgstr "اختيار إعادة إرسال الإشعار غير صالح."
+
+msgid "Live updates"
+msgstr "تحديثات مباشرة"
+
+msgid "Matching jobs: {{ count }}"
+msgstr "المهام المطابقة: {{ count }}"
+
+msgid "No eligible failed delivery, or another delivery is still pending."
+msgstr "لا توجد عملية تسليم فاشلة مؤهلة، أو لا تزال عملية تسليم أخرى قيد الانتظار."
+
+msgid "No external channel attempts recorded yet."
+msgstr "لم تُسجل أي محاولات عبر قنوات خارجية بعد."
+
+msgid "Notification history"
+msgstr "سجل الإشعارات"
+
+msgid "Notification redelivery"
+msgstr "إعادة إرسال الإشعارات"
+
+msgid "Notification type"
+msgstr "نوع الإشعار"
+
+msgid "Only administrators can resend notifications."
+msgstr "يمكن للمسؤولين فقط إعادة إرسال الإشعارات."
+
+msgid "Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again."
+msgstr "المستلمون الأصليون: {{ count }}. ستتم إعادة التحقق من صلاحية الوصول وأهلية قنوات الإرسال."
+
+msgid "Original recipients of this saved content"
+msgstr "المستلمون الأصليون لهذا المحتوى المحفوظ"
+
+msgid "Pause updates"
+msgstr "إيقاف التحديثات مؤقتًا"
+
+msgid "Preparing delivery records"
+msgstr "جارٍ تجهيز سجلات التسليم"
+
+msgid "Push success means a confirmed provider receipt, not that the student opened the message. Pending receipts keep polling; terminal failures can be retried."
+msgstr "نجاح الإشعارات الفورية يعني تأكيد إيصال مزود الخدمة، ولا يعني أن الطالب فتح الرسالة. تستمر متابعة الإيصالات المعلقة، ويمكن إعادة محاولة حالات الفشل النهائية."
+
+msgid "Queue another delivery using this saved content?"
+msgstr "هل تريد وضع عملية تسليم أخرى في قائمة الانتظار باستخدام هذا المحتوى المحفوظ؟"
+
+msgid "Read in the inbox"
+msgstr "تمت القراءة في صندوق الوارد"
+
+msgid "Recipient"
+msgstr "المستلم"
+
+msgid "Recipient copies are being prepared."
+msgstr "جارٍ تجهيز نسخ المستلمين."
+
+msgid "Recipient pages"
+msgstr "صفحات المستلمين"
+
+msgid "Redelivery queued. Final progress includes delivery receipts."
+msgstr "تمت إضافة إعادة الإرسال إلى قائمة الانتظار. يشمل التقدم النهائي إيصالات التسليم."
+
+msgid "Resend all"
+msgstr "إعادة إرسال الكل"
+
+msgid "Resume updates"
+msgstr "متابعة التحديثات"
+
+msgid "Retry notification generation"
+msgstr "إعادة محاولة إنشاء الإشعارات"
+
+msgid "Retry or resend"
+msgstr "إعادة المحاولة أو الإرسال"
+
+msgid "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history."
+msgstr "تعيد المحاولة إرسال أحدث المحاولات الفاشلة عبر القنوات فقط. ينشئ خيار إعادة إرسال الكل نسخًا جديدة للمستلمين الأصليين المحددين. لا تُكرر عمليات التسليم المعلقة، وتبقى النتائج السابقة في السجل."
+
+msgid "Saved notification content"
+msgstr "محتوى الإشعار المحفوظ"
+
+msgid "Saved system and admin notifications, per-recipient delivery progress and original content."
+msgstr "إشعارات النظام والمسؤول المحفوظة، وتقدم التسليم لكل مستلم، والمحتوى الأصلي."
+
+msgid "Scheduled for later"
+msgstr "مجدول لوقت لاحق"
+
+msgid "Telegram broadcast"
+msgstr "رسالة جماعية عبر تيليجرام"
+
+msgid "Telegram recipients"
+msgstr "مستلمو تيليجرام"
+
+msgid "The notification is no longer eligible for redelivery."
+msgstr "لم يعد هذا الإشعار مؤهلاً لإعادة الإرسال."
+
+msgid "The notification was cancelled."
+msgstr "تم إلغاء الإشعار."
+
+msgid "The original notification is no longer available."
+msgstr "لم يعد الإشعار الأصلي متاحًا."
+
+msgid "There are no currently eligible recipients for this delivery."
+msgstr "لا يوجد مستلمون مؤهلون حاليًا لعملية التسليم هذه."
+
+msgid "This notification has not reached its scheduled time."
+msgstr "لم يحِن موعد هذا الإشعار بعد."
+
+msgid "This recipient only"
+msgstr "هذا المستلم فقط"
+
+msgid "This redelivery"
+msgstr "إعادة الإرسال هذه"
+
+msgid "This redelivery's recipients"
+msgstr "مستلمو إعادة الإرسال هذه"
+
+msgid "Transport retry only; no duplicate inbox notification was created."
+msgstr "إعادة محاولة لقناة الإرسال فقط؛ لم يتم إنشاء إشعار مكرر في صندوق الوارد."
+
+msgid "Unavailable"
+msgstr "غير متاح"
+
+msgid "Unread in the inbox"
+msgstr "لم يُقرأ في صندوق الوارد"
+
+msgid "Updates paused"
+msgstr "التحديثات متوقفة مؤقتًا"
+
+msgid "View delivery history"
+msgstr "عرض سجل التسليم"
+
+msgid "Initial delivery records are still being prepared. Resend all will be available when they finish."
+msgstr "لا تزال سجلات الإرسال الأولية قيد الإعداد. سيصبح خيار إعادة الإرسال متاحًا بعد اكتمالها."
+
+msgid "Wait for the original delivery records to finish before resending all."
+msgstr "انتظر حتى تنتهي سجلات الإرسال الأصلية قبل إعادة إرسال الجميع."
+
+msgid "Wait for the current delivery to finish before resending."
+msgstr "انتظر حتى تكتمل عملية التسليم الحالية قبل إعادة الإرسال."
+
+msgid "Waiting for delivery"
+msgstr "بانتظار التسليم"
+
+msgid "device"
+msgstr "جهاز"

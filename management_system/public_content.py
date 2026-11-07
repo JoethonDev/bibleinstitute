@@ -50,7 +50,7 @@ COMMON = {
             {'title': 'Accurate information', 'text': 'All submitted information and documents must be accurate and complete.'},
             {'title': 'Tuition', 'text': 'Annual tuition is EGP 900 inside Egypt and USD 80 outside Egypt. It may be paid in two installments: the first before studies begin and the second during January.'},
             {'title': 'Books and notes', 'text': 'Tuition excludes books, study notes, and shipping, which are charged at actual cost.'},
-            {'title': 'Study and examinations', 'text': 'Students must follow the study mode appropriate to their residence and the Institute’s attendance, coursework, and examination rules.'},
+            {'title': 'Study and examinations', 'text': "Students must follow the study mode appropriate to their residence and the Institute's attendance, coursework, and examination rules."},
             {'title': 'Assessment and progression', 'text': 'The passing grade is 50% per subject. A student who fails more than two subjects may not progress to the next year.'},
             {'title': 'Personal data', 'text': 'Student information and documents are used only for application and academic administration at the Institute.'},
         ],
@@ -62,7 +62,7 @@ HOME = {
         'hero_kicker': 'منذ عام 2002', 'hero_title': 'لأن الكلمة حياة، ندرسها بعمق ونحياها بصدق',
         'hero_text': 'رحلة دراسية متكاملة تجمع بين المعرفة الأكاديمية والتكوين الروحي والتطبيق العملي، لتصنع شاهداً حياً للمسيح في الكنيسة والمجتمع.',
         'discover': 'اكتشف البرنامج', 'watch_message': 'شاهد كلمة نيافة الأنبا دانيال',
-        'stats': [('2002', 'عام التأسيس'), ('2', 'سنتان دراسيتان'), ('11', 'مجالاً دراسياً'), ('∞', 'تعلم من أي مكان')],
+        'stats': [('2002', 'عام التأسيس'), ('2', 'سنتان دراسيتان'), ('11', 'مجالاً دراسياً'), ('inf', 'تعلم من أي مكان')],
         'identity_kicker': 'هوية المعهد', 'identity_title': 'بيت للدراسة، ومساحة للنمو، ورسالة للحياة',
         'identity_text': 'تأسس المعهد تحت رعاية صاحب النيافة الحبر الجليل الأنبا دانيال، مطران المعادي وتوابعها، ليقدم دراسة كتابية رصينة داخل إطار كنسي أرثوذكسي أصيل.',
         'pillars': [
@@ -70,7 +70,7 @@ HOME = {
             {'number': '02', 'title': 'حياة روحية', 'text': 'ليست المعرفة غاية في ذاتها؛ بل طريقاً لعلاقة أعمق بالله وحياة تتشكل بكلمته.'},
             {'number': '03', 'title': 'شهادة مؤثرة', 'text': 'تأهيل خدام ودارسين يترجمون ما تعلموه إلى حضور إيجابي في الأسرة والكنيسة والوطن.'},
         ],
-        'news_kicker': 'آخر الأخبار', 'news_title': 'العام الدراسي 2026–2027',
+        'news_kicker': 'آخر الأخبار', 'news_title': 'العام الدراسي 2026-2027',
         'news_text': 'تبدأ الدراسة يوم الأحد 20 سبتمبر 2026 وتستمر حتى نهاية مايو 2027. الدراسة النظامية يومي الأحد والثلاثاء من السادسة حتى التاسعة مساءً.',
         'news_badge': 'التقديم متاح', 'news_link': 'اعرف مواعيد ونظام الدراسة',
         'path_kicker': 'اختر مسارك', 'path_title': 'نفس المحتوى، بالطريقة الأنسب لظروفك',
@@ -87,9 +87,9 @@ HOME = {
     },
     'en': {
         'hero_kicker': 'Since 2002', 'hero_title': 'Because the Word is life, we study it deeply and live it faithfully',
-        'hero_text': 'An integrated journey combining academic knowledge, spiritual formation, and practical application—forming living witnesses for Christ in Church and society.',
-        'discover': 'Explore the Program', 'watch_message': 'Watch Bishop Daniel’s Message',
-        'stats': [('2002', 'Founded'), ('2', 'Academic Years'), ('11', 'Fields of Study'), ('∞', 'Learn Anywhere')],
+        'hero_text': 'An integrated journey combining academic knowledge, spiritual formation, and practical application-forming living witnesses for Christ in Church and society.',
+        'discover': 'Explore the Program', 'watch_message': 'Watch Bishop Daniel\'s Message',
+        'stats': [('2002', 'Founded'), ('2', 'Academic Years'), ('11', 'Fields of Study'), ('inf', 'Learn Anywhere')],
         'identity_kicker': 'Our Identity', 'identity_title': 'A home for study, a place for growth, a mission for life',
         'identity_text': 'Founded under the patronage of His Grace Bishop Daniel, Metropolitan of Maadi and its districts, the Institute offers rigorous biblical study within an authentic Coptic Orthodox setting.',
         'pillars': [
@@ -97,8 +97,8 @@ HOME = {
             {'number': '02', 'title': 'Spiritual Life', 'text': 'Knowledge is not an end in itself, but a path toward deeper fellowship with God and a life shaped by His Word.'},
             {'number': '03', 'title': 'Living Witness', 'text': 'Preparing students and servants to translate learning into a positive presence in family, Church, and nation.'},
         ],
-        'news_kicker': 'Latest News', 'news_title': 'Academic Year 2026–2027',
-        'news_text': 'Studies begin Sunday, September 20, 2026 and continue through the end of May 2027. On-campus classes meet Sundays and Tuesdays, 6–9 PM.',
+        'news_kicker': 'Latest News', 'news_title': 'Academic Year 2026-2027',
+        'news_text': 'Studies begin Sunday, September 20, 2026 and continue through the end of May 2027. On-campus classes meet Sundays and Tuesdays, 6-9 PM.',
         'news_badge': 'Admissions Open', 'news_link': 'View dates and study system',
         'path_kicker': 'Choose Your Path', 'path_title': 'The same formation, delivered around your life',
         'paths': [
@@ -109,14 +109,14 @@ HOME = {
         'quote_label': 'Our Vision', 'curriculum_kicker': 'What Will You Study?', 'curriculum_title': 'A broad curriculum connecting text, context, and Church life', 'curriculum_image_alt': 'Bible Institute statement of faith',
         'curriculum_text': 'From the Old and New Testaments and their people to biblical geography, literary forms, lectionary readings, and theological concepts.',
         'curriculum_action': 'Explore all courses', 'video_kicker': 'From the Institute', 'video_title': 'A Message from Our General Supervisor',
-        'video_text': 'Hear His Grace Bishop Daniel speak about the Institute’s mission and the place of Scripture in a life of faith.',
-        'cta_title': 'Begin a deeper journey with Scripture', 'cta_text': 'Everyone is invited to study, understand, and go deeper—on campus or online.',
+        'video_text': "Hear His Grace Bishop Daniel speak about the Institute's mission and the place of Scripture in a life of faith.",
+        'cta_title': 'Begin a deeper journey with Scripture', 'cta_text': 'Everyone is invited to study, understand, and go deeper-on campus or online.',
     },
 }
 
 ABOUT = {
     'ar': {
-        'page_title': 'عن المعهد', 'hero_kicker': 'من نحن', 'hero_title': 'أكثر من دراسة… تكوين إنسان يعيش بالكلمة',
+        'page_title': 'عن المعهد', 'hero_kicker': 'من نحن', 'hero_title': 'أكثر من دراسة... تكوين إنسان يعيش بالكلمة',
         'hero_text': 'نخدم رؤية واضحة: أن يصبح الكتاب المقدس حياة يومية، ومصدراً للنمو، وقوة للشهادة.',
         'story_kicker': 'قصتنا', 'story_title': 'البداية من كوتسيكا، والرسالة إلى كل العالم',
         'story_text_1': 'في عام 2002م تم إنشاء المعهد بكنيسة الشهيد العظيم مارجرجس بكوتسيكا، تحت رعاية صاحب النيافة الحبر الجليل الأنبا دانيال، مطران المعادي وتوابعها.',
@@ -138,7 +138,7 @@ ABOUT = {
         'place_kicker': 'مقر المعهد', 'place_title': 'في قلب المعادي', 'place_text': 'تُعقد المحاضرات في القاعات الخاصة بالمعهد بكنيسة الشهيد العظيم مارجرجس بكوتسيكا، في بيئة تجمع بين الدراسة والشركة والحياة الكنسية.',
     },
     'en': {
-        'page_title': 'About Us', 'hero_kicker': 'Who We Are', 'hero_title': 'More than study—forming people who live by the Word',
+        'page_title': 'About Us', 'hero_kicker': 'Who We Are', 'hero_title': 'More than study-forming people who live by the Word',
         'hero_text': 'We serve a clear vision: Scripture becoming daily life, a source of growth, and power for witness.',
         'story_kicker': 'Our Story', 'story_title': 'From Kotsika to learners around the world',
         'story_text_1': 'The Institute was founded in 2002 at St. George Church in Kotsika under the patronage of His Grace Bishop Daniel, Metropolitan of Maadi and its districts.',
@@ -157,7 +157,7 @@ ABOUT = {
             {'role': 'Supreme Head of Seminaries and Theological Institutes', 'name': 'His Holiness Pope Tawadros II', 'detail': 'Pope of Alexandria and Patriarch of the See of St. Mark'},
             {'role': 'General Supervisor of the Institute', 'name': 'His Grace Bishop Daniel', 'detail': 'Metropolitan of Maadi and its districts'},
         ],
-        'place_kicker': 'Our Campus', 'place_title': 'In the heart of Maadi', 'place_text': 'Lectures take place in the Institute’s halls at St. George Church in Kotsika, an environment joining study, fellowship, and Church life.',
+        'place_kicker': 'Our Campus', 'place_title': 'In the heart of Maadi', 'place_text': "Lectures take place in the Institute's halls at St. George Church in Kotsika, an environment joining study, fellowship, and Church life.",
     },
 }
 
@@ -165,7 +165,7 @@ COURSES = {
     'ar': {
         'page_title': 'نظام الدراسة والمواد', 'hero_kicker': 'رحلتك الدراسية', 'hero_title': 'برنامج واضح، مرن، وعميق',
         'hero_text': 'سنتان دراسيتان، أربعة فصول، ونظام ساعات معتمدة صُمم ليمنحك فهماً متدرجاً ومتكاملاً للكتاب المقدس.',
-        'overview': [('20 سبتمبر 2026', 'بداية الدراسة'), ('الأحد والثلاثاء', 'أيام الحضور'), ('6–9 مساءً', 'موعد المحاضرات'), ('50%', 'نسبة النجاح')],
+        'overview': [('20 سبتمبر 2026', 'بداية الدراسة'), ('الأحد والثلاثاء', 'أيام الحضور'), ('6-9 مساءً', 'موعد المحاضرات'), ('50%', 'نسبة النجاح')],
         'system_kicker': 'نظام الدراسة', 'system_title': 'كل ما تحتاج معرفته قبل أن تبدأ',
         'system_items': [
             {'title': 'المدة والتقسيم', 'text': 'الدراسة على سنتين، وتنقسم كل سنة إلى فصلين دراسيين. يُمنح الدارس شهادة إتمام الدراسة في حفل التخرج السنوي.'},
@@ -184,7 +184,7 @@ COURSES = {
             ('الفنون الكتابية', 'تمييز السرد والشعر والنبوة والحكمة والرسالة وأثر النوع الأدبي في التفسير.'),
             ('نقد الكتاب واستحالة تحريفه', 'التعرف إلى انتقال النص وشواهده والأسس التي تؤكد أمانته.'),
             ('الأسرار الكنسية والكتاب', 'استكشاف الجذور الكتابية للحياة السرائرية في الكنيسة.'),
-            ('القراءات الكنسية – القطمارس', 'فهم ترتيب القراءات وعلاقتها بالمواسم والأعياد والليتورجيا.'),
+            ('القراءات الكنسية - القطمارس', 'فهم ترتيب القراءات وعلاقتها بالمواسم والأعياد والليتورجيا.'),
             ('جغرافيا الكتاب المقدس', 'ربط الأحداث بالأماكن والطرق والبيئة في العهدين.'),
             ('خلفيات العهد القديم', 'التاريخ والثقافات والعادات التي تساعد على قراءة النص في عالمه.'),
             ('ما بين العهدين والأسفار القانونية الثانية', 'فهم الفترة التي مهدت للعهد الجديد والتعرف إلى الأسفار القانونية الثانية.'),
@@ -204,25 +204,25 @@ COURSES = {
     'en': {
         'page_title': 'Study System & Courses', 'hero_kicker': 'Your Learning Journey', 'hero_title': 'Clear, flexible, and deeply formative',
         'hero_text': 'Two academic years, four terms, and a credit-hour system designed to build a progressive, integrated understanding of Scripture.',
-        'overview': [('Sep 20, 2026', 'Studies Begin'), ('Sun & Tue', 'Campus Days'), ('6–9 PM', 'Lecture Time'), ('50%', 'Passing Grade')],
+        'overview': [('Sep 20, 2026', 'Studies Begin'), ('Sun & Tue', 'Campus Days'), ('6-9 PM', 'Lecture Time'), ('50%', 'Passing Grade')],
         'system_kicker': 'Study System', 'system_title': 'Everything you need to know before you begin',
         'system_items': [
             {'title': 'Duration & Terms', 'text': 'The program runs for two years, each divided into two terms. Graduates receive a completion certificate at the annual ceremony.'},
-            {'title': 'On-Campus Study', 'text': 'Classes meet Sundays and Tuesdays, 6–9 PM, at the Institute for residents of Greater Cairo and Giza.'},
+            {'title': 'On-Campus Study', 'text': 'Classes meet Sundays and Tuesdays, 6-9 PM, at the Institute for residents of Greater Cairo and Giza.'},
             {'title': 'Online Study', 'text': 'Self-paced learning for other governorates and abroad, with video, audio, and study materials available online.'},
             {'title': 'Examinations', 'text': 'All exams take place online, with windows set to accommodate students in different time zones.'},
             {'title': 'Assessment & Progression', 'text': 'The passing grade is 50% per course. Students failing more than two courses may not progress to the next year.'},
             {'title': 'Books & Conference', 'text': 'Books and notes are available digitally or from campus. An annual required conference studies a biblical book in depth.'},
         ],
         'curriculum_kicker': 'Curriculum', 'curriculum_title': 'An integrated map for learning',
-        'curriculum_intro': 'The program spans text, context, history, theology, and Church life—helping students see the whole story without losing the beauty of its details.',
+        'curriculum_intro': 'The program spans text, context, history, theology, and Church life-helping students see the whole story without losing the beauty of its details.',
         'subjects': [
             ('Biblical Characters', 'Lives from both Testaments and what their journeys reveal about God and humanity.'),
             ('Old Testament Books', 'A structured introduction to their backgrounds, message, and place in salvation history.'),
             ('The New Testament', 'The Gospels, Acts, Epistles, and Revelation read within their contexts.'),
-            ('Biblical Literary Forms', 'Narrative, poetry, prophecy, wisdom, and letters—and how genre shapes interpretation.'),
+            ('Biblical Literary Forms', 'Narrative, poetry, prophecy, wisdom, and letters-and how genre shapes interpretation.'),
             ('Textual Criticism & Preservation', 'How the text was transmitted, its witnesses, and the foundations for confidence in its integrity.'),
-            ('Sacraments & Scripture', 'Exploring the biblical roots of the Church’s sacramental life.'),
+            ('Sacraments & Scripture', "Exploring the biblical roots of the Church's sacramental life."),
             ('Lectionary Readings', 'Understanding the Katameros and the relationship of readings to seasons, feasts, and liturgy.'),
             ('Biblical Geography', 'Connecting events with the lands, routes, and environments of both Testaments.'),
             ('Old Testament Backgrounds', 'The histories, cultures, and customs that illuminate the biblical world.'),

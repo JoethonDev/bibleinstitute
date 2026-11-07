@@ -32,7 +32,7 @@
   }
   function flipStar(btn, pinned) {
     // Optimistic in-place update: no list rebuild, no fetch, no modal flash.
-    btn.textContent = pinned ? "★" : "☆";
+    btn.textContent = pinned ? "*" : "*";
     btn.classList.toggle("text-warning", pinned);
     btn.classList.toggle("text-muted", !pinned);
     var label = pinned ? t("Unpin") : t("Pin");
@@ -94,7 +94,7 @@
     var b = document.createElement("button");
     b.type = "button";
     b.className = "btn btn-sm btn-link p-0 flex-shrink-0 cmd-star " + (pinned ? "text-warning" : "text-muted");
-    b.textContent = pinned ? "★" : "☆";
+    b.textContent = pinned ? "*" : "*";
     var label = pinned ? t("Unpin") : t("Pin");
     b.setAttribute("aria-label", label);
     b.title = label;
@@ -204,7 +204,7 @@
     box.innerHTML = "";
     var d = document.createElement("div");
     d.className = "list-group-item text-muted";
-    d.textContent = t("Searching…");
+    d.textContent = t("Searching...");
     box.appendChild(d);
   }
   function search() {
@@ -251,7 +251,7 @@
     if (document.activeElement === input && !input.value && e.key.toLowerCase() === "g" && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       gArmedAt = Date.now();
-      input.setAttribute("placeholder", "g …");
+      input.setAttribute("placeholder", "g ...");
       return;
     }
     if (gArmedAt) {
