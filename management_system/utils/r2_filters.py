@@ -210,7 +210,7 @@ class R2FileFilter:
         return stats
 
 
-# Canonical filter presets — one kind-based rule set shared by the drive page,
+# Canonical filter presets - one kind-based rule set shared by the drive page,
 # its search, and its stats.
 FILTER_PRESETS = {
     'media': FileFilterConfig(

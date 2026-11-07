@@ -66,8 +66,8 @@
                 {% for attachment in attachments %}
                 <li class="tg-broadcast-attachment">
                     <i class="fas fa-file me-2" aria-hidden="true"></i>
-                    <span class="tg-broadcast-attachment-name">{% firstof attachment.original_name "—" %}</span>
-                    <span class="tg-broadcast-attachment-type">{{ attachment.mime_type|default:"—" }}</span>
+                    <span class="tg-broadcast-attachment-name">{% firstof attachment.original_name "-" %}</span>
+                    <span class="tg-broadcast-attachment-type">{{ attachment.mime_type|default:"-" }}</span>
                     <span class="tg-broadcast-attachment-size">{{ attachment.size_bytes|filesizeformat }}</span>
                 </li>
                 {% endfor %}

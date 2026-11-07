@@ -9,7 +9,7 @@ def validate_egyptian_national_id(value):
 
 def validate_passport(value):
     if not re.fullmatch(r'[A-Za-z0-9]{6,20}', value):
-        raise ValidationError(_("Passport number must be 6–20 alphanumeric characters."))
+        raise ValidationError(_("Passport number must be 6-20 alphanumeric characters."))
 
 def validate_identity_by_type(identity_type, identity_number):
     if identity_type == "national_id":
@@ -23,6 +23,20 @@ def normalize_username(value: str) -> str:
     if not isinstance(value, str):
         return ""
     return unicodedata.normalize("NFKC", value).strip().lower()
+
+
+def parse_strict_bool(value: object, *, default: bool = False) -> bool:
+    """Return a real JSON boolean, rejecting truthy strings/numbers/lists.
+
+    A value such as the string ``"false"`` must never widen a signed selection,
+    so coercion errors are surfaced to the caller instead of being swallowed.
+    """
+
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raise ValueError("Expected a boolean value")
 
 def normalize_phone(value: str) -> str | None:
     """Return a canonical E.164-like phone or ``None`` when ambiguous.
@@ -77,3 +91,24 @@ def normalize_phone(value: str) -> str | None:
     if not 7 <= len(digits) <= 15:
         return None
     return '+' + digits
+
+
+def validate_unique_phone(value: str, *, exclude_user_id: int | None = None) -> str:
+    """Return the canonical phone, or raise ValidationError when invalid/in use.
+
+    ``exclude_user_id`` is the account being edited (``None`` for a new account),
+    so a profile update may keep its own number. Forms keep their own blank and
+    required conventions; this function only owns normalization and uniqueness.
+    """
+
+    phone = normalize_phone(value)
+    if not phone:
+        raise ValidationError(_("Enter a valid international phone number."))
+    from ..models import User
+
+    conflicts = User.objects.filter(phone=phone)
+    if exclude_user_id is not None:
+        conflicts = conflicts.exclude(pk=exclude_user_id)
+    if conflicts.exists():
+        raise ValidationError(_("This phone number is already in use."))
+    return phone

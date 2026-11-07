@@ -14,6 +14,7 @@ student only has enrollments outside the selected scope are excluded.
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+import logging
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import TruncDate
@@ -25,6 +26,8 @@ from django.utils.translation import get_language
 from .models import AcademicYearLevel, Enrollment, User
 from .utils.csv_export import _csv_safe_cell
 from .utils.timezones import format_application_datetime
+
+logger = logging.getLogger(__name__)
 
 ANALYTICS_STATUSES = tuple(value for value, _label in User.APPLICATION_STATUSES)
 ANALYTICS_STUDY_MODES = tuple(value for value, _label in User.STUDY_MODES)
@@ -119,11 +122,29 @@ def analytics_date_range(scope: AcademicYearLevel | None, from_param, to_param) 
     else:
         default_from = today - window
         default_to = today
-    date_from = _parse_iso_date(from_param) or default_from
-    date_to = _parse_iso_date(to_param) or default_to
+    date_from = _supported_analytics_date(_parse_iso_date(from_param)) or default_from
+    date_to = _supported_analytics_date(_parse_iso_date(to_param)) or default_to
     if date_to < date_from:
         date_from, date_to = date_to, date_from
     return date_from, date_to
+
+
+# Analytics are read-only reporting windows; dates outside this supported range
+# fall back to the endpoint default instead of producing impossible buckets.
+ANALYTICS_MIN_DATE = date(2000, 1, 1)
+
+
+def _supported_analytics_date(value: date | None) -> date | None:
+    if value is None:
+        return None
+    max_date = timezone.localdate() + timedelta(days=366)
+    if value < ANALYTICS_MIN_DATE or value > max_date:
+        logger.warning(
+            "analytics date outside supported range",
+            extra={"event": "analytics_date_rejected", "value": value.isoformat()},
+        )
+        return None
+    return value
 
 
 def resolve_analytics_group(value, date_from: date, date_to: date) -> str:
@@ -241,8 +262,12 @@ def _period_starts(group: str, date_from: date, date_to: date) -> list[date]:
     while start <= date_to:
         periods.append(start)
         if step is not None:
+            if (date.max - start) < step:
+                break
             start += step
         elif start.month == 12:
+            if start.year >= date.max.year:
+                break
             start = start.replace(year=start.year + 1, month=1)
         else:
             start = start.replace(month=start.month + 1)
@@ -353,9 +378,9 @@ def build_analytics_context(request) -> dict:
         {
             "value": str(scope.pk),
             "label": (
-                f"{scope.academic_year.name} — {scope.level} ({_('Active')})"
+                f"{scope.academic_year.name} - {scope.level} ({_('Active')})"
                 if scope.academic_year.is_active
-                else f"{scope.academic_year.name} — {scope.level}"
+                else f"{scope.academic_year.name} - {scope.level}"
             ),
         }
         for scope in analytics_scope_queryset()

@@ -4,27 +4,34 @@
 {% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
-<div id="content" class="container-fluid px-3 ad-page tg-broadcast-page">
+<div id="content" class="container-fluid px-3 ad-page tg-broadcast-page"{% if monitor_job %} x-data="backgroundJobsMonitor" data-job-detail="true" data-job-status-url="{{ job_status_url }}" data-unavailable-label="{% translate 'Unavailable' %}"{% endif %}>
 
     <div class="tg-broadcast-header">
         <div>
             <h4 class="mb-1"><i class="fas fa-bullhorn me-2 ad-page-header-icon" aria-hidden="true"></i>{% translate "Broadcast Details" %}</h4>
             <p class="tg-broadcast-head-desc mb-0">{% translate "Inspect the recipient snapshot and delivery status. Support conversation history is not changed." %}</p>
         </div>
-        <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ broadcast_list_url }}">
-            <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
-        </a>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            {% if monitor_job %}{% include "partials/background_polling_toggle.html" %}{% endif %}
+            <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{{ broadcast_list_url }}">
+                <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
+            </a>
+        </div>
     </div>
 
-    <div class="ad-card mb-3">
+    {% if monitor_job %}<p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>{% endif %}
+    <div class="ad-card mb-3"{% if monitor_job %} data-job-record data-primary-job="true" data-family="telegram" data-id="{{ monitor_job.id }}" data-active="{{ monitor_job.active|yesno:'true,false' }}" data-next-poll-at="{{ monitor_job.next_poll|date:'c' }}"{% endif %}>
         <div class="ad-card-head"><i class="fas fa-circle-info me-2" aria-hidden="true"></i>{% translate "Broadcast Summary" %}</div>
         <div class="ad-card-body">
-            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Status" %}</span><span class="ad-kv-value">{{ broadcast.get_status_display }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Status" %}</span><span class="ad-kv-value"{% if monitor_job %} data-job-field="status_label" aria-live="polite"{% endif %}>{% if monitor_job %}{{ monitor_job.status_label }}{% else %}{{ broadcast.get_status_display }}{% endif %}</span></div>
             <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Academic Year" %}</span><span class="ad-kv-value">{{ broadcast.academic_year.name }}</span></div>
             <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Target" %}</span><span class="ad-kv-value">{{ target_label }}</span></div>
             <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Recipients" %}</span><span class="ad-kv-value tg-broadcast-count">{{ broadcast.recipient_count }}</span></div>
-            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Sent" %}</span><span class="ad-kv-value tg-broadcast-count">{{ broadcast.sent_count }}</span></div>
-            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Failed" %}</span><span class="ad-kv-value tg-broadcast-count">{{ broadcast.failed_count }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Sent" %}</span><span class="ad-kv-value tg-broadcast-count"{% if monitor_job %} data-job-field="succeeded"{% endif %}>{{ broadcast.sent_count }}</span></div>
+            <div class="ad-kv-row"><span class="ad-kv-label">{% translate "Failed" %}</span><span class="ad-kv-value tg-broadcast-count"{% if monitor_job %} data-job-field="failed"{% endif %}>{{ broadcast.failed_count }}</span></div>
+            {% if monitor_job %}<div class="ad-kv-row"><span class="ad-kv-label">{% translate "Skipped" %}</span><span class="ad-kv-value tg-broadcast-count" data-job-field="skipped">{{ broadcast.skipped_count }}</span></div>
+            <progress max="100" value="{{ monitor_job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress>
+            <p data-job-field="progress_label">{{ monitor_job.progress_label }}</p>{% endif %}
         </div>
     </div>
 
@@ -41,8 +48,8 @@
                 {% for attachment in attachments %}
                 <li class="tg-broadcast-attachment">
                     <i class="fas fa-file me-2" aria-hidden="true"></i>
-                    <span class="tg-broadcast-attachment-name">{% firstof attachment.original_name "—" %}</span>
-                    <span class="tg-broadcast-attachment-type">{{ attachment.mime_type|default:"—" }}</span>
+                    <span class="tg-broadcast-attachment-name">{% firstof attachment.original_name "-" %}</span>
+                    <span class="tg-broadcast-attachment-type">{{ attachment.mime_type|default:"-" }}</span>
                     <span class="tg-broadcast-attachment-size">{{ attachment.size_bytes|filesizeformat }}</span>
                 </li>
                 {% endfor %}
@@ -53,12 +60,16 @@
         </div>
     </div>
 
-    {% if broadcast.status == 'failed' and broadcast.failed_count %}
-    <form method="post" action="{{ retry_url }}" hx-post="{{ retry_url }}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="mb-3" data-confirm-message="{% translate 'Are you sure?' %}">
+    {% if broadcast.status == 'failed' or broadcast.status == 'completed' %}
+    <form method="post" action="{{ redelivery_url }}" hx-post="{{ redelivery_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="mb-3" data-confirm-message="{% translate 'Queue another delivery using this saved content?' %}">
         {% csrf_token %}
-        <button type="submit" class="ad-btn ad-btn--outline-gold">
+        <input type="hidden" name="audience" value="group">
+        <div class="d-flex flex-wrap gap-2">
+        <button type="submit" name="mode" value="failed" class="ad-btn ad-btn--outline-gold">
             <i class="fas fa-rotate-right me-2" aria-hidden="true"></i>{% translate "Retry failed deliveries" %}
         </button>
+        <button type="submit" name="mode" value="all" class="ad-btn ad-btn--danger">{% translate "Resend all" %}</button>
+        </div>
     </form>
     {% endif %}
 
@@ -89,7 +100,7 @@
                             <td>{{ recipient.user_display_name|default:recipient.user_username }}</td>
                             <td>{{ recipient.get_status_display }}</td>
                             <td class="tg-broadcast-count">{{ recipient.attempt_count }}</td>
-                            <td>{{ recipient.last_error|default:"—" }}</td>
+                            <td>{{ recipient.last_error|default:"-" }}</td>
                         </tr>
                     {% empty %}
                         <tr><td colspan="4" class="ad-empty">{% translate "No recipient records are available." %}</td></tr>

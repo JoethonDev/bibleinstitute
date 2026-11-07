@@ -334,8 +334,8 @@ function quizForm() {
                         </button>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold text-primary">${this.t("questionType")}</label>
-                            <select class="form-select question-type" name="questions[${questionNumber}][type]">
+                            <label class="form-label fw-semibold text-primary" for="question-${questionNumber}-type">${this.t("questionType")}</label>
+                            <select class="form-select question-type" id="question-${questionNumber}-type" name="questions[${questionNumber}][type]">
                                 <option value="mcq" ${type === "mcq" ? "selected" : ""}>${this.t("mcq")}</option>
                                 <option value="written" ${type === "written" ? "selected" : ""}>${this.t("written")}</option>
                                 <option value="complete" ${type === "complete" ? "selected" : ""}>${this.t("complete")}</option>
@@ -346,12 +346,12 @@ function quizForm() {
 
                         <div class="row mb-3">
                             <div class="col-12 col-md-8 mb-2 mb-md-0">
-                                <label class="form-label fw-semibold">${this.t("question")}</label>
-                                <input type="text" value="" required class="form-control" name="questions[${questionNumber}][name]" placeholder="${this.t("questionPlaceholder")}">
+                                <label class="form-label fw-semibold" for="question-${questionNumber}-name">${this.t("question")}</label>
+                                <input type="text" value="" required class="form-control" id="question-${questionNumber}-name" name="questions[${questionNumber}][name]" placeholder="${this.t("questionPlaceholder")}">
                             </div>
                             <div class="col-12 col-md-4">
-                                <label class="form-label fw-semibold">${this.t("grade")}</label>
-                                <input type="number" name="questions[${questionNumber}][grade]" class="form-control" required value="1" min="0">
+                                <label class="form-label fw-semibold" for="question-${questionNumber}-grade">${this.t("grade")}</label>
+                                <input type="number" id="question-${questionNumber}-grade" name="questions[${questionNumber}][grade]" class="form-control" required value="1" min="0">
                             </div>
                         </div>
 
@@ -404,6 +404,23 @@ function quizForm() {
                 card.querySelectorAll('[data-choice-row] input').forEach(choiceInput => {
                     choiceInput.name = `questions[${index}][choices]`;
                 });
+
+                // Keep each generated label associated with its control after
+                // add/remove/reorder/import reindexes the cards.
+                const relabel = (selector, newId) => {
+                    const field = card.querySelector(selector);
+                    if (!field) return;
+                    const oldId = field.id;
+                    field.id = newId;
+                    if (!oldId) return;
+                    card.querySelectorAll('label[for]').forEach(label => {
+                        if (label.getAttribute('for') === oldId) label.setAttribute('for', newId);
+                    });
+                };
+                relabel('.question-type', `question-${index}-type`);
+                relabel('input[name$="[name]"]', `question-${index}-name`);
+                relabel('input[name$="[grade]"]', `question-${index}-grade`);
+                relabel('.correct-answer-section input, .correct-answer-section textarea', `question-${index}-answer`);
             });
         },
 
@@ -610,11 +627,11 @@ function quizForm() {
             }
             return `
                 <div class="card bg-light border-0 p-3">
-                    <label class="form-label fw-semibold text-success mb-2">
+                    <label class="form-label fw-semibold text-success mb-2" for="question-${questionNumber}-answer">
                         <i class="fa fa-check-circle me-2"></i>
                         ${this.t('correctAnswer')}
                     </label>
-                    <input class="form-control" id="answer_${questionNumber}" 
+                    <input class="form-control" id="question-${questionNumber}-answer"
                            name="questions[${questionNumber}][answer]" value="">
                 </div>
             `;
@@ -646,7 +663,6 @@ function quizForm() {
         /**
          * Add event listeners to question card
          */
-        addEventListenersToQuestion() {}
     };
 }
 

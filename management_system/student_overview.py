@@ -1,13 +1,14 @@
-"""Canonical Student 360 aggregation — one bounded read per section.
+"""Canonical Student 360 aggregation - one bounded read per section.
 
 Reused by the admin 360 page only. No writes, no R2, no provider calls.
 Every list is bounded (<=25) with select_related; counts use SQL aggregation.
 """
 from __future__ import annotations
 
-from django.db.models import Count, Q
+from django.db.models import Count
 
 from .academic_access import accessible_offerings
+from .course_content import with_offering_content_counts
 from .models import (
     AcademicPayment,
     AttendanceRecord,
@@ -17,7 +18,6 @@ from .models import (
     LectureProgress,
     MobilePushDevice,
     PromotionHistory,
-    PublicationStatus,
     StudentMobileSession,
     StudentNotification,
     TelegramAccount,
@@ -108,20 +108,8 @@ def build_student_overview(student_id: int) -> dict | None:
     # sees, with published content counts. Rendered as plain text (no links,
     # no actions) so an admin can never act as the student from here.
     readonly_offerings = list(
-        accessible_offerings(student)
+        with_offering_content_counts(accessible_offerings(student))
         .select_related("course", "academic_year_level__academic_year", "academic_year_level__level")
-        .annotate(
-            published_lesson_count=Count(
-                "lessons",
-                filter=Q(lessons__status=PublicationStatus.PUBLISHED),
-                distinct=True,
-            ),
-            published_quiz_count=Count(
-                "quizzes",
-                filter=Q(quizzes__status=PublicationStatus.PUBLISHED),
-                distinct=True,
-            ),
-        )
         .order_by(
             "academic_year_level__academic_year__ordering",
             "academic_year_level__level__ordering",

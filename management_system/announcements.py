@@ -308,7 +308,7 @@ def fan_out_announcement(announcement_id: int) -> int:
         if batch:
             StudentNotification.objects.bulk_create(batch, ignore_conflicts=True)
         created = StudentNotification.objects.filter(
-            announcement_id=announcement.pk
+            announcement_id=announcement.pk, is_manual_redelivery=False,
         ).count()
         if not created:
             raise AnnouncementError(

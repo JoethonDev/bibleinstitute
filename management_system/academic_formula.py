@@ -36,6 +36,7 @@ def validate_formula_rules(rules: list[dict]) -> None:
     rules = normalize_formula_rules(rules)
 
     total_weight = Decimal("0")
+    attendance_weight = Decimal("0")
     attendance_count = 0
     all_quiz_count = 0
     quiz_type_ids = set()
@@ -52,6 +53,7 @@ def validate_formula_rules(rules: list[dict]) -> None:
             raise ValidationError(_("Rule percentages must be between 0 and 100."))
         if metric == PromotionRule.Metric.ATTENDANCE:
             attendance_count += 1
+            attendance_weight += weight
             if quiz_type is not None:
                 raise ValidationError(_("Attendance rules cannot select a quiz type."))
         elif metric == PromotionRule.Metric.QUIZ:
@@ -71,6 +73,12 @@ def validate_formula_rules(rules: list[dict]) -> None:
         raise ValidationError(_("All-quizzes and specific quiz-type rules cannot overlap."))
     if total_weight != Decimal("100"):
         raise ValidationError(_("Rule weights must total exactly 100 percent."))
+    # Online students skip attendance, so the remaining rules must still carry
+    # a positive weight; otherwise evaluation would divide by zero.
+    if total_weight - attendance_weight <= Decimal("0"):
+        raise ValidationError(_(
+            "Online students would have no applicable weight. Add a quiz rule or lower the attendance weight."
+        ))
 
 
 @transaction.atomic

@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import os
+import logging
 import uuid
 
 from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -19,12 +21,29 @@ from django.views.decorators.http import require_POST
 from .announcements import AnnouncementError, clean_announcement_action
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
 from .models import MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, StudentBanner
+from .storage_coordination import assert_storage_namespace_available, guarded_storage_write, lock_storage_namespace
 from .utils.decorators import capability_required, can_manage_academic_setup
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
 from .utils.storage_operations import get_r2_client, upload_to_bucket
 
 APK_MAX_BYTES = 500 * 1024 * 1024
 APK_PREFIX = "app-releases"
+
+logger = logging.getLogger(__name__)
+
+
+def _delete_orphan_apk(client, bucket: str, key: str) -> None:
+    """Remove only the just-uploaded object after a failed release insert."""
+
+    try:
+        client.delete_object(Bucket=bucket, Key=key)
+    except Exception:
+        # Cleanup failure must stay observable without hiding the original error.
+        logger.warning(
+            "apk orphan cleanup failed",
+            extra={"event": "apk_orphan_cleanup_failed", "apk_key": key},
+            exc_info=True,
+        )
 APK_MIME_TYPES = {"application/vnd.android.package-archive", "application/octet-stream"}
 
 
@@ -218,17 +237,42 @@ def app_release_manage(request):
             upload.seek(0)
         except (AttributeError, OSError):
             pass
-        if not upload_to_bucket(client, bucket, upload, key, content_type="application/vnd.android.package-archive"):
-            messages.error(request, _("The upload failed. Please retry."))
+        uploaded_to_storage = False
+        try:
+            with transaction.atomic():
+                lock_storage_namespace(APK_PREFIX)
+                assert_storage_namespace_available(APK_PREFIX)
+                if not upload_to_bucket(client, bucket, upload, key, content_type="application/vnd.android.package-archive"):
+                    messages.error(request, _("The upload failed. Please retry."))
+                    return redirect("app-release-manage")
+                uploaded_to_storage = True
+                MobileAppRelease.objects.create(
+                    version_name=version_name,
+                    version_code=version_code,
+                    apk_key=key,
+                    file_size=getattr(upload, "size", 0) or 0,
+                    release_notes=release_notes,
+                    uploaded_by=request.user,
+                )
+        except IntegrityError:
+            # A concurrent publish won the unique version code after the
+            # pre-check; remove only this attempt's object and keep the old build.
+            _delete_orphan_apk(client, bucket, key)
+            messages.error(request, _("This version code is already published."))
             return redirect("app-release-manage")
-        MobileAppRelease.objects.create(
-            version_name=version_name,
-            version_code=version_code,
-            apk_key=key,
-            file_size=getattr(upload, "size", 0) or 0,
-            release_notes=release_notes,
-            uploaded_by=request.user,
-        )
+        except ValidationError as exc:
+            if uploaded_to_storage:
+                _delete_orphan_apk(client, bucket, key)
+            messages.error(request, str(exc))
+            return redirect("app-release-manage")
+        except Exception:
+            logger.exception(
+                "app release save failed",
+                extra={"event": "app_release_save_failed", "apk_key": key},
+            )
+            _delete_orphan_apk(client, bucket, key)
+            messages.error(request, _("The release could not be saved. Please retry."))
+            return redirect("app-release-manage")
         messages.success(request, _("App version %(version)s published.") % {"version": version_name})
         return redirect("app-release-manage")
     releases_page_obj = Paginator(
@@ -254,20 +298,25 @@ def app_release_manage(request):
 @capability_required(can_manage_academic_setup)
 @require_POST
 def app_release_delete(request, release_id: int):
-    release = get_object_or_404(MobileAppRelease, pk=release_id)
-    others = MobileAppRelease.objects.exclude(pk=release.pk).exists()
-    key = release.apk_key
-    release.delete()
-    # Keep the currently served build downloadable: only remove the R2 object
-    # when another release remains published.
-    if others:
-        client = get_r2_client()
-        bucket = getattr(settings, "R2_BUCKET_NAME", "") or ""
-        if client is not None and bucket:
-            try:
-                client.delete_object(Bucket=bucket, Key=key)
-            except Exception:
-                pass
+    try:
+        with guarded_storage_write(APK_PREFIX):
+            release = get_object_or_404(MobileAppRelease, pk=release_id)
+            others = MobileAppRelease.objects.exclude(pk=release.pk).exists()
+            key = release.apk_key
+            release.delete()
+            # Keep the currently served build downloadable: only remove the R2 object
+            # when another release remains published.
+            if others:
+                client = get_r2_client()
+                bucket = getattr(settings, "R2_BUCKET_NAME", "") or ""
+                if client is not None and bucket:
+                    try:
+                        client.delete_object(Bucket=bucket, Key=key)
+                    except Exception:
+                        pass
+    except ValidationError as exc:
+        messages.error(request, str(exc))
+        return redirect("app-release-manage")
     messages.success(request, _("App release deleted."))
     return redirect("app-release-manage")
 
@@ -279,10 +328,10 @@ def banner_manage(request):
         if form.is_valid():
             form.save()
             messages.success(request, _("Banner published."))
-        else:
-            for err in form.errors.get("__all__", []):
-                messages.error(request, str(err))
-        return redirect("banner-manage")
+            return redirect("banner-manage")
+        # Keep the bound values and every field/nonfield error on the page.
+    else:
+        form = BannerForm()
     page_obj = Paginator(
         StudentBanner.objects.order_by("-created_at", "-pk"),
         25,
@@ -291,7 +340,7 @@ def banner_manage(request):
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
         "pagination_aria_label": _("Page navigation"),
-        "form": BannerForm(),
+        "form": form,
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Banners"), None),

@@ -47,10 +47,13 @@
                 <span>{% translate "Export CSV" %}</span>
             </a>
             {% elif view == 'submission' %}
-            <a href="{% url 'export-quiz-submissions-csv' quiz_id=parameters.0 %}" class="ad-btn ad-btn--teal ad-btn--sm">
-                <i class="fas fa-download me-1"></i>
-                <span>{% translate "Export Quiz Data" %}</span>
-            </a>
+            <form method="post" action="{% url 'export-quiz-submissions-csv' quiz_id=parameters.0 %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                    <i class="fas fa-download me-1"></i>
+                    <span>{% translate "Export Quiz Data" %}</span>
+                </button>
+            </form>
             {% elif view == 'quiz' %}
             <button class="ad-btn ad-btn--outline-gold ad-btn--sm"
                     hx-get="{% url 'quiz-create' %}?import=1"

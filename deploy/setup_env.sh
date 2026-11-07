@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_env.sh — Interactive .env setup.  Core settings plus optional Telegram
+# setup_env.sh - Interactive .env setup.  Core settings plus optional Telegram
 # infrastructure settings (encryption key and dedicated R2 bucket).
 # Prompts domain, PostgreSQL, Django secret, TLS dir.  Rerunnable.
 # Creates a minimal runtime .env on the first run or updates an existing .env
@@ -23,12 +23,12 @@ Usage: bash deploy/setup_env.sh
   shows existing values as defaults.  Secrets are hidden.
   Auto-generates Django secret and DB password when left blank.
 
-  TLS certificates are NOT provisioned here — do that separately.
+  TLS certificates are NOT provisioned here - do that separately.
   Rerun at any time to update settings.
 
   Telegram: the optional encryption key and dedicated R2 bucket are
   prompted below.  The bot token and webhook secret are managed in the
-  admin dashboard and stored encrypted in the database — they are never
+  admin dashboard and stored encrypted in the database - they are never
   written to .env by this script.
 
 Options:  --help, -h    Show this message.
@@ -36,9 +36,9 @@ HELP
     exit 0
 }
 
-# ── Helpers ────────────────────────────────────────────────────────────
+# -- Helpers ------------------------------------------------------------
 
-# read_value KEY PROMPT DEFAULT — show current value (or DEFAULT) as default
+# read_value KEY PROMPT DEFAULT - show current value (or DEFAULT) as default
 read_value() {
     local key="$1" prompt="$2" default="$3" cur input
     cur="$(awk -v k="$key" 'index($0, k"=")==1{sub(/^[^=]+=/, "", $0); print; exit}' "$TMP")"
@@ -50,7 +50,7 @@ read_value() {
     fi
 }
 
-# write_value KEY VALUE — upsert KEY=VALUE in $TMP via awk
+# write_value KEY VALUE - upsert KEY=VALUE in $TMP via awk
 write_value() {
     local k="$1" v="$2"
     awk -v k="$k" -v v="$v" 'BEGIN{f=0} index($0,k"=")==1{print k"="v;f=1;next} {print} END{if(!f)print k"="v}' \
@@ -63,7 +63,7 @@ value_from_tmp() {
     printf '%s' "${value:-$default}"
 }
 
-# read_secret_value KEY PROMPT — hidden input; never prints the current value
+# read_secret_value KEY PROMPT - hidden input; never prints the current value
 read_secret_value() {
     local key="$1" prompt="$2" current input force_reentry=false
     current="$(value_from_tmp "$key" "")"
@@ -124,13 +124,13 @@ gen_secret() {
     fi
 }
 
-# ── Preflight ──────────────────────────────────────────────────────────
+# -- Preflight ----------------------------------------------------------
 [[ $# -eq 0 ]] || { case "$1" in -h|--help) usage ;; *) die "Unknown: $1" ;; esac; }
 [[ -f compose.infrastructure.yml ]] || die "Run from repo root"
 
-# ── Base file ──────────────────────────────────────────────────────────
+# -- Base file ----------------------------------------------------------
 echo ""
-echo "Bible Institute LMS — .env Setup"
+echo "Bible Institute LMS - .env Setup"
 echo ""
 if [[ -f .env ]]; then
     cp .env "$TMP"; info "Updating existing .env"
@@ -140,7 +140,7 @@ else
     HAS_EXISTING_ENV=false
 fi
 
-# ── 1. Domain ──────────────────────────────────────────────────────────
+# -- 1. Domain ----------------------------------------------------------
 if $HAS_EXISTING_ENV; then
     raw="$(read_value DJANGO_SITE_DOMAIN "Primary domain (e.g. bibleinstitute-eg.org)" "")"
 else
@@ -151,12 +151,13 @@ domain="${raw#https://}"; domain="${domain#http://}"; domain="${domain%%/*}"
 [[ "$domain" != *[[:space:]]* ]] || die "Domain cannot contain spaces"
 write_value DJANGO_ALLOWED_HOSTS "$domain,.$domain"
 write_value DJANGO_CSRF_TRUSTED_ORIGINS "https://$domain,https://*.$domain"
+write_value DJANGO_TRUSTED_PROXY_IPS "${LMS_NETWORK_SUBNET:-172.31.240.0/24}"
 write_value DJANGO_SITE_DOMAIN "https://$domain"
 write_value MONITORING_DOMAIN "monitor.$domain"
 write_value DEPLOY_HEALTHCHECK_URL "https://${domain}/"
 echo ""
 
-# ── 2. PostgreSQL ──────────────────────────────────────────────────────
+# -- 2. PostgreSQL ------------------------------------------------------
 write_value POSTGRES_DB "$(read_value POSTGRES_DB "Database name" lms_database)"
 write_value POSTGRES_USER "$(read_value POSTGRES_USER "Database user" lms_user)"
 write_value POSTGRES_HOST postgres
@@ -181,7 +182,7 @@ write_value CELERY_RESULT_BACKEND redis://redis:6379/0
 write_value CELERY_CONCURRENCY 2
 echo ""
 
-# ── 3. Django Secret Key ───────────────────────────────────────────────
+# -- 3. Django Secret Key -----------------------------------------------
 existing_key="$(awk -v k="DJANGO_SECRET_KEY" 'index($0,k"=")==1{sub(/^[^=]+=/, "", $0); print; exit}' "$TMP")"
 # Treat template placeholder as empty
 if [[ "$existing_key" == "insecure_dev_key_replace_me" ]]; then existing_key=""; fi
@@ -197,12 +198,12 @@ fi
 write_value DJANGO_SECRET_KEY "$key"
 echo ""
 
-# ── 4. TLS directory ───────────────────────────────────────────────────
+# -- 4. TLS directory ---------------------------------------------------
 tls_dir="$(read_value NGINX_TLS_CERT_DIR "TLS certificate directory" ./certs)"
 write_value NGINX_TLS_CERT_DIR "$tls_dir"
 echo ""
 
-# ── 5. Telegram (optional infrastructure) ──────────────────────────────
+# -- 5. Telegram (optional infrastructure) ------------------------------
 # The Telegram bot token and webhook secret are dashboard/database-managed
 # and encrypted; this builder never prompts for, generates, or writes them.
 # The encryption key is hidden and never printed; blank preserves Django's
@@ -226,7 +227,7 @@ write_value TELEGRAM_ENCRYPTION_KEY "$enc"
 write_value TELEGRAM_R2_BUCKET_NAME "$(read_value TELEGRAM_R2_BUCKET_NAME "Dedicated private Telegram media bucket (blank = disabled)" "")"
 echo ""
 
-# ── 6. Media automation API ───────────────────────────────────────────
+# -- 6. Media automation API -------------------------------------------
 # The API is disabled when either value is blank. The key is server-only and
 # is never printed; the client sends it later as the X-Key request header.
 automation_key="$(read_secret_value AUTOMATION_API_KEY "Automation API key (blank = disabled; at least 32 characters if set)")"
@@ -243,7 +244,7 @@ if [[ -n "$automation_key" ]]; then
 fi
 echo ""
 
-# ── 7. Mobile push and media Worker ────────────────────────────────────
+# -- 7. Mobile push and media Worker ------------------------------------
 # Expo access tokens and Worker shared secrets are server-only. They are
 # hidden during input, preserved on Enter, and never copied to .compose.env.
 write_value EXPO_PUSH_ACCESS_TOKEN "$(read_secret_value EXPO_PUSH_ACCESS_TOKEN "Expo Push access token (blank = disabled)")"
@@ -259,7 +260,7 @@ write_value WORKER_HMAC_SECRET "$(read_secret_value WORKER_HMAC_SECRET "Worker H
 write_value WORKER_RECEIPT_SECRET "$(read_secret_value WORKER_RECEIPT_SECRET "Worker receipt secret (blank = disabled)")"
 echo ""
 
-# ── Production defaults ────────────────────────────────────────────────
+# -- Production defaults ------------------------------------------------
 write_value DJANGO_DEBUG False
 write_value NGINX_HTTP_PORT 80
 write_value NGINX_HTTPS_PORT 443
@@ -269,7 +270,7 @@ write_value WEB_THREADS 8
 write_value DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE 2147483648
 write_value DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE 10485760
 
-# ── Atomic write ───────────────────────────────────────────────────────
+# -- Atomic write -------------------------------------------------------
 chmod 600 "$TMP"
 write_compose_env
 mv "$TMP" .env

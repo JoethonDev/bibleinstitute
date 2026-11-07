@@ -18,8 +18,12 @@ storage URLs, so gallery exports are gated client-side only.
 
 from __future__ import annotations
 
+from django.utils import translation
+from django.utils.translation import gettext as _
+
 from .mobile_http import json_api_response
 from .models import MobileDownloadPolicy
+from .utils.localization import normalize_language
 
 PURPOSE_IN_APP = "in_app"
 PURPOSE_DEVICE = "device"
@@ -45,31 +49,24 @@ def download_policy_payload() -> dict:
 def download_disabled_response(request, purpose: str):
     """Return a 403 when ``purpose`` is disabled, else ``None``."""
     policy = MobileDownloadPolicy.load()
-    if purpose == PURPOSE_IN_APP and not policy.in_app_download_enabled:
-        return json_api_response(
-            request,
-            {
-                "error": {
-                    "code": "download_disabled",
-                    "message": "Saving in the app is disabled.",
-                    "details": {"purpose": purpose},
-                }
-            },
-            status=403,
-        )
-    if purpose == PURPOSE_DEVICE and not policy.device_download_enabled:
-        return json_api_response(
-            request,
-            {
-                "error": {
-                    "code": "download_disabled",
-                    "message": "Saving on the device is disabled.",
-                    "details": {"purpose": purpose},
-                }
-            },
-            status=403,
-        )
-    return None
+    with translation.override(normalize_language(request)):
+        if purpose == PURPOSE_IN_APP and not policy.in_app_download_enabled:
+            message = _("Saving in the app is disabled.")
+        elif purpose == PURPOSE_DEVICE and not policy.device_download_enabled:
+            message = _("Saving on the device is disabled.")
+        else:
+            return None
+    return json_api_response(
+        request,
+        {
+            "error": {
+                "code": "download_disabled",
+                "message": str(message),
+                "details": {"purpose": purpose},
+            }
+        },
+        status=403,
+    )
 
 
 def enforce_download_purpose(request):

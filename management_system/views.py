@@ -1,16 +1,16 @@
 # Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpRequest, HttpResponse, FileResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, FileResponse, JsonResponse, StreamingHttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _
 from django.utils import translation
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Avg, BooleanField, Case, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
+from django.db.models import Avg, Case, Count, IntegerField, Prefetch, Q, Sum, When
 from django.db import IntegrityError, transaction
 from django.contrib import messages
-from django.contrib.messages import success, error, info
+from django.contrib.messages import success, error
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core import signing
@@ -23,17 +23,14 @@ from django.utils.timezone import now
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.forms import formset_factory
-import hashlib
 import hmac
 import io
-import math
 import secrets
 import uuid
 import random
-import posixpath
 from collections import defaultdict
 from itertools import islice
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 # Third Party
 from logging import getLogger
@@ -54,7 +51,7 @@ from .models import *
 from .forms import LessonEditorForm, CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm, SignupSettingsForm, apply_cleaned_data_to_locked_instance
 
 # Internal Imports - Utilities
-from .utils.csv_export import export_users_to_csv, export_quiz_with_submissions_to_csv, export_single_submission_to_csv, export_quiz_summary_to_csv, _csv_safe_cell, _safe_filename
+from .utils.csv_export import export_users_to_csv, export_single_submission_to_csv, _csv_safe_cell, _safe_filename, enqueue_quiz_export
 from .grade_matrix import (
     GRADE_MATRIX_PAGE_SIZE,
     grade_matrix_courses,
@@ -81,7 +78,7 @@ from .application_analytics import (
     build_analytics_dataset,
     iter_analytics_csv_rows,
 )
-from .utils.reports import build_report_data, build_report_page_rows, iter_report_data, report_enrollments
+from .utils.reports import build_report_page_rows, iter_report_data, report_enrollments
 from .utils.student_data import student_course_progress_data, student_next_actions
 from .command_palette import PALETTE_TYPES, palette_results
 from .student_overview import build_student_overview
@@ -93,42 +90,48 @@ from .utils.file_validator import (
     downloadable_audio_key,
     validate_downloadable_audio_key,
     validate_hls_object_key,
-    FileValidator,
 )
-from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, download_from_bucket, generate_unique_url, get_r2_client
-from .utils.helpers import build_scan_url, get_datetime, paginate_obj, render_dashboard, select_content_academic_year, unpack_quiz_form, safe_get_user, get_student_quiz_status, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
+from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, generate_unique_url, get_r2_client
+from .utils.helpers import build_scan_url, render_dashboard, select_content_academic_year, unpack_quiz_form, get_student_quiz_status, get_student_quiz_status_map, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import ajax_login_required, capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_status_notification
 from .progress_activity import (
+    ProgressHeartbeatError,
+    apply_progress_heartbeat,
     format_active_duration,
     part_display_name,
     progress_activity_for_rows,
-    credit_watch_sample,
     watch_sessions_for_day,
 )
 from .utils.application_uploads import (
     APPLICATION_DOCUMENT_FIELDS,
+    APPLICATION_DOCUMENT_LABELS,
     APPLICATION_PREVIEW_FIELDS,
+    apply_application_document_changes,
+    cleanup_replaced_application_documents,
     delete_application_files,
+    lock_application_document_namespace,
+    rollback_staged_application_documents,
+    stage_application_documents,
     upload_application_file,
 )
 from .utils.egyptian_cities import EGYPTIAN_CITIES
-from .utils.r2_references import rewrite_lesson_r2_references
+from .utils.r2_references import (
+    application_referenced_storage_keys,
+    lesson_referenced_storage_keys,
+    lesson_rows_matching_storage_values,
+    lesson_storage_keys,
+    other_referenced_storage_keys,
+    rewrite_storage_references,
+    storage_reference_transition_conflicts,
+)
 from .utils.attendance import (
-    DAY_GRADE_NONE,
-    AttendanceDayStatus,
     assign_unassigned_attendance,
     attendance_scan_availability,
-    get_expected_dates,
-    grade_attendance_day,
     is_expected_date,
-    local_scan_time,
-    merge_attendance_pairs,
-    pair_attendance_records,
-    reconcile_missing_exits,
 )
-from .utils.timezones import ensure_aware, format_user_datetime
-from .utils.validators import normalize_username
+from .utils.timezones import parse_application_datetime, ensure_aware, format_user_datetime
+from .utils.validators import normalize_username, parse_strict_bool
 from .utils.search import normalize_search_text, normalized_contains_q
 from .admin_tables import (
     load_selection_token,
@@ -143,7 +146,7 @@ from .admin_tables import (
     user_scope,
 )
 from .utils.quiz_access import answers_releasable, grant_quiz_openings, quiz_window
-from .quiz_questions import build_question_instance
+from .quiz_questions import MAX_QUESTIONS, build_question_instance
 from .quiz_import import parse_quiz_import
 from .public_content import get_institute_copy
 from .study_mode import apply_study_mode_from_city
@@ -159,33 +162,58 @@ from .academic_enrollment import (
     lock_application_status_for_edit,
     set_user_normal_enrollment_scope,
     promote_evaluation_result,
-    promote_evaluation_results,
     promote_historical_summary,
 )
 from .historical_intake import (
     INTAKE_COLUMNS,
     MAX_EXISTING_BULK_STUDENTS,
+    IntakeLookups,
     assign_exceptional_courses,
     build_existing_intake_row,
+    enqueue_historical_intake,
     intake_historical_row,
     parse_intake_upload,
     preview_intake_rows,
     summaries_for_users_scopes,
 )
-from .academic_copy import copy_offerings
-from .academic_formula import normalize_formula_rules, save_promotion_formula
+from .legacy_user_import import (
+    enqueue_legacy_user_import,
+    read_legacy_import_upload,
+    validate_legacy_import_rows,
+)
+from .academic_formula import normalize_formula_rules, validate_formula_rules
 from .academic_evaluation import (
     build_evaluation_plan,
     evaluation_enrollments,
     evaluate_enrollment_page,
     override_evaluation_result,
-    save_formula_and_results,
+    save_formula_and_enqueue,
 )
-from .evaluation_export import build_evaluation_workbook, xlsx_safe_cell
-from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, active_year_offerings_for_student, get_accessible_offering_or_403, user_can_read_offering, user_can_write_offering_activity
+from .evaluation_export import build_evaluation_workbook, enqueue_evaluation_export
+from .report_export import (
+    enqueue_report_export,
+    normalize_report_filters,
+    report_export_conflict_key,
+)
+from .xlsx_export import XLSX_CONTENT_TYPE
+from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, get_accessible_offering_or_403
+from .media_delivery import (
+    MEDIA_AUDIENCES,
+    MEDIA_SEGMENT_TOKEN_LIFETIME,
+    MEDIA_TOKEN_VERSION,
+    MediaAccessError,
+    build_manifest_playlist,
+    create_viewing_session,
+    resolve_audio_download,
+    resolve_book_url,
+    resolve_media_link,
+    sign_media_message,
+    sign_session,
+    valid_session_token,
+)
+from .course_content import course_navigation, with_offering_content_counts
 from .mobile_auth import revoke_user_mobile_access
-from .utils.hls_parser import get_lesson_segments, get_segment_number
-from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
+from .utils.hls_parser import get_segment_number
 from .utils.grouped_choices import offering_option_groups
 from .media_processing import (
     ACTIVE_WORKER_STATUSES,
@@ -207,7 +235,20 @@ from .media_processing import (
     PUBLICATION_FAILED_ERROR,
     PUBLICATION_PENDING_ERROR,
 )
-from .media_tasks import get_r2_rename_status, queue_r2_rename
+from .storage_jobs import enqueue_storage_delete, enqueue_storage_rename, enqueue_storage_usage, storage_usage_snapshot
+from .storage_coordination import (
+    assert_storage_namespace_available,
+    guarded_storage_write,
+    lock_storage_namespace,
+    reserve_media_output_folder,
+)
+from .storage_ownership import (
+    filter_content_storage_entries,
+    filter_visible_storage_entries,
+    is_private_storage_key,
+    storage_key_transition_allowed,
+    user_may_manage_storage_key,
+)
 from .media_storage import (
     MediaStorageError,
     STAGING_UPLOAD_URL_TTL_SECONDS,
@@ -221,14 +262,12 @@ from .student_notifications import (
     create_lesson_publication_event,
     schedule_quiz_opening_events,
 )
-from .payments import academic_payment_scopes_for_student
 from .payment_matrix import PAYMENT_MATRIX_PAGE_SIZE, PAYMENT_STATUS_VALUES, payment_matrix_page, payment_matrix_student_queryset
 
 # Standard Library (moved from function-local)
 import calendar as py_calendar
 from datetime import datetime
 from io import BytesIO
-import openpyxl
 import qrcode
 
 # Django
@@ -279,6 +318,14 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
         raise ValidationError(_("Lesson files are incomplete."))
     if any(file_type not in {"video", "audio", "book"} for file_type in files_type):
         raise ValidationError(_("Lesson files are incomplete."))
+    if any(is_private_storage_key(key) for key in videos):
+        raise ValidationError(_("The lesson media links are invalid."))
+    existing_links = [
+        link for link in existing_links
+        if isinstance(link, dict)
+        and not is_private_storage_key(link.get("id"))
+        and not is_private_storage_key(link.get("download_id"))
+    ]
 
     existing_part_ids = {
         link["id"]: link["part_id"]
@@ -325,6 +372,8 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
             valid, errors = validate_downloadable_audio_key(download_key)
             if not valid:
                 raise ValidationError(errors or [_('Downloadable audio key is invalid.')])
+            if is_private_storage_key(download_key):
+                raise ValidationError(_("The lesson media links are invalid."))
             if files_type[index] == "book":
                 raise ValidationError(_("Book media cannot have a downloadable audio file."))
         group = part_groups[index].strip() if index < len(part_groups) else ""
@@ -355,7 +404,6 @@ def _lesson_links_from_form(request, existing_links=()) -> list[dict]:
 R2_MANAGER = R2Manager(CLOUD_CLIENT, bucket_name, cloudflare_client)
 
 # Helper functions moved to utils/storage_operations.py and utils/helpers.py
-# Google Drive legacy code moved to utils/google_drive_manager.py
 
 def prepare_exam_question(question_data):
     """Attach randomized display payloads for exam mode without mutating answer keys."""
@@ -397,6 +445,9 @@ class AdminPermissionView(LoginProtection):
 
 class FormBase(AdminPermissionView, FormView):
     view_name = ""
+    # Stable URL slug; view_name is a translated label and must never be used
+    # to reverse a URL name.
+    view_slug = ""
     action = ""
     template_name = "dashboard_form.html"
 
@@ -427,6 +478,7 @@ class FormBase(AdminPermissionView, FormView):
         if context["draft_saved"]:
             self.request.session.pop("saved_dashboard_form", None)
         context["view_name"] = self.view_name  # Example shared context
+        context["view_slug"] = self.view_slug or self.view_name
         context["action"] = self.action
         context["object_id"] = self.object.pk if self.object else 'new'
         return context
@@ -435,6 +487,7 @@ class UserBaseView(FormBase):
     model = User
     pk_url_kwarg = "user_id"
     view_name = _("user") # Translate view_name
+    view_slug = "user"
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and not can_manage_applications(request.user):
@@ -445,17 +498,20 @@ class CourseBaseView(FormBase):
     model = Course
     pk_url_kwarg = "course_id"
     view_name = _("course") # Translate view_name
+    view_slug = "course"
     form_class = CourseForm
 
 class LessonBaseView(FormBase):
     model = Lesson
     pk_url_kwarg = "lesson_id"
     view_name = _("lesson") # Translate view_name
+    view_slug = "lesson"
 
 class QuizBaseView(FormBase):
     model = Quiz
     pk_url_kwarg = "quiz_id"
     view_name = _("quiz") # Translate view_name
+    view_slug = "quiz"
 
 # # Create your views here.
 class LoginView(views.LoginView):
@@ -469,7 +525,6 @@ class LoginView(views.LoginView):
     def post(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             return redirect(reverse("view-profile"))
-        translation.activate('ar')  # Activating Arabic language
         response =  super().post(request, *args, **kwargs)
         username = request.POST.get("username")
 
@@ -503,262 +558,6 @@ def index(request):
 def portal(request):
     return redirect("home")
 
-@login_required(login_url=LOGIN_URL)
-def student_ui_proposal(request):
-    """Read-only design proposal page presenting all student screens with the Psalmodia theme."""
-    return render(request, "theme_showcase/student_proposal.html")
-
-
-@login_required(login_url=LOGIN_URL)
-def admin_ui_proposal(request):
-    """Interactive admin-dashboard design proposal with live bounded data (admin only)."""
-    role = getattr(getattr(request.user, "role", None), "role", "")
-    if role != "admin":
-        raise PermissionDenied
-
-    today = timezone.localdate()
-
-    # --- People ---
-    role_counts = {
-        row["role__role"]: row["n"]
-        for row in User.objects.values("role__role").annotate(n=Count("id"))
-    }
-    pending_applications = User.objects.filter(application_status="pending")
-    recent_users = User.objects.select_related("role").order_by("-date_joined")[:6]
-
-    # --- Content ---
-    courses = (
-        Course.objects.select_related("level")
-        .annotate(
-            offering_count=Count("offerings", distinct=True),
-            lesson_count=Count("offerings__lessons", distinct=True),
-            quiz_count=Count("offerings__quizzes", distinct=True),
-        )
-        .order_by("level__ordering", "name")[:8]
-    )
-    lesson_status_counts = {
-        row["status"]: row["n"]
-        for row in Lesson.objects.values("status").annotate(n=Count("id"))
-    }
-    recent_lessons = (
-        Lesson.objects.select_related(
-            "course_offering__course",
-            "course_offering__academic_year_level__level",
-        )
-        .order_by("-updated_date")[:6]
-    )
-    quiz_status_counts = {
-        row["status"]: row["n"]
-        for row in Quiz.objects.values("status").annotate(n=Count("id"))
-    }
-    recent_quizzes = (
-        Quiz.objects.select_related("course_offering__course", "quiz_type")
-        .annotate(question_count=Count("questions", distinct=True))
-        .order_by("-created_date")[:6]
-    )
-    draft_lessons = (
-        Lesson.objects.filter(status=PublicationStatus.DRAFT)
-        .select_related("course_offering__course")
-        .order_by("-updated_date")[:5]
-    )
-    lessons_total = Lesson.objects.count()
-    lessons_with_media = sum(
-        1 for links in Lesson.objects.values_list("links", flat=True) if links
-    )
-
-    # --- Academic setup ---
-    levels = (
-        Level.objects.order_by("ordering")
-        .annotate(
-            course_count=Count("courses", distinct=True),
-            offering_count=Count("courses__offerings", distinct=True),
-            enrollment_count=Count("year_links__enrollments", distinct=True),
-        )
-    )
-    years = (
-        AcademicYear.objects.annotate(
-            scope_count=Count("level_links", distinct=True),
-            offering_count=Count("level_links__course_offerings", distinct=True),
-            enrollment_count=Count("level_links__enrollments", distinct=True),
-        ).order_by("-ordering")
-    )
-    weekday_labels = [str(label) for label in (
-        _("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
-        _("Friday"), _("Saturday"), _("Sunday"),
-    )]
-    active_year = AcademicYear.objects.filter(is_active=True).first()
-    active_scopes = (
-        AcademicYearLevel.objects.filter(academic_year__is_active=True)
-        .select_related("academic_year", "level")
-        .order_by("level__ordering")
-    )
-    calendar_scopes = [
-        {
-            "scope": scope,
-            "weekdays": [
-                weekday_labels[i] for i in (scope.meeting_weekdays or [])
-                if 0 <= i < 7
-            ],
-        }
-        for scope in active_scopes
-    ]
-    holidays = (
-        AcademicHoliday.objects.filter(academic_year__is_active=True)
-        .order_by("date")[:6]
-    )
-
-    meeting_weekday_numbers = sorted({
-        weekday
-        for scope in active_scopes
-        for weekday in (scope.meeting_weekdays or [])
-    })
-    month_holidays = {
-        holiday.date: holiday.name
-        for holiday in AcademicHoliday.objects.filter(
-            academic_year__is_active=True,
-            date__year=today.year,
-            date__month=today.month,
-        )
-    }
-    calendar_cells = []
-    for week in py_calendar.Calendar(firstweekday=6).monthdatescalendar(
-        today.year, today.month
-    ):
-        for day in week:
-            in_year = bool(
-                active_year and active_year.starts_on <= day <= active_year.ends_on
-            )
-            calendar_cells.append({
-                "day": day.day,
-                "in_month": day.month == today.month,
-                "is_today": day == today,
-                "is_meeting": in_year and day.weekday() in meeting_weekday_numbers,
-                "holiday_name": month_holidays.get(day, ""),
-            })
-    calendar_month = today.replace(day=1)
-
-    detail_offering = (
-        CourseOffering.objects.filter(status=PublicationStatus.PUBLISHED)
-        .select_related(
-            "course", "academic_year_level__level",
-            "academic_year_level__academic_year",
-        )
-        .prefetch_related("lessons", "quizzes")
-        .order_by("course__name")
-        .first()
-    )
-
-    # --- Participation ---
-    attendance_by_action = {
-        row["action"]: row["n"]
-        for row in AttendanceRecord.objects.values("action").annotate(n=Count("id"))
-    }
-    recent_attendance = (
-        AttendanceRecord.objects.select_related("student", "course_offering__course")
-        .order_by("-scanned_at")[:6]
-    )
-    progress_total = LectureProgress.objects.count()
-    progress_avg = LectureProgress.objects.aggregate(avg=Avg("percent"))["avg"] or 0
-    progress_completed = LectureProgress.objects.filter(
-        completed_at__isnull=False
-    ).count()
-    recent_progress = (
-        LectureProgress.objects.select_related("student", "lesson")
-        .order_by("-id")[:5]
-    )
-
-    # --- Analytics ---
-    formulas = (
-        PromotionFormula.objects.select_related(
-            "academic_year_level", "academic_year_level__level",
-            "academic_year_level__academic_year", "course_offering__course",
-        )
-        .annotate(rule_count=Count("rules", distinct=True))
-        .order_by("-updated_at")[:5]
-    )
-    result_counts = {
-        row["final_status"]: row["n"]
-        for row in EvaluationResult.objects.values("final_status").annotate(n=Count("id"))
-    }
-    recent_history = (
-        PromotionHistory.objects.select_related("student")
-        .order_by("-id")[:5]
-    )
-    report_scopes = []
-    for scope in active_scopes:
-        report_scopes.append({
-            "scope": scope,
-            "students": Enrollment.objects.filter(
-                academic_year_level=scope,
-                enrollment_type=Enrollment.Type.NORMAL,
-            ).count(),
-            "grade_avg": Grade.objects.filter(
-                quiz__course_offering__academic_year_level=scope
-            ).aggregate(avg=Avg("total_grade"))["avg"],
-        })
-    recent_grades = (
-        Grade.objects.select_related(
-            "user", "quiz", "quiz__course_offering__course",
-        )
-        .order_by("-submitted_at")[:6]
-    )
-    grades_average = Grade.objects.aggregate(avg=Avg("total_grade"))["avg"] or 0
-
-    context = {
-        "users_total": User.objects.count(),
-        "role_counts": role_counts,
-        "pending_applications": pending_applications[:5],
-        "pending_applications_count": pending_applications.count(),
-        "recent_users": recent_users,
-        "courses_total": Course.objects.count(),
-        "courses": courses,
-        "offerings_total": CourseOffering.objects.count(),
-        "offerings_published": CourseOffering.objects.filter(
-            status=PublicationStatus.PUBLISHED,
-        ).count(),
-        "lessons_total": lessons_total,
-        "lesson_status_counts": lesson_status_counts,
-        "recent_lessons": recent_lessons,
-        "quizzes_total": Quiz.objects.count(),
-        "quiz_status_counts": quiz_status_counts,
-        "recent_quizzes": recent_quizzes,
-        "draft_lessons": draft_lessons,
-        "lessons_with_media": lessons_with_media,
-        "levels": levels,
-        "years": years,
-        "calendar_scopes": calendar_scopes,
-        "holidays": holidays,
-        "calendar_cells": calendar_cells,
-        "calendar_month": calendar_month,
-        "meeting_weekday_numbers": meeting_weekday_numbers,
-        "detail_offering": detail_offering,
-        "enrollments_total": Enrollment.objects.count(),
-        "recent_enrollments": (
-            Enrollment.objects.select_related(
-                "student", "academic_year_level", "academic_year_level__level",
-            ).order_by("-enrolled_at")[:5]
-        ),
-        "grades_total": Grade.objects.count(),
-        "submissions_total": Submission.objects.count(),
-        "attendance_by_action": attendance_by_action,
-        "attendance_today": AttendanceRecord.objects.filter(
-            attendance_date=today,
-        ).count(),
-        "recent_attendance": recent_attendance,
-        "students_with_qr": User.objects.filter(qr_token__isnull=False).count(),
-        "progress_total": progress_total,
-        "progress_avg": progress_avg,
-        "progress_completed": progress_completed,
-        "recent_progress": recent_progress,
-        "formulas": formulas,
-        "result_counts": result_counts,
-        "recent_history": recent_history,
-        "report_scopes": report_scopes,
-        "recent_grades": recent_grades,
-        "grades_average": grades_average,
-    }
-    return render(request, "theme_showcase/admin_proposal.html", context)
-
 def about_page(request):
     return render(request, "about.html", get_institute_copy(translation.get_language(), "about"))
 
@@ -791,14 +590,14 @@ class ProfileDetail(LoginProtection, DetailView):
         context["academic_payment_form"] = AcademicPaymentForm(student=user) if profile_editable else None
         missing_profile_items = []
         if profile_editable:
-            details_form = SignupDetailsForm(instance=user)
+            details_form = signup_details_form
             for field_name in sorted(SignupDetailsForm.SIGNUP_REQUIRED_FIELDS | {"full_name"}):
                 field = details_form.fields.get(field_name)
                 if field and not field.disabled and field.required:
                     missing_profile_items.append(str(field.label))
             missing_profile_items.extend(str(field.label) for field in missing_documents_form.fields.values())
             missing_profile_items.extend(
-                f"{scope.level.display_name} — {scope.academic_year.name}"
+                f"{scope.level.display_name} - {scope.academic_year.name}"
                 for scope in academic_payment_scopes
             )
         context["missing_profile_items"] = missing_profile_items
@@ -807,12 +606,6 @@ class ProfileDetail(LoginProtection, DetailView):
             AcademicPayment.objects.filter(student=user)
             .select_related("academic_year_level__academic_year", "academic_year_level__level")
         )
-        document_labels = {
-            "identity_front": _("Identity Front"),
-            "identity_back": _("Identity Back"),
-            "payment": _("Payment"),
-            "profile": _("Profile"),
-        }
         application_documents = []
         for document_type, model_field in APPLICATION_DOCUMENT_FIELDS.items():
             key = getattr(user, model_field, None)
@@ -820,7 +613,7 @@ class ProfileDetail(LoginProtection, DetailView):
                 continue
             application_documents.append({
                 "type": document_type,
-                "label": document_labels[document_type],
+                "label": APPLICATION_DOCUMENT_LABELS[document_type],
                 "url": reverse("application-document", args=[user.pk, document_type]),
                 "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 "is_image": (mimetypes.guess_type(key)[0] or "").startswith("image/"),
@@ -834,7 +627,9 @@ class ProfileDetail(LoginProtection, DetailView):
                 academic_year_level__academic_year__is_active=True,
             ).order_by("academic_year_level__level__ordering", "course__name")
         else:
-            offerings = accessible_offerings(user).order_by(
+            offerings = accessible_offerings(user).select_related(
+                "course", "academic_year_level__academic_year", "academic_year_level__level"
+            ).order_by(
                 "academic_year_level__academic_year__ordering",
                 "academic_year_level__level__ordering",
                 "course__name",
@@ -864,7 +659,7 @@ class ProfileDetail(LoginProtection, DetailView):
                 levels_map[group_key] = {
                     "level_name": lvl.display_name,
                     "academic_year_name": scope.academic_year.name,
-                    "section_name": f"{lvl.display_name} — {scope.academic_year.name}",
+                    "section_name": f"{lvl.display_name} - {scope.academic_year.name}",
                     "offerings": [],
                 }
             levels_map[group_key]["offerings"].append(o)
@@ -952,9 +747,14 @@ class ProfileDetail(LoginProtection, DetailView):
 # Course Routes
 @login_required(login_url=LOGIN_URL)
 def view_courses(request, course_id=None):
-    user = User.objects.get(pk=request.user.pk)
+    user = request.user
     management_preview = user_has_management_role(user)
-    offerings_queryset = accessible_offerings(user, include_management=management_preview).order_by(
+    offerings_queryset = with_offering_content_counts(
+        accessible_offerings(user, include_management=management_preview),
+        include_drafts=management_preview,
+    ).select_related(
+        "course", "academic_year_level__academic_year", "academic_year_level__level"
+    ).order_by(
         "-academic_year_level__academic_year__ordering",
         "-academic_year_level__level__ordering",
         "course__name",
@@ -964,14 +764,12 @@ def view_courses(request, course_id=None):
         offerings_queryset = offerings_queryset.filter(course_id=course_id)
     offerings = list(offerings_queryset)
     normal_scopes = set()
-    targeted_offerings = set()
     if not management_preview:
-        enrollments = Enrollment.objects.filter(
+        normal_scopes = set(Enrollment.objects.filter(
             student=user,
-            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-        ).values_list("enrollment_type", "academic_year_level_id", "course_offering_id")
-        normal_scopes = {scope_id for enrollment_type, scope_id, _ in enrollments if enrollment_type == Enrollment.Type.NORMAL}
-        targeted_offerings = {offering_id for enrollment_type, _, offering_id in enrollments if enrollment_type != Enrollment.Type.NORMAL and offering_id}
+            status__in=READABLE_ENROLLMENT_STATUSES,
+            enrollment_type=Enrollment.Type.NORMAL,
+        ).values_list("academic_year_level_id", flat=True))
 
     grouped = defaultdict(list)
     for offering in offerings:
@@ -1001,38 +799,32 @@ def view_courses(request, course_id=None):
 
 @login_required(login_url=LOGIN_URL)
 def view_course_details(request, offering_id):
-    user = User.objects.get(pk=request.user.pk)
+    user = request.user
     offering = get_accessible_offering_or_403(user, offering_id)
     management_preview = user_has_management_role(user)
-    lessons = offering.lessons.all() if management_preview else offering.lessons.filter(status=PublicationStatus.PUBLISHED)
-    quizzes = offering.quizzes.all() if management_preview else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
     return render(request, "course_detail.html", {
         "offering": offering,
         "offering_id": offering.pk,
         "course": offering.course,
-        "lessons": lessons,
-        "quizzes": quizzes,
+        **course_navigation(offering, include_drafts=management_preview),
         "management_preview": management_preview,
     })
 
 @login_required(login_url=LOGIN_URL)
 def view_lesson_details(request, offering_id, lesson_id):
-    user = User.objects.get(pk=request.user.pk)
+    user = request.user
     offering = get_accessible_offering_or_403(user, offering_id)
     lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
     if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
         raise PermissionDenied(_("You do not have access to this lesson."))
     management_preview = user_has_management_role(user)
-    lessons = offering.lessons.all() if management_preview else offering.lessons.filter(status=PublicationStatus.PUBLISHED)
-    quizzes = offering.quizzes.all() if management_preview else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
     lesson_links = json.loads(lesson.links)
-    return render(request, "lesson_stream.html", {
+    context = {
         "offering": offering,
         "offering_id": offering.pk,
         "course": offering.course,
         "lesson_id": lesson_id,
-        "lessons": lessons,
-        "quizzes": quizzes,
+        **course_navigation(offering, include_drafts=management_preview),
         "management_preview": management_preview,
         "links": [{
             "url": reverse(
@@ -1048,27 +840,42 @@ def view_lesson_details(request, offering_id, lesson_id):
                 if file.get("file_type") == "audio" else ""
             ),
         } for file_index, file in enumerate(lesson_links)]
-    })
+    }
+    # Inner lesson navigation swaps #display-page; return only the content
+    # wrapper there and keep the complete shell for direct/deep-link requests.
+    target = (request.headers.get("HX-Target") or "").strip()
+    target_id = target.rsplit("#", 1)[-1].strip() if "#" in target else target
+    history_restore = (
+        request.headers.get("HX-History-Restore-Request") or ""
+    ).strip().lower() == "true"
+    if history_restore or (
+        request.headers.get("HX-Request") == "true" and target_id == "display-page"
+    ):
+        return render(request, "partials/lesson_stream_content.html", context)
+    return render(request, "lesson_stream.html", context)
 
 @login_required(login_url=LOGIN_URL)
 def stream_lesson(request, offering_id, lesson_id, file_index):
-    user = User.objects.get(pk=request.user.pk)
-    offering = get_accessible_offering_or_403(user, offering_id)
-    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
-    if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
-        raise PermissionDenied(_("You do not have access to this lesson."))
-    lesson_links = json.loads(lesson.links)
-    if file_index < 0 or file_index >= len(lesson_links):
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allow_unpublished=True,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "forbidden":
+            raise PermissionDenied(exc.message)
         raise Http404
-    file_data = lesson_links[file_index]
-
-    file_name = file_data.get("name")
-    file_key = file_data.get("id")
-    file_type = file_data.get("file_type")
-
-    if file_type == "book":
-        return JsonResponse({"url": generate_unique_url(CLOUD_CLIENT, bucket_name, file_key, expires_in=3600)})
-
+    if media.file_type == "book":
+        return JsonResponse({
+            "url": resolve_book_url(
+                media=media,
+                cloud_client=CLOUD_CLIENT,
+                bucket_name=bucket_name,
+            )
+        })
     return JsonResponse(
         {"error": _("Media playback requires a viewing session.")},
         status=410,
@@ -1120,7 +927,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 quiz_mode = "view"
                 query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user) if grade else Question.objects.filter(quiz_id=quiz_id)
             elif grade:
-                # Student has already submitted – always show their submission
+                # Student has already submitted - always show their submission
                 quiz_mode = "view"
                 query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user)
             elif quiz_mode == "exam":
@@ -1191,7 +998,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
 
                 except PermissionDenied:
                     raise
-                except Exception as e:
+                except Exception:
                     error(request, _("Sending quiz has failed, Please Try again!"), extra_tags="alert-danger") # Translate
                     logger.exception(
                         "quiz submission failed",
@@ -1239,9 +1046,39 @@ def quiz_snapshot(request, offering_id, quiz_id):
 
 
 # Admin Views
+#: The dashboard runs ~20 population aggregates. One short cache window keeps a
+#: refresh storm (and the blue/green healthcheck) from re-scanning the whole
+#: database while still showing fresh-enough numbers to an operator.
+ADMIN_PANEL_KPI_CACHE_SECONDS = 60
+
+
+def _admin_panel_cache_key(today) -> str:
+    return f"admin-panel:kpis:v1:{today.isoformat()}"
+
+
+def _admin_panel_cached_context(cache_key: str):
+    try:
+        return cache.get(cache_key)
+    except Exception:
+        logger.warning("admin dashboard cache read failed", extra={"event": "admin_dashboard_cache_error"})
+        return None
+
+
+def _admin_panel_store_context(cache_key: str, context: dict) -> None:
+    try:
+        cache.set(cache_key, context, ADMIN_PANEL_KPI_CACHE_SECONDS)
+    except Exception:
+        logger.warning("admin dashboard cache write failed", extra={"event": "admin_dashboard_cache_error"})
+
+
 @capability_required(can_manage_content)
 def admin_panel(request):
     today = timezone.now().date()
+    cache_key = _admin_panel_cache_key(today)
+    cached_context = _admin_panel_cached_context(cache_key)
+    if cached_context is not None:
+        return render(request, "admin_panel.html", cached_context)
+
     first_of_month = today.replace(day=1)
     week_ago = today - timedelta(days=7)
 
@@ -1287,7 +1124,7 @@ def admin_panel(request):
         CourseOffering.objects.values('status').annotate(count=Count('id'))
     )
     academic_years_total = AcademicYear.objects.count()
-    current_academic_years = AcademicYear.objects.filter(is_active=True)
+    current_academic_years = list(AcademicYear.objects.filter(is_active=True))
 
     # ====== 4. ENROLLMENT ANALYTICS ======
     enrollments_total = Enrollment.objects.count()
@@ -1315,7 +1152,6 @@ def admin_panel(request):
     )
     total_submissions = Grade.objects.count()
     avg_grade = Grade.objects.aggregate(avg=Avg('total_grade'))['avg'] or 0
-    max_quiz_grade = Quiz.objects.aggregate(max=Sum('total_grade'))['max'] or 0
 
     # ====== 6. LECTURE PROGRESS ANALYTICS ======
     progress_total = LectureProgress.objects.count()
@@ -1342,15 +1178,15 @@ def admin_panel(request):
     )
 
     # ====== 8. RECENT ACTIVITY ======
-    recent_enrollments = Enrollment.objects.select_related(
+    recent_enrollments = list(Enrollment.objects.select_related(
         'student', 'academic_year_level__academic_year'
-    ).order_by('-enrolled_at')[:5]
+    ).order_by('-enrolled_at')[:5])
 
-    recent_submissions = Grade.objects.select_related(
+    recent_submissions = list(Grade.objects.select_related(
         'user', 'quiz__course_offering__course'
-    ).order_by('-submitted_at')[:5]
+    ).order_by('-submitted_at')[:5])
 
-    return render(request, "admin_panel.html", {
+    context = {
         "today": today,
         "admin_metrics": {
             "users": users_total,
@@ -1396,7 +1232,9 @@ def admin_panel(request):
         # Recent Activity
         "recent_enrollments": recent_enrollments,
         "recent_submissions": recent_submissions,
-    })
+    }
+    _admin_panel_store_context(cache_key, context)
+    return render(request, "admin_panel.html", context)
 
 @capability_required(can_manage_content)
 def export_users_csv(request):
@@ -1460,58 +1298,26 @@ def user_profile(request, user_id):
         original = User.objects.get(pk=user.pk)
         actor_role = getattr(getattr(request.user, "role", None), "role", None)
         desired_status = form.cleaned_data.get("application_status", original.application_status)
-        document_fields = {
-            "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
-            "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
-            "payment": ("payment_key", "payment_preview_key", _("Payment")),
-            "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
-        }
-        uploaded_keys = []
-        uploaded_by_type = {}
-        old_keys = []
+        staged = None
+        change = None
         database_committed = False
         try:
-            for upload_type, (_model_field, _preview_field, document_label) in document_fields.items():
-                uploaded_file = form.cleaned_data.get(upload_type)
-                if not uploaded_file:
-                    continue
-                uploaded = upload_application_file(
-                    CLOUD_CLIENT,
-                    bucket_name,
-                    user.id,
-                    uploaded_file,
-                    upload_type,
-                )
-                if not uploaded:
-                    raise ValidationError(
-                        _("The %(document)s could not be uploaded.")
-                        % {"document": document_label}
-                    )
-                uploaded_by_type[upload_type] = uploaded
-                uploaded_keys.extend(uploaded.keys)
             with transaction.atomic():
+                lock_application_document_namespace(user.id)
+                staged = stage_application_documents(
+                    cloud_client=CLOUD_CLIENT,
+                    bucket_name=bucket_name,
+                    user_id=user.id,
+                    cleaned_data=form.cleaned_data,
+                )
                 locked_user = lock_application_status_for_edit(user.pk, original.application_status)
                 if desired_status != original.application_status:
                     form.cleaned_data["application_status"] = original.application_status
                 apply_cleaned_data_to_locked_instance(form, locked_user)
                 updated_user = form.save()
-                for upload_type, (model_field, preview_field, document_label) in document_fields.items():
-                    previous_key = getattr(updated_user, model_field, None)
-                    previous_preview_key = getattr(updated_user, preview_field, None)
-                    if form.cleaned_data.get(f"clear_{upload_type}"):
-                        old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
-                        setattr(updated_user, model_field, None)
-                        setattr(updated_user, preview_field, None)
-                    uploaded = uploaded_by_type.get(upload_type)
-                    if uploaded:
-                        old_keys.extend(
-                            key
-                            for key in (previous_key, previous_preview_key)
-                            if key and key not in uploaded.keys
-                        )
-                        setattr(updated_user, model_field, uploaded.original_key)
-                        setattr(updated_user, preview_field, uploaded.preview_key)
-                updated_user.save()
+                change = apply_application_document_changes(
+                    updated_user, staged, form.cleaned_data
+                )
                 if actor_role == "admin" and desired_status != original.application_status:
                     updated_user, _enrollment = set_application_status(
                         updated_user, request.user, desired_status, original.application_status
@@ -1531,14 +1337,14 @@ def user_profile(request, user_id):
                 if actor_role == "admin" and scope and desired_status == "active":
                     set_user_normal_enrollment_scope(updated_user, request.user, scope)
             database_committed = True
-            delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
+            cleanup_replaced_application_documents(change, CLOUD_CLIENT, bucket_name)
         except ValidationError as exc:
-            if not database_committed:
-                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+            if not database_committed and staged is not None:
+                rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
             form.add_error(None, exc)
         except Exception:
-            if not database_committed:
-                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+            if not database_committed and staged is not None:
+                rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
             raise
         else:
             if user.pk == request.user.pk and form.cleaned_data.get("password"):
@@ -1564,16 +1370,10 @@ def user_profile(request, user_id):
     can_view_application_data = can_manage_applications(request.user)
     application_documents = []
     if can_view_application_data:
-        document_labels = {
-            "identity_front": _("Identity Front"),
-            "identity_back": _("Identity Back"),
-            "payment": _("Payment"),
-            "profile": _("Profile"),
-        }
         for document_type, field_name in APPLICATION_DOCUMENT_FIELDS.items():
             if getattr(user, field_name, None):
                 application_documents.append({
-                    "label": document_labels[document_type],
+                    "label": APPLICATION_DOCUMENT_LABELS[document_type],
                     "url": reverse("application-document", args=[user.pk, document_type]),
                     "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 })
@@ -1752,9 +1552,18 @@ def historical_intake(request):
             else:
                 try:
                     with transaction.atomic():
+                        # One bounded context for the selected page instead of
+                        # re-resolving identity/scope facts per row.
+                        lookups = IntakeLookups.from_rows([row for _user, row in rows])
                         for index, (user, row) in enumerate(rows):
                             try:
-                                intake_historical_row(row=row, actor=request.user, source_key=f"existing:{request.user.pk}:{uuid.uuid4().hex}:{index}", source_file="admin-existing-bulk")
+                                intake_historical_row(
+                                    row=row,
+                                    actor=request.user,
+                                    source_key=f"existing:{request.user.pk}:{uuid.uuid4().hex}:{index}",
+                                    source_file="admin-existing-bulk",
+                                    lookups=lookups,
+                                )
                             except ValidationError as row_exc:
                                 raise ValidationError(
                                     _("Row for %(student)s: %(message)s") % {"student": user.username, "message": "; ".join(row_exc.messages)}
@@ -1781,21 +1590,32 @@ def historical_intake(request):
                         })
         elif request.FILES.get("intake_file"):
             try:
-                rows, upload_digest = parse_intake_upload(request.FILES["intake_file"])
+                upload = request.FILES["intake_file"]
+                rows, upload_digest = parse_intake_upload(upload)
                 preview = preview_intake_rows(rows)
                 if request.POST.get("apply_upload") == "yes":
                     errors = [item for item in preview if item["action"] == "error"]
                     if errors:
                         raise ValidationError(_("Resolve all upload errors before applying the intake."))
-                    for index, row in enumerate(rows, start=2):
-                        intake_historical_row(
-                            row=row,
-                            actor=request.user,
-                            source_key=f"upload:{upload_digest}:{index}",
-                            source_file=request.FILES["intake_file"].name,
-                            source_row=index,
-                        )
-                    messages.success(request, _("Historical intake applied for %(count)d student(s).") % {"count": len(rows)})
+                    intake_job = enqueue_historical_intake(
+                        rows=rows,
+                        actor=request.user,
+                        source_file=upload.name,
+                        digest=upload_digest,
+                        language=translation.get_language() or "ar",
+                    )
+                    try:
+                        from .admin_operation_tasks import run_admin_operation
+
+                        run_admin_operation.apply_async(args=[str(intake_job.pk)], queue="admin")
+                    except Exception:
+                        # The queued row is picked up by the recovery schedule.
+                        logger.warning("historical intake awaits worker recovery", exc_info=True)
+                    messages.success(
+                        request,
+                        _("Historical intake was queued for %(count)d row(s). Rows are applied one at a time; review progress below.")
+                        % {"count": len(rows)},
+                    )
                     return redirect("historical-intake")
             except (ValidationError, UnicodeDecodeError, ValueError) as exc:
                 messages.error(request, str(exc))
@@ -1864,6 +1684,14 @@ def historical_intake(request):
             record_filter |= Q(student__pk=int(record_search))
         summaries = summaries.filter(record_filter)
     summary_page_obj = Paginator(summaries, 25).get_page(request.GET.get("page", 1))
+    intake_job = (
+        AdminOperationJob.objects.filter(
+            actor=request.user,
+            kind=AdminOperationJob.Kind.HISTORICAL_INTAKE,
+        )
+        .order_by("-created_at")
+        .first()
+    )
     return render_page(request, "historical_intake.html", "partials/historical_intake_content.html", {
         "form": form,
         "exceptional_form": exceptional_form,
@@ -1880,6 +1708,10 @@ def historical_intake(request):
         "preview": preview,
         "upload_digest": upload_digest,
         "intake_columns": INTAKE_COLUMNS,
+        "intake_job": intake_job,
+        "intake_status_url": (
+            reverse("admin-operation-status", args=[intake_job.pk]) if intake_job else ""
+        ),
     })
 
 
@@ -1922,94 +1754,80 @@ def user_bulk_create(request):
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
             csv_file = request.FILES['csv_file']
-            if not csv_file.name.endswith('.csv'):
+            if not csv_file.name.lower().endswith('.csv'):
                 error(request, _('This is not a CSV file'), extra_tags="alert-danger")
                 return redirect('user-bulk-create')
 
             try:
-                decoded_file = csv_file.read().decode('utf-8').splitlines()
-                reader = csv.reader(decoded_file)
-                # Skip header
-                next(reader, None)
-
-                users_to_create = []
-                errors_list = []
-                line_number = 1
-
-                with transaction.atomic():
-                    for row in reader:
-                        line_number += 1
-                        if not row: continue # skip empty rows
-                        
-                        try:
-                            username, first_name, last_name, password, role_name = row
-                            username = normalize_username(username)
-                            
-                            if User.objects.filter(username=username).exists():
-                                errors_list.append(_("Line %(line)d: User '%(username)s' already exists.") % {
-                                    "line": line_number,
-                                    "username": username,
-                                })
-                                continue
-
-                            try:
-                                role = Role.objects.get(role=role_name.lower().strip())
-                            except Role.DoesNotExist:
-                                errors_list.append(_("Line %(line)d: Role '%(role)s' does not exist.") % {
-                                    "line": line_number,
-                                    "role": role_name,
-                                })
-                                continue
-
-                            user = User(
-                                username=username,
-                                first_name=first_name.strip(),
-                                last_name=last_name.strip(),
-                                role=role
-                            )
-                            user.set_password(password)
-                            user.full_clean()
-                            user.save()
-                            users_to_create.append(user)
-
-                        except ValueError:
-                            errors_list.append(_("Line %(line)d: Incorrect number of columns. Expected 5, got %(count)d.") % {
-                                "line": line_number,
-                                "count": len(row),
-                            })
-                        except ValidationError as e:
-                            errors_list.append(_("Line %(line)d: Validation error for user '%(username)s': %(errors)s") % {
-                                "line": line_number,
-                                "username": username,
-                                "errors": ", ".join(e.messages),
-                            })
-                        except Exception as e:
-                             errors_list.append(_("Line %(line)d: An unexpected error occurred: %(error)s") % {
-                                 "line": line_number,
-                                 "error": e,
-                             })
-
-                    if errors_list:
-                        # If there are errors, raise an exception to trigger a rollback of the transaction
-                        raise Exception("Errors found in CSV file.")
-
-                success(request, _("%(count)d users have been created successfully!") % {
-                    "count": len(users_to_create),
-                }, extra_tags="alert-success")
-                return redirect('user-dashboard')
-
-            except Exception as e:
-                # This will catch the explicit raise and any other exceptions
-                for err in errors_list:
-                    error(request, err, extra_tags="alert-danger")
-                if not errors_list:
-                     error(request, _("An error occurred: %(error)s") % {"error": e}, extra_tags="alert-danger")
+                content = read_legacy_import_upload(csv_file)
+                # Bounded pre-check without hashing: the authoritative pass,
+                # including password hashing and the atomic apply, runs on the
+                # admin worker.
+                precheck = validate_legacy_import_rows(content, hash_passwords=False)
+            except ValidationError as exc:
+                for message in exc.messages:
+                    error(request, message, extra_tags="alert-danger")
                 return redirect('user-bulk-create')
+
+            if precheck["errors"]:
+                for message in precheck["errors"]:
+                    error(request, message["message"], extra_tags="alert-danger")
+                error(
+                    request,
+                    _("No users were created because the file has %(count)d invalid row(s).") % {
+                        "count": precheck["error_count"],
+                    },
+                    extra_tags="alert-danger",
+                )
+                return redirect('user-bulk-create')
+
+            job, storage_error = enqueue_legacy_user_import(
+                actor=request.user,
+                content=content,
+                filename=csv_file.name,
+                language=translation.get_language() or "ar",
+            )
+            if storage_error:
+                error(request, storage_error, extra_tags="alert-danger")
+                return redirect('user-bulk-create')
+            try:
+                from .admin_operation_tasks import run_admin_operation
+
+                run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            except Exception:
+                # The queued row is picked up by the recovery schedule.
+                logger.warning("legacy user import awaits worker recovery", exc_info=True)
+            success(
+                request,
+                _("The user import was queued for %(count)d row(s). Accounts are created only after the whole file validates; progress is available below.") % {
+                    "count": len(precheck["rows"]),
+                },
+                extra_tags="alert-success",
+            )
+            return redirect('user-bulk-create')
 
     else:
         form = CSVUploadForm()
-    
-    return render(request, 'user_bulk_form.html', {'form': form})
+
+    bulk_job = (
+        AdminOperationJob.objects.filter(
+            actor=request.user,
+            kind=AdminOperationJob.Kind.LEGACY_USER_IMPORT,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    bulk_errors = []
+    if bulk_job is not None and isinstance(bulk_job.result, dict):
+        bulk_errors = list(bulk_job.result.get("row_errors") or [])[:20]
+    return render(request, 'user_bulk_form.html', {
+        'form': form,
+        'bulk_job': bulk_job,
+        'bulk_status_url': (
+            reverse("admin-operation-status", args=[bulk_job.pk]) if bulk_job else ""
+        ),
+        'bulk_errors': bulk_errors,
+    })
 
 # User Dashboard
 class CreateUser(UserBaseView, CreateView):
@@ -2037,38 +1855,20 @@ class UpdateUser(UserBaseView, UpdateView):
     def form_valid(self, form):
         actor = self.request.user
         actor_role = getattr(getattr(actor, "role", None), "role", None)
-        document_fields = {
-            "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
-            "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
-            "payment": ("payment_key", "payment_preview_key", _("Payment")),
-            "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
-        }
-        uploaded_keys = []
-        uploaded_by_type = {}
-        old_keys = []
+        staged = None
+        change = None
         database_committed = False
         try:
             original = User.objects.get(pk=self.object.pk)
             desired_status = form.cleaned_data.get("application_status", original.application_status)
-            for upload_type, (_model_field, _preview_field, document_label) in document_fields.items():
-                uploaded_file = form.cleaned_data.get(upload_type)
-                if not uploaded_file:
-                    continue
-                uploaded = upload_application_file(
-                    CLOUD_CLIENT,
-                    bucket_name,
-                    self.object.pk,
-                    uploaded_file,
-                    upload_type,
-                )
-                if not uploaded:
-                    raise ValidationError(
-                        _("The %(document)s could not be uploaded.")
-                        % {"document": document_label}
-                    )
-                uploaded_by_type[upload_type] = uploaded
-                uploaded_keys.extend(uploaded.keys)
             with transaction.atomic():
+                lock_application_document_namespace(self.object.pk)
+                staged = stage_application_documents(
+                    cloud_client=CLOUD_CLIENT,
+                    bucket_name=bucket_name,
+                    user_id=self.object.pk,
+                    cleaned_data=form.cleaned_data,
+                )
                 locked_user = lock_application_status_for_edit(self.object.pk, original.application_status)
                 self.object = locked_user
                 if desired_status != original.application_status:
@@ -2076,23 +1876,9 @@ class UpdateUser(UserBaseView, UpdateView):
                 apply_cleaned_data_to_locked_instance(form, locked_user)
                 self.object = form.instance
                 response = super().form_valid(form)
-                for upload_type, (model_field, preview_field, document_label) in document_fields.items():
-                    previous_key = getattr(self.object, model_field, None)
-                    previous_preview_key = getattr(self.object, preview_field, None)
-                    if form.cleaned_data.get(f"clear_{upload_type}"):
-                        old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
-                        setattr(self.object, model_field, None)
-                        setattr(self.object, preview_field, None)
-                    uploaded = uploaded_by_type.get(upload_type)
-                    if uploaded:
-                        old_keys.extend(
-                            key
-                            for key in (previous_key, previous_preview_key)
-                            if key and key not in uploaded.keys
-                        )
-                        setattr(self.object, model_field, uploaded.original_key)
-                        setattr(self.object, preview_field, uploaded.preview_key)
-                self.object.save()
+                change = apply_application_document_changes(
+                    self.object, staged, form.cleaned_data
+                )
                 if actor_role == "admin" and desired_status != original.application_status:
                     self.object, _enrollment = set_application_status(
                         self.object, actor, desired_status, original.application_status
@@ -2112,15 +1898,15 @@ class UpdateUser(UserBaseView, UpdateView):
                 if actor_role == "admin" and scope and desired_status == "active":
                     set_user_normal_enrollment_scope(self.object, actor, scope)
             database_committed = True
-            delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
+            cleanup_replaced_application_documents(change, CLOUD_CLIENT, bucket_name)
         except ValidationError as exc:
-            if not database_committed:
-                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+            if not database_committed and staged is not None:
+                rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
             form.add_error(None, exc)
             return self.form_invalid(form)
         except Exception:
-            if not database_committed:
-                delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+            if not database_committed and staged is not None:
+                rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
             raise
         # If the password field was changed, update the session to keep user logged in
         if self.object.pk == self.request.user.pk and "password" in form.cleaned_data and form.cleaned_data["password"]:
@@ -2342,12 +2128,8 @@ def recalculate_quizzes(request):
         return JsonResponse({"error": _("The selection has expired. Reload the list and try again.")}, status=409)
     except (ValueError, TypeError, UnicodeDecodeError):
         return JsonResponse({"error": _("Invalid JSON")}, status=400)
-    if selection.get("actor") != request.user.pk or selection.get("view") != "quiz" or not isinstance(selection.get("scope"), dict):
-        return JsonResponse({"error": _("The selection is not valid for this operator.")}, status=403)
     try:
-        select_all = payload.get("select_all", False)
-        if not isinstance(select_all, bool):
-            raise ValueError
+        select_all = parse_strict_bool(payload.get("select_all"))
         lists = []
         for name in ("ids", "excluded_ids"):
             raw = payload.get(name, [])
@@ -2522,7 +2304,12 @@ def _render_lesson_editor(request: HttpRequest, lesson: Lesson | None, form: Les
         videos = json.loads(lesson.links or "[]") if lesson else []
         if not isinstance(videos, list):
             videos = []
-        videos = [dict(video) for video in videos if isinstance(video, dict)]
+        videos = [
+            dict(video) for video in videos
+            if isinstance(video, dict)
+            and not is_private_storage_key(video.get("id"))
+            and not is_private_storage_key(video.get("download_id"))
+        ]
         part_numbers = {}
         for video in videos:
             part_id = video.get("part_id")
@@ -2537,7 +2324,7 @@ def _render_lesson_editor(request: HttpRequest, lesson: Lesson | None, form: Les
         request.session.pop("saved_content_form", None)
     return render(request, "lesson_form.html", {
         "offering_groups": offering_option_groups(form.fields["course_offering"].queryset, include_year=True),
-        "drive": list_current_folder(CLOUD_CLIENT, bucket_name)[0],
+        "drive": filter_content_storage_entries(list_current_folder(CLOUD_CLIENT, bucket_name)[0]),
         "is_root": True,
         "is_edit": lesson is not None,
         "selected_offering_id": form["course_offering"].value(),
@@ -2566,6 +2353,14 @@ def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResp
             with transaction.atomic():
                 saved = Lesson.objects.select_for_update().get(pk=lesson.pk) if lesson else Lesson()
                 links = _lesson_links_from_form(request, json.loads(saved.links or "[]") if saved.pk else [])
+                storage_keys = lesson_storage_keys(links)
+                if storage_keys:
+                    lock_storage_namespace(*storage_keys)
+                    assert_storage_namespace_available(
+                        *storage_keys,
+                        check_media_outputs=False,
+                        check_media_cleanup=False,
+                    )
                 previous_status = saved.status
                 saved.name = form.cleaned_data["lesson_name"]
                 saved.description = form.cleaned_data["description"] or None
@@ -2602,10 +2397,13 @@ def navigate_folder(request, folder_id=None):
     root = True
     parent_folder = None
     if folder_id and folder_id != "None":
+        if is_private_storage_key(folder_id):
+            raise PermissionDenied
         root = False
         drive, parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folder_id, folders_only=folders_only)
     else:
         drive, _parent_folder = list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=folders_only)
+    drive = filter_content_storage_entries(drive)
 
     return render(request, "drive_files.html", {
         "drive" : drive,
@@ -2879,7 +2677,7 @@ def media_job_create(request):
         default_part_id = payload.get("part_id")
         default_lesson, default_part_id = _media_job_lesson_target(default_lesson_id, default_part_id)
         jobs = []
-        with transaction.atomic():
+        with reserve_media_output_folder(folder):
             for item in files:
                 if not isinstance(item, dict):
                     raise ValidationError(_("Each media file descriptor is invalid."))
@@ -3249,10 +3047,26 @@ def promotion_formula(request):
     offering_id = request.GET.get("course_offering") or request.POST.get("course_offering")
     selected_scope = None
     if scope_id and str(scope_id).isdigit():
+        scopes = AcademicYearLevel.objects.select_related("academic_year", "level")
+        visible_scopes = Q(academic_year__is_active=True)
+        # Promotion can consume a scope after its academic year is archived.
+        # Keep the submitting administrator's exact job redirect reviewable.
+        if request.method == "GET" and request.GET.get("promotion_job"):
+            from .models import AdminOperationJob
+
+            try:
+                job_id = uuid.UUID(request.GET["promotion_job"])
+            except (ValueError, TypeError):
+                job_id = None
+            if job_id and AdminOperationJob.objects.filter(
+                pk=job_id, actor=request.user,
+                kind=AdminOperationJob.Kind.BULK_PROMOTION,
+                academic_year_level_id=scope_id,
+            ).exists():
+                visible_scopes |= Q(pk=scope_id)
         selected_scope = get_object_or_404(
-            AcademicYearLevel.objects.select_related("academic_year", "level"),
+            scopes.filter(visible_scopes),
             pk=scope_id,
-            academic_year__is_active=True,
         )
 
     selected_offering = None
@@ -3283,6 +3097,7 @@ def promotion_formula(request):
             ]
             try:
                 rules = normalize_formula_rules(submitted_rules)
+                validate_formula_rules(rules)
             except ValidationError as exc:
                 formula_form.add_error(None, exc)
                 rules = []
@@ -3310,7 +3125,7 @@ def promotion_formula(request):
                 messages.info(request, _("Preview generated without saving the formula or results."))
             elif rules:
                 try:
-                    saved, _result_counts = save_formula_and_results(
+                    saved, calculation_job = save_formula_and_enqueue(
                         scope=formula_form.cleaned_data["academic_year_level"],
                         course_offering=formula_form.cleaned_data["course_offering"],
                         overall_pass_percent=formula_form.cleaned_data["overall_pass_percent"],
@@ -3319,8 +3134,19 @@ def promotion_formula(request):
                         failed_courses_repeat_threshold=formula_form.cleaned_data["failed_courses_repeat_threshold"],
                         rules=rules,
                         actor=request.user,
+                        language=translation.get_language() or "ar",
                     )
-                    messages.success(request, _("Promotion formula and evaluation results saved."))
+                    from .admin_operation_tasks import run_admin_operation
+
+                    try:
+                        run_admin_operation.apply_async(args=[str(calculation_job.pk)], queue="admin")
+                    except Exception:
+                        # The queued row is picked up by the recovery schedule.
+                        logger.warning("formula calculation awaits worker recovery", exc_info=True)
+                    messages.success(
+                        request,
+                        _("Promotion formula saved. Recalculation was queued; promotion stays blocked until it completes."),
+                    )
                     query = f"scope={saved.academic_year_level_id}"
                     if saved.course_offering_id:
                         query += f"&course_offering={saved.course_offering_id}"
@@ -3441,12 +3267,66 @@ def promotion_formula(request):
             if formula else None
         )
 
+    calculation_job = None
+    promotion_job = None
+    export_job = None
+    if selected_scope:
+        from .models import AdminOperationJob
+
+        calculation_job = (
+            AdminOperationJob.objects.filter(
+                kind=AdminOperationJob.Kind.FORMULA_RECALCULATION,
+                academic_year_level=selected_scope,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        promotion_jobs = AdminOperationJob.objects.filter(
+            actor=request.user, kind=AdminOperationJob.Kind.BULK_PROMOTION,
+            academic_year_level=selected_scope,
+        )
+        promotion_job_id = request.GET.get("promotion_job")
+        if promotion_job_id:
+            try:
+                promotion_jobs = promotion_jobs.filter(pk=uuid.UUID(promotion_job_id))
+            except (ValueError, TypeError):
+                promotion_jobs = promotion_jobs.none()
+        promotion_job = promotion_jobs.order_by("-created_at").first()
+        export_job = (
+            AdminOperationJob.objects.filter(
+                actor=request.user,
+                kind=AdminOperationJob.Kind.EVALUATION_EXPORT,
+                academic_year_level=selected_scope,
+                course_offering=selected_offering,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
     return render_page(request, "promotion_evaluation.html", "partials/promotion_evaluation_content.html", {
         "formula_form": formula_form,
         "rule_formset": rule_formset,
         "selected_scope": selected_scope,
         "selected_offering": selected_offering,
         "selected_offering_id": selected_offering.pk if selected_offering else None,
+        "promotion_job": promotion_job,
+        "promotion_status_url": (
+            reverse("admin-operation-status", args=[promotion_job.pk]) if promotion_job else ""
+        ),
+        "calculation_job": calculation_job,
+        "calculation_status_url": (
+            reverse("admin-operation-status", args=[calculation_job.pk])
+            if calculation_job else ""
+        ),
+        "export_job": export_job,
+        "export_status_url": (
+            reverse("admin-operation-status", args=[export_job.pk])
+            if export_job else ""
+        ),
+        "export_download_url": (
+            reverse("admin-operation-download", args=[export_job.pk])
+            if export_job else ""
+        ),
         "course_offerings": CourseOffering.objects.filter(
             academic_year_level=selected_scope,
             status=PublicationStatus.PUBLISHED,
@@ -3519,18 +3399,55 @@ def promotion_result(request, result_id):
 @require_POST
 @capability_required(can_manage_academic_setup)
 def bulk_promotion_results(request):
-    result_ids = [value for value in request.POST.getlist("result_ids") if value.isdigit()]
-    try:
-        histories, errors = promote_evaluation_results(result_ids=[int(value) for value in result_ids], actor=request.user)
-    except (ValidationError, PermissionDenied) as exc:
-        messages.error(request, str(exc))
-        histories, errors = [], []
-    if histories:
-        messages.success(request, _("%(count)d student promotion(s) were recorded.") % {"count": len(histories)})
-    if errors:
-        messages.error(request, _("%(count)d promotion(s) could not be recorded.") % {"count": len(errors)})
+    raw_ids = request.POST.getlist("result_ids")
+    if len(raw_ids) > 1000 or any(
+        not value.isascii() or not value.isdigit() or len(value) > 10
+        or not 0 < int(value) <= 2_147_483_647
+        for value in raw_ids
+    ):
+        return HttpResponse(_("Invalid selection flags."), status=400)
+    result_ids = sorted({int(value) for value in raw_ids})
     scope_id = request.POST.get("scope", "")
-    return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
+    if not result_ids:
+        messages.error(request, _("Select at least one student result."))
+        return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
+    from .admin_operation_tasks import run_admin_operation
+    from .admin_operations import create_admin_operation
+    from .models import AdminOperationJob
+
+    if (not scope_id.isascii() or not scope_id.isdigit() or len(scope_id) > 10
+            or not 0 < int(scope_id) <= 2_147_483_647):
+        return HttpResponse(_("Invalid selection flags."), status=400)
+    promotion_scope = get_object_or_404(AcademicYearLevel, pk=int(scope_id))
+    if EvaluationResult.objects.filter(
+        pk__in=result_ids, formula__academic_year_level=promotion_scope,
+        course_offering__isnull=True,
+    ).count() != len(result_ids):
+        return HttpResponse(_("Invalid selection flags."), status=400)
+    try:
+        job = create_admin_operation(
+            actor=request.user,
+            kind=AdminOperationJob.Kind.BULK_PROMOTION,
+            input={"result_ids": result_ids},
+            conflict_key=f"promotion:{scope_id}",
+            scope=promotion_scope,
+            language=translation.get_language() or "ar",
+            total=len(result_ids),
+        )
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
+    try:
+        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+    except Exception:
+        # The queued row is picked up by the recovery schedule.
+        logger.warning("bulk promotion awaits worker recovery", exc_info=True)
+    messages.success(
+        request,
+        _("Promotion was queued for %(count)d student(s). Progress is available while it runs.")
+        % {"count": len(result_ids)},
+    )
+    return redirect(f"{reverse('promotion-formula')}?scope={scope_id}&promotion_job={job.pk}")
 
 
 @capability_required(can_view_reports)
@@ -3732,8 +3649,11 @@ def create_quiz(request):
             return redirect(reverse("quiz-create"))
         try:
             questions, quiz = unpack_quiz_form(request.POST)
-            opening_date = get_datetime(quiz.get("opening_date", ""))
-            closing_date = get_datetime(quiz.get("closing_date", ""))
+            if len(questions) > MAX_QUESTIONS:
+                error(request, _("Too many questions: the maximum is %(limit)s.") % {"limit": MAX_QUESTIONS}, extra_tags="alert-danger")
+                return redirect(reverse("quiz-create"))
+            opening_date = parse_application_datetime(quiz.get("opening_date", ""))
+            closing_date = parse_application_datetime(quiz.get("closing_date", ""))
             
             offering_id = request.POST.get("course_offering")
             course_offering = get_object_or_404(
@@ -3846,6 +3766,9 @@ def update_quiz(request, quiz_id):
             return redirect(reverse("quiz-update", args=[quiz_id]))
         try:
             questions, quiz_data = unpack_quiz_form(request.POST)
+            if len(questions) > MAX_QUESTIONS:
+                error(request, _("Too many questions: the maximum is %(limit)s.") % {"limit": MAX_QUESTIONS}, extra_tags="alert-danger")
+                return redirect(reverse("quiz-update", args=[quiz_id]))
             # Update Quiz
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             can_edit_published_quiz = can_manage_academic_setup(request.user)
@@ -3868,8 +3791,8 @@ def update_quiz(request, quiz_id):
                         success(request, _("Quiz status is updated successfully"), extra_tags="alert-success")
                         return redirect(reverse("quiz-update", args=[quiz_id]))
             requested_name = quiz_data['quiz_name']
-            requested_opening_date = get_datetime(quiz_data['opening_date'])
-            requested_closing_date = get_datetime(quiz_data['closing_date'])
+            requested_opening_date = parse_application_datetime(quiz_data['opening_date'])
+            requested_closing_date = parse_application_datetime(quiz_data['closing_date'])
             if requested_closing_date <= requested_opening_date:
                 raise ValidationError(_("Closing date must be after opening date."))
             requested_total_grade = quiz_data['total_grade']
@@ -3999,13 +3922,40 @@ class DeleteQuiz(QuizBaseView, DeleteView):
     success_url = reverse_lazy("lesson-dashboard")
 
 # Submission Dashboard
+def _queue_quiz_export(request, quiz_id, kind):
+    if request.method != "POST":
+        return HttpResponse(_("Start the quiz export from the submissions page."), status=400)
+    quiz = get_object_or_404(Quiz, pk=quiz_id)
+    job = enqueue_quiz_export(
+        actor=request.user,
+        quiz=quiz,
+        kind=kind,
+        language=translation.get_language() or "ar",
+    )
+    try:
+        from .admin_operation_tasks import run_admin_operation
+
+        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+    except Exception:
+        logger.warning("quiz export awaits worker recovery", exc_info=True)
+    messages.success(
+        request,
+        _("Quiz export was queued. The download link appears here when it is ready."),
+    )
+    return redirect("submission-dashboard", quiz_id=quiz.pk)
+
+
+@require_http_methods(["GET", "POST"])
 @capability_required(can_grade)
 def export_quiz_submissions_csv(request, quiz_id):
-    return export_quiz_with_submissions_to_csv(quiz_id)
+    return _queue_quiz_export(request, quiz_id, AdminOperationJob.Kind.QUIZ_DETAIL_EXPORT)
 
+
+@require_http_methods(["GET", "POST"])
 @capability_required(can_grade)
 def export_quiz_summary_csv(request, quiz_id):
-    return export_quiz_summary_to_csv(quiz_id)
+    return _queue_quiz_export(request, quiz_id, AdminOperationJob.Kind.QUIZ_SUMMARY_EXPORT)
+
 
 @capability_required(can_grade)
 def export_submission_csv(request, grade_id):
@@ -4169,6 +4119,12 @@ def payments_matrix_dashboard(request):
         }
         for level in levels
     ]
+    # One aggregate replaces three population COUNTs on every render.
+    payment_counts = all_students.aggregate(
+        all_count=Count("pk"),
+        paid_count=Count("pk", filter=Q(payment_uploaded=True)),
+        unpaid_count=Count("pk", filter=Q(payment_uploaded=False)),
+    )
     context = {
         "title": _("Payments matrix"),
         "years": years,
@@ -4182,9 +4138,7 @@ def payments_matrix_dashboard(request):
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
         "student_count": page_obj.paginator.count,
-        "all_count": all_students.count(),
-        "paid_count": all_students.filter(payment_uploaded=True).count(),
-        "unpaid_count": all_students.filter(payment_uploaded=False).count(),
+        **payment_counts,
     }
     return render_page(request, "payment_matrix.html", "partials/payment_matrix_content.html", context)
 
@@ -4283,6 +4237,18 @@ def submission_dashboard(request, quiz_id):
         )
         .order_by("submitted_at", "pk")
     )
+    quiz_export_job = (
+        AdminOperationJob.objects.filter(
+            actor=request.user,
+            kind__in=[
+                AdminOperationJob.Kind.QUIZ_DETAIL_EXPORT,
+                AdminOperationJob.Kind.QUIZ_SUMMARY_EXPORT,
+            ],
+            input__quiz_id=quiz_id,
+        )
+        .order_by("-created_at")
+        .first()
+    )
 
     context = {
         "name_value" : name or "",
@@ -4310,6 +4276,15 @@ def submission_dashboard(request, quiz_id):
         "quiz_id" : quiz_id,
         "quiz" : quiz,
         "view_name" : view,
+        "quiz_export_job": quiz_export_job,
+        "quiz_export_status_url": (
+            reverse("admin-operation-status", args=[quiz_export_job.pk])
+            if quiz_export_job else ""
+        ),
+        "quiz_export_download_url": (
+            reverse("admin-operation-download", args=[quiz_export_job.pk])
+            if quiz_export_job else ""
+        ),
     }
 
     return render_dashboard(request, grades, view, context, parameters=[quiz_id, ])
@@ -4378,6 +4353,8 @@ def submission_user(request, quiz_id, user_id):
         if not can_manage_academic_setup(request.user):
             raise PermissionDenied
         questions, _parsed_form_data = unpack_quiz_form(request.POST)
+        validation_errors = []
+        modified_count = 0
         try:
             with transaction.atomic():
                 Quiz.objects.select_for_update().only("pk").get(pk=quiz_id)
@@ -4398,40 +4375,80 @@ def submission_user(request, quiz_id, user_id):
                     str(submission.question_id): submission
                     for submission in submissions
                 }
-                modified_questions = []
+                corrections = []
                 for question in questions.values():
                     if "manual_grade" not in question:
                         continue
                     question_submission = submissions_by_question.get(str(question.get("id", "")))
                     if question_submission is None:
+                        validation_errors.append(
+                            _("The grading form contains a question that does not belong to this submission.")
+                        )
                         continue
                     try:
                         manual_grade = int(question["manual_grade"])
                     except (TypeError, ValueError):
+                        validation_errors.append(
+                            _("Question %(question)s: enter a whole number.") % {
+                                "question": question_submission.question_id,
+                            }
+                        )
                         continue
-                    if manual_grade < 0:
+                    maximum = question_submission.question.grade
+                    if manual_grade < 0 or manual_grade > maximum:
+                        validation_errors.append(
+                            _("Question %(question)s: the grade must be between 0 and %(maximum)s.") % {
+                                "question": question_submission.question_id,
+                                "maximum": maximum,
+                            }
+                        )
                         continue
-                    question_submission.assign_grade(True, manual_grade)
-                    modified_questions.append(question_submission)
+                    corrections.append((question_submission, manual_grade))
 
-                Submission.objects.bulk_update(modified_questions, ['is_graded', 'grade'])
-                grade.total_grade = Submission.objects.filter(
-                    user_id=user_id,
-                    question__quiz_id=quiz_id,
-                ).aggregate(total=Sum("grade"))["total"] or 0
-                grade.save(update_fields=["total_grade"])
-                logger.info(
-                    "Grades updated for quiz=%s user=%s questions=%s total=%s",
-                    quiz_id,
-                    user_id,
-                    len(modified_questions),
-                    grade.total_grade,
+                if not validation_errors:
+                    for question_submission, manual_grade in corrections:
+                        question_submission.assign_grade(True, manual_grade)
+                    Submission.objects.bulk_update(
+                        [item for item, _value in corrections], ["is_graded", "grade"]
+                    )
+                    grade.total_grade = Submission.objects.filter(
+                        user_id=user_id,
+                        question__quiz_id=quiz_id,
+                    ).aggregate(total=Sum("grade"))["total"] or 0
+                    grade.save(update_fields=["total_grade"])
+                    modified_count = len(corrections)
+                    logger.info(
+                        "Grades updated for quiz=%s user=%s questions=%s total=%s",
+                        quiz_id,
+                        user_id,
+                        modified_count,
+                        grade.total_grade,
+                    )
+        except Exception:
+            logger.exception(
+                "Manual grading failed for quiz=%s user=%s",
+                quiz_id,
+                user_id,
+            )
+            messages.error(request, _("Grades could not be saved. No changes were made."))
+            return redirect(reverse("submission-user", args=[quiz_id, user_id]))
+
+        if validation_errors:
+            for error in validation_errors[:5]:
+                messages.error(request, error)
+            if len(validation_errors) > 5:
+                messages.error(
+                    request,
+                    _("%(count)s more grading errors were not shown.") % {
+                        "count": len(validation_errors) - 5,
+                    },
                 )
-    
-        except Exception as e:
-            logger.error(f"Something went wrong while updating grades!")
-            logger.error(f"Stack Traceback : {e}")
-        
+            return redirect(reverse("submission-user", args=[quiz_id, user_id]))
+
+        messages.success(
+            request,
+            _("%(count)s question grade(s) saved.") % {"count": modified_count},
+        )
         return redirect(reverse("submission-user", args=[quiz_id, user_id]))
     
     else:
@@ -4446,48 +4463,37 @@ def generate_audio_download(
     expires_in: int = 3600,
     file_index: int | None = None,
 ):
-    user = User.objects.get(pk=request.user.pk)
-    offering = get_accessible_offering_or_403(user, offering_id)
-    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
-    if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
-        raise PermissionDenied(_("You do not have access to this lesson."))
-
     try:
         file_index = int(
             file_index if file_index is not None else request.GET.get("file_index", "-1")
         )
     except (TypeError, ValueError):
         raise Http404
-    lesson_links = json.loads(lesson.links or "[]")
-    if file_index < 0 or file_index >= len(lesson_links):
-        raise Http404
-    link = lesson_links[file_index]
-    if link.get("file_type") != "audio":
-        raise Http404
-
-    manifest_key = link.get("id", "")
-    download_key = link.get("download_id") or downloadable_audio_key(manifest_key)
-    valid, errors = validate_downloadable_audio_key(download_key or "")
-    if not valid or download_key != downloadable_audio_key(manifest_key):
-        logger.warning("Invalid downloadable audio metadata for lesson %s link %s: %s", lesson.pk, file_index, errors)
-        raise Http404
-
-    filename = re.sub(r"[^A-Za-z0-9._-]+", "_", posixpath.basename(download_key)) or "audio.mp3"
     try:
-        download_url = CLOUD_CLIENT.generate_presigned_url(
-            "get_object",
-            Params={
-                "Bucket": bucket_name,
-                "Key": download_key,
-                "ResponseContentType": "audio/mpeg",
-                "ResponseContentDisposition": f'attachment; filename="{filename}"',
-            },
-            ExpiresIn=max(60, min(int(expires_in), 3600)),
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("audio",),
+            allow_unpublished=True,
         )
-    except Exception:
-        logger.exception("Error generating downloadable audio URL for lesson %s", lesson.pk)
-        return JsonResponse({"error": _("Download is temporarily unavailable.")}, status=503)
-    return redirect(download_url)
+    except MediaAccessError as exc:
+        if exc.code == "forbidden":
+            raise PermissionDenied(exc.message)
+        raise Http404
+    try:
+        download = resolve_audio_download(
+            media=media,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+            expires_in=expires_in,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "unavailable":
+            return JsonResponse({"error": exc.message}, status=503)
+        raise Http404
+    return redirect(download.url)
 
 # Bulk Operations
 @capability_required(can_delete_content)
@@ -4514,6 +4520,31 @@ def bulk_delete_quizzes(request):
 # R2 FILE MANAGEMENT API ENDPOINTS
 # ============================================================================
 
+def _storage_delete_reference_conflict(file_key: str) -> JsonResponse | None:
+    """Adapt exact lesson/application storage references to the existing API response."""
+
+    lesson_references = lesson_referenced_storage_keys([file_key])
+    if file_key in lesson_references:
+        names = list(
+            lesson_rows_matching_storage_values([file_key]).values_list("name", flat=True)[:5]
+        )
+        if names:
+            return JsonResponse({
+                "error": _("File is referenced by lessons: %(names)s. Delete lessons first or reupload.")
+                % {"names": ", ".join(names)}
+            }, status=409)
+    if (
+        file_key in lesson_references
+        or file_key in application_referenced_storage_keys([file_key])
+        or file_key in other_referenced_storage_keys([file_key])
+    ):
+        return JsonResponse(
+            {'error': _('File is still linked to a record and cannot be deleted.')},
+            status=409,
+        )
+    return None
+
+
 @capability_required(can_delete_content)
 def api_delete_file(request):
     """
@@ -4523,24 +4554,29 @@ def api_delete_file(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
 
     try:
-
         data = json.loads(request.body)
-        file_key = data.get('file_key')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': _('Invalid JSON')}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'error': _('Invalid JSON')}, status=400)
+    file_key = data.get('file_key')
+    if not isinstance(file_key, str) or not file_key.strip():
+        return JsonResponse({'error': _('File key required')}, status=400)
+    file_key = file_key.strip()
+    if not R2_MANAGER._is_safe_object_key(file_key):
+        return JsonResponse({'error': _('Invalid file key')}, status=400)
+    if not user_may_manage_storage_key(request.user, file_key):
+        return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
 
-        if not file_key:
-            return JsonResponse({'error': _('File key required')}, status=400)
-
-        referencing = Lesson.objects.filter(Q(links__contains=file_key))
-        if referencing.exists():
-            names = list(referencing.values_list("name", flat=True)[:5])
-            return JsonResponse({
-                "error": _("File is referenced by lessons: %(names)s. Delete lessons first or reupload.") % {"names": ", ".join(names)}
-            }, status=409)
-
-        if isinstance(file_key, str) and file_key.lower().endswith('.m3u8'):
+    try:
+        if file_key.lower().endswith('.m3u8'):
             # A manifest must clean its segment children first, otherwise the
             # .ts objects are orphaned. Children are deleted before the parent.
-            successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
+            with guarded_storage_write(file_key):
+                conflict = _storage_delete_reference_conflict(file_key)
+                if conflict is not None:
+                    return conflict
+                successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
             logger.info(
                 "r2 manifest deleted",
                 extra={
@@ -4561,7 +4597,11 @@ def api_delete_file(request):
                 })
             return JsonResponse({'error': _('Failed to delete file')}, status=500)
 
-        success = R2_MANAGER.delete_file(file_key)
+        with guarded_storage_write(file_key):
+            conflict = _storage_delete_reference_conflict(file_key)
+            if conflict is not None:
+                return conflict
+            success = R2_MANAGER.delete_file(file_key)
 
         if success:
             logger.info(
@@ -4569,15 +4609,16 @@ def api_delete_file(request):
                 extra={"event": "r2_file_deleted", "file_key": file_key},
             )
             return JsonResponse({'success': True, 'message': _('File deleted successfully')})
-        else:
-            return JsonResponse({'error': _('Failed to delete file')}, status=500)
+        return JsonResponse({'error': _('Failed to delete file')}, status=500)
 
-    except Exception as e:
+    except ValidationError as exc:
+        return JsonResponse({'error': "; ".join(exc.messages)}, status=409)
+    except Exception:
         logger.exception(
             "r2 file delete failed",
             extra={"event": "r2_delete_failed", "file_key": file_key},
         )
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': _('Failed to delete file')}, status=500)
 
 @capability_required(can_delete_content)
 def api_delete_m3u8_file(request):
@@ -4589,24 +4630,29 @@ def api_delete_m3u8_file(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
 
     try:
-
         data = json.loads(request.body)
-        file_key = data.get('file_key')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': _('Invalid JSON')}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'error': _('Invalid JSON')}, status=400)
+    file_key = data.get('file_key')
+    if not isinstance(file_key, str) or not file_key.strip():
+        return JsonResponse({'error': _('File key required')}, status=400)
+    file_key = file_key.strip()
+    if not R2_MANAGER._is_safe_object_key(file_key):
+        return JsonResponse({'error': _('Invalid file key')}, status=400)
 
-        if not file_key:
-            return JsonResponse({'error': _('File key required')}, status=400)
+    if not file_key.lower().endswith('.m3u8'):
+        return JsonResponse({'error': _('File must be an m3u8 file')}, status=400)
+    if not user_may_manage_storage_key(request.user, file_key):
+        return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
 
-        if not file_key.lower().endswith('.m3u8'):
-            return JsonResponse({'error': _('File must be an m3u8 file')}, status=400)
-
-        referencing = Lesson.objects.filter(Q(links__contains=file_key))
-        if referencing.exists():
-            names = list(referencing.values_list("name", flat=True)[:5])
-            return JsonResponse({
-                "error": _("File is referenced by lessons: %(names)s. Delete lessons first or reupload.") % {"names": ", ".join(names)}
-            }, status=409)
-
-        successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
+    try:
+        with guarded_storage_write(file_key):
+            conflict = _storage_delete_reference_conflict(file_key)
+            if conflict is not None:
+                return conflict
+            successful, failed = R2_MANAGER.delete_m3u8_with_segments(file_key)
 
         logger.info(
             "r2 manifest deleted",
@@ -4627,12 +4673,14 @@ def api_delete_m3u8_file(request):
             'failed_files': failed
         })
 
-    except Exception as e:
+    except ValidationError as exc:
+        return JsonResponse({'error': "; ".join(exc.messages)}, status=409)
+    except Exception:
         logger.exception(
             "r2 manifest delete failed",
             extra={"event": "r2_delete_failed", "file_key": file_key},
         )
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': _('Failed to delete file')}, status=500)
 
 @capability_required(can_delete_content)
 def api_delete_files_batch(request):
@@ -4645,36 +4693,60 @@ def api_delete_files_batch(request):
         return JsonResponse({'error': _('Method not allowed')}, status=405)
 
     try:
-
         data = json.loads(request.body)
-        file_keys = data.get('file_keys', [])
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': _('Invalid JSON')}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'error': _('Invalid JSON')}, status=400)
+    raw_keys = data.get('file_keys')
+    if not isinstance(raw_keys, list) or not raw_keys:
+        return JsonResponse({'error': _('No files specified')}, status=400)
+    if len(raw_keys) > MAX_EXPLICIT_SELECTION:
+        return JsonResponse(
+            {'error': _('Select at most %(limit)s files per request.') % {'limit': MAX_EXPLICIT_SELECTION}},
+            status=400,
+        )
+    file_keys: list[str] = []
+    seen: set[str] = set()
+    for raw_key in raw_keys:
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            return JsonResponse({'error': _('Every file key must be a non-empty string.')}, status=400)
+        key = raw_key.strip()
+        if not R2_MANAGER._is_safe_object_key(key):
+            return JsonResponse({'error': _('Invalid file key')}, status=400)
+        if not user_may_manage_storage_key(request.user, key):
+            return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
+        if key not in seen:
+            seen.add(key)
+            file_keys.append(key)
 
-        if not file_keys:
-            return JsonResponse({'error': _('No files specified')}, status=400)
-
+    try:
         successful: list = []
         failed: list = []
         plain_keys: list = []
-        for key in file_keys:
-            if not isinstance(key, str) or not key:
-                failed.append(key)
-                continue
-            if Lesson.objects.filter(Q(links__contains=key)).exists():
-                failed.append(key)
-                continue
-            if key.lower().endswith('.m3u8'):
-                ok, bad = R2_MANAGER.delete_m3u8_with_segments(key)
+        with guarded_storage_write(*file_keys):
+            referenced_keys = (
+                lesson_referenced_storage_keys(file_keys)
+                | application_referenced_storage_keys(file_keys)
+                | other_referenced_storage_keys(file_keys)
+            )
+            for key in file_keys:
+                if key in referenced_keys:
+                    failed.append(key)
+                    continue
+                if key.lower().endswith('.m3u8'):
+                    ok, bad = R2_MANAGER.delete_m3u8_with_segments(key)
+                    successful.extend(ok)
+                    failed.extend(bad)
+                    # A manifest whose parent delete failed is already in `bad`;
+                    # do not also queue it for the plain batch below.
+                else:
+                    plain_keys.append(key)
+
+            if plain_keys:
+                ok, bad = R2_MANAGER.delete_files_batch(plain_keys)
                 successful.extend(ok)
                 failed.extend(bad)
-                # A manifest whose parent delete failed is already in `bad`;
-                # do not also queue it for the plain batch below.
-            else:
-                plain_keys.append(key)
-
-        if plain_keys:
-            ok, bad = R2_MANAGER.delete_files_batch(plain_keys)
-            successful.extend(ok)
-            failed.extend(bad)
 
         logger.info(
             "r2 files deleted in batch",
@@ -4694,12 +4766,14 @@ def api_delete_files_batch(request):
             'failed_files': failed
         })
 
-    except Exception as e:
+    except ValidationError as exc:
+        return JsonResponse({'error': "; ".join(exc.messages)}, status=409)
+    except Exception:
         logger.exception(
             "r2 batch delete failed",
-            extra={"event": "r2_delete_failed", "requested_count": len(file_keys) if isinstance(file_keys, list) else 0},
+            extra={"event": "r2_delete_failed", "requested_count": len(file_keys)},
         )
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': _('Failed to delete file')}, status=500)
 
 @capability_required(can_manage_content)
 def api_rename_file(request):
@@ -4747,21 +4821,38 @@ def api_rename_file(request):
         new_manifest = new_key.lower().endswith('.m3u8')
         if not is_folder and old_manifest != new_manifest:
             return JsonResponse({'error': _('Both names must be video manifests')}, status=400)
+        if not user_may_manage_storage_key(request.user, old_key) or not user_may_manage_storage_key(
+            request.user, new_key
+        ) or not storage_key_transition_allowed(old_key, new_key):
+            return JsonResponse(
+                {'error': _('You do not have permission to manage this storage key.')},
+                status=403,
+            )
 
-        operation_id = queue_r2_rename(
-            old_key,
-            new_key,
-            is_folder=is_folder,
-            created_by_id=request.user.pk,
-        )
-        status_url = reverse('api-r2-rename-status', args=[operation_id])
+        try:
+            job = enqueue_storage_rename(
+                actor=request.user,
+                old_key=old_key,
+                new_key=new_key,
+                is_folder=is_folder,
+                language=translation.get_language() or "ar",
+            )
+        except ValidationError as exc:
+            return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
+        try:
+            from .admin_operation_tasks import run_admin_operation
+
+            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        except Exception:
+            logger.warning("storage rename awaits worker recovery", exc_info=True)
+        status_url = reverse('admin-operation-status', args=[job.pk])
         logger.info(
             "R2 rename queued",
-            extra={"event": "r2_rename_queued", "operation_id": operation_id, "user_id": request.user.pk},
+            extra={"event": "r2_rename_queued", "job_id": str(job.pk), "user_id": request.user.pk},
         )
         return JsonResponse({
             'status': 'queued',
-            'operation_id': operation_id,
+            'job_id': str(job.pk),
             'status_url': status_url,
         }, status=202)
     except json.JSONDecodeError:
@@ -4770,37 +4861,6 @@ def api_rename_file(request):
         logger.exception("Could not queue R2 rename")
         return JsonResponse({'error': _('Could not start the rename. Please try again.')}, status=503)
 
-
-@capability_required(can_manage_content)
-def api_r2_rename_status(request, operation_id):
-    if request.method != 'GET':
-        return JsonResponse({'error': _('Method not allowed')}, status=405)
-    status = get_r2_rename_status(str(operation_id))
-    if status is None:
-        return JsonResponse({'error': _('Rename progress was not found')}, status=404)
-    if (
-        getattr(getattr(request.user, "role", None), "role", None) != "admin"
-        and status.get("created_by_id") != request.user.pk
-    ):
-        return JsonResponse({'error': _('You do not have permission to view this rename')}, status=403)
-    warning = status.get("warning", "")
-    if warning == "old_files_remain":
-        warning = str(_("The new files are ready, but some old files remain."))
-    error = (
-        str(_("Rename failed. Check the source and destination, then try again."))
-        if status.get("error_code") == "rename_failed"
-        else ""
-    )
-    return JsonResponse({
-        "operation_id": status.get("operation_id"),
-        "status": status.get("status"),
-        "phase": status.get("phase"),
-        "progress": int(status.get("progress", 0) or 0),
-        "done": int(status.get("done", 0) or 0),
-        "total": int(status.get("total", 0) or 0),
-        "error": error,
-        "warning": warning,
-    })
 
 @capability_required(can_manage_content)
 def api_move_file(request):
@@ -4818,22 +4878,42 @@ def api_move_file(request):
         
         if not file_key or not destination_folder:
             return JsonResponse({'error': _('File key and destination folder required')}, status=400)
-        
-        new_key = R2_MANAGER.move_file(file_key, destination_folder)
+        if not isinstance(file_key, str) or not isinstance(destination_folder, str):
+            return JsonResponse({'error': _('File key and destination folder required')}, status=400)
+        if not user_may_manage_storage_key(request.user, file_key) or not user_may_manage_storage_key(
+            request.user, destination_folder
+        ) or not storage_key_transition_allowed(file_key, destination_folder):
+            return JsonResponse(
+                {'error': _('You do not have permission to manage this storage key.')},
+                status=403,
+            )
+
+        with guarded_storage_write(file_key, destination_folder):
+            new_filename = file_key.rsplit("/", 1)[-1]
+            normalized_destination = destination_folder.rstrip("/")
+            anticipated_new_key = f"{normalized_destination}/{new_filename}"
+            if storage_reference_transition_conflicts(file_key, anticipated_new_key):
+                raise ValidationError(_("A record already uses a destination file name."))
+            new_key = R2_MANAGER.move_file(file_key, destination_folder)
+            if new_key:
+                # The move has already happened; the DB reference update is
+                # best-effort and must not turn a successful move into a failure.
+                try:
+                    updated_count = rewrite_storage_references(file_key, new_key)
+                except Exception:
+                    logger.exception("File-move reference update failed")
+                    updated_count = 0
+            else:
+                updated_count = 0
         
         if new_key:
-            # The move has already happened; the DB reference update is
-            # best-effort and must not turn a successful move into a failure.
-            try:
-                updated_count = rewrite_lesson_r2_references(file_key, new_key)
-            except Exception:
-                logger.exception("File-move reference update failed")
-                updated_count = 0
-            logger.info(f"User {request.user} moved file from {file_key} to {new_key}. Updated {updated_count} lesson references.")
+            logger.info(f"User {request.user} moved file from {file_key} to {new_key}. Updated {updated_count} storage references.")
             return JsonResponse({'success': True, 'message': _('File moved successfully and %(count)d database references updated') % {'count': updated_count}, 'new_key': new_key})
         else:
             return JsonResponse({'error': _('Failed to move file')}, status=500)
     
+    except ValidationError as exc:
+        return JsonResponse({'error': "; ".join(exc.messages)}, status=409)
     except Exception as e:
         logger.error(f"Error moving file: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
@@ -4853,8 +4933,14 @@ def api_create_folder(request):
         
         if not folder_path:
             return JsonResponse({'error': _('Folder path required')}, status=400)
+        if not isinstance(folder_path, str) or not user_may_manage_storage_key(request.user, folder_path):
+            return JsonResponse(
+                {'error': _('You do not have permission to manage this storage key.')},
+                status=403,
+            )
         
-        success = R2_MANAGER.create_folder(folder_path)
+        with guarded_storage_write(folder_path):
+            success = R2_MANAGER.create_folder(folder_path)
         
         if success:
             logger.info(f"User {request.user} created folder: {folder_path}")
@@ -4862,6 +4948,8 @@ def api_create_folder(request):
         else:
             return JsonResponse({'error': _('Failed to create folder')}, status=500)
     
+    except ValidationError as exc:
+        return JsonResponse({'error': "; ".join(exc.messages)}, status=409)
     except Exception as e:
         logger.error(f"Error creating folder: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
@@ -4877,14 +4965,69 @@ def api_delete_folder(request):
     try:
 
         data = json.loads(request.body)
+        if not isinstance(data, dict):
+            return JsonResponse({'error': _('Invalid folder request')}, status=400)
         folder_path = data.get('folder_path')
-        recursive = data.get('recursive', False)
+        try:
+            recursive = parse_strict_bool(data.get('recursive'))
+        except ValueError:
+            return JsonResponse({'error': _('Invalid folder request')}, status=400)
         
-        if not folder_path:
+        if not folder_path or not isinstance(folder_path, str):
             return JsonResponse({'error': _('Folder path required')}, status=400)
-        
-        deleted_count, errors = R2_MANAGER.delete_folder(folder_path, recursive)
-        
+        if not user_may_manage_storage_key(request.user, folder_path):
+            return JsonResponse(
+                {'error': _('You do not have permission to manage this storage key.')},
+                status=403,
+            )
+
+        if recursive:
+            try:
+                job = enqueue_storage_delete(
+                    actor=request.user,
+                    folder_path=folder_path,
+                    language=translation.get_language() or "ar",
+                )
+            except ValidationError as exc:
+                return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
+            try:
+                from .admin_operation_tasks import run_admin_operation
+
+                run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            except Exception:
+                logger.warning("storage delete awaits worker recovery", exc_info=True)
+            logger.info(
+                "R2 recursive delete queued",
+                extra={"event": "r2_delete_queued", "job_id": str(job.pk), "user_id": request.user.pk},
+            )
+            return JsonResponse({
+                "status": "queued",
+                "job_id": str(job.pk),
+                "status_url": reverse("admin-operation-status", args=[job.pk]),
+                "message": _("Folder deletion was queued."),
+            }, status=202)
+
+        folder_prefix = folder_path.rstrip("/") + "/"
+        with guarded_storage_write(folder_prefix):
+            page = R2_MANAGER.list_folder_page(folder_prefix, max_keys=2)
+            contents = page.get("Contents", [])
+            if len(contents) > 1:
+                deleted_count, errors = 0, 1
+            elif not contents:
+                deleted_count, errors = 0, 0
+            else:
+                object_key = contents[0]["Key"]
+                referenced = (
+                    lesson_referenced_storage_keys([object_key])
+                    | application_referenced_storage_keys([object_key])
+                    | other_referenced_storage_keys([object_key])
+                )
+                if object_key in referenced:
+                    deleted_count, errors = 0, 1
+                else:
+                    deleted_count, errors = (
+                        (1, 0) if R2_MANAGER.delete_file(object_key) else (0, 1)
+                    )
         if errors > 0:
             return JsonResponse({
                 'success': False,
@@ -4900,6 +5043,8 @@ def api_delete_folder(request):
             'deleted_count': deleted_count
         })
     
+    except ValidationError as exc:
+        return JsonResponse({'error': "; ".join(exc.messages)}, status=409)
     except Exception as e:
         logger.error(f"Error deleting folder: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
@@ -4913,6 +5058,8 @@ def api_get_file_metadata(request):
     
     if not file_key:
         return JsonResponse({'error': _('File key required')}, status=400)
+    if not user_may_manage_storage_key(request.user, file_key):
+        return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
     
     try:
         metadata = R2_MANAGER.get_file_metadata(file_key)
@@ -4933,38 +5080,46 @@ def api_get_file_metadata(request):
         logger.error(f"Error getting file metadata: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
+@require_http_methods(["GET", "POST"])
 @capability_required(can_manage_content)
 def api_get_storage_stats(request):
-    """
-    API endpoint to get storage statistics
-    """
-    prefix = request.GET.get('prefix', '')
-    
-    try:
-        stats = R2_MANAGER.get_storage_stats(prefix)
-        
-        # Format sizes
-        stats['total_size_formatted'] = R2_MANAGER.format_file_size(stats['total_size'])
-        
-        # Format extension stats
-        for ext, data in stats['by_extension'].items():
-            data['size_formatted'] = R2_MANAGER.format_file_size(data['size'])
-
-        # Format kind stats (canonical video/audio/image/document groups)
-        for kind, data in stats.get('by_kind', {}).items():
-            data['size_formatted'] = R2_MANAGER.format_file_size(data['size'])
-        
-        # Format largest files
-        for file_data in stats['largest_files']:
-            file_data['size_formatted'] = R2_MANAGER.format_file_size(file_data['size'])
-            if 'last_modified' in file_data and file_data['last_modified']:
-                file_data['last_modified'] = file_data['last_modified'].isoformat()
-        
-        return JsonResponse({'success': True, 'stats': stats})
-    
-    except Exception as e:
-        logger.error(f"Error getting storage stats: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+    prefix = request.GET.get("prefix", "").strip()
+    if len(prefix) > 1024 or (prefix and not R2_MANAGER._is_safe_object_key(prefix.rstrip("/"))):
+        return JsonResponse({"error": _("Invalid file key")}, status=400)
+    if prefix and not user_may_manage_storage_key(request.user, prefix):
+        return JsonResponse({"error": _("You do not have permission to manage this storage key.")}, status=403)
+    if request.method == "POST":
+        job = enqueue_storage_usage(
+            actor=request.user, prefix=prefix, language=translation.get_language() or "ar",
+        )
+        try:
+            from .admin_operation_tasks import run_admin_operation
+            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        except Exception:
+            logger.warning("storage usage awaits worker recovery", exc_info=True)
+        response = JsonResponse({
+            "status": job.status, "status_url": reverse("admin-operation-status", args=[job.pk]),
+        }, status=202)
+    else:
+        stats = storage_usage_snapshot(prefix)
+        if stats is None:
+            response = JsonResponse({"success": False, "available": False, "refresh_required": True})
+        else:
+            # Filtering the private sample is per-request; never cache actor visibility.
+            stats["largest_files"] = [
+                entry for entry in stats.get("largest_files", [])
+                if user_may_manage_storage_key(request.user, entry.get("key", ""))
+            ]
+            if not stats.get("available", True):
+                response = JsonResponse({
+                    "success": False, "available": False,
+                    "unavailable_reason": stats.get("unavailable_reason", "unknown"),
+                    "error": _("Storage statistics are unavailable right now."),
+                }, status=503)
+            else:
+                response = JsonResponse({"success": True, "stats": stats})
+    response["Cache-Control"] = "no-store"
+    return response
 
 @capability_required(can_manage_content)
 def api_search_files(request):
@@ -4988,6 +5143,8 @@ def api_search_files(request):
                 exclude_extensions={'ts'},
                 include_folders=True,
             )
+        if prefix.strip() and not user_may_manage_storage_key(request.user, prefix):
+            return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
 
         results, next_token = search_files_page(
             CLOUD_CLIENT,
@@ -4997,6 +5154,7 @@ def api_search_files(request):
             filter_config,
             continuation_token=continuation_token,
         )
+        results = filter_visible_storage_entries(request.user, results)
         
         # Format sizes and dates
         for file_data in results:
@@ -5017,7 +5175,7 @@ def api_search_files(request):
 
 def api_quiz_status(request, offering_id):
     """
-    API endpoint – returns quiz mode/status for every quiz in a course
+    API endpoint - returns quiz mode/status for every quiz in a course
     for the requesting user. Used by the course-detail sidebar to show
     status badges without reloading the page.
 
@@ -5031,13 +5189,15 @@ def api_quiz_status(request, offering_id):
         offering = get_accessible_offering_or_403(user, offering_id)
 
         current_time = now()
-        quizzes = offering.quizzes.all() if user_has_management_role(user) else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
-        result = []
-
-        for quiz in quizzes:
-            status, _status_detail = get_student_quiz_status(quiz, user, current_time)
-
-            result.append({"id": quiz.pk, "status": status})
+        quizzes = list(
+            offering.quizzes.all()
+            if user_has_management_role(user)
+            else offering.quizzes.filter(status=PublicationStatus.PUBLISHED)
+        )
+        statuses = get_student_quiz_status_map(quizzes, user, current_time)
+        result = [
+            {"id": quiz.pk, "status": statuses[quiz.pk][0]} for quiz in quizzes
+        ]
 
         return JsonResponse({"quizzes": result})
 
@@ -5067,12 +5227,15 @@ def api_list_files(request):
             )
         else:
             filter_config = get_filter_preset(filter_preset)
+        if folder_name.strip() and not user_may_manage_storage_key(request.user, folder_name):
+            return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
         
         # List files with filter
         contents, parent_folder, next_token = list_current_folder_page(
             CLOUD_CLIENT, bucket_name, folder_name, filter_config,
             continuation_token=continuation_token, search_query=search_query,
         )
+        contents = filter_visible_storage_entries(request.user, contents)
         
         # Format sizes and dates
         for item in contents:
@@ -5102,6 +5265,8 @@ def api_download_file(request):
     
     if not file_key:
         return JsonResponse({'error': _('File key required')}, status=400)
+    if not user_may_manage_storage_key(request.user, file_key):
+        return JsonResponse({'error': _('You do not have permission to manage this storage key.')}, status=403)
     
     try:
         # Generate presigned URL for download
@@ -5133,6 +5298,8 @@ def r2_management_dashboard(request):
     
     # List files with filter
     if folder_id and folder_id != "None":
+        if not user_may_manage_storage_key(request.user, folder_id):
+            raise PermissionDenied
         contents, parent_folder, next_token = list_current_folder_page(
             CLOUD_CLIENT, bucket_name, folder_id, filter_config,
             continuation_token=continuation_token, search_query=search_query,
@@ -5142,33 +5309,13 @@ def r2_management_dashboard(request):
             CLOUD_CLIENT, bucket_name, "", filter_config,
             continuation_token=continuation_token, search_query=search_query,
         )
+    contents = filter_visible_storage_entries(request.user, contents)
     
-    # Get storage statistics with error handling - ONLY if requested via AJAX
-    # Skip initial page load to improve performance
-    load_stats = request.GET.get('load_stats', 'false') == 'true'
-    
-    if load_stats:
-        try:
-            stats = R2_MANAGER.get_storage_stats()
-        except Exception as e:
-            logger.error(f"Error getting storage stats: {str(e)}")
-            # Provide default stats if R2 is unavailable
-            stats = {
-                'total_files': 0,
-                'total_size': 0,
-                'by_extension': {},
-                'largest_files': []
-            }
-    else:
-        # Provide placeholder stats for initial page load
-        stats = {
-            'total_files': '...',
-            'total_size': 0,
-            'by_extension': {},
-            'largest_files': [],
-            'loading': True
-        }
-    
+    stats = storage_usage_snapshot("") or {
+        "total_files": "...", "total_size": 0, "by_extension": {},
+        "largest_files": [], "loading": True,
+    }
+
     context = {
         'drive': contents,
         'parent_folder': parent_folder,
@@ -5196,7 +5343,7 @@ def r2_management_dashboard(request):
     return render(request, 'r2_management.html', context)
 
 # ============================================================================
-# PHASE 3 — Student Applications
+# PHASE 3 - Student Applications
 # ============================================================================
 
 def signup(request):
@@ -5238,48 +5385,49 @@ def signup(request):
             try:
                 with transaction.atomic():
                     user = form.save()
+                    lock_application_document_namespace(user.pk)
                     study_mode_changed = apply_study_mode_from_city(user)
                     if study_mode_changed:
                         user.save(update_fields=["study_mode"])
 
-                file_type_map = APPLICATION_DOCUMENT_FIELDS
-                required_upload_types = {"identity_front", "profile"}
-                if user.identity_type == "national_id":
-                    required_upload_types.add("identity_back")
-                for upload_type, model_field in file_type_map.items():
-                    if upload_type not in request.FILES:
-                        continue
-                    uploaded = upload_application_file(
-                        CLOUD_CLIENT,
-                        bucket_name,
-                        user.id,
-                        request.FILES[upload_type],
-                        upload_type,
-                    )
-                    if uploaded:
-                        setattr(user, model_field, uploaded.original_key)
-                        setattr(user, APPLICATION_PREVIEW_FIELDS[upload_type], uploaded.preview_key)
-                        uploaded_keys.extend(uploaded.keys)
+                    file_type_map = APPLICATION_DOCUMENT_FIELDS
+                    required_upload_types = {"identity_front", "profile"}
+                    if user.identity_type == "national_id":
+                        required_upload_types.add("identity_back")
+                    for upload_type, model_field in file_type_map.items():
+                        if upload_type not in request.FILES:
+                            continue
+                        uploaded = upload_application_file(
+                            CLOUD_CLIENT,
+                            bucket_name,
+                            user.id,
+                            request.FILES[upload_type],
+                            upload_type,
+                        )
+                        if uploaded:
+                            setattr(user, model_field, uploaded.original_key)
+                            setattr(user, APPLICATION_PREVIEW_FIELDS[upload_type], uploaded.preview_key)
+                            uploaded_keys.extend(uploaded.keys)
 
-                missing_documents = [
-                    upload_type for upload_type in required_upload_types
-                    if not getattr(user, file_type_map[upload_type], None)
-                ]
-                if missing_documents:
-                    document_labels = {
-                        "identity_front": _("Identity Front"),
-                        "identity_back": _("Identity Back"),
-                        "profile": _("Profile Photo"),
-                    }
-                    named = ", ".join(str(document_labels[t]) for t in file_type_map if t in missing_documents)
-                    raise ValidationError(_("Missing required document(s): %(documents)s.") % {"documents": named})
-                if uploaded_keys:
-                    user.save(
-                        update_fields=[
-                            *[v for v in file_type_map.values() if getattr(user, v, None)],
-                            *[v for v in APPLICATION_PREVIEW_FIELDS.values() if getattr(user, v, None)],
-                        ]
-                    )
+                    missing_documents = [
+                        upload_type for upload_type in required_upload_types
+                        if not getattr(user, file_type_map[upload_type], None)
+                    ]
+                    if missing_documents:
+                        document_labels = {
+                            "identity_front": _("Identity Front"),
+                            "identity_back": _("Identity Back"),
+                            "profile": _("Profile Photo"),
+                        }
+                        named = ", ".join(str(document_labels[t]) for t in file_type_map if t in missing_documents)
+                        raise ValidationError(_("Missing required document(s): %(documents)s.") % {"documents": named})
+                    if uploaded_keys:
+                        user.save(
+                            update_fields=[
+                                *[v for v in file_type_map.values() if getattr(user, v, None)],
+                                *[v for v in APPLICATION_PREVIEW_FIELDS.values() if getattr(user, v, None)],
+                            ]
+                        )
             except ValidationError as exc:
                 delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
                 if user is not None:
@@ -5412,44 +5560,25 @@ def signup_settings(request):
 def application_review(request, user_id):
     user = get_object_or_404(User, pk=user_id)
     original_study_mode = user.study_mode
-    document_fields = {
-        "identity_front": ("identity_front_key", "identity_front_preview_key", _("Identity Front")),
-        "identity_back": ("identity_back_key", "identity_back_preview_key", _("Identity Back")),
-        "payment": ("payment_key", "payment_preview_key", _("Payment")),
-        "profile": ("profile_image_key", "profile_image_preview_key", _("Profile")),
-    }
     if request.method == "POST":
         original_status = user.application_status
         original_role_id = user.role_id
         original_is_active = user.is_active
         form = ApplicationAdminForm(request.POST, request.FILES, instance=user)
         if form.is_valid():
-            uploaded_keys = []
-            uploaded_by_type = {}
-            old_keys = []
+            staged = None
+            change = None
             database_committed = False
             desired_status = form.cleaned_data["application_status"]
             try:
-                for upload_type, (_model_field, _preview_field, document_label) in document_fields.items():
-                    uploaded_file = form.cleaned_data.get(upload_type)
-                    if not uploaded_file:
-                        continue
-                    uploaded = upload_application_file(
-                        CLOUD_CLIENT,
-                        bucket_name,
-                        user.id,
-                        uploaded_file,
-                        upload_type,
-                    )
-                    if not uploaded:
-                        raise ValidationError(
-                            _("The %(document)s could not be uploaded.")
-                            % {"document": document_label}
-                        )
-                    uploaded_by_type[upload_type] = uploaded
-                    uploaded_keys.extend(uploaded.keys)
-
                 with transaction.atomic():
+                    lock_application_document_namespace(user.id)
+                    staged = stage_application_documents(
+                        cloud_client=CLOUD_CLIENT,
+                        bucket_name=bucket_name,
+                        user_id=user.id,
+                        cleaned_data=form.cleaned_data,
+                    )
                     locked_user = lock_application_status_for_edit(user.pk, original_status)
                     original_role_id = locked_user.role_id
                     original_is_active = locked_user.is_active
@@ -5457,23 +5586,9 @@ def application_review(request, user_id):
                         form.cleaned_data["application_status"] = original_status
                     apply_cleaned_data_to_locked_instance(form, locked_user)
                     user = form.save()
-                    for upload_type, (model_field, preview_field, document_label) in document_fields.items():
-                        previous_key = getattr(user, model_field, None)
-                        previous_preview_key = getattr(user, preview_field, None)
-                        if form.cleaned_data.get(f"clear_{upload_type}"):
-                            old_keys.extend(key for key in (previous_key, previous_preview_key) if key)
-                            setattr(user, model_field, None)
-                            setattr(user, preview_field, None)
-                        uploaded = uploaded_by_type.get(upload_type)
-                        if uploaded:
-                            old_keys.extend(
-                                key
-                                for key in (previous_key, previous_preview_key)
-                                if key and key not in uploaded.keys
-                            )
-                            setattr(user, model_field, uploaded.original_key)
-                            setattr(user, preview_field, uploaded.preview_key)
-                    user.save()
+                    change = apply_application_document_changes(
+                        user, staged, form.cleaned_data
+                    )
 
                     if desired_status != original_status:
                         user, _enrollment = set_application_status(
@@ -5493,7 +5608,7 @@ def application_review(request, user_id):
                     if scope and user.application_status == "active":
                         set_user_normal_enrollment_scope(user, request.user, scope)
                 database_committed = True
-                delete_application_files(CLOUD_CLIENT, bucket_name, old_keys)
+                cleanup_replaced_application_documents(change, CLOUD_CLIENT, bucket_name)
                 if desired_status != original_status:
                     try:
                         send_application_status_notification(user, desired_status)
@@ -5502,16 +5617,16 @@ def application_review(request, user_id):
                 messages.success(request, _("Application and student data updated."))
                 return redirect("application-review", user_id=user.pk)
             except (ValidationError, PermissionDenied) as exc:
-                if not database_committed:
-                    delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+                if not database_committed and staged is not None:
+                    rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
                 form.add_error(None, str(exc))
             except User.DoesNotExist as exc:
-                if not database_committed:
-                    delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+                if not database_committed and staged is not None:
+                    rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
                 raise Http404 from exc
             except Exception:
-                if not database_committed:
-                    delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
+                if not database_committed and staged is not None:
+                    rollback_staged_application_documents(staged, CLOUD_CLIENT, bucket_name)
                 raise
     else:
         form = ApplicationAdminForm(instance=user)
@@ -5519,13 +5634,13 @@ def application_review(request, user_id):
     if request.method == "POST":
         user.refresh_from_db()
     documents = []
-    for document_type, (field, _preview_field, label) in document_fields.items():
+    for document_type, field in APPLICATION_DOCUMENT_FIELDS.items():
         key = getattr(user, field, None)
         if key:
             content_type = mimetypes.guess_type(key)[0] or ""
             documents.append({
                 "type": document_type,
-                "label": label,
+                "label": APPLICATION_DOCUMENT_LABELS[document_type],
                 "url": reverse("application-document", args=[user.pk, document_type]),
                 "download_url": reverse("application-document", args=[user.pk, document_type]) + "?download=1",
                 "is_image": content_type.startswith("image/"),
@@ -5621,17 +5736,11 @@ def application_delete(request, user_id):
 def application_document(request, user_id, document_type):
     if request.user.pk != user_id and not can_manage_applications(request.user):
         raise PermissionDenied
-    document_fields = {
-        "identity_front": ("identity_front_key", "identity_front_preview_key"),
-        "identity_back": ("identity_back_key", "identity_back_preview_key"),
-        "payment": ("payment_key", "payment_preview_key"),
-        "profile": ("profile_image_key", "profile_image_preview_key"),
-    }
-    document_spec = document_fields.get(document_type)
-    if not document_spec:
+    if document_type not in APPLICATION_DOCUMENT_FIELDS:
         raise Http404
     user = get_object_or_404(User, pk=user_id)
-    original_field, preview_field = document_spec
+    original_field = APPLICATION_DOCUMENT_FIELDS[document_type]
+    preview_field = APPLICATION_PREVIEW_FIELDS[document_type]
     original_key = getattr(user, original_field, None)
     if not original_key:
         raise Http404
@@ -5679,34 +5788,34 @@ def profile_missing_documents(request):
         if not form.is_valid():
             raise ValidationError(form.errors.as_text())
 
-        for document_type, _model_field in form.document_types.items():
-            uploaded_file = form.cleaned_data.get(document_type)
-            if not uploaded_file:
-                continue
-            uploaded = upload_application_file(
-                CLOUD_CLIENT,
-                bucket_name,
-                user.pk,
-                uploaded_file,
-                document_type,
-            )
-            if not uploaded:
-                raise ValidationError(
-                    _("The %(document)s could not be uploaded.")
-                    % {"document": form.fields[document_type].label}
-                )
-            uploaded_by_type[document_type] = uploaded
-            uploaded_keys.extend(uploaded.keys)
-        if not uploaded_by_type:
-            raise ValidationError(_("Select at least one missing document."))
-
         with transaction.atomic():
+            lock_application_document_namespace(request.user.pk)
             user = User.objects.select_for_update().get(pk=request.user.pk)
             current_form = MissingApplicationDocumentsForm(instance=user)
             current_document_types = current_form.document_types
             allowed_types = set(current_document_types)
             if not submitted_types.issubset(allowed_types):
                 raise ValidationError(_("Only missing signup documents can be uploaded."))
+            for document_type in current_document_types:
+                uploaded_file = form.cleaned_data.get(document_type)
+                if not uploaded_file:
+                    continue
+                uploaded = upload_application_file(
+                    CLOUD_CLIENT,
+                    bucket_name,
+                    user.pk,
+                    uploaded_file,
+                    document_type,
+                )
+                if not uploaded:
+                    raise ValidationError(
+                        _("The %(document)s could not be uploaded.")
+                        % {"document": form.fields[document_type].label}
+                    )
+                uploaded_by_type[document_type] = uploaded
+                uploaded_keys.extend(uploaded.keys)
+            if not uploaded_by_type:
+                raise ValidationError(_("Select at least one missing document."))
             update_fields = []
             for document_type, model_field in current_document_types.items():
                 uploaded = uploaded_by_type.get(document_type)
@@ -5716,7 +5825,6 @@ def profile_missing_documents(request):
                 setattr(user, model_field, uploaded.original_key)
                 setattr(user, preview_field, uploaded.preview_key)
                 update_fields.extend([model_field, preview_field])
-                uploaded_keys.extend(uploaded.keys)
             if not update_fields:
                 raise ValidationError(_("Select at least one missing document."))
             user.save(update_fields=update_fields)
@@ -5745,21 +5853,8 @@ def profile_academic_payment(request):
         if not form.is_valid():
             raise ValidationError(form.errors.as_text())
         scope = form.cleaned_data["academic_year_level"]
-        if AcademicPayment.objects.filter(student=user, academic_year_level=scope).exists():
-            raise ValidationError(_("A payment receipt already exists for this academic level."))
-
-        uploaded = upload_application_file(
-            CLOUD_CLIENT,
-            bucket_name,
-            user.pk,
-            form.cleaned_data["payment"],
-            "academic_payment",
-        )
-        if not uploaded:
-            raise ValidationError(_("The payment receipt could not be uploaded."))
-        uploaded_keys.extend(uploaded.keys)
-
         with transaction.atomic():
+            lock_application_document_namespace(request.user.pk)
             user = User.objects.select_for_update().get(pk=request.user.pk)
             if not academic_payment_scopes_for_student(user).filter(pk=scope.pk).exists():
                 raise ValidationError(_("The selected academic scope is no longer available for payment."))
@@ -5768,6 +5863,16 @@ def profile_academic_payment(request):
                 academic_year_level=scope,
             ).exists():
                 raise ValidationError(_("A payment receipt already exists for this academic level."))
+            uploaded = upload_application_file(
+                CLOUD_CLIENT,
+                bucket_name,
+                user.pk,
+                form.cleaned_data["payment"],
+                "academic_payment",
+            )
+            if not uploaded:
+                raise ValidationError(_("The payment receipt could not be uploaded."))
+            uploaded_keys.extend(uploaded.keys)
             AcademicPayment.objects.create(
                 student=user,
                 academic_year_level=scope,
@@ -5864,7 +5969,10 @@ def bulk_application_decision(request):
 
     application_search = str(selection.get("search", "")).strip()[:100]
 
-    select_all = bool(data.get("select_all"))
+    try:
+        select_all = parse_strict_bool(data.get("select_all"))
+    except ValueError:
+        return JsonResponse({"error": _("Invalid selection flags.")}, status=400)
     if select_all:
         selection_queryset = User.objects.filter(
             application_status__in=status_filter,
@@ -5986,18 +6094,52 @@ def duplicate_quiz(request, quiz_id):
 def copy_course_offerings(request):
     form = OfferingCopyForm(request.POST)
     if form.is_valid():
+        source_scope = form.cleaned_data["source_year_level"]
+        target_scope = form.cleaned_data["target_year_level"]
+        offerings = list(form.cleaned_data["offerings"])
+        offering_ids = sorted(offering.pk for offering in offerings)
+        # Bounded pre-enqueue conflict check: the executor rechecks the whole
+        # all-or-nothing copy unit before mutating.
+        conflict = CourseOffering.objects.filter(
+            academic_year_level=target_scope,
+            course_id__in=[offering.course_id for offering in offerings],
+        ).exists()
+        if conflict:
+            messages.error(request, _("The target scope already contains one or more selected courses."))
+            return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
+        from .admin_operation_tasks import run_admin_operation
+        from .admin_operations import create_admin_operation
+
         try:
-            copied = copy_offerings(
-                form.cleaned_data["source_year_level"],
-                form.cleaned_data["target_year_level"],
-                list(form.cleaned_data["offerings"].values_list("pk", flat=True)),
-                copy_lessons=form.cleaned_data["copy_lessons"],
-                copy_quizzes=form.cleaned_data["copy_quizzes"],
+            job = create_admin_operation(
                 actor=request.user,
+                kind=AdminOperationJob.Kind.COURSE_COPY,
+                input={
+                    "mode": "offerings",
+                    "source_scope_id": source_scope.pk,
+                    "target_scope_id": target_scope.pk,
+                    "offering_ids": offering_ids,
+                    "copy_lessons": bool(form.cleaned_data["copy_lessons"]),
+                    "copy_quizzes": bool(form.cleaned_data["copy_quizzes"]),
+                },
+                conflict_key=f"course-copy:{source_scope.pk}:{target_scope.pk}",
+                scope=target_scope,
+                language=translation.get_language() or "ar",
+                total=len(offering_ids),
             )
-            messages.success(request, _("Copied %(count)d offering(s) as drafts.") % {"count": len(copied)})
-        except (ValidationError, PermissionDenied) as exc:
-            messages.error(request, str(exc))
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
+        try:
+            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        except Exception:
+            # The queued row is picked up by the recovery schedule.
+            logger.warning("course offering copy awaits worker recovery", exc_info=True)
+        messages.success(
+            request,
+            _("Copying %(count)d offering(s) as drafts was queued. Progress is available while it runs; the copy commits all offerings together.")
+            % {"count": len(offering_ids)},
+        )
     else:
         for error in form.non_field_errors():
             messages.error(request, error)
@@ -6162,6 +6304,16 @@ def academic_setup(request):
     offering_pagination_params = request.GET.copy()
     offering_pagination_params.pop("page", None)
     offering_pagination_params.pop("offering_page", None)
+    copy_job = None
+    if can_manage_academic_setup(request.user):
+        copy_job = (
+            AdminOperationJob.objects.filter(
+                actor=request.user,
+                kind=AdminOperationJob.Kind.COURSE_COPY,
+            )
+            .order_by("-created_at")
+            .first()
+        )
     return render_page(request, "academic_setup.html", "partials/academic_setup_content.html", {
         "years": year_page_obj.object_list,
         "year_page_obj": year_page_obj,
@@ -6185,6 +6337,10 @@ def academic_setup(request):
         "year_form": year_form,
         "offering_form": offering_form,
         "copy_form": copy_form,
+        "copy_job": copy_job,
+        "copy_status_url": (
+            reverse("admin-operation-status", args=[copy_job.pk]) if copy_job else ""
+        ),
         "COURSE_LEVELS": course_levels,
         "meeting_weekday_choices": [(0, _("Monday")), (1, _("Tuesday")), (2, _("Wednesday")), (3, _("Thursday")), (4, _("Friday")), (5, _("Saturday")), (6, _("Sunday"))],
     })
@@ -6352,7 +6508,6 @@ def course_offering_edit(request, offering_id):
 @capability_required(can_manage_academic_setup)
 def course_offering_delete(request, offering_id):
     offering = get_object_or_404(CourseOffering, pk=offering_id)
-    year_id = offering.academic_year_level.academic_year_id
     try:
         offering.delete()
         messages.success(request, _("Course offering deleted."))
@@ -6360,39 +6515,91 @@ def course_offering_delete(request, offering_id):
         messages.error(request, _("Cannot delete this course offering: it is referenced by other records (%s).") % str(e))
     return redirect(f"{reverse('academic-setup')}?scope={offering.academic_year_level_id}")
 
+_COPY_FLAG_TRUE = frozenset({"1", "true", "yes", "on"})
+_COPY_FLAG_FALSE = frozenset({"0", "false", "no", "off"})
+
+
+def _post_copy_flag(value, *, default: bool = True) -> bool:
+    """Parse one explicit copy flag; an unknown value is not silently accepted."""
+
+    if value is None:
+        return default
+    normalized = str(value).strip().lower()
+    if normalized in _COPY_FLAG_TRUE:
+        return True
+    if normalized in _COPY_FLAG_FALSE:
+        return False
+    raise ValueError("invalid copy flag")
+
+
 @require_POST
 @capability_required(can_manage_content)
 def duplicate_course(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
-    new_name = request.POST.get("new_name", "")
+    new_name = (request.POST.get("new_name") or "").strip()
     if not new_name:
         return HttpResponse(_("New course name is required."), status=400)
-    target_scope_id = request.POST.get("academic_year_level_id")
-    target_scope = get_object_or_404(AcademicYearLevel, pk=target_scope_id) if target_scope_id else None
-    with transaction.atomic():
-        new_course = Course.objects.create(name=new_name, description=course.description, instructor=course.instructor, level=course.level)
-        if target_scope:
-            new_offering = CourseOffering.objects.create(course=new_course, academic_year_level=target_scope, status="draft")
-            for lesson in Lesson.objects.filter(course_offering__course=course):
-                lesson.pk = None
-                lesson.course_offering = new_offering
-                lesson.status = PublicationStatus.DRAFT
-                lesson.save()
-            for quiz in Quiz.objects.filter(course_offering__course=course):
-                questions = list(quiz.questions.all())
-                quiz.pk = None
-                quiz.course_offering = new_offering
-                quiz.status = PublicationStatus.DRAFT
-                quiz.save()
-                for q in questions:
-                    q.pk = None
-                    q.quiz = quiz
-                Question.objects.bulk_create(questions)
-    messages.success(request, _("Course duplicated."))
-    return redirect("course-dashboard")
+    source_offering_id = request.POST.get("source_offering_id", "")
+    if not source_offering_id.isdigit():
+        return HttpResponse(_("Select the source offering to duplicate."), status=400)
+    source_offering = CourseOffering.objects.filter(
+        pk=int(source_offering_id),
+        course=course,
+    ).first()
+    if source_offering is None:
+        return HttpResponse(_("The source offering does not belong to this course."), status=400)
+    target_scope_id = request.POST.get("academic_year_level_id", "")
+    if not target_scope_id.isdigit():
+        return HttpResponse(_("Select a valid target academic scope."), status=400)
+    target_scope = AcademicYearLevel.objects.filter(pk=int(target_scope_id)).first()
+    if target_scope is None:
+        return HttpResponse(_("The selected academic scope is not available."), status=400)
+    try:
+        copy_lessons = _post_copy_flag(request.POST.get("copy_lessons"))
+        copy_quizzes = _post_copy_flag(request.POST.get("copy_quizzes"))
+    except ValueError:
+        return HttpResponse(_("Invalid copy option."), status=400)
+    if not copy_lessons and not copy_quizzes:
+        return HttpResponse(_("Select lessons, quizzes, or both to copy."), status=400)
+    if source_offering.course.level_id != target_scope.level_id:
+        return HttpResponse(_("The source offering level does not match the target academic scope."), status=400)
+
+    from .admin_operation_tasks import run_admin_operation
+    from .admin_operations import create_admin_operation
+
+    try:
+        job = create_admin_operation(
+            actor=request.user,
+            kind=AdminOperationJob.Kind.COURSE_COPY,
+            input={
+                "mode": "duplicate",
+                "source_offering_id": source_offering.pk,
+                "target_scope_id": target_scope.pk,
+                "new_course_name": new_name[:255],
+                "copy_lessons": copy_lessons,
+                "copy_quizzes": copy_quizzes,
+            },
+            conflict_key=f"course-copy:duplicate:{target_scope.pk}:{source_offering.pk}",
+            scope=target_scope,
+            language=translation.get_language() or "ar",
+            total=1,
+        )
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
+    try:
+        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+    except Exception:
+        # The queued row is picked up by the recovery schedule.
+        logger.warning("course duplication awaits worker recovery", exc_info=True)
+    messages.success(
+        request,
+        _("Course duplication was queued. The source offering content is copied as drafts and progress is available while it runs."),
+    )
+    return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
 
 # ============================================================================
-# PHASE 5 — Attendance Calendar, QR, and Scanning
+# PHASE 5 - Attendance Calendar, QR, and Scanning
 # ============================================================================
 
 def _calendar_weekday_labels():
@@ -6868,7 +7075,7 @@ def student_calendar(request):
         {
             "value": enrollment.pk,
             "label": (
-                f"{enrollment.academic_year_level.academic_year.name} — "
+                f"{enrollment.academic_year_level.academic_year.name} - "
                 f"{enrollment.academic_year_level.level.display_name}"
             ),
             "is_current": selected_enrollment is not None and enrollment.pk == selected_enrollment.pk,
@@ -7181,6 +7388,16 @@ def attendance_management(request):
         }
         for scope in levels
     ]
+    reconcile_job = None
+    if can_correct_attendance(request.user):
+        reconcile_job = (
+            AdminOperationJob.objects.filter(
+                actor=request.user,
+                kind=AdminOperationJob.Kind.ATTENDANCE_RECONCILE,
+            )
+            .order_by("-created_at")
+            .first()
+        )
     return render_page(request, "attendance_management.html", "partials/attendance_management_content.html", {
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request, exclude=("page",)),
@@ -7209,6 +7426,10 @@ def attendance_management(request):
         "policy_form": AttendancePolicyForm(instance=policy),
         "today": timezone.localdate(),
         "can_manage_policy": can_correct_attendance(request.user),
+        "reconcile_job": reconcile_job,
+        "reconcile_status_url": (
+            reverse("admin-operation-status", args=[reconcile_job.pk]) if reconcile_job else ""
+        ),
     })
 
 @require_POST
@@ -7231,22 +7452,33 @@ def attendance_policy_save(request):
 @capability_required(can_correct_attendance)
 def attendance_reconcile(request):
     raw_date = request.POST.get("date", "")
-    target_date = None
+    target_date = timezone.localdate()
     if raw_date:
         try:
             target_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
         except (TypeError, ValueError):
             messages.error(request, _("Invalid date format."))
             return redirect("attendance-management")
-    target_date = target_date or timezone.localdate()
-    reconciled = reconcile_missing_exits(target_date, actor=request.user)
-    if reconciled:
-        messages.success(request, _("%(count)s missing exit(s) were recorded for %(date)s.") % {
-            "count": reconciled,
-            "date": target_date,
-        })
-    else:
-        messages.info(request, _("No missing exits were found for %(date)s.") % {"date": target_date})
+    from .admin_operation_tasks import run_admin_operation
+    from .admin_operations import create_admin_operation
+
+    job = create_admin_operation(
+        actor=request.user,
+        kind=AdminOperationJob.Kind.ATTENDANCE_RECONCILE,
+        input={"date": target_date.isoformat()},
+        conflict_key=f"attendance-reconcile:{target_date.isoformat()}",
+        language=translation.get_language() or "ar",
+    )
+    try:
+        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+    except Exception:
+        # The queued row is picked up by the recovery schedule.
+        logger.warning("attendance reconciliation awaits worker recovery", exc_info=True)
+    messages.success(
+        request,
+        _("Attendance reconciliation for %(date)s was queued. Missing exits are recorded in bounded batches.")
+        % {"date": target_date},
+    )
     return redirect("attendance-management")
 
 @capability_required(can_correct_attendance)
@@ -7302,184 +7534,36 @@ def delete_attendance(request, record_id):
     return redirect("attendance-management")
 
 # ============================================================================
-# PHASE 6 — Online Lecture Progress Tracking
+# PHASE 6 - Online Lecture Progress Tracking
 # ============================================================================
-
-def create_viewing_session(student, lesson, part_id, *, mobile_session=None, media_key=""):
-    session_id = secrets.token_urlsafe(32)
-    session_hours = max(1, int(getattr(settings, "MEDIA_VIEWING_SESSION_HOURS", 3) or 3))
-    expires_at = timezone.now() + timedelta(hours=session_hours)
-    access_channel = ViewingSession.AccessChannel.MOBILE if mobile_session is not None else ViewingSession.AccessChannel.WEB
-    if mobile_session is not None and mobile_session.user_id != student.pk:
-        raise PermissionDenied(_("The viewing session is invalid."))
-    session = ViewingSession.objects.create(
-        student=student,
-        lesson=lesson,
-        mobile_session=mobile_session,
-        access_channel=access_channel,
-        part_id=part_id,
-        media_key=media_key or "",
-        session_id=session_id,
-        expires_at=expires_at,
-    )
-    LectureProgressEvent.objects.get_or_create(
-        viewing_session=session,
-        event_type=LectureProgressEvent.EventType.STARTED,
-        defaults={
-            "student": student,
-            "lesson": lesson,
-            "part_id": part_id,
-            "occurred_at": timezone.now(),
-        },
-    )
-    return session
-
-
-def _record_progress_event(
-    session,
-    event_type,
-    *,
-    occurred_at=None,
-    percent=0,
-    unique_seconds=0,
-):
-    occurred_at = occurred_at or timezone.now()
-    defaults = {
-        "student": session.student,
-        "lesson": session.lesson,
-        "part_id": session.part_id,
-        "viewing_session": session,
-        "occurred_at": occurred_at,
-        "percent": max(0, min(int(percent or 0), 100)),
-        "unique_seconds": max(0, int(unique_seconds or 0)),
-    }
-    if event_type == LectureProgressEvent.EventType.COMPLETED:
-        lookup = {
-            "student": session.student,
-            "lesson": session.lesson,
-            "part_id": session.part_id,
-            "event_type": event_type,
-        }
-    else:
-        lookup = {
-            "viewing_session": session,
-            "event_type": event_type,
-        }
-    if event_type in {
-        LectureProgressEvent.EventType.ACTIVITY,
-        LectureProgressEvent.EventType.PROGRESS,
-    }:
-        lookup["bucket_start"] = occurred_at.replace(second=0, microsecond=0)
-    if event_type == LectureProgressEvent.EventType.PROGRESS:
-        lookup["percent"] = defaults["percent"]
-    return LectureProgressEvent.objects.get_or_create(**lookup, defaults=defaults)
-
-
-MEDIA_TOKEN_VERSION = "v2"
-MEDIA_AUDIENCES = frozenset({"web", "mobile"})
-MEDIA_SEGMENT_TOKEN_LIFETIME = timedelta(
-    minutes=max(1, int(getattr(settings, "MEDIA_SEGMENT_TOKEN_MINUTES", 180) or 180))
-)
-
-
-def _media_binding(audience, mobile_session_id=None):
-    """Return the opaque bearer-session binding carried by mobile tokens."""
-    if audience != "mobile":
-        return ""
-    if mobile_session_id is None:
-        raise ValueError("Mobile media tokens require a mobile session binding.")
-    return hmac.new(
-        settings.SECRET_KEY.encode("utf-8"),
-        f"mobile-media:{mobile_session_id}".encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-
-def _validate_media_audience(audience):
-    if audience not in MEDIA_AUDIENCES:
-        raise ValueError("Unsupported media audience.")
-    return audience
-
-
-def _sign_media_message(message):
-    return hmac.new(
-        settings.MEDIA_WORKER_HMAC_SECRET.encode(),
-        message.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-
-
-def sign_session(session_id, expires_at, *, audience="web", mobile_session_id=None):
-    audience = _validate_media_audience(audience)
-    expires_at_value = int(expires_at.timestamp())
-    binding = _media_binding(audience, mobile_session_id)
-    message = f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|{expires_at_value}|{binding}"
-    signature = _sign_media_message(message)
-    return f"{MEDIA_TOKEN_VERSION}:{audience}:{session_id}:{expires_at_value}:{binding}:{signature}"
-
-
-def sign_media_token(session_id, expires_at, segment_key, *, audience="web", token_expires_at=None):
-    audience = _validate_media_audience(audience)
-    token_expiry = token_expires_at or expires_at
-    expires_at_value = int(token_expiry.timestamp())
-    message = f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|{expires_at_value}|{segment_key}"
-    return f"{MEDIA_TOKEN_VERSION}:{audience}:{session_id}:{expires_at_value}:{_sign_media_message(message)}"
-
-
-def _valid_session_token(token, session, *, audience="web", mobile_session_id=None):
-    if not token:
-        return False
-    parts = token.split(":")
-    if len(parts) != 6 or parts[0] != MEDIA_TOKEN_VERSION or parts[1] != audience:
-        return False
-    if parts[2] != session.session_id:
-        return False
-    try:
-        expires_at = int(parts[3])
-    except (TypeError, ValueError):
-        return False
-    if expires_at != int(session.expires_at.timestamp()) or timezone.now().timestamp() >= expires_at:
-        return False
-    binding = parts[4]
-    if audience == "mobile":
-        if not binding:
-            return False
-        if mobile_session_id is not None:
-            try:
-                expected_binding = _media_binding(audience, mobile_session_id)
-            except ValueError:
-                return False
-            if not hmac.compare_digest(binding, expected_binding):
-                return False
-    elif binding:
-        return False
-    expected = _sign_media_message(
-        f"{MEDIA_TOKEN_VERSION}|{audience}|{session.session_id}|{expires_at}|{binding}"
-    )
-    return hmac.compare_digest(parts[5], expected)
 
 @login_required
 def start_viewing_session(request, offering_id, lesson_id, file_index):
-    offering = get_accessible_offering_or_403(request.user, offering_id)
-    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
-    if not user_has_management_role(request.user) and lesson.status != PublicationStatus.PUBLISHED:
-        raise PermissionDenied(_("You do not have access to this lesson."))
-    links = json.loads(lesson.links)
-    if file_index < 0 or file_index >= len(links):
-        return JsonResponse({"error": _("Invalid media file.")}, status=400)
-    file_info = links[file_index]
-    if file_info.get("file_type") not in {"video", "audio"} or not file_info.get("id"):
-        return JsonResponse({"error": _("Invalid media file.")}, status=400)
-
-    part_id = file_info.get("part_id", "")
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("video", "audio"),
+            allow_unpublished=True,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "forbidden":
+            raise PermissionDenied(exc.message)
+        if exc.code == "not_found":
+            raise Http404
+        return JsonResponse({"error": exc.message}, status=400)
     # Each player/tab gets an independent authorization session and sequence.
     # Logical study sessions are shared and serialized by the progress row lock.
-    session = create_viewing_session(request.user, lesson, part_id, media_key=file_info.get("id", ""))
+    session = create_viewing_session(
+        request.user, media.lesson, media.part_id, media_key=media.media_key
+    )
     token = sign_session(session.session_id, session.expires_at, audience="web")
     progress_row = LectureProgress.objects.filter(
         student=request.user,
-        lesson=lesson,
-        part_id=part_id,
+        lesson=media.lesson,
+        part_id=media.part_id,
     ).values("percent", "last_position_seconds").first()
     progress_percent = int(progress_row["percent"] or 0) if progress_row else 0
     resume_seconds = int(progress_row["last_position_seconds"] or 0) if progress_row else 0
@@ -7488,24 +7572,29 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         "token": token,
         "expires_at": session.expires_at.isoformat(),
         "segment_token_lifetime_seconds": int(MEDIA_SEGMENT_TOKEN_LIFETIME.total_seconds()),
-        "manifest_url": reverse("lesson-manifest", args=[offering.pk, lesson.pk, file_index]),
+        "manifest_url": reverse(
+            "lesson-manifest",
+            args=[media.offering.pk, media.lesson.pk, media.file_index],
+        ),
         "progress_percent": progress_percent,
         "resume_seconds": resume_seconds,
     })
 
 @login_required
 def lesson_manifest(request, offering_id, lesson_id, file_index):
-    offering = get_accessible_offering_or_403(request.user, offering_id)
-    lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
-    if not user_has_management_role(request.user) and lesson.status != PublicationStatus.PUBLISHED:
-        raise PermissionDenied(_("You do not have access to this lesson."))
-    links = json.loads(lesson.links)
-    if file_index < 0 or file_index >= len(links):
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("video", "audio"),
+            allow_unpublished=True,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "forbidden":
+            raise PermissionDenied(exc.message)
         return HttpResponse(status=404)
-    file_info = links[file_index]
-    if file_info.get("file_type") not in {"video", "audio"} or not file_info.get("id"):
-        return HttpResponse(status=404)
-    key = file_info["id"]
     session_id = request.GET.get("session_id", "")
     token = request.GET.get("token", "")
     if not session_id or not token:
@@ -7514,8 +7603,8 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
         ViewingSession,
         session_id=session_id,
         student=request.user,
-        lesson=lesson,
-        part_id=file_info.get("part_id", ""),
+        lesson=media.lesson,
+        part_id=media.part_id,
     )
     if timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Viewing session expired.")}, status=401)
@@ -7527,54 +7616,30 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
     )
     if session.access_channel != expected_channel:
         return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
-    if not _valid_session_token(token, session, audience=audience):
+    if not valid_session_token(token, session, audience=audience):
         return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
-    # The session is opened for one exact file. Reject a manifest request for a
-    # different file so progress is never verified against the wrong timeline.
-    if session.media_key and session.media_key != key:
+    if session.media_key and session.media_key != media.media_key:
         return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
     try:
-        response = CLOUD_CLIENT.get_object(Bucket=bucket_name, Key=key)
-        playlist = response["Body"].read().decode()
-    except Exception:
+        playlist = build_manifest_playlist(
+            user=request.user,
+            media=media,
+            session=session,
+            audience=audience,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "expired":
+            return JsonResponse({"error": exc.message}, status=401)
+        if exc.code == "forbidden":
+            return JsonResponse({"error": exc.message}, status=403)
         return HttpResponse(status=404)
-
-    playlist_lines = []
-    manifest_folder = posixpath.dirname(key).strip("/")
-    for line in playlist.splitlines():
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#") and stripped.lower().endswith(".ts"):
-            if stripped.startswith(("/", "http://", "https://")):
-                return HttpResponse(status=404)
-            segment_key = posixpath.normpath(posixpath.join(posixpath.dirname(key), stripped))
-            if segment_key in {".", ".."} or segment_key.startswith("../"):
-                return HttpResponse(status=404)
-            if manifest_folder and not segment_key.startswith(f"{manifest_folder}/"):
-                return HttpResponse(status=404)
-            if get_segment_number(segment_key) is None:
-                return HttpResponse(status=404)
-            segment_expires_at = min(
-                session.expires_at,
-                timezone.now() + MEDIA_SEGMENT_TOKEN_LIFETIME,
-            )
-            signed_token = sign_media_token(
-                session.session_id,
-                session.expires_at,
-                segment_key,
-                audience=audience,
-                token_expires_at=segment_expires_at,
-            )
-            worker_base = settings.CLOUD_WORKER.rstrip("/")
-            playlist_lines.append(
-                f"{worker_base}/media/{quote(session.session_id, safe='')}/"
-                f"{quote(segment_key, safe='')}?token={quote(signed_token, safe='')}"
-            )
-        else:
-            playlist_lines.append(line)
     return HttpResponse(
-        "\n".join(playlist_lines) + ("\n" if playlist.endswith("\n") else ""),
+        playlist,
         content_type="application/vnd.apple.mpegurl",
     )
+
 
 @csrf_exempt
 @require_POST
@@ -7637,7 +7702,7 @@ def worker_receipt(request):
 
     if get_segment_number(segment_key) != segment_number:
         return JsonResponse({"error": _("Invalid segment number.")}, status=400)
-    expected = _sign_media_message(
+    expected = sign_media_message(
         f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|"
         f"{token_expires_at}|{segment_key}"
     )
@@ -7657,207 +7722,29 @@ def worker_receipt(request):
 
 @require_POST
 def progress_heartbeat(request, *, allow_management=False):
-    if not request.user.is_authenticated:
-        return JsonResponse({"error": _("Authentication required")}, status=401)
     try:
-        data = json.loads(request.body)
+        payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"error": _("Invalid request format.")}, status=400)
-
-    session_id = data.get("session_id")
-    ranges = data.get("ranges", [])
-    ended = data.get("ended", False)
-    active_seconds = data.get("active_seconds", 0)
-    sequence = data.get("sequence")
-
-    if (
-        not session_id
-        or not isinstance(ranges, list)
-        or not isinstance(ended, bool)
-        or isinstance(active_seconds, bool)
-        or not isinstance(active_seconds, (int, float))
-        or not math.isfinite(active_seconds)
-        or active_seconds < 0
-        or active_seconds > 3600
-    ):
-        return JsonResponse({"error": _("Missing session identifier or time ranges.")}, status=400)
-    if active_seconds > 0 and (
-        isinstance(sequence, bool)
-        or not isinstance(sequence, int)
-        or sequence <= 0
-        or sequence > 2_147_483_647
-    ):
-        return JsonResponse({"error": _("Invalid playback sequence.")}, status=400)
-
-    if len(ranges) > 200:
-        return JsonResponse({"error": _("Too many time ranges.")}, status=400)
-
-    # Validate ranges are finite, ordered, non-negative, and bounded before
-    # intersecting them with the verified media timeline.
     try:
-        ranges = [[float(s), float(e)] for s, e in ranges]
-    except (ValueError, TypeError):
-        return JsonResponse({"error": _("Invalid time range format.")}, status=400)
-    max_duration = float(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60))
-    if any(
-        not math.isfinite(start)
-        or not math.isfinite(end)
-        or start < 0
-        or end <= start
-        or end > max_duration
-        for start, end in ranges
-    ):
-        return JsonResponse({"error": _("Invalid time range format.")}, status=400)
-
-    session = get_object_or_404(ViewingSession, session_id=session_id)
-
-    # Reject another user's session
-    if session.student != request.user:
-        return JsonResponse({"error": _("Session belongs to another user.")}, status=403)
-
-    if timezone.now() >= session.expires_at:
-        return JsonResponse({"error": _("Session expired.")}, status=403)
-
-    def progress_response(note=None):
-        current = LectureProgress.objects.filter(
-            student=request.user,
-            lesson=session.lesson,
-            part_id=session.part_id,
-        ).values("percent", "completed_at").first()
-        payload = {
-            "status": "ok",
-            "percent": int(current["percent"] or 0) if current else 0,
-            "completed": bool(current and current["completed_at"]),
-        }
-        if note:
-            payload["note"] = note
-        return JsonResponse(payload)
-
-    if session.ended_at is not None:
-        return progress_response()
-
-    if not user_can_write_offering_activity(
-        request.user,
-        session.lesson.course_offering,
-        allow_management=allow_management,
-    ):
-        return progress_response(_("Historical content is read-only"))
-
-    heartbeat_at = timezone.now()
-    session.last_heartbeat = heartbeat_at
-    update_fields = ["last_heartbeat"]
-    if ended and session.ended_at is None:
-        session.ended_at = heartbeat_at
-        update_fields.append("ended_at")
-    session.save(update_fields=update_fields)
-
-    if ended:
-        _record_progress_event(
-            session,
-            LectureProgressEvent.EventType.ENDED,
-            occurred_at=heartbeat_at,
+        result = apply_progress_heartbeat(
+            user=request.user,
+            payload=payload,
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+            allow_management=allow_management,
         )
+    except ProgressHeartbeatError as exc:
+        if exc.code == "session_not_found":
+            raise Http404
+        status = {
+            "unauthenticated": 401,
+            "forbidden": 403,
+            "expired": 403,
+        }.get(exc.code, 400)
+        return JsonResponse({"error": exc.message}, status=status)
+    return JsonResponse(result.as_payload())
 
-    # Get verified segment requests for this session
-    verified = set(session.verified_requests.values_list("segment_number", flat=True))
-    if not verified:
-        return progress_response(_("No verified segments yet"))
-
-    # Get segment time ranges from the played file's own playlist. Paired
-    # video/audio share a part_id but can have different segment timelines, so
-    # the session's media_key (when present) selects the exact manifest.
-    lesson_segments = get_lesson_segments(
-        session.lesson,
-        CLOUD_CLIENT,
-        bucket_name,
-        media_key=session.media_key or None,
-        requested_part_id=session.part_id,
-    ).get(session.part_id, [])
-    all_ranges = [
-        [float(sr.get("start", 0)), float(sr.get("end", 0))]
-        for sr in lesson_segments
-        if float(sr.get("end", 0)) > float(sr.get("start", 0))
-    ]
-    verified_ranges = []
-    for sr in lesson_segments:
-        if sr.get("number") in verified:
-            verified_ranges.append({
-                "start": float(sr.get("start", 0)),
-                "end": float(sr.get("end", 0)),
-            })
-
-    if not verified_ranges:
-        return progress_response(_("No verified segment ranges"))
-
-    total_secs = sum(end - start for start, end in all_ranges)
-    with transaction.atomic():
-        locked_session = ViewingSession.objects.select_for_update().get(pk=session.pk)
-        if locked_session.ended_at is not None and locked_session.ended_at != heartbeat_at:
-            return progress_response()
-        progress, _created = LectureProgress.objects.select_for_update().get_or_create(
-            student=request.user,
-            lesson=session.lesson,
-            part_id=session.part_id,
-            defaults={"merged_ranges": []},
-        )
-        merged = merge_verified_progress_ranges(
-            progress.merged_ranges,
-            ranges,
-            verified_ranges,
-        )
-        unique_secs = unique_seconds(merged)
-        percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
-        previous_percent = progress.percent
-        progress.merged_ranges = merged
-        progress.percent = percent
-        progress.unique_seconds = int(round(unique_secs))
-        if merged:
-            # Resume point = furthest verified second reached for this part.
-            # Video and audio of the same part share this row, so either one
-            # resumes to the same position on the next visit.
-            furthest = max(float(end) for _start, end in merged)
-            progress.last_position_seconds = max(
-                int(progress.last_position_seconds or 0),
-                int(furthest),
-            )
-        if not progress.completed_at and percent >= 80:
-            progress.completed_at = timezone.now()
-        progress.save()
-
-        credit_watch_sample(
-            locked_session,
-            progress,
-            active_seconds=active_seconds,
-            sequence=sequence,
-            progress_before=previous_percent,
-            progress_after=percent,
-            ended=ended,
-            now=heartbeat_at,
-        )
-
-        if percent != previous_percent:
-            _record_progress_event(
-                locked_session,
-                LectureProgressEvent.EventType.PROGRESS,
-                occurred_at=heartbeat_at,
-                percent=percent,
-                unique_seconds=progress.unique_seconds,
-            )
-
-        if progress.completed_at:
-            _record_progress_event(
-                locked_session,
-                LectureProgressEvent.EventType.COMPLETED,
-                occurred_at=progress.completed_at,
-                percent=percent,
-                unique_seconds=progress.unique_seconds,
-            )
-
-    return JsonResponse({
-        "status": "ok",
-        "percent": percent,
-        "completed": progress.completed_at is not None,
-    })
 
 @capability_required(can_manage_content)
 def progress_dashboard(request):
@@ -7966,6 +7853,8 @@ def report_dashboard(request):
     student_search = normalize_search_text(request.GET.get("student", "").strip()[:100])
     study_mode = request.GET.get("study_mode") or None
     course_offering_id = request.GET.get("course_offering") or None
+    report_filters = normalize_report_filters(student_search, study_mode, course_offering_id)
+    offering_pk = report_filters["course_offering_id"]
 
     levels = Level.objects.order_by("ordering")
     academic_years = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by(
@@ -7974,6 +7863,7 @@ def report_dashboard(request):
     selected_year = None
     rows = []
     page_obj = None
+    report_export_job = None
 
     if academic_year_level_id:
         selected_year = get_object_or_404(
@@ -7988,13 +7878,29 @@ def report_dashboard(request):
             selected_year,
             student_search=student_search,
             study_mode=study_mode,
-            course_offering_id=int(course_offering_id) if course_offering_id and str(course_offering_id).isdigit() else None,
+            course_offering_id=offering_pk,
         )
         page_obj = Paginator(report_query, 25).get_page(request.GET.get("page", 1))
         rows = build_report_page_rows(
             page_obj.object_list,
             selected_year,
-            course_offering_id=int(course_offering_id) if course_offering_id and str(course_offering_id).isdigit() else None,
+            course_offering_id=offering_pk,
+        )
+        from .models import AdminOperationJob
+
+        report_export_job = (
+            AdminOperationJob.objects.filter(
+                actor=request.user,
+                kind=AdminOperationJob.Kind.GRADES_REPORT_EXPORT,
+                conflict_key=report_export_conflict_key(
+                    selected_year,
+                    student=report_filters["student"],
+                    study_mode=report_filters["study_mode"],
+                    course_offering_id=offering_pk,
+                ),
+            )
+            .order_by("-created_at")
+            .first()
         )
 
     context = {
@@ -8005,13 +7911,22 @@ def report_dashboard(request):
         "selected_level": request.GET.get("level", ""),
         "selected_student": student_search,
         "selected_study_mode": study_mode or "",
-        "selected_course_offering": course_offering_id or "",
+        "selected_course_offering": offering_pk or "",
         "students": [],
         "course_offerings": course_offerings if academic_year_level_id else [],
         "rows": rows,
         "row_count": page_obj.paginator.count if page_obj else 0,
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
+        "report_export_job": report_export_job,
+        "report_export_status_url": (
+            reverse("admin-operation-status", args=[report_export_job.pk])
+            if report_export_job else ""
+        ),
+        "report_export_download_url": (
+            reverse("admin-operation-download", args=[report_export_job.pk])
+            if report_export_job else ""
+        ),
     }
     return render_page(request, "report_dashboard.html", "partials/report_dashboard_content.html", context)
 
@@ -8058,90 +7973,52 @@ def export_report_csv(request):
     response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
     return response
 
+@require_http_methods(["GET", "POST"])
 @capability_required(can_view_reports)
 def export_report_xlsx(request):
-    academic_year_level_id = request.GET.get("academic_year_level") or request.GET.get("academic_year")
-    if not academic_year_level_id:
+    if request.method != "POST":
+        # All report workbooks are population-sized; the durable job owns the
+        # only workbook path and the HTML page submits a POST action.
+        return HttpResponse(_("Start the report export from the reports page."), status=400)
+    academic_year_level_id = request.POST.get("academic_year_level") or request.POST.get("academic_year")
+    if not academic_year_level_id or not str(academic_year_level_id).isdigit():
         return HttpResponse(_("Academic year is required."), status=400)
-    scope = get_object_or_404(AcademicYearLevel, pk=academic_year_level_id)
-
-    report_kwargs = {
-        "student_id": request.GET.get("student") or None,
-        "study_mode": request.GET.get("study_mode") or None,
-        "course_offering_id": request.GET.get("course_offering") or None,
-    }
-
-    wb = openpyxl.Workbook(write_only=True)
-
-    ws1 = wb.create_sheet(str(_("Grades Summary")))
-    headers = [_("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Course"), _("Quiz"),
-               _("Grade"), _("Total"), _("Percent")]
-    ws1.append([xlsx_safe_cell(cell) for cell in headers])
-    for row in iter_report_data(scope, **report_kwargs):
-        for detail in row["grade_details"]:
-            pct = round(detail["grade"] / detail["total"] * 100, 1) if detail["total"] else 0
-            ws1.append([xlsx_safe_cell(cell) for cell in [
-                row["student_id"], row["username"], row["first_name"], row["last_name"],
-                detail["course_name"], detail["quiz_name"],
-                detail["grade"], detail["total"], pct,
-            ]])
-
-    ws2 = wb.create_sheet(str(_("Attendance Summary")))
-    ws2.append([xlsx_safe_cell(cell) for cell in [
-        _("Student ID"), _("Username"), _("First Name"), _("Last Name"),
-        _("Expected"), _("Full days"), _("Partial"), _("Absent"), _("Attendance Score"),
-        _("Attendance %"), _("Absence %"),
-    ]])
-    for row in iter_report_data(scope, **report_kwargs):
-        ws2.append([xlsx_safe_cell(cell) for cell in [
-            row["student_id"], row["username"], row["first_name"], row["last_name"],
-            row["expected"], row["valid"], row["invalid"], row["absent"], row["attendance_score"],
-            row["attendance_rate"], row["absence_rate"],
-        ]])
-
-    ws3 = wb.create_sheet(str(_("Attendance Daily")))
-    ws3.append([xlsx_safe_cell(cell) for cell in [
-        _("Student ID"), _("Username"), _("First Name"), _("Last Name"),
-        _("Date"), _("Day"), _("Entrance"), _("Exit"), _("Status"), _("Grade"),
-    ]])
-    expected = get_expected_dates(scope)
-    policy = AttendancePolicy.load()
-    report_rows = iter_report_data(scope, **report_kwargs)
-    while True:
-        batch = list(islice(report_rows, 500))
-        if not batch:
-            break
-        student_ids = [row["student_id"] for row in batch]
-        attendance_queryset = AttendanceRecord.objects.filter(
-            course_offering__academic_year_level=scope, student_id__in=student_ids
+    scope = get_object_or_404(AcademicYearLevel, pk=int(academic_year_level_id))
+    filters = normalize_report_filters(
+        request.POST.get("student"),
+        request.POST.get("study_mode"),
+        request.POST.get("course_offering"),
+    )
+    try:
+        job = enqueue_report_export(
+            actor=request.user,
+            academic_year_level=scope,
+            student=filters["student"],
+            study_mode=filters["study_mode"],
+            course_offering_id=filters["course_offering_id"],
+            language=translation.get_language() or "ar",
         )
-        if report_kwargs["course_offering_id"]:
-            attendance_queryset = attendance_queryset.filter(course_offering_id=report_kwargs["course_offering_id"])
-        pairs = merge_attendance_pairs(pair_attendance_records(
-            attendance_queryset.values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
-        ))
-        for row in batch:
-            days = pairs.get(row["student_id"], {})
-            for day in expected:
-                pair = days.get(day, {})
-                entrance = pair.get("entrance")
-                exit_record = pair.get("exit")
-                attendance = grade_attendance_day(entrance, exit_record, policy)
-                ws3.append([xlsx_safe_cell(cell) for cell in [
-                    row["student_id"], row["username"], row["first_name"], row["last_name"],
-                    day.isoformat(), formats.date_format(day, "l"),
-                    local_scan_time(entrance).strftime("%H:%M:%S") if entrance else "",
-                    local_scan_time(exit_record).strftime("%H:%M:%S") if exit_record else "",
-                    AttendanceDayStatus(attendance.status).label, attendance.grade,
-                ]])
+    except ValidationError as exc:
+        return HttpResponse("; ".join(exc.messages), status=400)
+    try:
+        from .admin_operation_tasks import run_admin_operation
 
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    safe_name = _safe_filename(scope.academic_year.name)
-    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = f'attachment; filename="report_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-    return response
+        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+    except Exception:
+        # The queued row is picked up by the recovery schedule.
+        logger.warning("report export awaits worker recovery", exc_info=True)
+    messages.success(
+        request,
+        _("Report export was queued. The download link appears here when it is ready."),
+    )
+    query = {"academic_year": scope.pk}
+    if filters["student"]:
+        query["student"] = filters["student"]
+    if filters["study_mode"]:
+        query["study_mode"] = filters["study_mode"]
+    if filters["course_offering_id"]:
+        query["course_offering"] = filters["course_offering_id"]
+    return redirect(f"{reverse('report-dashboard')}?{urlencode(query)}")
 
 
 @capability_required(can_view_reports)
@@ -8176,11 +8053,13 @@ def export_application_analytics_csv(request):
     return response
 
 
+@require_http_methods(["GET", "POST"])
 @capability_required(can_view_reports)
 def export_evaluation_xlsx(request):
-    formula_id = request.GET.get("formula")
-    scope_id = request.GET.get("scope")
-    offering_id = request.GET.get("course_offering")
+    source = request.POST if request.method == "POST" else request.GET
+    formula_id = source.get("formula")
+    scope_id = source.get("scope")
+    offering_id = source.get("course_offering")
     if formula_id and str(formula_id).isdigit():
         formula = get_object_or_404(
             PromotionFormula.objects.select_related("academic_year_level__academic_year", "academic_year_level__level"),
@@ -8195,18 +8074,47 @@ def export_evaluation_xlsx(request):
         ).select_related("academic_year_level__academic_year", "academic_year_level__level").first()
         if formula is None:
             return HttpResponse(_("Promotion formula is required."), status=404)
+
+    if formula.course_offering_id is None:
+        # Whole-scope exports are population-sized and always run through the
+        # durable job; a GET must not keep a synchronous full-population path.
+        if request.method != "POST":
+            return HttpResponse(
+                _("Start a whole-scope export from the promotion formula page."),
+                status=400,
+            )
+        try:
+            job = enqueue_evaluation_export(
+                actor=request.user,
+                formula=formula,
+                language=translation.get_language() or "ar",
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            return redirect(f"{reverse('promotion-formula')}?scope={formula.academic_year_level_id}")
+        try:
+            from .admin_operation_tasks import run_admin_operation
+
+            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        except Exception:
+            # The queued row is picked up by the recovery schedule.
+            logger.warning("evaluation export awaits worker recovery", exc_info=True)
+        messages.success(
+            request,
+            _("Evaluation export was queued. The download link appears here when it is ready."),
+        )
+        return redirect(f"{reverse('promotion-formula')}?scope={formula.academic_year_level_id}")
+
     workbook = build_evaluation_workbook(formula)
-    response = HttpResponse(
-        workbook.read(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
     safe_name = _safe_filename(
         f"{formula.academic_year_level.academic_year.name}-{formula.academic_year_level.level.display_name}"
     )
-    response["Content-Disposition"] = (
-        f'attachment; filename="evaluation_{safe_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    return FileResponse(
+        workbook,
+        as_attachment=True,
+        filename=f"evaluation_{safe_name}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        content_type=XLSX_CONTENT_TYPE,
     )
-    return response
 
 def robots_txt(request):
     return HttpResponse(
@@ -8298,7 +8206,7 @@ def student_overview(request, user_id):
     account = payload.get("telegram_account")
     if account is not None and getattr(account, "phone", None) and not show_phone:
         digits = "".join(ch for ch in str(account.phone) if ch.isdigit())
-        payload["telegram_phone_display"] = ("•••" + digits[-4:]) if digits else "•••"
+        payload["telegram_phone_display"] = ("---" + digits[-4:]) if digits else "---"
     else:
         payload["telegram_phone_display"] = getattr(account, "phone", "") if account is not None else ""
     payload["breadcrumb_items"] = generate_breadcrumb([

@@ -1,0 +1,27 @@
+{% load i18n %}
+<div class="ad-card mb-3" x-data="adminOperationStatus({statusUrl: '{{ status_url|escapejs }}', error: '{{ operation_job.error|default:""|escapejs }}', status: '{{ status|default:""|escapejs }}', total: {{ total|default:0 }}, processed: {{ processed|default:0 }}, succeeded: {{ succeeded|default:0 }}, failed: {{ failed|default:0 }}, skipped: {{ skipped|default:0 }}, artifactReady: {% if artifact_ready %}true{% else %}false{% endif %}})">
+    <div class="ad-card-body">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <span class="fw-semibold">{% if operation_job %}{{ operation_job.get_kind_display }}{% else %}{% translate "Operation progress" %}{% endif %}</span>
+            <span class="text-muted small" x-text="statusLabel()"></span>
+        </div>
+        <progress class="app-progress progress-thin w-100 mt-2" :value="percent()" max="100"></progress>
+        <div class="small text-muted mt-1" aria-live="polite">
+            {% translate "Processed" %} <span x-text="processed"></span> /
+            <span x-text="total"></span> -
+            {% translate "Succeeded" %} <span x-text="succeeded"></span> -
+            {% translate "Failed" %} <span x-text="failed"></span> -
+            {% translate "Skipped" %} <span x-text="skipped"></span>
+        </div>
+        <div class="text-danger small mt-1" x-show="error" x-text="error"></div>
+        <div class="text-warning small mt-1" x-show="warning" x-text="warning"></div>
+        <ul class="small text-danger mt-2" x-show="rowErrors.length" aria-live="polite">
+            <template x-for="(rowError, index) in rowErrors" :key="index">
+                <li><span x-text="rowError.row || rowError.line || rowError.result_id || rowError.key || ''"></span>: <span x-text="rowError.message"></span></li>
+            </template>
+        </ul>
+        <div class="mt-2" x-show="artifactReady" x-cloak>
+            <a class="ad-btn ad-btn--teal ad-btn--sm" href="{{ artifact_url|default:"" }}">{% translate "Download result" %}</a>
+        </div>
+    </div>
+</div>

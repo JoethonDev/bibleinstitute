@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
+from datetime import datetime, timedelta
 from logging import Filter, Formatter, getLogger
 from re import fullmatch
 from time import monotonic
@@ -10,16 +11,53 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from django.conf import settings
+from django.conf.urls.i18n import is_language_prefix_patterns_used
 from django.http import JsonResponse, HttpResponse
+from django.middleware.locale import LocaleMiddleware
 from django.urls import resolve, Resolver404
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 from django.utils.cache import patch_vary_headers
 
+from .utils.client_identity import client_ip
 from .utils.localization import normalize_language
 
 logger = getLogger(__name__)
 _request_context: ContextVar[dict] = ContextVar("lms_request_context", default={})
+
+
+class ArabicDefaultLocaleMiddleware(LocaleMiddleware):
+    """Install the site language from an explicit choice, defaulting to Arabic.
+
+    A browser ``Accept-Language`` preference is not an explicit choice for this
+    site, so it must not switch the default. An explicit ``/en/`` URL prefix or
+    the ``set_language`` cookie (remembered per browser/device) still wins.
+    """
+
+    def process_request(self, request):
+        urlconf = getattr(request, "urlconf", settings.ROOT_URLCONF)
+        i18n_patterns_used, _prefixed_default = is_language_prefix_patterns_used(urlconf)
+        language = None
+        if i18n_patterns_used:
+            language = translation.get_language_from_path(request.path_info)
+        if language is None:
+            language = _explicit_cookie_language(request)
+        if language is None:
+            language = settings.LANGUAGE_CODE
+        translation.activate(language)
+        request.LANGUAGE_CODE = translation.get_language()
+
+
+def _explicit_cookie_language(request):
+    """Return the language explicitly stored by the language switcher, if any."""
+
+    value = request.COOKIES.get(settings.LANGUAGE_COOKIE_NAME)
+    if not value:
+        return None
+    try:
+        return translation.get_supported_language_variant(value)
+    except LookupError:
+        return None
 
 
 def _mobile_cors_origin_allowed(origin):
@@ -277,7 +315,8 @@ class MobileApiCorsMiddleware:
             response["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
             response["Access-Control-Allow-Headers"] = (
                 "Accept, Accept-Language, Authorization, Content-Type, "
-                "X-CSRFToken, X-Installation-ID, X-Request-ID"
+                "X-CSRFToken, X-Installation-ID, X-Request-ID, "
+                "X-App-Platform, X-App-Build, X-App-Version"
             )
             response["Access-Control-Expose-Headers"] = "Content-Language, X-Request-ID"
             response["Access-Control-Max-Age"] = "600"
@@ -314,7 +353,7 @@ class RequestObservabilityMiddleware:
             "user_id": getattr(user, "pk", None) if getattr(user, "is_authenticated", False) else "-",
             "username": _clean(getattr(user, "username", None)) if getattr(user, "is_authenticated", False) else "-",
             "role_id": getattr(user, "role_id", None) if getattr(user, "is_authenticated", False) else "-",
-            "remote_ip": _clean(request.META.get("REMOTE_ADDR"), limit=64),
+            "remote_ip": _clean(client_ip(request), limit=64),
             "device": device,
             "browser": browser,
             "os": operating_system,
@@ -356,28 +395,43 @@ class RequestObservabilityMiddleware:
             _request_context.reset(token)
 
 class SessionExpiryUpdate:
+    """Renew a browser session's 7-day lifetime at most once per rolling 24 hours.
+
+    Ordinary read requests inside the renewal window must not mark the session
+    modified, because the configured backend persists every modified session.
+    The last persisted renewal timestamp lives in the session itself, so a new
+    request in the same session reads it without an extra cache round-trip.
+    """
+
+    RENEWAL_INTERVAL = timedelta(hours=24)
+    RENEWED_AT_KEY = "expiry_renewed_at"
+
     def __init__(self, get_response):
         self.get_response = get_response
-        # One-time configuration and initialization.
 
     def __call__(self, request):
-        # Code to be executed for each request before
-        # the view (and later middleware) are called.
-        if request.user.is_authenticated:
-            expiry_time = request.session.get_expiry_age()
-            if expiry_time > 0:
+        if request.user.is_authenticated and request.session.get_expiry_age() > 0:
+            if self._renewal_due(request.session):
                 try:
                     request.session.set_expiry(request.session.get_session_cookie_age())
-                    logger.debug("session expiry refreshed")
-                except Exception as e:
+                    request.session[self.RENEWED_AT_KEY] = timezone.now().isoformat()
+                    logger.debug("session expiry renewed")
+                except Exception as exc:
                     logger.exception(
                         "session expiry refresh failed exception_type=%s",
-                        type(e).__name__,
+                        type(exc).__name__,
                     )
 
-        response = self.get_response(request)
+        return self.get_response(request)
 
-        # Code to be executed for each request/response after
-        # the view is called.
-
-        return response
+    def _renewal_due(self, session) -> bool:
+        stored = session.get(self.RENEWED_AT_KEY)
+        if not isinstance(stored, str):
+            return True
+        try:
+            last_renewed = datetime.fromisoformat(stored)
+        except ValueError:
+            return True
+        if timezone.is_naive(last_renewed):
+            last_renewed = timezone.make_aware(last_renewed)
+        return timezone.now() - last_renewed >= self.RENEWAL_INTERVAL

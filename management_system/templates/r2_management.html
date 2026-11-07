@@ -7,7 +7,6 @@
 <div class="ad-page" id="content" x-data="r2Manager()"
      data-r2-download-url="{% url 'api-download-file' %}"
      data-r2-rename-url="{% url 'api-rename-file' %}"
-     data-r2-rename-status-url-template="{% url 'api-r2-rename-status' '00000000-0000-0000-0000-000000000000' %}"
      data-r2-delete-url="{% url 'api-delete-file' %}"
      data-r2-delete-m3u8-url="{% url 'api-delete-m3u8-file' %}"
      data-r2-delete-folder-url="{% url 'api-delete-folder' %}"
@@ -21,24 +20,25 @@
         <p class="ad-pane-desc">{% translate "Manage your Cloudflare R2 storage files and folders" %}</p>
     </div>
 
-    <div class="alert alert-info mt-3 d-none" role="status" aria-live="polite" data-r2-rename-progress>
+    <div class="alert alert-info mt-3 d-none" role="status" aria-live="polite" data-r2-operation-progress>
         <div class="d-flex justify-content-between align-items-start gap-3">
             <div>
-                <strong data-r2-rename-heading>{% translate "Rename in progress" %}</strong>
-                <span class="d-block" data-r2-rename-phase></span>
-                <small data-r2-rename-count></small>
+                <strong data-r2-operation-heading>{% translate "Storage operation" %}</strong>
+                <span class="d-block" data-r2-operation-phase></span>
+                <small data-r2-operation-count></small>
             </div>
-            <button type="button" class="btn-close" aria-label="{% translate 'Close' %}" data-r2-rename-dismiss hidden></button>
+            <button type="button" class="btn-close" aria-label="{% translate 'Close' %}" data-r2-operation-dismiss hidden></button>
         </div>
-        <div class="progress mt-2" role="progressbar" aria-label="{% translate 'Rename progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-r2-rename-bar-wrap>
-            <div class="progress-bar" style="width: 0%" data-r2-rename-bar></div>
+        <div class="progress mt-2" role="progressbar" aria-label="{% translate 'Storage operation progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-r2-operation-bar-wrap>
+            <div class="progress-bar" style="width: 0%" data-r2-operation-bar></div>
         </div>
-        <small class="d-block mt-2 text-danger" data-r2-rename-error hidden></small>
-        <small class="d-block mt-2" data-r2-rename-warning hidden></small>
+        <small class="d-block mt-2 text-danger" data-r2-operation-error hidden></small>
+        <small class="d-block mt-2" data-r2-operation-warning hidden></small>
     </div>
 
     <!-- Storage Statistics -->
     <div class="ad-stats" id="storage-stats-container">
+        <span id="stat-unavailable" class="badge bg-secondary-subtle text-secondary-emphasis mb-2" style="display:none" role="status" aria-live="polite"></span>
         <div class="ad-stat ad-stat--file">
             <div class="ad-stat-ic"><i class="fas fa-file"></i></div>
             <div>
@@ -89,6 +89,8 @@
         </div>
     </div>
 
+    <p id="stat-refreshed" class="small text-muted" aria-live="polite"></p>
+
     <!-- File Management Toolbar -->
     <div class="ad-card mb-4">
         <div class="ad-drive-toolbar">
@@ -138,7 +140,7 @@
         </div>
     </div>
 
-    <!-- File List (browse partial — breadcrumb, back, grid) -->
+    <!-- File List (browse partial - breadcrumb, back, grid) -->
     <div class="ad-card" id="file-list-container">
         {% include 'partials/r2_browse.html' %}
     </div>

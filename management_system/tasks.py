@@ -192,3 +192,19 @@ def send_application_declined_task(user_id: int) -> None:
         subject=_("Application Status"),
         template_name="emails/application_declined.html",
     )
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    ignore_result=True,
+)
+def send_password_reset_email_task(user_id: int, reset_url: str) -> None:
+    """Deliver the browser password-reset link built by QueuedPasswordResetForm."""
+    _send_or_skip(
+        user_id,
+        subject=_("Reset your Bible Institute password"),
+        template_name="emails/password_reset.html",
+        extra_context={"reset_url": reset_url},
+    )

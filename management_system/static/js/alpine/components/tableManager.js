@@ -48,30 +48,76 @@ function tableManager() {
                         this.pollRecalculation();
                     }
                 } catch (error) { /* Storage is optional; the job runs on the worker. */ }
+                this.discoveryDelay = 5000;
+                this.maxDiscoveryDelay = 60000;
+                this.wakeHandler = () => {
+                    if (document.hidden) return;
+                    this.discoveryDelay = 5000;
+                    if (this.recalculationStatusUrl) this.pollRecalculation();
+                    this.scheduleDiscovery(0);
+                };
+                document.addEventListener('visibilitychange', this.wakeHandler);
+                window.addEventListener('focus', this.wakeHandler);
                 this.discoverJob();
-                this.discoveryTimer = setInterval(() => this.discoverJob(), 5000);
             }
         },
 
         destroy() {
             clearTimeout(this.recalculationTimer);
-            clearInterval(this.discoveryTimer);
+            clearTimeout(this.discoveryTimer);
             if (this.jobStartedHandler) window.removeEventListener("quiz-operation-started", this.jobStartedHandler);
+            if (this.wakeHandler) {
+                document.removeEventListener('visibilitychange', this.wakeHandler);
+                window.removeEventListener('focus', this.wakeHandler);
+            }
+        },
+
+        scheduleDiscovery(delay = this.discoveryDelay) {
+            clearTimeout(this.discoveryTimer);
+            this.discoveryTimer = null;
+            // Active status polling owns the loop; hidden tabs make no requests.
+            if (!this.$root.isConnected || document.hidden || this.recalculationStatusUrl) return;
+            this.discoveryTimer = setTimeout(() => this.discoverJob(), delay);
         },
 
         async discoverJob() {
-            if (!this.$root.isConnected || this.recalculationBusy || this.recalculationStatusUrl) return;
+            if (!this.$root.isConnected || this.recalculationBusy || this.recalculationStatusUrl) {
+                this.scheduleDiscovery();
+                return;
+            }
+            let found = false;
             try {
                 const response = await fetch(this.quizRecalculateUrl, {cache: 'no-store'});
-                if (!response.ok) return;
+                if (!response.ok) {
+                    this.discoveryDelay = Math.min(this.discoveryDelay * 2, this.maxDiscoveryDelay);
+                    this.scheduleDiscovery();
+                    return;
+                }
                 const data = await response.json();
-                if (!data.status_url || !this.$root.isConnected || this.recalculationStatusUrl) return;
+                if (!data.status_url || !this.$root.isConnected || this.recalculationStatusUrl) {
+                    // No active job: back off idle discovery instead of polling every cycle.
+                    this.discoveryDelay = Math.min(this.discoveryDelay * 2, this.maxDiscoveryDelay);
+                    this.scheduleDiscovery();
+                    return;
+                }
                 let completed = '';
                 try { completed = sessionStorage.getItem(this.recalculationKey() + '-completed'); } catch (error) { /* Optional. */ }
-                if (data.status_url === completed) return;
+                if (data.status_url === completed) {
+                    this.discoveryDelay = Math.min(this.discoveryDelay * 2, this.maxDiscoveryDelay);
+                    this.scheduleDiscovery();
+                    return;
+                }
                 this.recalculationStatusUrl = data.status_url;
+                found = true;
+            } catch (error) {
+                this.discoveryDelay = Math.min(this.discoveryDelay * 2, this.maxDiscoveryDelay);
+            }
+            if (found) {
+                this.discoveryDelay = 5000;
                 this.pollRecalculation();
-            } catch (error) { /* Discovery retries while this table is visible. */ }
+            } else {
+                this.scheduleDiscovery();
+            }
         },
 
         recalculationKey() {
@@ -95,7 +141,7 @@ function tableManager() {
         async startRecalculation(payload) {
             if (this.recalculationBusy || this.recalculationStatusUrl) return;
             this.recalculationBusy = true;
-            this.recalculationStatus = gettext('Starting quiz operation…');
+            this.recalculationStatus = gettext('Starting quiz operation...');
             const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value
                 || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
             try {
@@ -113,7 +159,7 @@ function tableManager() {
         },
 
         async pollRecalculation() {
-            if (!this.recalculationStatusUrl || !this.$root.isConnected) return;
+            if (!this.recalculationStatusUrl || !this.$root.isConnected || document.hidden) return;
             this.recalculationBusy = true;
             clearTimeout(this.recalculationTimer);
             try {
@@ -137,6 +183,8 @@ function tableManager() {
                     this.recalculationBusy = false;
                     this.recalculationStatusUrl = '';
                     try { sessionStorage.removeItem(this.recalculationKey()); } catch (error) { /* Optional. */ }
+                    this.discoveryDelay = 5000;
+                    this.scheduleDiscovery(0);
                 } else {
                     this.recalculationTimer = setTimeout(() => this.pollRecalculation(), 2000);
                 }

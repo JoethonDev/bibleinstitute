@@ -13,7 +13,7 @@
   </a>
   {% endif %}
 
-  <!-- ── Detail Head ── -->
+  <!-- -- Detail Head -- -->
   <div class="ad-detail-head mb-4">
     <div class="ad-detail-ic">
       {% if is_quiz %}<i class="fas fa-question-circle"></i>{% else %}<i class="fas fa-video"></i>{% endif %}
@@ -30,7 +30,7 @@
       {% elif content.status == "archived" %}
       <span class="ad-pill--on-dark ad-pill--muted">{{ content.get_status_display }}</span>
       {% else %}
-      <span class="ad-pill--on-dark">{{ content.get_status_display|default:"—" }}</span>
+      <span class="ad-pill--on-dark">{{ content.get_status_display|default:"-" }}</span>
       {% endif %}
       {% if edit_url %}
       <a href="{{ edit_url }}" class="ad-pill--on-dark ad-pill--on-dark-action">
@@ -45,19 +45,19 @@
     </div>
   </div>
 
-  <!-- ── Metadata Grid ── -->
+  <!-- -- Metadata Grid -- -->
   <div class="ad-meta-grid mb-4">
     <div class="ad-meta-item">
       <b>{% translate "Course" %}</b>
-      <span>{{ offering.course.name|default:"—" }}</span>
+      <span>{{ offering.course.name|default:"-" }}</span>
     </div>
     <div class="ad-meta-item">
       <b>{% translate "Level" %}</b>
-      <span>{{ offering.academic_year_level.level.display_name|default:"—" }}</span>
+      <span>{{ offering.academic_year_level.level.display_name|default:"-" }}</span>
     </div>
     <div class="ad-meta-item">
       <b>{% translate "Academic Year" %}</b>
-      <span>{{ offering.academic_year_level.academic_year.name|default:"—" }}</span>
+      <span>{{ offering.academic_year_level.academic_year.name|default:"-" }}</span>
     </div>
 
     {% if is_quiz %}
@@ -71,26 +71,26 @@
     </div>
     <div class="ad-meta-item">
       <b>{% translate "Opens" %}</b>
-      <span>{{ content.opening_date|date:"SHORT_DATETIME_FORMAT"|default:"—" }}</span>
+      <span>{{ content.opening_date|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
     </div>
     <div class="ad-meta-item">
       <b>{% translate "Closes" %}</b>
-      <span>{{ content.closing_date|date:"SHORT_DATETIME_FORMAT"|default:"—" }}</span>
+      <span>{{ content.closing_date|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
     </div>
     {% else %}
     <div class="ad-meta-item">
       <b>{% translate "Created" %}</b>
-      <span>{{ content.created_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</span>
+      <span>{{ content.created_date|date:"SHORT_DATE_FORMAT"|default:"-" }}</span>
     </div>
     <div class="ad-meta-item">
       <b>{% translate "Last Updated" %}</b>
-      <span>{{ content.updated_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</span>
+      <span>{{ content.updated_date|date:"SHORT_DATE_FORMAT"|default:"-" }}</span>
     </div>
     {% endif %}
 
     <div class="ad-meta-item">
       <b>{% translate "Course Offering" %}</b>
-      <span>{{ offering.course.name|default:"—" }} ({{ offering.academic_year_level.level.display_name|default:"—" }})</span>
+      <span>{{ offering.course.name|default:"-" }} ({{ offering.academic_year_level.level.display_name|default:"-" }})</span>
     </div>
     <div class="ad-meta-item">
       <b>{% translate "Offering Status" %}</b>
@@ -102,13 +102,13 @@
         {% elif offering.status == "archived" %}
         <span class="ad-pill ad-pill--muted">{{ offering.get_status_display }}</span>
         {% else %}
-        <span class="ad-pill ad-pill--muted">{{ offering.get_status_display|default:"—" }}</span>
+        <span class="ad-pill ad-pill--muted">{{ offering.get_status_display|default:"-" }}</span>
         {% endif %}
       </span>
     </div>
   </div>
 
-  <!-- ── Content Section ── -->
+  <!-- -- Content Section -- -->
   {% if not is_quiz and content.description %}
   <div class="ad-card mb-4">
     <div class="ad-card-head">
@@ -179,7 +179,7 @@
       </div>
     </div>
     {% endif %}
-    <!-- ════ QUIZ QUESTIONS ════ -->
+    <!-- ==== QUIZ QUESTIONS ==== -->
     <div class="ad-card mb-4">
       <div class="ad-card-head">
         <i class="fas fa-list-ol"></i>
@@ -203,7 +203,7 @@
             {% for q in questions %}
             <tr>
               <td class="text-center ps-muted-text">{{ forloop.counter }}</td>
-              <td class="fw-semibold">{{ q.title|default:"—" }}</td>
+              <td class="fw-semibold">{{ q.title|default:"-" }}</td>
               <td>{{ q.get_question_type_display|default:q.question_type }}</td>
               <td class="text-center">{{ q.grade }}</td>
               <td class="text-center">
@@ -280,7 +280,7 @@
     </div>
 
   {% else %}
-    <!-- ════ LESSON LINKS ════ -->
+    <!-- ==== LESSON LINKS ==== -->
     <div class="ad-card mb-4">
       <div class="ad-card-head">
         <i class="fas fa-link"></i>
@@ -303,9 +303,9 @@
             <tr>
               <td class="text-center ps-muted-text">{{ forloop.counter }}</td>
               <td>{{ link.name|default:link.file_id|default:link.id|default:_("(unnamed)") }}</td>
-              <td><span class="ad-pill ad-pill--muted">{{ link.file_type|default:link.type|default:_("—") }}</span></td>
-              <td class="small ps-muted-text">{{ link.file_id|default:link.id|default:_("—") }}</td>
-              <td class="small ps-muted-text">{{ link.type|default:_("—") }}</td>
+              <td><span class="ad-pill ad-pill--muted">{{ link.file_type|default:link.type|default:_("-") }}</span></td>
+              <td class="small ps-muted-text">{{ link.file_id|default:link.id|default:_("-") }}</td>
+              <td class="small ps-muted-text">{{ link.type|default:_("-") }}</td>
             </tr>
             {% endfor %}
           </tbody>

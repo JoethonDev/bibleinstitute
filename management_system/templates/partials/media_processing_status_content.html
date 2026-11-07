@@ -91,7 +91,7 @@
                 <tr data-media-status-url="{% url 'media-job-status' job.public_id %}" data-media-job-id="{{ job.public_id }}" data-current-media-status="{{ job.status }}" data-current-cleanup-status="{{ job.cleanup_status }}" data-current-publication-pending="{{ job.publication_pending|yesno:'true,false' }}" data-cleanup-not-before="{{ job.cleanup_not_before|date:'c' }}">
                     <td>
                         <strong>{{ job.original_filename }}</strong>
-                        <small class="d-block text-muted">{{ job.source_kind|upper }} · {{ job.source_size|filesizeformat }}</small>
+                        <small class="d-block text-muted">{{ job.source_kind|upper }} - {{ job.source_size|filesizeformat }}</small>
                     </td>
                     <td dir="ltr">{{ job.requested_folder|default:"/" }}</td>
                     <td>
@@ -125,11 +125,11 @@
                             <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" data-media-stop-url="{% url 'media-job-stop' job.public_id %}" data-media-confirm-message="{% translate 'Stop processing this upload and any companion files?' %}">{% translate "Stop" %}</button>
                             {% endif %}
                             {% if job.can_cleanup %}
-                            <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" data-media-cleanup-url="{% url 'media-job-cleanup' job.public_id %}" data-media-confirm-message="{% translate 'Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed.' %}">{% if job.cleanup_status == 'failed' %}{% translate "Retry cleanup" %}{% else %}{% translate "Clean up" %}{% endif %}</button>
+                            <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" data-media-cleanup-url="{% url 'media-job-cleanup' job.public_id %}" data-media-confirm-message="{% translate "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed." %}">{% if job.cleanup_status == 'failed' %}{% translate "Retry cleanup" %}{% else %}{% translate "Clean up" %}{% endif %}</button>
                             {% endif %}
                         </div>
                         <small class="d-block text-muted mt-1">{% translate "Next:" %} <span data-media-next-step>{{ job.next_step_label }}</span></small>
-                        <small class="d-block text-muted mt-1" data-media-completed{% if not job.completed_steps %} hidden{% endif %}>{% if job.completed_steps %}{% translate "Done:" %} {% for step in job.completed_steps %}{% if not forloop.first %} · {% endif %}{{ step }}{% endfor %}{% endif %}</small>
+                        <small class="d-block text-muted mt-1" data-media-completed{% if not job.completed_steps %} hidden{% endif %}>{% if job.completed_steps %}{% translate "Done:" %} {% for step in job.completed_steps %}{% if not forloop.first %} - {% endif %}{{ step }}{% endfor %}{% endif %}</small>
                         <small class="d-block text-danger mt-1" data-media-error{% if not job.error_message %} hidden{% endif %}>{% if job.error_message %}{{ job.error_message }}{% endif %}</small>
                         <small class="d-block text-danger mt-1" data-media-cleanup-error{% if not job.cleanup_error_message %} hidden{% endif %}>{{ job.cleanup_error_message }}</small>
                         <small class="d-block text-success mt-1" data-media-cleanup-lesson{% if not job.lesson_deleted %} hidden{% endif %}>{% translate "Draft lesson removed." %}</small>

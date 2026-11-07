@@ -16,7 +16,36 @@
     {% if attachments %}
     <ul class="tg-chat-attachments list-unstyled mb-0">
         {% for attachment in attachments %}
-        <li><a class="tg-chat-attachment" href="{% url 'telegram-attachment' attachment_id=attachment.pk %}"><i class="fas fa-paperclip" aria-hidden="true"></i><span>{{ attachment.original_name|default:attachment.media_type }}</span></a></li>
+        {% url 'telegram-attachment' attachment_id=attachment.pk as attachment_url %}
+        <li class="tg-chat-attachment-row">
+            {% if attachment.is_available %}
+                {% if attachment.media_type == "voice" or attachment.media_type == "audio" %}
+                <audio class="tg-chat-audio" controls preload="none" src="{{ attachment_url }}">
+                    <a class="tg-chat-attachment" href="{{ attachment_url }}?download=1">{{ attachment.original_name|default:attachment.media_type }}</a>
+                </audio>
+                <a class="tg-chat-attachment" href="{{ attachment_url }}?download=1">
+                    <i class="fas fa-download" aria-hidden="true"></i><span>{% translate "Download" %}</span>
+                </a>
+                {% elif attachment.media_type == "photo" %}
+                <a class="tg-chat-photo" href="{{ attachment_url }}" target="_blank" rel="noopener">
+                    <img src="{{ attachment_url }}" alt="{{ attachment.original_name }}" loading="lazy" decoding="async">
+                </a>
+                {% elif attachment.media_type == "video" %}
+                <video class="tg-chat-video" controls preload="none" src="{{ attachment_url }}"></video>
+                <a class="tg-chat-attachment" href="{{ attachment_url }}?download=1">
+                    <i class="fas fa-download" aria-hidden="true"></i><span>{% translate "Download" %} {{ attachment.original_name }}</span>
+                </a>
+                {% else %}
+                <a class="tg-chat-attachment" href="{{ attachment_url }}">
+                    <i class="fas fa-paperclip" aria-hidden="true"></i><span>{{ attachment.original_name|default:attachment.media_type }}</span>
+                </a>
+                {% endif %}
+            {% else %}
+            <span class="tg-chat-attachment tg-chat-attachment--error">
+                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>{% translate "Attachment unavailable" %}</span>
+            </span>
+            {% endif %}
+        </li>
         {% endfor %}
     </ul>
     {% endif %}

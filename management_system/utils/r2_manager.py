@@ -8,13 +8,14 @@ This module provides comprehensive R2 storage management functions including:
 - Smart HLS deletion
 """
 
-import boto3
-import os
 import posixpath
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+
+import logging
 
 from management_system.utils.r2_filters import file_kind
+
+logger = logging.getLogger(__name__)
 
 
 class R2Manager:
@@ -271,6 +272,43 @@ class R2Manager:
         except Exception:
             return False
 
+    def object_exists(self, key: str) -> bool:
+        """Public existence probe for bounded job verification."""
+        return self._object_exists(key)
+
+    def list_folder_page(
+        self,
+        prefix: str,
+        *,
+        continuation_token: str = "",
+        start_after: str = "",
+        max_keys: int = 1000,
+    ) -> Dict[str, Any]:
+        """Return one bounded provider page under an exact prefix.
+
+        Exactly one of ``continuation_token`` (next page) or ``start_after``
+        (resume point) is used; the caller owns the cursor.
+        """
+
+        kwargs: Dict[str, Any] = {
+            "Bucket": self.bucket_name,
+            "Prefix": prefix,
+            "MaxKeys": max(1, min(int(max_keys or 1000), 1000)),
+        }
+        if continuation_token:
+            kwargs["ContinuationToken"] = continuation_token
+        elif start_after:
+            kwargs["StartAfter"] = start_after
+        return self.client.list_objects_v2(**kwargs)
+
+    def copy_key(self, source_key: str, destination_key: str) -> None:
+        """Copy one verified object key to its destination."""
+        self.client.copy_object(
+            Bucket=self.bucket_name,
+            CopySource={"Bucket": self.bucket_name, "Key": source_key},
+            Key=destination_key,
+        )
+
     @staticmethod
     def _report_rename_progress(callback, phase: str, done: int, total: int) -> None:
         if callback is not None:
@@ -500,182 +538,6 @@ class R2Manager:
             self._report_rename_progress(progress_callback, "warning", 1, 1)
         return True
 
-    def rename_folder(
-        self,
-        old_prefix: str,
-        new_prefix: str,
-        *,
-        progress_callback=None,
-        resume=False,
-        resume_phase="",
-        expected_total=0,
-    ) -> bool:
-        """
-        Rename a folder by copying all contained objects to a new prefix then deleting the originals.
-
-        Args:
-            old_prefix: Current folder path, e.g. "first year/lectures/"
-            new_prefix: New folder path,  e.g. "first year/sessions/"
-
-        Returns:
-            bool: True if successful
-        """
-        # Normalise: ensure both prefixes end with "/"
-        if not old_prefix.endswith('/'):
-            old_prefix += '/'
-        if not new_prefix.endswith('/'):
-            new_prefix += '/'
-
-        if (
-            old_prefix == new_prefix
-            or not self._is_safe_object_key(old_prefix.rstrip('/'))
-            or not self._is_safe_object_key(new_prefix.rstrip('/'))
-            or new_prefix.startswith(old_prefix)
-            or old_prefix.startswith(new_prefix)
-        ):
-            return False
-
-        try:
-            self._report_rename_progress(progress_callback, "scanning", 0, 0)
-            if not resume and self.client.list_objects_v2(
-                Bucket=self.bucket_name, Prefix=new_prefix, MaxKeys=1
-            ).get('Contents'):
-                return False
-            paginator = self.client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=old_prefix)
-
-            objects_to_move = []
-            for page in pages:
-                for obj in page.get('Contents', []):
-                    objects_to_move.append(obj['Key'])
-
-            destination_keys = set()
-            if resume:
-                destination_pages = paginator.paginate(Bucket=self.bucket_name, Prefix=new_prefix)
-                for page in destination_pages:
-                    destination_keys.update(obj['Key'] for obj in page.get('Contents', []))
-                expected_total = max(0, int(expected_total or 0))
-                expected_keys = {
-                    new_prefix + old_key[len(old_prefix):]
-                    for old_key in objects_to_move
-                }
-                if resume_phase == "copying":
-                    if len(objects_to_move) != expected_total or not destination_keys.issubset(expected_keys):
-                        return False
-                elif resume_phase in {"deleting", "updating_references"}:
-                    if len(destination_keys) != expected_total:
-                        return False
-                    if any(
-                        new_prefix + old_key[len(old_prefix):] not in destination_keys
-                        for old_key in objects_to_move
-                    ):
-                        return False
-                else:
-                    return False
-
-            if not objects_to_move:
-                # Folder may only be a virtual prefix with no objects — succeed silently
-                if resume and expected_total and len(destination_keys) != expected_total:
-                    return False
-                if resume and expected_total:
-                    self._report_rename_progress(
-                        progress_callback, "deleting", expected_total, expected_total
-                    )
-                else:
-                    self._report_rename_progress(progress_callback, "complete", 0, 0)
-                return True
-
-            # Copy each object to new location
-            total = expected_total if resume and expected_total else len(objects_to_move)
-            copied_keys = []
-            if resume_phase == "copying" or not resume:
-                self._report_rename_progress(progress_callback, "copying", 0, total)
-            for index, old_key in enumerate(objects_to_move, start=1):
-                relative = old_key[len(old_prefix):]
-                new_key = new_prefix + relative
-                if new_key not in destination_keys:
-                    self.client.copy_object(
-                        Bucket=self.bucket_name,
-                        CopySource={'Bucket': self.bucket_name, 'Key': old_key},
-                        Key=new_key
-                    )
-                    copied_keys.append(new_key)
-                    destination_keys.add(new_key)
-                if resume_phase == "copying" or not resume:
-                    self._report_rename_progress(progress_callback, "copying", index, total)
-
-            # Batch-delete originals only after every destination copy exists.
-            delete_base = max(0, total - len(objects_to_move)) if resume and resume_phase == "deleting" else 0
-            self._report_rename_progress(progress_callback, "deleting", delete_base, total)
-            try:
-                for i in range(0, len(objects_to_move), 1000):
-                    old_batch = objects_to_move[i:i + 1000]
-                    response = self.client.delete_objects(
-                        Bucket=self.bucket_name,
-                        Delete={'Objects': [{'Key': key} for key in old_batch]},
-                    )
-                    errors = response.get('Errors', [])
-                    self._report_rename_progress(
-                        progress_callback,
-                        "deleting",
-                        min(delete_base + i + len(old_batch) - len(errors), total),
-                        total,
-                    )
-                    if errors:
-                        raise RuntimeError("R2 could not remove every source file.")
-            except Exception as delete_error:
-                restored = True
-                restore_keys = {
-                    old_prefix + key[len(new_prefix):]
-                    for key in destination_keys
-                }
-                for old_key in restore_keys:
-                    relative = old_key[len(old_prefix):]
-                    try:
-                        self.client.copy_object(
-                            Bucket=self.bucket_name,
-                            CopySource={'Bucket': self.bucket_name, 'Key': new_prefix + relative},
-                            Key=old_key,
-                        )
-                    except Exception:
-                        restored = False
-                if restored:
-                    rollback_keys = sorted(destination_keys)
-                    for start in range(0, len(rollback_keys), 1000):
-                        try:
-                            self.client.delete_objects(
-                                Bucket=self.bucket_name,
-                                Delete={'Objects': [{'Key': key} for key in rollback_keys[start:start + 1000]]},
-                            )
-                        except Exception:
-                            pass
-                    print(f"Folder rename rolled back after source deletion failed: {delete_error}")
-                    return False
-                print(f"New folder is ready, but some old files remain: {delete_error}")
-                self._report_rename_progress(progress_callback, "warning", total, total)
-                return True
-
-            self._report_rename_progress(progress_callback, "deleting", total, total)
-            return True
-
-        except Exception as e:
-            print(f"Error renaming folder from {old_prefix} to {new_prefix}: {e}")
-            rollback_keys = (
-                sorted(destination_keys)
-                if resume and resume_phase == "copying" and 'destination_keys' in locals()
-                else copied_keys if 'copied_keys' in locals() else []
-            )
-            if rollback_keys:
-                for start in range(0, len(rollback_keys), 1000):
-                    try:
-                        self.client.delete_objects(
-                            Bucket=self.bucket_name,
-                            Delete={'Objects': [{'Key': key} for key in rollback_keys[start:start + 1000]]},
-                        )
-                    except Exception:
-                        pass
-            return False
-
     def move_file(self, file_key: str, destination_folder: str) -> Optional[str]:
         """
         Move a file to a different folder
@@ -744,41 +606,24 @@ class R2Manager:
             print(f"Error creating folder {folder_path}: {e}")
             return False
     
-    def delete_folder(self, folder_path: str, recursive: bool = False) -> Tuple[int, int]:
+    def delete_folder_nonrecursive(self, folder_path: str) -> Tuple[int, int]:
+        """Delete a folder only when it is empty or holds a single marker.
+
+        One provider page of two keys is enough to prove non-empty, so this
+        stops as soon as the second object is seen and never materializes the
+        folder contents. Recursive deletion runs through the durable job.
         """
-        Delete a folder
-        
-        Args:
-            folder_path: Path of the folder to delete
-            recursive: If True, delete all contents; if False, only delete if empty
-        
-        Returns:
-            Tuple of (files_deleted, errors)
-        """
+
         if not folder_path.endswith('/'):
             folder_path += '/'
-        
-        # List all objects in the folder
-        objects_to_delete = []
-        
         try:
-            paginator = self.client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=folder_path)
-            
-            for page in pages:
-                if 'Contents' in page:
-                    objects_to_delete.extend([obj['Key'] for obj in page['Contents']])
-            
-            if not recursive and len(objects_to_delete) > 1:
-                # Folder is not empty and recursive is False
+            page = self.list_folder_page(folder_path, max_keys=2)
+            contents = page.get('Contents', [])
+            if len(contents) > 1:
                 return 0, 1
-            
-            if objects_to_delete:
-                successful, failed = self.delete_files_batch(objects_to_delete)
-                return len(successful), len(failed)
-            
-            return 0, 0
-        
+            if not contents:
+                return 0, 0
+            return (1, 0) if self.delete_file(contents[0]['Key']) else (0, 1)
         except Exception as e:
             print(f"Error deleting folder {folder_path}: {e}")
             return 0, 1
@@ -809,60 +654,102 @@ class R2Manager:
             return None
     
     def get_storage_stats(self, prefix: str = "") -> Dict[str, Any]:
+        """Return bounded storage statistics for the requested scope.
+
+        A prefix request is honoured with a bounded paginated scan and labelled
+        approximate when the cap is reached. Whole-bucket requests may use the
+        provider's native usage totals; when the provider is missing/failing or
+        returns no usage, the result is explicitly marked unavailable instead of
+        reporting exact-looking zeros.
         """
-        Get storage statistics for a folder or entire bucket.
-        
-        Uses the Cloudflare native usage API when a ``cloudflare_client`` is
-        configured – instant, no pagination.  Falls back to boto3 pagination
-        (up to 20 pages) when Cloudflare is not available.
-        
-        Args:
-            prefix: Folder prefix to analyze (empty for entire bucket)
-        
-        Returns:
-            Dictionary with storage statistics
-        """
+
+        prefix = prefix or ""
+        max_objects = 20_000
+        truncated = False
+        scanned = 0
         stats = {
-            'total_files': 0,
-            'total_size': 0,
-            'by_extension': {},
-            'by_kind': {},
-            'largest_files': [],
-            'approximate': False,
+            "total_files": 0,
+            "total_size": 0,
+            "by_extension": {},
+            "by_kind": {},
+            "largest_files": [],
+            "approximate": False,
+            "available": True,
+            "scope": "prefix" if prefix else "bucket",
+            "prefix": prefix,
+            "source": "scan",
+            "unavailable_reason": "",
         }
-        
-        # Fast path: Cloudflare native usage API for exact totals
-        usage = self.cloudflare.get_bucket_usage(self.bucket_name)
-        if usage:
-            stats['total_files'] = int(usage.get('objectCount', 0))
-            stats['total_size'] = int(usage.get('payloadSize', 0))
-            # Still sample one page via boto3 for extension/kind breakdown
+
+        def record(key, size, last_modified, *, count_totals):
+            nonlocal scanned
+            scanned += 1
+            if count_totals:
+                stats["total_files"] += 1
+                stats["total_size"] += int(size or 0)
+            name = key.rsplit("/", 1)[-1]
+            extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            if extension:
+                entry = stats["by_extension"].setdefault(extension, {"count": 0, "size": 0})
+                entry["count"] += 1
+                entry["size"] += int(size or 0)
+            kind = file_kind(name)
+            entry = stats["by_kind"].setdefault(kind, {"count": 0, "size": 0})
+            entry["count"] += 1
+            entry["size"] += int(size or 0)
+            if size:
+                largest = stats["largest_files"]
+                largest.append({"key": key, "size": int(size), "last_modified": last_modified})
+                largest.sort(key=lambda item: item["size"], reverse=True)
+                del largest[10:]
+
+        if not prefix and self.cloudflare is not None:
             try:
-                sample = self.client.list_objects_v2(
-                    Bucket=self.bucket_name, MaxKeys=1000
-                )
-                if 'Contents' in sample:
-                    for obj in sample['Contents']:
-                        key = obj['Key']
-                        if key.endswith('/'):
-                            continue
-                        if '.' in key:
-                            ext = key.split('.')[-1].lower()
-                            if ext not in stats['by_extension']:
-                                stats['by_extension'][ext] = {'count': 0, 'size': 0}
-                            stats['by_extension'][ext]['count'] += 1
-                            stats['by_extension'][ext]['size'] += obj.get('Size', 0)
-                        kind = file_kind(key)
-                        if kind not in stats['by_kind']:
-                            stats['by_kind'][kind] = {'count': 0, 'size': 0}
-                        stats['by_kind'][kind]['count'] += 1
-                        stats['by_kind'][kind]['size'] += obj.get('Size', 0)
+                usage = self.cloudflare.get_bucket_usage(self.bucket_name)
             except Exception:
-                pass
-        
-        
+                logger.warning("bucket usage provider failed", exc_info=True)
+                usage = None
+                stats["unavailable_reason"] = "provider_error"
+            if usage:
+                stats["total_files"] = int(usage.get("objectCount", 0))
+                stats["total_size"] = int(usage.get("payloadSize", 0))
+                stats["source"] = "provider"
+                try:
+                    sample = self.client.list_objects_v2(Bucket=self.bucket_name, MaxKeys=1000)
+                    for obj in sample.get("Contents", []):
+                        if obj["Key"].endswith("/"):
+                            continue
+                        record(obj["Key"], obj.get("Size", 0), obj.get("LastModified"), count_totals=False)
+                except Exception:
+                    logger.warning("bucket usage sample failed", exc_info=True)
+                    stats["unavailable_reason"] = stats["unavailable_reason"] or "sample_error"
+                # Provider totals are exact for the bucket; the breakdown is a sample.
+                stats["approximate"] = True
+                return stats
+        elif self.cloudflare is None and not prefix:
+            stats["unavailable_reason"] = "provider_not_configured"
+
+        try:
+            paginator = self.client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(
+                Bucket=self.bucket_name,
+                Prefix=prefix,
+                PaginationConfig={"PageSize": 1000, "MaxItems": max_objects},
+            ):
+                for obj in page.get("Contents", []):
+                    if obj["Key"].endswith("/"):
+                        continue
+                    record(obj["Key"], obj.get("Size", 0), obj.get("LastModified"), count_totals=True)
+                truncated = bool(page.get("IsTruncated"))
+        except Exception:
+            logger.warning("bucket statistics scan failed", exc_info=True)
+            stats["available"] = False
+            stats["unavailable_reason"] = "scan_error"
+            return stats
+
+        stats["approximate"] = truncated or scanned >= max_objects
         return stats
-    
+
     def format_file_size(self, bytes_size: int) -> str:
         """
         Format file size to human-readable format

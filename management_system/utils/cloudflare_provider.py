@@ -20,7 +20,7 @@ class CloudflareR2Client:
     def get_bucket_usage(self, bucket_name: str) -> Optional[Dict[str, Any]]:
         """Fetch instant bucket usage stats (object count + total size).
 
-        GET …/r2/buckets/{bucket_name}/usage
+        GET .../r2/buckets/{bucket_name}/usage
 
         Returns dict with keys: payloadSize, metadataSize, objectCount
         or None on failure.

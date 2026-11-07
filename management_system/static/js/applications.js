@@ -128,7 +128,7 @@
                     if (notificationFailed) {
                         parts.push(summary.dataset.notificationFailedLabel + ': ' + notificationFailed);
                     }
-                    summary.textContent = parts.join(' · ');
+                    summary.textContent = parts.join(' - ');
                     summary.classList.remove('d-none', 'ad-alert--danger', 'ad-alert--info', 'ad-alert--warning', 'ad-alert--success');
                     summary.classList.add(
                         stale || failed || notificationFailed ? 'ad-alert--warning' : 'ad-alert--success'

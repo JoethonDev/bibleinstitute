@@ -111,7 +111,12 @@ function autoSave(formKey) {
         },
         
         loadDraft() {
-            const draft = localStorage.getItem(this.draftKey);
+            let draft = null;
+            try {
+                draft = localStorage.getItem(this.draftKey);
+            } catch (error) {
+                return;
+            }
             if (draft) {
                 try {
                     this.formData = JSON.parse(draft);
@@ -128,14 +133,9 @@ function autoSave(formKey) {
                         throw new Error('Invalid form draft');
                     }
                     
-                    // Auto-restore draft if content exists and show notification
+                    // restoreDraft() owns the single user notification.
                     if (Object.keys(this.formData).length > 0) {
                         this.restoreDraft();
-                        
-                        // Show notification with option to clear
-                        if (window.Alpine && Alpine.store('notifications')) {
-                            Alpine.store('notifications').info(gettext('Draft restored from previous session'));
-                        }
                     }
                 } catch (e) {
                     console.error('Failed to load draft:', e);
@@ -178,7 +178,7 @@ function autoSave(formKey) {
                 if (typeof this.afterDraftRestore === 'function') this.afterDraftRestore();
                 
                 if (window.Alpine && Alpine.store('notifications')) {
-                    Alpine.store('notifications').add(gettext('Draft restored'), 'info');
+                    Alpine.store('notifications').add(gettext('Draft restored from previous session'), 'info');
                 }
             }
         },
@@ -257,7 +257,7 @@ function formValidation() {
                 return;
             }
 
-            // Native form submit — includes the csrfmiddlewaretoken hidden input.
+            // Native form submit - includes the csrfmiddlewaretoken hidden input.
             form.submit();
         }
     };

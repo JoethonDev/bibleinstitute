@@ -78,9 +78,9 @@
               <span class="cell-content">{{ row.user.get_full_name|default:row.user.username }}</span>
               <span class="ps-muted-text d-block">{{ row.user.username }}</span>
             </td>
-            <td>{{ row.role_name|default:"—" }}</td>
-            <td>{{ row.level_name|default:"—" }}</td>
-            <td dir="ltr">{{ row.user.phone|default:"—" }}</td>
+            <td>{{ row.role_name|default:"-" }}</td>
+            <td>{{ row.level_name|default:"-" }}</td>
+            <td dir="ltr">{{ row.user.phone|default:"-" }}</td>
             <td>
               {% if row.is_linked %}
               <span class="ad-pill ad-pill--success"><i class="fas fa-link" aria-hidden="true"></i> {% translate "Linked" %}</span>
@@ -91,14 +91,14 @@
             <td dir="ltr">
               {% if row.is_linked %}
                 {% if row.telegram_phone %}{{ row.telegram_phone }}{% else %}<span class="ps-muted-text">{% translate "Not shared" %}</span>{% endif %}
-              {% else %}—{% endif %}
+              {% else %}-{% endif %}
             </td>
             <td>
               {% if row.match_label %}
               <span class="ad-pill ad-pill--{{ row.match_tone }}">{{ row.match_label }}</span>
-              {% else %}—{% endif %}
+              {% else %}-{% endif %}
             </td>
-            <td>{% if row.account %}{{ row.account.linked_at|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+            <td>{% if row.account %}{{ row.account.linked_at|date:"Y-m-d" }}{% else %}-{% endif %}</td>
             <td class="column-actions">
               {% if row.is_linked %}
               <form method="post"
@@ -120,7 +120,7 @@
                   <i class="fas fa-unlink me-1" aria-hidden="true"></i>{% translate "Unlink Telegram" %}
                 </button>
               </form>
-              {% else %}<span class="ps-muted-text">—</span>{% endif %}
+              {% else %}<span class="ps-muted-text">-</span>{% endif %}
             </td>
           </tr>
           {% empty %}

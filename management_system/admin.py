@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .mobile_auth import revoke_user_mobile_access
 from .forms import CanonicalUserAdminForm
@@ -9,29 +9,11 @@ from .models import *
 
 
 def _is_admin_user(request):
-    return getattr(getattr(request.user, "role", None), "role", None) == "admin"
-
-
-class UserAdmin(admin.ModelAdmin):
-    """Revoke mobile access when direct admin edits invalidate an account."""
-
-    form = CanonicalUserAdminForm
-
-    def save_model(self, request, obj, form, change):
-        original = None
-        if change and obj.pk:
-            original = User.objects.only(
-                "role_id", "application_status", "is_active"
-            ).get(pk=obj.pk)
-        if not form or "study_mode" not in form.changed_data:
-            apply_study_mode_from_city(obj)
-        super().save_model(request, obj, form, change)
-        if original is not None and (
-            original.role_id != obj.role_id
-            or original.application_status != obj.application_status
-            or original.is_active != obj.is_active
-        ):
-            revoke_user_mobile_access(obj)
+    user = request.user
+    return bool(
+        getattr(user, "is_superuser", False)
+        or getattr(getattr(user, "role", None), "role", None) == "admin"
+    )
 
 
 class AdminOnlyModelAdmin(admin.ModelAdmin):
@@ -49,6 +31,43 @@ class AdminOnlyModelAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _is_admin_user(request)
+
+
+class UserAdmin(AdminOnlyModelAdmin):
+    """Revoke mobile access when direct admin edits invalidate an account."""
+
+    form = CanonicalUserAdminForm
+
+    def has_module_permission(self, request):
+        return _is_admin_user(request) and admin.ModelAdmin.has_module_permission(self, request)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_admin_user(request) and admin.ModelAdmin.has_view_permission(self, request, obj)
+
+    def has_add_permission(self, request):
+        return _is_admin_user(request) and admin.ModelAdmin.has_add_permission(self, request)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_admin_user(request) and admin.ModelAdmin.has_change_permission(self, request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_admin_user(request) and admin.ModelAdmin.has_delete_permission(self, request, obj)
+
+    def save_model(self, request, obj, form, change):
+        original = None
+        if change and obj.pk:
+            original = User.objects.only(
+                "role_id", "application_status", "is_active"
+            ).get(pk=obj.pk)
+        if not form or "study_mode" not in form.changed_data:
+            apply_study_mode_from_city(obj)
+        super().save_model(request, obj, form, change)
+        if original is not None and (
+            original.role_id != obj.role_id
+            or original.application_status != obj.application_status
+            or original.is_active != obj.is_active
+        ):
+            revoke_user_mobile_access(obj)
 
 
 class AcademicContentReadOnlyAdmin(AdminOnlyModelAdmin):
@@ -121,7 +140,7 @@ class AcademicYearAdmin(AdminOnlyModelAdmin):
         return super().get_queryset(request).prefetch_related("levels")
 
     def levels_display(self, obj):
-        return " / ".join(lvl.display_name for lvl in obj.levels.order_by("ordering"))
+        return obj.level_display()
     levels_display.short_description = _("Levels")
 
 
@@ -251,6 +270,16 @@ class PromotionFormulaAdmin(admin.ModelAdmin):
     raw_id_fields = ["created_by", "updated_by"]
     ordering = ["-created_at"]
     list_per_page = 50
+    # Nullable displayed relations are not auto-joined by Django; include every
+    # displayed relation because an explicit list replaces the automatic join.
+    list_select_related = [
+        "academic_year_level__academic_year",
+        "academic_year_level__level",
+        "course_offering__course",
+        "course_offering__academic_year_level__academic_year",
+        "course_offering__academic_year_level__level",
+        "created_by",
+    ]
 
     def has_module_permission(self, request):
         return getattr(getattr(request.user, "role", None), "role", None) == "admin"
@@ -275,6 +304,7 @@ class PromotionRuleAdmin(admin.ModelAdmin):
     ordering = ["formula", "ordering"]
     list_per_page = 50
     raw_id_fields = ["formula"]
+    list_select_related = ["formula", "quiz_type"]
 
     def has_module_permission(self, request):
         return getattr(getattr(request.user, "role", None), "role", None) == "admin"
@@ -300,6 +330,18 @@ class EvaluationResultAdmin(admin.ModelAdmin):
     ordering = ["-saved_at"]
     list_per_page = 50
     raw_id_fields = ["enrollment", "course_offering", "overridden_by"]
+    list_select_related = [
+        "enrollment__student",
+        "enrollment__academic_year_level__academic_year",
+        "enrollment__academic_year_level__level",
+        "enrollment__course_offering__course",
+        "enrollment__course_offering__academic_year_level__academic_year",
+        "enrollment__course_offering__academic_year_level__level",
+        "course_offering__course",
+        "course_offering__academic_year_level__academic_year",
+        "course_offering__academic_year_level__level",
+        "formula",
+    ]
     readonly_fields = [
         "formula", "enrollment", "course_offering", "computed_score", "computed_status",
         "final_status", "metric_snapshot", "override_note", "overridden_by",
@@ -333,6 +375,14 @@ class PromotionHistoryAdmin(admin.ModelAdmin):
     ordering = ["-created_at"]
     list_per_page = 50
     raw_id_fields = ["student", "actor", "override_actor", "source_enrollment", "destination_enrollment"]
+    list_select_related = [
+        "student",
+        "source_year_level__academic_year",
+        "source_year_level__level",
+        "destination_year_level__academic_year",
+        "destination_year_level__level",
+        "actor",
+    ]
     readonly_fields = [
         "evaluation_result", "source_enrollment", "destination_enrollment",
         "student", "source_year_level", "destination_year_level",
@@ -365,6 +415,12 @@ class HistoricalAcademicSummaryAdmin(admin.ModelAdmin):
     ordering = ["-created_at"]
     list_per_page = 50
     raw_id_fields = ["student", "reviewed_by"]
+    list_select_related = [
+        "student",
+        "academic_year_level__academic_year",
+        "academic_year_level__level",
+        "reviewed_by",
+    ]
     readonly_fields = ["source_key", "created_at", "updated_at", "promoted_at"]
 
     def has_module_permission(self, request):

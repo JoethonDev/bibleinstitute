@@ -6,7 +6,7 @@ import uuid
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F
@@ -19,6 +19,7 @@ from django.views.decorators.http import require_GET, require_POST
 from . import graduation_gallery as gg
 from .gallery_tasks import enqueue_gallery_job
 from .models import AcademicYearLevel, GraduationGalleryItem, GraduationGalleryJob
+from .storage_coordination import assert_storage_namespace_available, guarded_storage_write, lock_storage_namespace
 from .utils.decorators import capability_required, can_manage_content
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
 from .utils.storage_operations import get_r2_client
@@ -150,22 +151,32 @@ def gallery_upload_authorize(request):
     staging_key = gg.build_staging_key(job_uuid, filename)
     mime = content_type or ("application/zip" if kind == "zip" else "application/octet-stream")
     try:
-        upload_url = client.generate_presigned_url(
-            "put_object",
-            Params={"Bucket": bucket, "Key": staging_key, "ContentType": mime},
-            ExpiresIn=3600,
-        )
-    except Exception:
-        return JsonResponse({"error": {"code": "storage_unavailable", "message": str(_("Could not authorize the upload."))}}, status=503)
-    job = GraduationGalleryJob.objects.create(
-        academic_year_level=scope,
-        staging_key=staging_key,
-        original_filename=filename[:255],
-        content_type=mime,
-        is_zip=(kind == "zip"),
-        created_by=request.user,
-    )
-    transaction.on_commit(lambda: enqueue_gallery_job(str(job.public_id)))
+        with transaction.atomic():
+            lock_storage_namespace(gg.GALLERY_PUBLIC_PREFIX, gg.GALLERY_STAGING_PREFIX)
+            assert_storage_namespace_available(
+                gg.GALLERY_PUBLIC_PREFIX,
+                gg.GALLERY_STAGING_PREFIX,
+                ignore_gallery_jobs=True,
+            )
+            try:
+                upload_url = client.generate_presigned_url(
+                    "put_object",
+                    Params={"Bucket": bucket, "Key": staging_key, "ContentType": mime},
+                    ExpiresIn=3600,
+                )
+            except Exception:
+                return JsonResponse({"error": {"code": "storage_unavailable", "message": str(_("Could not authorize the upload."))}}, status=503)
+            job = GraduationGalleryJob.objects.create(
+                academic_year_level=scope,
+                staging_key=staging_key,
+                original_filename=filename[:255],
+                content_type=mime,
+                is_zip=(kind == "zip"),
+                created_by=request.user,
+            )
+            transaction.on_commit(lambda: enqueue_gallery_job(str(job.public_id)))
+    except ValidationError as exc:
+        return JsonResponse({"error": {"code": "storage_busy", "message": str(exc)}}, status=409)
     return JsonResponse({
         "upload_url": upload_url,
         "method": "PUT",
@@ -195,23 +206,28 @@ def gallery_item_delete(request, item_id: int):
     item = get_object_or_404(GraduationGalleryItem, pk=item_id)
     scope_id = item.academic_year_level_id
     bucket = getattr(settings, "R2_BUCKET_NAME", "") or ""
-    with transaction.atomic():
-        locked = (
-            GraduationGalleryItem.objects.select_for_update().filter(pk=item.pk).first()
-        )
-        if locked is None:
-            messages.error(request, _("Photo not found."))
-            return redirect("graduation-gallery-manage")
-        display_key, original_key = locked.display_key, locked.original_key
-        locked.delete()
-    gg.invalidate_gallery_urls(display_key, original_key)
-    client = get_r2_client()
-    if client is not None and bucket:
-        for key in {display_key, original_key}:
-            try:
-                client.delete_object(Bucket=bucket, Key=key)
-            except Exception:
-                continue
+    try:
+        with guarded_storage_write(gg.GALLERY_PUBLIC_PREFIX):
+            with transaction.atomic():
+                locked = (
+                    GraduationGalleryItem.objects.select_for_update().filter(pk=item.pk).first()
+                )
+                if locked is None:
+                    messages.error(request, _("Photo not found."))
+                    return redirect("graduation-gallery-manage")
+                display_key, original_key = locked.display_key, locked.original_key
+                locked.delete()
+            gg.invalidate_gallery_urls(display_key, original_key)
+            client = get_r2_client()
+            if client is not None and bucket:
+                for key in {display_key, original_key}:
+                    try:
+                        client.delete_object(Bucket=bucket, Key=key)
+                    except Exception:
+                        continue
+    except ValidationError as exc:
+        messages.error(request, str(exc))
+        return redirect("graduation-gallery-manage")
     messages.success(request, _("Photo deleted."))
     url = reverse("graduation-gallery-manage")
     return redirect(f"{url}?scope={scope_id}")

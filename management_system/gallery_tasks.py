@@ -235,11 +235,22 @@ def _process_single(client, bucket: str, job, filename: str, raw: bytes) -> dict
         return {"total": 1, "processed": 0, "failed": 1, "error": str(exc)}
 
 
+def _read_entry_bounded(archive: zipfile.ZipFile, info, limit: int) -> bytes:
+    """Decompress at most ``limit`` + 1 bytes, ignoring a forged header size."""
+
+    with archive.open(info, "r") as handle:
+        data = handle.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError("entry exceeds its expanded-byte budget")
+    return data
+
+
 def _process_zip(client, bucket: str, job, tmp_path: str) -> dict:
     items: list[GraduationGalleryItem] = []
     failed = 0
     total = 0
     error = ""
+    expanded_bytes = 0
     try:
         archive = zipfile.ZipFile(tmp_path)
     except zipfile.BadZipFile:
@@ -247,21 +258,29 @@ def _process_zip(client, bucket: str, job, tmp_path: str) -> dict:
     with archive:
         for info, base in _iter_zip_entries(archive):
             total += 1
-            if info.file_size > gg.MAX_SINGLE_VIDEO_BYTES:
-                failed += 1
-                continue
-            try:
-                raw = archive.read(info.filename)
-            except Exception:
-                failed += 1
-                continue
             kind = gg.classify_upload(base, "")
-            if kind == "image" and len(raw) > gg.MAX_SINGLE_IMAGE_BYTES:
-                failed += 1
-                continue
             if kind not in ("image", "video"):
                 failed += 1
                 continue
+            limit = gg.MAX_SINGLE_IMAGE_BYTES if kind == "image" else gg.MAX_SINGLE_VIDEO_BYTES
+            if info.file_size > limit:
+                failed += 1
+                continue
+            # Enforce the aggregate decompressed budget before reading anything.
+            if expanded_bytes + max(0, info.file_size) > gg.MAX_ZIP_EXPANDED_BYTES:
+                failed += 1
+                error = str(_("The archive exceeds the expanded-size budget; remaining files were skipped."))
+                break
+            try:
+                raw = _read_entry_bounded(archive, info, limit)
+            except (ValueError, OSError, RuntimeError, zipfile.BadZipFile):
+                failed += 1
+                continue
+            if expanded_bytes + len(raw) > gg.MAX_ZIP_EXPANDED_BYTES:
+                failed += 1
+                error = str(_("The archive exceeds the expanded-size budget; remaining files were skipped."))
+                break
+            expanded_bytes += len(raw)
             try:
                 if kind == "image":
                     items.append(_upload_image(client, bucket, job, base, raw))
@@ -276,6 +295,6 @@ def _process_zip(client, bucket: str, job, tmp_path: str) -> dict:
     if items:
         GraduationGalleryItem.objects.bulk_create(items, batch_size=_CHUNK, ignore_conflicts=True)
     processed = total - failed
-    if processed and failed:
+    if processed and failed and not error:
         error = str(_("Some files were skipped because they are not supported images or videos."))
     return {"total": total, "processed": processed, "failed": failed, "error": error}

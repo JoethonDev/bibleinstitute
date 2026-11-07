@@ -211,7 +211,7 @@
                                 <option value="">{% translate "Select quiz type" %}</option>
                                 {% for quiz_type in quiz_types %}
                                     <option value="{{ quiz_type.pk }}" {% if quiz_type.pk == selected_quiz_type_id %}selected{% endif %}>
-                                        {{ quiz_type.name_en }}{% if quiz_type.name_ar %} — {{ quiz_type.name_ar }}{% endif %}
+                                        {{ quiz_type.name_en }}{% if quiz_type.name_ar %} - {{ quiz_type.name_ar }}{% endif %}
                                     </option>
                                 {% endfor %}
                             </select>

@@ -34,27 +34,27 @@
         <div class="quiz-import-summary">
             <div class="mb-1">
                 <span class="text-muted">{% translate "Quiz name" %}:</span>
-                <strong>{{ import_summary.name|default:"—" }}</strong>
+                <strong>{{ import_summary.name|default:"-" }}</strong>
             </div>
             <div class="mb-1">
                 <span class="text-muted">{% translate "Course offering" %}:</span>
-                {{ import_summary.offering_label|default:"—" }}
+                {{ import_summary.offering_label|default:"-" }}
             </div>
             <div class="mb-1">
                 <span class="text-muted">{% translate "Quiz Type" %}:</span>
-                {{ import_summary.quiz_type_label|default:"—" }}
+                {{ import_summary.quiz_type_label|default:"-" }}
             </div>
             <div class="mb-1">
                 <span class="text-muted">{% translate "Status" %}:</span>
-                {{ import_summary.status_label|default:"—" }}
+                {{ import_summary.status_label|default:"-" }}
             </div>
             <div class="mb-1">
                 <span class="text-muted">{% translate "Opening Date" %}:</span>
-                {{ import_summary.opening_display|default:"—" }}
+                {{ import_summary.opening_display|default:"-" }}
             </div>
             <div class="mb-1">
                 <span class="text-muted">{% translate "Closing Date" %}:</span>
-                {{ import_summary.closing_display|default:"—" }}
+                {{ import_summary.closing_display|default:"-" }}
             </div>
             <div class="mb-1">
                 <span class="text-muted">{% translate "Total Grade" %}:</span>

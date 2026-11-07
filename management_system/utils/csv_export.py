@@ -3,7 +3,9 @@ import io
 import json
 import re
 from collections import defaultdict
-from django.http import HttpResponse
+from tempfile import SpooledTemporaryFile
+
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.translation import gettext as _
 from django.utils import timezone
 from ..models import User, Quiz, Submission, Question, Grade
@@ -12,14 +14,11 @@ from .timezones import format_application_datetime
 
 def export_users_to_csv():
     """
-    Export all users to CSV format.
-    Returns HttpResponse with CSV data.
+    Stream every user as CSV.
+
+    The row iterator keeps one page of users in memory, and the single
+    select_related removes the per-row role lookup the old loop performed.
     """
-    # Create CSV buffer
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Write header row
     headers = [
         f"  {_('Username')}  ",
         f"  {_('First Name')}  ",
@@ -30,27 +29,34 @@ def export_users_to_csv():
         f"  {_('Last Login')}  ",
         f"  {_('Is Active')}  "
     ]
-    writer.writerow(headers)
-    
-    # Write user data
-    users = User.objects.all().order_by('joined_date')
-    for user in users:
-        writer.writerow([
-            f"  {_csv_safe_cell(user.username)}  ",
-            f"  {_csv_safe_cell(user.first_name)}  ",
-            f"  {_csv_safe_cell(user.last_name)}  ",
-            f"  {_csv_safe_cell(user.email)}  ",
-            f"  {_csv_safe_cell(user.role.get_role_display() if user.role else '')}  ",
-            f"  {_csv_safe_cell(user.joined_date.strftime('%Y-%m-%d %H:%M:%S') if user.joined_date else '')}  ",
-            f"  {_csv_safe_cell(user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '')}  ",
-            f"  {_csv_safe_cell(_('Yes') if user.is_active else _('No'))}  "
-        ])
-    
-    # Create HTTP response
-    output.seek(0)
-    response = HttpResponse(output.read(), content_type='text/csv')
+
+    def csv_rows():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        yield output.getvalue()
+        users = (
+            User.objects.select_related("role")
+            .order_by("joined_date", "pk")
+            .iterator(chunk_size=500)
+        )
+        for user in users:
+            output.seek(0)
+            output.truncate(0)
+            writer.writerow([
+                f"  {_csv_safe_cell(user.username)}  ",
+                f"  {_csv_safe_cell(user.first_name)}  ",
+                f"  {_csv_safe_cell(user.last_name)}  ",
+                f"  {_csv_safe_cell(user.email)}  ",
+                f"  {_csv_safe_cell(user.role.get_role_display() if user.role else '')}  ",
+                f"  {_csv_safe_cell(user.joined_date.strftime('%Y-%m-%d %H:%M:%S') if user.joined_date else '')}  ",
+                f"  {_csv_safe_cell(user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '')}  ",
+                f"  {_csv_safe_cell(_('Yes') if user.is_active else _('No'))}  "
+            ])
+            yield output.getvalue()
+
+    response = StreamingHttpResponse(csv_rows(), content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="users_export_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-    
     return response
 
 
@@ -105,168 +111,229 @@ def _build_submission_map(submissions):
     return grouped
 
 
-def export_quiz_with_submissions_to_csv(quiz_id):
-    """
-    Export quiz questions with choices and correct answers, plus all submissions.
-    Returns HttpResponse with CSV data.
-    """
-    try:
-        quiz = Quiz.objects.select_related('course_offering__course').get(id=quiz_id)
-    except Quiz.DoesNotExist:
-        # Return empty response if quiz doesn't exist
-        response = HttpResponse('', content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="quiz_not_found.csv"'
-        return response
-    
-    # Create CSV buffer
+def _grade_batches(quiz, batch_size: int = 500):
+    """Yield bounded grade batches in username order without materializing all."""
+
+    grades = Grade.objects.select_related("user").filter(quiz=quiz).order_by(
+        "user__username", "pk"
+    ).iterator(chunk_size=batch_size)
+    batch = []
+    for grade in grades:
+        batch.append(grade)
+        if len(batch) >= batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def _write_csv_row(spool, row) -> None:
     output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Write quiz header information
-    writer.writerow([_('Quiz Export')])
-    writer.writerow([_('Quiz Name'), quiz.name])
-    writer.writerow([_('Course'), quiz.course_offering.course.name if quiz.course_offering_id else ''])
-    writer.writerow([_('Opening Date'), format_application_datetime(quiz.opening_date, '%Y-%m-%d %H:%M:%S') if quiz.opening_date else ''])
-    writer.writerow([_('Closing Date'), format_application_datetime(quiz.closing_date, '%Y-%m-%d %H:%M:%S') if quiz.closing_date else ''])
-    writer.writerow([])  # Empty row separator
-    
-    # Write quiz questions section
-    writer.writerow([_('QUIZ QUESTIONS AND ANSWERS')])
-    questions = list(Question.objects.filter(quiz=quiz).order_by('id'))
-    
-    question_headers = [
+    csv.writer(output).writerow(row)
+    spool.write(output.getvalue().encode("utf-8"))
+
+
+def _new_csv_spool():
+    return SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b")
+
+
+def _quiz_export_filename(quiz, prefix: str) -> str:
+    safe_quiz_name = _safe_filename(quiz.name)
+    return f"{prefix}_{safe_quiz_name}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+
+def build_quiz_detail_csv(quiz, progress=None):
+    """Write the detailed quiz/submission CSV to a bounded spooled file."""
+    questions = list(Question.objects.filter(quiz=quiz).order_by("id"))
+    total = Grade.objects.filter(quiz=quiz).count() if progress is not None else 0
+    processed = 0
+    spool = _new_csv_spool()
+
+    _write_csv_row(spool, [_("Quiz Export")])
+    _write_csv_row(spool, [_("Quiz Name"), quiz.name])
+    _write_csv_row(spool, [_("Course"), quiz.course_offering.course.name if quiz.course_offering_id else ""])
+    _write_csv_row(spool, [_("Opening Date"), format_application_datetime(quiz.opening_date, "%Y-%m-%d %H:%M:%S") if quiz.opening_date else ""])
+    _write_csv_row(spool, [_("Closing Date"), format_application_datetime(quiz.closing_date, "%Y-%m-%d %H:%M:%S") if quiz.closing_date else ""])
+    _write_csv_row(spool, [])
+    _write_csv_row(spool, [_("QUIZ QUESTIONS AND ANSWERS")])
+    _write_csv_row(spool, [
         f"  {_('Question Number')}  ",
         f"  {_('Question Text')}  ",
         f"  {_('Question Type')}  ",
         f"  {_('Grade')}  ",
         f"  {_('Choices (for MCQ)')}  ",
-        f"  {_('Correct Answer')}  "
-    ]
-    writer.writerow(question_headers)
-    
+        f"  {_('Correct Answer')}  ",
+    ])
     for idx, question in enumerate(questions, 1):
-        writer.writerow([
+        _write_csv_row(spool, [
             f"  {idx}  ",
             f"  {_csv_safe_cell(question.title)}  ",
             f"  {_csv_safe_cell(question.get_question_type_display())}  ",
             f"  {_csv_safe_cell(question.grade)}  ",
             f"  {_csv_safe_cell(_question_choices_text(question))}  ",
-            f"  {_csv_safe_cell(_question_answer_text(question))}  "
+            f"  {_csv_safe_cell(_question_answer_text(question))}  ",
         ])
-    
-    writer.writerow([])  # Empty row separator
-    writer.writerow([])  # Empty row separator
-    
-    # Write submissions section
-    writer.writerow([_('STUDENT SUBMISSIONS')])
-    grades = Grade.objects.select_related('user').filter(quiz=quiz).order_by('user__username')
-    submissions = Submission.objects.filter(question__quiz=quiz).select_related('question', 'user')
-    submissions_by_user = _build_submission_map(submissions)
-    
-    if grades.exists():
-        # Create dynamic headers for submissions
-        submission_headers = [
-            f"  {_('Student Username')}  ",
-            f"  {_('Student Name')}  ",
-            f"  {_('Submission Date')}  ",
-            f"  {_('Total Grade')}  ",
-            f"  {_('Maximum Grade')}  "
-        ]
-        
-        # Add question columns
-        for idx, question in enumerate(questions, 1):
-            submission_headers.append(f"  {_('Q')}{idx}: {question.title[:30]}...  ")
-            submission_headers.append(f"  {_('Q')}{idx} {_('Grade')}  ")
-        
-        writer.writerow(submission_headers)
-        
-        # Write submission data
-        for grade in grades:
+    _write_csv_row(spool, [])
+    _write_csv_row(spool, [])
+    _write_csv_row(spool, [_("STUDENT SUBMISSIONS")])
+
+    submission_headers = [
+        f"  {_('Student Username')}  ",
+        f"  {_('Student Name')}  ",
+        f"  {_('Submission Date')}  ",
+        f"  {_('Total Grade')}  ",
+        f"  {_('Maximum Grade')}  ",
+    ]
+    for idx, question in enumerate(questions, 1):
+        submission_headers.append(f"  {_('Q')}{idx}: {question.title[:30]}...  ")
+        submission_headers.append(f"  {_('Q')}{idx} {_('Grade')}  ")
+    _write_csv_row(spool, submission_headers)
+
+    wrote_row = False
+    for grade_batch in _grade_batches(quiz):
+        submissions = Submission.objects.filter(
+            question__quiz=quiz,
+            user_id__in=[grade.user_id for grade in grade_batch],
+        ).only("user_id", "question_id", "submitted_answer", "grade")
+        submissions_by_user = _build_submission_map(submissions)
+        for grade in grade_batch:
+            wrote_row = True
             row_data = [
                 f"  {_csv_safe_cell(grade.user.username)}  ",
                 f"  {_csv_safe_cell(grade.user.get_full_name())}  ",
                 f"  {_csv_safe_cell(grade.submitted_at.strftime('%Y-%m-%d %H:%M:%S'))}  ",
                 f"  {_csv_safe_cell(grade.total_grade)}  ",
-                f"  {_csv_safe_cell(quiz.total_grade)}  "
+                f"  {_csv_safe_cell(quiz.total_grade)}  ",
             ]
-            
             user_submissions = submissions_by_user.get(grade.user_id, {})
-
             for question in questions:
-                answer_text = ''
-                question_grade = 0
-                
                 user_submission = user_submissions.get(question.id)
-                if user_submission:
-                    answer_text = user_submission.submitted_answer
-                    question_grade = user_submission.grade
-                
+                answer_text = user_submission.submitted_answer if user_submission else ""
+                question_grade = user_submission.grade if user_submission else 0
                 row_data.append(f"  {_csv_safe_cell(answer_text)}  ")
                 row_data.append(f"  {_csv_safe_cell(question_grade)}  ")
-            
-            writer.writerow(row_data)
-    else:
-        writer.writerow([_('No submissions found for this quiz')])
-    
-    # Create HTTP response
-    output.seek(0)
-    response = HttpResponse(output.read(), content_type='text/csv')
-    
-    # Create safe filename
-    safe_quiz_name = "".join(c for c in quiz.name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    filename = f"quiz_{safe_quiz_name}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    return response
+            _write_csv_row(spool, row_data)
+        processed += len(grade_batch)
+        if progress is not None:
+            progress(processed=processed, total=total)
+    if not wrote_row:
+        _write_csv_row(spool, [_("No submissions found for this quiz")])
+    spool.seek(0)
+    return spool
 
 
-def export_quiz_summary_to_csv(quiz_id):
-    """
-    Export a concise quiz report with user identity and grade columns.
-    """
-    try:
-        quiz = Quiz.objects.select_related('course_offering__course').get(id=quiz_id)
-    except Quiz.DoesNotExist:
-        response = HttpResponse('', content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="quiz_not_found.csv"'
-        return response
+def build_quiz_summary_csv(quiz, progress=None):
+    """Write the summary quiz CSV to a bounded spooled file."""
+    total = Grade.objects.filter(quiz=quiz).count() if progress is not None else 0
+    processed = 0
+    spool = _new_csv_spool()
+    _write_csv_row(spool, [_("Quiz Summary Export")])
+    _write_csv_row(spool, [_("Quiz Name"), quiz.name])
+    _write_csv_row(spool, [_("Course"), quiz.course_offering.course.name if quiz.course_offering_id else ""])
+    _write_csv_row(spool, [])
+    _write_csv_row(spool, [
+        _("User ID"),
+        _("Username"),
+        _("First Name"),
+        _("Last Name"),
+        _("Grade"),
+        _("Total Grade"),
+        _("Submitted At"),
+    ])
+    for grade_batch in _grade_batches(quiz):
+        for grade in grade_batch:
+            _write_csv_row(spool, [
+                _csv_safe_cell(grade.user_id),
+                _csv_safe_cell(grade.user.username),
+                _csv_safe_cell(grade.user.first_name),
+                _csv_safe_cell(grade.user.last_name),
+                _csv_safe_cell(grade.total_grade),
+                _csv_safe_cell(quiz.total_grade),
+                _csv_safe_cell(grade.submitted_at.strftime("%Y-%m-%d %H:%M:%S")),
+            ])
+        processed += len(grade_batch)
+        if progress is not None:
+            progress(processed=processed, total=total)
+    spool.seek(0)
+    return spool
 
-    output = io.StringIO()
-    writer = csv.writer(output)
 
-    writer.writerow([_('Quiz Summary Export')])
-    writer.writerow([_('Quiz Name'), quiz.name])
-    writer.writerow([_('Course'), quiz.course_offering.course.name if quiz.course_offering_id else ''])
-    writer.writerow([])
+def enqueue_quiz_export(*, actor, quiz, kind, language="ar"):
+    """Create or reuse one durable whole-population quiz export job."""
+    from ..admin_operations import create_admin_operation
+    from ..models import AdminOperationJob
 
-    headers = [
-        _('User ID'),
-        _('Username'),
-        _('First Name'),
-        _('Last Name'),
-        _('Grade'),
-        _('Total Grade'),
-        _('Submitted At'),
-    ]
-    writer.writerow(headers)
+    if kind not in {
+        AdminOperationJob.Kind.QUIZ_DETAIL_EXPORT,
+        AdminOperationJob.Kind.QUIZ_SUMMARY_EXPORT,
+    }:
+        raise ValueError("Unsupported quiz export kind.")
+    prefix = "quiz" if kind == AdminOperationJob.Kind.QUIZ_DETAIL_EXPORT else "quiz_summary"
+    total = Grade.objects.filter(quiz=quiz).count()
+    return create_admin_operation(
+        actor=actor,
+        kind=kind,
+        input={"quiz_id": quiz.pk},
+        conflict_key=f"{prefix}-export:{quiz.pk}",
+        offering=quiz.course_offering,
+        language=language,
+        total=total,
+    )
 
-    grades = Grade.objects.select_related('user').filter(quiz=quiz).order_by('user__username')
-    for grade in grades:
-        writer.writerow([
-            _csv_safe_cell(grade.user_id),
-            _csv_safe_cell(grade.user.username),
-            _csv_safe_cell(grade.user.first_name),
-            _csv_safe_cell(grade.user.last_name),
-            _csv_safe_cell(grade.total_grade),
-            _csv_safe_cell(quiz.total_grade),
-            _csv_safe_cell(grade.submitted_at.strftime('%Y-%m-%d %H:%M:%S')),
-        ])
 
-    output.seek(0)
-    response = HttpResponse(output.read(), content_type='text/csv')
-    safe_quiz_name = _safe_filename(quiz.name)
-    response['Content-Disposition'] = f'attachment; filename="quiz_summary_{safe_quiz_name}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-    return response
+def execute_quiz_export(job, token) -> dict:
+    """J01 executor: build one private CSV artifact and publish it on completion."""
+    from django.utils import translation
+
+    from ..models import AdminOperationJob
+    from ..admin_operations import (
+        AdminOperationError,
+        assert_admin_operation_progress,
+        finalize_admin_operation_export,
+    )
+    from ..utils.decorators import can_grade
+
+    from ..admin_operations import require_admin_operation_actor
+
+    require_admin_operation_actor(job)
+    if not can_grade(job.actor):
+        raise AdminOperationError(
+            "not_permitted",
+            _("You are no longer allowed to export quiz submissions."),
+        )
+    quiz_id = int((job.input or {}).get("quiz_id") or 0)
+    quiz = Quiz.objects.select_related("course_offering__course").filter(pk=quiz_id).first()
+    if quiz is None:
+        raise AdminOperationError("quiz_missing", _("The quiz no longer exists."))
+
+    def progress(*, processed, total):
+        assert_admin_operation_progress(
+            job.pk,
+            token,
+            processed=processed,
+            succeeded=processed,
+            failed=0,
+            skipped=0,
+            total=total,
+        )
+
+    with translation.override(job.language or "ar"):
+        if job.kind == AdminOperationJob.Kind.QUIZ_SUMMARY_EXPORT:
+            file_obj = build_quiz_summary_csv(quiz, progress=progress)
+            filename = _quiz_export_filename(quiz, "quiz_summary")
+        else:
+            file_obj = build_quiz_detail_csv(quiz, progress=progress)
+            filename = _quiz_export_filename(quiz, "quiz")
+        finalize_admin_operation_export(
+            job, token, file_obj, filename, content_type="text/csv"
+        )
+    return {
+        "status": AdminOperationJob.Status.COMPLETED,
+        "result": {
+            "filename": filename,
+            "content_type": "text/csv",
+        },
+    }
 
 
 def export_single_submission_to_csv(grade_id):

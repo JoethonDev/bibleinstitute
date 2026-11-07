@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block head_meta %}
+<title>{% translate 'Password updated' %} | {% translate "Bible Institute Coptic" %}</title>
+{% endblock %}
+
+{% block body %}
+<section class="login-page sd-page">
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-11 col-sm-8 col-md-6 col-lg-5 col-xl-4">
+            <div class="sd-frame login-card">
+                <div class="sd-screen p-4 p-sm-5">
+                    <div class="text-center mb-4">
+                        <a href="{% url 'home' %}"><img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Logo' %}" class="login-logo"></a>
+                        <h5 class="sd-serious mt-3">{% translate 'Password updated' %}</h5>
+                    </div>
+                    <p class="ps-muted-text text-center">{% translate "Your password has been changed. Sign in with your new password to continue." %}</p>
+                    <div class="d-grid mt-4">
+                        <a href="{% url 'user_login' %}" class="sd-btn sd-btn--teal btn-lg w-100">{% translate "Login" %}</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+{% endblock %}

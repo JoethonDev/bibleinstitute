@@ -13,20 +13,30 @@
             </h2>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <a href="{% url 'export-quiz-summary-csv' quiz_id=quiz_id %}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
-                <i class="fas fa-table me-1"></i>
-                {% translate "Quiz Summary" %}
-            </a>
-            <a href="{% url 'export-quiz-submissions-csv' quiz_id=quiz_id %}" class="ad-btn ad-btn--teal ad-btn--sm">
-                <i class="fas fa-file-csv me-1"></i>
-                {% translate "Export Quiz & Submissions" %}
-            </a>
+            <form method="post" action="{% url 'export-quiz-summary-csv' quiz_id=quiz_id %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                    <i class="fas fa-table me-1"></i>
+                    {% translate "Quiz Summary" %}
+                </button>
+            </form>
+            <form method="post" action="{% url 'export-quiz-submissions-csv' quiz_id=quiz_id %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                    <i class="fas fa-file-csv me-1"></i>
+                    {% translate "Export Quiz & Submissions" %}
+                </button>
+            </form>
             <a href="{% url 'grades-matrix-dashboard' %}" class="ad-btn ad-btn--ghost ad-btn--sm">
                 <i class="fas fa-graduation-cap me-1"></i>
                 {% translate "Grades matrix" %}
             </a>
         </div>
     </div>
+
+    {% if quiz_export_job %}
+        {% include "partials/admin_operation_status.html" with operation_job=quiz_export_job status_url=quiz_export_status_url status=quiz_export_job.status total=quiz_export_job.total processed=quiz_export_job.processed succeeded=quiz_export_job.succeeded failed=quiz_export_job.failed skipped=quiz_export_job.skipped artifact_ready=quiz_export_job.artifact_key artifact_url=quiz_export_download_url %}
+    {% endif %}
 
     <!-- Main Card -->
     <div class="ad-card">

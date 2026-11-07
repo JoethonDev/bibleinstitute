@@ -1,4 +1,4 @@
-"""Read-only content QA checks — bounded SQL + bounded Python JSON parsing.
+"""Read-only content QA checks - bounded SQL + bounded Python JSON parsing.
 
 No writes, no R2 calls, no migration. Each check returns counts + up to 25
 sample rows with links into the existing dashboards. Live segment existence
@@ -10,7 +10,7 @@ import json
 
 from django.db.models import Count
 
-from .models import Lesson, PublicationStatus, Question, Quiz
+from .models import Lesson, PublicationStatus, Quiz
 
 SAMPLE = 25
 
@@ -24,7 +24,7 @@ def _parse_links(raw) -> list:
 
 
 def qa_counts() -> dict:
-    """Aggregate counts for the QA header — 5 small COUNT queries."""
+    """Aggregate counts for the QA header - 5 small COUNT queries."""
     empty_lessons = Lesson.objects.filter(links__in=["", "[]", None]).count()
     published = Lesson.objects.filter(status=PublicationStatus.PUBLISHED)
     published_total = published.count()

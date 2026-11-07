@@ -83,7 +83,7 @@
                     <form method="post" action="{% url 'level-edit' lvl.level %}" hx-post="{% url 'level-edit' lvl.level %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                         {% csrf_token %}
                         <div class="modal-header">
-                            <h6 class="modal-title" id="editLevelModalLabel{{ lvl.level }}">{% translate "Edit Level Name" %} — {{ lvl.name }}</h6>
+                            <h6 class="modal-title" id="editLevelModalLabel{{ lvl.level }}">{% translate "Edit Level Name" %} - {{ lvl.name }}</h6>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                         </div>
                         <div class="modal-body">

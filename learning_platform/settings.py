@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from urllib.parse import urlsplit
+import ipaddress as _ipaddress
 import os
 from celery.schedules import crontab
 from dotenv import load_dotenv
@@ -113,6 +114,19 @@ CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 CORS_ALLOWED_ORIGINS = _env_csv('DJANGO_CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_ALL_ORIGINS = DEBUG and _env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS')
 
+# Ingress identity: only these explicit peer networks may supply X-Client-IP.
+# Nginx is the internal hop and rewrites the header from the validated
+# Cloudflare/direct client address. Empty means no peer is trusted, so the
+# request keeps its socket address (safe default for direct development).
+TRUSTED_PROXY_IPS = tuple(_env_csv('DJANGO_TRUSTED_PROXY_IPS'))
+for _trusted_network in TRUSTED_PROXY_IPS:
+    try:
+        _ipaddress.ip_network(_trusted_network, strict=False)
+    except ValueError as _exc:
+        raise ImproperlyConfigured(
+            f'DJANGO_TRUSTED_PROXY_IPS contains an invalid network: {_trusted_network!r}'
+        ) from _exc
+
 TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'Africa/Cairo')
 DJANGO_SITE_DOMAIN = os.getenv('DJANGO_SITE_DOMAIN', '').rstrip('/')
 
@@ -140,7 +154,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware', # Add this for localization
+    'management_system.middleware.ArabicDefaultLocaleMiddleware', # Arabic unless explicit choice
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -195,7 +209,7 @@ DATABASES = {
     },
 }
 
-# Celery (Redis broker / result backend — defaults to the redis service on lms_network)
+# Celery (Redis broker / result backend - defaults to the redis service on lms_network)
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or os.getenv(
     "REDIS_URL", "redis://redis:6379/0"
 )
@@ -224,17 +238,35 @@ CELERY_IMPORTS = (
     "management_system.mobile_otp_tasks",
     "management_system.announcement_tasks",
     "management_system.gallery_tasks",
+    "management_system.admin_operation_tasks",
 )
 CELERY_TASK_ROUTES = {
     # The dedicated single-concurrency media worker must only run tasks that
     # need FFmpeg or its private work directory. Every such task sets
     # queue="media" explicitly when it is enqueued, except the beat-scheduled
-    # recover_pending_media_jobs, which is routed here. Everything else in
-    # media_tasks (notably rename_r2_operation, which is pure R2/DB work) runs
-    # on the general worker and therefore never queues behind a media job.
+    # recover_pending_media_jobs, which is routed here. Pure R2/DB storage jobs
+    # run through the admin operation ledger instead of the media worker.
     "management_system.media_tasks.recover_pending_media_jobs": {"queue": "media"},
+    # Heavy management operations run on the dedicated, single-concurrency
+    # admin pool so exports/calculations never delay web, OTP or media work.
+    "management_system.admin_operation_tasks.run_admin_operation": {"queue": "admin"},
+    # Recovery is a lightweight coordinator and must remain runnable when the
+    # dedicated admin worker is busy with a population-sized operation.
+    "management_system.admin_operation_tasks.recover_admin_operations": {"queue": "default"},
 }
 CELERY_BEAT_SCHEDULE = {
+    "refresh-notification-redeliveries": {
+        "task": "management_system.admin_operation_tasks.refresh_notification_redeliveries",
+        "schedule": 5.0,
+    },
+    "recover-admin-operations": {
+        "task": "management_system.admin_operation_tasks.recover_admin_operations",
+        "schedule": 60.0,
+    },
+    "cleanup-admin-operation-artifacts": {
+        "task": "management_system.admin_operation_tasks.cleanup_admin_operation_artifacts",
+        "schedule": 900.0,
+    },
     "recover-quiz-operations": {"task": "management_system.tasks.recover_quiz_operations", "schedule": 60.0},
     "reconcile-closed-quiz-snapshots": {"task": "management_system.tasks.reconcile_closed_quiz_snapshots", "schedule": 60.0},
     "recover-pending-media-jobs": {
@@ -341,6 +373,10 @@ MEDIA_MAX_SEGMENT_BYTES = int(os.getenv("MEDIA_MAX_SEGMENT_BYTES", str(512 * 100
 # Keep Django's request ceiling aligned with the Nginx 2 GiB upload ceiling.
 # Uploaded files above FILE_UPLOAD_MAX_MEMORY_SIZE are spooled to disk by
 # Django's temporary-file upload handler rather than held in process memory.
+# Bounded for the canonical 200-question editor payload (~8 fields/question
+# plus quiz fields); just beyond the supported contract Django returns 400.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
+
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(
     os.getenv("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", str(2 * 1024 ** 3))
 )
@@ -370,10 +406,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = 'en'
+LANGUAGE_CODE = 'ar'
 LANGUAGES = [
-    ('en', 'English'),
     ('ar', 'Arabic'),
+    ('en', 'English'),
 ]
 
 
@@ -438,7 +474,7 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 # Seconds Minutes Hours Days
 # Make tempalte always use absolute urls
 FORCE_SCRIPT_NAME = '/'
 
-# Email — set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD for Gmail SMTP
+# Email - set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD for Gmail SMTP
 EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('DJANGO_EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('DJANGO_EMAIL_PORT', '587'))

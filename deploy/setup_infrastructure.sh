@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_infrastructure.sh — Phase 1: create external Docker resources, start
+# setup_infrastructure.sh - Phase 1: create external Docker resources, start
 # PostgreSQL + Redis.  If TLS certs exist, also start Nginx.  Never
 # destructive (no volume removal, no database delete, no app deploy).
 # Prerequisites: .env, Docker Compose v2, compose YAMLs in repo root.
@@ -14,7 +14,7 @@ COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.compose.env}"
 HEALTH_ATTEMPTS=90
 HEALTH_INTERVAL=2
 
-# Tiny .env key reader — never sources the file.
+# Tiny .env key reader - never sources the file.
 env_val() {
     local key="$1" default="$2" val
     [[ -f ".env" ]] || { printf '%s' "$default"; return; }
@@ -90,33 +90,39 @@ if [[ $# -gt 0 ]]; then
         -h|--help)
             echo "Usage: bash deploy/setup_infrastructure.sh"
             echo "Starts PostgreSQL and Redis; starts Nginx only after TLS files exist."
-            echo "Dozzle monitoring is separate — run 'bash deploy/setup_monitoring.sh' after this."
+            echo "Dozzle monitoring is separate - run 'bash deploy/setup_monitoring.sh' after this."
             exit 0
             ;;
         *) die "Unknown option: $1" ;;
     esac
 fi
 
-# ── Preflight ─────────────────────────────────────────────────────────────
+# -- Preflight -------------------------------------------------------------
 [[ -f "$INFRA_COMPOSE" ]] || die "Run from repo root (missing $INFRA_COMPOSE)"
-[[ -f ".env"          ]] || die "Missing .env — run 'bash deploy/setup_env.sh' first"
-[[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE — run 'bash deploy/setup_env.sh' to generate the safe Compose interpolation file"
+[[ -f ".env"          ]] || die "Missing .env - run 'bash deploy/setup_env.sh' first"
+[[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE - run 'bash deploy/setup_env.sh' to generate the safe Compose interpolation file"
 
 command -v docker >/dev/null 2>&1 || die "Docker is not installed"
 docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required"
 
-info "Validating Compose config…"
+info "Validating Compose config..."
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" config >/dev/null \
     || die "Compose config is invalid for $INFRA_COMPOSE"
 
-# ── External resources (create only when absent — never remove) ─────────
-info "Ensuring external Docker resources…"
+# -- External resources (create only when absent - never remove) ---------
+info "Ensuring external Docker resources..."
+LMS_NETWORK_SUBNET="${LMS_NETWORK_SUBNET:-172.31.240.0/24}"
 if docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
     info "Network '$NETWORK_NAME' already exists."
+    existing_subnets="$(docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' "$NETWORK_NAME")"
+    if ! printf '%s' "$existing_subnets" | grep -qw "$LMS_NETWORK_SUBNET"; then
+        warn "Network '$NETWORK_NAME' subnets ($existing_subnets) do not include $LMS_NETWORK_SUBNET."
+        warn "Set DJANGO_TRUSTED_PROXY_IPS to the actual Nginx network before relying on client identity."
+    fi
 else
-    docker network create "$NETWORK_NAME" >/dev/null \
+    docker network create --subnet "$LMS_NETWORK_SUBNET" "$NETWORK_NAME" >/dev/null \
         || die "Failed to create network '$NETWORK_NAME'"
-    info "Created network '$NETWORK_NAME'."
+    info "Created network '$NETWORK_NAME' ($LMS_NETWORK_SUBNET)."
 fi
 
 if docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
@@ -127,12 +133,12 @@ else
     info "Created volume '$VOLUME_NAME'."
 fi
 
-# ── Start PostgreSQL + Redis ────────────────────────────────────────────
-info "Starting PostgreSQL and Redis…"
+# -- Start PostgreSQL + Redis --------------------------------------------
+info "Starting PostgreSQL and Redis..."
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" up -d postgres redis \
     || die "Failed to start PostgreSQL or Redis"
 
-info "Waiting for health (up to $((HEALTH_ATTEMPTS * HEALTH_INTERVAL))s)…"
+info "Waiting for health (up to $((HEALTH_ATTEMPTS * HEALTH_INTERVAL))s)..."
 for svc in postgres redis; do
     ok=false
     for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
@@ -151,17 +157,17 @@ for svc in postgres redis; do
     if ! $ok; then
         docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" ps "$svc" || true
         docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" logs --tail=100 "$svc" || true
-        die "$svc not healthy within $((HEALTH_ATTEMPTS * HEALTH_INTERVAL))s — see the logs above"
+        die "$svc not healthy within $((HEALTH_ATTEMPTS * HEALTH_INTERVAL))s - see the logs above"
     fi
 done
 info "PostgreSQL and Redis are healthy."
 
-# ── Optional Nginx (only with TLS) ───────────────────────────────────────
+# -- Optional Nginx (only with TLS) ---------------------------------------
 CERT_FILE="$TLS_DIR/fullchain.pem"
 KEY_FILE="$TLS_DIR/privkey.pem"
 
 if [[ -r "$CERT_FILE" && -r "$KEY_FILE" ]]; then
-    info "TLS certificates found. Preparing Nginx runtime state…"
+    info "TLS certificates found. Preparing Nginx runtime state..."
     mkdir -p -m 700 "$RUNTIME_DIR"
     write_monitoring_server_config
     info "Generated Nginx monitoring host for https://${MONITORING_DOMAIN}/."
@@ -171,26 +177,26 @@ if [[ -r "$CERT_FILE" && -r "$KEY_FILE" ]]; then
         echo -n "blue" > "$RUNTIME_DIR/active-slot"
         info "Initialised active-slot to 'blue'."
     else
-        info "active-slot already exists — not overwriting."
+        info "active-slot already exists - not overwriting."
     fi
     if [[ ! -f "$RUNTIME_DIR/nginx-active-upstream.conf" ]]; then
         echo 'set $lms_app_upstream http://lms-app-blue:8000;' > "$RUNTIME_DIR/nginx-active-upstream.conf"
         info "Created upstream file for lms-app-blue."
     else
-        info "Upstream file already exists — not overwriting."
+        info "Upstream file already exists - not overwriting."
     fi
 
-    info "Starting Nginx…"
+    info "Starting Nginx..."
     docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" up -d nginx || die "Failed to start Nginx"
-    info "Validating Nginx config…"
+    info "Validating Nginx config..."
     docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -t || die "Nginx config test FAILED"
     docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" exec -T nginx nginx -s reload || die "Nginx reload FAILED"
     info "Nginx is running."
 else
-    info "TLS certificates NOT found at $TLS_DIR — Nginx intentionally not started."
+    info "TLS certificates NOT found at $TLS_DIR - Nginx intentionally not started."
 fi
 
-# ── Summary ──────────────────────────────────────────────────────────────
+# -- Summary --------------------------------------------------------------
 echo ""
 info "Infrastructure setup complete."
 info "  Running: postgres, redis"
@@ -198,7 +204,7 @@ if [[ -r "$CERT_FILE" && -r "$KEY_FILE" ]]; then
     info "  Running: nginx"
     info "  Monitoring host: https://${MONITORING_DOMAIN}/ (run setup_monitoring.sh to start Dozzle)"
 else
-    info "  Stopped: nginx (no TLS — provision $TLS_DIR/fullchain.pem + privkey.pem)"
+    info "  Stopped: nginx (no TLS - provision $TLS_DIR/fullchain.pem + privkey.pem)"
 fi
 echo ""
 info "Next steps:"

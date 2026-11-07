@@ -9,11 +9,10 @@
     <span id="payments-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
   </div>
 
-  <nav class="grade-matrix-level-tabs ad-card" role="tablist" aria-label="{% translate 'Academic level' %}">
+  <nav class="grade-matrix-level-tabs ad-card" aria-label="{% translate 'Academic level' %}">
     {% for tab in level_tabs %}
       <a class="grade-matrix-level-tab{% if tab.selected %} is-active{% endif %}"
-         role="tab"
-         aria-selected="{{ tab.selected|yesno:'true,false' }}"
+{% if tab.selected %}aria-current="page"{% endif %}
          href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;name={{ name_value|urlencode }}&amp;status={{ status }}"
          hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;name={{ name_value|urlencode }}&amp;status={{ status }}"
          hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
@@ -37,7 +36,7 @@
         <label for="payment-matrix-year">{% translate "Academic year" %}</label>
         <select id="payment-matrix-year" name="academic_year" class="form-select" hx-get="{% url 'payments-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#payments-loading">
           {% for year in years %}
-            <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} — {% translate "Active" %}{% endif %}</option>
+            <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} - {% translate "Active" %}{% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -64,7 +63,7 @@
 
   <section class="ad-card">
     <div class="ad-card-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
-      {% if selected_scope %}<strong>{{ selected_scope.level.display_name }} — {{ selected_year.name }}</strong>{% elif selected_year %}<strong>{{ selected_year.name }}</strong>{% endif %}
+      {% if selected_scope %}<strong>{{ selected_scope.level.display_name }} - {{ selected_year.name }}</strong>{% elif selected_year %}<strong>{{ selected_year.name }}</strong>{% endif %}
       <span class="ad-pill ad-pill--muted">{% blocktranslate with count=student_count %}{{ count }} Students shown{% endblocktranslate %}</span>
     </div>
     <div class="ad-table-wrap">
@@ -84,7 +83,7 @@
             <td>{{ row.student.get_full_name|default:row.student.username }}</td>
             <td>{{ row.student.username }}</td>
             <td>{% if row.paid %}<span class="ad-pill ad-pill--success"><i class="fas fa-check"></i> {% translate "Uploaded" %}</span>{% else %}<span class="ad-pill ad-pill--danger"><i class="fas fa-clock"></i> {% translate "Not uploaded" %}</span>{% endif %}</td>
-            <td>{% if row.receipt_url %}<a href="{{ row.receipt_url }}" target="_blank" rel="noopener noreferrer" class="ad-btn ad-btn--ghost ad-btn--sm">{% translate "View" %}</a><a href="{{ row.download_url }}" class="ad-btn ad-btn--teal ad-btn--sm ms-1" download>{% translate "Download" %}</a>{% else %}<span class="ps-muted-text">—</span>{% endif %}</td>
+            <td>{% if row.receipt_url %}<a href="{{ row.receipt_url }}" target="_blank" rel="noopener noreferrer" class="ad-btn ad-btn--ghost ad-btn--sm">{% translate "View" %}</a><a href="{{ row.download_url }}" class="ad-btn ad-btn--teal ad-btn--sm ms-1" download>{% translate "Download" %}</a>{% else %}<span class="ps-muted-text">-</span>{% endif %}</td>
           </tr>
           {% empty %}
           <tr><td colspan="4" class="ad-empty">{% translate "No students match the selected filters." %}</td></tr>

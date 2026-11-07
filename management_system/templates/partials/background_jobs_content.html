@@ -1,0 +1,73 @@
+{% load i18n %}
+<div id="content" class="ad-page" x-data="backgroundJobsMonitor" data-job-status-url="{% url 'background-job-status-batch' %}" data-unavailable-label="{% translate 'Unavailable' %}">
+    <div class="container-fluid py-3">
+        <div class="ad-pane-head flex-wrap gap-2">
+            <div>
+                <h1 class="ad-page-title">{% if notification_history %}{% translate "Notification history" %}{% else %}{% translate "Background jobs" %}{% endif %}</h1>
+                <p class="ad-page-subtitle">{% if notification_history %}{% translate "Saved system and admin notifications, per-recipient delivery progress and original content." %}{% else %}{% translate "Management, quizzes, media, gallery uploads, announcements and Telegram batches." %}{% endif %}</p>
+                <p class="small text-muted">{% translate "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed." %}</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% include "partials/background_polling_toggle.html" %}
+                {% if not notification_history %}<a class="ad-btn ad-btn--ghost" href="{% url 'notification-history' %}" hx-get="{% url 'notification-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "Notification history" %}</a>{% endif %}
+                <a class="ad-btn ad-btn--ghost" href="?{{ request.GET.urlencode }}" hx-get="?{{ request.GET.urlencode }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML">{% translate "Refresh" %}</a>
+            </div>
+        </div>
+        <div class="ad-card ad-card-body mb-3">
+            <form method="get" class="row g-3 align-items-end" role="search"
+                  hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace">
+                {{ filter_form.non_field_errors }}
+                {% for field in filter_form %}
+                {% if field.is_hidden %}{{ field }}{% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}{% else %}
+                <div class="col-12 col-md-6 col-xl-4">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger small" role="alert">{{ field.errors }}</div>{% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="ad-btn ad-btn--teal">{% translate "Search and filter" %}</button>
+                    <a class="ad-btn ad-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "Clear" %}</a>
+                </div>
+            </form>
+        </div>
+        <p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
+        {% if jobs_page %}
+        <p class="small text-muted">{% blocktranslate with count=jobs_page.paginator.count %}Matching jobs: {{ count }}{% endblocktranslate %}</p>
+        <div class="ad-card"><div class="table-responsive position-relative">
+            <table class="ad-table">
+                <caption class="visually-hidden">{% translate "Background jobs" %}</caption>
+                <thead><tr>
+                    <th scope="col">{% translate "Operation" %}</th>
+                    <th scope="col">{% translate "Requested by" %}</th>
+                    <th scope="col">{% translate "Target" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Progress" %}</th>
+                    <th scope="col">{% translate "Created" %}</th>
+                    <th scope="col">{% translate "Updated" %}</th>
+                    <th scope="col">{% translate "Details" %}</th>
+                </tr></thead>
+                <tbody>
+                {% for job in jobs_page.object_list %}
+                    <tr data-job-record data-family="{{ job.family }}" data-id="{{ job.id }}" data-active="{{ job.active|yesno:'true,false' }}" data-next-poll-at="{{ job.next_poll|date:'c' }}">
+                        <td><strong>{{ job.label }}</strong><small class="d-block text-muted">{{ job.family_label }}</small></td>
+                        <td>{{ job.actor }}</td>
+                        <td class="text-break">{{ job.target }}</td>
+                        <td><span class="ad-pill ad-pill--muted" data-job-field="status_label">{{ job.status_label }}</span><small class="d-block" data-job-field="phase_label">{{ job.phase_label }}</small></td>
+                        <td><progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress><small class="d-block" data-job-field="progress_label">{{ job.progress_label }}</small></td>
+                        <td>{{ job.created|date:"SHORT_DATETIME_FORMAT" }}</td>
+                        <td data-job-field="updated_label">{{ job.updated_label }}</td>
+                        <td><a href="{{ job.detail_url }}" hx-get="{{ job.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost ad-btn--sm">{% translate "View details" %}<span class="visually-hidden">: {{ job.label }}</span></a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="text-center py-4">{% translate "No background jobs match these filters." %}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div></div>
+        {% translate "Background job pages" as job_pages_label %}
+        {% include "partials/pagination.html" with page_obj=jobs_page pagination_query=pagination_query aria_label=job_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
+        {% endif %}
+    </div>
+</div>

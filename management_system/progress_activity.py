@@ -1,11 +1,25 @@
 import json
+import math
+from dataclasses import dataclass
 from datetime import date, timedelta
 
+from django.conf import settings
+from django.db import transaction
 from django.db.models import Count, Max, Min, Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from .models import LectureProgress, LectureWatchDay, LectureWatchSession, Lesson, ViewingSession
+from .academic_access import user_can_write_offering_activity
+from .models import (
+    LectureProgress,
+    LectureProgressEvent,
+    LectureWatchDay,
+    LectureWatchSession,
+    Lesson,
+    ViewingSession,
+)
+from .utils.hls_parser import get_lesson_segments
+from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
 
 WATCH_SESSION_GAP = timedelta(minutes=10)
 MAX_HEARTBEAT_ACTIVE_SECONDS = 60
@@ -304,3 +318,271 @@ def watch_sessions_for_day(row: LectureProgress, study_date: date):
     ).annotate(
         day_active_seconds=Sum("days__active_watch_seconds"),
     ).distinct().order_by("started_at", "pk")
+
+
+@dataclass(frozen=True)
+class ProgressHeartbeatResult:
+    """Domain result shared by the web and mobile progress adapters."""
+
+    percent: int
+    completed: bool
+    note: str = ""
+
+    def as_payload(self) -> dict:
+        payload = {"status": "ok", "percent": self.percent, "completed": self.completed}
+        if self.note:
+            payload["note"] = self.note
+        return payload
+
+
+class ProgressHeartbeatError(Exception):
+    """Expected domain rejection; adapters choose the HTTP status."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def _record_progress_event(
+    session,
+    event_type,
+    *,
+    occurred_at=None,
+    percent=0,
+    unique_seconds=0,
+):
+    occurred_at = occurred_at or timezone.now()
+    defaults = {
+        "student": session.student,
+        "lesson": session.lesson,
+        "part_id": session.part_id,
+        "viewing_session": session,
+        "occurred_at": occurred_at,
+        "percent": max(0, min(int(percent or 0), 100)),
+        "unique_seconds": max(0, int(unique_seconds or 0)),
+    }
+    if event_type == LectureProgressEvent.EventType.COMPLETED:
+        lookup = {
+            "student": session.student,
+            "lesson": session.lesson,
+            "part_id": session.part_id,
+            "event_type": event_type,
+        }
+    else:
+        lookup = {
+            "viewing_session": session,
+            "event_type": event_type,
+        }
+    if event_type in {
+        LectureProgressEvent.EventType.ACTIVITY,
+        LectureProgressEvent.EventType.PROGRESS,
+    }:
+        lookup["bucket_start"] = occurred_at.replace(second=0, microsecond=0)
+    if event_type == LectureProgressEvent.EventType.PROGRESS:
+        lookup["percent"] = max(0, min(int(percent or 0), 100))
+    LectureProgressEvent.objects.get_or_create(**lookup, defaults=defaults)
+
+
+def apply_progress_heartbeat(
+    *,
+    user,
+    payload,
+    cloud_client,
+    bucket_name: str,
+    allow_management: bool = False,
+    session: ViewingSession | None = None,
+) -> ProgressHeartbeatResult:
+    """Validate, authorize and persist one playback heartbeat.
+
+    The caller owns transport authentication (browser session or mobile
+    bearer/audience token); this operation owns input validation, session
+    ownership/expiry, write-access policy, verified-range merging and the
+    locked progress/event writes.
+    """
+
+    if not user or not getattr(user, "is_authenticated", False):
+        raise ProgressHeartbeatError("unauthenticated", _("Authentication required"))
+    if not isinstance(payload, dict):
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid request format."))
+
+    session_id = payload.get("session_id")
+    ranges = payload.get("ranges", [])
+    ended = payload.get("ended", False)
+    active_seconds = payload.get("active_seconds", 0)
+    sequence = payload.get("sequence")
+
+    if (
+        not session_id
+        or not isinstance(ranges, list)
+        or not isinstance(ended, bool)
+        or isinstance(active_seconds, bool)
+        or not isinstance(active_seconds, (int, float))
+        or not math.isfinite(active_seconds)
+        or active_seconds < 0
+        or active_seconds > 3600
+    ):
+        raise ProgressHeartbeatError(
+            "invalid_payload",
+            _("Missing session identifier or time ranges."),
+        )
+    if active_seconds > 0 and (
+        isinstance(sequence, bool)
+        or not isinstance(sequence, int)
+        or sequence <= 0
+        or sequence > 2_147_483_647
+    ):
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid playback sequence."))
+    if len(ranges) > 200:
+        raise ProgressHeartbeatError("invalid_payload", _("Too many time ranges."))
+    try:
+        ranges = [[float(start), float(end)] for start, end in ranges]
+    except (ValueError, TypeError):
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
+    max_duration = float(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60))
+    if any(
+        not math.isfinite(start)
+        or not math.isfinite(end)
+        or start < 0
+        or end <= start
+        or end > max_duration
+        for start, end in ranges
+    ):
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
+
+    if session is None:
+        session = (
+            ViewingSession.objects.select_related("lesson__course_offering")
+            .filter(session_id=session_id)
+            .first()
+        )
+        if session is None:
+            raise ProgressHeartbeatError("session_not_found", _("Viewing session was not found."))
+    if str(session.session_id) != str(session_id) or session.student_id != user.pk:
+        raise ProgressHeartbeatError("forbidden", _("Session belongs to another user."))
+    if timezone.now() >= session.expires_at:
+        raise ProgressHeartbeatError("expired", _("Session expired."))
+
+    def result(note=None) -> ProgressHeartbeatResult:
+        current = LectureProgress.objects.filter(
+            student=user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+        ).values("percent", "completed_at").first()
+        return ProgressHeartbeatResult(
+            percent=int(current["percent"] or 0) if current else 0,
+            completed=bool(current and current["completed_at"]),
+            note=str(note or ""),
+        )
+
+    if session.ended_at is not None:
+        return result()
+
+    if not user_can_write_offering_activity(
+        user,
+        session.lesson.course_offering,
+        allow_management=allow_management,
+    ):
+        return result(_("Historical content is read-only"))
+
+    heartbeat_at = timezone.now()
+    session.last_heartbeat = heartbeat_at
+    update_fields = ["last_heartbeat"]
+    if ended and session.ended_at is None:
+        session.ended_at = heartbeat_at
+        update_fields.append("ended_at")
+    session.save(update_fields=update_fields)
+
+    if ended:
+        _record_progress_event(
+            session,
+            LectureProgressEvent.EventType.ENDED,
+            occurred_at=heartbeat_at,
+        )
+
+    verified = set(session.verified_requests.values_list("segment_number", flat=True))
+    if not verified:
+        return result(_("No verified segments yet"))
+
+    lesson_segments = get_lesson_segments(
+        session.lesson,
+        cloud_client,
+        bucket_name,
+        media_key=session.media_key or None,
+        requested_part_id=session.part_id,
+    ).get(session.part_id, [])
+    all_ranges = [
+        [float(segment.get("start", 0)), float(segment.get("end", 0))]
+        for segment in lesson_segments
+        if float(segment.get("end", 0)) > float(segment.get("start", 0))
+    ]
+    verified_ranges = []
+    for segment in lesson_segments:
+        if segment.get("number") in verified:
+            verified_ranges.append({
+                "start": float(segment.get("start", 0)),
+                "end": float(segment.get("end", 0)),
+            })
+    if not verified_ranges:
+        return result(_("No verified segment ranges"))
+
+    total_secs = sum(end - start for start, end in all_ranges)
+    with transaction.atomic():
+        locked_session = ViewingSession.objects.select_for_update().get(pk=session.pk)
+        if locked_session.ended_at is not None and locked_session.ended_at != heartbeat_at:
+            return result()
+        progress, _created = LectureProgress.objects.select_for_update().get_or_create(
+            student=user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+            defaults={"merged_ranges": []},
+        )
+        merged = merge_verified_progress_ranges(
+            progress.merged_ranges,
+            ranges,
+            verified_ranges,
+        )
+        unique_secs = unique_seconds(merged)
+        percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
+        previous_percent = progress.percent
+        progress.merged_ranges = merged
+        progress.percent = percent
+        progress.unique_seconds = int(round(unique_secs))
+        if merged:
+            furthest = max(float(end) for _start, end in merged)
+            progress.last_position_seconds = max(
+                int(progress.last_position_seconds or 0),
+                int(furthest),
+            )
+        if not progress.completed_at and percent >= 80:
+            progress.completed_at = timezone.now()
+        progress.save()
+
+        credit_watch_sample(
+            locked_session,
+            progress,
+            active_seconds=active_seconds,
+            sequence=sequence,
+            progress_before=previous_percent,
+            progress_after=percent,
+            ended=ended,
+            now=heartbeat_at,
+        )
+
+        if percent != previous_percent:
+            _record_progress_event(
+                locked_session,
+                LectureProgressEvent.EventType.PROGRESS,
+                occurred_at=heartbeat_at,
+                percent=percent,
+                unique_seconds=progress.unique_seconds,
+            )
+        if progress.completed_at:
+            _record_progress_event(
+                locked_session,
+                LectureProgressEvent.EventType.COMPLETED,
+                occurred_at=progress.completed_at,
+                percent=percent,
+                unique_seconds=progress.unique_seconds,
+            )
+    return ProgressHeartbeatResult(percent=percent, completed=progress.completed_at is not None)

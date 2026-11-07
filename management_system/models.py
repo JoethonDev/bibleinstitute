@@ -3,7 +3,7 @@ from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.urls import reverse_lazy
-from django.db.models import Case, F, Sum, Prefetch, Q, Value, When, prefetch_related_objects
+from django.db.models import Case, F, Q, Value, When
 from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, time, timedelta
@@ -11,7 +11,6 @@ import json
 import uuid
 from django.utils.translation import gettext_lazy as _
 from django.utils import translation
-from django.db.models import Max
 from django.db.models.functions import Lower, Trim
 from django.conf import settings
 from .utils.timezones import format_application_datetime
@@ -24,7 +23,7 @@ MANAGEMENT_ROLES = ["admin", "staff"]
 
 # Helper Function
 def assign_academic_date():
-    today = date.today()
+    today = timezone.localdate()
     if today.month < 8 :
         today = today.replace(year=today.year-1)
     return today.replace(month=8)
@@ -302,7 +301,7 @@ class TelegramAccount(models.Model):
 
 
 class TelegramLinkToken(models.Model):
-    """A permanent-until-used one-time LMS-to-Telegram linking token."""
+    """A short-lived (15 min) one-time LMS-to-Telegram linking token."""
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_link_tokens")
     token_digest = models.CharField(max_length=64, unique=True)
@@ -417,6 +416,7 @@ class TelegramNotificationDelivery(models.Model):
     attempt_count = models.PositiveSmallIntegerField(default=0)
     telegram_message_id = models.BigIntegerField(null=True, blank=True)
     last_error = models.CharField(max_length=500, blank=True, default="")
+    content_snapshot = models.TextField(blank=True, default="")
     sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -735,6 +735,16 @@ class StudentNotification(models.Model):
     effective_opening_at = models.DateTimeField(null=True, blank=True)
     effective_closing_at = models.DateTimeField(null=True, blank=True)
     idempotency_key = models.CharField(max_length=255, unique=True)
+    redelivery_job = models.ForeignKey(
+        "AdminOperationJob", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="notification_copies",
+    )
+    redelivery_of = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="redeliveries",
+    )
+    inbox_visible = models.BooleanField(default=True)
+    is_manual_redelivery = models.BooleanField(default=False)
     title_ar = models.CharField(max_length=255)
     body_ar = models.TextField()
     title_en = models.CharField(max_length=255)
@@ -824,6 +834,10 @@ class StudentNotification(models.Model):
                 fields=["scheduled_for", "push_expires_at", "cancelled_at"],
                 name="student_notif_push_due_idx",
             ),
+            models.Index(fields=["-created_at", "-id"], name="notif_history_recent_idx"),
+            models.Index(fields=["notification_type", "entity_id", "offering_id"], name="notif_history_event_idx"),
+            GinIndex(OpClass(SearchNormalize("title_ar"), name="gin_trgm_ops"), name="notif_history_title_ar_idx"),
+            GinIndex(OpClass(SearchNormalize("title_en"), name="gin_trgm_ops"), name="notif_history_title_en_idx"),
         ]
 
     def __str__(self):
@@ -949,6 +963,8 @@ class TelegramMessage(models.Model):
         PHOTO = "photo", _("Photo")
         DOCUMENT = "document", _("Document")
         VIDEO = "video", _("Video")
+        VOICE = "voice", _("Voice")
+        AUDIO = "audio", _("Audio")
         DIGEST = "digest", _("Digest")
         UNSUPPORTED = "unsupported", _("Unsupported")
 
@@ -1024,7 +1040,9 @@ class TelegramAttachment(models.Model):
     """Controlled R2 metadata for a supported Telegram attachment."""
 
     message = models.ForeignKey(TelegramMessage, on_delete=models.CASCADE, related_name="attachments")
-    telegram_file_id = models.CharField(max_length=255)
+    # Empty for files uploaded from the admin dashboard: those are stored in R2
+    # first and Telegram never returns a reusable file_id for them.
+    telegram_file_id = models.CharField(max_length=255, blank=True, default="")
     media_type = models.CharField(max_length=16)
     r2_key = models.CharField(max_length=1024, blank=True, default="")
     original_name = models.CharField(max_length=255, blank=True, default="")
@@ -1039,6 +1057,7 @@ class TelegramAttachment(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["message", "telegram_file_id"],
+                condition=~models.Q(telegram_file_id=""),
                 name="telegram_attachment_file_unique",
             ),
         ]
@@ -1064,6 +1083,13 @@ class TelegramBroadcast(models.Model):
         "AcademicYear",
         on_delete=models.PROTECT,
         related_name="telegram_broadcasts",
+    )
+    redelivery_of = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="redeliveries",
     )
     level = models.ForeignKey(
         "Level",
@@ -1092,6 +1118,7 @@ class TelegramBroadcast(models.Model):
     recipient_count = models.PositiveIntegerField(default=0)
     sent_count = models.PositiveIntegerField(default=0)
     failed_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
     last_error = models.CharField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1200,7 +1227,7 @@ class TelegramBroadcastRecipient(models.Model):
         ]
 
     def __str__(self):
-        return f"Broadcast {self.broadcast_id} → {self.telegram_chat_id}"
+        return f"Broadcast {self.broadcast_id} -> {self.telegram_chat_id}"
 
 
 class OfflineCity(models.Model):
@@ -1248,6 +1275,9 @@ class Level(models.Model):
 
     @property
     def display_name(self):
+        language = translation.get_language() or "ar"
+        if language == "ar":
+            return self.name_ar or self.name_en or str(self.ordering)
         return self.name_en or self.name_ar or str(self.ordering)
 
 
@@ -1273,7 +1303,7 @@ class Course(models.Model):
     def __str__(self):
         return f"Course : {self.name} in level : {self.level.ordering}"
 
-    # ── Instance methods ───────────────────────────────────────────
+    # -- Instance methods -------------------------------------------
     def serialize_pagination(self):
         return {
             "id" : self.pk,
@@ -1305,7 +1335,7 @@ class AcademicYearLevel(models.Model):
         verbose_name_plural = _("Academic Year Levels")
 
     def __str__(self):
-        return f"{self.academic_year.name} → {self.level.display_name}"
+        return f"{self.academic_year.name} -> {self.level.display_name}"
 
     def clean(self):
         super().clean()
@@ -1347,7 +1377,7 @@ class AcademicPayment(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.student.username} — {self.academic_year_level}"
+        return f"{self.student.username} - {self.academic_year_level}"
 
 
 class AcademicYearLevelMeeting(models.Model):
@@ -1373,7 +1403,7 @@ class AcademicYearLevelMeeting(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.academic_year_level} — {self.course_offering.course.name}"
+        return f"{self.academic_year_level} - {self.course_offering.course.name}"
 
     def clean(self):
         super().clean()
@@ -1831,7 +1861,7 @@ class HistoricalAcademicSummary(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.student.username} — {self.academic_year_level}"
+        return f"{self.student.username} - {self.academic_year_level}"
 
 
 class PromotionHistory(models.Model):
@@ -1940,7 +1970,7 @@ class GraduationGalleryItem(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.academic_year_level} — {self.original_filename}"
+        return f"{self.academic_year_level} - {self.original_filename}"
 
 
 class GraduationGalleryJob(models.Model):
@@ -1978,7 +2008,7 @@ class GraduationGalleryJob(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.original_filename} — {self.status}"
+        return f"{self.original_filename} - {self.status}"
 
 
 class MobileAppRelease(models.Model):
@@ -2191,6 +2221,12 @@ class AttendanceRecord(models.Model):
                 fields=["student", "course_offering", "attendance_date"],
                 name="attendance_student_off_idx",
             ),
+            # Date-only reads (today's counters, daily reconciliation) have no
+            # leading date column in the two indexes above.
+            models.Index(
+                fields=["attendance_date", "action"],
+                name="attendance_date_action_idx",
+            ),
         ]
 
     def __str__(self):
@@ -2242,7 +2278,6 @@ class ViewingSession(models.Model):
     )
 
     class Meta:
-        indexes = [models.Index(fields=["session_id"])]
         constraints = [
             models.CheckConstraint(
                 condition=(
@@ -3062,3 +3097,88 @@ class QuizOperationJob(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["status", "lease_until"], name="quiz_job_recovery_idx")]
+
+
+class AdminOperationJob(models.Model):
+    """Durable status/lease record for population-sized management operations.
+
+    This is a bounded ledger, not a workflow engine: the owning domain module
+    still validates, authorizes and executes each operation. QuizOperationJob
+    and the media/gallery jobs stay canonical for their own domains.
+    """
+
+    class Kind(models.TextChoices):
+        FORMULA_RECALCULATION = "formula_recalculation", _("Formula recalculation")
+        BULK_PROMOTION = "bulk_promotion", _("Bulk promotion")
+        HISTORICAL_INTAKE = "historical_intake", _("Historical intake")
+        LEGACY_USER_IMPORT = "legacy_user_import", _("Legacy user import")
+        QUIZ_DETAIL_EXPORT = "quiz_detail_export", _("Quiz detail export")
+        QUIZ_SUMMARY_EXPORT = "quiz_summary_export", _("Quiz summary export")
+        EVALUATION_EXPORT = "evaluation_export", _("Evaluation export")
+        GRADES_REPORT_EXPORT = "grades_report_export", _("Grades report export")
+        COURSE_COPY = "course_copy", _("Course copy")
+        ATTENDANCE_RECONCILE = "attendance_reconcile", _("Attendance reconcile")
+        STORAGE_RENAME = "storage_rename", _("Storage rename")
+        STORAGE_DELETE = "storage_delete", _("Storage delete")
+        STORAGE_USAGE_REFRESH = "storage_usage_refresh", _("Storage usage refresh")
+        NOTIFICATION_REDELIVERY = "notification_redelivery", _("Notification redelivery")
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        RUNNING = "running", _("Running")
+        WAITING = "waiting", _("Waiting for delivery")
+        COMPLETED = "completed", _("Completed")
+        FAILED = "failed", _("Failed")
+        PARTIAL = "partial", _("Completed with failures")
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="admin_operations")
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    academic_year_level = models.ForeignKey(
+        AcademicYearLevel, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="admin_operations",
+    )
+    course_offering = models.ForeignKey(
+        CourseOffering, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="admin_operations",
+    )
+    language = models.CharField(max_length=8, default="ar")
+    # Frozen normalized input/selection and bounded execution cursor.
+    input = models.JSONField(default=dict, blank=True)
+    cursor = models.JSONField(default=dict, blank=True)
+    conflict_key = models.CharField(max_length=120, blank=True)
+    total = models.PositiveIntegerField(default=0)
+    processed = models.PositiveIntegerField(default=0)
+    succeeded = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    skipped = models.PositiveIntegerField(default=0)
+    lease_token = models.UUIDField(null=True, blank=True, editable=False)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    artifact_key = models.CharField(max_length=1024, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["kind", "status"], name="admin_op_kind_status_idx"),
+            models.Index(fields=["actor", "-created_at"], name="admin_op_actor_created_idx"),
+            models.Index(fields=["status", "lease_until"], name="admin_op_recovery_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["actor", "kind", "conflict_key"],
+                condition=(
+                    models.Q(status__in=["queued", "running", "waiting"])
+                    & ~models.Q(conflict_key="")
+                ),
+                name="admin_operation_one_active_conflict",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.kind} ({self.status}) {self.pk}"

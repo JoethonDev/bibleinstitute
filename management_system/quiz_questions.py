@@ -13,9 +13,65 @@ from django.utils.translation import gettext as _
 from .models import Question
 from .utils.helpers import parse_json_value
 
+# One supported question contract for the editor, the JSON importer and the
+# request parser. Keep these bounds in sync with DATA_UPLOAD_MAX_NUMBER_FIELDS
+# (200 questions x fixed fields and choices).
+MAX_QUESTIONS = 200
+MAX_QUESTION_TITLE = 255
+MAX_QUESTION_GRADE = 1000
+MAX_QUESTION_CHOICES = 12
+
+SUPPORTED_QUESTION_TYPES = frozenset(key for key, _label in Question.QUESTION_TYPES)
+
+
+def validate_question_payload(question_data) -> None:
+    """Apply the canonical question bounds; raise ``ValueError`` when invalid.
+
+    Both the manual create/update handlers and the JSON import preview call the
+    shared builder, so this is the single rule that decides whether a question
+    payload may become a ``Question`` row.
+    """
+
+    title = str(question_data.get("name") or "").strip()
+    if not title:
+        raise ValueError(_("The question text is required."))
+    if len(title) > MAX_QUESTION_TITLE:
+        raise ValueError(
+            _("The question text must be at most %(limit)s characters.") % {"limit": MAX_QUESTION_TITLE}
+        )
+
+    question_type = question_data.get("type")
+    if question_type not in SUPPORTED_QUESTION_TYPES:
+        raise ValueError(
+            _('Unsupported question type "%(type)s". Allowed types: %(allowed)s.')
+            % {
+                "type": str(question_type or ""),
+                "allowed": ", ".join(key for key, _label in Question.QUESTION_TYPES),
+            }
+        )
+
+    try:
+        grade = int(question_data.get("grade", 1) or 1)
+    except (TypeError, ValueError):
+        raise ValueError(_("The question grade must be a whole number."))
+    if not 0 <= grade <= MAX_QUESTION_GRADE:
+        raise ValueError(
+            _("The question grade must be between 0 and %(limit)s.") % {"limit": MAX_QUESTION_GRADE}
+        )
+
+    if question_type == "mcq":
+        choices = [str(choice).strip() for choice in (question_data.get("choices") or []) if str(choice).strip()]
+        if len(choices) < 2:
+            raise ValueError(_("Multiple choice questions need at least 2 choices."))
+        if len(choices) > MAX_QUESTION_CHOICES:
+            raise ValueError(
+                _("Multiple choice questions can have at most %(limit)s choices.") % {"limit": MAX_QUESTION_CHOICES}
+            )
+
 
 def build_question_instance(question_data, quiz):
     """Build a Question instance from parsed form data."""
+    validate_question_payload(question_data)
     title = question_data.get("name", "")
     question_type = question_data.get("type", "")
     grade = int(question_data.get("grade", 1) or 1)

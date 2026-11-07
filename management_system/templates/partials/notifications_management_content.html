@@ -70,7 +70,7 @@
                 hx-post="{{ recipient_count_url }}"
                 hx-trigger="load, change from:#notification-compose-form"
                 hx-include="closest form"
-                aria-live="polite">…</span>
+                aria-live="polite">...</span>
         </p>
 
         <button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-paper-plane" aria-hidden="true"></i> {% translate "Send notification" %}</button>
@@ -112,14 +112,14 @@
               {% endif %}
             </td>
             <td>
-              {% if announcement.created_by %}{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}{% else %}—{% endif %}
+              {% if announcement.created_by %}{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}{% else %}-{% endif %}
             </td>
             <td>
               {% with announcement_levels=announcement.levels.all %}
               {% if announcement_levels %}{% for level in announcement_levels %}{{ level }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}{% translate "All active students" %}{% endif %}
               {% endwith %}
             </td>
-            <td>{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}—{% endif %}</td>
+            <td>{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}-{% endif %}</td>
             <td>{{ announcement.title|truncatechars:60 }}</td>
             <td>{{ announcement.body|truncatechars:100 }}</td>
           </tr>

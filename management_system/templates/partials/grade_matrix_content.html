@@ -14,11 +14,10 @@
     </div>
   </div>
 
-  <nav class="grade-matrix-level-tabs ad-card" role="tablist" aria-label="{% translate 'Academic level' %}">
+  <nav class="grade-matrix-level-tabs ad-card" aria-label="{% translate 'Academic level' %}">
     {% for tab in level_tabs %}
       <a class="grade-matrix-level-tab{% if tab.selected %} is-active{% endif %}"
-         role="tab"
-         aria-selected="{{ tab.selected|yesno:'true,false' }}"
+         {% if tab.selected %}aria-current="page"{% endif %}
          href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}"
          hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}"
          hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
@@ -51,7 +50,7 @@
         <label for="grade-matrix-year">{% translate "Academic year" %}</label>
         <select id="grade-matrix-year" name="academic_year" class="form-select" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
           {% for year in years %}
-            <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} · {% translate "Active" %}{% endif %}</option>
+            <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} - {% translate "Active" %}{% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -63,17 +62,17 @@
     <div class="grade-matrix-filter-summary">
       <span>{% translate "Showing" %}:</span>
       <span class="ad-pill ad-pill--teal">{{ selected_scope.level.display_name }}</span>
-      <span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if active_year %} · {% translate "Active year" %}{% else %} · {% translate "Historical year" %}{% endif %}</span>
+      <span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if active_year %} - {% translate "Active year" %}{% else %} - {% translate "Historical year" %}{% endif %}</span>
       {% if selected_course_id %}<span class="ad-pill ad-pill--muted">{% translate "Course filtered" %}</span>{% endif %}
       <span class="grade-matrix-summary-spacer"></span>
-      <span>{{ student_count }} {% translate "Students" %} · {{ quiz_count }} {% translate "Quizzes" %}</span>
+      <span>{{ student_count }} {% translate "Students" %} - {{ quiz_count }} {% translate "Quizzes" %}</span>
     </div>
   </section>
 
   <section class="ad-card grade-matrix-card" aria-labelledby="grade-matrix-heading">
     <div class="grade-matrix-card-head">
       <div>
-        <h4 id="grade-matrix-heading" class="mb-1">{{ selected_scope.level.display_name }} · {{ selected_year.name }}</h4>
+        <h4 id="grade-matrix-heading" class="mb-1">{{ selected_scope.level.display_name }} - {{ selected_year.name }}</h4>
         <p class="mb-0">{% translate "Weekly and final quiz results grouped by course offering." %}</p>
       </div>
       <div class="grade-matrix-card-actions">
@@ -114,19 +113,19 @@
             <tr>
               <th scope="row" class="grade-matrix-identity">
                 <span class="grade-matrix-student-name">{{ row.name }}</span>
-                <span class="grade-matrix-student-meta">{{ row.username }} · #{{ row.id }}</span>
+                <span class="grade-matrix-student-meta">{{ row.username }} - #{{ row.id }}</span>
               </th>
               {% for course in row.courses %}
                 {% for cell in course.quiz_cells %}
                   <td data-detail-cell="true">
-                    {% if cell.submitted %}<span class="grade-matrix-score">{{ cell.grade }}/{{ cell.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                    {% if cell.submitted %}<span class="grade-matrix-score">{{ cell.grade }}/{{ cell.total }}</span>{% else %}<span class="grade-matrix-missing">-</span>{% endif %}
                   </td>
                 {% endfor %}
                 <td class="grade-matrix-weekly-total">
-                  {% if course.weekly.has_grade %}<span class="grade-matrix-score">{{ course.weekly.earned }}/{{ course.weekly.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                  {% if course.weekly.has_grade %}<span class="grade-matrix-score">{{ course.weekly.earned }}/{{ course.weekly.total }}</span>{% else %}<span class="grade-matrix-missing">-</span>{% endif %}
                 </td>
                 <td class="grade-matrix-final-total">
-                  {% if course.final.has_grade %}<span class="grade-matrix-score">{{ course.final.earned }}/{{ course.final.total }}</span>{% else %}<span class="grade-matrix-missing">—</span>{% endif %}
+                  {% if course.final.has_grade %}<span class="grade-matrix-score">{{ course.final.earned }}/{{ course.final.total }}</span>{% else %}<span class="grade-matrix-missing">-</span>{% endif %}
                 </td>
               {% endfor %}
             </tr>

@@ -2333,7 +2333,7 @@ msgstr "Previous"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "            "
 msgid "Page %(current)s of %(total)s"
 msgstr "Page %(current)s of %(total)s"
@@ -2763,6 +2763,52 @@ msgstr "Support storage is unavailable."
 msgid "The attachment could not be stored."
 msgstr "The attachment could not be stored."
 
+# Telegram support voice playback and dashboard attachment replies.
+msgid "Voice"
+msgstr "Voice"
+
+msgid "Voice message"
+msgstr "Voice message"
+
+msgid "Audio message"
+msgstr "Audio message"
+
+msgid "The attachment could not be read."
+msgstr "The attachment could not be read."
+
+msgid "Attachments support a message of 1,024 characters or fewer."
+msgstr "Attachments support a message of 1,024 characters or fewer."
+
+msgid "Images must be 10 MB or smaller."
+msgstr "Images must be 10 MB or smaller."
+
+msgid "Videos and PDF files must be 50 MB or smaller."
+msgstr "Videos and PDF files must be 50 MB or smaller."
+
+msgid "The attachment must be a JPEG, PNG, MP4, or PDF file."
+msgstr "The attachment must be a JPEG, PNG, MP4, or PDF file."
+
+msgid "The attachment content does not match its file type."
+msgstr "The attachment content does not match its file type."
+
+msgid "A reply message or an attachment is required."
+msgstr "A reply message or an attachment is required."
+
+msgid "This message type is not supported. Text, photos, documents, videos, and voice messages are accepted."
+msgstr "This message type is not supported. Text, photos, documents, videos, and voice messages are accepted."
+
+msgid "Send your message to support. You can send text, photos, documents, videos, or voice messages."
+msgstr "Send your message to support. You can send text, photos, documents, videos, or voice messages."
+
+msgid "Attach a file"
+msgstr "Attach a file"
+
+msgid "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
+msgstr "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
+
+msgid "Attachment unavailable"
+msgstr "Attachment unavailable."
+
 #: .\management_system\telegram\support.py:255
 #
 #| msgid "Media coverage"
@@ -3074,8 +3120,8 @@ msgid "Search years"
 msgstr "Search years"
 
 #: .\management_system\templates\academic_setup.html:37
-msgid "Search years…"
-msgstr "Search years…"
+msgid "Search years..."
+msgstr "Search years..."
 
 #: .\management_system\templates\academic_setup.html:40
 msgid "Filter by status"
@@ -3233,8 +3279,8 @@ msgstr "Next page"
 
 #: .\management_system\templates\academic_setup.html:148
 #, python-format
-msgid "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
-msgstr "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
+msgid "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s-%(end)s of %(total)s)"
+msgstr "Page %(year_page_obj.number)s of %(year_page_obj.paginator.num_pages)s (%(start)s-%(end)s of %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:157
 msgid "Year Levels"
@@ -3269,8 +3315,8 @@ msgid "Search offerings"
 msgstr "Search offerings"
 
 #: .\management_system\templates\academic_setup.html:207
-msgid "Search offerings…"
-msgstr "Search offerings…"
+msgid "Search offerings..."
+msgstr "Search offerings..."
 
 #: .\management_system\templates\academic_setup.html:215
 msgid "New Offering"
@@ -3294,16 +3340,16 @@ msgstr "Offering pagination"
 
 #: .\management_system\templates\academic_setup.html:302
 #, python-format
-msgid "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
-msgstr "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s–%(end)s of %(total)s)"
+msgid "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s-%(end)s of %(total)s)"
+msgstr "Page %(offering_page_obj.number)s of %(offering_page_obj.paginator.num_pages)s (%(start)s-%(end)s of %(total)s)"
 
 #: .\management_system\templates\academic_setup.html:314
 msgid "New Course Offering"
 msgstr "New Course Offering"
 
 #: .\management_system\templates\academic_setup.html:319
-msgid "Select course…"
-msgstr "Select course…"
+msgid "Select course..."
+msgstr "Select course..."
 
 #: .\management_system\templates\academic_setup.html:339
 #: .\management_system\templates\academic_setup.html:378
@@ -3397,8 +3443,8 @@ msgid "Copy"
 msgstr "Copy"
 
 #: .\management_system\templates\academic_setup.html:507
-msgid "Loading…"
-msgstr "Loading…"
+msgid "Loading..."
+msgstr "Loading..."
 
 msgid "Load more notifications"
 msgstr "Load more notifications"
@@ -3841,11 +3887,11 @@ msgstr "Select all matching records"
 #, python-format
 msgid ""
 "\n"
-"                    Showing %(start)s–%(end)s of %(total)s\n"
+"                    Showing %(start)s-%(end)s of %(total)s\n"
 "                    "
 msgstr ""
 "\n"
-"                    Showing %(start)s–%(end)s of %(total)s\n"
+"                    Showing %(start)s-%(end)s of %(total)s\n"
 "                    "
 
 #: .\management_system\templates\applications_dashboard.html:97
@@ -3904,8 +3950,8 @@ msgid "New Action"
 msgstr "New Action"
 
 #: .\management_system\templates\attendance_correction.html:56
-msgid "— Keep current —"
-msgstr "— Keep current —"
+msgid "- Keep current -"
+msgstr "- Keep current -"
 
 #: .\management_system\templates\attendance_correction.html:62
 msgid "Save Correction"
@@ -4023,10 +4069,10 @@ msgstr "Attendance pagination"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "            "
-msgid "Showing %(start)s–%(end)s of %(total)s"
-msgstr "Showing %(start)s–%(end)s of %(total)s"
+msgid "Showing %(start)s-%(end)s of %(total)s"
+msgstr "Showing %(start)s-%(end)s of %(total)s"
 
 #: .\management_system\templates\attendance_management.html:157
 msgid "Choose a filter to load results"
@@ -4049,8 +4095,8 @@ msgstr "Bible Institute Coptic"
 
 #: .\management_system\templates\base.html:12
 #: .\management_system\templates\base.html:20
-msgid "Bible Institute Coptic — Online theological education"
-msgstr "Bible Institute Coptic — Online theological education"
+msgid "Bible Institute Coptic - Online theological education"
+msgstr "Bible Institute Coptic - Online theological education"
 
 #: .\management_system\templates\base.html:13
 msgid "Bible institute, Coptic, theological education, online learning, Egypt"
@@ -4075,8 +4121,8 @@ msgid "Bible Institute"
 msgstr "Bible Institute"
 
 #: .\management_system\templates\base.html:78
-msgid "Maadi · Academic study with an ecclesial spirit"
-msgstr "Maadi · Academic study with an ecclesial spirit"
+msgid "Maadi - Academic study with an ecclesial spirit"
+msgstr "Maadi - Academic study with an ecclesial spirit"
 
 #: .\management_system\templates\base.html:80
 msgid "Toggle navigation"
@@ -4177,8 +4223,8 @@ msgid "Institute Headquarters"
 msgstr "Institute Headquarters"
 
 #: .\management_system\templates\base.html:206
-msgid "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
-msgstr "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt"
+msgid "Church of the Great Martyr Mar Girgis, Kotsika - Maadi - Egypt"
+msgstr "Church of the Great Martyr Mar Girgis, Kotsika - Maadi - Egypt"
 
 #: .\management_system\templates\base.html:213
 msgid "All rights reserved to the Bible Institute in Maadi"
@@ -4436,8 +4482,8 @@ msgstr "(unnamed)"
 #: .\management_system\templates\content_detail.html:297
 #: .\management_system\templates\content_detail.html:298
 #: .\management_system\templates\content_detail.html:299
-msgid "—"
-msgstr "—"
+msgid "-"
+msgstr "-"
 
 #: .\management_system\templates\content_detail.html:308
 msgid "No file links have been added to this lesson yet."
@@ -4567,17 +4613,6 @@ msgstr "Filters"
 #: .\management_system\templates\telegram_conversations.html:82
 msgid "Clear"
 msgstr "Clear"
-
-#: .\management_system\templates\dashboard.html:92
-#: .\management_system\templates\naming_filter.html:7
-#: .\management_system\templates\partials\components\loading_overlay.html:20
-#: .\management_system\templates\partials\components\loading_overlay.html:22
-#: .\management_system\templates\r2_management.html:217
-#: .\management_system\templates\submission_dashboard.html:77
-#: .\management_system\templates\upload_video.html:9
-#: .\management_system\templates\upload_video.html:111
-msgid "Loading..."
-msgstr "Loading..."
 
 #: .\management_system\templates\dashboard_form.html:15
 #: .\management_system\templates\lesson_form.html:22
@@ -4757,8 +4792,8 @@ msgid "May God bless you,"
 msgstr "May God bless you,"
 
 #: .\management_system\templates\emails\base_email.html:16
-msgid "Bible Institute — Light for every nation"
-msgstr "Bible Institute — Light for every nation"
+msgid "Bible Institute - Light for every nation"
+msgstr "Bible Institute - Light for every nation"
 
 #: .\management_system\templates\historical_intake.html:8
 #
@@ -5457,11 +5492,11 @@ msgstr "Broadcast list pagination"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s broadcasts\n"
+"                Showing %(start)s-%(end)s of %(total)s broadcasts\n"
 "            "
 msgstr ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s broadcasts\n"
+"                Showing %(start)s-%(end)s of %(total)s broadcasts\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_chat_panel.html:18
@@ -5527,13 +5562,13 @@ msgstr "Conversation list pagination"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "                "
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s conversations\n"
+"                Showing %(start)s-%(end)s of %(total)s conversations\n"
 "            "
-msgstr "\n                Showing %(start)s–%(end)s of %(total)s conversations\n            "
+msgstr "\n                Showing %(start)s-%(end)s of %(total)s conversations\n            "
 
 #: .\management_system\templates\partials\telegram_linked_user_list.html:35
 #: .\management_system\templates\telegram_conversations.html:26
@@ -5558,11 +5593,11 @@ msgstr "Linked user pagination"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s linked users\n"
+"                Showing %(start)s-%(end)s of %(total)s linked users\n"
 "            "
 msgstr ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s linked users\n"
+"                Showing %(start)s-%(end)s of %(total)s linked users\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_message_items.html:24
@@ -5585,13 +5620,13 @@ msgstr "Message history pagination"
 #, python-format
 #| msgid ""
 #| "\n"
-#| "                Showing %(start)s–%(end)s of %(total)s results\n"
+#| "                Showing %(start)s-%(end)s of %(total)s results\n"
 #| "                "
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s messages\n"
+"                Showing %(start)s-%(end)s of %(total)s messages\n"
 "            "
-msgstr "\n                Showing %(start)s–%(end)s of %(total)s messages\n            "
+msgstr "\n                Showing %(start)s-%(end)s of %(total)s messages\n            "
 
 #: .\management_system\templates\partials\telegram_message_list.html:129
 msgid "Send Message"
@@ -5763,8 +5798,8 @@ msgid "Select Academic Scope"
 msgstr "Select Academic Scope"
 
 #: .\management_system\templates\promotion_evaluation.html:41
-msgid "Select a scope…"
-msgstr "Select a scope…"
+msgid "Select a scope..."
+msgstr "Select a scope..."
 
 #: .\management_system\templates\promotion_evaluation.html:60
 msgid "Leave empty for an all-courses formula, or select a specific course to configure a course-specific override."
@@ -5785,8 +5820,8 @@ msgstr "These are persisted evaluation results. Scores and statuses were calcula
 #: .\management_system\templates\promotion_evaluation.html:95
 #: .\management_system\templates\promotion_evaluation.html:641
 #: .\management_system\templates\promotion_history.html:25
-msgid "Name or email…"
-msgstr "Name or email…"
+msgid "Name or email..."
+msgstr "Name or email..."
 
 #: .\management_system\templates\promotion_evaluation.html:98
 #: .\management_system\templates\promotion_evaluation.html:174
@@ -5891,8 +5926,8 @@ msgid "Override status"
 msgstr "Override status"
 
 #: .\management_system\templates\promotion_evaluation.html:299
-msgid "Select…"
-msgstr "Select…"
+msgid "Select..."
+msgstr "Select..."
 
 #: .\management_system\templates\promotion_evaluation.html:304
 msgid "Note (optional)"
@@ -5920,11 +5955,11 @@ msgstr "Consumed"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
+"                Showing %(start)s-%(end)s of %(total)s results\n"
 "                "
 msgstr ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s results\n"
+"                Showing %(start)s-%(end)s of %(total)s results\n"
 "                "
 
 #: .\management_system\templates\promotion_evaluation.html:389
@@ -6060,11 +6095,11 @@ msgstr "Metrics"
 #, python-format
 msgid ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s students\n"
+"                Showing %(start)s-%(end)s of %(total)s students\n"
 "                "
 msgstr ""
 "\n"
-"                Showing %(start)s–%(end)s of %(total)s students\n"
+"                Showing %(start)s-%(end)s of %(total)s students\n"
 "                "
 
 #: .\management_system\templates\promotion_evaluation.html:779
@@ -6854,8 +6889,8 @@ msgid "Search linked users"
 msgstr "Search linked users"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:6
-msgid "Admin Consistory — UI Proposal"
-msgstr "Admin Consistory — UI Proposal"
+msgid "Admin Consistory - UI Proposal"
+msgstr "Admin Consistory - UI Proposal"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:20
 #: .\management_system\templates\theme_showcase\student_proposal.html:21
@@ -6867,8 +6902,8 @@ msgid "The Consistory Desk"
 msgstr "The Consistory Desk"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:22
-msgid "One calm desk for all seventeen dashboard tabs — same ink and liturgical gold as the student pages, with live data from the running system."
-msgstr "One calm desk for all seventeen dashboard tabs — same ink and liturgical gold as the student pages, with live data from the running system."
+msgid "One calm desk for all seventeen dashboard tabs - same ink and liturgical gold as the student pages, with live data from the running system."
+msgstr "One calm desk for all seventeen dashboard tabs - same ink and liturgical gold as the student pages, with live data from the running system."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:24
 msgid "17 dashboard tabs"
@@ -6987,8 +7022,8 @@ msgid "Years, scopes and offerings"
 msgstr "Years, scopes and offerings"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:92
-msgid "Buttons, tables, modals…"
-msgstr "Buttons, tables, modals…"
+msgid "Buttons, tables, modals..."
+msgstr "Buttons, tables, modals..."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:97
 msgid "Latest enrollments"
@@ -6999,12 +7034,12 @@ msgstr "Latest enrollments"
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:88
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:223
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:90
-msgid "Live · last 5"
-msgstr "Live · last 5"
+msgid "Live - last 5"
+msgstr "Live - last 5"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:107
-msgid "New hearts knocking on the door — review, accept, decline."
-msgstr "New hearts knocking on the door — review, accept, decline."
+msgid "New hearts knocking on the door - review, accept, decline."
+msgstr "New hearts knocking on the door - review, accept, decline."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:112
 msgid "Total registered users"
@@ -7031,8 +7066,8 @@ msgid "Search users"
 msgstr "Search users"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:136
-msgid "Live · last 6 joined"
-msgstr "Live · last 6 joined"
+msgid "Live - last 6 joined"
+msgstr "Live - last 6 joined"
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:156
 msgid "Delete lesson?"
@@ -7048,16 +7083,16 @@ msgid "Destructive actions always stay server-confirmed."
 msgstr "Destructive actions always stay server-confirmed."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:170
-msgid "This is a live-data design proposal — no existing dashboard behavior was changed."
-msgstr "This is a live-data design proposal — no existing dashboard behavior was changed."
+msgid "This is a live-data design proposal - no existing dashboard behavior was changed."
+msgstr "This is a live-data design proposal - no existing dashboard behavior was changed."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:170
 msgid "See the student proposal"
 msgstr "See the student proposal"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:5
-msgid "Scope-level academic health: enrollments and grade averages per year–level."
-msgstr "Scope-level academic health: enrollments and grade averages per year–level."
+msgid "Scope-level academic health: enrollments and grade averages per year-level."
+msgstr "Scope-level academic health: enrollments and grade averages per year-level."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:9
 msgid "Active-year scope report"
@@ -7082,12 +7117,12 @@ msgid "No active academic year."
 msgstr "No active academic year."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:32
-msgid "Same SQL aggregation the production report uses — paginated, never one query per student."
-msgstr "Same SQL aggregation the production report uses — paginated, never one query per student."
+msgid "Same SQL aggregation the production report uses - paginated, never one query per student."
+msgstr "Same SQL aggregation the production report uses - paginated, never one query per student."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:39
-msgid "Official grade sheets — running totals per student, per course."
-msgstr "Official grade sheets — running totals per student, per course."
+msgid "Official grade sheets - running totals per student, per course."
+msgstr "Official grade sheets - running totals per student, per course."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:47
 msgid "Latest recorded grades"
@@ -7097,8 +7132,8 @@ msgstr "Latest recorded grades"
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:129
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:173
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:14
-msgid "Live · last 6"
-msgstr "Live · last 6"
+msgid "Live - last 6"
+msgstr "Live - last 6"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:78
 msgid "Formulas, saved course results and the immutable promotion ledger."
@@ -7161,8 +7196,8 @@ msgid "No pending applications right now."
 msgstr "No pending applications right now."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:5
-msgid "The library shelves — every course with its offerings, lessons and quizzes in one quiet row."
-msgstr "The library shelves — every course with its offerings, lessons and quizzes in one quiet row."
+msgid "The library shelves - every course with its offerings, lessons and quizzes in one quiet row."
+msgstr "The library shelves - every course with its offerings, lessons and quizzes in one quiet row."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:10
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:15
@@ -7174,8 +7209,8 @@ msgid "Course catalog"
 msgstr "Course catalog"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:14
-msgid "Live · 8 rows"
-msgstr "Live · 8 rows"
+msgid "Live - 8 rows"
+msgstr "Live - 8 rows"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:40
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:87
@@ -7190,8 +7225,8 @@ msgid "Offering detail anatomy"
 msgstr "Offering detail anatomy"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:53
-msgid "Live — first published offering"
-msgstr "Live — first published offering"
+msgid "Live - first published offering"
+msgstr "Live - first published offering"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:119
 msgid "Every lecture, with its publication status calm as a wax seal."
@@ -7224,8 +7259,8 @@ msgid "Latest quizzes"
 msgstr "Latest quizzes"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:214
-msgid "The media workshop — scheduled drafts wait quietly until their HLS segmentation is verified."
-msgstr "The media workshop — scheduled drafts wait quietly until their HLS segmentation is verified."
+msgid "The media workshop - scheduled drafts wait quietly until their HLS segmentation is verified."
+msgstr "The media workshop - scheduled drafts wait quietly until their HLS segmentation is verified."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:218
 msgid "Draft lessons"
@@ -7259,8 +7294,8 @@ msgid "Encoding stays client-side (HLS H.264/AAC); finalization verifies every m
 msgstr "Encoding stays client-side (HLS H.264/AAC); finalization verifies every manifest and segment before publishing."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:250
-msgid "The archives — database-linked media inventory, without touching live storage billing."
-msgstr "The archives — database-linked media inventory, without touching live storage billing."
+msgid "The archives - database-linked media inventory, without touching live storage billing."
+msgstr "The archives - database-linked media inventory, without touching live storage billing."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:258
 msgid "Media coverage"
@@ -7288,8 +7323,8 @@ msgid "files"
 msgstr "files"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:315
-msgid "Icon+name grid with hover actions — replaces tall truncated cards; folder-first on wide screens, 2-column on phones."
-msgstr "Icon+name grid with hover actions — replaces tall truncated cards; folder-first on wide screens, 2-column on phones."
+msgid "Icon+name grid with hover actions - replaces tall truncated cards; folder-first on wide screens, 2-column on phones."
+msgstr "Icon+name grid with hover actions - replaces tall truncated cards; folder-first on wide screens, 2-column on phones."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_enrollments_table.html:10
 msgid "Enrolled"
@@ -7300,8 +7335,8 @@ msgid "No enrollments yet."
 msgstr "No enrollments yet."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:5
-msgid "Every working component the dashboard tabs share — buttons, table actions, pagination, filters, alerts, toasts, modal and scroll — all interactive."
-msgstr "Every working component the dashboard tabs share — buttons, table actions, pagination, filters, alerts, toasts, modal and scroll — all interactive."
+msgid "Every working component the dashboard tabs share - buttons, table actions, pagination, filters, alerts, toasts, modal and scroll - all interactive."
+msgstr "Every working component the dashboard tabs share - buttons, table actions, pagination, filters, alerts, toasts, modal and scroll - all interactive."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:6
 msgid "Shared components"
@@ -7324,8 +7359,8 @@ msgid "Table with row actions"
 msgstr "Table with row actions"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:23
-msgid "Edit · duplicate · delete"
-msgstr "Edit · duplicate · delete"
+msgid "Edit - duplicate - delete"
+msgstr "Edit - duplicate - delete"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:35
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:19
@@ -7355,16 +7390,16 @@ msgid "Last"
 msgstr "Last"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:71
-msgid "Page 2 of 5 · 25 rows per page"
-msgstr "Page 2 of 5 · 25 rows per page"
+msgid "Page 2 of 5 - 25 rows per page"
+msgstr "Page 2 of 5 - 25 rows per page"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:77
 msgid "Filter pills & search"
 msgstr "Filter pills & search"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:79
-msgid "Search…"
-msgstr "Search…"
+msgid "Search..."
+msgstr "Search..."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:91
 msgid "Alerts & toasts"
@@ -7404,8 +7439,8 @@ msgid "The segment did not match the manifest checksum."
 msgstr "The segment did not match the manifest checksum."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:97
-msgid "Attendance recorded — welcome in."
-msgstr "Attendance recorded — welcome in."
+msgid "Attendance recorded - welcome in."
+msgstr "Attendance recorded - welcome in."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_kit.html:97
 msgid "Show toast"
@@ -7505,8 +7540,8 @@ msgid "Correct record"
 msgstr "Correct record"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:44
-msgid "No attendance scans yet — the year starts soon."
-msgstr "No attendance scans yet — the year starts soon."
+msgid "No attendance scans yet - the year starts soon."
+msgstr "No attendance scans yet - the year starts soon."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:55
 msgid "The gate: scan a QR, preview the student, record entrance or exit."
@@ -7541,8 +7576,8 @@ msgid "Step 3"
 msgstr "Step 3"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:68
-msgid "Record entrance or exit — duplicates are refused by the database"
-msgstr "Record entrance or exit — duplicates are refused by the database"
+msgid "Record entrance or exit - duplicates are refused by the database"
+msgstr "Record entrance or exit - duplicates are refused by the database"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_participation.html:71
 msgid "Entrance recorded."
@@ -7593,8 +7628,8 @@ msgid "Step"
 msgstr "Step"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:27
-msgid "Academic years, their opened scopes and offerings — the frame of the whole institution."
-msgstr "Academic years, their opened scopes and offerings — the frame of the whole institution."
+msgid "Academic years, their opened scopes and offerings - the frame of the whole institution."
+msgstr "Academic years, their opened scopes and offerings - the frame of the whole institution."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:31
 msgid "Academic years"
@@ -7609,8 +7644,8 @@ msgid "Scopes"
 msgstr "Scopes"
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:67
-msgid "A true month grid— meeting days in teal, holy days in gold, and holiday actions one click away."
-msgstr "A true month grid— meeting days in teal, holy days in gold, and holiday actions one click away."
+msgid "A true month grid- meeting days in teal, holy days in gold, and holiday actions one click away."
+msgstr "A true month grid- meeting days in teal, holy days in gold, and holiday actions one click away."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:76
 msgid "This month"
@@ -7739,8 +7774,8 @@ msgid "Geography"
 msgstr "Geography"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:42
-msgid "The lands of the Bible — rivers, mountains and trade roads that carried salvation history."
-msgstr "The lands of the Bible — rivers, mountains and trade roads that carried salvation history."
+msgid "The lands of the Bible - rivers, mountains and trade roads that carried salvation history."
+msgstr "The lands of the Bible - rivers, mountains and trade roads that carried salvation history."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:56
 #: .\management_system\templates\theme_showcase\partials\proposal_profile.html:62
@@ -7748,8 +7783,8 @@ msgid "History"
 msgstr "History"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:57
-msgid "Between the Testaments and through the early Church — how God guided His people."
-msgstr "Between the Testaments and through the early Church — how God guided His people."
+msgid "Between the Testaments and through the early Church - how God guided His people."
+msgstr "Between the Testaments and through the early Church - how God guided His people."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:75
 msgid "2 courses"
@@ -7762,8 +7797,8 @@ msgid "New Testament"
 msgstr "New Testament"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:82
-msgid "The promise fulfilled — the Gospels, the Pauline corpus and the early apostolic word."
-msgstr "The promise fulfilled — the Gospels, the Pauline corpus and the early apostolic word."
+msgid "The promise fulfilled - the Gospels, the Pauline corpus and the early apostolic word."
+msgstr "The promise fulfilled - the Gospels, the Pauline corpus and the early apostolic word."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_courses.html:96
 #: .\management_system\templates\theme_showcase\partials\proposal_profile.html:72
@@ -7878,8 +7913,8 @@ msgid "Isaac"
 msgstr "Isaac"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_quiz.html:58
-msgid "Choose…"
-msgstr "Choose…"
+msgid "Choose..."
+msgstr "Choose..."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_quiz.html:63
 msgid "Submit Answers"
@@ -7895,8 +7930,8 @@ msgid "Design Tokens"
 msgstr "Design Tokens"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:6
-msgid "The small palette behind every screen — nothing added that the screens do not use."
-msgstr "The small palette behind every screen — nothing added that the screens do not use."
+msgid "The small palette behind every screen - nothing added that the screens do not use."
+msgstr "The small palette behind every screen - nothing added that the screens do not use."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:12
 msgid "Psalmodia theme"
@@ -7931,16 +7966,16 @@ msgid "Serif display"
 msgstr "Serif display"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:27
-msgid "Georgia/Sakkal Majalla headings — an illuminated-manuscript voice, system fonts only."
-msgstr "Georgia/Sakkal Majalla headings — an illuminated-manuscript voice, system fonts only."
+msgid "Georgia/Sakkal Majalla headings - an illuminated-manuscript voice, system fonts only."
+msgstr "Georgia/Sakkal Majalla headings - an illuminated-manuscript voice, system fonts only."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:30
 msgid "Quiet sacred marks"
 msgstr "Quiet sacred marks"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:30
-msgid "A faint cross glyph and halo gradients — present, never loud."
-msgstr "A faint cross glyph and halo gradients — present, never loud."
+msgid "A faint cross glyph and halo gradients - present, never loud."
+msgstr "A faint cross glyph and halo gradients - present, never loud."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_tokens.html:33
 msgid "Soft motion"
@@ -7959,16 +7994,16 @@ msgid "Logical CSS properties keep every layout perfect in Arabic RTL and Englis
 msgstr "Logical CSS properties keep every layout perfect in Arabic RTL and English LTR."
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:6
-msgid "Student Experience — UI Proposal"
-msgstr "Student Experience — UI Proposal"
+msgid "Student Experience - UI Proposal"
+msgstr "Student Experience - UI Proposal"
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:22
 msgid "A Calm, Sacred Space to Study"
 msgstr "A Calm, Sacred Space to Study"
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:23
-msgid "A smoother, more modern home for every student screen — quiet parchment surfaces, liturgical gold on deep ink, and generous room for the Word. Same flows, softer soul."
-msgstr "A smoother, more modern home for every student screen — quiet parchment surfaces, liturgical gold on deep ink, and generous room for the Word. Same flows, softer soul."
+msgid "A smoother, more modern home for every student screen - quiet parchment surfaces, liturgical gold on deep ink, and generous room for the Word. Same flows, softer soul."
+msgstr "A smoother, more modern home for every student screen - quiet parchment surfaces, liturgical gold on deep ink, and generous room for the Word. Same flows, softer soul."
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:25
 msgid "5 student screens"
@@ -8488,8 +8523,8 @@ msgid "National ID must be exactly 14 digits."
 msgstr "National ID must be exactly 14 digits."
 
 #: .\management_system\utils\validators.py:12
-msgid "Passport number must be 6–20 alphanumeric characters."
-msgstr "Passport number must be 6–20 alphanumeric characters."
+msgid "Passport number must be 6-20 alphanumeric characters."
+msgstr "Passport number must be 6-20 alphanumeric characters."
 
 #: .\management_system\views.py:150
 #, python-format
@@ -9757,8 +9792,8 @@ msgstr "Force stop"
 msgid "Stop processing this upload and any companion files?"
 msgstr "Stop processing this upload and any companion files?"
 
-msgid "Remove this upload’s server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
-msgstr "Remove this upload’s server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
+msgid "Remove this upload's server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
+msgstr "Remove this upload's server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
 
 msgid "Clean up upload"
 msgstr "Clean up upload"
@@ -9949,8 +9984,8 @@ msgstr "messages"
 msgid "Load more files"
 msgstr "Load more files"
 
-msgid "Loading more files…"
-msgstr "Loading more files…"
+msgid "Loading more files..."
+msgstr "Loading more files..."
 
 msgid "Unread"
 msgstr "Unread"
@@ -10332,7 +10367,6 @@ msgstr "Image"
 
 msgid "All files"
 msgstr "All files"
-
 
 msgid "Attendance Policy"
 msgstr "Attendance Policy"
@@ -11037,17 +11071,17 @@ msgstr "Yes. Android shows a warning for every app installed outside Google Play
 msgid "Installation steps"
 msgstr "Installation steps"
 
-msgid "Tap “Download the app” above and wait until the file finishes downloading."
-msgstr "Tap “Download the app” above and wait until the file finishes downloading."
+msgid "Tap \"Download the app\" above and wait until the file finishes downloading."
+msgstr "Tap \"Download the app\" above and wait until the file finishes downloading."
 
 msgid "Open the downloaded file from your browser downloads or the Files app."
 msgstr "Open the downloaded file from your browser downloads or the Files app."
 
-msgid "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install."
-msgstr "When Android asks, allow “Install unknown apps” for Chrome or Files, then tap Install."
+msgid "When Android asks, allow \"Install unknown apps\" for Chrome or Files, then tap Install."
+msgstr "When Android asks, allow \"Install unknown apps\" for Chrome or Files, then tap Install."
 
-msgid "Open “Bible Institute” and sign in with your website account."
-msgstr "Open “Bible Institute” and sign in with your website account."
+msgid "Open \"Bible Institute\" and sign in with your website account."
+msgstr "Open \"Bible Institute\" and sign in with your website account."
 
 msgid "After updates, repeat the same steps; your account and data stay unchanged."
 msgstr "After updates, repeat the same steps; your account and data stay unchanged."
@@ -11170,7 +11204,6 @@ msgstr "No banners yet."
 msgid "Student banner messages"
 msgstr "Student banner messages"
 
-
 msgid "Quick jump"
 msgstr "Quick jump"
 
@@ -11192,15 +11225,14 @@ msgstr "Saved filters"
 msgid "Name this filter"
 msgstr "Name this filter"
 
-
 msgid "Recent"
 msgstr "Recent"
 
 msgid "Telegram"
 msgstr "Telegram"
 
-msgid "Searching…"
-msgstr "Searching…"
+msgid "Searching..."
+msgstr "Searching..."
 
 msgid "Search failed. Try again."
 msgstr "Search failed. Try again."
@@ -11235,7 +11267,6 @@ msgstr "Access to this page is logged."
 msgid "Aggregate"
 msgstr "Aggregate"
 
-
 msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
@@ -11251,9 +11282,8 @@ msgstr "Go to"
 msgid "then"
 msgstr "then"
 
-msgid "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
-msgstr "Ctrl on Windows, ⌘ on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
-
+msgid "Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
+msgstr "Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
 
 msgid "Pinned"
 msgstr "Pinned"
@@ -11267,72 +11297,11 @@ msgstr "Unpin"
 msgid "Open all"
 msgstr "Open all"
 
-
 msgid "No playable content"
 msgstr "No playable content"
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "Cannot accept a %(status)s application."
-
-#, python-format
-#~ msgid "Cannot decline a %(status)s application."
-#~ msgstr "Cannot decline a %(status)s application."
-
-#, fuzzy
-#~| msgid "Main navigation"
-#~ msgid "Claim conversation"
-#~ msgstr "Main navigation"
-
-#, fuzzy
-#~| msgid "Correction applied"
-#~ msgid "Conversation claimed."
-#~ msgstr "Correction applied"
-
-#~ msgid "Checking for new conversations"
-#~ msgstr "Checking for new conversations"
-
-#~ msgid "Telegram support conversations"
-#~ msgstr "Telegram support conversations"
-
-#~ msgid "Messages"
-#~ msgstr "Messages"
-
-#~ msgid "Last Activity"
-#~ msgstr "Last Activity"
-
-#~ msgid "Checking for new messages"
-#~ msgstr "Checking for new messages"
-
-#, python-format
-#~ msgid "Claimed by %(name)s"
-#~ msgstr "Claimed by %(name)s"
-
-#~ msgid "Send a Reply"
-#~ msgstr "Send a Reply"
-
-#~ msgid "You are replying to a specific message in this conversation."
-#~ msgstr "You are replying to a specific message in this conversation."
-
-#~ msgid "Replies are delivered to the student anonymously as Admin."
-#~ msgstr "Replies are delivered to the student anonymously as Admin."
-
-#~ msgid "Send Reply"
-#~ msgstr "Send Reply"
-
-#~ msgid "View, claim, and reply to student support conversations received through Telegram."
-#~ msgstr "View, claim, and reply to student support conversations received through Telegram."
-
-#~ msgid "Student name, username, or message text"
-#~ msgstr "Student name, username, or message text"
-
-#~ msgid "Filter conversations by status"
-#~ msgstr "Filter conversations by status"
-
-#~ msgid "All required application documents must be uploaded."
-#~ msgstr "All required application documents must be uploaded."
-
-#~ msgid "Graduated students cannot receive exceptional course enrollments."
-#~ msgstr "Graduated students cannot receive exceptional course enrollments."
 
 msgid "Payment Receipt"
 msgstr "Payment Receipt"
@@ -11408,133 +11377,6 @@ msgstr "Search student or source name"
 
 msgid "No matching historical records."
 msgstr "No matching historical records."
-
-#~ msgid "Priest Name"
-#~ msgstr "Priest Name"
-
-#~ msgid "Priest Phone"
-#~ msgstr "Priest Phone"
-
-#~ msgid "ID Front"
-#~ msgstr "ID Front"
-
-#~ msgid "ID Back"
-#~ msgstr "ID Back"
-
-#~ msgid "Attendance records"
-#~ msgstr "Attendance records"
-
-#~ msgid "Date when the evaluation is performed. Must fall within the academic year."
-#~ msgstr "Date when the evaluation is performed. Must fall within the academic year."
-
-#~ msgid "Preview results pagination"
-#~ msgstr "Preview results pagination"
-
-#~ msgid "Some actions already recorded for today."
-#~ msgstr "Some actions already recorded for today."
-
-#~ msgid "By submitting this application, you agree to the following terms:"
-#~ msgstr "By submitting this application, you agree to the following terms:"
-
-#~ msgid "All information provided must be accurate and complete."
-#~ msgstr "All information provided must be accurate and complete."
-
-#~ msgid "You commit to attending scheduled classes and completing required coursework."
-#~ msgstr "You commit to attending scheduled classes and completing required coursework."
-
-#~ msgid "The institute reserves the right to modify schedules, curriculum, and policies as needed."
-#~ msgstr "The institute reserves the right to modify schedules, curriculum, and policies as needed."
-
-#~ msgid "Your personal data will be used solely for institute administrative purposes."
-#~ msgstr "Your personal data will be used solely for institute administrative purposes."
-
-#~ msgid "You agree to abide by the institute's code of conduct and academic integrity policies."
-#~ msgstr "You agree to abide by the institute's code of conduct and academic integrity policies."
-
-#~ msgid "selected"
-#~ msgstr "selected"
-
-#~ msgid "items (Frontend Only)"
-#~ msgstr "items (Frontend Only)"
-
-#~ msgid "Saved changes"
-#~ msgstr "Saved changes"
-
-#~ msgid "View Submission"
-#~ msgstr "View Submission"
-
-#, python-format
-#~ msgid "Update %(view_name)s"
-#~ msgstr "Update %(view_name)s"
-
-#~ msgid "Item deleted successfully."
-#~ msgstr "Item deleted successfully."
-
-#~ msgid "No Data Here!"
-#~ msgstr "No Data Here!"
-
-#~ msgid "No active enrollment."
-#~ msgstr "No active enrollment."
-
-#~ msgid "Meeting days for every opened year–level scope and the year's holy days."
-#~ msgstr "Meeting days for every opened year–level scope and the year's holy days."
-
-#~ msgid "No meeting days configured."
-#~ msgstr "No meeting days configured."
-
-#~ msgid "Meeting courses saved."
-#~ msgstr "Meeting courses saved."
-
-#~ msgid "Meeting added."
-#~ msgstr "Meeting added."
-
-#~ msgid "Invalid part ID."
-#~ msgstr "Invalid part ID."
-
-#~ msgid "Teacher"
-#~ msgstr "Teacher"
-
-#~ msgid "Second Year"
-#~ msgstr "Second Year"
-
-#~ msgid "Bulk Create from CSV"
-#~ msgstr "Bulk Create from CSV"
-
-#~ msgid "Back to"
-#~ msgstr "Back to"
-
-#~ msgid "Update"
-#~ msgstr "Update"
-
-#~ msgid "authorized"
-#~ msgstr "authorized"
-
-#~ msgid "Quiz is closed, You can not take it anymore!"
-#~ msgstr "Quiz is closed, You can not take it anymore!"
-
-#~ msgid "Choose Course"
-#~ msgstr "Choose Course"
-
-#~ msgid "unauthorized!"
-#~ msgstr "unauthorized!"
-
-#~ msgid "Correct answer is not in choices"
-#~ msgstr "Correct answer is not in choices"
-
-#~ msgid "Page navigation example"
-#~ msgstr "Page navigation example"
-
-#~ msgid "HLS segment key must have a folder prefix and a \"Video Segments\" or \"Audio Segments\" media folder."
-#~ msgstr "HLS segment key must have a folder prefix and a \"Video Segments\" or \"Audio Segments\" media folder."
-
-#~ msgid "HLS segment key must have a non-empty folder prefix before the \"Video Segments\" or \"Audio Segments\" folder."
-#~ msgstr "HLS segment key must have a non-empty folder prefix before the \"Video Segments\" or \"Audio Segments\" folder."
-
-#~ msgid "Today's records:"
-#~ msgstr "Today's records:"
-
-#~ msgid "Replace payment receipt"
-#~ msgstr "Replace payment receipt"
 
 msgid "Academic Payment"
 msgstr "Academic Payment"
@@ -12009,8 +11851,8 @@ msgstr "Study activity details"
 msgid "Study timeline"
 msgstr "Study timeline"
 
-msgid "Meaningful daily playback activity · last 30 days"
-msgstr "Meaningful daily playback activity · last 30 days"
+msgid "Meaningful daily playback activity - last 30 days"
+msgstr "Meaningful daily playback activity - last 30 days"
 
 msgid "Activity intensity legend"
 msgstr "Activity intensity legend"
@@ -12369,8 +12211,8 @@ msgstr "Stop"
 msgid "Clean up"
 msgstr "Clean up"
 
-msgid "Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed."
-msgstr "Remove this upload’s files from the server and R2? An unused draft lesson created by this upload will also be removed."
+msgid "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed."
+msgstr "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed."
 
 msgid "Draft lesson removed."
 msgstr "Draft lesson removed."
@@ -12507,8 +12349,8 @@ msgstr "Refresh recalculation status"
 msgid "Select valid quizzes from the current list."
 msgstr "Select valid quizzes from the current list."
 
-msgid "Starting quiz recalculation…"
-msgstr "Starting quiz recalculation…"
+msgid "Starting quiz recalculation..."
+msgstr "Starting quiz recalculation..."
 
 msgid ""
 "Unable to read recalculation progress. Refresh the status to try again."
@@ -12539,8 +12381,8 @@ msgstr "Quiz operation failed. Completed work remains saved."
 msgid "Invalid quiz operation."
 msgstr "Invalid quiz operation."
 
-msgid "Recovering saved answers…"
-msgstr "Recovering saved answers…"
+msgid "Recovering saved answers..."
+msgstr "Recovering saved answers..."
 
 msgid "Recovery could not finish. Reload to try again."
 msgstr "Recovery could not finish. Reload to try again."
@@ -12551,8 +12393,8 @@ msgstr "Answers could not be saved. Keep this page open and retry."
 msgid "Answers saved."
 msgstr "Answers saved."
 
-msgid "Saving answers…"
-msgstr "Saving answers…"
+msgid "Saving answers..."
+msgstr "Saving answers..."
 
 msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
 msgstr "Submit saved snapshots after the grace period for %(count)s quizzes?"
@@ -12572,8 +12414,8 @@ msgstr "Reconcile selected quizzes"
 msgid "Reconcile all matching quizzes"
 msgstr "Reconcile all matching quizzes"
 
-msgid "Starting quiz operation…"
-msgstr "Starting quiz operation…"
+msgid "Starting quiz operation..."
+msgstr "Starting quiz operation..."
 
 msgid "Unable to start quiz operation."
 msgstr "Unable to start quiz operation."
@@ -12582,3 +12424,519 @@ msgid ""
 "Unable to read quiz operation progress. Refresh the status to try again."
 msgstr ""
 "Unable to read quiz operation progress. Refresh the status to try again."
+
+msgid "%(title)s (part %(number)d)"
+msgstr "%(title)s (part %(number)d)"
+
+msgid "Evaluation export was queued. The download link appears here when it is ready."
+msgstr "Evaluation export was queued. The download link appears here when it is ready."
+
+msgid "Start a whole-scope export from the promotion formula page."
+msgstr "Start a whole-scope export from the promotion formula page."
+
+msgid "The export is not ready yet."
+msgstr "The export is not ready yet."
+
+msgid "This export has expired. Start a new export."
+msgstr "This export has expired. Start a new export."
+
+msgid "Private export storage is not available. Try again later."
+msgstr "Private export storage is not available. Try again later."
+
+msgid "The export file could not be stored. Try again later."
+msgstr "The export file could not be stored. Try again later."
+
+msgid "This export is no longer available."
+msgstr "This export is no longer available."
+
+msgid "You are no longer allowed to export evaluation results."
+msgstr "You are no longer allowed to export evaluation results."
+
+msgid "Download result"
+msgstr "Download result"
+
+msgid "Operation progress"
+msgstr "Operation progress"
+
+msgid "Evaluation export"
+msgstr "Evaluation export"
+
+msgid "Grades report export"
+msgstr "Grades report export"
+
+msgid "Completed with failures"
+msgstr "Completed with failures"
+
+msgid "Report export was queued. The download link appears here when it is ready."
+msgstr "Report export was queued. The download link appears here when it is ready."
+
+msgid "Start the report export from the reports page."
+msgstr "Start the report export from the reports page."
+
+msgid "The selected course offering does not belong to this academic scope."
+msgstr "The selected course offering does not belong to this academic scope."
+
+msgid "You are no longer allowed to export reports."
+msgstr "You are no longer allowed to export reports."
+
+msgid "Invalid study mode."
+msgstr "Invalid study mode."
+
+msgid "Storage is not available right now."
+msgstr "Storage is not available right now."
+
+msgid "Another storage operation is already using these folders."
+msgstr "Another storage operation is already using these folders."
+
+msgid "A storage path is required."
+msgstr "A storage path is required."
+
+msgid "Storage has reached its active operation limit. Try again shortly."
+msgstr "Storage has reached its active operation limit. Try again shortly."
+
+msgid "A media upload or cleanup is already using this storage folder."
+msgstr "A media upload or cleanup is already using this storage folder."
+
+msgid "A graduation gallery upload is using this storage folder."
+msgstr "A graduation gallery upload is using this storage folder."
+
+msgid "A record already uses a destination file name."
+msgstr "A record already uses a destination file name."
+
+msgid "You are no longer allowed to manage storage."
+msgstr "You are no longer allowed to manage storage."
+
+msgid "You are no longer allowed to delete storage."
+msgstr "You are no longer allowed to delete storage."
+
+msgid "The destination folder is not empty."
+msgstr "The destination folder is not empty."
+
+msgid "The folder copy failed before any old file was removed."
+msgstr "The folder copy failed before any old file was removed."
+
+msgid "The renamed copy is incomplete; old files were not removed."
+msgstr "The renamed copy is incomplete; old files were not removed."
+
+msgid "The copied file could not be verified, so the original was kept."
+msgstr "The copied file could not be verified, so the original was kept."
+
+msgid "The old file could not be removed."
+msgstr "The old file could not be removed."
+
+msgid "Some files changed during the rename and were not moved."
+msgstr "Some files changed during the rename and were not moved."
+
+msgid "The files were renamed, but lesson links were not updated."
+msgstr "The files were renamed, but lesson links were not updated."
+
+msgid "The files were renamed, but some record links were not updated."
+msgstr "The files were renamed, but some record links were not updated."
+
+msgid "The file rename failed."
+msgstr "The file rename failed."
+
+msgid "The rename failed."
+msgstr "The rename failed."
+
+msgid "The file could not be removed."
+msgstr "The file could not be removed."
+
+msgid "The file is still linked to a record and was kept."
+msgstr "The file is still linked to a record and was kept."
+
+msgid "File is still linked to a record and cannot be deleted."
+msgstr "File is still linked to a record and cannot be deleted."
+
+msgid "The folder contains files still linked to application records."
+msgstr "The folder contains files still linked to application records."
+
+msgid "Some files remain in the folder."
+msgstr "Some files remain in the folder."
+
+msgid "Folder deletion was queued."
+msgstr "Folder deletion was queued."
+
+msgid "Storage operation"
+msgstr "Storage operation"
+
+msgid "Storage operation progress"
+msgstr "Storage operation progress"
+
+msgid "Storage operation complete"
+msgstr "Storage operation complete"
+
+msgid "Storage operation completed with warnings"
+msgstr "Storage operation completed with warnings"
+
+msgid "Storage operation failed"
+msgstr "Storage operation failed"
+
+msgid "Storage operation queued"
+msgstr "Storage operation queued"
+
+msgid "Storage operation in progress"
+msgstr "Storage operation in progress"
+
+msgid "Verifying copies"
+msgstr "Verifying copies"
+
+msgid "Could not load storage operation progress"
+msgstr "Could not load storage operation progress"
+
+msgid "Waiting for storage operation progress"
+msgstr "Waiting for storage operation progress"
+
+msgid "The operation failed."
+msgstr "The operation failed."
+
+msgid "%(done)s files"
+msgstr "%(done)s files"
+
+msgid "The folder rename failed and the original files were restored."
+msgstr "The folder rename failed and the original files were restored."
+
+msgid "Start the quiz export from the submissions page."
+msgstr "Start the quiz export from the submissions page."
+
+msgid "Quiz export was queued. The download link appears here when it is ready."
+msgstr "Quiz export was queued. The download link appears here when it is ready."
+
+msgid "You are no longer allowed to export quiz submissions."
+msgstr "You are no longer allowed to export quiz submissions."
+
+msgid "The quiz no longer exists."
+msgstr "The quiz no longer exists."
+
+msgid "You are no longer allowed to run this operation."
+msgstr "You are no longer allowed to run this operation."
+
+msgid "Another operation with different input is already running. Wait for it to finish."
+msgstr "Another operation with different input is already running. Wait for it to finish."
+
+msgid "Last updated"
+msgstr "Last updated"
+
+msgid "%(processed)s of %(total)s"
+msgstr "%(processed)s of %(total)s"
+
+msgid "Announcement delivery"
+msgstr "Announcement delivery"
+
+msgid "Background job pages"
+msgstr "Background job pages"
+
+msgid "Background jobs"
+msgstr "Background jobs"
+
+msgid "Choose an operation in the selected category."
+msgstr "Choose an operation in the selected category."
+
+msgid "Cleanup: %(status)s"
+msgstr "Cleanup: %(status)s"
+
+msgid "Created from"
+msgstr "Created from"
+
+msgid "Created through"
+msgstr "Created through"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "First 20 row errors"
+msgstr "First 20 row errors"
+
+msgid "Gallery uploads"
+msgstr "Gallery uploads"
+
+msgid "Job category"
+msgstr "Job category"
+
+msgid "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
+msgstr "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
+
+msgid "Lesson attachment: %(status)s"
+msgstr "Lesson attachment: %(status)s"
+
+msgid "Management operations"
+msgstr "Management operations"
+
+msgid "Management, quizzes, media, gallery uploads, announcements and Telegram batches."
+msgstr "Management, quizzes, media, gallery uploads, announcements and Telegram batches."
+
+msgid "Matching jobs: %(count)s"
+msgstr "Matching jobs: %(count)s"
+
+msgid "No background jobs match these filters."
+msgstr "No background jobs match these filters."
+
+msgid "No progress reported"
+msgstr "No progress reported"
+
+msgid "Not specified"
+msgstr "Not specified"
+
+msgid "Operation"
+msgstr "Operation"
+
+msgid "Progress updates are temporarily unavailable. Retrying..."
+msgstr "Progress updates are temporarily unavailable. Retrying..."
+
+msgid "Quiz operations"
+msgstr "Quiz operations"
+
+msgid "Reference"
+msgstr "Reference"
+
+msgid "Requested by"
+msgstr "Requested by"
+
+msgid "Search and filter"
+msgstr "Search and filter"
+
+msgid "Search jobs"
+msgstr "Search jobs"
+
+msgid "Selected submissions"
+msgstr "Selected submissions"
+
+msgid "The end date must be on or after the start date."
+msgstr "The end date must be on or after the start date."
+
+msgid "View details"
+msgstr "View details"
+
+msgid "All storage"
+msgstr "All storage"
+
+msgid "Formula recalculation"
+msgstr "Formula recalculation"
+
+msgid "Bulk promotion"
+msgstr "Bulk promotion"
+
+msgid "Historical intake"
+msgstr "Historical intake"
+
+msgid "Legacy user import"
+msgstr "Legacy user import"
+
+msgid "Quiz detail export"
+msgstr "Quiz detail export"
+
+msgid "Quiz summary export"
+msgstr "Quiz summary export"
+
+msgid "Course copy"
+msgstr "Course copy"
+
+msgid "Attendance reconcile"
+msgstr "Attendance reconcile"
+
+msgid "Storage rename"
+msgstr "Storage rename"
+
+msgid "Storage delete"
+msgstr "Storage delete"
+
+msgid "Storage usage refresh"
+msgstr "Storage usage refresh"
+
+msgid "A redelivery for this notification is already in progress."
+msgstr "A redelivery for this notification is already in progress."
+
+msgid "Accepted, waiting for receipt"
+msgstr "Accepted, waiting for receipt"
+
+msgid "Action button"
+msgstr "Action button"
+
+msgid "Announcement generation"
+msgstr "Announcement generation"
+
+msgid "Arabic content"
+msgstr "Arabic content"
+
+msgid "Audience"
+msgstr "Audience"
+
+msgid "Channel delivery attempts"
+msgstr "Channel delivery attempts"
+
+msgid "Delivery attempt pages"
+msgstr "Delivery attempt pages"
+
+msgid "Device"
+msgstr "Device"
+
+msgid "English content"
+msgstr "English content"
+
+msgid "Exact Telegram message text"
+msgstr "Exact Telegram message text"
+
+msgid "Exact text was not recorded for older Telegram attempts. The saved notification content is shown above."
+msgstr "Exact text was not recorded for older Telegram attempts. The saved notification content is shown above."
+
+msgid "Finish notification generation before resending."
+msgstr "Finish notification generation before resending."
+
+msgid "Has failed deliveries"
+msgstr "Has failed deliveries"
+
+msgid "Inbox generation; view notification history for delivery receipts."
+msgstr "Inbox generation; view notification history for delivery receipts."
+
+msgid "Invalid notification redelivery selection."
+msgstr "Invalid notification redelivery selection."
+
+msgid "Invalid selection flags."
+msgstr "Invalid selection flags."
+
+msgid "Live updates"
+msgstr "Live updates"
+
+msgid "Matching jobs: {{ count }}"
+msgstr "Matching jobs: {{ count }}"
+
+msgid "No eligible failed delivery, or another delivery is still pending."
+msgstr "No eligible failed delivery, or another delivery is still pending."
+
+msgid "No external channel attempts recorded yet."
+msgstr "No external channel attempts recorded yet."
+
+msgid "Notification history"
+msgstr "Notification history"
+
+msgid "Notification redelivery"
+msgstr "Notification redelivery"
+
+msgid "Notification type"
+msgstr "Notification type"
+
+msgid "Only administrators can resend notifications."
+msgstr "Only administrators can resend notifications."
+
+msgid "Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again."
+msgstr "Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again."
+
+msgid "Original recipients of this saved content"
+msgstr "Original recipients of this saved content"
+
+msgid "Pause updates"
+msgstr "Pause updates"
+
+msgid "Preparing delivery records"
+msgstr "Preparing delivery records"
+
+msgid "Push success means a confirmed provider receipt, not that the student opened the message. Pending receipts keep polling; terminal failures can be retried."
+msgstr "Push success means a confirmed provider receipt, not that the student opened the message. Pending receipts keep polling; terminal failures can be retried."
+
+msgid "Queue another delivery using this saved content?"
+msgstr "Queue another delivery using this saved content?"
+
+msgid "Read in the inbox"
+msgstr "Read in the inbox"
+
+msgid "Recipient"
+msgstr "Recipient"
+
+msgid "Recipient copies are being prepared."
+msgstr "Recipient copies are being prepared."
+
+msgid "Recipient pages"
+msgstr "Recipient pages"
+
+msgid "Redelivery queued. Final progress includes delivery receipts."
+msgstr "Redelivery queued. Final progress includes delivery receipts."
+
+msgid "Resend all"
+msgstr "Resend all"
+
+msgid "Resume updates"
+msgstr "Resume updates"
+
+msgid "Retry notification generation"
+msgstr "Retry notification generation"
+
+msgid "Retry or resend"
+msgstr "Retry or resend"
+
+msgid "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history."
+msgstr "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history."
+
+msgid "Saved notification content"
+msgstr "Saved notification content"
+
+msgid "Saved system and admin notifications, per-recipient delivery progress and original content."
+msgstr "Saved system and admin notifications, per-recipient delivery progress and original content."
+
+msgid "Scheduled for later"
+msgstr "Scheduled for later"
+
+msgid "Telegram broadcast"
+msgstr "Telegram broadcast"
+
+msgid "Telegram recipients"
+msgstr "Telegram recipients"
+
+msgid "The notification is no longer eligible for redelivery."
+msgstr "The notification is no longer eligible for redelivery."
+
+msgid "The notification was cancelled."
+msgstr "The notification was cancelled."
+
+msgid "The operation failed. Review the results and try again."
+msgstr "The operation failed. Review the results and try again."
+
+msgid "The operation was taken over by another worker."
+msgstr "The operation was taken over by another worker."
+
+msgid "The original notification is no longer available."
+msgstr "The original notification is no longer available."
+
+msgid "There are no currently eligible recipients for this delivery."
+msgstr "There are no currently eligible recipients for this delivery."
+
+msgid "This notification has not reached its scheduled time."
+msgstr "This notification has not reached its scheduled time."
+
+msgid "This recipient only"
+msgstr "This recipient only"
+
+msgid "This redelivery"
+msgstr "This redelivery"
+
+msgid "This redelivery's recipients"
+msgstr "This redelivery's recipients"
+
+msgid "Transport retry only; no duplicate inbox notification was created."
+msgstr "Transport retry only; no duplicate inbox notification was created."
+
+msgid "Unavailable"
+msgstr "Unavailable"
+
+msgid "Unread in the inbox"
+msgstr "Unread in the inbox"
+
+msgid "Updates paused"
+msgstr "Updates paused"
+
+msgid "View delivery history"
+msgstr "View delivery history"
+
+msgid "Initial delivery records are still being prepared. Resend all will be available when they finish."
+msgstr "Initial delivery records are still being prepared. Resend all will be available when they finish."
+
+msgid "Wait for the original delivery records to finish before resending all."
+msgstr "Wait for the original delivery records to finish before resending all."
+
+msgid "Wait for the current delivery to finish before resending."
+msgstr "Wait for the current delivery to finish before resending."
+
+msgid "Waiting for delivery"
+msgstr "Waiting for delivery"
+
+msgid "device"
+msgstr "device"

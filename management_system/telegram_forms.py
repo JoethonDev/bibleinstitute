@@ -11,6 +11,12 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from .telegram.attachments import (
+    CAPTION_MAX_LENGTH,
+    SUPPORT_ATTACHMENT_ACCEPT,
+    classify_attachment,
+)
+
 
 class MultipleFileInput(forms.ClearableFileInput):
     """File input that accepts several files for one optional field."""
@@ -49,14 +55,15 @@ class TelegramBotConfigForm(forms.Form):
 class TelegramSupportReplyForm(forms.Form):
     """Accept one bounded admin web-chat reply without database or delivery work.
 
-    This is a trust-boundary validator only. View-layer admin authorization,
-    conversation ownership of ``reply_to_telegram_message_id``, and the shared
-    claim/reply service belong to the Phase 6 admin view and
-    ``management_system/telegram/support.py``.
+    A reply carries either text or one Telegram-supported file (JPEG/PNG photo,
+    MP4 video, or PDF document). This is a trust-boundary validator only.
+    View-layer admin authorization, conversation ownership of
+    ``reply_to_telegram_message_id``, and the shared claim/reply service belong
+    to ``management_system/telegram/support.py``.
     """
 
     message = forms.CharField(
-        required=True,
+        required=False,
         label=_("Reply message"),
         max_length=4000,
         error_messages={
@@ -71,6 +78,21 @@ class TelegramSupportReplyForm(forms.Form):
             }
         ),
     )
+    attachment = forms.FileField(
+        required=False,
+        label=_("Attachment"),
+        allow_empty_file=False,
+        error_messages={
+            "empty": _("Empty files are not accepted."),
+        },
+        widget=forms.ClearableFileInput(
+            attrs={
+                "class": "form-control form-control-sm tg-chat-file-input",
+                "accept": SUPPORT_ATTACHMENT_ACCEPT,
+                "aria-describedby": "telegram-support-attachment-help",
+            }
+        ),
+    )
     reply_to_telegram_message_id = forms.IntegerField(
         required=False,
         min_value=1,
@@ -82,11 +104,36 @@ class TelegramSupportReplyForm(forms.Form):
     )
 
     def clean_message(self) -> str:
-        message = self.cleaned_data.get("message", "")
-        message = message.strip()
-        if not message:
-            raise ValidationError(_("A reply message is required."))
-        return message
+        return self.cleaned_data.get("message", "").strip()
+
+    def clean_attachment(self):
+        attachment = self.cleaned_data.get("attachment")
+        if not attachment:
+            return None
+        head = attachment.read(16)
+        attachment.seek(0)
+        try:
+            classify_attachment(
+                filename=str(getattr(attachment, "name", "") or ""),
+                size=int(getattr(attachment, "size", 0) or 0),
+                head=head,
+            )
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+        return attachment
+
+    def clean(self):
+        cleaned = super().clean()
+        message = cleaned.get("message", "")
+        attachment = cleaned.get("attachment")
+        if not message and not attachment and not self.errors:
+            self.add_error("message", _("A reply message or an attachment is required."))
+        if attachment and len(message) > CAPTION_MAX_LENGTH:
+            self.add_error(
+                "message",
+                _("Attachments support a message of 1,024 characters or fewer."),
+            )
+        return cleaned
 
 
 class TelegramBroadcastForm(forms.Form):

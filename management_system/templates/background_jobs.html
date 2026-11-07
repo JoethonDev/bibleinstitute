@@ -1,0 +1,9 @@
+{% extends "admin_panel.html" %}
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
+{% block body %}
+{% if job_detail %}
+    {% include "partials/background_job_detail_content.html" %}
+{% else %}
+    {% include "partials/background_jobs_content.html" %}
+{% endif %}
+{% endblock %}

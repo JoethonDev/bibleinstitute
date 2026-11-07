@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import json
 import random
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from django.core.paginator import Page, Paginator
-from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, QuerySet, Window
-from django.db.models.functions import RowNumber
+from django.db.models import Count, DateTimeField, Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Window
+from django.db.models.functions import Coalesce, RowNumber
 from django.utils.timezone import localdate, now
 
 from ..academic_access import (
-    TARGETED_ENROLLMENT_TYPES,
     active_year_published_offerings_for_user,
     accessible_offerings,
+    readable_offering_access,
     user_can_write_offering_activity,
 )
 from ..models import (
@@ -36,8 +36,7 @@ from ..models import (
 )
 from .attendance import DAY_GRADE_NONE, grade_attendance_day, pair_attendance_records
 from .progress_merge import unique_seconds
-from .quiz_access import QUIZ_SUBMISSION_GRACE, answers_releasable
-from .timezones import ensure_aware
+from .quiz_access import QUIZ_SUBMISSION_GRACE, answers_releasable, quiz_status_from
 
 
 PAGE_SIZE = 20
@@ -66,12 +65,14 @@ def _nested_page_metadata(page: int, has_next: bool) -> dict[str, int | bool | N
 
 
 def student_offerings_queryset(user: User) -> QuerySet:
-    """Return bounded published offerings readable by a mobile account."""
+    """Return readable offerings and their labels; callers paginate the queryset."""
     if getattr(getattr(user, "role", None), "role", None) in {"admin", "staff"}:
         offerings = active_year_published_offerings_for_user(user)
     else:
         offerings = accessible_offerings(user)
-    return offerings.prefetch_related(None).order_by(
+    return offerings.select_related(
+        "course", "academic_year_level__academic_year", "academic_year_level__level"
+    ).order_by(
         "-academic_year_level__academic_year__ordering",
         "academic_year_level__level__ordering",
         "course__name",
@@ -81,25 +82,6 @@ def student_offerings_queryset(user: User) -> QuerySet:
 
 def _can_read_offering(user: User, offering_id: int) -> bool:
     return student_offerings_queryset(user).filter(pk=offering_id).exists()
-
-
-def _offering_access_annotations(queryset: QuerySet, user: User) -> QuerySet:
-    normal = Enrollment.objects.filter(
-        student=user,
-        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-        enrollment_type=Enrollment.Type.NORMAL,
-        academic_year_level_id=OuterRef("academic_year_level_id"),
-    )
-    targeted = Enrollment.objects.filter(
-        student=user,
-        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-        enrollment_type__in=TARGETED_ENROLLMENT_TYPES,
-        course_offering_id=OuterRef("pk"),
-    )
-    return queryset.annotate(
-        student_has_normal_access=Exists(normal),
-        student_has_targeted_access=Exists(targeted),
-    )
 
 
 def _access_kind(offering) -> str:
@@ -247,11 +229,11 @@ def _student_offerings_with_content(
         "id", "name", "quiz_type_id", "course_offering_id", "status", "opening_date", "closing_date", "total_grade",
         "quiz_type__code", "quiz_type__name_en", "quiz_type__name_ar",
     ).order_by("course_offering_id", "opening_date", "pk")
-    return _offering_access_annotations(
-        student_offerings_queryset(user).prefetch_related(
-            Prefetch("lessons", queryset=lesson_queryset, to_attr="published_lessons"),
-            Prefetch("quizzes", queryset=quiz_queryset, to_attr="published_quizzes"),
-        ), user
+    return student_offerings_queryset(user).annotate(
+        **readable_offering_access(user)
+    ).prefetch_related(
+        Prefetch("lessons", queryset=lesson_queryset, to_attr="published_lessons"),
+        Prefetch("quizzes", queryset=quiz_queryset, to_attr="published_quizzes"),
     )
 
 
@@ -375,13 +357,10 @@ def _quiz_mode(
     opening: QuizStudentOpening | Quiz,
     can_write: bool,
 ) -> str:
-    if grade:
-        return "view"
-    if quiz.status == PublicationStatus.PUBLISHED and can_write:
-        current = now()
-        if ensure_aware(opening.opening_date) <= current <= ensure_aware(opening.closing_date) + QUIZ_SUBMISSION_GRACE:
-            return "exam"
-    return "closed_unsolved"
+    """Mobile-facing wrapper around the one canonical quiz-mode rule."""
+    published_write = bool(can_write and quiz.status == PublicationStatus.PUBLISHED)
+    mode, _grade = quiz_status_from(quiz, grade, opening, now(), published_write)
+    return mode
 
 
 def student_quiz_data(user: User, offering_id: int, quiz_id: int, language: str) -> dict | None:
@@ -779,13 +758,8 @@ def student_course_progress_data(
 def student_overview_data(user: User, language: str = "en", page: int = 1) -> dict:
     """Return bounded, own-account study summaries without per-offering queries."""
     course_page = Paginator(
-        _offering_access_annotations(
-            student_offerings_queryset(user).select_related(
-                "course",
-                "academic_year_level__academic_year",
-                "academic_year_level__level",
-            ),
-            user,
+        student_offerings_queryset(user).annotate(
+            **readable_offering_access(user)
         ),
         PAGE_SIZE,
     ).get_page(page)
@@ -869,6 +843,7 @@ def student_notifications_queryset(user: User) -> QuerySet:
     """
     return StudentNotification.objects.filter(
         student=user,
+        inbox_visible=True,
         cancelled_at__isnull=True,
         scheduled_for__lte=now(),
     )
@@ -945,8 +920,13 @@ def student_next_actions(user: User) -> dict:
     Bounded (1 resume row, <=5 quizzes); reuses authorized offerings and the
     existing profile-gap signals. No per-row queries beyond the bounded sets.
     """
+    readable_offerings = student_offerings_queryset(user).values("pk").order_by()
     resume = (
-        LectureProgress.objects.filter(student=user, last_position_seconds__gt=0)
+        LectureProgress.objects.filter(
+            student=user,
+            last_position_seconds__gt=0,
+            lesson__course_offering__in=readable_offerings,
+        )
         .select_related("lesson", "lesson__course_offering__course")
         .order_by("-id")
         .first()
@@ -963,41 +943,39 @@ def student_next_actions(user: User) -> dict:
             "position": resume.last_position_seconds,
             "percent": resume.percent,
         }
-    offerings = list(student_offerings_queryset(user)[:PAGE_SIZE])
-    offering_ids = [o.pk for o in offerings]
     next_quizzes: list[dict] = []
-    if offering_ids:
-        current = now()
-        quizzes = list(
-            Quiz.objects.filter(
-                course_offering_id__in=offering_ids,
-                status=PublicationStatus.PUBLISHED,
-            )
-            .select_related("course_offering__course")
-            .order_by("closing_date", "pk")[:50]
+    current = now()
+    effective_closing = Coalesce(
+        Subquery(
+            QuizStudentOpening.objects.filter(
+                quiz=OuterRef("pk"), student=user
+            ).values("closing_date")[:1],
+            output_field=DateTimeField(),
+        ),
+        F("closing_date"),
+    )
+    candidates = (
+        Quiz.objects.filter(
+            course_offering__in=readable_offerings,
+            status=PublicationStatus.PUBLISHED,
         )
-        graded_ids = set(
-            Grade.objects.filter(user=user, quiz_id__in=[q.pk for q in quizzes]).values_list("quiz_id", flat=True)
+        .annotate(effective_closing=effective_closing)
+        .filter(
+            Q(effective_closing__isnull=True)
+            | Q(effective_closing__gte=current - QUIZ_SUBMISSION_GRACE)
         )
-        for quiz in quizzes:
-            if quiz.pk in graded_ids:
-                continue
-            opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first() or quiz
-            try:
-                closing = ensure_aware(opening.closing_date) if opening.closing_date else None
-            except Exception:
-                closing = None
-            if closing is not None and closing + QUIZ_SUBMISSION_GRACE < current:
-                continue
-            next_quizzes.append({
-                "id": quiz.pk,
-                "name": quiz.name,
-                "offering_id": quiz.course_offering_id,
-                "course_name": quiz.course_offering.course.name if quiz.course_offering_id else "",
-                "closing_at": opening.closing_date.isoformat() if opening.closing_date else None,
-            })
-            if len(next_quizzes) >= 5:
-                break
+        .exclude(Exists(Grade.objects.filter(quiz_id=OuterRef("pk"), user=user)))
+        .select_related("course_offering__course")
+        .order_by(F("effective_closing").asc(nulls_last=True), "pk")[:5]
+    )
+    for quiz in candidates:
+        next_quizzes.append({
+            "id": quiz.pk,
+            "name": quiz.name,
+            "offering_id": quiz.course_offering_id,
+            "course_name": quiz.course_offering.course.name if quiz.course_offering_id else "",
+            "closing_at": quiz.effective_closing.isoformat() if quiz.effective_closing else None,
+        })
     gaps: list[str] = []
     for field in ("phone", "city", "education_or_job"):
         if not getattr(user, field, None):

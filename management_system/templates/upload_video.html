@@ -63,7 +63,7 @@
                 <option value="">{% translate "None / Standalone output" %}</option>
                 {% for lesson in editable_lessons %}
                 <option value="{{ lesson.pk }}">
-                    {{ lesson.name }} — {{ lesson.course_offering.course.name }} — {{ lesson.course_offering.academic_year_level.level.display_name }} — {{ lesson.course_offering.academic_year_level.academic_year.name }}
+                    {{ lesson.name }} - {{ lesson.course_offering.course.name }} - {{ lesson.course_offering.academic_year_level.level.display_name }} - {{ lesson.course_offering.academic_year_level.academic_year.name }}
                 </option>
                 {% endfor %}
             </select>

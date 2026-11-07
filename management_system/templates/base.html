@@ -10,7 +10,7 @@
 
     {% block head_meta %}
     <title>{% translate "Bible Institute Coptic" %}</title>
-    <meta name="description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
+    <meta name="description" content="{% translate 'Bible Institute Coptic - Online theological education' %}">
     <meta name="keywords" content="{% translate 'Bible institute, Coptic, theological education, online learning, Egypt' %}">
     <link rel="canonical" href="{% if request.get_full_path %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% else %}{{ request.build_absolute_uri }}{% endif %}">
     <link rel="alternate" hreflang="x-default" href="{{ request.scheme }}://{{ request.get_host }}/">
@@ -18,7 +18,7 @@
     <link rel="alternate" hreflang="ar" href="{{ request.scheme }}://{{ request.get_host }}{{ localized_url_ar }}">
     <meta name="robots" content="{% if user.is_authenticated %}noindex, nofollow{% else %}index, follow{% endif %}">
     <meta property="og:title" content="{% translate 'Bible Institute Coptic' %}">
-    <meta property="og:description" content="{% translate 'Bible Institute Coptic — Online theological education' %}">
+    <meta property="og:description" content="{% translate 'Bible Institute Coptic - Online theological education' %}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.build_absolute_uri }}">
     <meta property="og:image" content="{% static 'login-logo.png' %}?v={{ static_asset_version }}">
@@ -82,7 +82,7 @@
         <div class="institute-topbar ps-site-topbar">
           <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span class="ps-site-topbar-info"><i class="fas fa-map-marker-alt fa-fw me-1"></i>{% translate "Bible Institute - Maadi - Cairo" %}</span>
-            <div class="ps-site-topbar-links"><a href="mailto:info@bibleinstitute-eg.org"><i class="fas fa-envelope fa-fw"></i> info@bibleinstitute-eg.org</a> <span class="ps-site-sep">·</span> <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-fw"></i> Facebook</a> <span class="ps-site-sep">·</span> <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener"><i class="fab fa-youtube fa-fw"></i> YouTube</a></div>
+            <div class="ps-site-topbar-links"><a href="mailto:info@bibleinstitute-eg.org"><i class="fas fa-envelope fa-fw"></i> info@bibleinstitute-eg.org</a> <span class="ps-site-sep">-</span> <a href="https://www.facebook.com/معهد-الكتاب-المقدس-مطرانية-المعادى-530308570454027/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-fw"></i> Facebook</a> <span class="ps-site-sep">-</span> <a href="https://www.youtube.com/channel/UCV66PWjHJv_6uVyohxJmvtw/featured/" target="_blank" rel="noopener"><i class="fab fa-youtube fa-fw"></i> YouTube</a></div>
           </div>
         </div>
     </header>
@@ -92,7 +92,7 @@
             <div class="container">
               <a class="navbar-brand ps-site-brand" href="{% url 'home' %}">
                   <img src="{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Logo' %}" width="125" height="40" class="d-inline-block align-text-top">
-                  <span class="institute-brand-copy ps-site-brand-text"><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Maadi · Academic study with an ecclesial spirit" %}</small></span>
+                  <span class="institute-brand-copy ps-site-brand-text"><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Maadi - Academic study with an ecclesial spirit" %}</small></span>
               </a>
               <button class="navbar-toggler ps-site-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <i class="fas fa-bars"></i>
@@ -193,7 +193,7 @@
               </div>
               <div class="col-lg-4 col-md-6 mb-4">
                   <h5 class="text-uppercase ps-site-footer-heading">{% translate "Institute Headquarters" %}</h5>
-                  <p class="ps-site-footer-text"><i class="fas fa-map-marker-alt me-2"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika – Maadi – Egypt" %}</p>
+                  <p class="ps-site-footer-text"><i class="fas fa-map-marker-alt me-2"></i>{% translate "Church of the Great Martyr Mar Girgis, Kotsika - Maadi - Egypt" %}</p>
                   <p class="ps-site-footer-text"><i class="fas fa-envelope me-2"></i>info@bibleinstitute-eg.org</p>
                   <p class="ps-site-footer-text"><i class="fas fa-globe me-2"></i>www.bibleinstitute-eg.org</p>
               </div>

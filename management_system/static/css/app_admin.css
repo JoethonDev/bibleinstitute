@@ -1,5 +1,5 @@
 /* ================================================================================
-   APP — ADMIN REALM (Psalmodia Consistory Desk)
+   APP - ADMIN REALM (Psalmodia Consistory Desk)
    Admin `.ad-*` classes approved by the operator via admin_proposal.css.
    Consumes role tokens from psalmodia.css. No literal hex colour values.
    RTL-safe with logical properties. Responsive.
@@ -68,7 +68,7 @@
     transition: grid-template-columns var(--ps-motion);
 }
 
-/* Collapsed sidebar — narrow rail shows icons only */
+/* Collapsed sidebar - narrow rail shows icons only */
 .ad-shell.is-sidebar-collapsed {
     grid-template-columns: 4.5rem minmax(0, 1fr);
 }
@@ -1105,19 +1105,19 @@
 .ad-calmg-cell .is-holiday { background: var(--ps-gold-soft); border-color: var(--ps-gold); }
 .ad-calmg-cell .is-today { border: 2px solid var(--ps-gold-deep); }
 
-/* ---------------- Admin calendar page — layered on ad-calmg-* grid ---------------- */
+/* ---------------- Admin calendar page - layered on ad-calmg-* grid ---------------- */
 
-/* Calendar page wrapper — extends .ad-page */
+/* Calendar page wrapper - extends .ad-page */
 .ad-calendar-page {
     min-height: 0; /* let content drive height */
 }
 
-/* Toolbar: month navigation and title — dual-classed with .ad-card */
+/* Toolbar: month navigation and title - dual-classed with .ad-card */
 .ad-card.ad-calendar-toolbar {
     margin-bottom: .75rem;
 }
 
-/* Cell content column — day number, holidays, meetings, add actions */
+/* Cell content column - day number, holidays, meetings, add actions */
 .ad-calendar-cell-content {
     display: flex;
     flex-direction: column;
@@ -1135,14 +1135,14 @@
     padding-block-end: .1rem;
 }
 
-/* Day number outside the academic year — muted */
+/* Day number outside the academic year - muted */
 .is-out .ad-calendar-day-number {
     color: var(--ps-muted);
     font-weight: 600;
     font-size: .72rem;
 }
 
-/* Holiday block — label + delete form */
+/* Holiday block - label + delete form */
 .ad-calendar-holiday {
     display: flex;
     align-items: flex-start;
@@ -1229,7 +1229,7 @@
     min-width: 0;
 }
 
-/* Meeting delete form — pinned to the row end */
+/* Meeting delete form - pinned to the row end */
 .ad-calmg-cell .ad-calendar-meeting .ps-inline-form {
     margin-inline-start: 0;
     flex-shrink: 0;
@@ -1434,7 +1434,7 @@
 html:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
-/* Neutralize legacy fixed sidebar — use Psalmodia full-height sticky rail geometry */
+/* Neutralize legacy fixed sidebar - use Psalmodia full-height sticky rail geometry */
 .admin-sidebar.ad-rail {
     grid-area: sidebar;
     display: flex;
@@ -1454,7 +1454,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 .mobile-menu-toggle { display: none !important; }
 
-/* Remove legacy margin-left on main content — use Psalmodia grid auto-flow */
+/* Remove legacy margin-left on main content - use Psalmodia grid auto-flow */
 .admin-main-content.ad-panes {
     grid-area: main;
     margin-inline-start: 0;
@@ -1478,7 +1478,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     outline-offset: 3px;
 }
 
-/* Legacy collapsed variant — must also clear margin on ad-panes */
+/* Legacy collapsed variant - must also clear margin on ad-panes */
 .sidebar-collapsed ~ .admin-main-content.ad-panes {
     margin-inline-start: 0;
 }
@@ -1681,7 +1681,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
    Dashboard-specific components (admin_panel.html body)
    ================================================================================ */
 
-/* ── Section titles (replaces .section-title) ── */
+/* -- Section titles (replaces .section-title) -- */
 .ad-section-title {
     display: flex;
     align-items: center;
@@ -1697,7 +1697,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 .ad-section-title i { font-size: 0.9rem; }
 
-/* ── Bar charts (replaces .bar-chart) ── */
+/* -- Bar charts (replaces .bar-chart) -- */
 .ad-bar {
     display: flex;
     align-items: center;
@@ -1747,7 +1747,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-bar-fill--slate { background: linear-gradient(135deg, #6A7A83, #565e64); }
 .ad-bar-fill--ink { background: linear-gradient(135deg, var(--ps-ink), var(--ps-ink-deep)); }
 
-/* ── Stat grid (replaces .stat-grid) ── */
+/* -- Stat grid (replaces .stat-grid) -- */
 .ad-stat-grid {
     display: flex;
     justify-content: space-around;
@@ -1792,7 +1792,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     letter-spacing: 0.03em;
 }
 
-/* ── Key-value row (replaces .kv-row) ── */
+/* -- Key-value row (replaces .kv-row) -- */
 .ad-kv-row {
     display: flex;
     justify-content: space-between;
@@ -1806,7 +1806,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 .ad-kv-row--compact { padding: 0.2rem 0; }
 
-/* ── Activity list (replaces .activity-list-item) ── */
+/* -- Activity list (replaces .activity-list-item) -- */
 .ad-activity {
     padding: 0.7rem 1.25rem;
     border-bottom: 1px solid var(--ps-line);
@@ -1820,7 +1820,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-activity-meta { font-size: 0.76rem; color: var(--ps-muted); }
 .ad-activity-date { font-size: 0.72rem; color: var(--ps-muted); white-space: nowrap; }
 
-/* ── Divider (replaces .dashboard-divider) ── */
+/* -- Divider (replaces .dashboard-divider) -- */
 .ad-divider {
     border: none;
     border-top: 1px solid var(--ps-line);
@@ -1828,7 +1828,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     opacity: 1;
 }
 
-/* ── Page header (replaces .page-header) ── */
+/* -- Page header (replaces .page-header) -- */
 .ad-pane-head--bordered {
     margin-bottom: 1.5rem;
     padding-bottom: 0.8rem;
@@ -1849,7 +1849,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 .ad-page-header-icon { color: var(--ps-gold); }
 
-/* ── Card subheading (the repeating .small.fw-bold + inline style pattern) ── */
+/* -- Card subheading (the repeating .small.fw-bold + inline style pattern) -- */
 .ad-card-subheading {
     font-size: 0.78rem;
     font-weight: 700;
@@ -1858,25 +1858,25 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     letter-spacing: 0.04em;
 }
 
-/* ── Empty state ── */
+/* -- Empty state -- */
 .ad-empty-state {
     font-size: 0.85rem;
     color: var(--ps-muted);
 }
 
-/* ── Slim variants for compact bars ── */
+/* -- Slim variants for compact bars -- */
 .ad-bar-track--sm { height: 16px; }
 .ad-bar-fill--sm { font-size: 0.62rem; }
 .ad-bar-label--sm { min-width: 56px; font-size: 0.75rem; }
 
-/* ── Weekday display helpers ── */
+/* -- Weekday display helpers -- */
 .ad-weekday-badge { font-weight: 500; }
 .ad-meeting-label { font-size: 0.76rem; }
 .ad-meeting-label--plain { text-transform: none; letter-spacing: 0; }
 .ad-heading-inline { display: inline-block; margin-bottom: 0.3rem; }
 .ad-icon--danger { color: var(--ps-danger); }
 
-/* ── Meter thin variant ── */
+/* -- Meter thin variant -- */
 .ad-meter--thin { height: 8px; border-radius: 4px; }
 
 /* ---------------- Progress meter variant ---------------- */
@@ -2023,8 +2023,8 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-pre-config { max-height: 120px; overflow: auto; font-size: 0.72rem; background: var(--ps-mist); border-radius: .5rem; padding: .5rem; }
 
 /* ---------------- Collapse state indicator for admin detail toggles ---------------- */
-/* LTR: collapsed → icon rotates -90deg (points right), expanded → points down.
-   RTL: collapsed → icon rotates 90deg (points left), expanded → points down. */
+/* LTR: collapsed -> icon rotates -90deg (points right), expanded -> points down.
+   RTL: collapsed -> icon rotates 90deg (points left), expanded -> points down. */
 .ad-collapse-indicator {
     transition: transform var(--ps-motion);
     font-size: .7rem;
@@ -2332,7 +2332,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .ad-table--dense th,
 .ad-table--dense td { padding: .4rem .6rem; font-size: .82rem; white-space: nowrap; }
 
-/* ── Responsive fine-tune for dashboard ── */
+/* -- Responsive fine-tune for dashboard -- */
 @media (max-width: 575.98px) {
     .ad-bar-label { min-width: 56px; font-size: 0.72rem; }
     .ad-pane-head--bordered h4 { font-size: 1.1rem; }
@@ -2342,7 +2342,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
    Telegram support chat (Phase 6 admin web chat)
    ================================================================================ */
 
-/* ── Page header ── */
+/* -- Page header -- */
 .tg-chat-page .breadcrumb { font-size: .85rem; }
 
 .tg-chat-header {
@@ -2363,7 +2363,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     margin-top: .25rem;
 }
 
-/* ── Status filter pills (counts) ── */
+/* -- Status filter pills (counts) -- */
 .tg-chat-pills {
     border-top: 1px solid var(--ps-line);
     padding-top: .75rem;
@@ -2371,7 +2371,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 .tg-chat-pill-count { font-weight: 600; }
 
-/* ── Conversation list surface ── */
+/* -- Conversation list surface -- */
 .tg-chat-list { position: relative; }
 
 .tg-chat-table-wrap .ad-table { min-width: 42rem; }
@@ -2407,7 +2407,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     white-space: nowrap;
 }
 
-/* ── WhatsApp-style conversation picker rows ── */
+/* -- WhatsApp-style conversation picker rows -- */
 .tg-chat-conv-list {
     display: flex;
     flex-direction: column;
@@ -2573,7 +2573,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     font-size: .8rem;
 }
 
-/* ── Conversation detail header ── */
+/* -- Conversation detail header -- */
 .tg-chat-detail-user {
     display: flex;
     align-items: center;
@@ -2627,7 +2627,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     border-bottom: 1px solid var(--ps-line);
 }
 
-/* ── Message thread (chronological history) ── */
+/* -- Message thread (chronological history) -- */
 .tg-chat-thread {
     display: flex;
     flex-direction: column;
@@ -2691,7 +2691,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     overflow-wrap: anywhere;
 }
 
-/* ── Attachments ── */
+/* -- Attachments -- */
 .tg-chat-attachments {
     display: flex;
     flex-direction: column;
@@ -2725,7 +2725,47 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     background: var(--ps-gold-soft);
 }
 
-/* ── Message meta (delivery state, errors, reply affordance) ── */
+.tg-chat-attachment-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.tg-chat-attachment--error {
+    color: var(--ps-danger);
+    background: var(--ps-danger-soft);
+    border-color: var(--ps-danger);
+}
+
+/* Voice notes and audio files play inline in the support thread. */
+.tg-chat-audio {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 24rem;
+    direction: ltr;
+}
+
+.tg-chat-photo img {
+    display: block;
+    max-width: 100%;
+    max-height: 14rem;
+    border: 1px solid var(--ps-line);
+    border-radius: .6rem;
+    background: var(--ps-mist);
+}
+
+.tg-chat-video {
+    display: block;
+    max-width: 100%;
+    max-height: 16rem;
+    border-radius: .6rem;
+    background: #000;
+}
+
+/* -- Message meta (delivery state, errors, reply affordance) -- */
 .tg-chat-msg-meta {
     display: flex;
     align-items: center;
@@ -2765,7 +2805,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     text-decoration: underline;
 }
 
-/* ── Auto-refresh toggle (Alpine poller control) ── */
+/* -- Auto-refresh toggle (Alpine poller control) -- */
 .tg-chat-autorefresh {
     display: inline-flex;
     align-items: center;
@@ -2797,7 +2837,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     box-shadow: 0 0 0 .18rem var(--ps-gold-soft);
 }
 
-/* ── Narrow screens / RTL-safe adjustments ── */
+/* -- Narrow screens / RTL-safe adjustments -- */
 @media (max-width: 767.98px) {
     .tg-chat-detail-head { flex-direction: column; align-items: stretch; }
     .tg-chat-msg { max-width: 92%; }
@@ -2818,7 +2858,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     .tg-chat-attachment { transition: none; }
 }
 
-/* ── Split workspace (conversation sidebar + chat pane) ── */
+/* -- Split workspace (conversation sidebar + chat pane) -- */
 .tg-chat-workspace {
     display: grid;
     grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
@@ -2865,7 +2905,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     max-height: none;
 }
 
-/* ── Empty chat pane ── */
+/* -- Empty chat pane -- */
 .tg-chat-empty {
     flex: 1 1 auto;
     display: flex;
@@ -2892,7 +2932,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .tg-chat-empty h5 { color: var(--ps-ink); font-weight: 700; margin-bottom: .15rem; }
 .tg-chat-empty p { max-width: 30rem; margin-bottom: 0; font-size: .88rem; }
 
-/* ── Composer row (textarea + send) ── */
+/* -- Composer row (textarea + send) -- */
 .tg-chat-composer-row {
     display: flex;
     align-items: flex-end;
@@ -2933,7 +2973,58 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     padding-inline: 1.1rem;
 }
 
-/* ── Compact composer pinned to the thread bottom ── */
+/* -- Optional attachment row inside the composer -- */
+.tg-chat-composer-attach {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.tg-chat-file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--ps-teal);
+    cursor: pointer;
+}
+
+.tg-chat-file-label:hover,
+.tg-chat-file-label:focus-visible {
+    color: var(--ps-gold-deep);
+    text-decoration: underline;
+}
+
+.tg-chat-reply-form .tg-chat-file-input {
+    flex: 1 1 14rem;
+    min-width: 0;
+    max-width: 100%;
+    font-size: .78rem;
+    color: var(--ps-muted);
+}
+
+.tg-chat-reply-form .tg-chat-file-input::file-selector-button {
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .45rem;
+    background: var(--ps-mist);
+    color: var(--ps-ink);
+    font-size: .78rem;
+    padding: .3rem .6rem;
+    margin-inline-end: .5rem;
+}
+
+.tg-chat-file-hint {
+    flex: 1 1 100%;
+    font-size: .72rem;
+    color: var(--ps-muted);
+}
+
+/* -- Compact composer pinned to the thread bottom -- */
 .tg-chat-composer {
     position: sticky;
     bottom: 0;
@@ -2961,7 +3052,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     .tg-chat-workspace .tg-chat-thread { flex: none; max-height: 24rem; }
 }
 
-/* ── Start-conversation modal (linked-user picker) ── */
+/* -- Start-conversation modal (linked-user picker) -- */
 .tg-chat-start-modal .modal-dialog {
     max-width: 38rem;
 }
@@ -3141,14 +3232,14 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     margin-inline-start: .35rem;
 }
 
-/* ── Composition form ── */
+/* -- Composition form -- */
 .tg-broadcast-form textarea { min-height: 10rem; }
 
 .tg-broadcast-form select { max-width: 30rem; }
 
 .tg-broadcast-form input[type="file"] { max-width: 100%; }
 
-/* ── Broadcast control skin (Bootstrap-compatible Psalmodia controls) ── */
+/* -- Broadcast control skin (Bootstrap-compatible Psalmodia controls) -- */
 .tg-broadcast-textarea,
 .tg-broadcast-select,
 .tg-broadcast-files {
@@ -3223,7 +3314,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     margin-inline-start: .35rem;
 }
 
-/* ── Confirmation summary ── */
+/* -- Confirmation summary -- */
 .tg-broadcast-message-preview {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -3286,7 +3377,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
     margin-inline-start: auto;
 }
 
-/* ── List surface ── */
+/* -- List surface -- */
 .tg-broadcast-list { position: relative; }
 
 .tg-broadcast-table-wrap .ad-table { min-width: 40rem; }
@@ -3336,7 +3427,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 
 .tg-broadcast-status { text-transform: capitalize; }
 
-/* ── Narrow screens / RTL-safe adjustments ── */
+/* -- Narrow screens / RTL-safe adjustments -- */
 @media (max-width: 767.98px) {
     .tg-broadcast-header { flex-direction: column; align-items: stretch; }
     .tg-broadcast-attachment-size { margin-inline-start: 0; }
@@ -3659,7 +3750,7 @@ body:has(.admin-layout.ad-shell) { background: var(--ps-page-bg); }
 .analytics-city-option .form-check-input { margin: 0; flex: 0 0 auto; }
 .analytics-city-option .form-check-label { cursor: pointer; }
 
-/* ── Attendance daily roster and scan coverage ── */
+/* -- Attendance daily roster and scan coverage -- */
 .ad-coverage-card .ad-coverage-date {
     font-size: .85rem;
     font-weight: 500;

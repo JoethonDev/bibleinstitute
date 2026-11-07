@@ -5,9 +5,13 @@ from __future__ import annotations
 
 SUPPORTED_LANGUAGES = frozenset({"ar", "en"})
 
+# Arabic is the site default. A client must send an explicit English
+# preference to receive English; a missing or invalid value is Arabic.
+DEFAULT_LANGUAGE = "ar"
+
 
 def normalize_language(request) -> str:
-    value = request.headers.get("Accept-Language") or "en"
+    value = request.headers.get("Accept-Language") or ""
     candidates = []
     for position, candidate in enumerate(value.lower().split(",")):
         parts = [part.strip() for part in candidate.split(";")]
@@ -24,4 +28,4 @@ def normalize_language(request) -> str:
     if candidates:
         candidates.sort()
         return candidates[0][2]
-    return "en"
+    return DEFAULT_LANGUAGE

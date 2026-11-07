@@ -40,7 +40,7 @@ def _mask_phone(phone: str | None) -> str:
     digits = re.sub(r"\D", "", str(phone or ""))
     if not digits:
         return ""
-    return "•••" + digits[-4:] if len(digits) > 4 else "•••" + digits
+    return "---" + digits[-4:] if len(digits) > 4 else "---" + digits
 
 
 def palette_results(query: str, type_filter: str | None = None, show_phone: bool = False) -> list[dict]:
@@ -111,7 +111,7 @@ def palette_results(query: str, type_filter: str | None = None, show_phone: bool
                 "type": "offering",
                 "id": o.pk,
                 "label": o.course.name if getattr(o, "course_id", None) else f"#{o.pk}",
-                "sub": f"{o.academic_year_level.level.display_name} — {o.academic_year_level.academic_year.name}" if getattr(o, "academic_year_level_id", None) else "",
+                "sub": f"{o.academic_year_level.level.display_name} - {o.academic_year_level.academic_year.name}" if getattr(o, "academic_year_level_id", None) else "",
                 "url": url,
             })
 
@@ -197,98 +197,4 @@ def palette_results(query: str, type_filter: str | None = None, show_phone: bool
                 "sub": phone,
                 "url": url,
             })
-    return out
-
-    users = (
-        User.objects.filter(
-            normalized_contains_q(("username", "email", "first_name", "last_name"), q)
-        )
-        .select_related("role")
-        .order_by("username")[:PALETTE_LIMIT]
-    )
-    for u in users:
-        try:
-            url = reverse("user-profile", args=[u.pk])
-        except Exception:
-            continue
-        out.append({
-            "type": "user",
-            "id": u.pk,
-            "label": u.get_full_name() or u.username,
-            "sub": u.username,
-            "url": url,
-        })
-
-    offerings = (
-        CourseOffering.objects.filter(
-            normalized_contains_q(("course__name",), q)
-        )
-        .select_related("course", "academic_year_level__level", "academic_year_level__academic_year")
-        .order_by("course__name")[:PALETTE_LIMIT]
-    )
-    for o in offerings:
-        try:
-            url = reverse("course-details", args=[o.pk])
-        except Exception:
-            continue
-        out.append({
-            "type": "offering",
-            "id": o.pk,
-            "label": o.course.name if getattr(o, "course_id", None) else f"#{o.pk}",
-            "sub": f"{o.academic_year_level.level.display_name} — {o.academic_year_level.academic_year.name}" if getattr(o, "academic_year_level_id", None) else "",
-            "url": url,
-        })
-
-    lessons = (
-        Lesson.objects.filter(normalized_contains_q(("name",), q))
-        .select_related("course_offering__course")
-        .order_by("name")[:PALETTE_LIMIT]
-    )
-    for lesson in lessons:
-        try:
-            url = reverse("lesson-view", args=[lesson.pk])
-        except Exception:
-            continue
-        out.append({
-            "type": "lesson",
-            "id": lesson.pk,
-            "label": lesson.name,
-            "sub": lesson.course_offering.course.name if getattr(lesson, "course_offering_id", None) and getattr(lesson.course_offering, "course_id", None) else "",
-            "url": url,
-        })
-
-    quizzes = (
-        Quiz.objects.filter(normalized_contains_q(("name",), q))
-        .select_related("course_offering__course")
-        .order_by("name")[:PALETTE_LIMIT]
-    )
-    for quiz in quizzes:
-        try:
-            url = reverse("quiz-view", args=[quiz.pk])
-        except Exception:
-            continue
-        out.append({
-            "type": "quiz",
-            "id": quiz.pk,
-            "label": quiz.name,
-            "sub": quiz.course_offering.course.name if getattr(quiz, "course_offering_id", None) and getattr(quiz.course_offering, "course_id", None) else "",
-            "url": url,
-        })
-
-    jobs = (
-        MediaProcessingJob.objects.filter(original_filename__icontains=q.strip()[:100])
-        .order_by("-created_at")[:PALETTE_LIMIT]
-    )
-    for job in jobs:
-        try:
-            url = reverse("media-processing-status") + f"?q={job.public_id}"
-        except Exception:
-            continue
-        out.append({
-            "type": "media",
-            "id": str(job.public_id),
-            "label": job.original_filename or str(job.public_id),
-            "sub": job.status,
-            "url": url,
-        })
     return out

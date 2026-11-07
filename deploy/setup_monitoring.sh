@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_monitoring.sh — create Dozzle credentials and start the read-only
+# setup_monitoring.sh - create Dozzle credentials and start the read-only
 # Docker log viewer behind the existing Nginx HTTPS proxy.
 set -Eeuo pipefail
 
@@ -40,8 +40,8 @@ if [[ $# -gt 0 ]]; then
 fi
 
 [[ -f "$INFRA_COMPOSE" ]] || die "Run from the repository root (missing $INFRA_COMPOSE)"
-[[ -f ".env" ]] || die "Missing .env — run 'bash deploy/setup_env.sh' first"
-[[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE — run 'bash deploy/setup_env.sh' first"
+[[ -f ".env" ]] || die "Missing .env - run 'bash deploy/setup_env.sh' first"
+[[ -f "$COMPOSE_ENV_FILE" ]] || die "Missing $COMPOSE_ENV_FILE - run 'bash deploy/setup_env.sh' first"
 command -v docker >/dev/null 2>&1 || die "Docker is not installed"
 docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required"
 
@@ -96,11 +96,11 @@ else
 fi
 
 export DOZZLE_DATA_DIR="$DATA_DIR"
-info "Validating infrastructure Compose configuration…"
+info "Validating infrastructure Compose configuration..."
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" config >/dev/null \
     || die "Compose configuration is invalid"
 
-info "Starting the isolated Docker socket proxy and Dozzle…"
+info "Starting the isolated Docker socket proxy and Dozzle..."
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$INFRA_COMPOSE" up -d dozzle-socket-proxy dozzle \
     || die "Failed to start Dozzle monitoring services"
 

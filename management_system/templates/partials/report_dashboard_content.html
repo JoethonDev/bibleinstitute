@@ -12,13 +12,24 @@
               <i class="fas fa-file-csv"></i>
               {% translate "Export CSV" %}
             </a>
-            <a href="{% url 'export-report-xlsx' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="ad-btn ad-btn--teal ad-btn--sm">
-              <i class="fas fa-file-excel"></i>
-              {% translate "Export XLSX" %}
-            </a>
+            <form method="post" action="{% url 'export-report-xlsx' %}" class="mb-0">
+              {% csrf_token %}
+              <input type="hidden" name="academic_year" value="{{ selected_year.id }}">
+              {% if selected_student %}<input type="hidden" name="student" value="{{ selected_student }}">{% endif %}
+              {% if selected_study_mode %}<input type="hidden" name="study_mode" value="{{ selected_study_mode }}">{% endif %}
+              {% if selected_course_offering %}<input type="hidden" name="course_offering" value="{{ selected_course_offering }}">{% endif %}
+              <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                <i class="fas fa-file-excel"></i>
+                {% translate "Export XLSX" %}
+              </button>
+            </form>
           {% endif %}
         </div>
       </div>
+
+      {% if report_export_job %}
+        {% include "partials/admin_operation_status.html" with operation_job=report_export_job status_url=report_export_status_url status=report_export_job.status total=report_export_job.total processed=report_export_job.processed succeeded=report_export_job.succeeded failed=report_export_job.failed skipped=report_export_job.skipped artifact_ready=report_export_job.artifact_key artifact_url=report_export_download_url %}
+      {% endif %}
 
       <div class="ad-card mb-4">
         <div class="ad-card-body">
@@ -42,7 +53,7 @@
                     <option value="{{ ay.id }}" data-level="{{ ay.level.ordering }}"
                     {% if selected_year and ay.id == selected_year.id %}selected{% endif %}
                     {% if selected_level and ay.level.ordering != selected_level|add:0 %}class="d-none"{% endif %}>
-                    {{ ay.academic_year.name }} — {{ ay.level.display_name }}
+                    {{ ay.academic_year.name }} - {{ ay.level.display_name }}
                   </option>
                 {% endfor %}
               </select>

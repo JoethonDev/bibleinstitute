@@ -133,7 +133,7 @@
     {% endif %}
     {% if snapshot_reconcile %}
     <div hidden>{% csrf_token %}</div>
-    <p id="snapshot-reconcile-status" role="status" class="text-center">{% translate "Recovering saved answers…" %}</p>
+    <p id="snapshot-reconcile-status" role="status" class="text-center">{% translate "Recovering saved answers..." %}</p>
     <script>
     (() => {
         const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
@@ -183,8 +183,10 @@
                     const answers = {};
                     form.querySelectorAll('[data-question-card]').forEach(card => {
                         const id = card.querySelector('input[name$="[id]"]')?.value;
+                        // Read the stored value only: serialization happens in the
+                        // actual ordering/matching interaction handlers so an
+                        // untouched structured question stays unanswered.
                         const structured = card.querySelector('[data-structured-answer]');
-                        if (structured) structured.value = serializeStructuredAnswer(card);
                         const field = structured || card.querySelector('input[type="radio"]:checked, textarea, .answers-section input:not([type="radio"]):not([type="hidden"])');
                         if (id) answers[id] = field?.value || '';
                     });
@@ -224,7 +226,7 @@
                         snapshotRevision = data.revision;
                         pendingSnapshot = null;
                         if (data.submitted) snapshotBlocked = true;
-                        statusText(snapshotDirty ? '{% translate "Saving answers…"|escapejs %}' : '{% translate "Answers saved."|escapejs %}');
+                        statusText(snapshotDirty ? '{% translate "Saving answers..."|escapejs %}' : '{% translate "Answers saved."|escapejs %}');
                     } catch (error) {
                         statusText(error.name === 'AbortError'
                             ? '{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}' : error.message);
@@ -388,7 +390,7 @@
                     const structuredAnswerInput = questionCard?.querySelector('[data-structured-answer]');
                     if (structuredAnswerInput) structuredAnswerInput.value = serializeStructuredAnswer(questionCard);
                     snapshotDirty = true;
-                    statusText('{% translate "Saving answers…"|escapejs %}');
+                    statusText('{% translate "Saving answers..."|escapejs %}');
                     clearTimeout(snapshotTimer);
                     snapshotTimer = setTimeout(persistSnapshot, 1000);
                 }

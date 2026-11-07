@@ -105,14 +105,18 @@
         <div class="ad-card-head"><h5 class="mb-0">{% translate "CSV/XLSX reviewed upload" %}</h5></div>
         <div class="ad-card-body">
             <p class="text-muted">{% translate "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid." %}</p>
+            {% if intake_job %}
+            {% include "partials/admin_operation_status.html" with operation_job=intake_job status_url=intake_status_url status=intake_job.status total=intake_job.total processed=intake_job.processed %}
+            {% endif %}
             <details class="mb-2"><summary class="small">{% translate "Expected columns" %}</summary><p class="mt-2">{% for column in intake_columns %}<code class="me-1">{{ column }}</code>{% endfor %}</p></details>
             <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="d-flex flex-wrap gap-2 align-items-end">
                 {% csrf_token %}
                 <div><label for="intake-file" class="form-label">{% translate "Intake CSV or XLSX" %}</label><input id="intake-file" class="form-control" type="file" name="intake_file" accept=".csv,.xlsx" required></div>
                 <button class="ad-btn ad-btn--outline-gold" type="submit" name="preview_upload" value="yes"><i class="fas fa-search me-1"></i>{% translate "Validate upload" %}</button>
-                {% if preview %}<button class="ad-btn ad-btn--teal" type="submit" name="apply_upload" value="yes"><i class="fas fa-check me-1"></i>{% translate "Apply reviewed upload" %}</button>{% endif %}
+                {% if preview %}<button class="ad-btn ad-btn--teal" type="submit" name="apply_upload" value="yes"><i class="fas fa-check me-1"></i>{% translate "Queue reviewed upload" %}</button>{% endif %}
             </form>
             {% if preview %}
+            <p class="small text-muted mt-2">{% translate "Applying queues one row at a time; a failing row is reported without stopping the remaining rows." %}</p>
             <div class="ad-table-wrap mt-3"><table class="ad-table"><thead><tr><th>{% translate "Row" %}</th><th>{% translate "Source student" %}</th><th>{% translate "Account" %}</th><th>{% translate "Result" %}</th><th>{% translate "Message" %}</th></tr></thead><tbody>{% for item in preview %}<tr><td>{{ item.row }}</td><td>{{ item.source_name }}</td><td>{{ item.account }}</td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}</tbody></table></div>
             {% endif %}
         </div>

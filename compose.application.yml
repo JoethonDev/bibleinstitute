@@ -1,4 +1,4 @@
-# ── Application services: blue/green Django web slots + Celery worker ──
+# -- Application services: blue/green Django web slots + Celery worker --
 # Infrastructure services (postgres, redis, nginx) live in
 # compose.infrastructure.yml on the same external lms_network.
 
@@ -12,7 +12,7 @@ x-app-base: &app-base
       required: false
       format: raw
   environment:
-    DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+    DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
     DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
     POSTGRES_DB: ${POSTGRES_DB:-lms_database}
     POSTGRES_USER: ${POSTGRES_USER:-lms_user}
@@ -33,7 +33,7 @@ x-app-base: &app-base
     - lms_network
 
 services:
-  # ── Blue web slot ──────────────────────────────────────────────
+  # -- Blue web slot ----------------------------------------------
   lms-app-blue:
     <<: *app-base
     command:
@@ -60,7 +60,7 @@ services:
     cpus: 1.0
     mem_limit: 1G
 
-  # ── Green web slot ─────────────────────────────────────────────
+  # -- Green web slot ---------------------------------------------
   lms-app-green:
     <<: *app-base
     command:
@@ -87,7 +87,7 @@ services:
     cpus: 1.0
     mem_limit: 1G
 
-  # ── Celery worker ──────────────────────────────────────────────
+  # -- Celery worker ----------------------------------------------
   celery:
     <<: *app-base
     command:
@@ -101,7 +101,7 @@ services:
     cpus: 0.5
     mem_limit: 1G
 
-  # ── Media processing worker (dedicated FFmpeg queue) ───────────
+  # -- Media processing worker (dedicated FFmpeg queue) -----------
   # Runs native ffmpeg/ffprobe only for `media`-queue jobs (server-side FFmpeg
   # migration, proposal sections 15-16). One job at a time: concurrency 1 and
   # prefetch 1. Private named volume mounted at MEDIA_WORK_DIR only; it does
@@ -113,6 +113,10 @@ services:
   # allowance; the quota only applies while FFmpeg runs.
   media-worker:
     <<: *app-base
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: media
     command:
       - celery
       - -A
@@ -123,7 +127,7 @@ services:
       - --concurrency=1
       - --prefetch-multiplier=1
     environment:
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
       POSTGRES_DB: ${POSTGRES_DB:-lms_database}
       POSTGRES_USER: ${POSTGRES_USER:-lms_user}
@@ -154,7 +158,25 @@ services:
     cpus: 2.0
     mem_limit: 2G
 
-  # ── Celery beat (bounded media recovery schedule) ──────────────
+  # -- Durable management-operation worker (isolated admin queue) --
+  # Population-sized calculations, promotions, imports, exports and storage
+  # work run here at concurrency 1 / prefetch 1 (configurable). Keeping this
+  # pool separate preserves web, default-worker, OTP and media latency.
+  admin-worker:
+    <<: *app-base
+    command:
+      - celery
+      - -A
+      - learning_platform
+      - worker
+      - --loglevel=INFO
+      - --queues=admin
+      - --concurrency=${ADMIN_WORKER_CONCURRENCY:-1}
+      - --prefetch-multiplier=1
+    cpus: 1.0
+    mem_limit: 1G
+
+  # -- Celery beat (bounded media recovery schedule) --------------
   celery-beat:
     <<: *app-base
     command:

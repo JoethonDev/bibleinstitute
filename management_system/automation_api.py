@@ -63,7 +63,9 @@ from .models import (
     PublicationStatus,
     User,
 )
+from .storage_coordination import reserve_media_output_folder
 from .utils.decorators import can_manage_content
+from .utils.client_identity import client_ip
 
 
 MAX_JSON_BYTES = 64 * 1024
@@ -92,8 +94,8 @@ def _error(error_code: str, status: int) -> JsonResponse:
 
 
 def _failed_auth_is_rate_limited(request) -> bool:
-    """Throttle failed key attempts without trusting forwarded client IPs."""
-    ip_address = request.META.get("REMOTE_ADDR", "unknown")
+    """Throttle failed key attempts with the validated client identity."""
+    ip_address = client_ip(request) or "unknown"
     cache_key = f"automation-auth-failure:{ip_address}"
     try:
         if cache.add(cache_key, 1, timeout=AUTH_FAILURE_WINDOW_SECONDS):
@@ -540,7 +542,7 @@ def lecture_upload(request):
                     timezone.now() + dt.timedelta(seconds=STAGING_UPLOAD_URL_TTL_SECONDS)
                 ),
             })
-        with transaction.atomic():
+        with reserve_media_output_folder(folder):
             lesson = Lesson.objects.create(
                 name=lecture_name,
                 description=None,

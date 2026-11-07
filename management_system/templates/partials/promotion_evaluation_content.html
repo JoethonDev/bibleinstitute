@@ -8,6 +8,16 @@
         <span id="promotion-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
     </div>
 
+    {% if calculation_job %}
+        {% include "partials/admin_operation_status.html" with operation_job=calculation_job status_url=calculation_status_url status=calculation_job.status total=calculation_job.total processed=calculation_job.processed %}
+    {% endif %}
+    {% if promotion_job %}
+        {% include "partials/admin_operation_status.html" with operation_job=promotion_job status_url=promotion_status_url status=promotion_job.status total=promotion_job.total processed=promotion_job.processed succeeded=promotion_job.succeeded failed=promotion_job.failed skipped=promotion_job.skipped %}
+    {% endif %}
+    {% if export_job %}
+        {% include "partials/admin_operation_status.html" with operation_job=export_job status_url=export_status_url status=export_job.status total=export_job.total processed=export_job.processed succeeded=export_job.succeeded failed=export_job.failed skipped=export_job.skipped artifact_ready=export_job.artifact_key artifact_url=export_download_url %}
+    {% endif %}
+
     <nav class="ad-stepper mb-4" aria-label="{% translate 'Promotion workflow' %}">
         <ol class="d-flex flex-wrap gap-2 list-unstyled mb-0">
             <li class="ad-stepper-item is-active"><span class="ad-stepper-number">1</span>{% translate "Scope" %}</li>
@@ -37,10 +47,10 @@
                 <div class="ad-form-field col-md-5 col-lg-4">
                     <label for="scope-selector" class="form-label">{% translate "Academic Year / Level" %}</label>
                     <select name="scope" id="scope-selector" class="form-select" hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-loading">
-                        <option value="">{% translate "Select a scope…" %}</option>
+                        <option value="">{% translate "Select a scope..." %}</option>
                         {% for s in scopes %}
                         <option value="{{ s.pk }}" {% if selected_scope and selected_scope.pk == s.pk %}selected{% endif %}>
-                            {{ s.academic_year.name }} — {{ s.level.display_name }}
+                            {{ s.academic_year.name }} - {{ s.level.display_name }}
                         </option>
                         {% endfor %}
                     </select>
@@ -85,13 +95,13 @@
                 {% translate "These are persisted evaluation results. Scores and statuses were calculated when the formula was last saved. Only administrators may override the final status of an individual result." %}
             </p>
 
-            {# Filter form — GET to promotion-formula, preserves scope #}
+            {# Filter form - GET to promotion-formula, preserves scope #}
             <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
                 <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
                 <div class="ad-form-field col-md-3">
                     <label for="result-search" class="form-label">{% translate "Student" %}</label>
                     <input type="text" name="result_search" id="result-search" class="form-control form-control-sm"
-                           value="{{ result_search|default:'' }}" placeholder="{% translate "Name or email…" %}" hx-preserve
+                           value="{{ result_search|default:'' }}" placeholder="{% translate "Name or email..." %}" hx-preserve
                            hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-loading">
                 </div>
                 <div class="ad-form-field col-md-2">
@@ -157,10 +167,20 @@
                     </button>
                 </form>
                 {% endif %}
+                {% if is_aggregate_formula %}
+                <form method="post" action="{% url 'export-evaluation-xlsx' %}" class="mb-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
+                    <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                        <i class="fas fa-file-excel me-1"></i>{% translate "Export XLSX" %}
+                    </button>
+                </form>
+                {% else %}
                 <a href="{% url 'export-evaluation-xlsx' %}?scope={{ selected_scope.pk }}{% if selected_offering_id %}&amp;course_offering={{ selected_offering_id }}{% endif %}"
                    class="ad-btn ad-btn--outline-gold ad-btn--sm">
                     <i class="fas fa-file-excel me-1"></i>{% translate "Export XLSX" %}
                 </a>
+                {% endif %}
                 <span class="text-muted small">{% translate "Only saved, unconsumed results may be promoted." %}</span>
             </div>
             <div class="ad-table-wrap">
@@ -222,7 +242,7 @@
                                 <br><span class="fst-italic text-muted">"{{ result.override_note }}"</span>
                                 {% endif %}
                                 {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td class="small">
@@ -243,10 +263,10 @@
                                     </span>
                                     {% endif %}
                                     {% if not snapshot.grading_errors and not snapshot.unresolved_question_count %}
-                                    <span class="text-muted">—</span>
+                                    <span class="text-muted">-</span>
                                     {% endif %}
                                 {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="text-muted">-</span>
                                 {% endif %}
                                 {% endwith %}
                             </td>
@@ -259,7 +279,7 @@
                                         <span class="ad-pill {% if failed_count >= threshold %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">
                                             {{ failed_count|default:"0" }}
                                         </span>
-                                        <span class="text-muted">/ {{ threshold|default:"—" }} {% translate "threshold" %}</span>
+                                        <span class="text-muted">/ {{ threshold|default:"-" }} {% translate "threshold" %}</span>
                                     </div>
                                     {% endwith %}
                                     <ul class="list-unstyled mb-0 small">
@@ -280,7 +300,7 @@
                                         {% endfor %}
                                     </ul>
                                 {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="text-muted">-</span>
                                 {% endif %}
                                 {% endwith %}
                             </td>
@@ -296,7 +316,7 @@
                                     <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
                                     <div class="d-flex flex-column gap-1">
                                         <select name="final_status" class="form-select form-select-sm" required aria-label="{% translate "Override status" %}">
-                                            <option value="">{% translate "Select…" %}</option>
+                                            <option value="">{% translate "Select..." %}</option>
                                             <option value="pass">{% translate "Pass" %}</option>
                                             <option value="fail">{% translate "Fail" %}</option>
                                         </select>
@@ -332,7 +352,7 @@
                 </table>
             </div>
 
-            {# Pagination — preserves every saved-results filter, uses separate result_page param #}
+            {# Pagination - preserves every saved-results filter, uses separate result_page param #}
             {% translate "results" as results_label %}
             {% translate "Saved results pagination" as results_aria_label %}
             {% include "partials/pagination.html" with page_obj=results_page_obj pagination_query=results_pagination_query page_param="result_page" item_label=results_label aria_label=results_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#promotion-loading" %}
@@ -384,10 +404,10 @@
                 {# Show scope as read-only display so admin knows which scope is targeted #}
                 <div class="ad-form-field mb-3">
                     <label class="form-label">{% translate "Academic Scope" %}</label>
-                    <input type="text" class="form-control" value="{{ selected_scope.academic_year.name }} — {{ selected_scope.level.display_name }}" readonly>
+                    <input type="text" class="form-control" value="{{ selected_scope.academic_year.name }} - {{ selected_scope.level.display_name }}" readonly>
                 </div>
 
-                {# Course offering — hidden when all-courses, selectable for override #}
+                {# Course offering - hidden when all-courses, selectable for override #}
                 <div class="ad-form-field mb-3">
                     <label class="form-label" for="{{ formula_form.course_offering.id_for_label }}">
                         {{ formula_form.course_offering.label }}
@@ -578,7 +598,7 @@
             </div>
             {% endif %}
 
-            {# Search form — preserves scope via GET #}
+            {# Search form - preserves scope via GET #}
             <form method="get" action="{% url 'promotion-formula' %}" hx-get="{% url 'promotion-formula' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-loading" class="ad-form-grid row g-3 align-items-end mb-3">
                 <input type="hidden" name="scope" value="{{ preview_scope_id }}">
                 {% if not selected_offering_id %}
@@ -595,7 +615,7 @@
                 <div class="ad-form-field col-md-6 col-lg-4">
                     <label for="preview-search" class="form-label">{% translate "Search Students" %}</label>
                     <input type="text" name="search" id="preview-search" class="form-control"
-                           value="{{ preview_search|default:'' }}" placeholder="{% translate "Name or email…" %}" hx-preserve
+                           value="{{ preview_search|default:'' }}" placeholder="{% translate "Name or email..." %}" hx-preserve
                            hx-get="{% url 'promotion-formula' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-loading">
                 </div>
                 <div class="ad-form-actions col-md-auto d-flex gap-2">
@@ -628,8 +648,8 @@
                     <tbody>
                         {% for row in preview_rows %}
                         <tr>
-                            <td>{{ row.course_offering.course.name|default:"—" }}</td>
-                            <td class="text-center">{{ row.published_lesson_count|default:"—" }}</td>
+                            <td>{{ row.course_offering.course.name|default:"-" }}</td>
+                            <td class="text-center">{{ row.published_lesson_count|default:"-" }}</td>
                             <td>{{ row.student.get_full_name|default:row.student.username }}</td>
                             <td>{{ row.computed_score|floatformat:1 }}%</td>
                             <td>
@@ -652,7 +672,7 @@
                                     {% endfor %}
                                 </ul>
                                 {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td class="small">
@@ -671,7 +691,7 @@
                                 </span>
                                 {% endif %}
                                 {% if not row.grading_errors and not row.unresolved_question_count %}
-                                <span class="text-muted">—</span>
+                                <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -680,7 +700,7 @@
                 </table>
             </div>
 
-            {# Pagination — preserves scope and search #}
+            {# Pagination - preserves scope and search #}
             {% translate "students" as students_label %}
             {% translate "Evaluation preview pagination" as preview_aria_label %}
             {% include "partials/pagination.html" with page_obj=preview_page_obj pagination_query=preview_pagination_query item_label=students_label aria_label=preview_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#promotion-loading" %}

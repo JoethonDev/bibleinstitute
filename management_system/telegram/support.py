@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
-import posixpath
-import re
+import mimetypes
+import uuid
 from datetime import datetime, timedelta
 from typing import cast
 
@@ -25,13 +25,19 @@ from ..models import (
     User,
 )
 from ..utils.storage_operations import get_r2_client, upload_to_bucket
+from .attachments import (
+    CAPTION_MAX_LENGTH,
+    SupportAttachmentSpec,
+    classify_attachment,
+    safe_filename,
+)
 from .text import strip_telegram_links
 
 
 logger = logging.getLogger(__name__)
 
 SUPPORT_MAX_MEDIA_BYTES = 50 * 1024 * 1024
-SUPPORTED_MEDIA = {"photo", "document", "video"}
+SUPPORTED_MEDIA = {"photo", "document", "video", "voice", "audio"}
 # Telegram cannot edit or delete bot messages indefinitely. Older digests are
 # terminally marked failed without making an API call.
 SUPPORT_DIGEST_ACTION_WINDOW = timedelta(hours=48)
@@ -178,6 +184,27 @@ def _message_payload(message: dict) -> dict:
             "file_name": "telegram-photo.jpg",
             "mime_type": "image/jpeg",
         }
+    voice = message.get("voice")
+    if isinstance(voice, dict):
+        return {
+            "content_type": TelegramMessage.ContentType.VOICE,
+            "text": "",
+            "file_id": voice.get("file_id"),
+            "file_size": voice.get("file_size") or 0,
+            "file_name": "telegram-voice.oga",
+            "mime_type": "audio/ogg",
+        }
+    audio = message.get("audio")
+    if isinstance(audio, dict):
+        original_name = str(audio.get("file_name") or "telegram-audio.mp3")
+        return {
+            "content_type": TelegramMessage.ContentType.AUDIO,
+            "text": strip_telegram_links(str(message.get("caption") or ""), message.get("caption_entities")),
+            "file_id": audio.get("file_id"),
+            "file_size": audio.get("file_size") or 0,
+            "file_name": original_name,
+            "mime_type": audio.get("mime_type") or mimetypes.guess_type(original_name)[0] or "",
+        }
     for field, content_type in (("document", TelegramMessage.ContentType.DOCUMENT), ("video", TelegramMessage.ContentType.VIDEO)):
         value = message.get(field)
         if isinstance(value, dict):
@@ -194,12 +221,6 @@ def _message_payload(message: dict) -> dict:
         "content_type": TelegramMessage.ContentType.UNSUPPORTED,
         "text": _("Unsupported Telegram message: %(types)s") % {"types": ", ".join(keys)[:300]},
     }
-
-
-def _safe_filename(name: str, fallback: str) -> str:
-    value = posixpath.basename(str(name or "")).replace("\\", "_")
-    value = re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._")
-    return (value or fallback)[:180]
 
 
 def _conversation_for_user(user: User) -> TelegramConversation:
@@ -270,7 +291,7 @@ def persist_inbound_message(*, user: User, update_id: int, message: dict) -> tup
             message=stored,
             telegram_file_id=str(payload["file_id"]),
             media_type=payload["content_type"],
-            original_name=_safe_filename(payload.get("file_name", ""), f"telegram-{payload['content_type']}"),
+            original_name=safe_filename(payload.get("file_name", ""), f"telegram-{payload['content_type']}"),
             mime_type=str(payload.get("mime_type") or "")[:255],
             size_bytes=max(0, int(payload.get("file_size") or 0)),
         )
@@ -307,7 +328,7 @@ def store_attachment(bot: telebot.TeleBot, attachment: TelegramAttachment) -> bo
         if not isinstance(content, (bytes, bytearray)) or not content or len(content) > SUPPORT_MAX_MEDIA_BYTES:
             raise ValueError("invalid size")
         digest = hashlib.sha256(content).hexdigest()
-        filename = _safe_filename(attachment.original_name, f"telegram-{attachment.media_type}")
+        filename = safe_filename(attachment.original_name, f"telegram-{attachment.media_type}")
         key = f"Telegram Support/{attachment.message.conversation.user_id}/{attachment.message_id}/{filename}"
         if not upload_to_bucket(client, bucket, io.BytesIO(content), key, attachment.mime_type or "application/octet-stream"):
             raise ValueError("upload failed")
@@ -325,7 +346,12 @@ def store_attachment(bot: telebot.TeleBot, attachment: TelegramAttachment) -> bo
 
 
 def _message_text(message: TelegramMessage) -> str:
-    body = message.text.strip() or _("[media message]")
+    if message.content_type == TelegramMessage.ContentType.VOICE:
+        body = message.text.strip() or _("Voice message")
+    elif message.content_type == TelegramMessage.ContentType.AUDIO:
+        body = message.text.strip() or _("Audio message")
+    else:
+        body = message.text.strip() or _("[media message]")
     if message.content_type == TelegramMessage.ContentType.UNSUPPORTED:
         return _("Unsupported message") + ": " + body
     attachments = list(message.attachments.all())
@@ -411,7 +437,7 @@ def handle_student_message(bot: telebot.TeleBot, *, user: User, update_id: int, 
     if stored.content_type == TelegramMessage.ContentType.UNSUPPORTED:
         bot.send_message(
             int(message["chat"]["id"]),
-            _("This message type is not supported. Text, photos, documents, and videos are accepted."),
+            _("This message type is not supported. Text, photos, documents, videos, and voice messages are accepted."),
         )
     else:
         send_support_digest(bot, conversation.pk, message_id=stored.pk)
@@ -530,6 +556,7 @@ def _queue_reply(
     text: str,
     reply_to_telegram_message_id: int | None,
     origin: str,
+    content_type: str = TelegramMessage.ContentType.TEXT,
 ) -> tuple[TelegramMessage, int, int | None]:
     """Queue one reply under a short row lock, then release before API I/O."""
     _require_admin(admin)
@@ -585,7 +612,7 @@ def _queue_reply(
             telegram_chat_id=student_account.telegram_chat_id,
             reply_to_telegram_message_id=reply_to_telegram_message_id,
             source_message=source_message,
-            content_type=TelegramMessage.ContentType.TEXT,
+            content_type=content_type,
             origin=origin,
             text=text,
             delivery_status=TelegramMessage.DeliveryStatus.QUEUED,
@@ -593,35 +620,19 @@ def _queue_reply(
         return outbound, student_account.telegram_chat_id, telegram_reply_to
 
 
-def reply_to_conversation(
-    bot: telebot.TeleBot,
-    *,
-    admin: User,
-    conversation_id: int,
-    text: str,
-    origin: str,
-    reply_to_telegram_message_id: int | None = None,
-) -> TelegramMessage:
-    """Queue and deliver one anonymous admin reply for Telegram or web chat."""
-    outbound, student_chat_id, telegram_reply_to = _queue_reply(
-        admin=admin,
-        conversation_id=conversation_id,
-        text=text,
-        reply_to_telegram_message_id=reply_to_telegram_message_id,
-        origin=origin,
-    )
-    try:
-        result = bot.send_message(
-            student_chat_id,
-            _("Admin") + ": " + text,
-            reply_to_message_id=telegram_reply_to,
-        )
-    except Exception as exc:
-        outbound.delivery_status = TelegramMessage.DeliveryStatus.FAILED
-        outbound.delivery_error = _("Telegram message delivery failed.")
-        outbound.save(update_fields=["delivery_status", "delivery_error"])
-        raise SupportReplyError(_("The reply could not be delivered; the conversation remains open.")) from exc
+def _fail_reply(outbound: TelegramMessage, message: str) -> None:
+    outbound.delivery_status = TelegramMessage.DeliveryStatus.FAILED
+    outbound.delivery_error = message[:500]
+    outbound.save(update_fields=["delivery_status", "delivery_error"])
 
+
+def _finalize_delivered_reply(
+    bot: telebot.TeleBot,
+    outbound: TelegramMessage,
+    admin: User,
+    result,
+) -> TelegramMessage:
+    """Record one successful Telegram send and resolve pending digests."""
     outbound.telegram_message_id = getattr(result, "message_id", None)
     outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
     outbound.sent_at = timezone.now()
@@ -649,6 +660,182 @@ def reply_to_conversation(
             outbound.conversation_id,
         )
     return outbound
+
+
+def reply_to_conversation(
+    bot: telebot.TeleBot,
+    *,
+    admin: User,
+    conversation_id: int,
+    text: str,
+    origin: str,
+    reply_to_telegram_message_id: int | None = None,
+) -> TelegramMessage:
+    """Queue and deliver one anonymous admin reply for Telegram or web chat."""
+    outbound, student_chat_id, telegram_reply_to = _queue_reply(
+        admin=admin,
+        conversation_id=conversation_id,
+        text=text,
+        reply_to_telegram_message_id=reply_to_telegram_message_id,
+        origin=origin,
+    )
+    try:
+        result = bot.send_message(
+            student_chat_id,
+            _("Admin") + ": " + text,
+            reply_to_message_id=telegram_reply_to,
+        )
+    except Exception as exc:
+        _fail_reply(outbound, _("Telegram message delivery failed."))
+        raise SupportReplyError(_("The reply could not be delivered; the conversation remains open.")) from exc
+    return _finalize_delivered_reply(bot, outbound, admin, result)
+
+
+def _attachment_content_type(kind: str) -> str:
+    return {
+        "photo": TelegramMessage.ContentType.PHOTO,
+        "video": TelegramMessage.ContentType.VIDEO,
+        "document": TelegramMessage.ContentType.DOCUMENT,
+    }[kind]
+
+
+def _classify_uploaded_file(uploaded_file) -> SupportAttachmentSpec:
+    try:
+        uploaded_file.seek(0)
+        head = uploaded_file.read(16)
+        uploaded_file.seek(0)
+        return classify_attachment(
+            filename=str(getattr(uploaded_file, "name", "") or ""),
+            size=int(getattr(uploaded_file, "size", 0) or 0),
+            head=head,
+        )
+    except ValueError as exc:
+        raise SupportReplyError(str(exc)) from exc
+    except Exception as exc:
+        raise SupportReplyError(_("The attachment could not be read.")) from exc
+
+
+def _store_outbound_attachment(
+    outbound: TelegramMessage,
+    spec: SupportAttachmentSpec,
+    uploaded_file,
+) -> TelegramAttachment:
+    """Persist one dashboard upload under the private support prefix."""
+    client = _r2_client()
+    bucket = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
+    if client is None or not bucket:
+        raise SupportReplyError(_("Telegram storage is not configured."))
+    filename = spec.filename
+    key = f"Telegram Support/Outbound/{outbound.conversation.user_id}/{uuid.uuid4().hex}-{filename}"
+    try:
+        digest = hashlib.sha256()
+        uploaded_file.seek(0)
+        for chunk in uploaded_file.chunks():
+            digest.update(chunk)
+        uploaded_file.seek(0)
+        if not upload_to_bucket(client, bucket, uploaded_file, key, spec.mime_type):
+            raise SupportReplyError(_("The attachment could not be stored."))
+        uploaded_file.seek(0)
+    except SupportReplyError:
+        raise
+    except Exception as exc:
+        logger.exception("Telegram support attachment storage failed.")
+        raise SupportReplyError(_("The attachment could not be stored.")) from exc
+    try:
+        return TelegramAttachment.objects.create(
+            message=outbound,
+            telegram_file_id="",
+            media_type=spec.kind,
+            r2_key=key,
+            original_name=filename,
+            mime_type=spec.mime_type,
+            size_bytes=spec.size,
+            sha256=digest.hexdigest(),
+            is_available=True,
+        )
+    except Exception:
+        logger.exception("Telegram support attachment record failed.")
+        try:
+            client.delete_object(Bucket=bucket, Key=key)
+        except Exception:
+            logger.warning("Telegram support attachment cleanup failed.")
+        raise SupportReplyError(_("The attachment could not be stored.")) from None
+
+
+def _telegram_input_file(uploaded_file, filename: str) -> tuple[telebot.types.InputFile, io.IOBase]:
+    """Return a telebot-compatible input and the stream to close after sending.
+
+    Large Django uploads are ``TemporaryUploadedFile`` instances whose ``.file``
+    is not an ``io.IOBase``; telebot accepts their temp path directly. Small
+    uploads expose a ``BytesIO``. Both are handed over without copying the file.
+    """
+    try:
+        path = uploaded_file.temporary_file_path()
+    except (AttributeError, ValueError):
+        path = None
+    if path:
+        input_file = telebot.types.InputFile(path, file_name=filename)
+        return input_file, input_file.file
+    stream = getattr(uploaded_file, "file", uploaded_file)
+    if not isinstance(stream, io.IOBase):
+        raise ValueError("unsupported upload stream")
+    return telebot.types.InputFile(stream, file_name=filename), stream
+
+
+def reply_with_attachment_to_conversation(
+    bot: telebot.TeleBot,
+    *,
+    admin: User,
+    conversation_id: int,
+    text: str,
+    uploaded_file,
+    origin: str,
+    reply_to_telegram_message_id: int | None = None,
+) -> TelegramMessage:
+    """Queue and deliver one admin reply carrying a JPEG/PNG, MP4 or PDF file."""
+    text = str(text or "").strip()
+    spec = _classify_uploaded_file(uploaded_file)
+    if len(text) > CAPTION_MAX_LENGTH:
+        raise SupportReplyError(_("Attachments support a message of 1,024 characters or fewer."))
+    outbound, student_chat_id, telegram_reply_to = _queue_reply(
+        admin=admin,
+        conversation_id=conversation_id,
+        text=text,
+        reply_to_telegram_message_id=reply_to_telegram_message_id,
+        origin=origin,
+        content_type=_attachment_content_type(spec.kind),
+    )
+    try:
+        _store_outbound_attachment(outbound, spec, uploaded_file)
+    except SupportReplyError as exc:
+        _fail_reply(outbound, str(exc))
+        raise
+    try:
+        input_file, cleanup_stream = _telegram_input_file(uploaded_file, spec.filename)
+    except Exception as exc:
+        _fail_reply(outbound, _("The attachment could not be read."))
+        raise SupportReplyError(_("The attachment could not be read.")) from exc
+    try:
+        send_kwargs = {}
+        if text:
+            send_kwargs["caption"] = text
+        if telegram_reply_to is not None:
+            send_kwargs["reply_to_message_id"] = telegram_reply_to
+        if spec.kind == "photo":
+            result = bot.send_photo(student_chat_id, input_file, **send_kwargs)
+        elif spec.kind == "video":
+            result = bot.send_video(student_chat_id, input_file, **send_kwargs)
+        else:
+            result = bot.send_document(student_chat_id, input_file, **send_kwargs)
+    except Exception as exc:
+        _fail_reply(outbound, _("Telegram message delivery failed."))
+        raise SupportReplyError(_("The reply could not be delivered; the conversation remains open.")) from exc
+    finally:
+        try:
+            cleanup_stream.close()
+        except Exception:
+            pass
+    return _finalize_delivered_reply(bot, outbound, admin, result)
 
 
 def _reply_target(message: dict, admin_chat_id: int) -> tuple[TelegramConversation | None, int | None]:

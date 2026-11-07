@@ -14,7 +14,7 @@ import telebot
 from celery import current_app
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, F, QuerySet
+from django.db.models import Count, F, OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -331,6 +331,7 @@ def _refresh_broadcast(broadcast_id: int) -> dict[str, int | bool]:
     updates = {
         "sent_count": counts[TelegramBroadcastRecipient.Status.SENT],
         "failed_count": counts[TelegramBroadcastRecipient.Status.FAILED],
+        "skipped_count": counts[TelegramBroadcastRecipient.Status.SKIPPED],
         "status": TelegramBroadcast.Status.SENDING if pending else (
             TelegramBroadcast.Status.FAILED if counts[TelegramBroadcastRecipient.Status.FAILED] else TelegramBroadcast.Status.COMPLETED
         ),
@@ -343,6 +344,9 @@ def _refresh_broadcast(broadcast_id: int) -> dict[str, int | bool]:
 
 def process_due_broadcast(broadcast_id: int, limit: int = BROADCAST_BATCH_SIZE) -> dict[str, int]:
     """Deliver one bounded recipient batch and schedule remaining work."""
+    broadcast = TelegramBroadcast.objects.select_related("academic_year", "level", "created_by__role").filter(pk=broadcast_id).first()
+    if broadcast is None:
+        return {"sent": 0, "failed": 0, "queued": 0}
     ids = _claim_recipient_ids(broadcast_id, limit)
     if not ids:
         state = _refresh_broadcast(broadcast_id)
@@ -356,8 +360,21 @@ def process_due_broadcast(broadcast_id: int, limit: int = BROADCAST_BATCH_SIZE) 
         bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False) if config else None
     except Exception:
         bot = None
-    recipients = TelegramBroadcastRecipient.objects.select_related("broadcast").filter(pk__in=ids)
+    recipients = list(TelegramBroadcastRecipient.objects.select_related("broadcast").filter(pk__in=ids))
+    allowed = set()
+    try:
+        _validate_target(broadcast)
+        if broadcast.created_by.is_active and broadcast.created_by.role and broadcast.created_by.role.role == "admin":
+            allowed = set(recipient_queryset(broadcast).filter(pk__in=[r.user_id for r in recipients])
+                          .values_list("pk", "telegram_account__pk", "telegram_account__telegram_chat_id"))
+    except BroadcastError:
+        pass
     for recipient in recipients:
+        if (recipient.user_id, recipient.telegram_account_id, recipient.telegram_chat_id) not in allowed:
+            TelegramBroadcastRecipient.objects.filter(pk=recipient.pk, status="sending").update(
+                status="skipped", last_error=_("Recipient is no longer authorized."), updated_at=timezone.now(),
+            )
+            continue
         if bot is None or any(not attachment.is_available for attachment in attachments) or (attachments and (client is None or not bucket)):
             _mark_failed(recipient, _("Telegram message delivery failed."))
             continue
@@ -385,35 +402,64 @@ def process_due_broadcast(broadcast_id: int, limit: int = BROADCAST_BATCH_SIZE) 
     return {"sent": int(state[TelegramBroadcastRecipient.Status.SENT]), "failed": int(state[TelegramBroadcastRecipient.Status.FAILED]), "queued": int(state["pending"])}
 
 
-def retry_failed_broadcast(broadcast_id: int, actor: User) -> TelegramBroadcast:
-    """Requeue only terminal recipient failures after an admin action."""
+def broadcast_redelivery_audience(broadcast: TelegramBroadcast, *, failed_only: bool) -> QuerySet[User]:
+    """Resolve the original audience with latest-attempt failure semantics."""
+    originals = broadcast.recipients.filter(user_id__isnull=False)
+    if failed_only:
+        lineage = TelegramBroadcast.objects.filter(
+            Q(pk=broadcast.pk) | Q(redelivery_of_id=broadcast.pk),
+        ).values("pk")
+        latest_status = TelegramBroadcastRecipient.objects.filter(
+            broadcast_id__in=lineage,
+            user_id=OuterRef("user_id"),
+        ).order_by("-pk").values("status")[:1]
+        originals = originals.annotate(latest_status=Subquery(latest_status)).filter(
+            latest_status=TelegramBroadcastRecipient.Status.FAILED,
+        )
+    return recipient_queryset(broadcast).filter(pk__in=originals.values("user_id"))
+
+
+def clone_broadcast_for_redelivery(*, source_id: int, actor: User, failed_only: bool) -> TelegramBroadcast:
+    """Copy the original audience/content into a new, independently tracked send."""
     _require_admin(actor)
     with transaction.atomic():
-        broadcast = TelegramBroadcast.objects.select_for_update().get(pk=broadcast_id)
-        if broadcast.status not in (TelegramBroadcast.Status.FAILED, TelegramBroadcast.Status.COMPLETED):
+        source = TelegramBroadcast.objects.select_for_update(of=("self",)).select_related("academic_year", "level").get(pk=source_id)
+        if source.redelivery_of_id:
+            source = TelegramBroadcast.objects.select_for_update(of=("self",)).select_related(
+                "academic_year", "level",
+            ).get(pk=source.redelivery_of_id)
+        if source.status not in {TelegramBroadcast.Status.COMPLETED, TelegramBroadcast.Status.FAILED}:
             raise BroadcastError(_("This broadcast is still being delivered."))
-        count = broadcast.recipients.filter(status=TelegramBroadcastRecipient.Status.FAILED).update(
-            status=TelegramBroadcastRecipient.Status.QUEUED,
-            scheduled_for=timezone.now(),
-            attempt_count=0,
-            telegram_message_id=None,
-            sent_at=None,
-            last_error="",
-            updated_at=timezone.now(),
+        _validate_target(source)
+        if source.attachments.filter(is_available=False).exists():
+            raise BroadcastError(_("One or more broadcast attachments are unavailable."))
+        audience = broadcast_redelivery_audience(source, failed_only=failed_only)
+        if not audience.exists():
+            raise BroadcastError(_("There are no linked eligible students in the selected target."))
+        copy = TelegramBroadcast.objects.create(
+            academic_year=source.academic_year, level=source.level, message=source.message,
+            redelivery_of=source, created_by=actor, confirmed_by=actor, confirmed_at=timezone.now(),
         )
-        if not count:
-            raise BroadcastError(_("This broadcast has no failed deliveries to retry."))
-        broadcast.status = TelegramBroadcast.Status.QUEUED
-        broadcast.completed_at = None
-        broadcast.last_error = ""
-        broadcast.save(update_fields=["status", "completed_at", "last_error", "updated_at"])
-        transaction.on_commit(
-            lambda: current_app.send_task(
-                "management_system.telegram_tasks.process_due_telegram_broadcasts",
-                args=[broadcast.pk],
-            )
-        )
-        return broadcast
+        # Confirmed attachment objects are immutable and remain private. Copy
+        # metadata only; never duplicate or expose provider credentials/URLs.
+        attachments = []
+        for row in source.attachments.order_by("pk").iterator(chunk_size=100):
+            attachments.append(TelegramBroadcastAttachment(
+                broadcast=copy, r2_key=row.r2_key, original_name=row.original_name,
+                mime_type=row.mime_type, size_bytes=row.size_bytes, sha256=row.sha256,
+                is_available=row.is_available, ordering=row.ordering,
+            ))
+            if len(attachments) == 100:
+                TelegramBroadcastAttachment.objects.bulk_create(attachments)
+                attachments = []
+        if attachments:
+            TelegramBroadcastAttachment.objects.bulk_create(attachments)
+        count = _bulk_snapshot_rows(copy, audience)
+        copy.status = TelegramBroadcast.Status.QUEUED
+        copy.recipient_count = count
+        copy.queued_at = timezone.now()
+        copy.save(update_fields=["status", "recipient_count", "queued_at", "updated_at"])
+        return copy
 
 
 def cancel_broadcast(broadcast_id: int, actor: User) -> None:

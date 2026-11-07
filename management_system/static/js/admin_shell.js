@@ -6,12 +6,11 @@
         Alpine.data('r2Manager', r2Manager);
         Alpine.data('lessonForm', lessonForm);
         Alpine.data('autoSave', autoSave);
-        Alpine.data('columnManager', columnManager);
-        Alpine.data('bulkActions', bulkActions);
         Alpine.data('quizForm', quizForm);
         Alpine.data('quizJsonImport', quizJsonImport);
         Alpine.data('formValidation', formValidation);
         Alpine.data('tableManager', tableManager);
+        Alpine.data('adminOperationStatus', adminOperationStatus);
         Alpine.data('progressTracker', progressTracker);
     });
 
