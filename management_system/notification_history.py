@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from .models import MobilePushDevice, PushDelivery, StudentNotification, TelegramAccount, TelegramNotificationDelivery
-from .mobile_push import _missing_device_exists
+from .mobile_push_queries import missing_push_device_exists
 
 
 def _delivery_count(model, foreign_key: str, statuses=None):
@@ -34,12 +34,18 @@ def notification_history_queryset() -> QuerySet:
             TelegramNotificationDelivery.Status.QUEUED, TelegramNotificationDelivery.Status.SENDING,
         ]),
         history_inbox_total=Case(When(inbox_visible=True, then=Value(1)), default=Value(0), output_field=IntegerField()),
-        history_inbox_done=Case(When(inbox_visible=True, scheduled_for__lte=now, cancelled_at__isnull=True, then=Value(1)), default=Value(0), output_field=IntegerField()),
-        history_missing_push=Exists(_missing_device_exists()),
+        history_inbox_done=Case(When(
+            inbox_visible=True,
+            scheduled_for__lte=now,
+            cancelled_at__isnull=True,
+            withdrawn_at__isnull=True,
+            then=Value(1),
+        ), default=Value(0), output_field=IntegerField()),
+        history_missing_push=Exists(missing_push_device_exists()),
         history_telegram_account=Exists(TelegramAccount.objects.filter(user_id=OuterRef("student_id"), is_active=True)),
     ).annotate(
         history_materializing=Case(When(
-            Q(is_manual_redelivery=False, cancelled_at__isnull=True, scheduled_for__lte=now,
+            Q(is_manual_redelivery=False, cancelled_at__isnull=True, withdrawn_at__isnull=True, scheduled_for__lte=now,
               student__is_active=True, student__application_status="active", student__role__role="student")
             & (Q(history_missing_push=True, push_expires_at__gt=now)
                | Q(history_telegram_total=0, history_telegram_account=True)), then=Value(True)), default=Value(False)),
@@ -51,6 +57,7 @@ def notification_history_queryset() -> QuerySet:
     ).annotate(
         history_processed=F("history_succeeded") + F("history_failed") + F("history_skipped"),
         history_status=Case(
+            When(withdrawn_at__isnull=False, then=Value("withdrawn")),
             When(cancelled_at__isnull=False, then=Value("cancelled")),
             When(Q(scheduled_for__gt=now) | Q(history_materializing=True), then=Value("queued")),
             When(history_pending__gt=0, then=Value("running")),
@@ -100,7 +107,11 @@ def notification_materializing_ids(notification_ids: list[int]) -> set[int]:
 
 
 def notification_channel_history(notification_id: int) -> QuerySet:
-    fields = ("row_id", "row_channel", "row_target", "row_status", "row_error", "row_attempts", "row_content", "row_created")
+    fields = (
+        "row_id", "row_channel", "row_target", "row_status", "row_error",
+        "row_attempts", "row_content", "row_created", "row_deletion_status",
+        "row_deletion_error",
+    )
     pushes = PushDelivery.objects.filter(notification_id=notification_id).order_by().annotate(
         row_id=Cast("pk", TextField()), row_channel=Value("push"),
         row_target=Concat(
@@ -114,10 +125,14 @@ def notification_channel_history(notification_id: int) -> QuerySet:
         ),
         row_status=F("status"), row_error=Substr("error_message", 1, 500), row_attempts=F("attempt_count"),
         row_content=Value("", output_field=TextField()), row_created=F("created_at"),
+        row_deletion_status=Value("", output_field=TextField()),
+        row_deletion_error=Value("", output_field=TextField()),
     ).values(*fields)
     telegram = TelegramNotificationDelivery.objects.filter(student_notification_id=notification_id).order_by().annotate(
         row_id=Cast("pk", TextField()), row_channel=Value("telegram"), row_target=Value(str(_("Telegram account"))),
         row_status=F("status"), row_error=Substr("last_error", 1, 500), row_attempts=F("attempt_count"),
         row_content=F("content_snapshot"), row_created=F("created_at"),
+        row_deletion_status=F("telegram_deletion_status"),
+        row_deletion_error=Substr("telegram_deletion_error", 1, 500),
     ).values(*fields)
     return pushes.union(telegram, all=True).order_by("-row_created", "row_channel", "row_id")

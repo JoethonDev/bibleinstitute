@@ -90,20 +90,34 @@
     <div class="ad-card">
         <div class="ad-card-head"><i class="fas fa-users me-2" aria-hidden="true"></i>{% translate "Recipient Delivery" %}</div>
         <div class="ad-card-body">
+            <p class="small text-muted">{% translate "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours." %}</p>
             <div class="ad-table-wrap tg-broadcast-table-wrap">
                 <table class="ad-table">
                     <caption class="visually-hidden">{% translate "Broadcast recipient delivery" %}</caption>
-                    <thead><tr><th scope="col">{% translate "Student" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Attempts" %}</th><th scope="col">{% translate "Error" %}</th></tr></thead>
+                    <thead><tr><th scope="col">{% translate "Student" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Attempts" %}</th><th scope="col">{% translate "Telegram removal" %}</th><th scope="col">{% translate "Error" %}</th><th scope="col">{% translate "Actions" %}</th></tr></thead>
                     <tbody>
                     {% for recipient in recipient_page_obj %}
                         <tr>
                             <td>{{ recipient.user_display_name|default:recipient.user_username }}</td>
                             <td>{{ recipient.get_status_display }}</td>
                             <td class="tg-broadcast-count">{{ recipient.attempt_count }}</td>
+                            <td>
+                                {% if recipient.telegram_message_count %}
+                                    {% blocktranslate with deleted=recipient.telegram_messages_deleted total=recipient.telegram_message_count expired=recipient.telegram_messages_expired failed=recipient.telegram_messages_failed %}{{ deleted }} of {{ total }} removed; {{ expired }} expired; {{ failed }} failed{% endblocktranslate %}
+                                {% else %}-{% endif %}
+                            </td>
                             <td>{{ recipient.last_error|default:"-" }}</td>
+                            <td>
+                                {% if recipient.telegram_messages_remaining and recipient.status != 'queued' and recipient.status != 'sending' %}
+                                <form method="post" action="{% url 'telegram-broadcast-recipient-delete' broadcast.pk recipient.pk %}" data-confirm-message="{% translate 'Delete every recorded broadcast message for this recipient?' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">{% translate "Delete from Telegram" %}</button>
+                                </form>
+                                {% else %}-{% endif %}
+                            </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="4" class="ad-empty">{% translate "No recipient records are available." %}</td></tr>
+                        <tr><td colspan="6" class="ad-empty">{% translate "No recipient records are available." %}</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>

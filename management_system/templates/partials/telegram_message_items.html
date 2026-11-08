@@ -56,8 +56,40 @@
         {% if message.direction == "outbound" and message.sender_user %}<span class="tg-chat-msg-sender">@{{ message.sender_user.username }}</span>{% endif %}
         {% if message.sent_at %}<time class="tg-chat-msg-time" datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
         {% if message.delivery_error %}<span class="tg-chat-msg-error" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
+        {% if message.delivery_status == "unknown" %}<span class="ad-pill ad-pill--warning">{% translate "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying." %}</span>{% endif %}
+        {% if message.content_type == "digest" %}
+        {% if message.resolved_at %}
+        {% if message.resolved_by %}
+        <span class="ad-pill ad-pill--success">{% blocktranslate with admin=message.resolved_by.username %}Answered by @{{ admin }}{% endblocktranslate %}</span>
+        {% else %}<span class="ad-pill ad-pill--success">{% translate "Answered" %}</span>{% endif %}
+        {% if message.resolution == "deleted" %}<span class="ad-pill ad-pill--muted">{% translate "Alert removed from Telegram" %}</span>
+        {% elif message.resolution == "edited" %}<span class="ad-pill ad-pill--muted">{% translate "Alert marked as replied in Telegram" %}</span>
+        {% elif message.resolution == "expired" %}<span class="ad-pill ad-pill--muted">{% translate "Alert remains in Telegram because the 48-hour deletion window expired" %}</span>
+        {% elif message.resolution == "failed" %}<span class="ad-pill ad-pill--danger">{% translate "Telegram could not update this alert" %}</span>{% endif %}
+        {% else %}<span class="ad-pill ad-pill--warning">{% translate "Awaiting a reply to this student message" %}</span>
+        {% endif %}
+        {% endif %}
+        {% if message.telegram_deletion_status %}
+        <span class="ad-pill ad-pill--muted">{% if message.telegram_deletion_status == "deleted" %}{% translate "Deleted from Telegram" %}{% elif message.telegram_deletion_status == "expired" %}{% translate "Telegram deletion window expired" %}{% else %}{% translate "Telegram deletion failed" %}{% endif %}</span>
+        {% endif %}
+        {% if message.telegram_deleted_by %}<span class="tg-chat-msg-sender">{% translate "Removed by" %} @{{ message.telegram_deleted_by.username }}</span>{% endif %}
+        {% if message.telegram_deletion_error %}<span class="tg-chat-msg-error">{{ message.telegram_deletion_error }}</span>{% endif %}
         {% if message.telegram_message_id and message.content_type != "digest" %}
         <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        {% endif %}
+        {% if message.direction == "outbound" and message.delivery_status == "sent" and message.telegram_deletion_status != "deleted" and message.telegram_deletion_status != "expired" %}
+        {% if message.sender_user_id == request.user.pk or message.content_type == "digest" and message.telegram_chat_id == own_admin_chat_id %}
+        <form method="post"
+              action="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}"
+              hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}?fragment=panel"
+              hx-target="#telegram-chat-panel"
+              hx-swap="innerHTML"
+              class="ps-inline-form"
+              data-confirm-message="{% translate 'Delete this message from Telegram? The local conversation history will remain.' %}">
+            {% csrf_token %}
+            <button type="submit" class="tg-chat-reply-link">{% translate "Delete from Telegram" %}</button>
+        </form>
+        {% endif %}
         {% endif %}
     </div>
 </li>

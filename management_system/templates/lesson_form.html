@@ -133,6 +133,16 @@
                                 <div class="form-text">{% translate "The offering determines the course, level, and academic year." %}</div>
                             </div>
 
+                            <div class="form-group mt-3">
+                                <label for="opening_date" class="form-label">{% translate "Available from" %}</label>
+                                <input type="datetime-local"
+                                       class="form-control"
+                                       id="opening_date"
+                                       name="opening_date"
+                                       value="{{ opening_date }}">
+                                <div class="form-text">{% translate "Leave blank to make this lesson available as soon as it is published." %} {% blocktranslate with timezone=application_timezone %}Scheduled times use {{ timezone }}.{% endblocktranslate %}</div>
+                            </div>
+
                             <!-- Publication Status -->
                             <div class="form-group mt-3">
                                 <label for="lesson-status" class="form-label">{% translate "Status" %}</label>

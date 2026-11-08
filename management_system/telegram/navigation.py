@@ -28,7 +28,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import translation
 from django.utils.translation import gettext as _
 
-from ..utils.timezones import ensure_aware, format_user_datetime
+from ..utils.timezones import format_human_datetime, timezone_name
 
 # Page size used by callers when slicing paginated lists.
 PAGE_SIZE = 5
@@ -371,37 +371,6 @@ def _level_label(level) -> str:
     return level.name_ar or level.name_en or (_("Level %(ordering)s") % {"ordering": level.ordering})
 
 
-def _hours(count: int) -> str:
-    if count == 2:
-        return _("two hours")
-    if 3 <= count <= 10:
-        return _("hours")
-    return _("hour")
-
-
-def _minutes(count: int) -> str:
-    if count == 2:
-        return _("two minutes")
-    if 3 <= count <= 10:
-        return _("minutes")
-    return _("minute")
-
-
-def _human_duration(seconds: float) -> str:
-    total_minutes = max(0, int(seconds // 60))
-    hours, minutes = divmod(total_minutes, 60)
-    if hours and minutes:
-        return _("%(hours)s %(hour_unit)s and %(minutes)s %(minute_unit)s") % {
-            "hours": hours,
-            "hour_unit": _hours(hours),
-            "minutes": minutes,
-            "minute_unit": _minutes(minutes),
-        }
-    if hours:
-        return _("%(hours)s %(hour_unit)s") % {"hours": hours, "hour_unit": _hours(hours)}
-    return _("%(minutes)s %(minute_unit)s") % {"minutes": minutes, "minute_unit": _minutes(minutes)}
-
-
 def format_home(user) -> str:
     """Arabic welcome message for the bot's home screen."""
     name = (getattr(user, "get_full_name", lambda: "")() or getattr(user, "username", "") or "").strip()
@@ -443,12 +412,12 @@ def format_offering(offering) -> str:
 
 
 def format_lesson(lesson, audio_available: bool, user) -> str:
-    """Arabic detail text for one already-authorized lesson.
+    """Detail text for one already-authorized lesson.
 
     ``audio_available`` is supplied by the caller from the lesson/R2
     representation; it is never inferred from video/PDF presence. ``user`` is
     part of the stable interface for callers that render user-specific
-    context; lesson dates are calendar dates and do not require a timezone.
+    context; scheduled availability uses the student's configured timezone.
     Empty description fields are omitted.
     """
     offering = lesson.course_offering
@@ -458,8 +427,11 @@ def format_lesson(lesson, audio_available: bool, user) -> str:
     ]
     if lesson.description and lesson.description.strip():
         lines.append(_('Description: %(description)s') % {"description": lesson.description.strip()})
-    if lesson.created_date:
-        lines.append(_('Publication date: %(date)s') % {"date": lesson.created_date.strftime('%d/%m/%Y')})
+    if lesson.opening_date is not None:
+        lines.append(_('Available from: %(date)s') % {
+            "date": format_human_datetime(lesson.opening_date, user),
+        })
+        lines.append(_('Time zone: %(name)s') % {"name": timezone_name(user)})
     link = website_url("lesson-details", [offering.pk, lesson.pk])
     if link:
         lines.append(_('Open lesson on the website: %(link)s') % {"link": link})
@@ -492,15 +464,13 @@ def format_quiz(quiz, user, opening=None, closing=None) -> str:
     opening_value = opening if opening is not None else quiz.opening_date
     closing_value = closing if closing is not None else quiz.closing_date
     if opening_value is not None and closing_value is not None:
-        time_format = "%d/%m/%Y %H:%M"
-        lines.append(_('Opens: %(date)s') % {"date": format_user_datetime(opening_value, user, time_format)})
-        lines.append(_('Closes: %(date)s') % {"date": format_user_datetime(closing_value, user, time_format)})
-        try:
-            duration_seconds = (ensure_aware(closing_value) - ensure_aware(opening_value)).total_seconds()
-        except TypeError:
-            duration_seconds = None
-        if duration_seconds is not None:
-            lines.append(_('Duration: %(duration)s') % {"duration": _human_duration(duration_seconds)})
+        lines.append(_('Opens: %(date)s') % {"date": format_human_datetime(opening_value, user)})
+        lines.append(_('Closes: %(date)s') % {"date": format_human_datetime(closing_value, user)})
+        lines.append(_('Time zone: %(name)s') % {"name": timezone_name(user)})
+        lines.append(_('Time allowed after starting: %(minutes)s minutes.') % {
+            "minutes": quiz.duration_minutes,
+        })
+        lines.append(_('Your attempt ends at its time limit or at closing time, whichever comes first.'))
 
     link = website_url("quiz-details", [offering.pk, quiz.pk])
     if link:

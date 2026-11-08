@@ -1861,6 +1861,7 @@ body.pdf-fs-open {
 
 .sd-quiz-head--success { background: linear-gradient(120deg, var(--ps-success), var(--ps-success-deep)); }
 .sd-quiz-head--closed { background: var(--ps-slate); }
+.sd-quiz-head--upcoming { background: linear-gradient(120deg, var(--ps-teal-deep), var(--ps-teal)); }
 .sd-quiz-head--preview { background: linear-gradient(120deg, var(--ps-teal-deep), var(--ps-teal)); }
 .sd-quiz-confirm-dialog {
     width: min(32rem, calc(100vw - 2rem));

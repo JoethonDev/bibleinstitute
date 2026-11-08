@@ -13,7 +13,11 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import translation
 from django.db.models.functions import Lower, Trim
 from django.conf import settings
-from .utils.timezones import format_application_datetime
+from .utils.timezones import (
+    format_application_datetime,
+    format_human_date,
+    format_human_datetime,
+)
 from .utils.search import SearchNormalize
 from .managers import CanonicalUserManager
 from .utils.validators import normalize_username
@@ -373,6 +377,11 @@ class TelegramNotificationDelivery(models.Model):
         FAILED = "failed", _("Failed")
         SKIPPED = "skipped", _("Skipped")
 
+    class DeletionStatus(models.TextChoices):
+        DELETED = "deleted", _("Deleted")
+        EXPIRED = "expired", _("Expired")
+        FAILED = "failed", _("Failed")
+
     idempotency_key = models.CharField(max_length=255, unique=True)
     notification_type = models.CharField(max_length=32, choices=NotificationType.choices)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_notification_deliveries")
@@ -383,6 +392,7 @@ class TelegramNotificationDelivery(models.Model):
         blank=True,
         related_name="notification_deliveries",
     )
+    telegram_chat_id = models.BigIntegerField(null=True, blank=True)
     student_notification = models.ForeignKey(
         "StudentNotification",
         on_delete=models.SET_NULL,
@@ -415,6 +425,22 @@ class TelegramNotificationDelivery(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     attempt_count = models.PositiveSmallIntegerField(default=0)
     telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    telegram_deletion_status = models.CharField(
+        max_length=16,
+        choices=DeletionStatus.choices,
+        blank=True,
+        default="",
+    )
+    telegram_deleted_at = models.DateTimeField(null=True, blank=True)
+    telegram_deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="deleted_telegram_notification_messages",
+    )
+    telegram_deletion_error = models.CharField(max_length=500, blank=True, default="")
     last_error = models.CharField(max_length=500, blank=True, default="")
     content_snapshot = models.TextField(blank=True, default="")
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -581,6 +607,10 @@ class MobilePushDevice(models.Model):
         ANDROID = "android", _("Android")
         IOS = "ios", _("iOS")
 
+    class Language(models.TextChoices):
+        ARABIC = "ar", _("Arabic")
+        ENGLISH = "en", _("English")
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -589,6 +619,11 @@ class MobilePushDevice(models.Model):
     expo_push_token = models.CharField(max_length=255, unique=True, null=True, blank=True)
     installation_id = models.CharField(max_length=128)
     platform = models.CharField(max_length=16, choices=Platform.choices)
+    language = models.CharField(
+        max_length=2,
+        choices=Language.choices,
+        default=Language.ARABIC,
+    )
     is_active = models.BooleanField(default=True)
     disabled_at = models.DateTimeField(null=True, blank=True)
     last_seen_at = models.DateTimeField(default=timezone.now)
@@ -760,6 +795,15 @@ class StudentNotification(models.Model):
     scheduled_for = models.DateTimeField()
     push_expires_at = models.DateTimeField()
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="withdrawn_student_notifications",
+    )
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -914,7 +958,7 @@ class TelegramConversation(models.Model):
     class Status(models.TextChoices):
         OPEN = "open", _("Open")
         CLAIMED = "claimed", _("Claimed")
-        HANDLED = "handled", _("Handled")
+        HANDLED = "handled", _("Resolved")
         BLOCKED = "blocked", _("Blocked")
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="telegram_conversations")
@@ -928,8 +972,24 @@ class TelegramConversation(models.Model):
     )
     claimed_at = models.DateTimeField(null=True, blank=True)
     handled_at = models.DateTimeField(null=True, blank=True)
+    handled_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="resolved_telegram_conversations",
+    )
     last_message_at = models.DateTimeField(null=True, blank=True)
     admin_read_at = models.DateTimeField(null=True, blank=True)
+    admin_read_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="read_telegram_conversations",
+    )
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -971,8 +1031,10 @@ class TelegramMessage(models.Model):
     class DeliveryStatus(models.TextChoices):
         RECEIVED = "received", _("Received")
         QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
         SENT = "sent", _("Sent")
         FAILED = "failed", _("Failed")
+        UNKNOWN = "unknown", _("Delivery outcome unknown")
 
     class Origin(models.TextChoices):
         TELEGRAM = "telegram", _("Via Telegram")
@@ -981,6 +1043,12 @@ class TelegramMessage(models.Model):
     class Resolution(models.TextChoices):
         DELETED = "deleted", _("Deleted")
         EDITED = "edited", _("Edited")
+        EXPIRED = "expired", _("Expired")
+        FAILED = "failed", _("Failed")
+
+    class DeletionStatus(models.TextChoices):
+        DELETED = "deleted", _("Deleted")
+        EXPIRED = "expired", _("Expired")
         FAILED = "failed", _("Failed")
 
     conversation = models.ForeignKey(TelegramConversation, on_delete=models.CASCADE, related_name="messages")
@@ -1004,6 +1072,22 @@ class TelegramMessage(models.Model):
         related_name="linked_messages",
         help_text="For digest rows: the student message announced. For replies: the student message answered.",
     )
+    resolved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="resolved_telegram_digests",
+    )
+    resolution_reply = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="resolved_digests",
+    )
     content_type = models.CharField(max_length=16, choices=ContentType.choices)
     origin = models.CharField(max_length=16, choices=Origin.choices, blank=True, default="")
     text = models.TextField(blank=True, default="")
@@ -1011,6 +1095,22 @@ class TelegramMessage(models.Model):
     delivery_error = models.CharField(max_length=500, blank=True, default="")
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolution = models.CharField(max_length=16, choices=Resolution.choices, blank=True, default="")
+    telegram_deletion_status = models.CharField(
+        max_length=16,
+        choices=DeletionStatus.choices,
+        blank=True,
+        default="",
+    )
+    telegram_deleted_at = models.DateTimeField(null=True, blank=True)
+    telegram_deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="deleted_telegram_support_messages",
+    )
+    telegram_deletion_error = models.CharField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
 
@@ -1205,7 +1305,6 @@ class TelegramBroadcastRecipient(models.Model):
     user_display_name = models.CharField(max_length=255, blank=True, default="")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     attempt_count = models.PositiveSmallIntegerField(default=0)
-    telegram_message_id = models.BigIntegerField(null=True, blank=True)
     scheduled_for = models.DateTimeField()
     sent_at = models.DateTimeField(null=True, blank=True)
     last_error = models.CharField(max_length=500, blank=True, default="")
@@ -1228,6 +1327,49 @@ class TelegramBroadcastRecipient(models.Model):
 
     def __str__(self):
         return f"Broadcast {self.broadcast_id} -> {self.telegram_chat_id}"
+
+
+class TelegramBroadcastDeliveryMessage(models.Model):
+    """Provider message IDs sent to one broadcast recipient, including files."""
+
+    class DeletionStatus(models.TextChoices):
+        DELETED = "deleted", _("Deleted")
+        EXPIRED = "expired", _("Expired")
+        FAILED = "failed", _("Failed")
+
+    recipient = models.ForeignKey(
+        TelegramBroadcastRecipient,
+        on_delete=models.CASCADE,
+        db_index=False,
+        related_name="messages",
+    )
+    telegram_message_id = models.BigIntegerField()
+    sent_at = models.DateTimeField(default=timezone.now)
+    deletion_status = models.CharField(
+        max_length=16,
+        choices=DeletionStatus.choices,
+        blank=True,
+        default="",
+    )
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="deleted_telegram_broadcast_messages",
+    )
+    deletion_error = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        ordering = ["pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipient", "telegram_message_id"],
+                name="tg_broadcast_message_id_unique",
+            ),
+        ]
 
 
 class OfflineCity(models.Model):
@@ -2456,6 +2598,7 @@ class Lesson(models.Model):
         choices=PublicationStatus.choices,
         default=PublicationStatus.DRAFT,
     )
+    opening_date = models.DateTimeField(null=True, blank=True)
     created_date = models.DateField(null=False, default=date.today)
     updated_date = models.DateField(null=False, auto_now=True)
     publication_event_version = models.PositiveIntegerField(default=0, editable=False)
@@ -2484,7 +2627,7 @@ class Lesson(models.Model):
                 offering.course.name,
                 offering.academic_year_level.level.display_name,
                 offering.academic_year_level.academic_year.name,
-                _("Updated on %(date)s") % {'date': self.updated_date.strftime('%d/%m/%Y')},
+                _("Updated on %(date)s") % {'date': format_human_date(self.updated_date)},
             ],
             "url" : reverse_lazy("lesson-view", args=[self.pk,])
         }
@@ -2635,6 +2778,8 @@ class Quiz(models.Model):
     total_grade = models.PositiveSmallIntegerField(default=50)
     opening_date = models.DateTimeField(default=now)
     closing_date = models.DateTimeField(default=now)
+    duration_minutes = models.PositiveIntegerField(default=60)
+    publication_event_version = models.PositiveIntegerField(default=1, editable=False)
     created_date = models.DateField(auto_now=True)
 
     class Meta:
@@ -2662,6 +2807,7 @@ class Quiz(models.Model):
             "selected_quiz_type_id": self.quiz_type_id,
             "opening_date" : format_application_datetime(self.opening_date, "%Y-%m-%dT%H:%M:%S"),
             "closing_date" : format_application_datetime(self.closing_date, "%Y-%m-%dT%H:%M:%S"),
+            "duration_minutes": self.duration_minutes,
         }
 
     def serialize_pagination(self):
@@ -2676,8 +2822,9 @@ class Quiz(models.Model):
                 offering.academic_year_level.academic_year.name,
                 self.quiz_type.name_en if self.quiz_type else _("Unassigned"),
                 self.total_grade,
-                format_application_datetime(self.opening_date, "%H:%M:%S, %d/%m/%Y"),
-                format_application_datetime(self.closing_date, "%H:%M:%S, %d/%m/%Y"),
+                format_human_datetime(self.opening_date),
+                format_human_datetime(self.closing_date),
+                self.duration_minutes,
                 getattr(self, "submissions_count", 0),
             ],
             "url" : reverse_lazy("quiz-view", args=[self.pk,])
@@ -2687,7 +2834,7 @@ class Quiz(models.Model):
     def get_columns():
         return [
             _("Name"), _("Course"), _("Level"), _("Academic Year"), _("Quiz Type"),
-            _("Grades"), _("Opening Date"), _("Closing Date"), _("Submissions"),
+            _("Grades"), _("Opening Date"), _("Closing Date"), _("Duration (minutes)"), _("Submissions"),
         ]
 
 class QuizStudentOpening(models.Model):
@@ -2954,7 +3101,7 @@ class Grade(models.Model):
     def serialize_pagination(self):
         return {
             "id" : self.pk,
-            "rows" : [self.user.username, self.total_grade, self.submitted_at.strftime("%H:%M:%S, %d/%m/%Y")],
+            "rows" : [self.user.username, self.total_grade, format_human_datetime(self.submitted_at)],
             "url" : reverse_lazy("submission-user", args=[self.quiz_id, self.user_id]),
             "submission_id" : self.pk  # Add submission_id for CSV export
         }
@@ -3060,10 +3207,12 @@ class QuizAnswerSnapshot(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     answers = models.JSONField(default=dict)
     revision = models.PositiveIntegerField(default=1)
+    deadline_at = models.DateTimeField()
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["quiz", "user"], name="unique_quiz_answer_snapshot")]
+        indexes = [models.Index(fields=["deadline_at"], name="quiz_snapshot_deadline_idx")]
 
 
 class QuizOperationJob(models.Model):

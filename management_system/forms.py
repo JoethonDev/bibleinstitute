@@ -355,6 +355,11 @@ class LessonEditorForm(forms.Form):
     lesson_name = forms.CharField(max_length=255, label=_("Lesson Name"))
     description = forms.CharField(required=False, label=_("Lesson Description"))
     course_offering = forms.ModelChoiceField(queryset=CourseOffering.objects.none(), label=_("Course Offering"))
+    opening_date = forms.CharField(
+        required=False,
+        label=_("Available from"),
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+    )
     status = forms.ChoiceField(choices=PublicationStatus.choices, label=_("Status"))
 
     def __init__(self, *args, current_offering_id=None, **kwargs):
@@ -364,6 +369,15 @@ class LessonEditorForm(forms.Form):
         ).select_related(
             "course", "academic_year_level__level", "academic_year_level__academic_year"
         ).order_by("academic_year_level__level__ordering", "course__name", "academic_year_level__academic_year__ordering", "pk")
+
+    def clean_opening_date(self):
+        value = self.cleaned_data["opening_date"]
+        if not value:
+            return None
+        try:
+            return parse_application_datetime(value)
+        except (TypeError, ValueError):
+            raise forms.ValidationError(_("Enter a valid date and time."))
 
 
 class CourseForm(forms.ModelForm):

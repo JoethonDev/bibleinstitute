@@ -7,8 +7,8 @@ import io
 import logging
 import mimetypes
 import uuid
-from datetime import datetime, timedelta
-from typing import cast
+from dataclasses import dataclass
+from datetime import timedelta
 
 import telebot
 from django.conf import settings
@@ -31,6 +31,7 @@ from .attachments import (
     classify_attachment,
     safe_filename,
 )
+from .deletion import delete_bot_message, is_missing_message_error
 from .text import strip_telegram_links
 
 
@@ -38,17 +39,30 @@ logger = logging.getLogger(__name__)
 
 SUPPORT_MAX_MEDIA_BYTES = 50 * 1024 * 1024
 SUPPORTED_MEDIA = {"photo", "document", "video", "voice", "audio"}
-# Telegram cannot edit or delete bot messages indefinitely. Older digests are
-# terminally marked failed without making an API call.
+# Telegram cannot edit or delete bot messages indefinitely.
 SUPPORT_DIGEST_ACTION_WINDOW = timedelta(hours=48)
+SUPPORT_DIGEST_RECOVERY_WINDOW = timedelta(minutes=15)
+SUPPORT_REPLY_RECOVERY_WINDOW = timedelta(minutes=10)
+SUPPORT_REPLY_RECOVERY_BATCH_SIZE = 100
 
 
 class SupportReplyError(Exception):
     """A safe, localized failure from the shared support reply boundary."""
 
 
+@dataclass(frozen=True)
+class SupportMessageDeletionResult:
+    status: str
+    reopened_conversation: bool
+
+
 def _require_admin(user: User) -> None:
-    if not user.is_authenticated or not user.role or user.role.role != "admin":
+    if (
+        not user.is_authenticated
+        or not user.is_active
+        or not user.role
+        or user.role.role != "admin"
+    ):
         raise SupportReplyError(_("Only administrators can start Telegram conversations."))
 
 
@@ -74,8 +88,12 @@ def start_conversation(*, admin: User, user_id: int) -> TelegramConversation:
             conversation.claimed_by = None
             conversation.claimed_at = None
             conversation.handled_at = None
+            conversation.handled_by = None
+            conversation.admin_read_at = None
+            conversation.admin_read_by = None
             conversation.save(update_fields=[
-                "status", "claimed_by", "claimed_at", "handled_at", "updated_at",
+                "status", "claimed_by", "claimed_at", "handled_at", "handled_by",
+                "admin_read_at", "admin_read_by", "updated_at",
             ])
         return conversation
     return TelegramConversation.objects.create(
@@ -93,36 +111,17 @@ def latest_inbound_message_queryset():
     ).order_by("-created_at", "-pk")
 
 
-def latest_message_queryset():
-    """Non-digest support messages ordered newest-first for read-state checks."""
-    return TelegramMessage.objects.exclude(
-        content_type=TelegramMessage.ContentType.DIGEST,
-    ).order_by("-created_at", "-pk")
-
-
 def unread_conversation_filter() -> Q:
-    """Canonical unread predicate.
-
-    Requires the ``latest_inbound_at`` and ``latest_message_direction``
-    annotations (both exclude digest rows). A conversation is unread while the
-    student wrote last and that message is newer than the read marker; an admin
-    message last always counts as handled.
-    """
-    return Q(latest_message_direction=TelegramMessage.Direction.INBOUND) & (
+    """Unread tracks whether an admin read the newest student message."""
+    return Q(latest_inbound_at__isnull=False) & (
         Q(admin_read_at__isnull=True) | Q(latest_inbound_at__gt=F("admin_read_at"))
     )
 
 
 def processed_conversation_filter() -> Q:
-    """Canonical processed predicate.
-
-    Requires the same annotations. A conversation is processed when the admin
-    wrote last, has no inbound message at all, or the read marker is at/after
-    the newest inbound message.
-    """
+    """Processed is the inverse read state and is separate from resolution."""
     return (
-        Q(latest_message_direction=TelegramMessage.Direction.OUTBOUND)
-        | Q(latest_inbound_at__isnull=True)
+        Q(latest_inbound_at__isnull=True)
         | Q(admin_read_at__isnull=False, latest_inbound_at__lte=F("admin_read_at"))
     )
 
@@ -132,12 +131,8 @@ def unread_conversations_queryset():
     latest_inbound = latest_inbound_message_queryset().filter(
         conversation=OuterRef("pk"),
     )
-    latest_message = latest_message_queryset().filter(
-        conversation=OuterRef("pk"),
-    )
     return TelegramConversation.objects.annotate(
         latest_inbound_at=Subquery(latest_inbound.values("created_at")[:1]),
-        latest_message_direction=Subquery(latest_message.values("direction")[:1]),
     ).filter(unread_conversation_filter())
 
 
@@ -155,7 +150,8 @@ def mark_conversation_read(*, conversation_id: int, admin: User) -> TelegramConv
     except TelegramConversation.DoesNotExist as exc:
         raise SupportReplyError(_("This conversation is no longer available.")) from exc
     conversation.admin_read_at = timezone.now()
-    conversation.save(update_fields=["admin_read_at", "updated_at"])
+    conversation.admin_read_by = admin
+    conversation.save(update_fields=["admin_read_at", "admin_read_by", "updated_at"])
     return conversation
 
 
@@ -165,7 +161,175 @@ def mark_all_conversations_read(*, admin: User) -> int:
     now = timezone.now()
     return TelegramConversation.objects.filter(
         pk__in=unread_conversations_queryset().values("pk"),
-    ).update(admin_read_at=now, updated_at=now)
+    ).update(admin_read_at=now, admin_read_by=admin, updated_at=now)
+
+
+@transaction.atomic
+def recover_stale_support_replies(limit: int = SUPPORT_REPLY_RECOVERY_BATCH_SIZE) -> int:
+    """Mark interrupted provider sends unknown and reopen their stale claims."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+        raise ValueError("Recovery limit must be between 1 and 1000.")
+
+    cutoff = timezone.now() - SUPPORT_REPLY_RECOVERY_WINDOW
+    stale = TelegramMessage.objects.filter(
+        direction=TelegramMessage.Direction.OUTBOUND,
+        delivery_status__in=(
+            TelegramMessage.DeliveryStatus.QUEUED,
+            TelegramMessage.DeliveryStatus.SENDING,
+        ),
+        created_at__lte=cutoff,
+    ).exclude(content_type=TelegramMessage.ContentType.DIGEST)
+    stale_rows = list(
+        stale.order_by("created_at", "pk")
+        .values_list("pk", "conversation_id")[:limit]
+    )
+    if not stale_rows:
+        return 0
+    stale_ids = [message_id for message_id, _ in stale_rows]
+    conversation_ids = {conversation_id for _, conversation_id in stale_rows}
+
+    conversations = {
+        conversation.pk: conversation
+        for conversation in TelegramConversation.objects.select_for_update(skip_locked=True)
+        .filter(pk__in=conversation_ids)
+        .order_by("pk")
+    }
+    if not conversations:
+        return 0
+
+    stale_messages = list(
+        TelegramMessage.objects.select_for_update(of=("self",), skip_locked=True)
+        .filter(
+            pk__in=stale_ids,
+            conversation_id__in=conversations,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            delivery_status__in=(
+                TelegramMessage.DeliveryStatus.QUEUED,
+                TelegramMessage.DeliveryStatus.SENDING,
+            ),
+            created_at__lte=cutoff,
+        )
+        .exclude(content_type=TelegramMessage.ContentType.DIGEST)
+        .order_by("conversation_id", "pk")[:limit]
+    )
+    if not stale_messages:
+        return 0
+
+    owner_ids_by_conversation: dict[int, set[int]] = {}
+    for message in stale_messages:
+        message.delivery_status = TelegramMessage.DeliveryStatus.UNKNOWN
+        message.delivery_error = ""
+        if message.sender_user_id is not None:
+            owner_ids_by_conversation.setdefault(message.conversation_id, set()).add(
+                message.sender_user_id,
+            )
+    TelegramMessage.objects.bulk_update(
+        stale_messages,
+        ["delivery_status", "delivery_error"],
+        batch_size=SUPPORT_REPLY_RECOVERY_BATCH_SIZE,
+    )
+
+    recovered_ids = [message.pk for message in stale_messages]
+    pending_conversation_ids = set(
+        TelegramMessage.objects.filter(
+            conversation_id__in=conversations,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            delivery_status__in=(
+                TelegramMessage.DeliveryStatus.QUEUED,
+                TelegramMessage.DeliveryStatus.SENDING,
+            ),
+        )
+        .exclude(content_type=TelegramMessage.ContentType.DIGEST)
+        .exclude(pk__in=recovered_ids)
+        .values_list("conversation_id", flat=True)
+        .distinct()
+    )
+    reopened = []
+    recovered_at = timezone.now()
+    for conversation_id, conversation in conversations.items():
+        if (
+            conversation.status == TelegramConversation.Status.CLAIMED
+            and conversation.claimed_by_id in owner_ids_by_conversation.get(conversation_id, set())
+            and conversation_id not in pending_conversation_ids
+        ):
+            conversation.status = TelegramConversation.Status.OPEN
+            conversation.claimed_by = None
+            conversation.claimed_at = None
+            conversation.version += 1
+            conversation.updated_at = recovered_at
+            reopened.append(conversation)
+    if reopened:
+        TelegramConversation.objects.bulk_update(
+            reopened,
+            ["status", "claimed_by", "claimed_at", "version", "updated_at"],
+            batch_size=SUPPORT_REPLY_RECOVERY_BATCH_SIZE,
+        )
+    return len(stale_messages)
+
+
+@transaction.atomic
+def claim_conversation(*, conversation_id: int, admin: User) -> TelegramConversation:
+    """Assign an open conversation to one admin under a row lock."""
+    _require_admin(admin)
+    try:
+        conversation = TelegramConversation.objects.select_for_update().select_related(
+            "claimed_by", "handled_by",
+        ).get(pk=conversation_id)
+    except TelegramConversation.DoesNotExist as exc:
+        raise SupportReplyError(_("This conversation is no longer available.")) from exc
+    if conversation.status == TelegramConversation.Status.BLOCKED:
+        raise SupportReplyError(_("This conversation is blocked."))
+    if conversation.status == TelegramConversation.Status.HANDLED:
+        raise SupportReplyError(_("This conversation has already been resolved."))
+    if conversation.claimed_by_id and conversation.claimed_by_id != admin.pk:
+        raise SupportReplyError(
+            _("This conversation is assigned to %(admin)s.")
+            % {"admin": conversation.claimed_by.get_full_name() or conversation.claimed_by.username}
+        )
+    if (
+        conversation.status != TelegramConversation.Status.CLAIMED
+        or conversation.claimed_by_id is None
+    ):
+        conversation.status = TelegramConversation.Status.CLAIMED
+        conversation.claimed_by = admin
+        conversation.claimed_at = timezone.now()
+        conversation.version += 1
+        conversation.save(update_fields=[
+            "status", "claimed_by", "claimed_at", "version", "updated_at",
+        ])
+    return conversation
+
+
+@transaction.atomic
+def release_conversation(*, conversation_id: int, admin: User) -> TelegramConversation:
+    """Return an admin-owned conversation to the shared open queue."""
+    _require_admin(admin)
+    try:
+        conversation = TelegramConversation.objects.select_for_update().get(pk=conversation_id)
+    except TelegramConversation.DoesNotExist as exc:
+        raise SupportReplyError(_("This conversation is no longer available.")) from exc
+    if conversation.status != TelegramConversation.Status.CLAIMED:
+        raise SupportReplyError(_("This conversation is not currently assigned."))
+    if conversation.claimed_by_id != admin.pk:
+        raise SupportReplyError(_("Only the assigned administrator can release this conversation."))
+    pending_reply = TelegramMessage.objects.filter(
+        conversation_id=conversation.pk,
+        direction=TelegramMessage.Direction.OUTBOUND,
+        delivery_status__in=(
+            TelegramMessage.DeliveryStatus.QUEUED,
+            TelegramMessage.DeliveryStatus.SENDING,
+        ),
+    ).exclude(content_type=TelegramMessage.ContentType.DIGEST).exists()
+    if pending_reply:
+        raise SupportReplyError(_("Wait for the pending reply to finish before releasing this conversation."))
+    conversation.status = TelegramConversation.Status.OPEN
+    conversation.claimed_by = None
+    conversation.claimed_at = None
+    conversation.version += 1
+    conversation.save(update_fields=[
+        "status", "claimed_by", "claimed_at", "version", "updated_at",
+    ])
+    return conversation
 
 
 def _message_payload(message: dict) -> dict:
@@ -227,20 +391,22 @@ def _conversation_for_user(user: User) -> TelegramConversation:
     active = TelegramConversation.objects.select_for_update().filter(
         user=user,
         status__in=(TelegramConversation.Status.OPEN, TelegramConversation.Status.CLAIMED),
-    ).first()
+    ).order_by("-last_message_at", "-updated_at", "-pk").first()
     if active:
         return active
     latest = TelegramConversation.objects.select_for_update().filter(
         user=user,
     ).order_by("-last_message_at", "-updated_at", "-pk").first()
     if latest:
-        latest.status = TelegramConversation.Status.OPEN
-        latest.claimed_by = None
-        latest.claimed_at = None
-        latest.handled_at = None
-        latest.save(update_fields=[
-            "status", "claimed_by", "claimed_at", "handled_at", "updated_at",
-        ])
+        if latest.status == TelegramConversation.Status.HANDLED:
+            latest.status = TelegramConversation.Status.OPEN
+            latest.claimed_by = None
+            latest.claimed_at = None
+            latest.handled_at = None
+            latest.handled_by = None
+            latest.save(update_fields=[
+                "status", "claimed_by", "claimed_at", "handled_at", "handled_by", "updated_at",
+            ])
         return latest
     try:
         with transaction.atomic():
@@ -285,7 +451,13 @@ def persist_inbound_message(*, user: User, update_id: int, message: dict) -> tup
         conversation.claimed_by = None
         conversation.claimed_at = None
         conversation.handled_at = None
-    conversation.save(update_fields=["status", "claimed_by", "claimed_at", "handled_at", "last_message_at", "version", "updated_at"])
+        conversation.handled_by = None
+    conversation.admin_read_at = None
+    conversation.admin_read_by = None
+    conversation.save(update_fields=[
+        "status", "claimed_by", "claimed_at", "handled_at", "handled_by",
+        "admin_read_at", "admin_read_by", "last_message_at", "version", "updated_at",
+    ])
     if payload["content_type"] in SUPPORTED_MEDIA and payload.get("file_id"):
         TelegramAttachment.objects.create(
             message=stored,
@@ -370,76 +542,131 @@ def _admin_accounts():
     )
 
 
-def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: int | None = None) -> int:
+def _sent_replies_to_source(source_message_id: int):
+    return TelegramMessage.objects.filter(
+        source_message_id=source_message_id,
+        direction=TelegramMessage.Direction.OUTBOUND,
+        delivery_status=TelegramMessage.DeliveryStatus.SENT,
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
+    ).order_by("-sent_at", "-pk")
+
+
+def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: int) -> int:
     """Announce one inbound student message to every linked admin account."""
     try:
-        conversation = TelegramConversation.objects.select_related("user").prefetch_related("messages__attachments").get(pk=conversation_id)
+        conversation = TelegramConversation.objects.select_related("user").get(pk=conversation_id)
     except TelegramConversation.DoesNotExist:
         return 0
+    if isinstance(message_id, bool) or not isinstance(message_id, int) or message_id < 1:
+        return 0
     sent = 0
-    inbound_messages = [
-        message for message in conversation.messages.all()
-        if message.direction == TelegramMessage.Direction.INBOUND
-        and (message_id is None or message.pk == message_id)
-    ]
+    inbound_messages = list(TelegramMessage.objects.filter(
+        conversation_id=conversation.pk,
+        direction=TelegramMessage.Direction.INBOUND,
+        pk=message_id,
+    ).prefetch_related("attachments").order_by("created_at", "pk"))
     sender_identity = conversation.user.telegram_display_identity
+    stale_before = timezone.now() - SUPPORT_DIGEST_RECOVERY_WINDOW
     for message in inbound_messages:
+        if _sent_replies_to_source(message.pk).exists():
+            continue
         text = _("Support message from %(name)s") % {"name": sender_identity}
         text += "\n\n" + _message_text(message)
         for account in _admin_accounts().iterator(chunk_size=100):
-            result = bot.send_message(account.telegram_chat_id, text)
-            TelegramMessage.objects.create(
-                conversation=conversation,
-                direction=TelegramMessage.Direction.OUTBOUND,
-                telegram_chat_id=account.telegram_chat_id,
-                telegram_message_id=getattr(result, "message_id", None),
-                source_message=message,
-                content_type=TelegramMessage.ContentType.DIGEST,
-                text=text,
-                delivery_status=TelegramMessage.DeliveryStatus.SENT,
-                sent_at=timezone.now(),
-            )
-            sent += 1
-    if inbound_messages:
-        answered_reply = TelegramMessage.objects.filter(
-            conversation=conversation,
-            direction=TelegramMessage.Direction.OUTBOUND,
-            delivery_status=TelegramMessage.DeliveryStatus.SENT,
-            sender_user__isnull=False,
-            sent_at__gte=min(message.created_at for message in inbound_messages),
-        ).exclude(
-            content_type=TelegramMessage.ContentType.DIGEST,
-        ).select_related("sender_user").order_by("-sent_at", "-pk").first()
-        if answered_reply:
-            try:
-                resolve_answered_announcements(
-                    bot,
+            with transaction.atomic():
+                TelegramConversation.objects.select_for_update().get(pk=conversation.pk)
+                if _sent_replies_to_source(message.pk).exists():
+                    continue
+                digests = TelegramMessage.objects.select_for_update().filter(
                     conversation_id=conversation.pk,
-                    responder=answered_reply.sender_user,
-                    answered_before=answered_reply.sent_at,
-                )
+                    source_message_id=message.pk,
+                    telegram_chat_id=account.telegram_chat_id,
+                    content_type=TelegramMessage.ContentType.DIGEST,
+                ).order_by("pk")
+                sent_digest = digests.filter(
+                    delivery_status=TelegramMessage.DeliveryStatus.SENT,
+                ).first()
+                recent_digest = digests.filter(
+                    delivery_status=TelegramMessage.DeliveryStatus.SENDING,
+                    created_at__gte=stale_before,
+                ).first()
+                if sent_digest is not None or recent_digest is not None:
+                    continue
+                digest = digests.first()
+                if digest is None:
+                    digest = TelegramMessage.objects.create(
+                        conversation=conversation,
+                        direction=TelegramMessage.Direction.OUTBOUND,
+                        telegram_chat_id=account.telegram_chat_id,
+                        source_message=message,
+                        content_type=TelegramMessage.ContentType.DIGEST,
+                        text=text,
+                        delivery_status=TelegramMessage.DeliveryStatus.SENDING,
+                    )
+                else:
+                    digest.text = text
+                    digest.delivery_status = TelegramMessage.DeliveryStatus.SENDING
+                    digest.delivery_error = ""
+                    digest.save(update_fields=["text", "delivery_status", "delivery_error"])
+            try:
+                result = bot.send_message(account.telegram_chat_id, text)
+                telegram_message_id = getattr(result, "message_id", None)
+                if telegram_message_id is None:
+                    raise ValueError("Telegram did not return a message identifier.")
             except Exception:
-                logger.exception(
-                    "telegram_support_resolution_error conversation=%s",
-                    conversation.pk,
+                TelegramMessage.objects.filter(
+                    pk=digest.pk,
+                    delivery_status=TelegramMessage.DeliveryStatus.SENDING,
+                ).update(
+                    delivery_status=TelegramMessage.DeliveryStatus.FAILED,
+                    delivery_error=_("Telegram message delivery failed."),
                 )
+                logger.exception(
+                    "telegram_support_digest_delivery_failed digest=%s",
+                    digest.pk,
+                )
+            else:
+                sent_digest_count = TelegramMessage.objects.filter(
+                    pk=digest.pk,
+                    delivery_status=TelegramMessage.DeliveryStatus.SENDING,
+                ).update(
+                    telegram_message_id=telegram_message_id,
+                    delivery_status=TelegramMessage.DeliveryStatus.SENT,
+                    sent_at=timezone.now(),
+                    delivery_error="",
+                )
+                sent += sent_digest_count
+                if sent_digest_count:
+                    reply = _sent_replies_to_source(message.pk).select_related(
+                        "sender_user",
+                    ).first()
+                    if reply is not None:
+                        try:
+                            resolve_answered_announcements(
+                                bot,
+                                source_message_id=message.pk,
+                                reply=reply,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "telegram_support_resolution_error conversation=%s",
+                                conversation.pk,
+                            )
     return sent
 
 
 def handle_student_message(bot: telebot.TeleBot, *, user: User, update_id: int, message: dict) -> bool:
     conversation, stored, created = persist_inbound_message(user=user, update_id=update_id, message=message)
-    if not created:
-        if not conversation.messages.filter(content_type=TelegramMessage.ContentType.DIGEST).exists():
-            send_support_digest(bot, conversation.pk)
-        return True
-    for attachment in stored.attachments.all():
-        store_attachment(bot, attachment)
-    if stored.content_type == TelegramMessage.ContentType.UNSUPPORTED:
+    if created:
+        for attachment in stored.attachments.all():
+            store_attachment(bot, attachment)
+    if created and stored.content_type == TelegramMessage.ContentType.UNSUPPORTED:
         bot.send_message(
             int(message["chat"]["id"]),
             _("This message type is not supported. Text, photos, documents, videos, and voice messages are accepted."),
         )
-    else:
+    elif stored.content_type != TelegramMessage.ContentType.UNSUPPORTED:
         send_support_digest(bot, conversation.pk, message_id=stored.pk)
     return True
 
@@ -467,59 +694,44 @@ def _answered_source_message(
     ).order_by("-created_at", "-pk").first()
 
 
-def _is_missing_message_error(exc: Exception) -> bool:
-    """Telegram reports an already-deleted digest as a not-found message error."""
-    message = str(exc).lower()
-    return "message to delete not found" in message or "message to edit not found" in message
-
-
 def resolve_answered_announcements(
     bot: telebot.TeleBot,
     *,
-    conversation_id: int,
-    responder: User,
-    answered_before: datetime | None = None,
+    source_message_id: int | None,
+    reply: TelegramMessage,
 ) -> int:
-    """Resolve every pending digest in a conversation for the other admins."""
+    """Close only the admin digests for the exact student message answered."""
+    if source_message_id is None:
+        return 0
     now = timezone.now()
-    answered_before = answered_before or now
-    responder_chats = TelegramAccount.objects.filter(
-        user_id=responder.pk,
-    ).values_list("telegram_chat_id", flat=True)
     digests = TelegramMessage.objects.filter(
-        conversation_id=conversation_id,
+        source_message_id=source_message_id,
         content_type=TelegramMessage.ContentType.DIGEST,
+        delivery_status=TelegramMessage.DeliveryStatus.SENT,
         resolved_at__isnull=True,
-    ).exclude(
-        telegram_chat_id__in=responder_chats,
-    )
-    digests = digests.filter(
-        Q(source_message__created_at__lte=answered_before)
-        | Q(source_message__isnull=True, created_at__lte=answered_before)
-    )
+    ).order_by("pk")
     resolved = 0
     for digest in digests.iterator(chunk_size=100):
         resolution = TelegramMessage.Resolution.FAILED
-        terminal_failure = (
-            digest.telegram_message_id is None
-            or digest.created_at <= now - SUPPORT_DIGEST_ACTION_WINDOW
-        )
-        if not terminal_failure:
-            message_id = cast(int, digest.telegram_message_id)
+        if digest.telegram_message_id is None or digest.sent_at is None:
+            resolution = TelegramMessage.Resolution.FAILED
+        elif now - digest.sent_at >= SUPPORT_DIGEST_ACTION_WINDOW:
+            resolution = TelegramMessage.Resolution.EXPIRED
+        else:
             try:
-                bot.delete_message(digest.telegram_chat_id, message_id)
+                bot.delete_message(digest.telegram_chat_id, digest.telegram_message_id)
             except Exception as exc:
-                if _is_missing_message_error(exc):
+                if is_missing_message_error(exc):
                     resolution = TelegramMessage.Resolution.DELETED
                 else:
                     try:
                         bot.edit_message_text(
-                            _("Replied by @%(username)s") % {"username": responder.username},
+                            _("Replied by @%(username)s") % {"username": reply.sender_user.username},
                             chat_id=digest.telegram_chat_id,
-                            message_id=message_id,
+                            message_id=digest.telegram_message_id,
                         )
                     except Exception as edit_exc:
-                        if _is_missing_message_error(edit_exc):
+                        if is_missing_message_error(edit_exc):
                             resolution = TelegramMessage.Resolution.DELETED
                     else:
                         resolution = TelegramMessage.Resolution.EDITED
@@ -531,21 +743,15 @@ def resolve_answered_announcements(
                 digest.pk,
                 digest.telegram_chat_id,
             )
-            if terminal_failure:
-                TelegramMessage.objects.filter(pk=digest.pk).update(
-                    resolution=TelegramMessage.Resolution.FAILED,
-                    resolved_at=now,
-                )
-            else:
-                TelegramMessage.objects.filter(pk=digest.pk).update(
-                    resolution=TelegramMessage.Resolution.FAILED,
-                )
-        else:
-            TelegramMessage.objects.filter(pk=digest.pk).update(
-                resolved_at=timezone.now(),
-                resolution=resolution,
-            )
-        resolved += 1
+        resolved += TelegramMessage.objects.filter(
+            pk=digest.pk,
+            resolved_at__isnull=True,
+        ).update(
+            resolved_at=now,
+            resolution=resolution,
+            resolved_by_id=reply.sender_user_id,
+            resolution_reply_id=reply.pk,
+        )
     return resolved
 
 
@@ -555,6 +761,7 @@ def _queue_reply(
     conversation_id: int,
     text: str,
     reply_to_telegram_message_id: int | None,
+    reply_target_chat_id: int | None,
     origin: str,
     content_type: str = TelegramMessage.ContentType.TEXT,
 ) -> tuple[TelegramMessage, int, int | None]:
@@ -562,7 +769,9 @@ def _queue_reply(
     _require_admin(admin)
     with transaction.atomic():
         try:
-            conversation = TelegramConversation.objects.select_for_update().get(pk=conversation_id)
+            conversation = TelegramConversation.objects.select_for_update().select_related(
+                "claimed_by", "handled_by",
+            ).get(pk=conversation_id)
         except TelegramConversation.DoesNotExist as exc:
             raise SupportReplyError(_("This conversation is no longer available.")) from exc
         if conversation.status == TelegramConversation.Status.BLOCKED:
@@ -570,28 +779,47 @@ def _queue_reply(
 
         reply_target = None
         if reply_to_telegram_message_id is not None:
-            reply_target = TelegramMessage.objects.filter(
-                conversation__user_id=conversation.user_id,
+            reply_targets = TelegramMessage.objects.filter(
+                conversation_id=conversation.pk,
                 telegram_message_id=reply_to_telegram_message_id,
-            ).first()
+            )
+            if reply_target_chat_id is not None:
+                reply_targets = reply_targets.filter(telegram_chat_id=reply_target_chat_id)
+            reply_target = reply_targets.order_by("-pk").first()
             if reply_target is None:
                 raise SupportReplyError(_("The selected message is no longer available."))
 
         source_message = _answered_source_message(conversation, reply_target)
-        if reply_target is not None and source_message is not None:
-            already_answered = TelegramMessage.objects.filter(
+        if source_message is not None:
+            prior_replies = TelegramMessage.objects.filter(
                 conversation=conversation,
                 direction=TelegramMessage.Direction.OUTBOUND,
                 source_message=source_message,
-            ).exclude(
-                content_type=TelegramMessage.ContentType.DIGEST,
-            ).exclude(
-                delivery_status=TelegramMessage.DeliveryStatus.FAILED,
-            ).exclude(
-                sender_user=admin,
-            ).exists()
-            if already_answered:
+            ).exclude(content_type=TelegramMessage.ContentType.DIGEST)
+            if prior_replies.filter(
+                delivery_status=TelegramMessage.DeliveryStatus.SENT,
+            ).exclude(sender_user=admin).exists():
                 raise SupportReplyError(_("This message was already answered by another admin."))
+            if prior_replies.filter(
+                delivery_status__in=(
+                    TelegramMessage.DeliveryStatus.QUEUED,
+                    TelegramMessage.DeliveryStatus.SENDING,
+                ),
+            ).exists():
+                raise SupportReplyError(_("A reply to this message is already being sent."))
+
+        if conversation.claimed_by_id and conversation.claimed_by_id != admin.pk:
+            assigned_admin = conversation.claimed_by
+            name = assigned_admin.get_full_name() or assigned_admin.username
+            raise SupportReplyError(_("This conversation is assigned to %(admin)s.") % {"admin": name})
+        if (
+            conversation.status == TelegramConversation.Status.HANDLED
+            and conversation.handled_by_id
+            and conversation.handled_by_id != admin.pk
+        ):
+            handled_admin = conversation.handled_by
+            name = handled_admin.get_full_name() or handled_admin.username
+            raise SupportReplyError(_("This conversation was resolved by %(admin)s.") % {"admin": name})
 
         student_account = TelegramAccount.objects.filter(
             user_id=conversation.user_id,
@@ -605,12 +833,27 @@ def _queue_reply(
             if reply_target.telegram_chat_id == student_account.telegram_chat_id:
                 telegram_reply_to = reply_to_telegram_message_id
 
+        if (
+            conversation.status == TelegramConversation.Status.OPEN
+            or (
+                conversation.status == TelegramConversation.Status.CLAIMED
+                and conversation.claimed_by_id is None
+            )
+        ):
+            conversation.status = TelegramConversation.Status.CLAIMED
+            conversation.claimed_by = admin
+            conversation.claimed_at = timezone.now()
+            conversation.version += 1
+            conversation.save(update_fields=[
+                "status", "claimed_by", "claimed_at", "version", "updated_at",
+            ])
+
         outbound = TelegramMessage.objects.create(
             conversation=conversation,
             direction=TelegramMessage.Direction.OUTBOUND,
             sender_user=admin,
             telegram_chat_id=student_account.telegram_chat_id,
-            reply_to_telegram_message_id=reply_to_telegram_message_id,
+            reply_to_telegram_message_id=telegram_reply_to,
             source_message=source_message,
             content_type=content_type,
             origin=origin,
@@ -626,33 +869,87 @@ def _fail_reply(outbound: TelegramMessage, message: str) -> None:
     outbound.save(update_fields=["delivery_status", "delivery_error"])
 
 
+def _mark_reply_sending(outbound: TelegramMessage) -> None:
+    updated = TelegramMessage.objects.filter(
+        pk=outbound.pk,
+        delivery_status=TelegramMessage.DeliveryStatus.QUEUED,
+    ).update(delivery_status=TelegramMessage.DeliveryStatus.SENDING)
+    if not updated:
+        raise SupportReplyError(_("The reply status changed. Refresh before sending another reply."))
+
+
 def _finalize_delivered_reply(
     bot: telebot.TeleBot,
     outbound: TelegramMessage,
     admin: User,
     result,
 ) -> TelegramMessage:
-    """Record one successful Telegram send and resolve pending digests."""
-    outbound.telegram_message_id = getattr(result, "message_id", None)
-    outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
-    outbound.sent_at = timezone.now()
-    outbound.save(update_fields=["telegram_message_id", "delivery_status", "sent_at"])
-    TelegramConversation.objects.filter(pk=outbound.conversation_id).update(
-        status=TelegramConversation.Status.HANDLED,
-        claimed_by=None,
-        claimed_at=None,
-        handled_at=timezone.now(),
-        last_message_at=outbound.created_at,
-        admin_read_at=timezone.now(),
-        version=F("version") + 1,
-        updated_at=timezone.now(),
-    )
+    """Persist delivery and resolve only the exact latest student message."""
+    sent_at = timezone.now()
+    message_id = getattr(result, "message_id", None)
+    with transaction.atomic():
+        conversation = TelegramConversation.objects.select_for_update().get(
+            pk=outbound.conversation_id,
+        )
+        outbound = TelegramMessage.objects.select_for_update().select_related("sender_user").get(pk=outbound.pk)
+        outbound.telegram_message_id = message_id
+        outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
+        outbound.sent_at = sent_at
+        outbound.delivery_error = "" if message_id is not None else _(
+            "Telegram sent the reply without returning a message identifier."
+        )
+        outbound.save(update_fields=[
+            "telegram_message_id", "delivery_status", "sent_at", "delivery_error",
+        ])
+        latest_inbound = TelegramMessage.objects.filter(
+            conversation_id=conversation.pk,
+            direction=TelegramMessage.Direction.INBOUND,
+        ).order_by("-created_at", "-pk").only("pk").first()
+        resolves_latest = bool(
+            outbound.source_message_id
+            and latest_inbound
+            and outbound.source_message_id == latest_inbound.pk
+        )
+        later_reply_exists = bool(outbound.source_message_id) and TelegramMessage.objects.filter(
+            conversation_id=conversation.pk,
+            source_message_id=outbound.source_message_id,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            pk__gt=outbound.pk,
+        ).exclude(content_type=TelegramMessage.ContentType.DIGEST).exclude(
+            delivery_status=TelegramMessage.DeliveryStatus.FAILED,
+        ).exists()
+        completes_admin_started = latest_inbound is None and conversation.status in {
+            TelegramConversation.Status.OPEN,
+            TelegramConversation.Status.CLAIMED,
+        }
+        may_resolve = (
+            conversation.status in {
+                TelegramConversation.Status.OPEN,
+                TelegramConversation.Status.CLAIMED,
+            }
+            and conversation.claimed_by_id in (None, admin.pk)
+            and not later_reply_exists
+        )
+        conversation.last_message_at = sent_at
+        conversation.version += 1
+        if may_resolve and (resolves_latest or completes_admin_started):
+            conversation.status = TelegramConversation.Status.HANDLED
+            conversation.claimed_by = None
+            conversation.claimed_at = None
+            conversation.handled_by = admin
+            conversation.handled_at = sent_at
+            if resolves_latest:
+                conversation.admin_read_at = sent_at
+                conversation.admin_read_by = admin
+        conversation.save(update_fields=[
+            "status", "claimed_by", "claimed_at", "handled_by", "handled_at",
+            "admin_read_at", "admin_read_by", "last_message_at", "version", "updated_at",
+        ])
     try:
         resolve_answered_announcements(
             bot,
-            conversation_id=outbound.conversation_id,
-            responder=admin,
-            answered_before=outbound.sent_at,
+            source_message_id=outbound.source_message_id,
+            reply=outbound,
         )
     except Exception:
         logger.exception(
@@ -670,6 +967,7 @@ def reply_to_conversation(
     text: str,
     origin: str,
     reply_to_telegram_message_id: int | None = None,
+    reply_target_chat_id: int | None = None,
 ) -> TelegramMessage:
     """Queue and deliver one anonymous admin reply for Telegram or web chat."""
     outbound, student_chat_id, telegram_reply_to = _queue_reply(
@@ -677,8 +975,10 @@ def reply_to_conversation(
         conversation_id=conversation_id,
         text=text,
         reply_to_telegram_message_id=reply_to_telegram_message_id,
+        reply_target_chat_id=reply_target_chat_id,
         origin=origin,
     )
+    _mark_reply_sending(outbound)
     try:
         result = bot.send_message(
             student_chat_id,
@@ -791,6 +1091,7 @@ def reply_with_attachment_to_conversation(
     uploaded_file,
     origin: str,
     reply_to_telegram_message_id: int | None = None,
+    reply_target_chat_id: int | None = None,
 ) -> TelegramMessage:
     """Queue and deliver one admin reply carrying a JPEG/PNG, MP4 or PDF file."""
     text = str(text or "").strip()
@@ -802,6 +1103,7 @@ def reply_with_attachment_to_conversation(
         conversation_id=conversation_id,
         text=text,
         reply_to_telegram_message_id=reply_to_telegram_message_id,
+        reply_target_chat_id=reply_target_chat_id,
         origin=origin,
         content_type=_attachment_content_type(spec.kind),
     )
@@ -821,6 +1123,7 @@ def reply_with_attachment_to_conversation(
             send_kwargs["caption"] = text
         if telegram_reply_to is not None:
             send_kwargs["reply_to_message_id"] = telegram_reply_to
+        _mark_reply_sending(outbound)
         if spec.kind == "photo":
             result = bot.send_photo(student_chat_id, input_file, **send_kwargs)
         elif spec.kind == "video":
@@ -836,6 +1139,96 @@ def reply_with_attachment_to_conversation(
         except Exception:
             pass
     return _finalize_delivered_reply(bot, outbound, admin, result)
+
+
+def delete_support_message(
+    bot: telebot.TeleBot,
+    *,
+    admin: User,
+    conversation_id: int,
+    message_id: int,
+) -> SupportMessageDeletionResult:
+    """Delete an admin's sent reply and reopen it if that reply resolved the latest student message."""
+    _require_admin(admin)
+    try:
+        message = TelegramMessage.objects.select_related("conversation").get(
+            pk=message_id,
+            conversation_id=conversation_id,
+            direction=TelegramMessage.Direction.OUTBOUND,
+        )
+    except TelegramMessage.DoesNotExist as exc:
+        raise SupportReplyError(_("This sent message is no longer available.")) from exc
+    if message.content_type == TelegramMessage.ContentType.DIGEST:
+        owns_digest_chat = TelegramAccount.objects.filter(
+            user_id=admin.pk,
+            telegram_chat_id=message.telegram_chat_id,
+            is_active=True,
+        ).exists()
+        if not owns_digest_chat:
+            raise SupportReplyError(_("You can delete only a Telegram alert sent to your linked account."))
+    elif message.sender_user_id != admin.pk:
+        raise SupportReplyError(_("You can delete only a reply you sent."))
+    if message.delivery_status != TelegramMessage.DeliveryStatus.SENT:
+        raise SupportReplyError(_("Only a sent Telegram reply can be deleted."))
+    if message.telegram_deletion_status == TelegramMessage.DeletionStatus.DELETED:
+        return SupportMessageDeletionResult(status="deleted", reopened_conversation=False)
+    if message.telegram_deletion_status == TelegramMessage.DeletionStatus.EXPIRED:
+        return SupportMessageDeletionResult(status="expired", reopened_conversation=False)
+
+    status, error = delete_bot_message(
+        bot,
+        chat_id=message.telegram_chat_id,
+        message_id=message.telegram_message_id,
+        sent_at=message.sent_at,
+    )
+    reopened = False
+    with transaction.atomic():
+        conversation = TelegramConversation.objects.select_for_update().get(pk=conversation_id)
+        message = TelegramMessage.objects.select_for_update().get(pk=message.pk)
+        now = timezone.now()
+        TelegramMessage.objects.filter(pk=message.pk).update(
+            telegram_deletion_status=status,
+            telegram_deleted_at=now if status == TelegramMessage.DeletionStatus.DELETED else None,
+            telegram_deleted_by_id=admin.pk if status == TelegramMessage.DeletionStatus.DELETED else None,
+            telegram_deletion_error=error,
+        )
+        latest_inbound = TelegramMessage.objects.filter(
+            conversation_id=conversation.pk,
+            direction=TelegramMessage.Direction.INBOUND,
+        ).order_by("-created_at", "-pk").only("pk").first()
+        other_live_reply = bool(message.source_message_id) and TelegramMessage.objects.filter(
+            conversation_id=conversation.pk,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            source_message_id=message.source_message_id,
+            delivery_status=TelegramMessage.DeliveryStatus.SENT,
+        ).exclude(
+            pk=message.pk,
+        ).exclude(
+            telegram_deletion_status=TelegramMessage.DeletionStatus.DELETED,
+        ).exists()
+        if (
+            status == TelegramMessage.DeletionStatus.DELETED
+            and not other_live_reply
+            and message.source_message_id is not None
+            and latest_inbound is not None
+            and message.source_message_id == latest_inbound.pk
+            and conversation.status == TelegramConversation.Status.HANDLED
+            and conversation.handled_by_id == message.sender_user_id
+        ):
+            conversation.status = TelegramConversation.Status.OPEN
+            conversation.handled_at = None
+            conversation.handled_by = None
+            conversation.claimed_by = None
+            conversation.claimed_at = None
+            conversation.admin_read_at = None
+            conversation.admin_read_by = None
+            conversation.version += 1
+            conversation.save(update_fields=[
+                "status", "handled_at", "handled_by", "claimed_by", "claimed_at",
+                "admin_read_at", "admin_read_by", "version", "updated_at",
+            ])
+            reopened = True
+    return SupportMessageDeletionResult(status=status, reopened_conversation=reopened)
 
 
 def _reply_target(message: dict, admin_chat_id: int) -> tuple[TelegramConversation | None, int | None]:
@@ -882,6 +1275,7 @@ def handle_admin_message(bot: telebot.TeleBot, *, admin: User, message: dict) ->
             conversation_id=conversation.pk,
             text=text,
             reply_to_telegram_message_id=reply_to,
+            reply_target_chat_id=admin_chat_id,
             origin=TelegramMessage.Origin.TELEGRAM,
         )
     except SupportReplyError as exc:

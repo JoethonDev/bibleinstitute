@@ -118,11 +118,12 @@
         <caption class="visually-hidden">{% translate "Attendance matrix by student and meeting" %}</caption>
         <colgroup>
           <col class="attendance-matrix-col-student"><col class="attendance-matrix-col-meetings">
-          <col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary">
+          <col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary">
         </colgroup>
         <thead><tr>
           <th scope="col" class="attendance-matrix-summary-head">{% translate "Student" %}</th>
           <th scope="col" class="attendance-matrix-summary-head">{% translate "Meetings" %}</th>
+          <th scope="col" class="attendance-matrix-summary-head">{% translate "Fully scanned" %}</th>
           <th scope="col" class="attendance-matrix-summary-head">{% translate "Full" %}</th>
           <th scope="col" class="attendance-matrix-summary-head">{% translate "Partial" %}</th>
           <th scope="col" class="attendance-matrix-summary-head">{% translate "Incomplete" %}</th>
@@ -134,13 +135,14 @@
           <tr>
             <th scope="row" class="attendance-matrix-student"><span class="grade-matrix-student-name">{{ row.student.get_full_name|default:row.student.username }}</span><span class="grade-matrix-student-meta">{{ row.student.username }} - #{{ row.student.pk }}</span></th>
             <td class="attendance-matrix-summary-cell"><button type="button" class="attendance-matrix-expand ad-btn ad-btn--ghost ad-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-meetings-{{ row.student.pk }}" aria-expanded="false" aria-controls="attendance-meetings-{{ row.student.pk }}" aria-label="{% translate 'Toggle meeting details' %}"><i class="fas fa-chevron-down" aria-hidden="true"></i><span>{{ row.cells|length }} {% translate "Meetings" %}</span></button></td>
+            <td class="attendance-matrix-summary-cell">{{ row.fully_scanned_days }}</td>
             <td class="attendance-matrix-summary-cell">{{ row.full_days }}</td>
             <td class="attendance-matrix-summary-cell">{{ row.partial_days }}</td>
             <td class="attendance-matrix-summary-cell">{{ row.incomplete_days }}</td>
             <td class="attendance-matrix-summary-cell">{{ row.absent_days }}</td>
             <td class="attendance-matrix-summary-cell attendance-matrix-score">{{ row.score }}</td>
           </tr>
-          <tr class="attendance-matrix-detail-row"><td colspan="7"><div class="collapse" id="attendance-meetings-{{ row.student.pk }}"><div class="attendance-matrix-meeting-list">
+          <tr class="attendance-matrix-detail-row"><td colspan="8"><div class="collapse" id="attendance-meetings-{{ row.student.pk }}"><div class="attendance-matrix-meeting-list">
             {% for cell in row.cells %}
             <article class="attendance-matrix-meeting attendance-matrix-cell--{{ cell.status }}">
               <header class="attendance-matrix-meeting-head"><div><strong>{{ cell.meeting.date|date:"DATE_FORMAT" }}</strong><span>{{ cell.meeting.course_name }}</span></div><div class="attendance-matrix-meeting-head-state"><span class="attendance-matrix-record-state{% if cell.entrance or cell.exit %} is-recorded{% else %} is-unrecorded{% endif %}"><i class="fas {% if cell.entrance or cell.exit %}fa-circle-check{% else %}fa-circle-xmark{% endif %}" aria-hidden="true"></i>{% if cell.entrance or cell.exit %}{% translate "Scan recorded" %}{% else %}{% translate "No scan recorded" %}{% endif %}</span><span class="attendance-matrix-meeting-grade"><strong>{{ cell.grade }}</strong> - {{ cell.status_label }}</span></div></header>

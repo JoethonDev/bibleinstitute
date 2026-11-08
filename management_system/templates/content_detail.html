@@ -129,6 +129,7 @@
       </div>
       <div class="ad-card-body">
         <p class="ps-muted-text">{% translate "Select enrolled students and a local opening window. This does not change the normal quiz window." %}</p>
+        <p class="ps-muted-text">{% blocktranslate with timezone=application_timezone %}All schedule times use {{ timezone }}.{% endblocktranslate %}</p>
         <form method="post" action="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}" hx-post="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Are you sure?' %}">
           {% csrf_token %}
           <div class="mb-3">

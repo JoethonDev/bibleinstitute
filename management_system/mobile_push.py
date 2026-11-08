@@ -11,11 +11,16 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Subquery, Window
-from django.db.models.functions import Coalesce, RowNumber
+from django.db.models import Exists, F, Prefetch, Q
 from django.utils import timezone
+from django.utils.translation import gettext as _
+from .notification_redelivery import eligible_redelivery_notification_ids, redelivery_source_queryset
 
 from .models import MobilePushDevice, PushDelivery, StudentNotification
+from .mobile_push_queries import (
+    active_push_devices,
+    missing_push_device_exists,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +29,6 @@ MAX_PUSH_ATTEMPTS = 3
 RETRY_DELAYS = (60, 300, 900)
 DELIVERY_SCAN_LIMIT = 1000
 DELIVERY_BATCH_SIZE = 500
-MAX_DEVICES_PER_STUDENT = 10
 ANDROID_CHANNEL_ID = "academic-events"
 RECEIPT_LEASE_SECONDS = 300
 SENDING_LEASE_SECONDS = 300
@@ -77,8 +81,28 @@ def _safe_provider_code(value: object, fallback: str = "provider_rejected") -> s
 
 
 def _mark_retryable(deliveries: list[PushDelivery], error_code: str, now) -> None:
+    delivery_ids = [delivery.pk for delivery in deliveries]
+    notification_state = {
+        delivery_id: (cancelled_at, withdrawn_at)
+        for delivery_id, cancelled_at, withdrawn_at in PushDelivery.objects.filter(
+            pk__in=delivery_ids,
+        ).values_list(
+            "pk", "notification__cancelled_at", "notification__withdrawn_at",
+        )
+    }
     for delivery in deliveries:
-        if delivery.attempt_count >= MAX_PUSH_ATTEMPTS:
+        cancelled_at, withdrawn_at = notification_state.get(delivery.pk, (None, None))
+        if withdrawn_at is not None:
+            delivery.status = PushDelivery.Status.SKIPPED
+            delivery.error_code = "notification_withdrawn"
+            delivery.error_message = _("The notification was withdrawn before delivery.")
+            delivery.next_attempt_at = now
+        elif cancelled_at is not None:
+            delivery.status = PushDelivery.Status.SKIPPED
+            delivery.error_code = "notification_cancelled"
+            delivery.error_message = _("The notification was cancelled before delivery.")
+            delivery.next_attempt_at = now
+        elif delivery.attempt_count >= MAX_PUSH_ATTEMPTS:
             delivery.status = PushDelivery.Status.FAILED
             delivery.error_code = error_code
             delivery.error_message = "Expo delivery failed after bounded retries."
@@ -94,6 +118,30 @@ def _mark_retryable(deliveries: list[PushDelivery], error_code: str, now) -> Non
             deliveries,
             ["status", "error_code", "error_message", "next_attempt_at", "updated_at"],
         )
+    # Close the race where withdrawal commits between the state read and retry
+    # write. A later withdrawal sees QUEUED and skips it itself.
+    PushDelivery.objects.filter(
+        pk__in=delivery_ids,
+        status=PushDelivery.Status.QUEUED,
+        notification__withdrawn_at__isnull=False,
+    ).update(
+        status=PushDelivery.Status.SKIPPED,
+        error_code="notification_withdrawn",
+        error_message=_("The notification was withdrawn before delivery."),
+        next_attempt_at=now,
+        updated_at=now,
+    )
+    PushDelivery.objects.filter(
+        pk__in=delivery_ids,
+        status=PushDelivery.Status.QUEUED,
+        notification__cancelled_at__isnull=False,
+    ).update(
+        status=PushDelivery.Status.SKIPPED,
+        error_code="notification_cancelled",
+        error_message=_("The notification was cancelled before delivery."),
+        next_attempt_at=now,
+        updated_at=now,
+    )
 
 
 def _mark_permanent_failure(deliveries: list[PushDelivery], error_code: str, message: str, now) -> None:
@@ -137,10 +185,16 @@ def _mark_receipt_retryable(deliveries: list[PushDelivery], error_code: str, now
 
 def _notification_payload(delivery: PushDelivery) -> dict:
     notification = delivery.notification
+    if delivery.device.language == MobilePushDevice.Language.ENGLISH:
+        title = notification.title_en or notification.title_ar
+        body = notification.body_en or notification.body_ar
+    else:
+        title = notification.title_ar or notification.title_en
+        body = notification.body_ar or notification.body_en
     return {
         "to": delivery.device.expo_push_token,
-        "title": notification.title_ar,
-        "body": notification.body_ar,
+        "title": title,
+        "body": body,
         "data": {
             "notification_id": notification.pk,
             "type": notification.notification_type,
@@ -162,65 +216,6 @@ def _notification_payload(delivery: PushDelivery) -> dict:
     }
 
 
-def _missing_device_exists():
-    """Devices still uncovered for a notification, restricted to the ranked scope.
-
-    Materialization only ever uses each student's newest MAX_DEVICES_PER_STUDENT
-    devices. The anti-join must use that same ranked scope, otherwise an older
-    notification whose coverage gap exists only on an 11th (never materialized)
-    device keeps occupying the bounded scan window without producing rows and
-    starves newer notifications.
-    """
-
-    ranked_newer_devices = (
-        MobilePushDevice.objects.filter(
-            user_id=OuterRef("user_id"),
-            is_active=True,
-            disabled_at__isnull=True,
-        )
-        .filter(
-            Q(last_seen_at__gt=OuterRef("last_seen_at"))
-            | Q(last_seen_at=OuterRef("last_seen_at"), pk__gt=OuterRef("pk"))
-        )
-        .values("user_id")
-        .annotate(total=Count("pk"))
-        .values("total")
-    )
-    return (
-        MobilePushDevice.objects.filter(
-            user_id=OuterRef("student_id"),
-            is_active=True,
-            disabled_at__isnull=True,
-        )
-        .annotate(
-            newer_device_count=Coalesce(
-                Subquery(ranked_newer_devices[:1]),
-                0,
-            )
-        )
-        .filter(newer_device_count__lt=MAX_DEVICES_PER_STUDENT)
-        .annotate(_sn_notif_id=OuterRef("pk"))
-        .filter(
-            ~Exists(
-                PushDelivery.objects.filter(
-                    notification_id=OuterRef("_sn_notif_id"),
-                    device_id=OuterRef("pk"),
-                )
-            )
-        )
-    )
-
-
-def active_push_devices():
-    """The bounded per-student device scope shared by normal and manual sends."""
-    return MobilePushDevice.objects.filter(
-        is_active=True, disabled_at__isnull=True,
-    ).annotate(mobile_device_row=Window(
-        expression=RowNumber(), partition_by=[F("user_id")],
-        order_by=[F("last_seen_at").desc(), F("pk").desc()],
-    )).filter(mobile_device_row__lte=MAX_DEVICES_PER_STUDENT)
-
-
 @transaction.atomic
 def _materialize_due_deliveries(limit: int) -> int:
     now = timezone.now()
@@ -231,7 +226,7 @@ def _materialize_due_deliveries(limit: int) -> int:
     # the scan window. The nested anti-join keeps notifications that still
     # have at least one active device without a delivery, so late-registered
     # devices and partial batches are still picked up.
-    missing_device_exists = _missing_device_exists()
+    missing_device_exists = missing_push_device_exists()
     active_devices = active_push_devices().only(
         "id", "user_id", "expo_push_token", "is_active", "disabled_at"
     )
@@ -241,6 +236,7 @@ def _materialize_due_deliveries(limit: int) -> int:
             scheduled_for__lte=now,
             push_expires_at__gt=now,
             cancelled_at__isnull=True,
+            withdrawn_at__isnull=True,
             student__is_active=True,
             student__application_status="active",
             student__role__role="student",
@@ -299,6 +295,7 @@ def _claim_due_deliveries(limit: int) -> list[PushDelivery]:
             next_attempt_at__lte=now,
             attempt_count__lt=MAX_PUSH_ATTEMPTS,
             notification__cancelled_at__isnull=True,
+            notification__withdrawn_at__isnull=True,
             notification__push_expires_at__gt=now,
             notification__student__is_active=True,
             notification__student__application_status="active",
@@ -385,8 +382,6 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
     manual_skipped = 0
     manual_ids = {d.notification_id for d in deliveries if d.notification.is_manual_redelivery}
     if manual_ids:
-        from .notification_redelivery import eligible_redelivery_notification_ids, redelivery_source_queryset
-
         allowed = eligible_redelivery_notification_ids(list(redelivery_source_queryset().filter(pk__in=manual_ids)))
         rejected = [d.pk for d in deliveries if d.notification_id in manual_ids and d.notification_id not in allowed]
         PushDelivery.objects.filter(pk__in=rejected, status="sending").update(
@@ -419,6 +414,46 @@ def _send_chunk(deliveries: list[PushDelivery]) -> dict[str, int]:
             updated_at=now,
         )
         deliveries = [delivery for delivery in deliveries if delivery.pk in owned_ids]
+    if not deliveries:
+        return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(reassigned) + manual_skipped}
+    blocked = list(
+        PushDelivery.objects.filter(
+            pk__in=[delivery.pk for delivery in deliveries],
+            status=PushDelivery.Status.SENDING,
+        ).filter(
+            Q(notification__withdrawn_at__isnull=False)
+            | Q(notification__cancelled_at__isnull=False),
+        ).values_list("pk", "notification__withdrawn_at")
+    )
+    withdrawn_ids = {delivery_id for delivery_id, withdrawn_at in blocked if withdrawn_at is not None}
+    cancelled_ids = {delivery_id for delivery_id, withdrawn_at in blocked if withdrawn_at is None}
+    now = timezone.now()
+    if withdrawn_ids:
+        PushDelivery.objects.filter(
+            pk__in=withdrawn_ids,
+            status=PushDelivery.Status.SENDING,
+        ).update(
+            status=PushDelivery.Status.SKIPPED,
+            error_code="notification_withdrawn",
+            error_message=_("The notification was withdrawn before delivery."),
+            next_attempt_at=now,
+            updated_at=now,
+        )
+    if cancelled_ids:
+        PushDelivery.objects.filter(
+            pk__in=cancelled_ids,
+            status=PushDelivery.Status.SENDING,
+        ).update(
+            status=PushDelivery.Status.SKIPPED,
+            error_code="notification_cancelled",
+            error_message=_("The notification was cancelled before delivery."),
+            next_attempt_at=now,
+            updated_at=now,
+        )
+    blocked_ids = withdrawn_ids | cancelled_ids
+    if blocked_ids:
+        manual_skipped += len(blocked_ids)
+        deliveries = [delivery for delivery in deliveries if delivery.pk not in blocked_ids]
     if not deliveries:
         return {"ticketed": 0, "failed": 0, "retried": 0, "deactivated": 0, "skipped": len(reassigned) + manual_skipped}
     expired = [delivery for delivery in deliveries if delivery.notification.push_expires_at <= now]
@@ -523,7 +558,17 @@ def _recover_stale_sending() -> None:
             )[:DELIVERY_SCAN_LIMIT]
         )
         for delivery in stale:
-            if delivery.notification.push_expires_at <= now:
+            if delivery.notification.withdrawn_at is not None:
+                delivery.status = PushDelivery.Status.SKIPPED
+                delivery.error_code = "notification_withdrawn"
+                delivery.error_message = _("The notification was withdrawn before delivery.")
+                delivery.next_attempt_at = now
+            elif delivery.notification.cancelled_at is not None:
+                delivery.status = PushDelivery.Status.SKIPPED
+                delivery.error_code = "notification_cancelled"
+                delivery.error_message = _("The notification was cancelled before delivery.")
+                delivery.next_attempt_at = now
+            elif delivery.notification.push_expires_at <= now:
                 delivery.status = PushDelivery.Status.SKIPPED
                 delivery.error_code = "notification_expired"
                 delivery.error_message = "The push notification expired before delivery."

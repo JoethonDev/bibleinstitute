@@ -12396,8 +12396,8 @@ msgstr "Answers saved."
 msgid "Saving answers..."
 msgstr "Saving answers..."
 
-msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
-msgstr "Submit saved snapshots after the grace period for %(count)s quizzes?"
+msgid "Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
+msgstr "Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
 
 msgid "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
 msgstr "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
@@ -12940,3 +12940,234 @@ msgstr "Waiting for delivery"
 
 msgid "device"
 msgstr "device"
+
+msgid "Time zone: %(name)s"
+msgstr "Time zone: %(name)s"
+
+msgid "Allowed time: up to %(minutes)s minutes after starting."
+msgstr "Allowed time: up to %(minutes)s minutes after starting."
+
+msgid "Your attempt ends at closing if that comes first."
+msgstr "Your attempt ends at closing if that comes first."
+
+msgid "Open the exam to view instructions and start."
+msgstr "Open the exam to view instructions and start."
+
+msgid "This lesson is available now."
+msgstr "This lesson is available now."
+
+msgid "Open the lesson to view its content."
+msgstr "Open the lesson to view its content."
+
+msgid "Lesson available: %(course)s - %(name)s"
+msgstr "Lesson available: %(course)s - %(name)s"
+
+msgid "Exam available: %(course)s - %(name)s"
+msgstr "Exam available: %(course)s - %(name)s"
+
+msgid "Scheduled times use %(timezone)s."
+msgstr "Scheduled times use %(timezone)s."
+
+msgid "All exam schedule times use %(timezone)s."
+msgstr "All exam schedule times use %(timezone)s."
+
+msgid "All schedule times use %(timezone)s."
+msgstr "All schedule times use %(timezone)s."
+
+msgid "%(count)s Telegram message(s) are older than 48 hours and remain in Telegram."
+msgstr "%(count)s Telegram message(s) are older than 48 hours and remain in Telegram."
+
+msgid "A reply to this message is already being sent."
+msgstr "A reply to this message is already being sent."
+
+msgid "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours."
+msgstr "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours."
+
+msgid "Alert marked as replied in Telegram"
+msgstr "Alert marked as replied in Telegram"
+
+msgid "Alert remains in Telegram because the 48-hour deletion window expired"
+msgstr "Alert remains in Telegram because the 48-hour deletion window expired"
+
+msgid "Alert removed from Telegram"
+msgstr "Alert removed from Telegram"
+
+msgid "Answered"
+msgstr "Answered"
+
+msgid "Answered by @%(admin)s"
+msgstr "Answered by @%(admin)s"
+
+msgid "Assigned to"
+msgstr "Assigned to"
+
+msgid "Assigned to @%(admin)s"
+msgstr "Assigned to @%(admin)s"
+
+msgid "Awaiting a reply to this student message"
+msgstr "Awaiting a reply to this student message"
+
+msgid "Claim conversation"
+msgstr "Claim conversation"
+
+msgid "Conversation assigned to you."
+msgstr "Conversation assigned to you."
+
+msgid "Conversation returned to the open queue."
+msgstr "Conversation returned to the open queue."
+
+msgid "Delete every recorded broadcast message for this recipient?"
+msgstr "Delete every recorded broadcast message for this recipient?"
+
+msgid "Delete from Telegram"
+msgstr "Delete from Telegram"
+
+msgid "Delete this message from Telegram? The local conversation history will remain."
+msgstr "Delete this message from Telegram? The local conversation history will remain."
+
+msgid "Deleted %(count)s Telegram message(s) for this recipient."
+msgstr "Deleted %(count)s Telegram message(s) for this recipient."
+
+msgid "Deleted from Telegram"
+msgstr "Deleted from Telegram"
+
+msgid "Last read by"
+msgstr "Last read by"
+
+msgid "Message deleted from Telegram."
+msgstr "Message deleted from Telegram."
+
+msgid "Message deleted from Telegram. The conversation is open again."
+msgstr "Message deleted from Telegram. The conversation is open again."
+
+msgid "Only a sent Telegram reply can be deleted."
+msgstr "Only a sent Telegram reply can be deleted."
+
+msgid "Only administrators can withdraw notifications."
+msgstr "Only administrators can withdraw notifications."
+
+msgid "Only the assigned administrator can release this conversation."
+msgstr "Only the assigned administrator can release this conversation."
+
+msgid "Original audience: %(count)s recipients. Current access and channel eligibility will be checked again."
+msgstr "Original audience: %(count)s recipients. Current access and channel eligibility will be checked again."
+
+msgid "Read"
+msgstr "Read"
+
+msgid "Release conversation"
+msgstr "Release conversation"
+
+msgid "Removed by"
+msgstr "Removed by"
+
+msgid "Resolved by"
+msgstr "Resolved by"
+
+msgid "Resolved by @%(admin)s"
+msgstr "Resolved by @%(admin)s"
+
+msgid "Retry Telegram deletion"
+msgstr "Retry Telegram deletion"
+
+msgid "Retry removing Telegram copies that previously failed?"
+msgstr "Retry removing Telegram copies that previously failed?"
+
+msgid "Telegram could not delete %(count)s message(s) for this recipient."
+msgstr "Telegram could not delete %(count)s message(s) for this recipient."
+
+msgid "Telegram could not delete this message."
+msgstr "Telegram could not delete this message."
+
+msgid "Telegram could not update this alert"
+msgstr "Telegram could not update this alert"
+
+msgid "Telegram deletion failed"
+msgstr "Telegram deletion failed"
+
+msgid "Telegram deletion window expired"
+msgstr "Telegram deletion window expired"
+
+msgid "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram."
+msgstr "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram."
+
+msgid "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs."
+msgstr "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs."
+
+msgid "Telegram message identifiers are unavailable."
+msgstr "Telegram message identifiers are unavailable."
+
+msgid "Telegram only allows deleting messages for 48 hours."
+msgstr "Telegram only allows deleting messages for 48 hours."
+
+msgid "Telegram removal"
+msgstr "Telegram removal"
+
+msgid "Telegram sent the reply without returning a message identifier."
+msgstr "Telegram sent the reply without returning a message identifier."
+
+msgid "The Telegram bot is not active."
+msgstr "The Telegram bot is not active."
+
+msgid "The Telegram message could not be deleted."
+msgstr "The Telegram message could not be deleted."
+
+msgid "The notification was withdrawn before delivery."
+msgstr "The notification was withdrawn before delivery."
+
+msgid "There are no Telegram messages left to delete for this recipient."
+msgstr "There are no Telegram messages left to delete for this recipient."
+
+msgid "This broadcast recipient is no longer available."
+msgstr "This broadcast recipient is no longer available."
+
+msgid "This conversation has already been resolved."
+msgstr "This conversation has already been resolved."
+
+msgid "This conversation is assigned to %(admin)s."
+msgstr "This conversation is assigned to %(admin)s."
+
+msgid "This conversation is not currently assigned."
+msgstr "This conversation is not currently assigned."
+
+msgid "This conversation was resolved by %(admin)s."
+msgstr "This conversation was resolved by %(admin)s."
+
+msgid "This message is older than 48 hours and remains in Telegram."
+msgstr "This message is older than 48 hours and remains in Telegram."
+
+msgid "This notification is no longer available."
+msgstr "This notification is no longer available."
+
+msgid "This sent message is no longer available."
+msgstr "This sent message is no longer available."
+
+msgid "Wait for the pending reply to finish before releasing this conversation."
+msgstr "Wait for the pending reply to finish before releasing this conversation."
+
+msgid "Wait for this recipient's broadcast delivery to finish."
+msgstr "Wait for this recipient's broadcast delivery to finish."
+
+msgid "Withdraw recipient notification"
+msgstr "Withdraw recipient notification"
+
+msgid "Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?"
+msgstr "Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?"
+
+msgid "You can delete only a Telegram alert sent to your linked account."
+msgstr "You can delete only a Telegram alert sent to your linked account."
+
+msgid "You can delete only a reply you sent."
+msgstr "You can delete only a reply you sent."
+
+msgid "%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
+msgstr "%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
+
+msgid "The notification was cancelled before delivery."
+msgstr "The notification was cancelled before delivery."
+
+msgid "Delivery outcome unknown"
+msgstr "Delivery outcome unknown"
+
+msgid "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."
+msgstr "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."

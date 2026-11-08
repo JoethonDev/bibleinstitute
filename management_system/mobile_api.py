@@ -58,7 +58,6 @@ from .mobile_downloads import (
     enforce_download_purpose,
 )
 from .models import (
-    Grade,
     PublicationStatus,
     Quiz,
     LectureProgress,
@@ -87,7 +86,6 @@ from .utils.student_data import (
     student_quiz_statuses,
     unread_notification_count,
 )
-from .utils.helpers import build_scan_url
 from .utils.validators import normalize_username
 from .media_delivery import (
     MediaAccessError,
@@ -100,7 +98,11 @@ from .media_delivery import (
     valid_session_token,
 )
 from .progress_activity import ProgressHeartbeatError, apply_progress_heartbeat
-from .views import CLOUD_CLIENT, bucket_name
+from .storage_clients import CLOUD_CLIENT, bucket_name
+
+from .quiz_attempts import quiz_snapshot_result, start_quiz_attempt, submit_answers
+from .utils.helpers import build_scan_url, user_has_management_role
+
 
 logger = logging.getLogger(__name__)
 
@@ -565,13 +567,35 @@ def quiz_detail(request, offering_id, quiz_id):
     data = student_quiz_data(request.user, offering_id, quiz_id, normalize_language(request))
     if data is None:
         return _error(request, "forbidden", _("You do not have access to this quiz."), 403)
-    from .models import QuizAnswerSnapshot
-    snapshot = QuizAnswerSnapshot.objects.filter(quiz_id=quiz_id, user=request.user).first()
-    data["snapshot"] = {"answers": snapshot.answers if snapshot else {}, "revision": snapshot.revision if snapshot else 0}
-    from django.utils.dateparse import parse_datetime
-    from .utils.quiz_access import QUIZ_SUBMISSION_GRACE
-    data["reconcile_required"] = bool(snapshot and data["mode"] == "closed_unsolved"
-        and timezone.now() > parse_datetime(data["effective_closing_at"]) + QUIZ_SUBMISSION_GRACE)
+    return json_api_response(request, data)
+
+
+@csrf_exempt
+@require_mobile_session
+@require_POST
+def quiz_start(request, offering_id, quiz_id):
+
+    try:
+        offering = get_accessible_offering_or_403(
+            request.user, offering_id, write=True, allow_management=True
+        )
+        if user_has_management_role(request.user):
+            return _error(request, "forbidden", _localized(request, "You do not have access to start this quiz."), 403)
+        quiz = Quiz.objects.get(
+            pk=quiz_id,
+            course_offering=offering,
+            status=PublicationStatus.PUBLISHED,
+        )
+    except (Http404, PermissionDenied, Quiz.DoesNotExist):
+        return _error(request, "forbidden", _localized(request, "You do not have access to this quiz."), 403)
+
+    try:
+        start_quiz_attempt(quiz.pk, request.user)
+    except PermissionDenied as exc:
+        return _error(request, "attempt_unavailable", str(exc), 409)
+    data = student_quiz_data(request.user, offering_id, quiz.pk, normalize_language(request))
+    if data is None:
+        return _error(request, "forbidden", _localized(request, "You do not have access to this quiz."), 403)
     return json_api_response(request, data)
 
 
@@ -593,13 +617,6 @@ def quiz_submit(request, offering_id, quiz_id):
         return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
     # Mobile and web share the same finalization operation; only the JSON
     # parsing/response adapter lives here.
-    from .quiz_attempts import reconcile_snapshots, submit_answers
-    from .utils.helpers import (
-        get_student_quiz_status,
-        is_quiz_in_user_window,
-        is_quiz_open,
-        user_has_management_role,
-    )
 
     try:
         offering = get_accessible_offering_or_403(
@@ -611,22 +628,6 @@ def quiz_submit(request, offering_id, quiz_id):
         quiz = Quiz.objects.get(**quiz_filters)
     except (Http404, PermissionDenied, Quiz.DoesNotExist):
         return _error(request, "forbidden", _("You do not have access to this quiz."), 403)
-
-    submission_time = timezone.now()
-    mode, grade = get_student_quiz_status(quiz, request.user, submission_time)
-    if grade is None and mode != "exam":
-        # Only previously accepted server snapshots can finalize after grace.
-        reconcile_snapshots(quiz.pk, user_id=request.user.pk)
-        grade = Grade.objects.filter(user=request.user, quiz=quiz).first()
-    if grade is not None:
-        return json_api_response(request, {
-            "status": "submitted",
-            "grade": {"total_grade": grade.total_grade, "submitted_at": grade.submitted_at},
-        })
-    if mode != "exam" or not is_quiz_open(quiz, submission_time, request.user) or not is_quiz_in_user_window(
-        quiz, request.user
-    ):
-        return _error(request, "submission_closed", _("The quiz is closed or already submitted."), 400)
 
     answers = payload["answers"]
     if isinstance(answers, dict):
@@ -785,6 +786,7 @@ def push_devices(request):
         payload.get("installation_id") if payload else None
     )
     platform = payload.get("platform") if payload else None
+    language = normalize_language(request)
     if (
         (token is not None and (
             not isinstance(token, str)
@@ -825,6 +827,7 @@ def push_devices(request):
                         expo_push_token=None,
                         installation_id=installation_id,
                         platform=platform,
+                        language=language,
                         is_active=False,
                         disabled_at=now,
                     )
@@ -834,17 +837,19 @@ def push_devices(request):
                         expo_push_token=token,
                         installation_id=installation_id,
                         platform=platform,
+                        language=language,
                     )
                 else:
                     # A same-account registration may rotate its installation ID.
                     device = existing_token
                     device.installation_id = installation_id
                     device.platform = platform
+                    device.language = language
                     device.is_active = True
                     device.disabled_at = None
                     device.last_seen_at = now
                     device.save(update_fields=[
-                        "user", "installation_id", "platform", "is_active",
+                        "user", "installation_id", "platform", "language", "is_active",
                         "disabled_at", "last_seen_at", "updated_at",
                     ])
             elif token is None:
@@ -852,20 +857,22 @@ def push_devices(request):
                 # without retaining a push target.
                 device.expo_push_token = None
                 device.platform = platform
+                device.language = language
                 device.is_active = False
                 device.disabled_at = now
                 device.last_seen_at = now
                 device.save(update_fields=[
-                    "expo_push_token", "platform", "is_active",
+                    "expo_push_token", "platform", "language", "is_active",
                     "disabled_at", "last_seen_at", "updated_at",
                 ])
             else:
                 device.expo_push_token = token
                 device.platform = platform
+                device.language = language
                 device.is_active = True
                 device.disabled_at = None
                 device.last_seen_at = now
-                device.save(update_fields=["expo_push_token", "platform", "is_active", "disabled_at", "last_seen_at", "updated_at"])
+                device.save(update_fields=["expo_push_token", "platform", "language", "is_active", "disabled_at", "last_seen_at", "updated_at"])
     except IntegrityError:
         return _error(request, "device_conflict", _("This push device belongs to another account."), 409)
     return json_api_response(request, {"device": {"id": device.pk, "installation_id": device.installation_id, "platform": device.platform, "is_active": device.is_active}})
@@ -1283,5 +1290,33 @@ def gallery_items(request, scope_id: int):
 @require_mobile_session
 @require_POST
 def quiz_snapshot_save(request, offering_id, quiz_id):
-    from .views import quiz_snapshot
-    return quiz_snapshot(request, offering_id, quiz_id)
+    if len(request.body) > 1100000:
+        return _error(request, "invalid_request", _localized(request, "Invalid quiz answers."), 400)
+    payload = _json_body(request)
+    if payload is None or not isinstance(payload, dict):
+        return _error(request, "invalid_request", _localized(request, "Invalid quiz answers."), 400)
+    reconcile = payload.get("reconcile") is True
+    try:
+        offering = get_accessible_offering_or_403(
+            request.user,
+            offering_id,
+            write=not reconcile,
+            allow_management=True,
+        )
+        quiz = Quiz.objects.get(
+            pk=quiz_id,
+            course_offering=offering,
+            status=PublicationStatus.PUBLISHED,
+        )
+    except (Http404, PermissionDenied, Quiz.DoesNotExist):
+        return _error(request, "forbidden", _localized(request, "You do not have access to this quiz."), 403)
+    try:
+        return json_api_response(
+            request,
+            quiz_snapshot_result(quiz=quiz, user=request.user, payload=payload),
+        )
+    except ValidationError as exc:
+        status = 409 if getattr(exc, "code", None) == "snapshot_conflict" else 400
+        return _error(request, "invalid_request", "; ".join(exc.messages), status)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return _error(request, "invalid_request", _localized(request, "Invalid quiz answers."), 400)

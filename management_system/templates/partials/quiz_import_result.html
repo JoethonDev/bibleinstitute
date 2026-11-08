@@ -57,6 +57,10 @@
                 {{ import_summary.closing_display|default:"-" }}
             </div>
             <div class="mb-1">
+                <span class="text-muted">{% translate "Time allowed after starting (minutes)" %}:</span>
+                {{ import_summary.duration_minutes|default_if_none:60 }}
+            </div>
+            <div class="mb-1">
                 <span class="text-muted">{% translate "Total Grade" %}:</span>
                 <strong>{{ import_summary.total_grade }}</strong>
             </div>

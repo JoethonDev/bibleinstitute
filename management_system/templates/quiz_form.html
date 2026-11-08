@@ -266,6 +266,20 @@
                         </div>
                     </div>
 
+                    <p class="form-text">{% blocktranslate with timezone=application_timezone %}All exam schedule times use {{ timezone }}.{% endblocktranslate %}</p>
+
+                    <div class="form-group mt-3">
+                        <label for="duration_minutes" class="form-label">{% translate "Time allowed after starting (minutes)" %}</label>
+                        <input type="number"
+                               class="form-control"
+                               id="duration_minutes"
+                               name="duration_minutes"
+                               min="0"
+                               required
+                               value="{{ duration_minutes|default_if_none:60 }}">
+                        <div class="form-text">{% translate "The attempt ends when this time limit or the exam closing time is reached, whichever comes first." %}</div>
+                    </div>
+
                     <!-- Questions Section -->
                     <div class="border-top pt-4 mt-4">
                         <h5 class="ad-section-title">

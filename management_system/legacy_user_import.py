@@ -21,6 +21,19 @@ from .models import AdminOperationJob, Role, User
 from .utils.decorators import can_manage_applications
 from .utils.validators import normalize_username
 
+from .admin_operations import (
+    MAX_ROW_ERRORS,
+    AdminOperationError,
+    active_admin_operation,
+    assert_admin_operation_progress,
+    create_admin_operation,
+    delete_admin_operation_artifact,
+    read_admin_operation_artifact,
+    require_admin_operation_actor,
+    store_admin_operation_artifact,
+)
+
+
 LEGACY_IMPORT_MAX_BYTES = 2 * 1024 * 1024
 LEGACY_IMPORT_MAX_ROWS = 1000
 LEGACY_IMPORT_COLUMNS = 5
@@ -184,13 +197,6 @@ def enqueue_legacy_user_import(
     A repeated submit of identical content returns the same active job.
     """
 
-    from .admin_operations import (
-        AdminOperationError,
-        active_admin_operation,
-        create_admin_operation,
-        delete_admin_operation_artifact,
-        store_admin_operation_artifact,
-    )
 
     digest = hashlib.sha256(content).hexdigest()
     conflict_key = f"legacy-user-import:{digest[:64]}"
@@ -242,15 +248,7 @@ def apply_legacy_user_rows(rows: list[dict]) -> int:
 def execute_legacy_user_import(job, token) -> dict:
     """J01 executor: validate the private file, hash, then apply or create none."""
 
-    from .admin_operations import (
-        MAX_ROW_ERRORS,
-        AdminOperationError,
-        delete_admin_operation_artifact,
-        read_admin_operation_artifact,
-        assert_admin_operation_progress,
-    )
 
-    from .admin_operations import require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if not can_manage_applications(job.actor):

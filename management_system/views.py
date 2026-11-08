@@ -34,7 +34,6 @@ from urllib.parse import quote, urlencode
 
 # Third Party
 from logging import getLogger
-import boto3
 import json
 import re
 import os
@@ -62,9 +61,12 @@ from .grade_matrix import (
 )
 from .quiz_grading import regrade_quiz_submissions
 from .tasks import recalculate_quizzes_task
-from .models import QuizAnswerSnapshot, QuizOperationJob
-from .utils.quiz_access import QUIZ_SUBMISSION_GRACE
-from .quiz_attempts import submit_answers, save_snapshot, reconcile_snapshots
+from .quiz_attempts import (
+    reconcile_snapshots,
+    quiz_snapshot_result,
+    start_quiz_attempt,
+    submit_answers,
+)
 from .attendance_matrix import (
     ATTENDANCE_MATRIX_PAGE_SIZE,
     ATTENDANCE_MATRIX_STATUS_VALUES,
@@ -85,14 +87,14 @@ from .student_overview import build_student_overview
 from .content_qa import qa_counts, qa_samples
 from .utils.r2_filters import FileFilterConfig, filter_preset_choices, get_filter_preset
 from .utils.r2_manager import R2Manager
-from .utils.cloudflare_provider import CloudflareR2Client
+from .storage_clients import CLOUD_CLIENT, bucket_name, cloudflare_client
 from .utils.file_validator import (
     downloadable_audio_key,
     validate_downloadable_audio_key,
     validate_hls_object_key,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, generate_unique_url, get_r2_client
-from .utils.helpers import build_scan_url, render_dashboard, select_content_academic_year, unpack_quiz_form, get_student_quiz_status, get_student_quiz_status_map, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
+from .utils.helpers import build_scan_url, render_dashboard, select_content_academic_year, unpack_quiz_form, get_student_quiz_status, get_student_quiz_status_map, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
 from .utils.decorators import ajax_login_required, capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_status_notification
 from .progress_activity import (
@@ -130,7 +132,12 @@ from .utils.attendance import (
     attendance_scan_availability,
     is_expected_date,
 )
-from .utils.timezones import parse_application_datetime, ensure_aware, format_user_datetime
+from .utils.timezones import (
+    parse_application_datetime,
+    format_human_datetime,
+    timezone_name,
+)
+from .utils.lesson_access import lesson_is_available
 from .utils.validators import normalize_username, parse_strict_bool
 from .utils.search import normalize_search_text, normalized_contains_q
 from .admin_tables import (
@@ -259,6 +266,7 @@ from .media_storage import (
 from .telegram.linking import TelegramLinkError, current_telegram_link
 from .student_notifications import (
     cancel_future_quiz_opening_events,
+    cancel_future_lesson_publication_events,
     create_lesson_publication_event,
     schedule_quiz_opening_events,
 )
@@ -273,22 +281,13 @@ import qrcode
 # Django
 from django.core.paginator import Paginator
 
+from .admin_operations import create_admin_operation, enqueue_admin_operation
+from django.http import QueryDict
+
+
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
 logger = getLogger(__name__)
-CLOUD_CLIENT = boto3.client(
-    's3',
-    endpoint_url=getattr(settings, "R2_ENDPOINT_URL", None),
-    aws_access_key_id=getattr(settings, "R2_ACCESS_KEY_ID", None),
-    aws_secret_access_key=getattr(settings, "R2_SECRET_ACCESS_KEY", None),
-    region_name='auto'
-)
-
-bucket_name = getattr(settings, "R2_BUCKET_NAME", "")
-
-cf_account_id = getattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
-cf_api_token = getattr(settings, "CLOUDFLARE_API_TOKEN", "")
-cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_account_id and cf_api_token else None
 
 PromotionRuleFormSet = formset_factory(PromotionRuleForm, extra=0, can_delete=True)
 
@@ -635,16 +634,10 @@ class ProfileDetail(LoginProtection, DetailView):
                 "course__name",
             )
         offerings = list(offerings)
-        offering_ids = [offering.pk for offering in offerings]
         course_progress = student_course_progress_data(
             user,
             offerings,
             include_unpublished=management_preview,
-            attendance_policy=(
-                AttendancePolicy.load()
-                if offering_ids and user.study_mode != "online"
-                else None
-            ),
         )
 
         for offering in offerings:
@@ -818,6 +811,8 @@ def view_lesson_details(request, offering_id, lesson_id):
     if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
         raise PermissionDenied(_("You do not have access to this lesson."))
     management_preview = user_has_management_role(user)
+    if not management_preview and not lesson_is_available(lesson):
+        raise PermissionDenied(_("This lesson is not available yet."))
     lesson_links = json.loads(lesson.links)
     context = {
         "offering": offering,
@@ -883,6 +878,21 @@ def stream_lesson(request, offering_id, lesson_id, file_index):
     
 
 @login_required(login_url=LOGIN_URL)
+@require_POST
+def quiz_start(request, offering_id: int, quiz_id: int) -> HttpResponse:
+    user = User.objects.get(pk=request.user.pk)
+    offering = get_accessible_offering_or_403(user, offering_id, write=True)
+    quiz = get_object_or_404(
+        Quiz,
+        pk=quiz_id,
+        course_offering=offering,
+        status=PublicationStatus.PUBLISHED,
+    )
+    start_quiz_attempt(quiz.pk, user)
+    return redirect("quiz-details", offering_id=offering.pk, quiz_id=quiz.pk)
+
+
+@login_required(login_url=LOGIN_URL)
 def take_exam(request, offering_id, quiz_id, *, allow_management=False):
     preview_requested = request.GET.get("preview") == "1"
     if request.method == "POST" and preview_requested:
@@ -909,12 +919,15 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
         quiz = get_object_or_404(Quiz, **quiz_filters)
 
         submission_datetime = now()
-        # Quiz can be submitted from opening time through the 30-minute closing buffer
-        can_submit = is_quiz_open(quiz, submission_datetime, user)
-        _effective_opening_date, effective_closing_date = quiz_window(quiz, user)
+        effective_opening_date, effective_closing_date = quiz_window(quiz, user)
+        quiz_mode, grade, snapshot = get_student_quiz_status(quiz, user, submission_datetime)
+        if not preview_requested and not user_has_management_role(user) and grade is None:
+            if snapshot is not None and snapshot.deadline_at <= submission_datetime:
+                reconcile_snapshots(quiz.pk, user_id=user.pk)
+                grade = Grade.objects.filter(quiz=quiz, user=user).first()
+                snapshot = None
+                quiz_mode = "view" if grade is not None else "closed_unsolved"
 
-        # Check if user has previously taken this quiz
-        quiz_mode, grade = get_student_quiz_status(quiz, user, submission_datetime)
         total_grade = grade.total_grade if grade else 0
 
         if request.method == "GET":
@@ -933,6 +946,8 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             elif quiz_mode == "exam":
                 quiz_mode = "exam"
                 query_set = Question.objects.filter(quiz_id=quiz_id)
+            elif quiz_mode in {"ready", "upcoming"}:
+                query_set = Question.objects.none()
             else:
                 # Quiz is closed or re-opened for a newer cohort; student never submitted
                 quiz_mode = "closed_unsolved"
@@ -963,11 +978,14 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                             q.pop("answer_payload", None)
                             q.pop("answer_payload_json", None)
 
-            snapshot = QuizAnswerSnapshot.objects.filter(quiz=quiz, user=user).first() if not preview_requested and not grade else None
+            active_snapshot = snapshot if quiz_mode == "exam" else None
+            server_time = now()
             return render(request, "display_quiz.html", {
-                "snapshot_data": {"answers": snapshot.answers if snapshot else {}, "revision": snapshot.revision if snapshot else 0},
+                "snapshot_data": {
+                    "answers": active_snapshot.answers if active_snapshot else {},
+                    "revision": active_snapshot.revision if active_snapshot else 0,
+                },
                 "snapshot_url": reverse("quiz-snapshot", args=[offering_id, quiz_id]),
-                "snapshot_reconcile": bool(snapshot and quiz_mode == "closed_unsolved" and now() > ensure_aware(effective_closing_date) + QUIZ_SUBMISSION_GRACE),
                 "quiz_name": quiz.name,
                 "username": request.user.username,
                 "questions": questions,
@@ -976,20 +994,19 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "extended_view": "base.html",
                 "id": "container",
                 "total_grade": total_grade,
-                "closing_date": ensure_aware(effective_closing_date).timestamp(),
+                "attempt_deadline": active_snapshot.deadline_at.timestamp() if active_snapshot else None,
+                "server_now_ms": int(server_time.timestamp() * 1000),
+                "quiz_duration_minutes": quiz.duration_minutes,
                 "exam_taken": True if grade else False,
                 "back_url": reverse("quiz-view", args=[quiz_id]) if preview_requested else reverse("course-details", args=[offering_id]),
-                "quiz_closing_date_str": format_user_datetime(effective_closing_date, user, "%d/%m/%Y %H:%M"),
+                "quiz_opening_date_str": format_human_datetime(effective_opening_date, user),
+                "quiz_closing_date_str": format_human_datetime(effective_closing_date, user),
+                "quiz_start_url": reverse("quiz-start", args=[offering_id, quiz_id]),
             })
         
         elif request.method == "POST":
             # Prevent another submission
             if not grade:
-                # Guard: reject if quiz is no longer submittable
-                if not can_submit or not is_quiz_in_user_window(quiz, user):
-                    # Send back to main page with error message TODO
-                    return HttpResponse(_("Invalid Request, submission is closed!")) # Translate
-                
                 questions_data, not_used = unpack_quiz_form(request.POST)
                 try:
                     answers = {str(data["id"]): data.get("answer", "") for data in questions_data.values()}
@@ -1030,15 +1047,7 @@ def quiz_snapshot(request, offering_id, quiz_id):
         reconcile = payload.get("reconcile") is True
         offering = get_accessible_offering_or_403(request.user, offering_id, write=not reconcile)
         quiz = get_object_or_404(Quiz, pk=quiz_id, course_offering=offering, status=PublicationStatus.PUBLISHED)
-        if reconcile:
-            count, _more = reconcile_snapshots(quiz.pk, user_id=request.user.pk)
-            submitted = Grade.objects.filter(quiz=quiz, user=request.user).exists()
-            return JsonResponse({"submitted": submitted})
-        revision = payload.get("revision")
-        if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
-            raise ValueError
-        snapshot = save_snapshot(quiz.pk, request.user, payload.get("answers"), revision)
-        return JsonResponse({"submitted": snapshot is None, "revision": snapshot.revision if snapshot else 0})
+        return JsonResponse(quiz_snapshot_result(quiz=quiz, user=request.user, payload=payload))
     except ValidationError as exc:
         return JsonResponse({"error": "; ".join(exc.messages)}, status=409 if getattr(exc, "code", None) == "snapshot_conflict" else 400)
     except (ValueError, TypeError, UnicodeDecodeError):
@@ -1605,9 +1614,8 @@ def historical_intake(request):
                         language=translation.get_language() or "ar",
                     )
                     try:
-                        from .admin_operation_tasks import run_admin_operation
 
-                        run_admin_operation.apply_async(args=[str(intake_job.pk)], queue="admin")
+                        enqueue_admin_operation(intake_job.pk, queue="admin")
                     except Exception:
                         # The queued row is picked up by the recovery schedule.
                         logger.warning("historical intake awaits worker recovery", exc_info=True)
@@ -1791,9 +1799,8 @@ def user_bulk_create(request):
                 error(request, storage_error, extra_tags="alert-danger")
                 return redirect('user-bulk-create')
             try:
-                from .admin_operation_tasks import run_admin_operation
 
-                run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+                enqueue_admin_operation(job.pk, queue="admin")
             except Exception:
                 # The queued row is picked up by the recovery schedule.
                 logger.warning("legacy user import awaits worker recovery", exc_info=True)
@@ -2087,6 +2094,7 @@ def quiz_detail(request, quiz_id):
         "exception_form": exception_form,
         "exceptional_openings": getattr(quiz, "exceptional_openings", []),
         "can_preview_quiz": can_preview_quiz,
+        "application_timezone": timezone_name(),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Quizzes"), reverse("quiz-dashboard")),
@@ -2330,6 +2338,8 @@ def _render_lesson_editor(request: HttpRequest, lesson: Lesson | None, form: Les
         "selected_offering_id": form["course_offering"].value(),
         "lesson_name": form["lesson_name"].value() or "",
         "lesson_description": form["description"].value() or "",
+        "opening_date": form["opening_date"].value() or "",
+        "application_timezone": timezone_name(),
         "videos": videos,
         "content_status": form["status"].value(),
         "publication_statuses": PublicationStatus.choices,
@@ -2344,6 +2354,7 @@ def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResp
         "lesson_name": lesson.name if lesson else "",
         "description": lesson.description if lesson else "",
         "course_offering": lesson.course_offering_id if lesson else None,
+        "opening_date": format_application_datetime(lesson.opening_date, "%Y-%m-%dT%H:%M") if lesson and lesson.opening_date else "",
         "status": lesson.status if lesson else PublicationStatus.DRAFT,
     }
     form = LessonEditorForm(request.POST if request.method == "POST" else None,
@@ -2362,16 +2373,37 @@ def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResp
                         check_media_cleanup=False,
                     )
                 previous_status = saved.status
+                previous_notification_facts = (
+                    saved.name,
+                    saved.course_offering_id,
+                    saved.opening_date,
+                )
                 saved.name = form.cleaned_data["lesson_name"]
                 saved.description = form.cleaned_data["description"] or None
                 saved.course_offering = form.cleaned_data["course_offering"]
                 saved.links = json.dumps(links)
+                saved.opening_date = form.cleaned_data["opening_date"]
                 saved.status = form.cleaned_data["status"]
-                publish = saved.status == PublicationStatus.PUBLISHED and (not saved.pk or previous_status != PublicationStatus.PUBLISHED)
+                current_notification_facts = (
+                    saved.name,
+                    saved.course_offering_id,
+                    saved.opening_date,
+                )
+                reschedule = (
+                    bool(saved.pk)
+                    and previous_status == PublicationStatus.PUBLISHED
+                    and saved.status == PublicationStatus.PUBLISHED
+                    and previous_notification_facts != current_notification_facts
+                )
+                publish = saved.status == PublicationStatus.PUBLISHED and (
+                    not saved.pk or previous_status != PublicationStatus.PUBLISHED or reschedule
+                )
                 if publish:
                     saved.publication_event_version += 1
                 saved.save()
                 if publish:
+                    if reschedule:
+                        cancel_future_lesson_publication_events(saved)
                     create_lesson_publication_event(saved)
             request.session["saved_content_form"] = f"lesson-{lesson.pk if lesson else 'new'}"
             success(request, _("Lesson is updated successfully") if lesson else _("Lesson is created successfully"), extra_tags="alert-success")
@@ -3052,7 +3084,6 @@ def promotion_formula(request):
         # Promotion can consume a scope after its academic year is archived.
         # Keep the submitting administrator's exact job redirect reviewable.
         if request.method == "GET" and request.GET.get("promotion_job"):
-            from .models import AdminOperationJob
 
             try:
                 job_id = uuid.UUID(request.GET["promotion_job"])
@@ -3136,10 +3167,9 @@ def promotion_formula(request):
                         actor=request.user,
                         language=translation.get_language() or "ar",
                     )
-                    from .admin_operation_tasks import run_admin_operation
 
                     try:
-                        run_admin_operation.apply_async(args=[str(calculation_job.pk)], queue="admin")
+                        enqueue_admin_operation(calculation_job.pk, queue="admin")
                     except Exception:
                         # The queued row is picked up by the recovery schedule.
                         logger.warning("formula calculation awaits worker recovery", exc_info=True)
@@ -3271,7 +3301,6 @@ def promotion_formula(request):
     promotion_job = None
     export_job = None
     if selected_scope:
-        from .models import AdminOperationJob
 
         calculation_job = (
             AdminOperationJob.objects.filter(
@@ -3411,9 +3440,6 @@ def bulk_promotion_results(request):
     if not result_ids:
         messages.error(request, _("Select at least one student result."))
         return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
-    from .admin_operation_tasks import run_admin_operation
-    from .admin_operations import create_admin_operation
-    from .models import AdminOperationJob
 
     if (not scope_id.isascii() or not scope_id.isdigit() or len(scope_id) > 10
             or not 0 < int(scope_id) <= 2_147_483_647):
@@ -3438,7 +3464,7 @@ def bulk_promotion_results(request):
         messages.error(request, "; ".join(exc.messages))
         return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("bulk promotion awaits worker recovery", exc_info=True)
@@ -3522,6 +3548,7 @@ def quiz_dashboard(request):
             {"label": _("Grades"), "key": "grades"},
             {"label": _("Opening Date"), "key": "opening_date"},
             {"label": _("Closing Date"), "key": "closing_date"},
+            {"label": _("Duration (minutes)"), "key": "duration_minutes"},
             {"label": _("Submissions"), "key": "submissions"},
         ],
         "sort_fields": {
@@ -3533,6 +3560,7 @@ def quiz_dashboard(request):
             "grades": "total_grade",
             "opening_date": "opening_date",
             "closing_date": "closing_date",
+            "duration_minutes": "duration_minutes",
             "submissions": "submissions_count",
         },
         "default_sort": "opening_date",
@@ -3586,7 +3614,6 @@ def _rejected_quiz_context(request, key):
     raw = request.session.pop(key, None)
     if not raw:
         return {}
-    from django.http import QueryDict
     post = QueryDict("", mutable=True)
     for name, values in raw.items():
         post.setlist(name, values)
@@ -3611,7 +3638,7 @@ def _rejected_quiz_context(request, key):
             config = {}
         rows.append({**row, "config": config, "config_json": json.dumps(config),
                      "correct_answer": row.get("answer", ""), "answer_payload_json": row.get("answer", "")})
-    return {**{key: fields.get(key, "") for key in ("quiz_name", "opening_date", "closing_date")}, "questions": rows, "selected_offering_id": fields.get("course_offering"),
+    return {**{key: fields.get(key, "") for key in ("quiz_name", "opening_date", "closing_date", "duration_minutes")}, "questions": rows, "selected_offering_id": fields.get("course_offering"),
             "selected_quiz_type_id": int(fields["quiz_type"]) if str(fields.get("quiz_type", "")).isdigit() else None,
             "content_status": fields.get("status", PublicationStatus.DRAFT), "form_errors": True}
 
@@ -3633,6 +3660,8 @@ def create_quiz(request):
             "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
             "question_types" : Question.QUESTION_TYPES,
             "questions" : [],
+            "duration_minutes": 60,
+            "application_timezone": timezone_name(),
             "content_status" : PublicationStatus.DRAFT,
             "content_status_display" : PublicationStatus.DRAFT.label,
             "publication_statuses" : PublicationStatus.choices,
@@ -3654,6 +3683,9 @@ def create_quiz(request):
                 return redirect(reverse("quiz-create"))
             opening_date = parse_application_datetime(quiz.get("opening_date", ""))
             closing_date = parse_application_datetime(quiz.get("closing_date", ""))
+            duration_minutes = Quiz._meta.get_field("duration_minutes").clean(
+                quiz.get("duration_minutes", 60), None
+            )
             
             offering_id = request.POST.get("course_offering")
             course_offering = get_object_or_404(
@@ -3671,6 +3703,8 @@ def create_quiz(request):
                 total_grade=quiz.get("total_grade", 0),
                 opening_date=opening_date,
                 closing_date=closing_date,
+                duration_minutes=duration_minutes,
+                publication_event_version=1 if publication_status == PublicationStatus.PUBLISHED else 0,
             )
             # Create Questions
             raise_exception = False
@@ -3714,6 +3748,9 @@ def create_quiz(request):
         except Http404:
             error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
             logger.error("Offering %s is not found to create a quiz!", request.POST.get("course_offering"))
+
+        except ValidationError as exc:
+            error(request, "; ".join(str(message) for message in exc.messages), extra_tags="alert-danger")
         
         except Exception as e:
             error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
@@ -3752,6 +3789,7 @@ def update_quiz(request, quiz_id):
                 ),
                 "quiz_mode" : "update",
                 "draft_saved": request.session.pop("saved_content_form", None) == f"quiz-{quiz_id}",
+                "application_timezone": timezone_name(),
                 **_rejected_quiz_context(request, f"rejected-quiz-{quiz_id}"),
             })
         except Http404:
@@ -3781,10 +3819,14 @@ def update_quiz(request, quiz_id):
                             return redirect(reverse("quiz-update", args=[quiz_id]))
                         previous_status = quiz.status
                         quiz.status = publication_status
-                        quiz.save(update_fields=["status"])
+                        update_fields = ["status"]
                         if previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
                             cancel_future_quiz_opening_events(quiz)
                         elif publication_status == PublicationStatus.PUBLISHED:
+                            quiz.publication_event_version += 1
+                            update_fields.append("publication_event_version")
+                        quiz.save(update_fields=update_fields)
+                        if publication_status == PublicationStatus.PUBLISHED:
                             schedule_quiz_opening_events(quiz, locked=True)
                         request.session.pop(f"rejected-quiz-{quiz_id}", None)
                         request.session["saved_content_form"] = f"quiz-{quiz_id}"
@@ -3793,6 +3835,9 @@ def update_quiz(request, quiz_id):
             requested_name = quiz_data['quiz_name']
             requested_opening_date = parse_application_datetime(quiz_data['opening_date'])
             requested_closing_date = parse_application_datetime(quiz_data['closing_date'])
+            requested_duration_minutes = Quiz._meta.get_field("duration_minutes").clean(
+                quiz_data.get("duration_minutes", 60), None
+            )
             if requested_closing_date <= requested_opening_date:
                 raise ValidationError(_("Closing date must be after opening date."))
             requested_total_grade = quiz_data['total_grade']
@@ -3855,13 +3900,37 @@ def update_quiz(request, quiz_id):
 
                 removed_ids = set(current_questions) - set(questions_id)
                 previous_status = quiz.status
+                previous_notification_facts = (
+                    quiz.name,
+                    quiz.course_offering_id,
+                    quiz.quiz_type_id,
+                    quiz.total_grade,
+                    quiz.opening_date,
+                    quiz.closing_date,
+                    quiz.duration_minutes,
+                )
                 quiz.name = requested_name
                 quiz.opening_date = requested_opening_date
                 quiz.closing_date = requested_closing_date
+                quiz.duration_minutes = requested_duration_minutes
                 quiz.total_grade = requested_total_grade
                 quiz.status = publication_status
                 quiz.quiz_type = requested_quiz_type
                 quiz.course_offering = requested_offering
+                current_notification_facts = (
+                    quiz.name,
+                    quiz.course_offering_id,
+                    quiz.quiz_type_id,
+                    quiz.total_grade,
+                    quiz.opening_date,
+                    quiz.closing_date,
+                    quiz.duration_minutes,
+                )
+                notification_facts_changed = previous_notification_facts != current_notification_facts
+                if publication_status == PublicationStatus.PUBLISHED and (
+                    previous_status != PublicationStatus.PUBLISHED or notification_facts_changed
+                ):
+                    quiz.publication_event_version += 1
                 # Delete Removed Questions
                 Question.objects.filter(quiz=quiz).exclude(pk__in=questions_id).delete()
 
@@ -3878,15 +3947,15 @@ def update_quiz(request, quiz_id):
                         reset_manual_ids=reset_manual_ids,
                         clamp_manual_ids=clamp_manual_ids,
                     )
-                # Notifications fire only on first publication: a newly
-                # published quiz, or a draft/archived quiz switching to
-                # published. Editing an already-published quiz (questions,
-                # dates, offering) never re-notifies and never cancels the
-                # already-queued opening notifications.
+                # Refresh only pending opening events when their copied exam
+                # facts change; already-delivered messages remain historical.
                 if publication_status == PublicationStatus.PUBLISHED and previous_status != PublicationStatus.PUBLISHED:
                     schedule_quiz_opening_events(quiz, locked=True)
                 elif previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
                     cancel_future_quiz_opening_events(quiz)
+                elif previous_status == PublicationStatus.PUBLISHED and notification_facts_changed:
+                    cancel_future_quiz_opening_events(quiz)
+                    schedule_quiz_opening_events(quiz, locked=True)
 
             logger.info(
                 "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",
@@ -3905,6 +3974,9 @@ def update_quiz(request, quiz_id):
 
         except PermissionDenied:
             raise
+
+        except ValidationError as exc:
+            error(request, "; ".join(str(message) for message in exc.messages), extra_tags="alert-danger")
 
         except Exception as e:
             error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
@@ -3933,9 +4005,8 @@ def _queue_quiz_export(request, quiz_id, kind):
         language=translation.get_language() or "ar",
     )
     try:
-        from .admin_operation_tasks import run_admin_operation
 
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         logger.warning("quiz export awaits worker recovery", exc_info=True)
     messages.success(
@@ -4840,9 +4911,8 @@ def api_rename_file(request):
         except ValidationError as exc:
             return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
         try:
-            from .admin_operation_tasks import run_admin_operation
 
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             logger.warning("storage rename awaits worker recovery", exc_info=True)
         status_url = reverse('admin-operation-status', args=[job.pk])
@@ -4991,9 +5061,8 @@ def api_delete_folder(request):
             except ValidationError as exc:
                 return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
             try:
-                from .admin_operation_tasks import run_admin_operation
 
-                run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+                enqueue_admin_operation(job.pk, queue="admin")
             except Exception:
                 logger.warning("storage delete awaits worker recovery", exc_info=True)
             logger.info(
@@ -5093,8 +5162,7 @@ def api_get_storage_stats(request):
             actor=request.user, prefix=prefix, language=translation.get_language() or "ar",
         )
         try:
-            from .admin_operation_tasks import run_admin_operation
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             logger.warning("storage usage awaits worker recovery", exc_info=True)
         response = JsonResponse({
@@ -5201,9 +5269,14 @@ def api_quiz_status(request, offering_id):
 
         return JsonResponse({"quizzes": result})
 
-    except Exception as e:
-        logger.error(f"api_quiz_status error: {e}")
-        return JsonResponse({"error": str(e)}, status=500)
+    except PermissionDenied:
+        return JsonResponse(
+            {"error": _("You do not have access to this offering.")},
+            status=403,
+        )
+    except Exception:
+        logger.exception("api_quiz_status_failed")
+        return JsonResponse({"error": _("Server error.")}, status=500)
 
 @capability_required(can_manage_content)
 def api_list_files(request):
@@ -5325,7 +5398,6 @@ def r2_management_dashboard(request):
         'filter_presets': filter_preset_choices(),
         'storage_stats': stats,
         'total_size_formatted': R2_MANAGER.format_file_size(stats.get('total_size', 0)) if isinstance(stats.get('total_size'), int) else '...',
-        'load_stats': load_stats,
         'next_page_url': None,
     }
     if next_token:
@@ -6107,8 +6179,6 @@ def copy_course_offerings(request):
         if conflict:
             messages.error(request, _("The target scope already contains one or more selected courses."))
             return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
-        from .admin_operation_tasks import run_admin_operation
-        from .admin_operations import create_admin_operation
 
         try:
             job = create_admin_operation(
@@ -6131,7 +6201,7 @@ def copy_course_offerings(request):
             messages.error(request, "; ".join(exc.messages))
             return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
         try:
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             # The queued row is picked up by the recovery schedule.
             logger.warning("course offering copy awaits worker recovery", exc_info=True)
@@ -6564,8 +6634,6 @@ def duplicate_course(request, course_id):
     if source_offering.course.level_id != target_scope.level_id:
         return HttpResponse(_("The source offering level does not match the target academic scope."), status=400)
 
-    from .admin_operation_tasks import run_admin_operation
-    from .admin_operations import create_admin_operation
 
     try:
         job = create_admin_operation(
@@ -6588,7 +6656,7 @@ def duplicate_course(request, course_id):
         messages.error(request, "; ".join(exc.messages))
         return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("course duplication awaits worker recovery", exc_info=True)
@@ -7305,7 +7373,7 @@ def record_attendance(request, token, action):
         "scanned_at": timezone.localtime(rec.scanned_at).strftime("%H:%M:%S"),
     })
 
-@capability_required(can_scan_attendance)
+@capability_required(can_view_reports)
 def attendance_management(request):
     academic_year_id = int(request.GET["academic_year"]) if request.GET.get("academic_year", "").isdigit() else None
     level_id = int(request.GET["level"]) if request.GET.get("level", "").isdigit() else None
@@ -7459,8 +7527,6 @@ def attendance_reconcile(request):
         except (TypeError, ValueError):
             messages.error(request, _("Invalid date format."))
             return redirect("attendance-management")
-    from .admin_operation_tasks import run_admin_operation
-    from .admin_operations import create_admin_operation
 
     job = create_admin_operation(
         actor=request.user,
@@ -7470,7 +7536,7 @@ def attendance_reconcile(request):
         language=translation.get_language() or "ar",
     )
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("attendance reconciliation awaits worker recovery", exc_info=True)
@@ -7886,7 +7952,6 @@ def report_dashboard(request):
             selected_year,
             course_offering_id=offering_pk,
         )
-        from .models import AdminOperationJob
 
         report_export_job = (
             AdminOperationJob.objects.filter(
@@ -7950,7 +8015,7 @@ def export_report_csv(request):
         writer.writerow([
             _("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Study Mode"),
             _("Level"), _("Academic Year"), _("Grade Earned"), _("Grade Available"), _("Grade %"),
-            _("Expected"), _("Full days"), _("Partial"), _("Absent"), _("Attendance Score"),
+            _("Expected"), _("Full days"), _("Fully scanned days"), _("Partial"), _("Absent"), _("Attendance Score"),
             _("Attendance %"), _("Absence %"),
         ])
         yield output.getvalue()
@@ -7963,7 +8028,7 @@ def export_report_csv(request):
                 _csv_safe_cell(_("Online") if row["study_mode"] == "online" else _("Offline") if row["study_mode"] == "offline" else row["study_mode"]),
                 row["level"],
                 _csv_safe_cell(row["year_name"]), row["grade_earned"], row["grade_available"],
-                row["grade_percent"], row["expected"], row["valid"], row["invalid"], row["absent"],
+                row["grade_percent"], row["expected"], row["valid"], row["fully_scanned"], row["invalid"], row["absent"],
                 row["attendance_score"], row["attendance_rate"], row["absence_rate"],
             ])
             yield output.getvalue()
@@ -8001,9 +8066,8 @@ def export_report_xlsx(request):
     except ValidationError as exc:
         return HttpResponse("; ".join(exc.messages), status=400)
     try:
-        from .admin_operation_tasks import run_admin_operation
 
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("report export awaits worker recovery", exc_info=True)
@@ -8093,9 +8157,8 @@ def export_evaluation_xlsx(request):
             messages.error(request, "; ".join(exc.messages))
             return redirect(f"{reverse('promotion-formula')}?scope={formula.academic_year_level_id}")
         try:
-            from .admin_operation_tasks import run_admin_operation
 
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             # The queued row is picked up by the recovery schedule.
             logger.warning("evaluation export awaits worker recovery", exc_info=True)

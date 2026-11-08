@@ -12658,10 +12658,8 @@ msgstr "تم حفظ الإجابات."
 msgid "Saving answers..."
 msgstr "جارٍ حفظ الإجابات..."
 
-msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
-msgstr ""
-"هل تريد تسليم الإجابات المحفوظة بعد مهلة السماح لعدد %(count)s من "
-"الاختبارات؟"
+msgid "Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
+msgstr "هل تريد إنهاء المحاولات المحفوظة التي انتهى وقتها لعدد %(count)s من الاختبارات؟"
 
 msgid "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
 msgstr ""
@@ -13530,3 +13528,234 @@ msgstr "بانتظار التسليم"
 
 msgid "device"
 msgstr "جهاز"
+
+msgid "Time zone: %(name)s"
+msgstr "المنطقة الزمنية: %(name)s"
+
+msgid "Allowed time: up to %(minutes)s minutes after starting."
+msgstr "الوقت المسموح به: حتى %(minutes)s دقيقة بعد البدء."
+
+msgid "Your attempt ends at closing if that comes first."
+msgstr "تنتهي محاولتك عند وقت الإغلاق إذا حل قبل انتهاء مدتها."
+
+msgid "Open the exam to view instructions and start."
+msgstr "افتح الاختبار لقراءة التعليمات وبدء المحاولة."
+
+msgid "This lesson is available now."
+msgstr "هذا الدرس متاح الآن."
+
+msgid "Open the lesson to view its content."
+msgstr "افتح الدرس لعرض محتواه."
+
+msgid "Lesson available: %(course)s - %(name)s"
+msgstr "درس متاح: %(course)s - %(name)s"
+
+msgid "Exam available: %(course)s - %(name)s"
+msgstr "اختبار متاح: %(course)s - %(name)s"
+
+msgid "Scheduled times use %(timezone)s."
+msgstr "تستخدم المواعيد المجدولة المنطقة الزمنية %(timezone)s."
+
+msgid "All exam schedule times use %(timezone)s."
+msgstr "تستخدم جميع مواعيد الاختبار المنطقة الزمنية %(timezone)s."
+
+msgid "All schedule times use %(timezone)s."
+msgstr "تستخدم جميع المواعيد المنطقة الزمنية %(timezone)s."
+
+msgid "%(count)s Telegram message(s) are older than 48 hours and remain in Telegram."
+msgstr "عدد %(count)s من رسائل Telegram تجاوزت 48 ساعة وما زالت في Telegram."
+
+msgid "A reply to this message is already being sent."
+msgstr "يجري إرسال رد على هذه الرسالة بالفعل."
+
+msgid "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours."
+msgstr "بعد الإرسال، يمكن للمسؤولين إزالة كل الرسائل التي وصلت إلى مستلم محدد. يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط."
+
+msgid "Alert marked as replied in Telegram"
+msgstr "تم وضع علامة على التنبيه بأنه تمت الإجابة عليه في Telegram"
+
+msgid "Alert remains in Telegram because the 48-hour deletion window expired"
+msgstr "ما زال التنبيه في Telegram لأن مهلة الحذف البالغة 48 ساعة انتهت"
+
+msgid "Alert removed from Telegram"
+msgstr "تمت إزالة التنبيه من Telegram"
+
+msgid "Answered"
+msgstr "تمت الإجابة"
+
+msgid "Answered by @%(admin)s"
+msgstr "أجاب @%(admin)s"
+
+msgid "Assigned to"
+msgstr "مسند إلى"
+
+msgid "Assigned to @%(admin)s"
+msgstr "مسند إلى @%(admin)s"
+
+msgid "Awaiting a reply to this student message"
+msgstr "بانتظار الرد على رسالة الطالب هذه"
+
+msgid "Claim conversation"
+msgstr "استلام المحادثة"
+
+msgid "Conversation assigned to you."
+msgstr "تم إسناد المحادثة إليك."
+
+msgid "Conversation returned to the open queue."
+msgstr "أُعيدت المحادثة إلى قائمة الانتظار المفتوحة."
+
+msgid "Delete every recorded broadcast message for this recipient?"
+msgstr "هل تريد حذف كل رسائل البث المسجلة لهذا المستلم؟"
+
+msgid "Delete from Telegram"
+msgstr "حذف من Telegram"
+
+msgid "Delete this message from Telegram? The local conversation history will remain."
+msgstr "هل تريد حذف هذه الرسالة من Telegram؟ سيبقى سجل المحادثة المحلي."
+
+msgid "Deleted %(count)s Telegram message(s) for this recipient."
+msgstr "تم حذف %(count)s من رسائل Telegram لهذا المستلم."
+
+msgid "Deleted from Telegram"
+msgstr "تم الحذف من Telegram"
+
+msgid "Last read by"
+msgstr "آخر من قرأها"
+
+msgid "Message deleted from Telegram."
+msgstr "تم حذف الرسالة من Telegram."
+
+msgid "Message deleted from Telegram. The conversation is open again."
+msgstr "تم حذف الرسالة من Telegram. عادت المحادثة إلى قائمة الانتظار المفتوحة."
+
+msgid "Only a sent Telegram reply can be deleted."
+msgstr "يمكن حذف رد أُرسل بالفعل إلى Telegram فقط."
+
+msgid "Only administrators can withdraw notifications."
+msgstr "يمكن للمسؤولين فقط سحب الإشعارات."
+
+msgid "Only the assigned administrator can release this conversation."
+msgstr "يمكن للمسؤول المعيّن فقط إعادة هذه المحادثة إلى قائمة الانتظار."
+
+msgid "Original audience: %(count)s recipients. Current access and channel eligibility will be checked again."
+msgstr "الجمهور الأصلي: %(count)s مستلمين. ستتم إعادة التحقق من صلاحية الوصول وقنوات التسليم الحالية."
+
+msgid "Read"
+msgstr "مقروءة"
+
+msgid "Release conversation"
+msgstr "إعادة المحادثة إلى قائمة الانتظار"
+
+msgid "Removed by"
+msgstr "أزالها"
+
+msgid "Resolved by"
+msgstr "تم حلها بواسطة"
+
+msgid "Resolved by @%(admin)s"
+msgstr "حل المحادثة @%(admin)s"
+
+msgid "Retry Telegram deletion"
+msgstr "إعادة محاولة الحذف من Telegram"
+
+msgid "Retry removing Telegram copies that previously failed?"
+msgstr "هل تريد إعادة محاولة إزالة نسخ Telegram التي فشل حذفها سابقا؟"
+
+msgid "Telegram could not delete %(count)s message(s) for this recipient."
+msgstr "تعذر على Telegram حذف %(count)s من الرسائل لهذا المستلم."
+
+msgid "Telegram could not delete this message."
+msgstr "تعذر على Telegram حذف هذه الرسالة."
+
+msgid "Telegram could not update this alert"
+msgstr "تعذر على Telegram تحديث هذا التنبيه"
+
+msgid "Telegram deletion failed"
+msgstr "فشل حذف الرسالة من Telegram"
+
+msgid "Telegram deletion window expired"
+msgstr "انتهت مهلة الحذف في Telegram"
+
+msgid "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram."
+msgstr "يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط. ستبقى الرسائل التي تجاوزت المهلة في Telegram."
+
+msgid "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs."
+msgstr "يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط. سيزيل التطبيق إشعار الهاتف عند المزامنة التالية."
+
+msgid "Telegram message identifiers are unavailable."
+msgstr "معرّفات رسالة Telegram غير متاحة."
+
+msgid "Telegram only allows deleting messages for 48 hours."
+msgstr "يسمح Telegram بحذف الرسائل خلال 48 ساعة فقط."
+
+msgid "Telegram removal"
+msgstr "الحذف من Telegram"
+
+msgid "Telegram sent the reply without returning a message identifier."
+msgstr "أرسل Telegram الرد دون إرجاع معرّف الرسالة."
+
+msgid "The Telegram bot is not active."
+msgstr "بوت Telegram غير نشط."
+
+msgid "The Telegram message could not be deleted."
+msgstr "تعذر حذف رسالة Telegram."
+
+msgid "The notification was withdrawn before delivery."
+msgstr "تم سحب الإشعار قبل تسليمه."
+
+msgid "There are no Telegram messages left to delete for this recipient."
+msgstr "لا توجد رسائل Telegram متبقية للحذف لهذا المستلم."
+
+msgid "This broadcast recipient is no longer available."
+msgstr "لم يعد مستلم البث متاحا."
+
+msgid "This conversation has already been resolved."
+msgstr "تم حل هذه المحادثة بالفعل."
+
+msgid "This conversation is assigned to %(admin)s."
+msgstr "هذه المحادثة مسندة إلى %(admin)s."
+
+msgid "This conversation is not currently assigned."
+msgstr "هذه المحادثة غير مسندة حاليا."
+
+msgid "This conversation was resolved by %(admin)s."
+msgstr "تم حل هذه المحادثة بواسطة %(admin)s."
+
+msgid "This message is older than 48 hours and remains in Telegram."
+msgstr "تجاوز عمر هذه الرسالة 48 ساعة، لذلك ستبقى في Telegram."
+
+msgid "This notification is no longer available."
+msgstr "لم يعد هذا الإشعار متاحا."
+
+msgid "This sent message is no longer available."
+msgstr "لم تعد هذه الرسالة المرسلة متاحة."
+
+msgid "Wait for the pending reply to finish before releasing this conversation."
+msgstr "انتظر حتى يكتمل إرسال الرد المعلّق قبل إعادة المحادثة إلى قائمة الانتظار."
+
+msgid "Wait for this recipient's broadcast delivery to finish."
+msgstr "انتظر حتى يكتمل إرسال البث إلى هذا المستلم."
+
+msgid "Withdraw recipient notification"
+msgstr "سحب إشعار المستلم"
+
+msgid "Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?"
+msgstr "هل تريد سحب إشعار هذا المستلم وإلغاء عمليات الإرسال المعلّقة ومحاولة إزالة نسخه من Telegram وإشعارات الهاتف؟"
+
+msgid "You can delete only a Telegram alert sent to your linked account."
+msgstr "يمكنك حذف تنبيه Telegram المرسل إلى حسابك المرتبط فقط."
+
+msgid "You can delete only a reply you sent."
+msgstr "يمكنك حذف رد أرسلته أنت فقط."
+
+msgid "%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
+msgstr "تمت إزالة %(deleted)s من أصل %(total)s؛ انتهت مهلة %(expired)s؛ وفشل حذف %(failed)s."
+
+msgid "The notification was cancelled before delivery."
+msgstr "تم إلغاء الإشعار قبل تسليمه."
+
+msgid "Delivery outcome unknown"
+msgstr "نتيجة التسليم غير معروفة"
+
+msgid "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."
+msgstr "تعذر تأكيد نتيجة الإرسال بعد انقطاع العملية. تحقق من Telegram قبل إرسال رد آخر."

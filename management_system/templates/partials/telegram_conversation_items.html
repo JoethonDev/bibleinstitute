@@ -39,9 +39,18 @@
                 </span>
                 <span class="tg-chat-row-status">
                     {% if conversation.is_unread %}
-                    <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
+                    <span class="ad-pill ad-pill--warning">{% translate "Unread" %}</span>
                     {% else %}
-                    <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
+                    <span class="ad-pill ad-pill--success">{% translate "Read" %}</span>
+                    {% endif %}
+                    {% if conversation.status == "claimed" and conversation.claimed_by %}
+                    <span class="ad-pill ad-pill--warning">{% blocktranslate with admin=conversation.claimed_by.username %}Assigned to @{{ admin }}{% endblocktranslate %}</span>
+                    {% elif conversation.status == "handled" and conversation.handled_by %}
+                    <span class="ad-pill ad-pill--success">{% blocktranslate with admin=conversation.handled_by.username %}Resolved by @{{ admin }}{% endblocktranslate %}</span>
+                    {% elif conversation.status == "blocked" %}
+                    <span class="ad-pill ad-pill--danger">{% translate "Blocked" %}</span>
+                    {% else %}
+                    <span class="ad-pill ad-pill--muted">{% translate "Open" %}</span>
                     {% endif %}
                 </span>
                 {% if conversation.message_count %}

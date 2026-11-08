@@ -10,12 +10,13 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Exists, OuterRef, TextChoices
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext, gettext_lazy as _
 
 from ..models import (
     AcademicHoliday,
     AcademicYearLevel,
     AcademicYearLevelMeeting,
+    AdminOperationJob,
     AttendancePolicy,
     AttendanceRecord,
     CourseOffering,
@@ -24,6 +25,14 @@ from ..models import (
     PublicationStatus,
     User,
 )
+
+from ..admin_operations import (
+    AdminOperationError,
+    assert_admin_operation_progress,
+    require_admin_operation_actor,
+)
+from .decorators import can_correct_attendance
+
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +125,18 @@ def grade_attendance_day(entrance, exit_record, policy: AttendancePolicy) -> Day
     return DayAttendance(grade, status, late, early)
 
 
+def fully_scanned_attendance_day(pair: dict) -> bool:
+    """Count a day when both actions were recorded by real scans, regardless of time."""
+    entrance = pair.get(AttendanceRecord.Action.ENTRANCE)
+    exit_record = pair.get(AttendanceRecord.Action.EXIT)
+    return bool(
+        entrance is not None
+        and exit_record is not None
+        and _scan_field(entrance, "source") == AttendanceRecord.Source.SCAN
+        and _scan_field(exit_record, "source") == AttendanceRecord.Source.SCAN
+    )
+
+
 def pair_attendance_records(records) -> dict:
     """Group one bounded record page into entrance/exit pairs per student/day/offering."""
     days: dict = {}
@@ -178,13 +199,8 @@ RECONCILE_BATCH_SIZE = 500
 def execute_attendance_reconcile(job, token) -> dict:
     """J01 executor: bounded, resumable manual reconciliation for one date."""
 
-    from django.utils.translation import gettext
 
-    from ..admin_operations import AdminOperationError, assert_admin_operation_progress
-    from ..models import AdminOperationJob
-    from .decorators import can_correct_attendance
 
-    from ..admin_operations import require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if not can_correct_attendance(job.actor):
@@ -475,6 +491,7 @@ def get_course_attendance_summary(student, course_offering, through_date=None, s
     if student.study_mode == "online":
         return {
             "expected": 0, "valid": 0, "invalid": 0, "absent": 0,
+            "fully_scanned": 0,
             "score": DAY_GRADE_NONE, "attendance_rate": None, "absence_rate": None,
         }
 
@@ -489,9 +506,10 @@ def get_course_attendance_summary(student, course_offering, through_date=None, s
         attendance_date__lte=effective_end,
     ).values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
 
-    full = partial = 0
+    full = partial = fully_scanned = 0
     score = DAY_GRADE_NONE
     for pair in pair_attendance_records(records).values():
+        fully_scanned += int(fully_scanned_attendance_day(pair))
         day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
         score += day.grade
         if day.grade == DAY_GRADE_FULL:
@@ -508,6 +526,7 @@ def get_course_attendance_summary(student, course_offering, through_date=None, s
         "valid": full,
         "invalid": partial,
         "absent": absent_count,
+        "fully_scanned": fully_scanned,
         "score": score,
         "attendance_rate": float(score / expected_count) if expected_count else 0,
         "absence_rate": absent_count / expected_count if expected_count else 0,

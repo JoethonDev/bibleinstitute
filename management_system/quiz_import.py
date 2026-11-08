@@ -14,11 +14,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, time
 from typing import Any
 
+from django.core.exceptions import ValidationError
 from django.utils import formats
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext as _
 
-from .models import CourseOffering, PublicationStatus, QUIZ_TYPE_CODES, Question, QuizType
+from .models import CourseOffering, PublicationStatus, QUIZ_TYPE_CODES, Question, Quiz, QuizType
 from .quiz_questions import MAX_QUESTION_GRADE, MAX_QUESTION_TITLE, MAX_QUESTIONS, build_question_instance
 from .utils.timezones import ensure_aware, format_application_datetime
 
@@ -62,6 +63,7 @@ QUIZ_FIELD_ALIASES = {
     "status": ("status", "publication_status"),
     "opening_date": ("opening_date", "opening", "start_date", "start"),
     "closing_date": ("closing_date", "closing", "end_date", "end"),
+    "duration_minutes": ("duration_minutes", "duration", "exam_duration_minutes"),
 }
 
 QUESTION_FIELD_ALIASES = {
@@ -179,6 +181,7 @@ def parse_quiz_import(payload: str, *, mode: str = "create") -> QuizImportResult
         "status_label": quiz_display.get("status_label", ""),
         "opening_display": quiz_display.get("opening_display", ""),
         "closing_display": quiz_display.get("closing_display", ""),
+        "duration_minutes": quiz_display.get("duration_minutes", 60),
         "total_grade": result.total_grade,
         "questions_count": len(result.questions),
     }
@@ -287,6 +290,17 @@ def _parse_quiz_block(
                 _('Unknown status "%(value)s". Use one of: %(allowed)s.')
                 % {"value": _text(status_value), "allowed": ", ".join(PublicationStatus.values)}
             )
+
+    _alias, duration_value = _pick(raw, QUIZ_FIELD_ALIASES["duration_minutes"])
+    try:
+        duration = Quiz._meta.get_field("duration_minutes").clean(
+            60 if duration_value is None else _text(duration_value), None
+        )
+    except ValidationError as exc:
+        result.errors.extend(exc.messages)
+    else:
+        client["duration_minutes"] = duration
+        display["duration_minutes"] = duration
 
     opening = _parse_import_datetime(
         raw, QUIZ_FIELD_ALIASES["opening_date"], _("opening date"), result

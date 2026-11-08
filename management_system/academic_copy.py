@@ -17,6 +17,9 @@ from .models import (
 )
 from .utils.decorators import can_manage_academic_setup, can_manage_content
 
+from .admin_operations import AdminOperationError, assert_admin_operation_progress, require_admin_operation_actor
+
+
 
 def _require_admin(actor: User) -> None:
     if not getattr(actor, "is_authenticated", False) or not can_manage_academic_setup(actor):
@@ -76,6 +79,7 @@ def _copy_offering_children(
                 links=lesson.links,
                 course_offering=new_offering,
                 status=PublicationStatus.DRAFT,
+                opening_date=lesson.opening_date,
                 created_date=lesson.created_date,
             )
             for lesson in source_offering.lessons.all()
@@ -99,6 +103,7 @@ def _copy_offering_children(
                     total_grade=quiz.total_grade,
                     opening_date=quiz.opening_date,
                     closing_date=quiz.closing_date,
+                    duration_minutes=quiz.duration_minutes,
                 ),
             ))
         if quiz_specs:
@@ -285,7 +290,6 @@ def duplicate_offering(
 def execute_course_copy(job, token) -> dict:
     """J01 executor: one all-or-nothing copy unit, then progress in the same commit."""
 
-    from .admin_operations import AdminOperationError, assert_admin_operation_progress, require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if (job.cursor or {}).get("index") and (job.result or {}).get("copied"):

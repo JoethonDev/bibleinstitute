@@ -1,21 +1,37 @@
 """Admin-only inspection of saved background jobs; no execution or retry actions."""
 
+import json
+import logging
+from datetime import timedelta
+
 from django import forms
 from django.core.paginator import Paginator
-from django.http import Http404, JsonResponse
+from django.db.models.fields.json import KeyTextTransform, KeyTransform
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET, require_POST
 
-from .admin_operations import ARTIFACT_TTL_HOURS, DOWNLOADABLE_EXPORT_KINDS
+from .admin_operations import ARTIFACT_TTL_HOURS, DOWNLOADABLE_EXPORT_KINDS, enqueue_admin_operation
 from .job_monitor import FAMILIES, PAGE_SIZE, STATUSES, monitored_jobs, operation_choices, readable_job, valid_job_id
 from .models import AdminOperationJob, Announcement, PushDelivery, StudentNotification, TelegramBroadcast, TelegramNotificationDelivery
+from .notification_history import (
+    notification_channel_history,
+    notification_materializing_ids,
+    original_audience,
+    original_notification,
+)
+from .notification_redelivery import enqueue_notification_redelivery
 from .utils.decorators import can_manage_academic_setup, capability_required
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
 from .utils.search import normalize_search_text
+
+
+logger = logging.getLogger(__name__)
 
 
 class JobFilters(forms.Form):
@@ -119,10 +135,6 @@ def _job_detail_response(request, family, job_id, redelivery_form=None):
     job = readable_job(row)
     errors, warning, download_url = [], "", ""
     if family == "management":
-        from django.db.models.fields.json import KeyTextTransform, KeyTransform
-        from django.utils import timezone
-        from datetime import timedelta
-
         extra = AdminOperationJob.objects.filter(pk=job_id).annotate(
             monitor_warning=KeyTextTransform("warning", "result"),
             monitor_errors=KeyTransform("row_errors", "result"),
@@ -157,11 +169,6 @@ class RedeliveryForm(forms.Form):
 
 
 def _notification_detail_context(request, family, job_id):
-    from .notification_history import (
-        notification_channel_history, notification_materializing_ids,
-        original_audience, original_notification,
-    )
-
     source, source_id = family, job_id
     result = {"notification_content": None}
     parent_job = None
@@ -189,12 +196,19 @@ def _notification_detail_context(request, family, job_id):
             return result
         source, source_id = "notification", sample.pk
     if source == "notification":
-        notification = StudentNotification.objects.select_related("student").get(pk=source_id)
+        notification = StudentNotification.objects.select_related("student", "withdrawn_by").get(pk=source_id)
         result["notification_content"] = notification
         result["notification_type_label"] = str(dict(StudentNotification.NotificationType.choices)[notification.notification_type])
         result["notification_recipient"] = notification.student.username
         result["inbox_visible"] = notification.inbox_visible
         result["inbox_read_at"] = notification.read_at
+        result["notification_deletion_retryable"] = TelegramNotificationDelivery.objects.filter(
+            student_notification_id=notification.pk,
+            status=TelegramNotificationDelivery.Status.SENT,
+            telegram_chat_id__isnull=False,
+            telegram_message_id__isnull=False,
+            telegram_deletion_status__in=("", TelegramNotificationDelivery.DeletionStatus.FAILED),
+        ).exists()
         try:
             original = original_notification(notification)
             result["audience_count"] = original_audience(original).count()
@@ -211,7 +225,12 @@ def _notification_detail_context(request, family, job_id):
             page = Paginator(notification_channel_history(notification.pk), 25).get_page(request.GET.get("delivery_page", "1"))
             labels = {**dict(PushDelivery.Status.choices), **dict(TelegramNotificationDelivery.Status.choices),
                       "ticketed": _("Accepted, waiting for receipt")}
-            page.object_list = [{**row, "status_label": labels.get(row["row_status"], row["row_status"])} for row in page.object_list]
+            deletion_labels = dict(TelegramNotificationDelivery.DeletionStatus.choices)
+            page.object_list = [{
+                **row,
+                "status_label": labels.get(row["row_status"], row["row_status"]),
+                "deletion_status_label": deletion_labels.get(row["row_deletion_status"], ""),
+            } for row in page.object_list]
             result["notification_delivery_page"] = page
             result["delivery_pagination_query"] = pagination_query_string(request, exclude=("delivery_page",))
     elif source == "telegram":
@@ -237,10 +256,6 @@ def _notification_detail_context(request, family, job_id):
 @require_POST
 @capability_required(can_manage_academic_setup)
 def notification_redelivery(request, source, source_id):
-    from .notification_redelivery import enqueue_notification_redelivery
-    from .admin_operation_tasks import run_admin_operation
-    from django.utils import translation
-
     form = RedeliveryForm(request.POST)
     if source not in {"notification", "telegram"}:
         return JsonResponse({"error": _("Invalid notification redelivery selection.")}, status=400)
@@ -259,15 +274,12 @@ def notification_redelivery(request, source, source_id):
         form.add_error(None, exc if isinstance(exc, ValidationError) else str(exc))
         return _job_detail_response(request, source, str(source_id), form)
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
-        import logging
-        logging.getLogger(__name__).warning("notification redelivery awaits job recovery", extra={"job_id": str(job.pk)})
+        logger.warning("notification redelivery awaits job recovery", extra={"job_id": str(job.pk)})
     messages.success(request, _("Redelivery queued. Final progress includes delivery receipts."))
     destination = reverse("background-job-detail", args=["management", job.pk])
     if request.headers.get("HX-Request") == "true":
-        import json
-        from django.http import HttpResponse
         response = HttpResponse()
         response["HX-Location"] = json.dumps({"path": destination, "target": "#content", "select": "#content", "swap": "outerHTML"})
         return response

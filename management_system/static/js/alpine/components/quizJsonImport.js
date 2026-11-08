@@ -157,7 +157,8 @@ function quizJsonImport() {
                 { key: 'quiz_type', selector: '#quiz_type' },
                 { key: 'status', selector: '#quiz-status' },
                 { key: 'opening_date', selector: '#opening_date' },
-                { key: 'closing_date', selector: '#closing_date' }
+                { key: 'closing_date', selector: '#closing_date' },
+                { key: 'duration_minutes', selector: '#duration_minutes' }
             ];
             const selectKeys = ['course_offering', 'quiz_type', 'status'];
             const failed = [];

@@ -1,12 +1,18 @@
-from datetime import datetime
+from datetime import date, datetime
 import zoneinfo
 
 from django.conf import settings
+from django.utils import formats
 from django.utils import timezone
 
 
 def application_timezone() -> zoneinfo.ZoneInfo:
     return zoneinfo.ZoneInfo(settings.TIME_ZONE)
+
+
+def timezone_name(user=None) -> str:
+    """Return the IANA timezone used for an application or user display."""
+    return (user_timezone(user) if user is not None else application_timezone()).key
 
 
 def user_timezone(user) -> zoneinfo.ZoneInfo:
@@ -46,3 +52,13 @@ def format_application_datetime(value: datetime, output_format: str) -> str:
 
 def format_user_datetime(value: datetime, user, output_format: str) -> str:
     return timezone.localtime(ensure_aware(value), user_timezone(user)).strftime(output_format)
+
+
+def format_human_datetime(value: datetime, user=None) -> str:
+    target_timezone = user_timezone(user) if user is not None else application_timezone()
+    localized = timezone.localtime(ensure_aware(value), target_timezone)
+    return formats.date_format(localized, "d-m-Y (H:i) (l)")
+
+
+def format_human_date(value: datetime | date) -> str:
+    return formats.date_format(value, "d-m-Y (l)")

@@ -9,6 +9,7 @@ import os
 import time
 import uuid
 from datetime import timedelta
+from dataclasses import dataclass
 
 import telebot
 from celery import current_app
@@ -25,11 +26,13 @@ from ..models import (
     TelegramBotConfig,
     TelegramBroadcast,
     TelegramBroadcastAttachment,
+    TelegramBroadcastDeliveryMessage,
     TelegramBroadcastRecipient,
     User,
 )
 from ..utils.storage_operations import get_r2_client
 from .configuration import stored_token
+from .deletion import delete_bot_message
 from .recipients import eligible_student_queryset
 
 
@@ -49,6 +52,13 @@ class BroadcastError(Exception):
 
 class BroadcastDeliveryError(Exception):
     """An intentionally redacted retryable Telegram/R2 delivery error."""
+
+
+@dataclass(frozen=True)
+class BroadcastRecipientDeletionResult:
+    deleted: int
+    expired: int
+    failed: int
 
 
 def _require_admin(actor: User) -> None:
@@ -309,12 +319,26 @@ def _send_recipient(bot, recipient: TelegramBroadcastRecipient, attachments, cli
     try:
         response = bot.send_message(recipient.telegram_chat_id, recipient.broadcast.message)
         message_id = getattr(response, "message_id", None)
+        if message_id is None:
+            raise BroadcastDeliveryError
+        TelegramBroadcastDeliveryMessage.objects.create(
+            recipient=recipient,
+            telegram_message_id=message_id,
+            sent_at=timezone.now(),
+        )
         time.sleep(BROADCAST_SEND_DELAY_SECONDS)
         for attachment in attachments:
             response = _send_attachment(bot, recipient.telegram_chat_id, attachment, client, bucket)
-            message_id = getattr(response, "message_id", message_id)
+            message_id = getattr(response, "message_id", None)
+            if message_id is None:
+                raise BroadcastDeliveryError
+            TelegramBroadcastDeliveryMessage.objects.create(
+                recipient=recipient,
+                telegram_message_id=message_id,
+                sent_at=timezone.now(),
+            )
             time.sleep(BROADCAST_SEND_DELAY_SECONDS)
-        return message_id
+        return None
     except BroadcastDeliveryError:
         raise
     except Exception as exc:
@@ -379,12 +403,11 @@ def process_due_broadcast(broadcast_id: int, limit: int = BROADCAST_BATCH_SIZE) 
             _mark_failed(recipient, _("Telegram message delivery failed."))
             continue
         try:
-            message_id = _send_recipient(bot, recipient, attachments, client, bucket)
+            _send_recipient(bot, recipient, attachments, client, bucket)
             TelegramBroadcastRecipient.objects.filter(
                 pk=recipient.pk, status=TelegramBroadcastRecipient.Status.SENDING
             ).update(
                 status=TelegramBroadcastRecipient.Status.SENT,
-                telegram_message_id=message_id,
                 sent_at=timezone.now(),
                 last_error="",
                 updated_at=timezone.now(),
@@ -474,6 +497,62 @@ def cancel_broadcast(broadcast_id: int, actor: User) -> None:
         broadcast.delete()
         if keys:
             transaction.on_commit(lambda: _delete_attachment_objects(bucket, keys))
+
+
+def delete_broadcast_recipient_messages(
+    *,
+    broadcast_id: int,
+    recipient_id: int,
+    actor: User,
+) -> BroadcastRecipientDeletionResult:
+    """Delete every recorded bot message for one completed/failed recipient."""
+    _require_admin(actor)
+    with transaction.atomic():
+        try:
+            recipient = TelegramBroadcastRecipient.objects.select_for_update().get(
+                pk=recipient_id,
+                broadcast_id=broadcast_id,
+            )
+        except TelegramBroadcastRecipient.DoesNotExist as exc:
+            raise BroadcastError(_("This broadcast recipient is no longer available.")) from exc
+        if recipient.status in {TelegramBroadcastRecipient.Status.QUEUED, TelegramBroadcastRecipient.Status.SENDING}:
+            raise BroadcastError(_("Wait for this recipient's broadcast delivery to finish."))
+        rows = list(
+            TelegramBroadcastDeliveryMessage.objects.filter(recipient_id=recipient.pk)
+            .exclude(deletion_status__in=(
+                TelegramBroadcastDeliveryMessage.DeletionStatus.DELETED,
+                TelegramBroadcastDeliveryMessage.DeletionStatus.EXPIRED,
+            ))
+            .order_by("pk")
+        )
+    if not rows:
+        return BroadcastRecipientDeletionResult(deleted=0, expired=0, failed=0)
+
+    config = TelegramBotConfig.objects.filter(is_active=True).first()
+    try:
+        bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False) if config else None
+    except Exception:
+        bot = None
+    counts = {"deleted": 0, "expired": 0, "failed": 0}
+    now = timezone.now()
+    for row in rows:
+        if bot is None:
+            status, error = "failed", _("The Telegram bot is not active.")
+        else:
+            status, error = delete_bot_message(
+                bot,
+                chat_id=recipient.telegram_chat_id,
+                message_id=row.telegram_message_id,
+                sent_at=row.sent_at,
+            )
+        TelegramBroadcastDeliveryMessage.objects.filter(pk=row.pk).update(
+            deletion_status=status,
+            deleted_at=now if status == "deleted" else None,
+            deleted_by_id=actor.pk if status == "deleted" else None,
+            deletion_error=error,
+        )
+        counts[status] += 1
+    return BroadcastRecipientDeletionResult(**counts)
 
 
 def _delete_attachment_objects(bucket: str, keys: list[str]) -> None:

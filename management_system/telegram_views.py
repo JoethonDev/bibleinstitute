@@ -24,6 +24,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
+from .job_monitor import monitored_jobs, readable_job
 from .models import (
     AcademicYear,
     Enrollment,
@@ -32,6 +33,7 @@ from .models import (
     TelegramAccount,
     TelegramBotConfig,
     TelegramBroadcast,
+    TelegramBroadcastDeliveryMessage,
     TelegramConversation,
     TelegramMessage,
     TelegramWebhookUpdate,
@@ -52,10 +54,13 @@ from .telegram.attachments import inline_attachment_mime_type
 from .telegram.linking import unlink_telegram_account
 from .telegram.support import (
     SupportReplyError,
+    claim_conversation,
     count_unread_conversations,
+    delete_support_message,
     mark_all_conversations_read,
     mark_conversation_read,
     processed_conversation_filter,
+    release_conversation,
     reply_to_conversation,
     reply_with_attachment_to_conversation,
     start_conversation,
@@ -79,6 +84,7 @@ from .telegram.broadcasts import (
     cancel_broadcast,
     confirm_broadcast,
     create_broadcast_draft,
+    delete_broadcast_recipient_messages,
     recipient_queryset,
 )
 from .telegram_forms import TelegramBotConfigForm, TelegramBroadcastForm, TelegramSupportReplyForm
@@ -357,7 +363,7 @@ TELEGRAM_MESSAGE_POLL_BATCH_SIZE = 100
 
 def _latest_user_message_queryset():
     return TelegramMessage.objects.filter(
-        conversation__user_id=OuterRef("user_id"),
+        conversation=OuterRef("pk"),
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
     ).order_by("-created_at", "-pk")
@@ -365,7 +371,7 @@ def _latest_user_message_queryset():
 
 def _latest_inbound_message_queryset():
     return TelegramMessage.objects.filter(
-        conversation__user_id=OuterRef("user_id"),
+        conversation=OuterRef("pk"),
         direction=TelegramMessage.Direction.INBOUND,
     ).exclude(
         content_type=TelegramMessage.ContentType.DIGEST,
@@ -374,12 +380,11 @@ def _latest_inbound_message_queryset():
 
 def _conversation_queryset():
     """Conversation rows with the annotations every chat surface depends on."""
-    return TelegramConversation.objects.select_related("user", "claimed_by").annotate(
+    return TelegramConversation.objects.select_related(
+        "user", "claimed_by", "handled_by", "admin_read_by",
+    ).annotate(
         latest_inbound_at=Subquery(
             _latest_inbound_message_queryset().values("created_at")[:1],
-        ),
-        latest_message_direction=Subquery(
-            _latest_user_message_queryset().values("direction")[:1],
         ),
         is_unread=unread_conversation_filter(),
     )
@@ -417,15 +422,16 @@ def _conversation_list_context(request):
     status = request.GET.get("status", "").strip()
     if status not in TELEGRAM_CONVERSATION_STATUSES:
         status = ""
-    searched = _conversation_search_queryset(search).select_related("user", "claimed_by").annotate(
+    searched = _conversation_search_queryset(search).select_related(
+        "user", "claimed_by", "handled_by", "admin_read_by",
+    ).annotate(
         latest_user_message_at=Subquery(_latest_user_message_queryset().values("created_at")[:1]),
         latest_user_message_text=Subquery(_latest_user_message_queryset().values("text")[:1]),
         latest_user_message_content_type=Subquery(_latest_user_message_queryset().values("content_type")[:1]),
-        latest_message_direction=Subquery(_latest_user_message_queryset().values("direction")[:1]),
         latest_inbound_at=Subquery(_latest_inbound_message_queryset().values("created_at")[:1]),
         message_count=Count(
-            "user__telegram_conversations__messages",
-            filter=~Q(user__telegram_conversations__messages__content_type=TelegramMessage.ContentType.DIGEST),
+            "messages",
+            filter=~Q(messages__content_type=TelegramMessage.ContentType.DIGEST),
             distinct=True,
         ),
     ).annotate(
@@ -506,7 +512,7 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
     if message_id <= 0:
         return None
     if not TelegramMessage.objects.filter(
-        conversation__user_id=conversation_id,
+        conversation_id=conversation_id,
         telegram_message_id=message_id,
     ).exclude(content_type=TelegramMessage.ContentType.DIGEST).exists():
         return None
@@ -514,11 +520,26 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
 
 
 def _conversation_detail_context(request, conversation, reply_form=None, panel_notice=None):
+    own_admin_chat_id = TelegramAccount.objects.filter(
+        user_id=request.user.pk,
+        is_active=True,
+    ).values_list("telegram_chat_id", flat=True).first()
     messages_queryset = TelegramMessage.objects.filter(
-        conversation__user_id=conversation.user_id,
-    ).exclude(
-        content_type=TelegramMessage.ContentType.DIGEST,
-    ).select_related("sender_user").prefetch_related("attachments").order_by("created_at", "pk")
+        conversation_id=conversation.pk,
+    ).select_related(
+        "sender_user", "telegram_deleted_by", "resolved_by",
+        "resolution_reply", "resolution_reply__sender_user",
+    ).prefetch_related("attachments").order_by("created_at", "pk")
+    if own_admin_chat_id is None:
+        messages_queryset = messages_queryset.exclude(content_type=TelegramMessage.ContentType.DIGEST)
+    else:
+        messages_queryset = messages_queryset.filter(
+            ~Q(content_type=TelegramMessage.ContentType.DIGEST)
+            | Q(
+                content_type=TelegramMessage.ContentType.DIGEST,
+                telegram_chat_id=own_admin_chat_id,
+            )
+        )
     after_raw = request.GET.get("after")
     message_items = None
     messages_page_obj = None
@@ -538,7 +559,7 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         messages_page_obj = paginator.get_page(page_number)
         latest_message_pk = messages_queryset.values_list("pk", flat=True).last()
     reply_to_message_id = _valid_reply_target(
-        conversation.user_id,
+        conversation.pk,
         request.GET.get("reply_to"),
     )
     if reply_form is None:
@@ -549,6 +570,7 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         )
     return {
         "conversation": conversation,
+        "own_admin_chat_id": own_admin_chat_id,
         "messages_page_obj": messages_page_obj,
         "message_items": message_items,
         "latest_message_pk": latest_message_pk,
@@ -557,6 +579,8 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "panel_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
         "mark_read_url": reverse("telegram-conversation-mark-read", kwargs={"conversation_id": conversation.pk}),
+        "claim_url": reverse("telegram-conversation-claim", kwargs={"conversation_id": conversation.pk}),
+        "release_url": reverse("telegram-conversation-release", kwargs={"conversation_id": conversation.pk}),
         "conversation_list_url": reverse("telegram-conversations"),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
@@ -702,6 +726,119 @@ def telegram_conversation_mark_read(request, conversation_id):
             ),
         )
     messages.success(request, _("Conversation marked as read."))
+    return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_conversation_claim_view(request, conversation_id):
+    panel_request = request.GET.get("fragment") == "panel"
+    try:
+        claim_conversation(conversation_id=conversation_id, admin=request.user)
+    except SupportReplyError as exc:
+        if not panel_request:
+            messages.error(request, str(exc))
+            return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+        notice = str(exc)
+    else:
+        notice = _("Conversation assigned to you.")
+        if not panel_request:
+            messages.success(request, notice)
+            return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+    conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
+    return render(
+        request,
+        "partials/telegram_chat_panel.html",
+        _conversation_detail_context(request, conversation, panel_notice=notice),
+    )
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_conversation_release_view(request, conversation_id):
+    panel_request = request.GET.get("fragment") == "panel"
+    try:
+        release_conversation(conversation_id=conversation_id, admin=request.user)
+    except SupportReplyError as exc:
+        if not panel_request:
+            messages.error(request, str(exc))
+            return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+        notice = str(exc)
+    else:
+        notice = _("Conversation returned to the open queue.")
+        if not panel_request:
+            messages.success(request, notice)
+            return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+    conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
+    return render(
+        request,
+        "partials/telegram_chat_panel.html",
+        _conversation_detail_context(request, conversation, panel_notice=notice),
+    )
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_conversation_message_delete(request, conversation_id, message_id):
+    panel_request = request.GET.get("fragment") == "panel"
+    config = TelegramBotConfig.objects.filter(is_active=True).first()
+    if config is None:
+        error = _("Telegram bot is not active.")
+        if panel_request:
+            conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
+            return render(
+                request,
+                "partials/telegram_chat_panel.html",
+                _conversation_detail_context(request, conversation, panel_notice=error),
+                status=400,
+            )
+        messages.error(request, error)
+        return redirect("telegram-conversation-detail", conversation_id=conversation_id)
+    result = None
+    response_status = 200
+    try:
+        bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
+        result = delete_support_message(
+            bot,
+            admin=request.user,
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
+    except SupportReplyError as exc:
+        error = str(exc)
+        response_status = 400
+        if not panel_request:
+            messages.error(request, error)
+    except TelegramConfigurationError:
+        error = _("Telegram bot configuration is unavailable.")
+        response_status = 400
+        if not panel_request:
+            messages.error(request, error)
+    except Exception:
+        error = _("The Telegram message could not be deleted.")
+        response_status = 400
+        if not panel_request:
+            messages.error(request, error)
+    else:
+        if result.status == "deleted":
+            error = _("Message deleted from Telegram.")
+        elif result.status == "expired":
+            error = _("This message is older than 48 hours and remains in Telegram.")
+        else:
+            error = _("Telegram could not delete this message.")
+            response_status = 400
+        if result.reopened_conversation:
+            error = _("Message deleted from Telegram. The conversation is open again.")
+        if not panel_request:
+            messages.success(request, error)
+    if panel_request:
+        conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
+        return render(
+            request,
+            "partials/telegram_chat_panel.html",
+            _conversation_detail_context(request, conversation, panel_notice=error),
+            status=response_status,
+        )
     return redirect("telegram-conversation-detail", conversation_id=conversation_id)
 
 
@@ -945,10 +1082,29 @@ def telegram_broadcast_detail(request, broadcast_id):
         TelegramBroadcast.objects.select_related("academic_year", "level", "created_by", "confirmed_by"),
         pk=broadcast_id,
     )
-    recipients = broadcast.recipients.order_by("pk")
+    recipients = broadcast.recipients.annotate(
+        telegram_message_count=Count("messages"),
+        telegram_messages_deleted=Count(
+            "messages",
+            filter=Q(messages__deletion_status=TelegramBroadcastDeliveryMessage.DeletionStatus.DELETED),
+        ),
+        telegram_messages_expired=Count(
+            "messages",
+            filter=Q(messages__deletion_status=TelegramBroadcastDeliveryMessage.DeletionStatus.EXPIRED),
+        ),
+        telegram_messages_failed=Count(
+            "messages",
+            filter=Q(messages__deletion_status=TelegramBroadcastDeliveryMessage.DeletionStatus.FAILED),
+        ),
+        telegram_messages_remaining=Count(
+            "messages",
+            filter=~Q(messages__deletion_status__in=(
+                TelegramBroadcastDeliveryMessage.DeletionStatus.DELETED,
+                TelegramBroadcastDeliveryMessage.DeletionStatus.EXPIRED,
+            )),
+        ),
+    ).order_by("pk")
     recipient_page_obj = Paginator(recipients, 50).get_page(request.GET.get("page", 1))
-    from .job_monitor import monitored_jobs, readable_job
-
     monitor_row = monitored_jobs(family="telegram", selection={"telegram": [str(broadcast.pk)]}).first()
     return render(
         request,
@@ -971,6 +1127,29 @@ def telegram_broadcast_detail(request, broadcast_id):
             ]),
         },
     )
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def telegram_broadcast_recipient_delete(request, broadcast_id, recipient_id):
+    try:
+        result = delete_broadcast_recipient_messages(
+            broadcast_id=broadcast_id,
+            recipient_id=recipient_id,
+            actor=request.user,
+        )
+    except BroadcastError as exc:
+        messages.error(request, str(exc))
+    else:
+        if result.deleted:
+            messages.success(request, _("Deleted %(count)s Telegram message(s) for this recipient.") % {"count": result.deleted})
+        if result.expired:
+            messages.warning(request, _("%(count)s Telegram message(s) are older than 48 hours and remain in Telegram.") % {"count": result.expired})
+        if result.failed:
+            messages.error(request, _("Telegram could not delete %(count)s message(s) for this recipient.") % {"count": result.failed})
+        if not any((result.deleted, result.expired, result.failed)):
+            messages.info(request, _("There are no Telegram messages left to delete for this recipient."))
+    return redirect("telegram-broadcast-detail", broadcast_id=broadcast_id)
 
 
 TELEGRAM_ACCOUNTS_PAGE_SIZE = 25

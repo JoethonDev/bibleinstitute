@@ -5,31 +5,33 @@ Autodiscovered by learning_platform.celery.app.
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from logging import getLogger
+from uuid import uuid4
 
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.template.loader import render_to_string
 from django.core.mail import send_mail
+from django.db import transaction
+from django.db.models import Q
+from django.template.loader import render_to_string
 from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
 from django.utils import translation
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
 from .admin_tables import quiz_queryset
-from .models import Quiz
+from .models import Quiz, QuizOperationJob
+from .quiz_attempts import due_snapshots, reconcile_snapshots
 from .quiz_grading import regrade_quiz_submissions
+
 
 User = get_user_model()
 logger = getLogger(__name__)
 
 @shared_task(ignore_result=True, acks_late=True, reject_on_worker_lost=True)
 def recalculate_quizzes_task(job_id: str) -> None:
-    from datetime import timedelta
-    from uuid import uuid4
-    from django.db import transaction
-    from .models import QuizOperationJob
-    from .quiz_attempts import reconcile_snapshots
 
     token = uuid4()
     with transaction.atomic():
@@ -85,8 +87,6 @@ def recalculate_quizzes_task(job_id: str) -> None:
 
 @shared_task(ignore_result=True)
 def recover_quiz_operations() -> None:
-    from .models import QuizOperationJob
-    from django.db.models import Q
     jobs = QuizOperationJob.objects.filter(
         Q(status=QuizOperationJob.Status.QUEUED) |
         Q(status=QuizOperationJob.Status.RUNNING, lease_until__lte=timezone.now())
@@ -97,7 +97,6 @@ def recover_quiz_operations() -> None:
 
 @shared_task(ignore_result=True)
 def reconcile_closed_quiz_snapshots() -> None:
-    from .quiz_attempts import due_snapshots, reconcile_snapshots
     quiz_ids = list(due_snapshots().order_by("quiz_id").values_list("quiz_id", flat=True).distinct()[:50])
     for quiz_id in quiz_ids:
         try:

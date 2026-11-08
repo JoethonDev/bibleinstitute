@@ -27,12 +27,14 @@
                 {% endif %}
 
                 <!-- Card header colour changes by quiz mode -->
-                <div class="sd-quiz-head {% if mode == 'view' %}sd-quiz-head--success{% elif mode == 'closed_unsolved' %}sd-quiz-head--closed{% elif mode == 'preview' %}sd-quiz-head--preview{% endif %}">
+                <div class="sd-quiz-head {% if mode == 'view' %}sd-quiz-head--success{% elif mode == 'closed_unsolved' %}sd-quiz-head--closed{% elif mode == 'preview' %}sd-quiz-head--preview{% elif mode == 'upcoming' %}sd-quiz-head--upcoming{% endif %}">
                     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center w-100">
                         <div>
                             <h4 class="sd-quiz-title d-flex align-items-center gap-2">
-                                {% if mode == "exam" %}
+                                {% if mode == "exam" or mode == "ready" %}
                                     <i class="fas fa-pen-to-square"></i>
+                                {% elif mode == "upcoming" %}
+                                    <i class="fas fa-calendar-clock"></i>
                                 {% elif mode == "preview" %}
                                     <i class="fas fa-flask"></i>
                                 {% elif mode == "view" %}
@@ -62,6 +64,31 @@
                     </div>
                     {% endif %}
 
+                    {% if mode == "upcoming" %}
+                    <div class="alert alert-info d-flex align-items-center gap-3 mb-4" role="status">
+                        <i class="fas fa-calendar-clock fa-lg"></i>
+                        <div>
+                            <strong>{% translate "Exam not open yet" %}</strong>
+                            <div class="ps-muted-text small">
+                                {% blocktranslate with date=quiz_opening_date_str %}This exam opens on {{ date }}. Questions will be available after it opens.{% endblocktranslate %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if mode == "ready" %}
+                    <div class="alert alert-info mb-4" role="status">
+                        <strong>{% translate "This exam is open." %}</strong>
+                        {% blocktranslate with minutes=quiz_duration_minutes close=quiz_closing_date_str %}You have {{ minutes }} minutes after starting. Your attempt ends at this time limit or when the exam closes at {{ close }}, whichever comes first.{% endblocktranslate %}
+                    </div>
+                    <form method="post" action="{{ quiz_start_url }}" class="d-grid">
+                        {% csrf_token %}
+                        <button type="submit" class="sd-btn sd-btn--gold btn-lg">
+                            <i class="fas fa-play me-2" aria-hidden="true"></i>{% translate "Start Exam" %}
+                        </button>
+                    </form>
+                    {% endif %}
+
                     <!-- Closed / not taken banner -->
                     {% if mode == "closed_unsolved" %}
                     <div class="alert sd-quiz-closed-alert d-flex align-items-center gap-3 mb-4">
@@ -75,6 +102,7 @@
                     </div>
                     {% endif %}
 
+                    {% if mode != "ready" and mode != "upcoming" %}
                     <form action="" method="post" id="quiz-form">
                         {% csrf_token %}
                         
@@ -93,6 +121,7 @@
                         </div>
                         {% endif %}
                     </form>
+                    {% endif %}
 
                     {% if mode == "exam" %}
                     <div class="modal fade" id="unansweredQuestionsModal" tabindex="-1" aria-labelledby="unansweredQuestionsModalLabel" aria-describedby="unansweredQuestionsModalDescription" aria-hidden="true">
@@ -131,19 +160,6 @@
     {{ snapshot_data|json_script:"quiz-answer-snapshot" }}
     <p id="snapshot-status" role="status" aria-live="polite" class="text-center"></p>
     {% endif %}
-    {% if snapshot_reconcile %}
-    <div hidden>{% csrf_token %}</div>
-    <p id="snapshot-reconcile-status" role="status" class="text-center">{% translate "Recovering saved answers..." %}</p>
-    <script>
-    (() => {
-        const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-        fetch('{{ snapshot_url|escapejs }}', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify({reconcile: true})})
-            .then(response => { if (!response.ok) throw new Error(); return response.json(); })
-            .then(data => { if (data.submitted) location.reload(); else throw new Error(); })
-            .catch(() => { document.getElementById('snapshot-reconcile-status').textContent = '{% translate "Recovery could not finish. Reload to try again."|escapejs %}'; });
-    })();
-    </script>
-    {% endif %}
     {% if mode == "exam" or mode == "preview" %}
         <script>
             (() => {
@@ -170,7 +186,9 @@
 
                 const isPreview = '{{ mode|escapejs }}' === 'preview';
                 let timerEl = document.querySelector("#timer span");
-                const endTime = parseInt('{{ closing_date|escapejs }}'.split(",")[0]);
+                const endTime = Number('{{ attempt_deadline|default:0|escapejs }}');
+                const serverTimeAtRender = Number('{{ server_now_ms|default:0|escapejs }}');
+                const monotonicTimeAtRender = performance.now();
                 const form = document.querySelector("#quiz-form");
                 const snapshot = JSON.parse(document.getElementById('quiz-answer-snapshot')?.textContent || '{"answers":{},"revision":0}');
                 let snapshotRevision = snapshot.revision;
@@ -369,7 +387,7 @@
                 }
 
                 function countDown() {
-                    let currentEpoch = Math.floor(Date.now() / 1000);
+                    let currentEpoch = Math.floor((serverTimeAtRender + performance.now() - monotonicTimeAtRender) / 1000);
                     let remainingTime = endTime - currentEpoch;
 
                     if (remainingTime <= 0) {

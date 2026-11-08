@@ -41,8 +41,13 @@ from .telegram.navigation import (
 )
 from .telegram.broadcasts import process_due_broadcast
 from .telegram.notifications import process_due_notifications
-from .telegram.support import handle_admin_message, handle_student_message
+from .telegram.support import (
+    handle_admin_message,
+    handle_student_message,
+    recover_stale_support_replies as recover_support_replies,
+)
 from .utils.quiz_access import quiz_window
+from .utils.lesson_access import lesson_available_filter
 from .utils.storage_operations import get_r2_client
 
 
@@ -131,7 +136,7 @@ def _active_lesson(user, offering_id: str, lesson_id: str):
         pk=lesson_pk,
         course_offering_id=offering.pk,
         status=PublicationStatus.PUBLISHED,
-    ).first()
+    ).filter(lesson_available_filter()).first()
     return offering, lesson
 
 
@@ -335,7 +340,10 @@ def _handle_callback(bot, callback: dict) -> None:
             if offering is None:
                 raise LookupError
             lessons, current, page_count = _page(
-                Lesson.objects.filter(course_offering=offering, status=PublicationStatus.PUBLISHED).order_by("created_date", "pk"),
+                Lesson.objects.filter(
+                    course_offering=offering,
+                    status=PublicationStatus.PUBLISHED,
+                ).filter(lesson_available_filter()).order_by("created_date", "pk"),
                 parts[1],
             )
             text = _list_text(
@@ -580,3 +588,10 @@ def process_due_telegram_broadcasts(broadcast_id: int, limit: int = 100) -> None
     """Deliver one bounded broadcast recipient batch and recover remaining rows."""
     with translation.override("ar"):
         process_due_broadcast(broadcast_id, limit=limit)
+
+
+@shared_task(ignore_result=True)
+def recover_stale_telegram_support_replies(limit: int = 100) -> None:
+    """Reopen claims blocked by interrupted Telegram support sends."""
+    with translation.override("ar"):
+        recover_support_replies(limit=limit)

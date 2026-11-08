@@ -109,6 +109,7 @@
                   <th scope="col">{% translate "Grade %" %}</th>
                   <th scope="col">{% translate "Expected" %}</th>
                   <th scope="col">{% translate "Full days" %}</th>
+                  <th scope="col">{% translate "Fully scanned days" %}</th>
                   <th scope="col">{% translate "Partial" %}</th>
                   <th scope="col">{% translate "Absent" %}</th>
                   <th scope="col">{% translate "Attendance Score" %}</th>
@@ -125,6 +126,7 @@
                     <td>{{ row.grade_percent }}%</td>
                     <td>{{ row.expected }}</td>
                     <td>{{ row.valid }}</td>
+                    <td>{{ row.fully_scanned }}</td>
                     <td>{{ row.invalid }}</td>
                     <td>{{ row.absent }}</td>
                     <td>{{ row.attendance_score }}</td>
@@ -133,7 +135,7 @@
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="11" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
+                    <td colspan="12" class="ad-empty">{% translate "No data found for the selected filters." %}</td>
                   </tr>
                 {% endfor %}
               </tbody>

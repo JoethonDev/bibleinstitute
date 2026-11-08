@@ -9,6 +9,7 @@ from ..models import AttendancePolicy, AttendanceRecord, Enrollment, Grade, Less
 from .attendance import (
     DAY_GRADE_FULL,
     DAY_GRADE_PARTIAL,
+    fully_scanned_attendance_day,
     grade_attendance_day,
     merge_attendance_pairs,
     pair_attendance_records,
@@ -147,11 +148,14 @@ def _build_report_batch(enrollments, academic_year_level, course_offering_id, fa
         if student.study_mode == "online":
             expected = valid = invalid = absent = 0
             attendance_score = Decimal("0")
+            fully_scanned = 0
         else:
             days = attendance_by_student.get(student.pk, {})
             full = partial = 0
+            fully_scanned = 0
             attendance_score = Decimal("0")
             for pair in days.values():
+                fully_scanned += int(fully_scanned_attendance_day(pair))
                 day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), facts.policy)
                 attendance_score += day.grade
                 if day.grade == DAY_GRADE_FULL:
@@ -177,6 +181,7 @@ def _build_report_batch(enrollments, academic_year_level, course_offering_id, fa
             "valid": valid,
             "invalid": invalid,
             "absent": absent,
+            "fully_scanned": fully_scanned,
             "attendance_score": attendance_score,
             "attendance_rate": round(float(attendance_score) / expected * 100, 1) if expected else 0,
             "absence_rate": round(absent / expected * 100, 1) if expected else 0,
@@ -225,11 +230,6 @@ def iter_report_batches(
         if facts is None:
             facts = load_report_facts(academic_year_level, course_offering_id)
         yield _build_report_batch(page, academic_year_level, course_offering_id, facts)
-
-
-def build_report_data(academic_year_level, student_id=None, study_mode=None, course_offering_id=None):
-    """Build report rows in bounded pages for exports and legacy callers."""
-    return list(iter_report_data(academic_year_level, student_id, study_mode, course_offering_id))
 
 
 def iter_report_data(academic_year_level, student_id=None, study_mode=None, course_offering_id=None):

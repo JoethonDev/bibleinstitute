@@ -24,9 +24,31 @@
     </div>
     <div class="tg-chat-detail-actions">
         {% if conversation.is_unread %}
-        <span class="ad-pill ad-pill--warning">{% translate "Pending" %}</span>
+        <span class="ad-pill ad-pill--warning">{% translate "Unread" %}</span>
         {% else %}
-        <span class="ad-pill ad-pill--success">{% translate "Processed" %}</span>
+        <span class="ad-pill ad-pill--success">{% translate "Read" %}</span>
+        {% endif %}
+
+        {% if conversation.status == "claimed" and conversation.claimed_by %}
+        <span class="ad-pill ad-pill--warning">{% blocktranslate with admin=conversation.claimed_by.username %}Assigned to @{{ admin }}{% endblocktranslate %}</span>
+        {% elif conversation.status == "handled" and conversation.handled_by %}
+        <span class="ad-pill ad-pill--success">{% blocktranslate with admin=conversation.handled_by.username %}Resolved by @{{ admin }}{% endblocktranslate %}</span>
+        {% elif conversation.status == "blocked" %}
+        <span class="ad-pill ad-pill--danger">{% translate "Blocked" %}</span>
+        {% else %}
+        <span class="ad-pill ad-pill--muted">{% translate "Open" %}</span>
+        {% endif %}
+
+        {% if conversation.status == "open" %}
+        <form method="post" action="{{ claim_url }}" hx-post="{{ claim_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="ps-inline-form">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Claim conversation" %}</button>
+        </form>
+        {% elif conversation.status == "claimed" and conversation.claimed_by_id == request.user.pk %}
+        <form method="post" action="{{ release_url }}" hx-post="{{ release_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="ps-inline-form">
+            {% csrf_token %}
+            <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">{% translate "Release conversation" %}</button>
+        </form>
         {% endif %}
 
         {% if conversation.is_unread %}
@@ -55,6 +77,18 @@
             <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
         </a>
     </div>
+</div>
+
+<div class="tg-chat-kv">
+    {% if conversation.claimed_by and conversation.claimed_at %}
+    <span>{% translate "Assigned to" %}: @{{ conversation.claimed_by.username }} - {{ conversation.claimed_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+    {% endif %}
+    {% if conversation.handled_by and conversation.handled_at %}
+    <span>{% translate "Resolved by" %}: @{{ conversation.handled_by.username }} - {{ conversation.handled_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+    {% endif %}
+    {% if conversation.admin_read_by and conversation.admin_read_at %}
+    <span>{% translate "Last read by" %}: @{{ conversation.admin_read_by.username }} - {{ conversation.admin_read_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+    {% endif %}
 </div>
 
 <div class="tg-chat-kv">
