@@ -990,7 +990,33 @@ compile; sweep 36/36 -> 200; DOM audit clean; encoding clean.
   pager, so sampled pages with an empty database showed no footer - that is the
   intended behaviour, not a regression.
 
-### Broadcast peek drawer (9 November 2026)
+### Calendar day agenda moved into the shared drawer (9 November 2026)
+
+The prototype opens a day's agenda in a drawer; the admin calendar used a
+Bootstrap modal. `admin_shell.js` now exposes a small programmatic API for
+components that already own their markup:
+
+```js
+window.awDrawer.open({ title, subtitle, html, trigger });
+window.awDrawer.close();
+```
+
+It reuses the existing drawer machinery (overlay, Escape, focus return, HTMX and
+Alpine init), so no second overlay implementation exists.
+
+`calendar_day_sheet.js` uses that API when present and falls back to the
+Bootstrap modal otherwise. This matters because the same script drives the
+student calendar, which does not load `admin_shell.js`: the admin calendar now
+shows the agenda in the drawer, while the student calendar keeps its dialog
+untouched. The cloned markup is **moved**, not copied - the staging node is
+emptied first, otherwise every id inside the agenda would exist twice while the
+drawer is open.
+
+Verified: admin calendar (after the `?academic_year=` redirect) returns 200 with
+the drawer shell, the shell script and the staging modal; the student calendar
+returns 200 with the modal and without the drawer shell or the shell script.
+DOM and markup audits stay clean; 187/187 templates compile; sweep 36/36 -> 200;
+max 23 queries; braces 926/926; JS encoding audit passes.
 
 Fourth drawer, and the first read-only one driven from a list row:
 

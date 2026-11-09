@@ -34,7 +34,6 @@
   }
 
   function openDaySheet(trigger) {
-    if (!window.bootstrap || !window.bootstrap.Modal) return false;
     var date = trigger.getAttribute('data-cal-day');
     if (!date) return false;
     var cell = document.querySelector('.aw-calmg-cell[data-cal-day="' + date + '"], .sd-day[data-cal-day="' + date + '"]');
@@ -42,7 +41,7 @@
     var modalEl = document.getElementById('calendar-day-modal');
     var body = document.getElementById('calendar-day-body');
     var label = document.getElementById('calendar-day-label');
-    if (!content || !modalEl || !body || !label) return false;
+    if (!content || !body || !label) return false;
     var fragment = content.cloneNode(true);
     var templates = fragment.querySelectorAll('template');
     for (var i = 0; i < templates.length; i++) templates[i].remove();
@@ -51,6 +50,22 @@
       return false;
     }
     label.textContent = trigger.getAttribute('data-cal-label') || '';
+    // The admin workspace opens the agenda in the shared peek drawer; the
+    // student calendar keeps the Bootstrap dialog, which is the only one it
+    // renders because the shell script is not loaded there.
+    if (window.awDrawer && typeof window.awDrawer.open === 'function') {
+      // Move the markup instead of copying it: leaving it in the staging node
+      // would duplicate every id while the drawer is open.
+      var html = body.innerHTML;
+      body.replaceChildren();
+      window.awDrawer.open({
+        title: label.textContent,
+        html: html,
+        trigger: trigger
+      });
+      return true;
+    }
+    if (!window.bootstrap || !window.bootstrap.Modal || !modalEl) return false;
     if (window.htmx && window.htmx.process) window.htmx.process(body);
     window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
     return true;

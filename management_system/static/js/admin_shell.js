@@ -361,6 +361,25 @@
         });
     }
 
+    // Programmatic entry point for components that already own their markup
+    // (the calendar day agenda clones it from the grid) instead of a URL.
+    window.awDrawer = {
+        open: function (options) {
+            options = options || {};
+            if (!drawer || !drawerBody) return;
+            drawerReturnFocus = (options.trigger instanceof Element) ? options.trigger : document.activeElement;
+            if (drawerTitle) drawerTitle.textContent = options.title || '';
+            if (drawerSubtitle) drawerSubtitle.textContent = options.subtitle || '';
+            showDrawer();
+            drawerBody.innerHTML = options.html || '';
+            if (window.htmx && typeof window.htmx.process === 'function') window.htmx.process(drawerBody);
+            if (window.Alpine && typeof window.Alpine.initTree === 'function') window.Alpine.initTree(drawerBody);
+            var focusTarget = drawerBody.querySelector('[autofocus], button, a, input, select, textarea');
+            if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
+        },
+        close: closeDrawer
+    };
+
     document.addEventListener('click', function (event) {
         var close = event.target.closest && event.target.closest('[data-aw-drawer-close]');
         if (close) {
