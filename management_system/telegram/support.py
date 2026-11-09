@@ -1147,7 +1147,8 @@ def _probe_audio_seconds(uploaded_file) -> float:
                 handle.write(chunk)
         result = subprocess.run(
             [
-                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                getattr(settings, "FFPROBE_BINARY", "ffprobe"),
+                "-v", "error", "-show_entries", "format=duration",
                 "-of", "default=nw=1:nk=1", temporary_path,
             ],
             capture_output=True,
@@ -1156,6 +1157,8 @@ def _probe_audio_seconds(uploaded_file) -> float:
             check=False,
         )
         duration = float((result.stdout or "").strip())
+    except FileNotFoundError as exc:
+        raise SupportReplyError(_("Audio validation is unavailable on this server.")) from exc
     except Exception as exc:
         raise SupportReplyError(_("The audio file could not be inspected.")) from exc
     finally:

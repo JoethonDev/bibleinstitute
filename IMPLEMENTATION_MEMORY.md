@@ -677,6 +677,13 @@ Telegram support chat U1-U5 (2026-11-09, migration 0112):
   Redis/worker stack (digest edits beyond 48 hours, delivery/unknown paths,
   Telegram-origin large media, native mobile push).
 
+Infrastructure follow-up (2026-11-09): support audio duration validation runs
+synchronously in the web process, so the runtime image now inherits the media
+stage (FFmpeg/FFprobe) and `FFPROBE_BINARY` is configurable in settings,
+`.env.example`, `.env` and both Compose environment blocks. The native FFmpeg
+media pipeline remains limited to the media queue. `docker build --check` passes
+and `docker compose ... config` resolves the new variable in every app service.
+
 Known follow-ups (not done): provider acceptance (R2 stats/search, Telegram
 delivery, media workers) remains
 separate from template verification and needs the Redis/worker stack; the

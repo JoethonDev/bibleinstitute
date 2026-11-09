@@ -13599,3 +13599,6 @@ msgstr "Configure the promotion evaluation formula for an academic year and leve
 
 msgid "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%."
 msgstr "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%."
+
+msgid "Audio validation is unavailable on this server."
+msgstr "Audio validation is unavailable on this server."

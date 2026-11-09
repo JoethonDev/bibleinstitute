@@ -32,12 +32,14 @@ EXPOSE 8000
 # production worker/thread/timeout options for both blue/green slots.
 CMD ["gunicorn", "learning_platform.wsgi:application", "--bind", "0.0.0.0:8000"]
 
-# Media worker target: adds FFmpeg/FFprobe only here. `ffmpeg` ships ffprobe
-# and is used only by the dedicated `media` Celery queue.
+# Media worker target: `ffmpeg` ships ffprobe and runs the dedicated `media`
+# Celery queue.
 FROM base AS media
 RUN apt-get update && \
     apt-get install --no-install-recommends -y ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-# Default final stage (web, default/general workers, admin jobs).
-FROM base AS runtime
+# Default final stage (web, default/general workers, admin jobs). It inherits
+# the media stage because support-chat audio uploads are validated with ffprobe
+# synchronously in the web process; no FFmpeg media pipeline runs there.
+FROM media AS runtime
