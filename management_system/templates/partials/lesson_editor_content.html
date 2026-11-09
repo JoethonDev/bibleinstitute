@@ -14,7 +14,7 @@
      x-data="{
          ...autoSave('lesson-form-{{ request.resolver_match.kwargs.lesson_id|default:'new' }}'),
          ...lessonForm()
-     }" 
+     }"
      x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
 
