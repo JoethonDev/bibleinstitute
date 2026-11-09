@@ -172,7 +172,7 @@ function r2Manager() {
             this.renameFileNewName = oldName;
             this.renameIsFolder = isFolder;
             const errorEl = document.getElementById('rename-file-error');
-            if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('d-none'); }
+            if (errorEl) { errorEl.textContent = ''; errorEl.hidden = true; }
             bootstrap.Modal.getOrCreateInstance(document.getElementById('renameFileModal')).show();
         },
 
@@ -199,7 +199,7 @@ function r2Manager() {
         pollStorageOperation(url) {
             const panel = this.$el.querySelector('[data-r2-operation-progress]');
             if (!panel) return;
-            panel.classList.remove('d-none');
+            panel.hidden = false;
             fetch(url, { credentials: 'same-origin', cache: 'no-store' })
                 .then(response => response.json().then(data => {
                     if (!response.ok) throw Object.assign(new Error(data.error || gettext('Could not load storage operation progress')), { status: response.status });
@@ -278,7 +278,8 @@ function r2Manager() {
             if (this.renamePollTimer) window.clearTimeout(this.renamePollTimer);
             this.renamePollTimer = null;
             try { window.localStorage.removeItem('r2-storage-operation'); } catch (error) {}
-            this.$el.querySelector('[data-r2-operation-progress]')?.classList.add('d-none');
+            var progressPanel = this.$el.querySelector('[data-r2-operation-progress]');
+            if (progressPanel) progressPanel.hidden = true;
         },
         
         /**
@@ -289,7 +290,7 @@ function r2Manager() {
             // independently, so a second rename must not be blocked.
             if (!this.renameFileNewName.trim() || this.renameFileNewName === this.renameFileOldName) {
                 const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = gettext('Please enter a different name'); errorEl.classList.remove('d-none'); }
+                if (errorEl) { errorEl.textContent = gettext('Please enter a different name'); errorEl.hidden = false; }
                 return;
             }
 
@@ -316,12 +317,12 @@ function r2Manager() {
                 csrf = this.getCSRFToken();
             } catch (error) {
                 const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
+                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.hidden = false; }
                 return;
             }
             if (!csrf) {
                 const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
+                if (errorEl) { errorEl.textContent = gettext('Failed to rename'); errorEl.hidden = false; }
                 return;
             }
             fetch(this.routes.rename, {
@@ -341,13 +342,13 @@ function r2Manager() {
                     this._hideModal(document.getElementById('renameFileModal'), () => this.watchStorageOperation(data));
                 } else {
                     const errorEl = document.getElementById('rename-file-error');
-                    if (errorEl) { errorEl.textContent = gettext('Rename request was not accepted'); errorEl.classList.remove('d-none'); }
+                    if (errorEl) { errorEl.textContent = gettext('Rename request was not accepted'); errorEl.hidden = false; }
                 }
             })
             .catch(error => {
                 console.error('Error renaming:', error);
                 const errorEl = document.getElementById('rename-file-error');
-                if (errorEl) { errorEl.textContent = error.message || gettext('Failed to rename'); errorEl.classList.remove('d-none'); }
+                if (errorEl) { errorEl.textContent = error.message || gettext('Failed to rename'); errorEl.hidden = false; }
             });
         },
         
@@ -534,7 +535,7 @@ function r2Manager() {
             if (this.newFolderName.trim() === '') {
                 const errorEl = document.getElementById('create-folder-error');
                 errorEl.textContent = gettext('Please enter a folder name');
-                errorEl.classList.remove('d-none');
+                errorEl.hidden = false;
                 return;
             }
             
@@ -556,14 +557,14 @@ function r2Manager() {
                 } else {
                     const errorEl = document.getElementById('create-folder-error');
                     errorEl.textContent = data.error;
-                    errorEl.classList.remove('d-none');
+                    errorEl.hidden = false;
                 }
             })
             .catch(error => {
                 console.error('Create folder error:', error);
                 const errorEl = document.getElementById('create-folder-error');
                 errorEl.textContent = gettext('Failed to create folder');
-                errorEl.classList.remove('d-none');
+                errorEl.hidden = false;
             });
         },
         

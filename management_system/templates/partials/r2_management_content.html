@@ -4,7 +4,9 @@
 R2 storage workspace. Presentation only: the r2Manager Alpine root, every
 data-r2-* endpoint, storage-stat id, operation-progress hook, modal id,
 breadcrumb/folder HTMX contract and file-list/drive ids are preserved. The
-page head, stats strip and toolbar use the shared admin workspace primitives.
+page head, stats card, toolbar, browse card and modals use the shared admin
+workspace primitives. Bootstrap remains only where r2Manager.js itself drives
+the Bootstrap modal API.
 {% endcomment %}
 <div class="aw-dashboard-page" id="content" x-data="r2Manager()"
      data-r2-download-url="{% url 'api-download-file' %}"
@@ -19,133 +21,141 @@ page head, stats strip and toolbar use the shared admin workspace primitives.
     {% translate "Media" as page_eyebrow %}
     {% translate "R2 Storage Management" as page_title %}
     {% translate "Manage your Cloudflare R2 storage files and folders" as page_description %}
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
-
-    <div class="aw-alert aw-alert--info d-none flex-column align-items-stretch" role="status" aria-live="polite" data-r2-operation-progress>
-        <div class="d-flex justify-content-between align-items-start gap-3">
-            <div>
-                <strong data-r2-operation-heading>{% translate "Storage operation" %}</strong>
-                <span class="d-block" data-r2-operation-phase></span>
-                <small data-r2-operation-count></small>
-            </div>
-            <button type="button" class="btn-close" aria-label="{% translate 'Close' %}" data-r2-operation-dismiss hidden></button>
-        </div>
-        <div class="aw-progress mt-2" role="progressbar" aria-label="{% translate 'Storage operation progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-r2-operation-bar-wrap>
-            <span style="width: 0%" data-r2-operation-bar></span>
-        </div>
-        <small class="aw-field-error d-block mt-2" data-r2-operation-error hidden></small>
-        <small class="aw-small aw-muted d-block mt-2" data-r2-operation-warning hidden></small>
-    </div>
-
-    <div class="aw-card">
-        <div class="aw-card-body">
-            <span id="stat-unavailable" class="aw-pill aw-pill--amber mb-2" style="display:none" role="status" aria-live="polite"></span>
-            <div class="aw-storage-stats" id="storage-stats-container">
-                <div class="aw-storage-stat">
-                    <div class="aw-flex">
-                        <b id="stat-total-files">
-                            {% if storage_stats.loading %}
-                            <span class="spinner-border spinner-border-sm"></span>
-                            {% else %}{{ storage_stats.total_files }}{% endif %}
-                        </b>
-                        <small id="stat-total-files-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
-                    </div>
-                    <span>{% translate "Total Files" %}</span>
-                </div>
-                <div class="aw-storage-stat">
-                    <div class="aw-flex">
-                        <b id="stat-total-storage">
-                            {% if storage_stats.loading %}
-                            <span class="spinner-border spinner-border-sm"></span>
-                            {% else %}{{ total_size_formatted }}{% endif %}
-                        </b>
-                        <small id="stat-total-storage-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
-                    </div>
-                    <span>{% translate "Total Storage" %}</span>
-                </div>
-                <div class="aw-storage-stat">
-                    <div class="aw-flex">
-                        <b id="stat-video-files">
-                            {% if storage_stats.loading %}
-                            <span class="spinner-border spinner-border-sm"></span>
-                            {% elif storage_stats.by_extension.mp4 %}{{ storage_stats.by_extension.mp4.count }}{% else %}0{% endif %}
-                        </b>
-                        <small id="stat-video-files-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
-                    </div>
-                    <span>{% translate "Video Files" %}</span>
-                </div>
-                <div class="aw-storage-stat">
-                    <div class="aw-flex">
-                        <b id="stat-pdf-files">
-                            {% if storage_stats.loading %}
-                            <span class="spinner-border spinner-border-sm"></span>
-                            {% elif storage_stats.by_extension.pdf %}{{ storage_stats.by_extension.pdf.count }}{% else %}0{% endif %}
-                        </b>
-                        <small id="stat-pdf-files-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
-                    </div>
-                    <span>{% translate "PDF Files" %}</span>
-                </div>
-            </div>
-            <p id="stat-refreshed" class="aw-small aw-muted mt-2 mb-0" aria-live="polite"></p>
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <button class="aw-btn" type="button" @click="showCreateFolderModal()">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-folder"></use></svg>
+                <span>{% translate "New Folder" %}</span>
+            </button>
+            <a class="aw-btn aw-btn--primary" href="{% url 'upload-files' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <span>{% translate "Upload Files" %}</span>
+            </a>
         </div>
     </div>
 
-    <div class="aw-card">
-        <div class="aw-card-body aw-card-body--tight">
-            <div class="aw-filter-bar">
-                <div class="aw-table-tools">
-                    <button class="aw-btn aw-btn--primary aw-btn--sm" type="button" @click="showCreateFolderModal()">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-folder"></use></svg>
-                        <span>{% translate "New Folder" %}</span>
-                    </button>
-                    <a class="aw-btn aw-btn--gold aw-btn--sm" href="{% url 'upload-files' %}">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
-                        <span>{% translate "Upload Files" %}</span>
-                    </a>
-                    <button class="aw-btn aw-btn--ghost aw-btn--sm" type="button" @click="refreshStats()">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
-                        <span>{% translate "Statistics" %}</span>
-                    </button>
-                    <button class="aw-btn aw-btn--danger aw-btn--sm" type="button"
-                            x-show="selectedFiles.length > 0"
-                            @click="deleteSelectedFiles()">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
-                        <span>{% translate "Delete Selected" %}</span> (<span x-text="selectedFiles.length"></span>)
-                    </button>
+    <div class="aw-stack aw-stack--lg">
+        <div class="aw-alert aw-alert--info aw-alert--stack" role="status" aria-live="polite" data-r2-operation-progress hidden>
+            <div class="aw-flex-between">
+                <div class="aw-stack">
+                    <strong data-r2-operation-heading>{% translate "Storage operation" %}</strong>
+                    <span data-r2-operation-phase></span>
+                    <small data-r2-operation-count></small>
+                </div>
+                <button type="button" class="aw-icon-btn" aria-label="{% translate 'Close' %}" data-r2-operation-dismiss hidden>
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                </button>
+            </div>
+            <div class="aw-progress" role="progressbar" aria-label="{% translate 'Storage operation progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-r2-operation-bar-wrap>
+                <span style="width: 0%" data-r2-operation-bar></span>
+            </div>
+            <small class="aw-field-error" data-r2-operation-error hidden></small>
+            <small class="aw-small aw-muted" data-r2-operation-warning hidden></small>
+        </div>
 
-                    <span class="aw-spacer" aria-hidden="true"></span>
-
-                    <select class="aw-select"
-                            x-model="currentFilter"
-                            @change="applyFilter()"
-                            aria-label="{% translate 'Filter' %}">
-                        {% for preset in filter_presets %}
-                        <option value="{{ preset.value }}" {% if preset.value == current_filter %}selected{% endif %}>
-                            {{ preset.label }}
-                        </option>
-                        {% endfor %}
-                    </select>
-
-                    <div class="aw-search-wrap">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                        <input class="aw-input aw-input--search"
-                               type="text"
-                               x-model="searchQuery"
-                               @keyup.debounce.500ms="searchFiles()"
-                               placeholder="{% translate 'Search files...' %}"
-                               aria-label="{% translate 'Search files...' %}">
+        <div class="aw-card">
+            <div class="aw-card-body aw-card-body--tight">
+                <span id="stat-unavailable" class="aw-pill aw-pill--amber" style="display:none" role="status" aria-live="polite"></span>
+                <div class="aw-storage-stats" id="storage-stats-container">
+                    <div class="aw-storage-stat">
+                        <div class="aw-flex">
+                            <b id="stat-total-files">
+                                {% if storage_stats.loading %}
+                                <span class="spinner-border spinner-border-sm"></span>
+                                {% else %}{{ storage_stats.total_files }}{% endif %}
+                            </b>
+                            <small id="stat-total-files-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
+                        </div>
+                        <span>{% translate "Total Files" %}</span>
                     </div>
-                    <button class="aw-btn aw-btn--sm" type="button" @click="searchFiles()">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                        <span class="visually-hidden">{% translate "Search files..." %}</span>
-                    </button>
+                    <div class="aw-storage-stat">
+                        <div class="aw-flex">
+                            <b id="stat-total-storage">
+                                {% if storage_stats.loading %}
+                                <span class="spinner-border spinner-border-sm"></span>
+                                {% else %}{{ total_size_formatted }}{% endif %}
+                            </b>
+                            <small id="stat-total-storage-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
+                        </div>
+                        <span>{% translate "Total Storage" %}</span>
+                    </div>
+                    <div class="aw-storage-stat">
+                        <div class="aw-flex">
+                            <b id="stat-video-files">
+                                {% if storage_stats.loading %}
+                                <span class="spinner-border spinner-border-sm"></span>
+                                {% elif storage_stats.by_extension.mp4 %}{{ storage_stats.by_extension.mp4.count }}{% else %}0{% endif %}
+                            </b>
+                            <small id="stat-video-files-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
+                        </div>
+                        <span>{% translate "Video Files" %}</span>
+                    </div>
+                    <div class="aw-storage-stat">
+                        <div class="aw-flex">
+                            <b id="stat-pdf-files">
+                                {% if storage_stats.loading %}
+                                <span class="spinner-border spinner-border-sm"></span>
+                                {% elif storage_stats.by_extension.pdf %}{{ storage_stats.by_extension.pdf.count }}{% else %}0{% endif %}
+                            </b>
+                            <small id="stat-pdf-files-approx" class="aw-pill aw-pill--plain aw-pill--amber"{% if not storage_stats.approximate %} style="display:none"{% endif %}>~</small>
+                        </div>
+                        <span>{% translate "PDF Files" %}</span>
+                    </div>
+                </div>
+                <div id="stat-refreshed" class="aw-small aw-muted" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="aw-card">
+            <div class="aw-card-body aw-card-body--tight">
+                <div class="aw-filter-bar">
+                    <div class="aw-table-tools">
+                        <button class="aw-btn aw-btn--ghost aw-btn--sm" type="button" @click="refreshStats()">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
+                            <span>{% translate "Statistics" %}</span>
+                        </button>
+                        <button class="aw-btn aw-btn--danger aw-btn--sm" type="button"
+                                x-show="selectedFiles.length > 0"
+                                @click="deleteSelectedFiles()">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                            <span>{% translate "Delete Selected" %}</span> (<span x-text="selectedFiles.length"></span>)
+                        </button>
+
+                        <span class="aw-spacer" aria-hidden="true"></span>
+
+                        <select class="aw-select"
+                                x-model="currentFilter"
+                                @change="applyFilter()"
+                                aria-label="{% translate 'Filter' %}">
+                            {% for preset in filter_presets %}
+                            <option value="{{ preset.value }}" {% if preset.value == current_filter %}selected{% endif %}>
+                                {{ preset.label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="aw-search-wrap">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                            <input class="aw-input aw-input--search"
+                                   type="text"
+                                   x-model="searchQuery"
+                                   @keyup.debounce.500ms="searchFiles()"
+                                   placeholder="{% translate 'Search files...' %}"
+                                   aria-label="{% translate 'Search files...' %}">
+                        </div>
+                        <button class="aw-btn aw-btn--sm" type="button" @click="searchFiles()">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                            <span class="visually-hidden">{% translate "Search files..." %}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="aw-card" id="file-list-container">
-        {% include 'partials/r2_browse.html' %}
+        <div class="aw-card" id="file-list-container">
+            {% include 'partials/r2_browse.html' %}
+        </div>
     </div>
 
     <div class="modal fade aw-modal" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModalLabel" data-bs-backdrop="static">
@@ -156,13 +166,15 @@ page head, stats strip and toolbar use the shared admin workspace primitives.
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="create-folder-error" class="aw-alert aw-alert--danger d-none"></div>
-                    <div class="aw-field">
-                        <label class="aw-field-label" for="r2-new-folder-name">{% translate "Folder Name" %}</label>
-                        <input type="text" class="aw-input" id="r2-new-folder-name"
-                               x-model="newFolderName"
-                               @keyup.enter="createFolder()"
-                               placeholder="{% translate 'Enter folder name' %}">
+                    <div class="aw-stack">
+                        <div id="create-folder-error" class="aw-alert aw-alert--danger" hidden></div>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="r2-new-folder-name">{% translate "Folder Name" %}</label>
+                            <input type="text" class="aw-input" id="r2-new-folder-name"
+                                   x-model="newFolderName"
+                                   @keyup.enter="createFolder()"
+                                   placeholder="{% translate 'Enter folder name' %}">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -185,14 +197,16 @@ page head, stats strip and toolbar use the shared admin workspace primitives.
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="rename-file-error" class="aw-alert aw-alert--danger d-none"></div>
-                    <div class="aw-field mb-3">
-                        <label class="aw-field-label" for="r2-rename-old-name">{% translate "Current Name" %}</label>
-                        <input type="text" class="aw-input" id="r2-rename-old-name" x-model="renameFileOldName" disabled>
-                    </div>
-                    <div class="aw-field">
-                        <label class="aw-field-label" for="r2-rename-new-name">{% translate "New Name" %}</label>
-                        <input type="text" class="aw-input" id="r2-rename-new-name" x-model="renameFileNewName" @keyup.enter="renameFile()">
+                    <div class="aw-stack">
+                        <div id="rename-file-error" class="aw-alert aw-alert--danger" hidden></div>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="r2-rename-old-name">{% translate "Current Name" %}</label>
+                            <input type="text" class="aw-input" id="r2-rename-old-name" x-model="renameFileOldName" disabled>
+                        </div>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="r2-rename-new-name">{% translate "New Name" %}</label>
+                            <input type="text" class="aw-input" id="r2-rename-new-name" x-model="renameFileNewName" @keyup.enter="renameFile()">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -215,7 +229,7 @@ page head, stats strip and toolbar use the shared admin workspace primitives.
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body" id="info-modal-body">
-                    <div class="d-flex justify-content-center">
+                    <div class="aw-flex" style="justify-content:center">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">{% translate "Loading..." %}</span>
                         </div>

@@ -1,7 +1,10 @@
-/* Canonical phone day sheet for the admin and student calendars.
-   Tapping a day cell (or an agenda row) clones that day's server-rendered
-   content into #calendar-day-body, so every meeting/holiday action stays
-   server-owned and no second data source exists. Desktop is untouched. */
+/* Canonical day sheet for the admin and student calendars.
+   Clicking or tapping a day cell (or an agenda row) clones that day's
+   server-rendered content into #calendar-day-body, so every meeting/holiday
+   action stays server-owned and no second data source exists.
+   The sheet opens at every width: a bottom sheet on phone, a centred dialog on
+   desktop (psalmodia.css). Bootstrap Modal owns Escape, backdrop dismissal and
+   body scroll locking, so no behaviour is reimplemented here. */
 (function () {
   if (window.__calendarDaySheetInstalled) return;
   window.__calendarDaySheetInstalled = true;
@@ -11,6 +14,9 @@
   var CONTENT_SELECTOR = '.aw-calendar-cell-content, .sd-day-body';
   var mq = window.matchMedia(MOBILE_QUERY);
 
+  /* Only the compact phone cell becomes a single button-like target; on wider
+     screens the cell keeps its visible meeting/holiday controls, so promoting
+     the container to role="button" would mask them for assistive technology. */
   function syncCellAccess() {
     var cells = document.querySelectorAll(CELL_SELECTOR);
     for (var i = 0; i < cells.length; i++) {
@@ -60,14 +66,13 @@
   }
 
   document.addEventListener('click', function (event) {
-    if (!mq.matches) return;
     var trigger = dayTrigger(event.target);
     if (!trigger) return;
     if (openDaySheet(trigger)) event.preventDefault();
   });
 
   document.addEventListener('keydown', function (event) {
-    if (!mq.matches || (event.key !== 'Enter' && event.key !== ' ')) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
     var trigger = dayTrigger(event.target);
     if (!trigger || trigger.tagName === 'BUTTON') return;
     if (openDaySheet(trigger)) event.preventDefault();

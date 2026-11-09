@@ -8,9 +8,9 @@
         if (!active) return;
         if (active.timer) { window.clearTimeout(active.timer); active.timer = null; }
         if (active.stream) active.stream.getTracks().forEach(function (track) { track.stop(); });
-        if (active.video) { active.video.pause(); active.video.srcObject = null; active.video.classList.add('d-none'); }
-        if (active.start) active.start.classList.remove('d-none');
-        if (active.stop) active.stop.classList.add('d-none');
+        if (active.video) { active.video.pause(); active.video.srcObject = null; active.video.hidden = true; }
+        if (active.start) active.start.hidden = false;
+        if (active.stop) active.stop.hidden = true;
         active = null;
     }
 
@@ -120,12 +120,12 @@
         var local = { video: video, start: start, stop: stopButton, stream: null, timer: null };
         start.addEventListener('click', async function () {
             stop();
-            errorBox.classList.add('d-none'); resultBox.textContent = '';
+            errorBox.hidden = true; resultBox.textContent = '';
             try {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('camera-unavailable');
                 local.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-                active = local; video.srcObject = local.stream; video.classList.remove('d-none');
-                start.classList.add('d-none'); stopButton.classList.remove('d-none');
+                active = local; video.srcObject = local.stream; video.hidden = false;
+                start.hidden = true; stopButton.hidden = false;
                 video.setAttribute('playsinline', 'true');
                 await video.play();
                 scan(local);
@@ -133,7 +133,7 @@
                 errorBox.textContent = error.name === 'NotAllowedError'
                     ? gettext('Camera permission was denied. Allow camera access and try again.')
                     : gettext('Camera access is unavailable on this device.');
-                errorBox.classList.remove('d-none');
+                errorBox.hidden = false;
             }
         });
         stopButton.addEventListener('click', stop);

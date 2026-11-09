@@ -2,17 +2,39 @@
 {% comment %}
 App releases workspace. Every policy/download/upload/delete POST form keeps its
 exact action, method, enctype, csrf token, field id/name, hx-* contract, confirm
-message and the #app-release-loading indicator. Presentation only: ad-* markup is
-replaced by the admin workspace primitives.
+message and the #app-release-loading indicator. Presentation only: Bootstrap
+controls are replaced by the workspace primitives (aw-input, aw-switch).
+
 The view projects only the release paginator and the two version policies, so
 the KPI grid shows the real build count and the current page. No adoption metric
 or update-enforcement value is invented; the policy explanation text is the
 existing server contract.
+
+Publish stays an in-card form on purpose: the prototype's "Publish build" button
+opens a drawer, and a drawer needs a fragment endpoint this app does not have, so
+no endpoint was invented.
 {% endcomment %}
 {% translate "Site & Apps" as page_eyebrow %}
 {% translate "App Releases" as page_title %}
+{% translate "Publish Android builds, enforce a minimum version, and control saving." as page_description %}
 <div id="content" class="aw-dashboard-page">
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+    <div class="aw-page-head aw-flex-wrap">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <button type="button" class="aw-btn aw-btn--primary aw-btn--sm"
+                    data-aw-drawer="{% url 'app-release-manage' %}?fragment=form"
+                    data-aw-drawer-title="{% translate 'Publish a new Android build' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <span>{% translate "Publish build" %}</span>
+            </button>
+            <noscript>
+                <a class="aw-btn aw-btn--ghost aw-btn--sm" href="?new=1">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                    <span>{% translate "Publish build" %}</span>
+                </a>
+            </noscript>
+        </div>
+    </div>
 
     <div class="aw-kpi-grid">
         <div class="aw-kpi">
@@ -43,7 +65,7 @@ existing server contract.
             </div>
         </div>
         <div class="aw-card-body aw-card-body--tight">
-            <div class="aw-alert aw-alert--info mb-0" role="note">
+            <div class="aw-alert aw-alert--info" role="note">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
                 <div>{% translate "Builds below the minimum are blocked (HTTP 426) until updated. Builds below the latest see an optional prompt. The update button opens the link below." %}</div>
             </div>
@@ -55,33 +77,34 @@ existing server contract.
             <div class="aw-form-section">
                 <div class="aw-form-section-head">
                     <div>
-                        <h3 class="text-capitalize">{{ platform }}</h3>
+                        <h3>{{ platform|capfirst }}</h3>
                     </div>
-                    <div class="form-check mb-0">
-                        <input class="form-check-input" type="checkbox" id="id_policy_{{ platform }}_enabled" name="policy_{{ platform }}_enabled" value="1"{% if policy.is_enabled %} checked{% endif %}>
-                        <label class="form-check-label" for="id_policy_{{ platform }}_enabled">{% translate "Versioning enabled" %}</label>
-                    </div>
+                    <label class="aw-switch">
+                        <input type="checkbox" id="id_policy_{{ platform }}_enabled" name="policy_{{ platform }}_enabled" value="1"{% if policy.is_enabled %} checked{% endif %}>
+                        <span class="aw-switch-track" aria-hidden="true"></span>
+                        <span>{% translate "Versioning enabled" %}</span>
+                    </label>
                 </div>
                 <div class="aw-form-grid">
                     <div class="aw-field">
                         <label for="id_policy_{{ platform }}_min_code">{% translate "Minimum code (force)" %}</label>
-                        <input id="id_policy_{{ platform }}_min_code" class="form-control" type="number" name="policy_{{ platform }}_min_code" min="0" value="{{ policy.min_version_code }}">
+                        <input id="id_policy_{{ platform }}_min_code" class="aw-input" type="number" name="policy_{{ platform }}_min_code" min="0" value="{{ policy.min_version_code }}">
                     </div>
                     <div class="aw-field">
                         <label for="id_policy_{{ platform }}_latest_code">{% translate "Latest code (optional)" %}</label>
-                        <input id="id_policy_{{ platform }}_latest_code" class="form-control" type="number" name="policy_{{ platform }}_latest_code" min="0" value="{{ policy.latest_version_code }}">
+                        <input id="id_policy_{{ platform }}_latest_code" class="aw-input" type="number" name="policy_{{ platform }}_latest_code" min="0" value="{{ policy.latest_version_code }}">
                     </div>
                     <div class="aw-field">
                         <label for="id_policy_{{ platform }}_min_name">{% translate "Minimum name" %}</label>
-                        <input id="id_policy_{{ platform }}_min_name" class="form-control" type="text" name="policy_{{ platform }}_min_name" maxlength="50" value="{{ policy.min_version_name }}" placeholder="1.2.0">
+                        <input id="id_policy_{{ platform }}_min_name" class="aw-input" type="text" name="policy_{{ platform }}_min_name" maxlength="50" value="{{ policy.min_version_name }}" placeholder="1.2.0">
                     </div>
                     <div class="aw-field">
                         <label for="id_policy_{{ platform }}_latest_name">{% translate "Latest name" %}</label>
-                        <input id="id_policy_{{ platform }}_latest_name" class="form-control" type="text" name="policy_{{ platform }}_latest_name" maxlength="50" value="{{ policy.latest_version_name }}" placeholder="1.3.0">
+                        <input id="id_policy_{{ platform }}_latest_name" class="aw-input" type="text" name="policy_{{ platform }}_latest_name" maxlength="50" value="{{ policy.latest_version_name }}" placeholder="1.3.0">
                     </div>
                     <div class="aw-field aw-span-2">
                         <label for="id_policy_{{ platform }}_update_url">{% translate "Update link (https)" %}</label>
-                        <input id="id_policy_{{ platform }}_update_url" class="form-control" type="url" name="policy_{{ platform }}_update_url" maxlength="2048" value="{{ policy.update_url }}" placeholder="https://">
+                        <input id="id_policy_{{ platform }}_update_url" class="aw-input" type="url" name="policy_{{ platform }}_update_url" maxlength="2048" value="{{ policy.update_url }}" placeholder="https://">
                     </div>
                 </div>
                 <div class="aw-form-actions">
@@ -100,7 +123,7 @@ existing server contract.
             </div>
         </div>
         <div class="aw-card-body aw-card-body--tight">
-            <div class="aw-alert aw-alert--info mb-0" role="note">
+            <div class="aw-alert aw-alert--info" role="note">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
                 <div>{% translate "Turn off a switch to hide the matching save buttons in the app and refuse new saves. Files already saved stay readable." %}</div>
             </div>
@@ -110,14 +133,16 @@ existing server contract.
             <input type="hidden" name="download_policy" value="1">
             <div class="aw-form-section">
                 <div class="aw-stack">
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="id_in_app_download_enabled" name="in_app_download_enabled" value="1"{% if download_policy.in_app_download_enabled %} checked{% endif %}>
-                        <label class="form-check-label" for="id_in_app_download_enabled">{% translate "Allow saving in the app (offline library)" %}</label>
-                    </div>
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="id_device_download_enabled" name="device_download_enabled" value="1"{% if download_policy.device_download_enabled %} checked{% endif %}>
-                        <label class="form-check-label" for="id_device_download_enabled">{% translate "Allow saving on the device (share / gallery downloads)" %}</label>
-                    </div>
+                    <label class="aw-switch">
+                        <input type="checkbox" id="id_in_app_download_enabled" name="in_app_download_enabled" value="1"{% if download_policy.in_app_download_enabled %} checked{% endif %}>
+                        <span class="aw-switch-track" aria-hidden="true"></span>
+                        <span>{% translate "Allow saving in the app (offline library)" %}</span>
+                    </label>
+                    <label class="aw-switch">
+                        <input type="checkbox" id="id_device_download_enabled" name="device_download_enabled" value="1"{% if download_policy.device_download_enabled %} checked{% endif %}>
+                        <span class="aw-switch-track" aria-hidden="true"></span>
+                        <span>{% translate "Allow saving on the device (share / gallery downloads)" %}</span>
+                    </label>
                 </div>
                 <div class="aw-form-actions">
                     <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Save download policy" %}</button>
@@ -126,46 +151,20 @@ existing server contract.
         </form>
     </section>
 
+    {% if show_form %}
     <section class="aw-card">
         <div class="aw-card-head">
             <div class="aw-card-title">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
                 <h3>{% translate "Publish a new Android build" %}</h3>
             </div>
-            <span id="app-release-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+            <span id="app-release-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
         </div>
-        <form method="post" action="{% url 'app-release-manage' %}" enctype="multipart/form-data" hx-post="{% url 'app-release-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
-            {% csrf_token %}
-            <div class="aw-form-section">
-                <div class="aw-form-grid">
-                    <div class="aw-field">
-                        <label for="id_version_name">{% translate "Version name" %}</label>
-                        <input id="id_version_name" class="form-control" type="text" name="version_name" maxlength="50" required placeholder="1.2.0">
-                    </div>
-                    <div class="aw-field">
-                        <label for="id_version_code">{% translate "Version code" %}</label>
-                        <input id="id_version_code" class="form-control" type="number" name="version_code" min="1" required placeholder="12">
-                    </div>
-                    <div class="aw-field">
-                        <label for="id_apk">{% translate "APK file" %}</label>
-                        <input id="id_apk" class="form-control" type="file" name="apk" accept=".apk" required>
-                    </div>
-                    <div class="aw-field">
-                        <label for="id_release_notes">{% translate "Release notes" %}</label>
-                        <input id="id_release_notes" class="form-control" type="text" name="release_notes" maxlength="2000">
-                    </div>
-                </div>
-                <div class="aw-form-actions">
-                    <button type="submit" class="aw-btn aw-btn--primary">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
-                        <span>{% translate "Publish" %}</span>
-                    </button>
-                </div>
-            </div>
-        </form>
+        {% include "partials/app_release_form_fields.html" %}
     </section>
+    {% endif %}
 
-    <div class="aw-table-card aw-table-wrap">
+    <section class="aw-card aw-table-card">
         <div class="aw-card-head">
             <div class="aw-card-title">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-mobile"></use></svg>
@@ -183,6 +182,7 @@ existing server contract.
                         <th scope="col">{% translate "Code" %}</th>
                         <th scope="col">{% translate "Size" %}</th>
                         <th scope="col">{% translate "Published" %}</th>
+                        <th scope="col">{% translate "Notes" %}</th>
                         <th scope="col">{% translate "Actions" %}</th>
                     </tr>
                 </thead>
@@ -192,9 +192,10 @@ existing server contract.
                         <td class="aw-cell-strong">{{ release.version_name }}</td>
                         <td class="aw-num">{{ release.version_code }}</td>
                         <td class="aw-num">{{ release.file_size|filesizeformat }}</td>
-                        <td class="aw-date">{{ release.created_at|date }}</td>
+                        <td class="aw-date">{{ release.created_at|date:"DATE_FORMAT" }}</td>
+                        <td>{% if release.release_notes %}<span class="aw-small aw-muted">{{ release.release_notes|truncatechars:80 }}</span>{% else %}<span class="aw-muted">-</span>{% endif %}</td>
                         <td>
-                            <div class="aw-flex aw-flex-wrap">
+                            <div class="aw-row-actions">
                                 <form method="post" action="{% url 'app-release-delete' release.pk %}" hx-post="{% url 'app-release-delete' release.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this app release?' %}">
                                     {% csrf_token %}
                                     <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete" %}</button>
@@ -213,5 +214,5 @@ existing server contract.
             {% include "partials/components/aw_empty.html" with icon="i-mobile" description=releases_empty_desc %}
         </div>
         {% endif %}
-    </div>
+    </section>
 </div>

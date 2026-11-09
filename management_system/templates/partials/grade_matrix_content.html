@@ -1,10 +1,21 @@
 {% load i18n %}
 {% comment %}
 Grades matrix workspace.
-Presentation only: level tabs, filters, matrix columns/cells, frozen identity
-column, XLSX link, pagination query and every HTMX hook are preserved.
-The page head is inlined because aw_page_head.html renders a server-built link
-list only and this view supplies no page_actions.
+Presentation only: level tabs, filter parameters, matrix columns/cells, frozen
+identity column, XLSX link, pagination query and every HTMX hook are preserved.
+
+Score tones are derived from the only value the view supplies per cell
+(`grade` out of `total`): the band is the integer percentage of that pair
+(80 and above = good, 60-79 = mid, below 60 = bad). A cell whose quiz has no
+total keeps the plain tone because no percentage exists. The legend below the
+matrix lists exactly those bands plus the not-submitted dash.
+
+Sticky sub-header: `.aw-matrix thead th` is `position: sticky; top: 0`, and this
+matrix has a two-row header (course groups, then quizzes), so the second row
+needs the height of the first as its offset. That offset is published by the
+`aw-th-subhead` class, whose stylesheet rule is scoped to
+`.aw-table thead th.aw-th-subhead`; it reaches this matrix only when the matrix
+table is added to that selector (see handoff). No inline offset remains.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
   {% translate "Reports" as page_eyebrow %}
@@ -13,7 +24,7 @@ list only and this view supplies no page_actions.
   <div class="aw-page-head aw-flex-wrap">
     {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
     <div class="aw-page-actions">
-      <span id="grades-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+      <span id="grades-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
       <a href="{% url 'export-grades-matrix-xlsx' %}?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}&amp;course={{ selected_course_id|default:'' }}&amp;name={{ name_value|urlencode }}" class="aw-btn aw-btn--primary aw-btn--sm">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
         <span>{% translate "Export XLSX" %}</span>
@@ -45,7 +56,7 @@ list only and this view supplies no page_actions.
     <span class="aw-ctx-sep" aria-hidden="true"></span>
     <span class="aw-ctx-item">
       <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
-      {% translate "Course filtered" %}
+      {% for course in course_options %}{% if selected_course_id == course.id %}{{ course.name }}{% endif %}{% endfor %}
     </span>
     {% endif %}
   </div>
@@ -66,37 +77,37 @@ list only and this view supplies no page_actions.
 
   <div class="aw-card aw-dashboard-filters">
     <div class="aw-card-body aw-card-body--tight">
-      <form method="get" class="aw-form-grid" hx-get="{% url 'grades-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#grades-loading">
-        <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
-        <div class="aw-field">
-          <label for="grade-matrix-search">{% translate "Search student" %}</label>
+      <div class="aw-filter-bar">
+        <form method="get" class="aw-table-tools" hx-get="{% url 'grades-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#grades-loading">
+          <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
+          <label class="visually-hidden" for="grade-matrix-search">{% translate "Search student" %}</label>
           <div class="aw-search-wrap">
             <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
             <input id="grade-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="aw-input aw-input--search" hx-preserve hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#grades-loading">
           </div>
-        </div>
-        <div class="aw-field">
-          <label for="grade-matrix-course">{% translate "Course offering" %}</label>
+          <label class="visually-hidden" for="grade-matrix-course">{% translate "Course offering" %}</label>
           <select id="grade-matrix-course" name="course" class="aw-select" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
             <option value="">{% translate "All courses" %}</option>
             {% for course in course_options %}
               <option value="{{ course.id }}"{% if selected_course_id == course.id %} selected{% endif %}>{{ course.name }}</option>
             {% endfor %}
           </select>
-        </div>
-        <div class="aw-field">
-          <label for="grade-matrix-year">{% translate "Academic year" %}</label>
+          <label class="visually-hidden" for="grade-matrix-year">{% translate "Academic year" %}</label>
           <select id="grade-matrix-year" name="academic_year" class="aw-select" hx-get="{% url 'grades-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#grades-loading">
             {% for year in years %}
               <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} - {% translate "Active" %}{% endif %}</option>
             {% endfor %}
           </select>
-        </div>
-        <div class="aw-span-2 aw-flex">
-          <button type="submit" class="aw-btn aw-btn--primary">{% translate "Apply" %}</button>
-          <a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="grade-matrix-search" class="aw-btn aw-btn--ghost">{% translate "Clear" %}</a>
-        </div>
-      </form>
+          <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
+            <span>{% translate "Apply" %}</span>
+          </button>
+          <a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="grade-matrix-search" class="aw-btn aw-btn--ghost aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+            <span>{% translate "Clear" %}</span>
+          </a>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -133,13 +144,13 @@ list only and this view supplies no page_actions.
           <tr>
             {% for course in matrix_courses %}
               {% for quiz in course.quizzes %}
-                <th scope="col" data-detail-col="true" style="top: 26px">
+                <th scope="col" class="aw-th-subhead" data-detail-col="true">
                   {{ quiz.name }}
                   <span class="aw-pill aw-pill--plain {% if quiz.type == 'final' %}aw-pill--gold{% else %}aw-pill--teal{% endif %}">{{ quiz.type_label }}</span>
                 </th>
               {% endfor %}
-              <th scope="col" style="top: 26px">{% translate "Weekly total" %}</th>
-              <th scope="col" style="top: 26px">{% translate "Final total" %}</th>
+              <th scope="col" class="aw-th-subhead">{% translate "Weekly total" %}</th>
+              <th scope="col" class="aw-th-subhead">{% translate "Final total" %}</th>
             {% endfor %}
           </tr>
         </thead>
@@ -153,14 +164,23 @@ list only and this view supplies no page_actions.
               {% for course in row.courses %}
                 {% for cell in course.quiz_cells %}
                   <td data-detail-cell="true">
-                    {% if cell.submitted %}<span class="aw-score">{{ cell.grade }}/{{ cell.total }}</span>{% else %}<span class="aw-score aw-score--none">-</span>{% endif %}
+                    {% if cell.submitted %}
+                      {% widthratio cell.grade cell.total 100 as cell_pct %}
+                      {% with pct=cell_pct|add:0 %}<span class="aw-score{% if cell.total %}{% if pct >= 80 %} aw-score--good{% elif pct >= 60 %} aw-score--mid{% else %} aw-score--bad{% endif %}{% endif %}">{{ cell.grade }}/{{ cell.total }}</span>{% endwith %}
+                    {% else %}<span class="aw-score aw-score--none">-</span>{% endif %}
                   </td>
                 {% endfor %}
                 <td>
-                  {% if course.weekly.has_grade %}<span class="aw-score">{{ course.weekly.earned }}/{{ course.weekly.total }}</span>{% else %}<span class="aw-score aw-score--none">-</span>{% endif %}
+                  {% if course.weekly.has_grade %}
+                    {% widthratio course.weekly.earned course.weekly.total 100 as weekly_pct %}
+                    {% with pct=weekly_pct|add:0 %}<span class="aw-score{% if course.weekly.total %}{% if pct >= 80 %} aw-score--good{% elif pct >= 60 %} aw-score--mid{% else %} aw-score--bad{% endif %}{% endif %}">{{ course.weekly.earned }}/{{ course.weekly.total }}</span>{% endwith %}
+                  {% else %}<span class="aw-score aw-score--none">-</span>{% endif %}
                 </td>
                 <td>
-                  {% if course.final.has_grade %}<span class="aw-score">{{ course.final.earned }}/{{ course.final.total }}</span>{% else %}<span class="aw-score aw-score--none">-</span>{% endif %}
+                  {% if course.final.has_grade %}
+                    {% widthratio course.final.earned course.final.total 100 as final_pct %}
+                    {% with pct=final_pct|add:0 %}<span class="aw-score{% if course.final.total %}{% if pct >= 80 %} aw-score--good{% elif pct >= 60 %} aw-score--mid{% else %} aw-score--bad{% endif %}{% endif %}">{{ course.final.earned }}/{{ course.final.total }}</span>{% endwith %}
+                  {% else %}<span class="aw-score aw-score--none">-</span>{% endif %}
                 </td>
               {% endfor %}
             </tr>
@@ -179,12 +199,19 @@ list only and this view supplies no page_actions.
       <span class="aw-pill aw-pill--teal">{% translate "Weekly assessment" %}</span>
       <span class="aw-pill aw-pill--gold">{% translate "Final assessment" %}</span>
       <span class="aw-pill aw-pill--muted">{% translate "Not submitted" %}</span>
-      <span class="aw-ms-auto aw-small aw-muted">{% translate "The student name column stays fixed while the matrix scrolls." %}</span>
+      <span class="aw-flex aw-flex-wrap aw-ms-auto">
+        <span class="aw-small aw-muted">{% translate "Grade" %}</span>
+        <span class="aw-score aw-score--good">80%+</span>
+        <span class="aw-score aw-score--mid">60-79%</span>
+        <span class="aw-score aw-score--bad">&lt;60%</span>
+        <span class="aw-score aw-score--none">-</span>
+        <span class="aw-small aw-muted">{% translate "The student name column stays fixed while the matrix scrolls." %}</span>
+      </span>
     </div>
   </section>
 
   {% translate "Grades matrix pagination" as pagination_aria_label %}
-  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#grades-loading" %}
+  {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="aw-table-foot--spaced" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#grades-loading" %}
 
 <script>
   (() => {

@@ -1015,6 +1015,30 @@ def telegram_broadcasts(request):
     }
     if request.GET.get("fragment") == "1":
         return render(request, "partials/telegram_broadcast_list.html", context)
+
+    # Drawer fragment: one broadcast peek for the shared drawer. A direct browser
+    # hit returns to the list instead of rendering a bare fragment.
+    if request.GET.get("fragment") == "broadcast":
+        if request.headers.get("HX-Request") != "true":
+            return redirect("telegram-broadcasts")
+        raw_id = request.GET.get("id", "")
+        if not raw_id.isdigit():
+            return HttpResponse(status=404)
+        broadcast = (
+            TelegramBroadcast.objects.select_related("academic_year", "level", "created_by")
+            .filter(pk=int(raw_id))
+            .first()
+        )
+        if broadcast is None:
+            return HttpResponse(status=404)
+        return render(request, "partials/drawer/broadcast_peek.html", {
+            "broadcast": broadcast,
+            "detail_url": reverse("telegram-broadcast-detail", args=[broadcast.pk]),
+            "target_label": (
+                broadcast.level.display_name if broadcast.level else _("All active students")
+            ),
+        })
+
     return render_page(request, "telegram_broadcasts.html", "partials/telegram_broadcasts_content.html", context)
 
 

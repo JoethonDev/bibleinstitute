@@ -9,7 +9,7 @@ are unchanged.
 {% endcomment %}
 <div>
     {% if not is_root %}
-    <div class="mb-3">
+    <div class="aw-mb-3">
         <button type="button"
                 class="aw-btn aw-btn--ghost aw-btn--sm"
                 hx-get="{% if parent_folder %}{% url 'navigate-folder' parent_folder %}{% else %}{% url 'navigate-folder-root' %}{% endif %}{% if folders_only %}?folders_only=true{% endif %}"
@@ -28,7 +28,7 @@ are unchanged.
         <div class="col">
             {% if data.type == 'folder' and data.id %}
             <div class="aw-folder-card">
-                <div class="is-clickable p-1"
+                <div class="is-clickable aw-p-1"
                      role="button"
                      tabindex="0"
                      hx-get="{% url 'navigate-folder' data.id %}{% if folders_only %}?folders_only=true{% endif %}"
@@ -37,10 +37,10 @@ are unchanged.
                      hx-target="#drive-files">
                     <svg class="aw-ico aw-ico--lg" aria-hidden="true"><use href="#i-folder"></use></svg>
                 </div>
-                <b class="card-title mb-0 text-break" title="{{ data.name }}">{{ data.name }}</b>
+                <b class="card-title aw-m-0 aw-break" title="{{ data.name }}">{{ data.name }}</b>
             </div>
             {% else %}
-            <div class="aw-file-card card-body text-center">
+            <div class="aw-file-card card-body aw-ta-c">
                 <div class="aw-file-icon file-icon mx-auto"
                      data-id="{{ data.id }}"
                      @click="addFile($event)"
@@ -54,7 +54,7 @@ are unchanged.
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
                     {% endif %}
                 </div>
-                <b class="card-title mb-0 mt-2 text-break" title="{{ data.name }}">{{ data.name }}</b>
+                <b class="card-title aw-m-0 aw-mt-2 aw-break" title="{{ data.name }}">{{ data.name }}</b>
             </div>
             {% endif %}
         </div>

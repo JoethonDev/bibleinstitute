@@ -1157,48 +1157,49 @@ def _admin_panel_today_context(request, shared_context):
         can_grade=can_grade(user),
     )
     metrics = shared_context.get("admin_metrics", {})
+    queue_by_key = {queue["key"]: queue for queue in today_context["queues"]}
+
+    def _queue_kpi(key, label, icon, tone, meta):
+        queue = queue_by_key.get(key)
+        return {
+            "key": key,
+            "label": label,
+            "value": queue["count"] if queue else 0,
+            "icon": icon,
+            "tone": tone,
+            "meta": meta,
+            "url": queue["url"] if queue else None,
+        }
+
+    # Decision cockpit, as in the prototype: the first four tiles are the live
+    # queues an operator acts on, not content inventory. Values come from the
+    # bounded queue counts already built above.
     today_kpis = [
+        _queue_kpi("applications", _("Pending applications"), "i-file", "amber",
+                   _("Waiting on a decision")),
+        _queue_kpi("media", _("Failed media jobs"), "i-upload", "red",
+                   _("Need a retry")),
+        _queue_kpi("grading", _("Ungraded answers"), "i-check-square", "blue",
+                   _("Waiting for a grade")),
+        _queue_kpi("support", _("Unread Telegram"), "i-message", "teal",
+                   _("Unanswered conversations")),
         {
             "key": "active_students",
             "label": _("Active students"),
             "value": today_context["stats"]["active_students"],
             "icon": "i-users",
-            "tone": "teal",
+            "tone": "green",
+            "meta": _("Across all levels"),
+            "url": None,
         },
         {
             "key": "attendance_today",
             "label": _("Attendance today"),
             "value": shared_context.get("today_attendance", 0),
             "icon": "i-check-square",
-            "tone": "blue",
-        },
-        {
-            "key": "courses",
-            "label": _("Courses"),
-            "value": metrics.get("courses", 0),
-            "icon": "i-book",
             "tone": "gold",
-        },
-        {
-            "key": "lessons",
-            "label": _("Lessons"),
-            "value": metrics.get("lessons", 0),
-            "icon": "i-video",
-            "tone": "green",
-        },
-        {
-            "key": "quizzes",
-            "label": _("Quizzes"),
-            "value": metrics.get("quizzes", 0),
-            "icon": "i-check-square",
-            "tone": "violet",
-        },
-        {
-            "key": "offerings",
-            "label": _("Offerings"),
-            "value": metrics.get("offerings", 0),
-            "icon": "i-layers",
-            "tone": "teal",
+            "meta": _("Scans recorded today"),
+            "url": reverse("attendance-management"),
         },
     ]
     actions = [
@@ -2311,9 +2312,14 @@ def regrade_quiz_question(request, quiz_id, question_id):
 @capability_required(can_manage_academic_setup)
 def recalculate_quizzes(request):
     if request.method == "GET":
+        # Discovery resumes a job that is still running for this operator. A
+        # finished job must not be re-advertised: doing so replayed its final
+        # status message on every page load, even when the operator had not
+        # started anything in that browser session.
         jobs = QuizOperationJob.objects.filter(actor=request.user)
-        job = jobs.filter(status__in=[QuizOperationJob.Status.QUEUED, QuizOperationJob.Status.RUNNING]).order_by("created_at").first()
-        job = job or jobs.order_by("-created_at").first()
+        job = jobs.filter(
+            status__in=[QuizOperationJob.Status.QUEUED, QuizOperationJob.Status.RUNNING]
+        ).order_by("created_at").first()
         response = JsonResponse({"status_url": reverse("quiz-recalculation-status", args=[job.pk]) if job else None})
         response["Cache-Control"] = "no-store"
         return response
@@ -3244,8 +3250,34 @@ def media_processing_status(request):
     queryset = MediaProcessingJob.objects.select_related("lesson", "created_by").order_by("-created_at", "-pk")
     if getattr(getattr(request.user, "role", None), "role", None) != "admin":
         queryset = queryset.filter(created_by=request.user)
-    if status_filter:
-        queryset = queryset.filter(status=status_filter)
+
+    # Drawer fragment: one job peek for the shared right-hand drawer. The
+    # trigger keeps a full-page fallback, and this endpoint applies the same
+    # actor scoping as the list.
+    if request.GET.get("fragment") == "job":
+        from uuid import UUID
+
+        # A direct browser hit renders the owning page instead of a bare
+        # fragment; only the drawer's fetch carries the HTMX marker.
+        if request.headers.get("HX-Request") != "true":
+            return redirect("media-processing-status")
+        try:
+            job_uuid = UUID(request.GET.get("job", "").strip())
+        except ValueError:
+            return HttpResponse(status=404)
+        job = MediaProcessingJob.objects.select_related("lesson", "created_by").filter(
+            public_id=job_uuid
+        ).first()
+        if job is None or (
+            getattr(getattr(request.user, "role", None), "role", None) != "admin"
+            and job.created_by_id != request.user.pk
+        ):
+            return HttpResponse(status=404)
+        for key, value in _media_job_ui_state(job, now=timezone.now()).items():
+            setattr(job, key, value)
+        job.cleanup_error_message = _media_cleanup_error(job)
+        return render(request, "partials/drawer/media_job_detail.html", {"job": job})
+
     if search:
         queryset = queryset.filter(
             normalized_contains_q(
@@ -3253,6 +3285,14 @@ def media_processing_status(request):
                 search,
             )
         )
+    # KPI strip scope: the actor's jobs under the current search, before the
+    # status filter narrows it. One aggregate statement for the whole strip.
+    status_counts = {
+        row["status"]: row["count"]
+        for row in queryset.order_by().values("status").annotate(count=Count("pk"))
+    }
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
     paginator = Paginator(queryset, 25)
     jobs_page = paginator.get_page(request.GET.get("page", "1"))
     now = timezone.now()
@@ -3260,8 +3300,44 @@ def media_processing_status(request):
         for key, value in _media_job_ui_state(job, now=now).items():
             setattr(job, key, value)
         job.cleanup_error_message = _media_cleanup_error(job)
+    media_kpis = [
+        {
+            "key": "queued",
+            "label": _("Queued"),
+            "value": status_counts.get("queued", 0),
+            "icon": "i-clock",
+            "tone": "amber",
+        },
+        {
+            "key": "processing",
+            "label": _("Processing"),
+            "value": sum(
+                status_counts.get(key, 0)
+                for key in ("processing", "uploading", "verifying")
+            ),
+            "icon": "i-refresh",
+            "tone": "blue",
+        },
+        {
+            "key": "completed",
+            "label": _("Completed"),
+            "value": status_counts.get("succeeded", 0),
+            "icon": "i-check",
+            "tone": "green",
+        },
+        {
+            "key": "failed",
+            "label": _("Failed"),
+            "value": status_counts.get("failed", 0),
+            "icon": "i-alert",
+            "tone": "red",
+        },
+    ]
     return render_page(request, "media_processing_status.html", "partials/media_processing_status_content.html", {
         "jobs_page": jobs_page,
+        "status_counts": status_counts,
+        "total_count": sum(status_counts.values()),
+        "media_kpis": media_kpis,
         "pagination_query": pagination_query_string(request),
         "status_choices": MediaProcessingStatus.choices,
         "status_labels_json": json.dumps(
@@ -3545,10 +3621,26 @@ def promotion_formula(request):
             .first()
         )
 
+    # Scope size for the context strip: distinct students with an active
+    # enrollment in the selected scope, the same notion of "scope students"
+    # the attendance matrix uses.
+    scope_student_count = 0
+    if selected_scope is not None:
+        scope_student_count = (
+            Enrollment.objects.filter(
+                course_offering__academic_year_level=selected_scope,
+                status=Enrollment.Status.ACTIVE,
+            )
+            .values("student_id")
+            .distinct()
+            .count()
+        )
+
     return render_page(request, "promotion_evaluation.html", "partials/promotion_evaluation_content.html", {
         "formula_form": formula_form,
         "rule_formset": rule_formset,
         "selected_scope": selected_scope,
+        "scope_student_count": scope_student_count,
         "selected_offering": selected_offering,
         "selected_offering_id": selected_offering.pk if selected_offering else None,
         "promotion_job": promotion_job,
@@ -3903,7 +3995,7 @@ def create_quiz(request):
             "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
             "question_types" : Question.QUESTION_TYPES,
             "questions" : [],
-            "duration_minutes": 60,
+            "duration_minutes": 0,
             "application_timezone": timezone_name(),
             "content_status" : PublicationStatus.DRAFT,
             "content_status_display" : PublicationStatus.DRAFT.label,
@@ -3927,7 +4019,7 @@ def create_quiz(request):
             opening_date = parse_application_datetime(quiz.get("opening_date", ""))
             closing_date = parse_application_datetime(quiz.get("closing_date", ""))
             duration_minutes = Quiz._meta.get_field("duration_minutes").clean(
-                quiz.get("duration_minutes", 60), None
+                quiz.get("duration_minutes", 0), None
             )
             
             offering_id = request.POST.get("course_offering")
@@ -4079,7 +4171,7 @@ def update_quiz(request, quiz_id):
             requested_opening_date = parse_application_datetime(quiz_data['opening_date'])
             requested_closing_date = parse_application_datetime(quiz_data['closing_date'])
             requested_duration_minutes = Quiz._meta.get_field("duration_minutes").clean(
-                quiz_data.get("duration_minutes", 60), None
+                quiz_data.get("duration_minutes", 0), None
             )
             if requested_closing_date <= requested_opening_date:
                 raise ValidationError(_("Closing date must be after opening date."))
@@ -4650,18 +4742,23 @@ def submission_user(request, quiz_id, user_id):
         if not submissions:
             return HttpResponse(_("Not Found!"), 404)
         questions = [submission.serialize() for submission in submissions]
+        # Admin-only surface: its own template, so the student exam shell never
+        # has to be reused (or changed) for management grading.
+        grade_student = grade.user
+        student_label = (
+            grade_student.get_full_name() or grade_student.username
+        )
 
-        return render(request, "display_quiz.html", {
-            "quiz_name" : quiz.name,
-            "username" : request.user.username,
-            "questions" : questions,
-            "is_student" : False,
+        return render(request, "submission_detail.html", {
+            "quiz_name": quiz.name,
+            "username": student_label,
+            "questions": questions,
+            "is_student": False,
             "can_correct_grade": can_manage_academic_setup(request.user),
-            "mode" : "view",
-            "extended_view" : "admin_panel.html",
-            "id" : "content",
-            "total_grade" : grade.total_grade,
-            "back_url" : reverse("submission-dashboard", args=[quiz_id,])
+            "mode": "view",
+            "id": "content",
+            "total_grade": grade.total_grade,
+            "back_url": reverse("submission-dashboard", args=[quiz_id, ]),
         })
     
     elif request.method == "POST":
@@ -7582,11 +7679,20 @@ def regenerate_qr(request, user_id):
 
 @capability_required(can_scan_attendance)
 def scanner(request):
+    # Bounded recent-activity feed so the scanner page has real "last scan"
+    # context instead of static copy. Six rows, one query.
+    recent_scans = list(
+        AttendanceRecord.objects.select_related("student")
+        .order_by("-scanned_at", "-pk")[:6]
+    )
     return render_page(
         request,
         "scanner.html",
         "partials/scanner_content.html",
-        {},
+        {
+            "recent_scans": recent_scans,
+            "last_scan": recent_scans[0] if recent_scans else None,
+        },
     )
 
 @capability_required(can_scan_attendance)
@@ -7755,6 +7861,55 @@ def attendance_management(request):
         policy=policy,
     )
 
+    # KPI strip: two bounded aggregates over the filtered scope, not the page.
+    meeting_dates = [meeting.date for meeting in meetings]
+    scanned_student_count = 0
+    if meeting_dates:
+        scanned_student_count = (
+            AttendanceRecord.objects.filter(
+                attendance_date__in=meeting_dates,
+                student_id__in=students.values("pk"),
+            )
+            .values("student_id")
+            .distinct()
+            .count()
+        )
+    total_students = page_obj.paginator.count
+    attendance_kpis = [
+        {
+            "key": "students",
+            "label": _("Students"),
+            "value": total_students,
+            "icon": "i-users",
+            "tone": "teal",
+            "meta": _("In this scope"),
+        },
+        {
+            "key": "scanned",
+            "label": _("Scanned"),
+            "value": scanned_student_count,
+            "icon": "i-check-square",
+            "tone": "green",
+            "meta": _("At least one scan"),
+        },
+        {
+            "key": "not_scanned",
+            "label": _("Not scanned"),
+            "value": max(0, total_students - scanned_student_count),
+            "icon": "i-alert",
+            "tone": "amber",
+            "meta": _("No scan recorded"),
+        },
+        {
+            "key": "meetings",
+            "label": _("Meetings"),
+            "value": len(meetings),
+            "icon": "i-calendar",
+            "tone": "blue",
+            "meta": _("In this window"),
+        },
+    ]
+
     selected_date = date_from if date_from == date_to else ""
     level_counts = {
         scope.pk: attendance_matrix_student_queryset(
@@ -7804,8 +7959,8 @@ def attendance_management(request):
         "matrix_rows": matrix_rows,
         "meetings": meetings,
         "meeting_count": len(meetings),
-        "matrix_column_count": (len(meetings) * 4) + 6,
         "student_count": page_obj.paginator.count,
+        "attendance_kpis": attendance_kpis,
         "policy": policy,
         "policy_form": AttendancePolicyForm(instance=policy),
         "today": timezone.localdate(),

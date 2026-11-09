@@ -1,5 +1,15 @@
 {% load i18n aw_ui %}
 {% aw_capabilities as caps %}
+{% comment %}
+Admin lesson editor in the workspace language. The form contract is unchanged:
+the same #content Alpine root (autoSave + lessonForm), the same media part field
+names (videos, videos_name, files_type, part_groups, download_ids) and ordering
+hooks (.video-container, .part-group-input, .part-badge, .download-key-field),
+the same #videos-input / #lectures-display / #drive-files targets, the same HTMX
+page navigation and the same plain POST. The editor form wraps the page head so
+the primary save stays the same form submit while sitting in the head actions.
+The publish checklist is still a server-rendered snapshot.
+{% endcomment %}
 <div id="content" class="aw-dashboard-page"
      data-form-errors="{{ has_form_errors|yesno:'true,false' }}"
      data-draft-saved="{{ draft_saved|yesno:'true,false' }}"
@@ -18,263 +28,309 @@
      x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
 
-    {% translate "Curriculum" as page_eyebrow %}
-    {% translate "Author lessons, attach media and control publication." as page_description %}
-    {% if is_edit %}{% translate "Edit Lesson" as page_title %}{% else %}{% translate "Create New Lesson" as page_title %}{% endif %}
-    <div class="aw-page-head">
-        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
-        <div class="aw-page-actions">
-            <a href="{% url 'lesson-dashboard' %}"
-               hx-get="{% url 'lesson-dashboard' %}"
-               hx-select="#page-region"
-               hx-push-url="true"
-               hx-target="#display-page"
-               class="aw-btn aw-btn--ghost">
-                <i class="fas fa-arrow-left me-2" aria-hidden="true"></i>
-                {% translate "Back to lessons" %}
-            </a>
-        </div>
-    </div>
-
-    <!-- Auto-save Indicator: draft saved -->
-    <div class="aw-alert aw-alert--success" x-show="lastSaved" x-transition.opacity>
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
-    </div>
-
-    <!-- Auto-save Indicator: saving -->
-    <div class="aw-alert aw-alert--info" x-show="isSaving" x-transition.opacity>
-        <div class="spinner-border spinner-border-sm" role="status">
-            <span class="visually-hidden">{% translate "Saving..." %}</span>
-        </div>
-        <span>{% translate "Saving draft..." %}</span>
-    </div>
-
-    <form action="" method="post" class="admin-form" x-data="formValidation()" @submit="handleSubmit($event)" @htmx:finally:request.window="submitting = false" novalidate hx-post="" hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
+    <form id="aw-lesson-editor-form"
+          action=""
+          method="post"
+          x-data="formValidation()"
+          @submit="handleSubmit($event)"
+          @htmx:finally:request.window="submitting = false"
+          novalidate
+          hx-post=""
+          hx-target="#display-page"
+          hx-select="#page-region"
+          hx-select-oob="#toast-stack"
+          hx-push-url="true">
         {% csrf_token %}
-        {% if editor_form.errors %}
-        <div class="aw-alert aw-alert--danger" role="alert">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-            <div>
-                {% for field in editor_form %}{% for message in field.errors %}<div>{{ field.label }}: {{ message }}</div>{% endfor %}{% endfor %}
-                {% for message in editor_form.non_field_errors %}<div>{{ message }}</div>{% endfor %}
+
+        {% translate "Curriculum" as page_eyebrow %}
+        {% translate "Author lessons, attach media and control publication." as page_description %}
+        {% if is_edit %}{% translate "Edit Lesson" as page_title %}{% else %}{% translate "Create New Lesson" as page_title %}{% endif %}
+        <div class="aw-page-head">
+            {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+            <div class="aw-page-actions">
+                <span class="aw-flex aw-small aw-muted" x-show="isSaving" x-cloak>
+                    <span class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">{% translate "Saving..." %}</span>
+                    </span>
+                    <span>{% translate "Saving draft..." %}</span>
+                </span>
+                <span class="aw-flex aw-small aw-muted" x-show="!isSaving && lastSaved" x-cloak aria-live="polite">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
+                </span>
+                <a href="{% url 'lesson-dashboard' %}"
+                   hx-get="{% url 'lesson-dashboard' %}"
+                   hx-select="#page-region"
+                   hx-push-url="true"
+                   hx-target="#display-page"
+                   class="aw-btn aw-btn--ghost">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></use></svg>
+                    <span>{% translate "Back to lessons" %}</span>
+                </a>
+                <button type="submit"
+                        class="aw-btn aw-btn--primary"
+                        :disabled="submitting"
+                        aria-label="{% translate 'Save' %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <span x-show="!submitting">{% translate "Save" %}</span>
+                    <span x-show="submitting" x-cloak>{% translate "Submitting..." %}</span>
+                </button>
             </div>
         </div>
-        {% endif %}
 
         <div class="aw-editor-grid">
-            <section class="aw-card">
+            <div class="aw-stack aw-stack--lg">
+                {% if editor_form.errors %}
+                <div class="aw-alert aw-alert--danger" role="alert">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                    <div>
+                        {% for field in editor_form %}{% for message in field.errors %}<div>{{ field.label }}: {{ message }}</div>{% endfor %}{% endfor %}
+                        {% for message in editor_form.non_field_errors %}<div>{{ message }}</div>{% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Lesson Details Section -->
-                <div class="aw-form-section">
-                    <div class="aw-form-section-head">
-                        <div>
-                            <h3>
-                                <i class="fas fa-info-circle me-2" aria-hidden="true"></i>
-                                {% translate "Lesson Details" %}
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div class="aw-form-grid">
-                        <!-- Lesson Name -->
-                        <div class="aw-field" @focusout="validateField($event)">
-                            <label for="lesson_name">
-                                {% translate "Lesson Name" %}
-                                <span class="aw-req" aria-hidden="true">*</span>
-                            </label>
-                            <input type="text"
-                                   class="aw-input"
-                                   id="lesson_name"
-                                   name="lesson_name"
-                                   required
-                                   value="{{ lesson_name }}"
-                                   placeholder="{% translate 'Enter lesson name' %}">
-                            <div class="invalid-feedback">
-                                {% translate "Please enter a lesson name" %}
+                <section class="aw-card" aria-labelledby="aw-lesson-details-heading">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                            <div>
+                                <h3 id="aw-lesson-details-heading">{% translate "Lesson Details" %}</h3>
                             </div>
                         </div>
-
-                        <!-- Course Offering (determines course and level) -->
-                        <div class="aw-field">
-                            <label for="course_offering">
-                                {% translate "Course Offering" %}
-                                <span class="aw-req" aria-hidden="true">*</span>
-                            </label>
-                            <select class="aw-select" id="course_offering" name="course_offering" required>
-                                <option value="">{% translate "Select Course Offering" %}</option>
-                                {% for group in offering_groups %}
-                                <optgroup label="{{ group.label }}">
-                                    {% for offering in group.options %}
-                                    <option value="{{ offering.value }}" {% if offering.value == selected_offering_id|stringformat:'s' %}selected{% endif %}>{{ offering.label }}</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endfor %}
-                            </select>
-                            <div class="aw-field-hint">{% translate "The offering determines the course, level, and academic year." %}</div>
-                        </div>
-
-                        <!-- Lesson Description (optional) -->
-                        <div class="aw-field aw-span-2">
-                            <label for="lesson-description">
-                                {% translate "Lesson Description" %}
-                            </label>
-                            <textarea class="aw-textarea"
-                                      id="lesson-description"
-                                      name="description"
-                                      rows="4"
-                                      placeholder="{% translate 'Enter lesson description' %}">{{ lesson_description|default:"" }}</textarea>
-                            <div class="aw-field-hint">{% translate "Optional short description shown for this lesson." %}</div>
-                        </div>
-
-                        <!-- Opening date -->
-                        <div class="aw-field">
-                            <label for="opening_date">{% translate "Available from" %}</label>
-                            <input type="datetime-local"
-                                   class="aw-input"
-                                   id="opening_date"
-                                   name="opening_date"
-                                   value="{{ opening_date }}">
-                            <div class="aw-field-hint">{% translate "Leave blank to make this lesson available as soon as it is published." %} {% blocktranslate with timezone=application_timezone %}Scheduled times use {{ timezone }}.{% endblocktranslate %}</div>
-                        </div>
-
-                        <!-- Publication Status -->
-                        <div class="aw-field">
-                            <label for="lesson-status">{% translate "Status" %}</label>
-                            <select class="aw-select" id="lesson-status" name="status" required>
-                                {% for status_value, status_label in publication_statuses %}
-                                <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Drive Files Section. The legacy wrapper keeps the bounded
-                     scroll contract for the picker; #drive-files stays the HTMX
-                     folder-swap target. -->
-                <div class="aw-form-section lesson-editor__drive">
-                    <div class="aw-form-section-head">
-                        <div>
-                            <h3>
-                                <i class="fas fa-cloud me-2" aria-hidden="true"></i>
-                                {% translate "Select Files from Drive" %}
-                            </h3>
-                        </div>
-                    </div>
-                    <div id="drive-files">
-                        {% include 'drive_files.html' %}
-                    </div>
-                </div>
-
-                <!-- Selected Lectures / media parts -->
-                <div class="aw-form-section">
-                    <div class="aw-form-section-head">
-                        <div>
-                            <h3>
-                                <i class="fas fa-list me-2" aria-hidden="true"></i>
-                                {% translate "Selected Lectures" %}
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div id="lectures-display">
-                        <div id="videos-input" class="d-flex flex-column">
-                            {% for video in videos %}
-                            <div class="video-container mb-3 aw-part-card">
-                                <input type="hidden" name="videos" value="{{ video.id }}">
-                                <input type="hidden" name="videos_name" value="{{ video.name }}">
-                                <div class="aw-part-head">
-                                    {% if video.file_type == "audio" %}
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-audio"></use></svg>
-                                    {% elif video.file_type == "book" %}
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
-                                    {% else %}
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
-                                    {% endif %}
-                                    <b class="text-break">{{ video.name }}</b>
-                                    <span class="aw-pill aw-pill--muted part-badge flex-shrink-0"
-                                          {% if not video.part_number %}hidden{% endif %}>{% translate "Part" %} {{ video.part_number }}</span>
-                                    <button type="button"
-                                            class="aw-btn aw-btn--ghost aw-btn--sm ms-auto"
-                                            @click="moveUp($event)"
-                                            title="{% translate 'Move up' %}">
-                                        <i class="fas fa-arrow-up" aria-hidden="true"></i>
-                                    </button>
-                                    <button type="button"
-                                            class="aw-btn aw-btn--ghost aw-btn--sm"
-                                            @click="moveDown($event)"
-                                            title="{% translate 'Move down' %}">
-                                        <i class="fas fa-arrow-down" aria-hidden="true"></i>
-                                    </button>
-                                    <button type="button"
-                                            class="btn-close"
-                                            @click="removeFile($event)"
-                                            aria-label="{% translate 'Close' %}"></button>
-                                </div>
-                                <div class="aw-part-body">
-                                    <select name="files_type" class="aw-select"
-                                            @change="toggleDownloadInput($event)">
-                                        <option value="video" {% if video.file_type == "video" %}selected{% endif %}>
-                                            {% translate "Video" %}
-                                        </option>
-                                        <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>
-                                            {% translate "Audio Recording" %}
-                                        </option>
-                                        <option value="book" {% if video.file_type == "book" %}selected{% endif %}>
-                                            {% translate "Book" %}
-                                        </option>
-                                    </select>
-                                    <div class="download-key-field mt-2{% if video.file_type != 'audio' %} d-none{% endif %}">
-                                        <label class="form-label small mb-1">{% translate "Download" %}</label>
-                                        <input type="text" name="download_ids"
-                                               class="aw-input download-key-input"
-                                               value="{% if video.file_type == 'audio' %}{{ video.download_key|default:'' }}{% else %}{{ video.download_id|default:'' }}{% endif %}"
-                                               placeholder="Downloadable Files/name.mp3"
-                                               aria-label="{% translate 'Download' %}">
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2 mt-2">
-                                        <label class="form-label small mb-0">{% translate "Part" %}</label>
-                                        <input type="number" min="1" name="part_groups"
-                                               class="aw-input part-group-input"
-                                               style="max-width:6rem"
-                                               value="{% if video.part_number %}{{ video.part_number }}{% endif %}"
-                                               @input="reindexParts()"
-                                               aria-label="{% translate 'Part' %}">
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="aw-flex">
+                            {% for status_value, status_label in publication_statuses %}
+                            {% if status_value == content_status %}
+                            <span class="aw-pill {% if status_value == 'published' %}aw-pill--green{% elif status_value == 'draft' %}aw-pill--amber{% else %}aw-pill--muted{% endif %}">{{ status_label }}</span>
+                            {% endif %}
                             {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="aw-card-body">
+                        <div class="aw-form-grid">
+                            <!-- Lesson Name -->
+                            <div class="aw-field" @focusout="validateField($event)">
+                                <label for="lesson_name">
+                                    {% translate "Lesson Name" %}
+                                    <span class="aw-req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="text"
+                                       class="aw-input"
+                                       id="lesson_name"
+                                       name="lesson_name"
+                                       required
+                                       value="{{ lesson_name }}"
+                                       placeholder="{% translate 'Enter lesson name' %}">
+                                <div class="invalid-feedback">
+                                    {% translate "Please enter a lesson name" %}
+                                </div>
+                            </div>
+
+                            <!-- Course Offering (determines course and level) -->
+                            <div class="aw-field">
+                                <label for="course_offering">
+                                    {% translate "Course Offering" %}
+                                    <span class="aw-req" aria-hidden="true">*</span>
+                                </label>
+                                <select class="aw-select" id="course_offering" name="course_offering" required>
+                                    <option value="">{% translate "Select Course Offering" %}</option>
+                                    {% for group in offering_groups %}
+                                    <optgroup label="{{ group.label }}">
+                                        {% for offering in group.options %}
+                                        <option value="{{ offering.value }}" {% if offering.value == selected_offering_id|stringformat:'s' %}selected{% endif %}>{{ offering.label }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endfor %}
+                                </select>
+                                <div class="aw-field-hint">{% translate "The offering determines the course, level, and academic year." %}</div>
+                            </div>
+
+                            <!-- Lesson Description (optional) -->
+                            <div class="aw-field aw-span-2">
+                                <label for="lesson-description">
+                                    {% translate "Lesson Description" %}
+                                </label>
+                                <textarea class="aw-textarea"
+                                          id="lesson-description"
+                                          name="description"
+                                          rows="4"
+                                          placeholder="{% translate 'Enter lesson description' %}">{{ lesson_description|default:"" }}</textarea>
+                                <div class="aw-field-hint">{% translate "Optional short description shown for this lesson." %}</div>
+                            </div>
+
+                            <!-- Opening date -->
+                            <div class="aw-field">
+                                <label for="opening_date">{% translate "Available from" %}</label>
+                                <input type="datetime-local"
+                                       class="aw-input"
+                                       id="opening_date"
+                                       name="opening_date"
+                                       value="{{ opening_date }}">
+                                <div class="aw-field-hint">{% translate "Leave blank to make this lesson available as soon as it is published." %} {% blocktranslate with timezone=application_timezone %}Scheduled times use {{ timezone }}.{% endblocktranslate %}</div>
+                            </div>
+
+                            <!-- Publication Status -->
+                            <div class="aw-field">
+                                <label for="lesson-status">{% translate "Status" %}</label>
+                                <select class="aw-select" id="lesson-status" name="status" required>
+                                    {% for status_value, status_label in publication_statuses %}
+                                    <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Media parts. One card per attached media link; cards sharing a
+                     part number are saved as one part. The Drive browser lives in
+                     the collapsible below the list and keeps #drive-files as its
+                     HTMX folder-swap target. -->
+                <section class="aw-card" aria-labelledby="aw-media-parts-heading">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                            <div>
+                                <h3 id="aw-media-parts-heading">{% translate "Media parts" %}</h3>
+                                <p>{% translate "Files sharing a part number are grouped into one part." %}</p>
+                            </div>
+                        </div>
+                        <a class="aw-btn aw-btn--primary" href="#drive-files">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                            <span>{% translate "Add part" %}</span>
+                        </a>
+                    </div>
+
+                    <div class="aw-card-body">
+                        <div id="lectures-display">
+                            <div id="videos-input">
+                                {% for video in videos %}
+                                <div class="video-container aw-part-card">
+                                    <input type="hidden" name="videos" value="{{ video.id }}">
+                                    <input type="hidden" name="videos_name" value="{{ video.name }}">
+                                    <div class="aw-part-head">
+                                        <span class="aw-pill aw-pill--muted part-badge"
+                                              {% if not video.part_number %}hidden{% endif %}>{% translate "Part" %} {{ video.part_number }}</span>
+                                        <span class="aw-tag">
+                                            {% if video.file_type == "audio" %}{% translate "Audio Recording" %}{% elif video.file_type == "book" %}{% translate "Book" %}{% else %}{% translate "Video" %}{% endif %}
+                                        </span>
+                                        <div class="aw-row-actions aw-ms-auto">
+                                            <button type="button"
+                                                    class="aw-icon-btn"
+                                                    @click="moveUp($event)"
+                                                    title="{% translate 'Move up' %}"
+                                                    aria-label="{% translate 'Move up' %}">
+                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+                                            </button>
+                                            <button type="button"
+                                                    class="aw-icon-btn"
+                                                    @click="moveDown($event)"
+                                                    title="{% translate 'Move down' %}"
+                                                    aria-label="{% translate 'Move down' %}">
+                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-down"></use></svg>
+                                            </button>
+                                            <button type="button"
+                                                    class="aw-icon-btn"
+                                                    @click="removeFile($event)"
+                                                    title="{% translate 'Close' %}"
+                                                    aria-label="{% translate 'Close' %}">
+                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="aw-part-body">
+                                        <div class="aw-file-row">
+                                            <span class="aw-file-ic">
+                                                {% if video.file_type == "audio" %}
+                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-audio"></use></svg>
+                                                {% elif video.file_type == "book" %}
+                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                                                {% else %}
+                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
+                                                {% endif %}
+                                            </span>
+                                            <span class="aw-file-main">
+                                                <b class="aw-break">{{ video.name }}</b>
+                                                <span class="aw-truncate" title="{{ video.id }}">{{ video.id }}</span>
+                                            </span>
+                                        </div>
+                                        <div class="aw-form-grid">
+                                            <div class="aw-field aw-span-2">
+                                                <select name="files_type" class="aw-select"
+                                                        @change="toggleDownloadInput($event)">
+                                                    <option value="video" {% if video.file_type == "video" %}selected{% endif %}>
+                                                        {% translate "Video" %}
+                                                    </option>
+                                                    <option value="audio" {% if video.file_type == "audio" %}selected{% endif %}>
+                                                        {% translate "Audio Recording" %}
+                                                    </option>
+                                                    <option value="book" {% if video.file_type == "book" %}selected{% endif %}>
+                                                        {% translate "Book" %}
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div class="aw-field">
+                                                <span class="aw-field-label">{% translate "Part" %}</span>
+                                                <input type="number" min="1" name="part_groups"
+                                                       class="aw-input part-group-input"
+                                                       value="{% if video.part_number %}{{ video.part_number }}{% endif %}"
+                                                       @input="reindexParts()"
+                                                       aria-label="{% translate 'Part' %}">
+                                            </div>
+                                            <div class="aw-field download-key-field"{% if video.file_type != 'audio' %} hidden{% endif %}>
+                                                <span class="aw-field-label">{% translate "Download" %}</span>
+                                                <input type="text" name="download_ids"
+                                                       class="aw-input download-key-input"
+                                                       value="{% if video.file_type == 'audio' %}{{ video.download_key|default:'' }}{% else %}{{ video.download_id|default:'' }}{% endif %}"
+                                                       placeholder="Downloadable Files/name.mp3"
+                                                       aria-label="{% translate 'Download' %}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
 
                             <!-- Empty State -->
                             <div x-show="selectedLectureCount === 0"
                                  x-cloak
                                  class="aw-empty">
                                 <span class="aw-empty-icon">
-                                    <i class="fas fa-folder-open fa-2x" aria-hidden="true"></i>
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-folder"></use></svg>
                                 </span>
                                 <p>{% translate "No lectures selected yet" %}</p>
                                 <p><small>{% translate "Click on files from the left to add them" %}</small></p>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Form Actions -->
-                    <div class="aw-form-actions">
-                        <button type="submit"
-                                class="aw-btn aw-btn--primary aw-btn--lg"
-                                :disabled="submitting">
-                            <span x-show="!submitting">
-                                <i class="fas fa-save me-2" aria-hidden="true"></i>
-                                {% translate "Submit" %}
-                            </span>
-                            <span x-show="submitting" x-cloak :class="{ 'd-flex align-items-center justify-content-center': submitting }">
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                {% translate "Submitting..." %}
-                            </span>
-                        </button>
+                        <details class="aw-mt-3" id="aw-media-picker">
+                            <summary class="aw-dropzone">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                                <b>{% translate "Select Files from Drive" %}</b>
+                                <span>{% translate "Choose a video, audio recording or book from the Drive browser." %}</span>
+                            </summary>
+                            <div class="lesson-editor__drive aw-mt-2">
+                                <div id="drive-files">
+                                    {% include 'drive_files.html' %}
+                                </div>
+                            </div>
+                        </details>
+
+                        <div class="aw-flex aw-flex-wrap aw-mt-3">
+                            <a class="aw-btn aw-btn--outline" href="#drive-files">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-folder"></use></svg>
+                                <span>{% translate "Attach existing file" %}</span>
+                            </a>
+                            <a class="aw-btn aw-btn--outline" href="{% url 'upload-files' %}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                                <span>{% translate "Upload files" %}</span>
+                            </a>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
 
             <aside class="aw-editor-rail">
                 <!-- Publish checklist. Server-rendered from the values provided
@@ -343,22 +399,24 @@
                     <div class="aw-card-head">
                         <div class="aw-card-title">
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-                            <h3 id="aw-lesson-danger">{% translate "Danger zone" %}</h3>
+                            <div>
+                                <h3 id="aw-lesson-danger">{% translate "Danger zone" %}</h3>
+                            </div>
                         </div>
                     </div>
                     <div class="aw-card-body">
                         <button type="reset"
-                                class="aw-btn aw-btn--danger w-100"
+                                class="aw-btn aw-btn--danger aw-w-100"
                                 @click="$event.target.closest('form').dispatchEvent(new Event('reset'))">
-                            <i class="fas fa-undo me-2" aria-hidden="true"></i>
-                            {% translate "Reset" %}
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                            <span>{% translate "Reset" %}</span>
                         </button>
                         {% if lesson_id and caps.delete_content %}
                         <button type="submit"
                                 form="aw-lesson-delete-form"
-                                class="aw-btn aw-btn--danger w-100 mt-2">
-                            <i class="fas fa-trash me-2" aria-hidden="true"></i>
-                            {% translate "Delete lesson" %}
+                                class="aw-btn aw-btn--danger aw-w-100 aw-mt-2">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                            <span>{% translate "Delete lesson" %}</span>
                         </button>
                         {% endif %}
                     </div>
@@ -369,7 +427,7 @@
     {% if lesson_id and caps.delete_content %}
     <form id="aw-lesson-delete-form" method="post"
           action="{% url 'lesson-delete' lesson_id %}"
-          class="d-none"
+          hidden
           data-confirm-message="{% translate 'Delete this lesson and its media links? Telegram delivery history is kept. This cannot be undone.' %}">
         {% csrf_token %}
     </form>

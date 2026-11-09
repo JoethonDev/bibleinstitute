@@ -47,7 +47,12 @@ def start_quiz_attempt(quiz_id: int, user) -> QuizAnswerSnapshot:
                 return snapshot
         else:
             closing = ensure_aware(closing)
-            deadline = min(current + timedelta(minutes=quiz.duration_minutes), closing)
+            # 0 minutes means "no time limit": the attempt is bounded only by the
+            # quiz window, which is the closing date the operator set.
+            if quiz.duration_minutes:
+                deadline = min(current + timedelta(minutes=quiz.duration_minutes), closing)
+            else:
+                deadline = closing
             snapshot = QuizAnswerSnapshot.objects.create(
                 quiz_id=quiz.pk,
                 user=user,

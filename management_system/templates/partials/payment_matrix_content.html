@@ -1,19 +1,61 @@
 {% load i18n %}
+{% load aw_ui %}
+{% aw_capabilities as caps %}
 {% comment %}
 Payments matrix workspace.
-Presentation only: level tabs, filters, payment rows, receipt links, KPI
-counts, pagination query and every HTMX hook are preserved.
-The page head main block is shared; the actions slot keeps the existing
-loading indicator.
+Presentation only: level tabs, filter parameters, payment rows, receipt links,
+coverage KPI values, pagination query and every HTMX hook are preserved.
+
+Aggregates: the view supplies all_count, paid_count and unpaid_count (one SQL
+aggregate for the whole scope) plus the filtered paginator count, so the
+coverage KPIs render above the level tabs with their real shares. The
+prototype's "verified this week" and "needs review" values have no context
+value and are not rendered.
+
+Page actions: the only real, related route is signup settings, which the
+applications capability owns, so it renders only for an actor who may open it.
+No payments export route exists.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
   {% translate "Reports" as page_eyebrow %}
   {% translate "Payments matrix" as page_title %}
   {% translate "See who has uploaded the payment receipt for each academic level and who still needs to pay." as page_description %}
-  <div class="aw-page-head">
+  <div class="aw-page-head aw-flex-wrap">
     {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
     <div class="aw-page-actions">
-      <span id="payments-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+      <span id="payments-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
+      {% if caps.manage_applications %}
+      <a href="{% url 'signup-settings' %}" class="aw-btn aw-btn--ghost aw-btn--sm">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg>
+        <span>{% translate "Signup Settings" %}</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="aw-kpi-grid">
+    <div class="aw-kpi aw-kpi--blue">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Students" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ all_count }}</div>
+    </div>
+    <div class="aw-kpi aw-kpi--green">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Uploaded" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ paid_count }}</div>
+      <div class="aw-kpi-meta">{% widthratio paid_count all_count 100 %}% {% translate "Uploaded" %}</div>
+    </div>
+    <div class="aw-kpi aw-kpi--red">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Not uploaded" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ unpaid_count }}</div>
+      <div class="aw-kpi-meta">{% widthratio unpaid_count all_count 100 %}% {% translate "Not uploaded" %}</div>
     </div>
   </div>
 
@@ -33,63 +75,36 @@ loading indicator.
 
   <div class="aw-card aw-dashboard-filters">
     <div class="aw-card-body aw-card-body--tight">
-      <form method="get" class="aw-form-grid" hx-get="{% url 'payments-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#payments-loading">
-        {% if selected_scope %}<input type="hidden" name="level" value="{{ selected_scope.level_id }}">{% endif %}
-        <div class="aw-field">
-          <label for="payment-matrix-search">{% translate "Search student" %}</label>
+      <div class="aw-filter-bar">
+        <form method="get" class="aw-table-tools" hx-get="{% url 'payments-matrix-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#payments-loading">
+          {% if selected_scope %}<input type="hidden" name="level" value="{{ selected_scope.level_id }}">{% endif %}
+          <label class="visually-hidden" for="payment-matrix-search">{% translate "Search student" %}</label>
           <div class="aw-search-wrap">
             <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
             <input id="payment-matrix-search" type="search" name="name" value="{{ name_value }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="aw-input aw-input--search" hx-preserve hx-get="{% url 'payments-matrix-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#payments-loading">
           </div>
-        </div>
-        <div class="aw-field">
-          <label for="payment-matrix-year">{% translate "Academic year" %}</label>
+          <label class="visually-hidden" for="payment-matrix-year">{% translate "Academic year" %}</label>
           <select id="payment-matrix-year" name="academic_year" class="aw-select" hx-get="{% url 'payments-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#payments-loading">
             {% for year in years %}
               <option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} - {% translate "Active" %}{% endif %}</option>
             {% endfor %}
           </select>
-        </div>
-        <div class="aw-field">
-          <label for="payment-matrix-status">{% translate "Payment status" %}</label>
+          <label class="visually-hidden" for="payment-matrix-status">{% translate "Payment status" %}</label>
           <select id="payment-matrix-status" name="status" class="aw-select" hx-get="{% url 'payments-matrix-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#payments-loading">
             <option value="all"{% if status == "all" %} selected{% endif %}>{% translate "All students" %}</option>
             <option value="paid"{% if status == "paid" %} selected{% endif %}>{% translate "Uploaded" %}</option>
             <option value="unpaid"{% if status == "unpaid" %} selected{% endif %}>{% translate "Not uploaded" %}</option>
           </select>
-        </div>
-        <div class="aw-span-2 aw-flex">
-          <button type="submit" class="aw-btn aw-btn--primary">
+          <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
             <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
             <span>{% translate "Filter" %}</span>
           </button>
-          <a href="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-get="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="payment-matrix-search" class="aw-btn aw-btn--ghost">{% translate "Clear" %}</a>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="aw-kpi-grid">
-    <div class="aw-kpi aw-kpi--blue">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Students" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
+          <a href="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-get="?academic_year={{ selected_year.pk }}{% if selected_scope %}&amp;level={{ selected_scope.level_id }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="payment-matrix-search" class="aw-btn aw-btn--ghost aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+            <span>{% translate "Clear" %}</span>
+          </a>
+        </form>
       </div>
-      <div class="aw-kpi-value">{{ all_count }}</div>
-    </div>
-    <div class="aw-kpi aw-kpi--green">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Uploaded" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg></span>
-      </div>
-      <div class="aw-kpi-value">{{ paid_count }}</div>
-    </div>
-    <div class="aw-kpi aw-kpi--red">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Not uploaded" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
-      </div>
-      <div class="aw-kpi-value">{{ unpaid_count }}</div>
     </div>
   </div>
 
@@ -109,16 +124,24 @@ loading indicator.
         <thead>
           <tr>
             <th scope="col">{% translate "Student" %}</th>
-            <th scope="col">{% translate "Username" %}</th>
             <th scope="col">{% translate "Payment status" %}</th>
+            <th scope="col">{% translate "Uploaded" %}</th>
             <th scope="col">{% translate "Receipt" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for row in payment_rows %}
           <tr>
-            <td class="aw-cell-strong">{{ row.student.get_full_name|default:row.student.username }}</td>
-            <td>{{ row.student.username }}</td>
+            <td>
+              <div class="aw-cell-main">
+                {% include "partials/components/aw_avatar.html" with name=row.student %}
+                <div>
+                  <b>{{ row.student.get_full_name|default:row.student.username }}</b>
+                  <span>@{{ row.student.username }}</span>
+                </div>
+                {% if selected_scope %}<span class="aw-chip aw-chip--teal">{{ selected_scope.level.display_name }}</span>{% endif %}
+              </div>
+            </td>
             <td>
               {% if row.paid %}
                 {% translate "Uploaded" as payment_uploaded_label %}
@@ -128,11 +151,18 @@ loading indicator.
                 <span class="aw-pill aw-pill--red">{{ payment_missing_label }}</span>
               {% endif %}
             </td>
+            <td class="aw-date">{% if row.receipt and row.receipt.uploaded_at %}{{ row.receipt.uploaded_at|date:"DATE_FORMAT" }}{% else %}-{% endif %}</td>
             <td>
               {% if row.receipt_url %}
                 <div class="aw-row-actions">
-                  <a href="{{ row.receipt_url }}" target="_blank" rel="noopener noreferrer" class="aw-btn aw-btn--ghost aw-btn--sm">{% translate "View" %}</a>
-                  <a href="{{ row.download_url }}" class="aw-btn aw-btn--primary aw-btn--sm" download>{% translate "Download" %}</a>
+                  <a href="{{ row.receipt_url }}" target="_blank" rel="noopener noreferrer" class="aw-btn aw-btn--ghost aw-btn--sm">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                    <span>{% translate "View" %}</span>
+                  </a>
+                  <a href="{{ row.download_url }}" class="aw-btn aw-btn--primary aw-btn--sm" download>
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
+                    <span>{% translate "Download" %}</span>
+                  </a>
                 </div>
               {% else %}
                 <span class="aw-muted">-</span>

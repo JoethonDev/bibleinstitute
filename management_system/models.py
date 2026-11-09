@@ -2839,7 +2839,7 @@ class Quiz(models.Model):
     total_grade = models.PositiveSmallIntegerField(default=50)
     opening_date = models.DateTimeField(default=now)
     closing_date = models.DateTimeField(default=now)
-    duration_minutes = models.PositiveIntegerField(default=60)
+    duration_minutes = models.PositiveIntegerField(default=0)
     publication_event_version = models.PositiveIntegerField(default=1, editable=False)
     created_date = models.DateField(auto_now=True)
 

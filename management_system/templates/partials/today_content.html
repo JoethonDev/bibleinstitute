@@ -36,7 +36,7 @@ count and every sample row links to its authorized destination list.
 
     <div class="aw-kpi-grid">
         {% for kpi in today_kpis %}
-        <div class="aw-kpi aw-kpi--{{ kpi.tone }}">
+        {% if kpi.url %}<a class="aw-kpi aw-kpi--{{ kpi.tone }} aw-kpi-link" href="{{ kpi.url }}">{% else %}<div class="aw-kpi aw-kpi--{{ kpi.tone }}">{% endif %}
             <div class="aw-kpi-top">
                 <span class="aw-kpi-label">{{ kpi.label }}</span>
                 <span class="aw-kpi-icon">
@@ -44,7 +44,8 @@ count and every sample row links to its authorized destination list.
                 </span>
             </div>
             <div class="aw-kpi-value">{{ kpi.value }}</div>
-        </div>
+            {% if kpi.meta %}<div class="aw-kpi-meta">{{ kpi.meta }}</div>{% endif %}
+        {% if kpi.url %}</a>{% else %}</div>{% endif %}
         {% endfor %}
     </div>
 
@@ -61,7 +62,7 @@ count and every sample row links to its authorized destination list.
                     <div class="aw-attn-list">
                         {% for queue in queues %}
                         <div class="aw-attn-item">
-                            <span class="aw-attn-icon{% if queue.count %} aw-attn-icon--red{% endif %}">
+                            <span class="aw-attn-icon{% if queue.count %} aw-attn-icon--{{ queue.tone|default:'red' }}{% endif %}">
                                 <svg class="aw-ico" aria-hidden="true"><use href="#{{ queue.icon }}"></use></svg>
                             </span>
                             <div class="aw-attn-main">
@@ -75,7 +76,7 @@ count and every sample row links to its authorized destination list.
                                 {% endif %}
                             </div>
                             <a class="aw-attn-go" href="{{ queue.url }}">
-                                {% translate "View" %}
+                                {% if queue.action_label %}{{ queue.action_label }}{% else %}{% translate "View" %}{% endif %}
                                 <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
                             </a>
                         </div>

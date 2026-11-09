@@ -1,0 +1,29 @@
+{% comment %}
+Canonical admin field renderer.
+
+Renders one bound field with the workspace layout so no template repeats
+label, required marker, hint or error markup. Control classes are assigned in
+management_system/forms.py by AwFormMixin, so this partial only owns layout:
+  - aw-field            vertical label + control stack (4px gap)
+  - aw-field--check     checkbox row: control beside its label
+  - aw-span-2           full-width cell inside .aw-form-grid
+{% endcomment %}
+{% with widget=field.field.widget %}
+{% if widget.input_type == 'checkbox' %}
+<div class="aw-field aw-field--check aw-span-2">
+    <label class="aw-check" for="{{ field.id_for_label }}">
+        {{ field }}
+        <span>{{ field.label }}{% if field.field.required %} <span class="aw-req" aria-hidden="true">*</span>{% endif %}</span>
+    </label>
+    {% if field.help_text %}<span class="aw-field-hint">{{ field.help_text }}</span>{% endif %}
+    {% for error in field.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+</div>
+{% else %}
+<div class="aw-field{% if widget.input_type == 'textarea' or widget.input_type == 'file' or widget.allow_multiple_selected %} aw-span-2{% endif %}">
+    {% if field.label %}<label class="aw-field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="aw-req" aria-hidden="true">*</span>{% endif %}</label>{% endif %}
+    {{ field }}
+    {% if field.help_text %}<span class="aw-field-hint">{{ field.help_text }}</span>{% endif %}
+    {% for error in field.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+</div>
+{% endif %}
+{% endwith %}

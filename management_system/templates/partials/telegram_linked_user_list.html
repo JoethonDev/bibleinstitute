@@ -1,27 +1,27 @@
 {% load i18n %}
-<div id="telegram-linked-user-list" class="tg-chat-linked-list">
-    <ul class="tg-chat-linked-items list-unstyled mb-0">
+<div id="telegram-linked-user-list" class="aw-linked-list">
+    <ul>
         {% for account in linked_user_page_obj %}
         {% with student_name=account.user.get_full_name|default:account.user.username %}
-        <li class="tg-chat-linked-row">
-            <span class="tg-chat-avatar aw-avatar d-flex" aria-hidden="true">
+        <li class="aw-linked-row">
+            <span class="aw-avatar" aria-hidden="true">
                 {% if account.user.profile_image_key %}
-                <img class="tg-chat-avatar-img"
+                <img class="aw-avatar-img"
                      src="{% url 'application-document' account.user.pk 'profile' %}"
                      alt=""
                      loading="lazy" decoding="async"
                      referrerpolicy="no-referrer">
                 {% else %}
-                <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
+                <span>{{ student_name|first|default:"?"|upper }}</span>
                 {% endif %}
             </span>
 
-            <span class="tg-chat-linked-main">
-                <span class="tg-chat-linked-name">{{ student_name }}</span>
-                <span class="tg-chat-linked-username aw-small">{{ account.user.username }}</span>
+            <span class="aw-linked-main">
+                <b>{{ student_name }}</b>
+                <span>@{{ account.user.username }}</span>
             </span>
 
-            <span class="tg-chat-linked-actions">
+            <span class="aw-flex">
                 {% if account.active_conversation_id %}
                 <a class="aw-btn aw-btn--ghost aw-btn--sm"
                    href="{% url 'telegram-conversation-detail' account.active_conversation_id %}"
@@ -50,5 +50,5 @@
 
     {% translate "linked users" as linked_users_label %}
     {% translate "Linked user pagination" as pagination_aria_label %}
-    {% include "partials/pagination.html" with page_obj=linked_user_page_obj pagination_query=pagination_query page_param="start_page" base_url=conversation_list_url item_label=linked_users_label aria_label=pagination_aria_label wrapper_class="tg-chat-linked-pagination" %}
+    {% include "partials/pagination.html" with page_obj=linked_user_page_obj pagination_query=pagination_query page_param="start_page" base_url=conversation_list_url item_label=linked_users_label aria_label=pagination_aria_label wrapper_class="" %}
 </div>

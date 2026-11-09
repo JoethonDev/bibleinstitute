@@ -3,8 +3,10 @@
 Immutable promotion ledger. The page head carries the existing evaluation
 link, the filter bar keeps its GET/HTMX contract and the single table renders
 only the values the view projects; no drawer or extra record field is added.
-The page head main block is shared; its action stays inline because it uses
-the standard HTMX page-navigation attributes.
+The view supplies the record count and the filters but no per-outcome
+aggregates, so the context strip reports the count only and no KPI grid is
+rendered. The page head main block is shared; its action stays inline because
+it uses the standard HTMX page-navigation attributes.
 {% endcomment %}
 {% translate "Academic" as page_eyebrow %}
 {% translate "Immutable Promotion History" as page_title %}
@@ -25,6 +27,18 @@ the standard HTMX page-navigation attributes.
         </div>
     </div>
 
+    <div class="aw-context-strip">
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+            <b>{{ page_obj.paginator.count }}</b> {% translate "Total" %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+            {% translate "Immutable promotion history" %}
+        </span>
+    </div>
+
     <div class="htmx-indicator aw-table-loading" id="promotion-history-loading" aria-hidden="true">
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">{% translate "Loading..." %}</span>
@@ -34,33 +48,26 @@ the standard HTMX page-navigation attributes.
     <div class="aw-card aw-dashboard-filters">
         <div class="aw-card-body aw-card-body--tight">
             <div class="aw-filter-bar">
-                <div class="aw-table-tools">
-                    <form method="get" hx-get="{% url 'promotion-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-history-loading" class="d-flex flex-wrap align-items-end gap-2 w-100">
-                        <div>
-                            <label class="form-label" for="promotion-history-search">{% translate "Student" %}</label>
-                            <div class="aw-search-wrap">
-                                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                                <input id="promotion-history-search" class="aw-input aw-input--search" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email...' %}" hx-preserve hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-history-loading" hx-trigger="input changed delay:200ms, search">
-                            </div>
-                        </div>
-                        <div class="aw-field">
-                            <label class="form-label" for="promotion-history-outcome">{% translate "Outcome" %}</label>
-                            <select id="promotion-history-outcome" class="aw-select" name="outcome" hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-history-loading" hx-trigger="change">
-                                <option value="">{% translate "All" %}</option>
-                                <option value="passed" {% if outcome == 'passed' %}selected{% endif %}>{% translate "Passed" %}</option>
-                                <option value="passed_with_exceptions" {% if outcome == 'passed_with_exceptions' %}selected{% endif %}>{% translate "Passed (with exceptions)" %}</option>
-                                <option value="repeated" {% if outcome == 'repeated' %}selected{% endif %}>{% translate "Repeated" %}</option>
-                                <option value="graduated" {% if outcome == 'graduated' %}selected{% endif %}>{% translate "Graduated" %}</option>
-                                <option value="last_level_exceptional" {% if outcome == 'last_level_exceptional' %}selected{% endif %}>{% translate "Last level (exceptional)" %}</option>
-                            </select>
-                        </div>
-                        <div class="aw-flex aw-flex-wrap">
-                            <button class="aw-btn aw-btn--primary aw-btn--sm" type="submit">
-                                <i class="fas fa-filter me-1" aria-hidden="true"></i>{% translate "Filter" %}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                <form method="get" class="aw-table-tools" hx-get="{% url 'promotion-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-history-loading">
+                    <label class="visually-hidden" for="promotion-history-search">{% translate "Student" %}</label>
+                    <div class="aw-search-wrap">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <input id="promotion-history-search" class="aw-input aw-input--search" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email...' %}" hx-preserve hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-history-loading" hx-trigger="input changed delay:200ms, search">
+                    </div>
+                    <label class="visually-hidden" for="promotion-history-outcome">{% translate "Outcome" %}</label>
+                    <select id="promotion-history-outcome" class="aw-select" name="outcome" hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-history-loading" hx-trigger="change">
+                        <option value="">{% translate "All" %}</option>
+                        <option value="passed" {% if outcome == 'passed' %}selected{% endif %}>{% translate "Passed" %}</option>
+                        <option value="passed_with_exceptions" {% if outcome == 'passed_with_exceptions' %}selected{% endif %}>{% translate "Passed (with exceptions)" %}</option>
+                        <option value="repeated" {% if outcome == 'repeated' %}selected{% endif %}>{% translate "Repeated" %}</option>
+                        <option value="graduated" {% if outcome == 'graduated' %}selected{% endif %}>{% translate "Graduated" %}</option>
+                        <option value="last_level_exceptional" {% if outcome == 'last_level_exceptional' %}selected{% endif %}>{% translate "Last level (exceptional)" %}</option>
+                    </select>
+                    <button class="aw-btn aw-btn--primary aw-btn--sm" type="submit">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
+                        <span>{% translate "Filter" %}</span>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -81,12 +88,32 @@ the standard HTMX page-navigation attributes.
                         <th scope="col">{% translate "Recorded by" %}</th>
                         <th scope="col">{% translate "Reason" %}</th>
                         <th scope="col">{% translate "Recorded" %}</th>
+                        <th scope="col" class="aw-ta-e"><span class="visually-hidden">{% translate "Actions" %}</span></th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for item in page_obj %}
                 <tr>
-                    <td>{{ item.student.get_full_name|default:item.student.username }}</td>
+                    <td>
+                        {% with student_name=item.student.get_full_name|default:item.student.username %}
+                        <div class="aw-cell-main">
+                            {% include "partials/components/aw_avatar.html" with name=student_name tone="teal" %}
+                            <div>
+                                {% if item.student_id %}
+                                <a href="{% url 'student-overview' item.student_id %}"
+                                   hx-get="{% url 'student-overview' item.student_id %}"
+                                   hx-target="#display-page"
+                                   hx-select="#page-region"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"><b>{{ student_name }}</b></a>
+                                {% else %}
+                                <b>{{ student_name }}</b>
+                                {% endif %}
+                                <span class="aw-cell-sub">{{ item.source_year_level.level.display_name }} - {{ item.student.username }}</span>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    </td>
                     <td>{{ item.source_year_level.academic_year.name }} - {{ item.source_year_level.level.display_name }}</td>
                     <td>{% if item.destination_year_level %}{{ item.destination_year_level.academic_year.name }} - {{ item.destination_year_level.level.display_name }}{% else %}<span class="aw-muted">{% translate "Graduated" %}</span>{% endif %}</td>
                     <td>
@@ -127,7 +154,7 @@ the standard HTMX page-navigation attributes.
                     <td class="aw-num">{% if item.score is not None %}{{ item.score|floatformat:1 }}%{% else %}<span class="aw-muted">-</span>{% endif %}</td>
                     <td class="aw-small">
                         {% if item.exceptional_offering_ids %}
-                        <ul class="list-unstyled mb-0">
+                        <ul class="list-unstyled">
                             {% for eid in item.exceptional_offering_ids %}
                             <li><span class="aw-pill aw-pill--muted">#{{ eid }}</span></li>
                             {% endfor %}
@@ -139,10 +166,28 @@ the standard HTMX page-navigation attributes.
                     <td>{{ item.actor.get_full_name|default:item.actor.username }}</td>
                     <td class="aw-small">{% if item.reason %}<span class="aw-muted">{{ item.reason }}</span>{% else %}<span class="aw-muted">-</span>{% endif %}</td>
                     <td class="aw-date">{{ item.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    <td>
+                        <div class="aw-row-actions">
+                            {% if item.student_id %}
+                            <a class="aw-btn aw-btn--sm"
+                               href="{% url 'student-overview' item.student_id %}"
+                               hx-get="{% url 'student-overview' item.student_id %}"
+                               hx-target="#display-page"
+                               hx-select="#page-region"
+                               hx-swap="innerHTML"
+                               hx-push-url="true">
+                                <span>{% translate "Overview" %}</span>
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+                            </a>
+                            {% else %}
+                            <span class="aw-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="10" class="aw-cell-empty">
+                    <td colspan="11" class="aw-cell-empty">
                         {% translate "No promotion history found." as no_history %}
                         {% include "partials/components/aw_empty.html" with icon="i-clock" description=no_history %}
                     </td>

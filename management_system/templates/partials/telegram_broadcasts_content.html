@@ -1,4 +1,16 @@
 {% load i18n %}
+{% comment %}
+Telegram broadcast workspace shell.
+
+Presentation only. The compose action points at the existing create route.
+The list fragment is included unchanged in its response contract.
+
+The view supplies only the paged broadcast queryset, the list URL and the
+compose URL: it computes no status aggregates and accepts no search/status
+query parameters. The prototype's KPI strip, status tabs and filter bar are
+therefore deliberately not rendered instead of being faked with page-local
+counts. The list itself reports Delivered/Failed from the model fields.
+{% endcomment %}
 <div id="content" class="aw-dashboard-page">
     {% translate "Engagement" as page_eyebrow %}
     {% translate "Telegram Broadcasts" as page_title %}

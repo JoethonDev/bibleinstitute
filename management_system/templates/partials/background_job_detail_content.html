@@ -14,7 +14,7 @@
             </a>
         </div>
     </div>
-    <p class="aw-small text-danger" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
+    <p class="aw-small aw-text-danger" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
 
     <div class="aw-card" data-job-record data-primary-job="true" data-family="{{ job.family }}" data-id="{{ job.id }}" data-active="{{ job.active|yesno:'true,false' }}" data-next-poll-at="{{ job.next_poll|date:'c' }}">
         <div class="aw-card-head">
@@ -35,18 +35,21 @@
             {% if job.failed != None %}<div class="aw-kv"><dt>{% translate "Failed" %}</dt><dd data-job-field="failed">{{ job.failed }}</dd></div>{% endif %}
             {% if job.skipped != None %}<div class="aw-kv"><dt>{% translate "Skipped" %}</dt><dd data-job-field="skipped">{{ job.skipped }}</dd></div>{% endif %}
 
-            <div class="aw-stack mt-3">
-                <progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress>
+            <div class="aw-stack aw-mt-2">
+                <div class="aw-progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100">
+                    <span style="width: {{ job.percent }}%"></span>
+                </div>
+                <progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress aw-w-100" hidden></progress>
                 <p data-job-field="progress_label">{{ job.progress_label }}</p>
                 <p class="aw-small aw-muted" data-job-field="phase_label">{{ job.phase_label }}</p>
-                <p class="text-danger aw-small text-break" data-job-field="error"{% if not job.error %} hidden{% endif %}>{{ job.error }}</p>
-                {% if warning %}<p class="text-warning aw-small text-break">{{ warning }}</p>{% endif %}
+                <p class="aw-text-danger aw-small aw-break" data-job-field="error"{% if not job.error %} hidden{% endif %}>{{ job.error }}</p>
+                {% if warning %}<p class="aw-text-warning aw-small aw-break">{{ warning }}</p>{% endif %}
                 {% if row_errors %}
                 <h3 class="h6">{% translate "First 20 row errors" %}</h3>
-                <ul class="aw-small">{% for error in row_errors %}<li class="text-break">{{ error.row }}: {{ error.message }}</li>{% endfor %}</ul>
+                <ul class="aw-small">{% for error in row_errors %}<li class="aw-break">{{ error.row }}: {{ error.message }}</li>{% endfor %}</ul>
                 {% endif %}
                 {% if download_url %}
-                <a class="aw-btn aw-btn--primary align-self-start" href="{{ download_url }}">{% translate "Download result" %}</a>
+                <a class="aw-btn aw-btn--primary aw-self-start" href="{{ download_url }}">{% translate "Download result" %}</a>
                 {% endif %}
             </div>
         </div>

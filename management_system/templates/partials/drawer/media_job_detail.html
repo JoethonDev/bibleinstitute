@@ -1,0 +1,57 @@
+{% load i18n %}
+{% comment %}
+Drawer body for one media job.
+
+Loaded through `data-aw-drawer` into `#aw-drawer-body`; the drawer component
+owns the title, subtitle and close affordance, so this fragment starts with the
+content. Read-only: the actions below reuse the same endpoints and data-*
+hooks as the row, handled by media_status.js.
+{% endcomment %}
+<div class="aw-stack aw-stack--lg">
+    <div class="aw-flex aw-flex-wrap">
+        {% include "partials/components/aw_status_pill.html" with status=job.status label=job.status_label %}
+        <span class="aw-small aw-muted">{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+    </div>
+
+    <dl class="aw-dl">
+        <div class="aw-kv"><dt>{% translate "File" %}</dt><dd>{{ job.original_filename }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Destination" %}</dt><dd>{% if job.lesson %}{{ job.lesson.name }}{% else %}{{ job.requested_folder }}{% endif %}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Size" %}</dt><dd>{{ job.source_size|filesizeformat }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Source" %}</dt><dd>{{ job.source_kind }}</dd></div>
+        {% if job.part_id %}<div class="aw-kv"><dt>{% translate "Part" %}</dt><dd>{{ job.part_id }}</dd></div>{% endif %}
+        <div class="aw-kv"><dt>{% translate "Owner" %}</dt><dd>{{ job.created_by.username }}</dd></div>
+    </dl>
+
+    {% if job.progress_label %}
+    <div class="aw-progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100">
+        <span style="width: {{ job.percent }}%"></span>
+    </div>
+    <span class="aw-cell-sub">{{ job.progress_label }}</span>
+    {% endif %}
+
+    {% if job.error_message %}
+    <div class="aw-alert aw-alert--danger" role="alert">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <span>{{ job.error_message }}</span>
+    </div>
+    {% endif %}
+    {% if job.cleanup_error_message %}
+    <div class="aw-alert aw-alert--warn" role="alert">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <span>{{ job.cleanup_error_message }}</span>
+    </div>
+    {% endif %}
+
+    <div class="aw-flex aw-flex-wrap">
+        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
+                data-media-retry-url="{% url 'media-job-retry' job.public_id %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+            {% translate "Retry" %}
+        </button>
+        <button type="button" class="aw-btn aw-btn--danger aw-btn--sm"
+                data-media-stop-url="{% url 'media-job-stop' job.public_id %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+            {% translate "Stop" %}
+        </button>
+    </div>
+</div>

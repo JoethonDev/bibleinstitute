@@ -7,29 +7,24 @@
                     <input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">
 
                     {% if mode == "edit" and not is_student %}
-                        <button type="button" class="btn btn-danger delete-question mb-3" data-action="remove-question">
-                            <i class="fa fa-trash"></i>
-                        </button>
-                        
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-primary" for="question-{{ counter }}-type">{% translate "Question Type" %}</label>
-                            <select id="question-{{ counter }}-type" name="questions[{{ counter }}][type]" class="form-select question-type">
-                                {% for type in question_types %}
-                                    <option value="{{ type.0 }}" {% if question.type == type.0 %}selected{% endif %}>{% translate type.1 %}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-12 col-md-8 mb-2 mb-md-0">
-                                <label class="form-label fw-semibold" for="question-{{ counter }}-name">{% translate "Question" %}</label>
-                                <input id="question-{{ counter }}-name" type="text" value="{{ question.name }}" required class="form-control" name="questions[{{ counter }}][name]" placeholder="{% translate "Question...?" %}">
+                        <div class="aw-q-card">
+                            <div class="aw-q-head">
+                                <span class="aw-q-num">{{ forloop.counter }}</span>
+                                <select id="question-{{ counter }}-type" name="questions[{{ counter }}][type]" class="aw-select question-type" aria-label="{% translate "Question Type" %}">
+                                    {% for type in question_types %}
+                                        <option value="{{ type.0 }}" {% if question.type == type.0 %}selected{% endif %}>{% translate type.1 %}</option>
+                                    {% endfor %}
+                                </select>
+                                <input id="question-{{ counter }}-grade" type="number" name="questions[{{ counter }}][grade]" class="aw-input aw-input--points" required value="{{ question.grade }}" min="0" aria-label="{% translate "Grade" %}">
+                                <button type="button" class="aw-icon-btn aw-ms-auto" data-action="remove-question" aria-label="{% translate "Delete" %}" title="{% translate "Delete" %}">
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                </button>
                             </div>
-                            <div class="col-12 col-md-4">
-                                <label class="form-label fw-semibold" for="question-{{ counter }}-grade">{% translate "Grade" %}</label>
-                                <input id="question-{{ counter }}-grade" type="number" name="questions[{{ counter }}][grade]" class="form-control" required value="{{ question.grade }}" min="0">
-                            </div>
-                        </div>
+                            <div class="aw-q-body">
+                                <div class="aw-field">
+                                    <label class="aw-field-label" for="question-{{ counter }}-name">{% translate "Question" %}</label>
+                                    <input id="question-{{ counter }}-name" type="text" value="{{ question.name }}" required class="aw-input" name="questions[{{ counter }}][name]" placeholder="{% translate "Question...?" %}">
+                                </div>
                     {% else %}
                         <div class="sd-q-head">
                             <span class="sd-q-num">{{ forloop.counter }}.</span>
@@ -51,12 +46,10 @@
                             <div class="mcq-choices w-100" data-choice-list>
                             {% for choice in question.choices %}
                                 {% if not is_student and mode == "edit" %}
-                                    <div class="d-flex align-items-center mb-2 w-100" data-choice-row>
-                                        <div class="flex-grow-1 me-2 w-100">
-                                            <input class="form-control choice-input" type="text" aria-label="{% translate 'Choice' %}" name="questions[{{ counter }}][choices]" value="{{ choice }}">
-                                        </div>
-                                        <button type="button" class="btn btn-outline-danger btn-sm mcq-delete-choice action-icon d-flex align-items-center justify-content-center" data-action="remove-choice">
-                                            <i class="fa-solid fa-xmark"></i>
+                                    <div class="aw-choice-row aw-flex" data-choice-row>
+                                        <input class="aw-input choice-input" type="text" aria-label="{% translate 'Choice' %}" name="questions[{{ counter }}][choices]" value="{{ choice }}">
+                                        <button type="button" class="aw-icon-btn" data-action="remove-choice" aria-label="{% translate 'Delete' %}">
+                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
                                         </button>
                                     </div>
                                 {% else %}
@@ -72,39 +65,40 @@
                             {% endfor %}
                             </div>
                             {% if not is_student and mode == "edit" %}
-                                <div class="mt-2">
-                                    <input class="form-control mcq-add" type="text" aria-label="{% translate 'Add another choice...' %}" placeholder="{% translate "Add another choice..." %}" autocomplete="off">
+                                <div class="aw-mt-2">
+                                    <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
+                                            @click="(() => { const card = $el.closest('.question-card'); card.querySelector('[data-choice-list]').insertAdjacentHTML('beforeend', buildChoiceRow(getQuestionIndex(card), '')); reindexQuestions(); })()">
+                                        <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                                        {% translate "Add another choice..." %}
+                                    </button>
                                 </div>
                             {% endif %}
 
                         {% elif question.type == "order_events" %}
                             {% if not is_student and mode == "edit" %}
-                                <div class="structured-editor w-100" data-structured-editor="order_events">
-                                    <label class="form-label fw-semibold text-secondary mb-2">{% translate "Order Events" %}</label>
+                                <div class="structured-editor aw-stack w-100" data-structured-editor="order_events">
+                                    <label class="aw-field-label">{% translate "Order Events" %}</label>
                                     <input type="hidden" name="questions[{{ counter }}][config]" value='{{ question.config_json|default:"{}" }}' data-structured-config>
-                                    <div class="structured-list mb-2 w-100" data-structured-list="order_events">
+                                    <div class="structured-list aw-stack w-100" data-structured-list="order_events">
                                         {% for item in question.config.items %}
-                                            <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mb-2 w-100" data-structured-row="order_events">
-                                                <div class="flex-grow-1 w-100">
-                                                    <input class="form-control" type="text" aria-label="{% translate 'Event item' %}" value="{{ item }}" data-structured-value="order_events" placeholder="{% translate "Event item" %}">
-                                                </div>
-                                                <div class="d-flex gap-2 flex-wrap w-100 w-md-auto">
-                                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill flex-md-grow-0" data-action="move-structured-up" aria-label="{% translate "Move up" %}">
-                                                    <i class="fa-solid fa-arrow-up"></i>
+                                            <div class="aw-flex w-100" data-structured-row="order_events">
+                                                <input class="aw-input" type="text" aria-label="{% translate 'Event item' %}" value="{{ item }}" data-structured-value="order_events" placeholder="{% translate "Event item" %}">
+                                                <button type="button" class="aw-icon-btn" data-action="move-structured-up" aria-label="{% translate "Move up" %}">
+                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
                                                 </button>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill flex-md-grow-0" data-action="move-structured-down" aria-label="{% translate "Move down" %}">
-                                                    <i class="fa-solid fa-arrow-down"></i>
+                                                <button type="button" class="aw-icon-btn" data-action="move-structured-down" aria-label="{% translate "Move down" %}">
+                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-down"></use></svg>
                                                 </button>
-                                                <button type="button" class="btn btn-outline-danger btn-sm flex-fill flex-md-grow-0" data-action="remove-structured-row" aria-label="{% translate "Delete" %}">
-                                                    <i class="fa-solid fa-xmark"></i>
+                                                <button type="button" class="aw-icon-btn" data-action="remove-structured-row" aria-label="{% translate "Delete" %}">
+                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
                                                 </button>
-                                                </div>
                                             </div>
                                         {% endfor %}
                                     </div>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" class="btn btn-outline-primary btn-sm" data-action="add-order-item">
-                                            <i class="fa fa-plus-circle me-1"></i>{% translate "Add item" %}
+                                    <div class="aw-flex aw-flex-wrap">
+                                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-action="add-order-item">
+                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                                            {% translate "Add item" %}
                                         </button>
                                     </div>
                                 </div>
@@ -149,29 +143,24 @@
 
                         {% elif question.type == "match_related" %}
                             {% if not is_student and mode == "edit" %}
-                                <div class="structured-editor w-100" data-structured-editor="match_related">
-                                    <label class="form-label fw-semibold text-secondary mb-2">{% translate "Match Related" %}</label>
+                                <div class="structured-editor aw-stack w-100" data-structured-editor="match_related">
+                                    <label class="aw-field-label">{% translate "Match Related" %}</label>
                                     <input type="hidden" name="questions[{{ counter }}][config]" value='{{ question.config_json|default:"{}" }}' data-structured-config>
-                                    <div class="structured-list mb-2 w-100" data-structured-list="match_related">
+                                    <div class="structured-list aw-stack w-100" data-structured-list="match_related">
                                         {% for pair in question.config.pairs %}
-                                            <div class="row g-2 align-items-stretch align-items-md-center mb-2 w-100" data-structured-row="match_related">
-                                                <div class="col-12 col-md-5">
-                                                    <input class="form-control" type="text" aria-label="{% translate 'Left item' %}" value="{{ pair.left }}" data-structured-left placeholder="{% translate "Left item" %}">
-                                                </div>
-                                                <div class="col-12 col-md-5">
-                                                    <input class="form-control" type="text" aria-label="{% translate 'Right item' %}" value="{{ pair.right }}" data-structured-right placeholder="{% translate "Right item" %}">
-                                                </div>
-                                                <div class="col-12 col-md-2 d-grid d-md-flex justify-content-md-end">
-                                                    <button type="button" class="btn btn-outline-danger btn-sm" data-action="remove-structured-row" aria-label="{% translate "Delete" %}">
-                                                        <i class="fa-solid fa-xmark"></i>
-                                                    </button>
-                                                </div>
+                                            <div class="aw-flex aw-flex-wrap w-100" data-structured-row="match_related">
+                                                <input class="aw-input" type="text" aria-label="{% translate 'Left item' %}" value="{{ pair.left }}" data-structured-left placeholder="{% translate "Left item" %}">
+                                                <input class="aw-input" type="text" aria-label="{% translate 'Right item' %}" value="{{ pair.right }}" data-structured-right placeholder="{% translate "Right item" %}">
+                                                <button type="button" class="aw-icon-btn" data-action="remove-structured-row" aria-label="{% translate "Delete" %}">
+                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                                                </button>
                                             </div>
                                         {% endfor %}
                                     </div>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" class="btn btn-outline-primary btn-sm" data-action="add-match-pair">
-                                            <i class="fa fa-plus-circle me-1"></i>{% translate "Add pair" %}
+                                    <div class="aw-flex aw-flex-wrap">
+                                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-action="add-match-pair">
+                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                                            {% translate "Add pair" %}
                                         </button>
                                     </div>
                                 </div>
@@ -225,7 +214,7 @@
                         {% elif question.type == "complete" %}
                             <label class="form-label fw-semibold text-secondary" for="question-{{ counter }}-answer-input">{% translate "Answer" %}</label>
                             {% if not is_student and mode == "edit" %}
-                                <input id="question-{{ counter }}-answer-input" class="form-control" type="text" disabled placeholder="{% translate "Student will complete this..." %}">
+                                <input id="question-{{ counter }}-answer-input" class="aw-input" type="text" disabled placeholder="{% translate "Student will complete this..." %}">
                             {% else %}
                                 <input class="form-control w-100" type="text" name="questions[{{ counter }}][answer]" value="{{ question.submitted_answer|default:'' }}" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>
                             {% endif %}
@@ -233,7 +222,7 @@
                         {% elif question.type == "written" %}
                             <label class="form-label fw-semibold text-secondary" for="question-{{ counter }}-answer-input">{% translate "Answer" %}</label>
                             {% if not is_student and mode == "edit" %}
-                                <textarea id="question-{{ counter }}-answer-input" class="form-control" rows="4" disabled placeholder="{% translate "Student will write their answer here..." %}"></textarea>
+                                <textarea id="question-{{ counter }}-answer-input" class="aw-textarea" rows="4" disabled placeholder="{% translate "Student will write their answer here..." %}"></textarea>
                             {% else %}
                                 <textarea class="form-control w-100" rows="4" name="questions[{{ counter }}][answer]" {% if mode == "view" or mode == "closed_unsolved" %}disabled readonly{% endif %}>{{ question.submitted_answer|default:'' }}</textarea>
                             {% endif %}
@@ -303,7 +292,7 @@
                             {% endif %}
                         {% endif %}
                     {% endif %}
-                    </div>
+                    </div>{% if not is_student %}{% if mode == "edit" %}</div></div>{% endif %}{% endif %}
                 </div>
             </div>
         {% endwith %}

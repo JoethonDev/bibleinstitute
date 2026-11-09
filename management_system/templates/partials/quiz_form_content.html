@@ -1,4 +1,5 @@
-{% load i18n %}
+{% load i18n aw_ui %}
+{% aw_capabilities as caps %}
 <div id="content" class="aw-dashboard-page"
      data-form-errors="{{ form_errors|yesno:'true,false' }}"
      data-draft-readonly="{{ quiz_editable|yesno:'false,true' }}"
@@ -6,7 +7,8 @@
      x-data="{
          ...autoSave('quiz-form-{{ request.resolver_match.kwargs.quiz_id|default:'new' }}'),
          ...quizForm(),
-         ...quizJsonImport()
+         ...quizJsonImport(),
+         ...formValidation()
       }"
      x-init="initAutoSave()"
      @input.debounce.2000ms="saveDraft()">
@@ -38,33 +40,28 @@
         }
     </script>
 
-    <!-- Auto-save Indicator -->
-    <div class="auto-save-indicator" x-show="lastSaved" x-transition.opacity>
-        <div class="aw-alert aw-alert--success" role="status">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-            <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
-        </div>
-    </div>
-
-    <!-- Saving Indicator -->
-    <div class="auto-save-indicator" x-show="isSaving" x-transition.opacity>
-        <div class="aw-alert aw-alert--info" role="status">
-            <div class="spinner-border spinner-border-sm" role="status">
-                <span class="visually-hidden">{% translate "Saving..." %}</span>
-            </div>
-            <span>{% translate "Saving draft..." %}</span>
-        </div>
-    </div>
-
     {% comment %}
-    The page head main block is shared; the Back link stays inline because it
-    carries view-specific HTMX page-navigation attributes.
+    The page head main block is shared; the Back link and the form actions stay
+    inline because they carry view-specific HTMX and form-association
+    attributes. Submit and Reset are associated with #quiz-editor-form, which
+    is declared below the import panel.
     {% endcomment %}
     {% translate "Curriculum" as page_eyebrow %}
+    {% translate "Build quizzes, review attempts and keep grading consistent." as page_description %}
     {% if quiz_mode == "update" %}{% translate "Edit Quiz" as page_title %}{% else %}{% translate "Create Quiz" as page_title %}{% endif %}
     <div class="aw-page-head">
-        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
         <div class="aw-page-actions">
+            <span class="aw-pill aw-pill--muted aw-pill--plain" x-show="lastSaved" x-transition.opacity x-cloak>
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                <span>{% translate "Draft saved at" %} <span x-text="lastSaved"></span></span>
+            </span>
+            <span class="aw-pill aw-pill--muted aw-pill--plain" x-show="isSaving" x-transition.opacity x-cloak>
+                <span class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">{% translate "Saving..." %}</span>
+                </span>
+                <span>{% translate "Saving draft..." %}</span>
+            </span>
             <a class="aw-btn aw-btn--ghost"
                href="{% url 'quiz-dashboard' %}"
                hx-get="{% url 'quiz-dashboard' %}"
@@ -76,6 +73,25 @@
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
                 <span>{% translate "Back to quizzes" %}</span>
             </a>
+            <button type="reset"
+                    form="quiz-editor-form"
+                    class="aw-btn aw-btn--ghost">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                {% translate "Reset" %}
+            </button>
+            <button type="submit"
+                    form="quiz-editor-form"
+                    class="aw-btn aw-btn--primary"
+                    :disabled="submitting">
+                <span x-show="!submitting" class="aw-flex">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    {% translate "Submit" %}
+                </span>
+                <span x-show="submitting" class="aw-flex">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    {% translate "Submitting..." %}
+                </span>
+            </button>
         </div>
     </div>
 
@@ -90,17 +106,17 @@
                 <h3>{% translate "Import Quiz from JSON" %}</h3>
             </div>
             <button type="button"
-                    class="aw-btn aw-btn--ghost aw-btn--sm ms-auto"
+                    class="aw-btn aw-btn--ghost aw-btn--sm aw-ms-auto"
                     @click="toggleImportPanel()"
                     :aria-expanded="importOpen ? 'true' : 'false'"
                     aria-controls="quiz-import-body">
-                <i class="fas" :class="importOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
                 <span class="visually-hidden">{% translate "Toggle import panel" %}</span>
             </button>
         </div>
         <div class="aw-card-body" id="quiz-import-body" x-show="importOpen" x-cloak>
-            <p class="aw-small aw-muted mb-2">{% translate "Paste a JSON payload or open a .json file, then preview it." %}</p>
-            <p class="aw-small aw-muted mb-3">{% translate "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft." %}</p>
+            <p class="aw-small aw-muted aw-mb-2">{% translate "Paste a JSON payload or open a .json file, then preview it." %}</p>
+            <p class="aw-small aw-muted aw-mb-3">{% translate "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft." %}</p>
             <textarea id="quiz-import-payload"
                       name="payload"
                       rows="10"
@@ -112,12 +128,12 @@
                       aria-label="{{ import_placeholder }}"
                       autocomplete="off"
                       spellcheck="false"></textarea>
-            <div class="mt-3 mb-3">
-                <label for="quiz-import-file" class="form-label">{% translate "Open a JSON file" %}</label>
-                <input type="file" id="quiz-import-file" class="form-control form-control-sm" accept=".json,application/json" @change="loadImportFile($event)">
+            <div class="aw-field aw-mt-3">
+                <label for="quiz-import-file" class="aw-field-label">{% translate "Open a JSON file" %}</label>
+                <input type="file" id="quiz-import-file" class="aw-input" accept=".json,application/json" @change="loadImportFile($event)">
             </div>
             <input type="hidden" id="quiz-import-mode" name="mode" value="{{ quiz_mode }}">
-            <div class="quiz-import-actions-row d-flex flex-wrap align-items-center gap-2">
+            <div class="quiz-import-actions-row aw-flex aw-flex-wrap aw-mt-3">
                 <button type="button"
                         class="aw-btn aw-btn--primary aw-btn--sm"
                         hx-post="{% url 'quiz-json-preview' %}"
@@ -148,98 +164,163 @@
     {% endif %}
 
     <!-- Form Container -->
-    <form action="" method="post" class="admin-form" x-data="formValidation()" @submit="handleSubmit($event)" @htmx:finally:request.window="submitting = false" novalidate hx-post="" hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
+    <form id="quiz-editor-form" action="" method="post" class="admin-form" @submit="handleSubmit($event)" @htmx:finally:request.window="submitting = false" novalidate hx-post="" hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
         {% csrf_token %}
         <div class="aw-editor-grid">
-            <div class="d-flex flex-column gap-3">
+            <div class="aw-stack aw-stack--lg">
                 <section class="aw-card" aria-labelledby="quiz-details-heading">
-                    <div class="aw-form-section">
-                        <div class="aw-form-section-head">
-                            <div>
-                                <h3 id="quiz-details-heading">{% translate "Quiz Details" %}</h3>
-                            </div>
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                            <h3 id="quiz-details-heading">{% translate "Quiz Details" %}</h3>
                         </div>
-
+                        {% include "partials/components/aw_status_pill.html" with status=content_status label=content_status_display %}
+                    </div>
+                    <div class="aw-card-body">
                         {% if not quiz_editable %}
-                        <div class="aw-alert aw-alert--info mb-3" role="status">
+                        <div class="aw-alert aw-alert--info aw-mb-3" role="status">
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
                             <div>{% translate "Only the status can be changed for this quiz. An administrator can edit its content." %}</div>
                         </div>
                         {% endif %}
 
-                        <fieldset {% if not quiz_editable %}disabled{% endif %}>
-                            <div class="aw-form-grid">
-                                <!-- Quiz Name -->
-                                <div class="aw-field" @focusout="validateField($event)">
-                                    <label for="quiz_name">
-                                        {% translate "Exam Title" %}
-                                        <span class="aw-req">*</span>
-                                    </label>
-                                    <input type="text"
-                                           class="aw-input"
-                                           id="quiz_name"
-                                           name="quiz_name"
-                                           required
-                                           value="{{ quiz_name }}"
-                                           placeholder="{% translate 'Enter exam title' %}">
-                                    <div class="invalid-feedback">
-                                        {% translate "Please enter an exam title" %}
-                                    </div>
-                                </div>
-
-                                <!-- Course Offering (determines course and level) -->
-                                <div class="aw-field">
-                                    <label for="course_offering">
-                                        {% translate "Course Offering" %}
-                                        <span class="aw-req">*</span>
-                                    </label>
-                                    <select class="aw-select" id="course_offering" name="course_offering" required>
-                                        <option value="">{% translate "Select Course Offering" %}</option>
-                                        {% for group in offering_groups %}
-                                        <optgroup label="{{ group.label }}">
-                                            {% for offering in group.options %}
-                                            <option value="{{ offering.value }}" {% if offering.value == selected_offering_id|stringformat:'s' %}selected{% endif %}>{{ offering.label }}</option>
-                                            {% endfor %}
-                                        </optgroup>
-                                        {% endfor %}
-                                    </select>
-                                    <div class="aw-field-hint">{% translate "The offering determines the course, level, and academic year." %}</div>
-                                </div>
-
-                                <div class="aw-field">
-                                    <label for="quiz_type">
-                                        {% translate "Quiz Type" %}
-                                        <span class="aw-req">*</span>
-                                    </label>
-                                    <select class="aw-select" id="quiz_type" name="quiz_type" required>
-                                        <option value="">{% translate "Select quiz type" %}</option>
-                                        {% for quiz_type in quiz_types %}
-                                            <option value="{{ quiz_type.pk }}" {% if quiz_type.pk == selected_quiz_type_id %}selected{% endif %}>
-                                                {{ quiz_type.name_en }}{% if quiz_type.name_ar %} - {{ quiz_type.name_ar }}{% endif %}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
+                        <div class="aw-form-grid">
+                            <!-- Quiz Name -->
+                            <div class="aw-field" @focusout="validateField($event)">
+                                <label for="quiz_name">
+                                    {% translate "Exam Title" %}
+                                    <span class="aw-req">*</span>
+                                </label>
+                                <input type="text"
+                                       class="aw-input"
+                                       id="quiz_name"
+                                       name="quiz_name"
+                                       required
+                                       value="{{ quiz_name }}"
+                                       {% if not quiz_editable %}disabled{% endif %}
+                                       placeholder="{% translate 'Enter exam title' %}">
+                                <div class="invalid-feedback">
+                                    {% translate "Please enter an exam title" %}
                                 </div>
                             </div>
-                        </fieldset>
+
+                            <!-- Course Offering (determines course and level) -->
+                            <div class="aw-field">
+                                <label for="course_offering">
+                                    {% translate "Course Offering" %}
+                                    <span class="aw-req">*</span>
+                                </label>
+                                <select class="aw-select" id="course_offering" name="course_offering" required {% if not quiz_editable %}disabled{% endif %}>
+                                    <option value="">{% translate "Select Course Offering" %}</option>
+                                    {% for group in offering_groups %}
+                                    <optgroup label="{{ group.label }}">
+                                        {% for offering in group.options %}
+                                        <option value="{{ offering.value }}" {% if offering.value == selected_offering_id|stringformat:'s' %}selected{% endif %}>{{ offering.label }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endfor %}
+                                </select>
+                                <div class="aw-field-hint">{% translate "The offering determines the course, level, and academic year." %}</div>
+                            </div>
+
+                            <div class="aw-field">
+                                <label for="quiz_type">
+                                    {% translate "Quiz Type" %}
+                                    <span class="aw-req">*</span>
+                                </label>
+                                <select class="aw-select" id="quiz_type" name="quiz_type" required {% if not quiz_editable %}disabled{% endif %}>
+                                    <option value="">{% translate "Select quiz type" %}</option>
+                                    {% for quiz_type in quiz_types %}
+                                        <option value="{{ quiz_type.pk }}" {% if quiz_type.pk == selected_quiz_type_id %}selected{% endif %}>
+                                            {{ quiz_type.name_en }}{% if quiz_type.name_ar %} - {{ quiz_type.name_ar }}{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="aw-field">
+                                <label for="quiz-status">{% translate "Status" %}</label>
+                                <select class="aw-select" id="quiz-status" name="status" required>
+                                    {% for status_value, status_label in publication_statuses %}
+                                    <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Opening Date -->
+                            <div class="aw-field" @focusout="validateField($event)">
+                                <label for="opening_date">
+                                    {% translate "Exam Opening Date" %}
+                                    <span class="aw-req">*</span>
+                                </label>
+                                <input type="datetime-local"
+                                       class="aw-input"
+                                       id="opening_date"
+                                       name="opening_date"
+                                       required
+                                       value="{{ opening_date }}"
+                                       {% if not quiz_editable %}disabled{% endif %}>
+                                <div class="invalid-feedback">
+                                    {% translate "Please select an opening date" %}
+                                </div>
+                            </div>
+
+                            <!-- Closing Date -->
+                            <div class="aw-field" @focusout="validateField($event)">
+                                <label for="closing_date">
+                                    {% translate "Exam Closing Date" %}
+                                    <span class="aw-req">*</span>
+                                </label>
+                                <input type="datetime-local"
+                                       class="aw-input"
+                                       id="closing_date"
+                                       name="closing_date"
+                                       required
+                                       value="{{ closing_date }}"
+                                       {% if not quiz_editable %}disabled{% endif %}>
+                                <div class="invalid-feedback">
+                                    {% translate "Please select a closing date" %}
+                                </div>
+                            </div>
+
+                            <div class="aw-field">
+                                <label for="duration_minutes" class="aw-field-label">{% translate "Duration (minutes)" %}</label>
+                                <input type="number"
+                                       class="aw-input"
+                                       id="duration_minutes"
+                                       name="duration_minutes"
+                                       min="0"
+                                       required
+                                       value="{{ duration_minutes|default_if_none:0 }}"
+                                       {% if not quiz_editable %}disabled{% endif %}>
+                                <span class="aw-field-hint">{% translate "0 means no time limit: the attempt is bounded only by the quiz closing date." %}</span>
+                                <div class="invalid-feedback">
+                                    {% translate "Please enter a duration" %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="aw-field-hint aw-mt-3">{% blocktranslate with timezone=application_timezone %}All exam schedule times use {{ timezone }}.{% endblocktranslate %}</p>
                     </div>
                 </section>
 
                 <section class="aw-card" aria-labelledby="quiz-questions-heading">
-                    <div class="aw-form-section">
-                        <div class="aw-form-section-head">
-                            <div>
-                                <h3 id="quiz-questions-heading">{% translate "Questions" %}</h3>
-                            </div>
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+                            <h3 id="quiz-questions-heading">{% translate "Questions" %}</h3>
                         </div>
+                        <span class="aw-pill aw-pill--muted aw-pill--plain">{{ questions|length }} {% translate "Questions" %}</span>
+                    </div>
+                    <div class="aw-card-body">
                         <fieldset {% if not quiz_editable %}disabled{% endif %}>
                             {% with is_student=False mode="edit" %}
                             {% include 'questions_rendering.html' %}
                             {% endwith %}
 
-                            <div class="d-flex justify-content-end mt-3">
+                            <div class="aw-flex aw-mt-3">
                                 <button type="button"
-                                        class="aw-btn aw-btn--ghost aw-btn--sm"
+                                        class="aw-btn aw-btn--ghost aw-btn--sm aw-ms-auto"
                                         data-action="add-question">
                                     <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
                                     {% translate "Add Question" %}
@@ -251,25 +332,6 @@
             </div>
 
             <aside class="aw-editor-rail">
-                <section class="aw-card" aria-labelledby="quiz-status-heading">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
-                            <h3 id="quiz-status-heading">{% translate "Status" %}</h3>
-                        </div>
-                    </div>
-                    <div class="aw-card-body">
-                        <div class="aw-field">
-                            <label for="quiz-status">{% translate "Status" %}</label>
-                            <select class="aw-select" id="quiz-status" name="status" required>
-                                {% for status_value, status_label in publication_statuses %}
-                                <option value="{{ status_value }}" {% if status_value == content_status %}selected{% endif %}>{{ status_label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                </section>
-
                 <section class="aw-card" aria-labelledby="quiz-schedule-heading">
                     <div class="aw-card-head">
                         <div class="aw-card-title">
@@ -278,86 +340,121 @@
                         </div>
                     </div>
                     <div class="aw-card-body">
-                        <fieldset {% if not quiz_editable %}disabled{% endif %}>
-                            <div class="d-flex flex-column gap-3">
-                                <!-- Opening Date -->
-                                <div class="aw-field" @focusout="validateField($event)">
-                                    <label for="opening_date">
-                                        {% translate "Exam Opening Date" %}
-                                        <span class="aw-req">*</span>
-                                    </label>
-                                    <input type="datetime-local"
-                                           class="aw-input"
-                                           id="opening_date"
-                                           name="opening_date"
-                                           required
-                                           value="{{ opening_date }}">
-                                    <div class="invalid-feedback">
-                                        {% translate "Please select an opening date" %}
-                                    </div>
-                                </div>
-
-                                <!-- Closing Date -->
-                                <div class="aw-field" @focusout="validateField($event)">
-                                    <label for="closing_date">
-                                        {% translate "Exam Closing Date" %}
-                                        <span class="aw-req">*</span>
-                                    </label>
-                                    <input type="datetime-local"
-                                           class="aw-input"
-                                           id="closing_date"
-                                           name="closing_date"
-                                           required
-                                           value="{{ closing_date }}">
-                                    <div class="invalid-feedback">
-                                        {% translate "Please select a closing date" %}
-                                    </div>
-                                </div>
-
-                                <p class="aw-field-hint mb-0">{% blocktranslate with timezone=application_timezone %}All exam schedule times use {{ timezone }}.{% endblocktranslate %}</p>
-
-                                <div class="aw-field">
-                                    <label for="duration_minutes">{% translate "Duration (minutes)" %}</label>
-                                    <input type="number"
-                                           class="aw-input"
-                                           id="duration_minutes"
-                                           name="duration_minutes"
-                                           min="0"
-                                           required
-                                           value="{{ duration_minutes|default_if_none:60 }}">
-                                    <div class="aw-field-hint">
-                                        {% blocktranslate with minutes=duration_minutes|default_if_none:60 %}Allowed time: up to {{ minutes }} minutes after starting.{% endblocktranslate %}
-                                    </div>
-                                </div>
-                            </div>
-                        </fieldset>
+                        <div class="aw-kv">
+                            <dt>{% translate "Opening Date" %}</dt>
+                            <dd>{{ opening_date|date:"Y-m-d H:i"|default:"-" }}</dd>
+                        </div>
+                        <div class="aw-kv">
+                            <dt>{% translate "Closing Date" %}</dt>
+                            <dd>{{ closing_date|date:"Y-m-d H:i"|default:"-" }}</dd>
+                        </div>
+                        <div class="aw-kv">
+                            <dt>{% translate "Duration (minutes)" %}</dt>
+                            <dd>{% if duration_minutes %}{{ duration_minutes }}{% else %}{% translate "No limit" %}{% endif %}</dd>
+                        </div>
+                        <p class="aw-small aw-muted aw-mt-2">{% blocktranslate with timezone=application_timezone %}All exam schedule times use {{ timezone }}.{% endblocktranslate %}</p>
                     </div>
                 </section>
+
+                <section class="aw-card" aria-labelledby="quiz-summary-heading">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+                            <h3 id="quiz-summary-heading">{% translate "Summary" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <div class="aw-kv">
+                            <dt>{% translate "Questions" %}</dt>
+                            <dd>{{ questions|length }}</dd>
+                        </div>
+                        <div class="aw-kv">
+                            <dt>{% translate "Status" %}</dt>
+                            <dd>{{ content_status_display }}</dd>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="quiz-checklist-heading">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+                            <h3 id="quiz-checklist-heading">{% translate "Publish checklist" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <div class="aw-checklist">
+                            <div class="aw-check-item{% if not quiz_name %} aw-check-item--todo{% endif %}">
+                                {% if quiz_name %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                                {% else %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                                {% endif %}
+                                <span><b>{% translate "Exam Title" %}</b><span class="visually-hidden">{% if quiz_name %}{% translate "Completed" %}{% else %}{% translate "Not started" %}{% endif %}</span></span>
+                            </div>
+                            <div class="aw-check-item{% if not selected_offering_id %} aw-check-item--todo{% endif %}">
+                                {% if selected_offering_id %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                                {% else %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                                {% endif %}
+                                <span><b>{% translate "Course Offering" %}</b><span class="visually-hidden">{% if selected_offering_id %}{% translate "Completed" %}{% else %}{% translate "Not started" %}{% endif %}</span></span>
+                            </div>
+                            <div class="aw-check-item{% if not selected_quiz_type_id %} aw-check-item--todo{% endif %}">
+                                {% if selected_quiz_type_id %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                                {% else %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                                {% endif %}
+                                <span><b>{% translate "Quiz Type" %}</b><span class="visually-hidden">{% if selected_quiz_type_id %}{% translate "Completed" %}{% else %}{% translate "Not started" %}{% endif %}</span></span>
+                            </div>
+                            <div class="aw-check-item{% if not questions %} aw-check-item--todo{% endif %}">
+                                {% if questions %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                                {% else %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                                {% endif %}
+                                <span><b>{% translate "Questions" %}</b><span class="visually-hidden">{% if questions %}{% translate "Completed" %}{% else %}{% translate "Not started" %}{% endif %}</span></span>
+                            </div>
+                        </div>
+                        <p class="aw-small aw-muted aw-mt-2">{% translate "Based on the values in this form." %}</p>
+                    </div>
+                </section>
+
+                {% if quiz_mode == "update" and caps.delete_content %}
+                <section class="aw-card" aria-labelledby="quiz-danger-heading">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                            <h3 id="quiz-danger-heading">{% translate "Danger zone" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <button type="submit"
+                                form="aw-quiz-delete-form"
+                                class="aw-btn aw-btn--danger aw-w-100">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                            {% translate "Delete" %} {% translate "Quiz" %}
+                        </button>
+                    </div>
+                </section>
+                {% endif %}
             </aside>
         </div>
-
-        <!-- Form Actions -->
-        <div class="aw-card">
-            <div class="aw-form-actions">
-                <button type="submit"
-                        class="aw-btn aw-btn--primary"
-                        :disabled="submitting">
-                    <span x-show="!submitting">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-                        {% translate "Submit" %}
-                    </span>
-                    <span x-show="submitting" :class="{ 'd-flex align-items-center justify-content-center': submitting }">
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        {% translate "Submitting..." %}
-                    </span>
-                </button>
-                <button type="reset"
-                        class="aw-btn aw-btn--ghost"
-                        @click="$event.target.closest('form').dispatchEvent(new Event('reset'))">
-                    <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
-                    {% translate "Reset" %}
-                </button>
-            </div>
-        </div>
     </form>
+
+    {% if quiz_mode == "update" and caps.delete_content %}
+    {% comment %}
+    Delete is a separate POST form declared after the editor form because HTML
+    does not allow nested forms. The button above is associated through its
+    form attribute; the existing DeleteQuiz route and capability gate are
+    unchanged.
+    {% endcomment %}
+    <form id="aw-quiz-delete-form" method="post"
+          action="{% url 'quiz-delete' quiz_id=request.resolver_match.kwargs.quiz_id %}"
+          hidden
+          data-confirm-message="{% translate 'Are you sure you want to delete this item?' %}">
+        {% csrf_token %}
+    </form>
+    {% endif %}
 </div>

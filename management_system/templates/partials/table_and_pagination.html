@@ -28,34 +28,6 @@
 
         <!-- Bulk Actions & Column Controls -->
     <div class="aw-table-tools">
-        <!-- Bulk Actions (shown when items selected) -->
-        <div class="aw-bulkbar" x-show="selected.length > 0" x-transition x-cloak>
-            <span class="bulk-count">
-                <i class="fas fa-check-circle me-1"></i>
-                <span x-text="selectionLabel()"></span>
-            </span>
-            <button class="aw-btn aw-btn--danger aw-btn--sm"
-                    @click="deleteSelected()"
-                    :disabled="selected.length === 0">
-                <i class="fas fa-trash me-1"></i>
-                <span>{% translate "Delete Selected" %}</span>
-            </button>
-            <button class="aw-btn aw-btn--ghost aw-btn--sm"
-                    @click="clearSelection()">
-                <i class="fas fa-times me-1"></i>
-                <span>{% translate "Clear" %}</span>
-            </button>
-            {% if view == 'quiz' and caps.manage_academic_setup %}
-            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
-                    @click="recalculateQuizzes('selected')" :disabled="recalculationBusy || !!recalculationStatusUrl">
-                {% translate "Recalculate selected quizzes" %}
-            </button>
-            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" @click="recalculateQuizzes('selected', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
-                {% translate "Reconcile selected quizzes" %}
-            </button>
-            {% endif %}
-        </div>
-
         <!-- Column Visibility Toggle -->
         <div class="column-controls">
             {% if view == 'quiz' and caps.manage_academic_setup %}
@@ -67,43 +39,36 @@
                 {% translate "Reconcile all matching quizzes" %}
             </button>
             {% endif %}
-            <div class="dropdown">
-                <button class="aw-btn aw-btn--ghost aw-btn--sm dropdown-toggle"
-                        type="button"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false">
-                    <i class="fas fa-columns me-1"></i>
+            <div class="aw-menu-wrap">
+                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
+                        data-aw-menu-trigger aria-expanded="false" aria-haspopup="menu">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-columns"></use></svg>
                     <span>{% translate "Columns" %}</span>
                 </button>
-                <ul class="dropdown-menu column-menu">
+                <div class="aw-menu" role="menu" hidden>
                     <template x-for="(col, index) in columns" :key="index">
-                        <li>
-                            <label class="column-option dropdown-item d-flex align-items-center gap-2">
-                                <input class="form-check-input m-0"
-                                       type="checkbox"
-                                       x-model="col.visible"
-                                       @change="saveColumnPreferences()">
-                                <span x-text="col.name"></span>
-                            </label>
-                        </li>
+                        <label class="aw-menu-item">
+                            <input type="checkbox" x-model="col.visible" @change="saveColumnPreferences()">
+                            <span x-text="col.name"></span>
+                        </label>
                     </template>
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <button class="dropdown-item" @click="resetColumns()">
-                            <i class="fas fa-redo me-2"></i>
-                            {% translate "Reset to Default" %}
-                        </button>
-                    </li>
-                </ul>
+                    <hr class="aw-divider">
+                    <button type="button" class="aw-menu-item" @click="resetColumns()">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                        {% translate "Reset to Default" %}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Select-all-matching hint (non-application branch) -->
     <div class="aw-alert aw-alert--info" x-show="showSelectAllHint()" x-cloak role="status">
-        <i class="fas fa-check-double me-2" aria-hidden="true"></i>
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
         <span>{% translate "All rows on this page are selected." %}</span>
-        <button type="button" class="aw-btn aw-btn--primary aw-btn--sm ms-2" @click="selectAllMatching()">
+        <button type="button" class="aw-btn aw-btn--primary aw-btn--sm"
+                aria-label="{% translate 'Select all rows matching the filter' %}"
+                @click="selectAllMatching()">
             <span x-text="selectAllMatchingLabel()"></span>
         </button>
     </div>
@@ -112,10 +77,16 @@
     <!-- Responsive Table -->
     {% if view == 'quiz' and caps.manage_academic_setup %}
     <div class="aw-alert aw-alert--info" x-show="!!recalculationStatus" x-cloak role="status" aria-live="polite">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
         <span x-text="recalculationStatus"></span>
-        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
+        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
                 x-show="!!recalculationStatusUrl && !recalculationBusy" @click="pollRecalculation()">
             {% translate "Refresh recalculation status" %}
+        </button>
+        <button type="button" class="aw-icon-btn aw-ms-auto"
+                @click="dismissRecalculationStatus()"
+                title="{% translate 'Dismiss' %}" aria-label="{% translate 'Dismiss' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
         </button>
     </div>
     {% endif %}
@@ -124,24 +95,25 @@
         {% translate "Scroll horizontally to see all columns." %}
     </div>
     <div class="aw-table-wrap">
-        <table class="aw-table{% if view == 'application' %} mb-0{% endif %} aw-table">
+        <table class="aw-table">
             <thead>
                 {% if view == "application" %}
                 <tr>
-                    <th class="column-checkbox"><input type="checkbox" id="select-all" aria-label="{% translate 'Select all visible applications' %}"></th>
+                    <th class="aw-cell-check"><input type="checkbox" id="select-all" aria-label="{% translate 'Select all visible applications' %}"></th>
                     <th>{% translate "Name" %}</th>
                     <th>{% translate "Phone" %}</th>
                     <th>{% translate "City" %}</th>
                     <th>{% translate "Mode" %}</th>
                     <th>{% translate "Submitted" %}</th>
                     <th>{% translate "Status" %}</th>
-                    <th class="column-actions">{% translate "Actions" %}</th>
+                    <th class="aw-row-actions">{% translate "Actions" %}</th>
                 </tr>
                 {% else %}
                 <tr>
                     <th class="column-checkbox">
                         <input type="checkbox"
-                               class="form-check-input"
+                               class="aw-check-input"
+                               aria-label="{% translate 'Select all rows on this page' %}"
                                @change="toggleAll($event)"
                                :checked="selectAll">
                     </th>
@@ -156,10 +128,18 @@
                         role="button"
                         tabindex="0">
                         <span>{{ col.label }}</span>
+                        {% if view == "course" or view == "lesson" or view == "quiz" %}
                         {% if sort_key == col.key %}
-                            <i class="fas fa-sort-{{ sort_order|default:'asc' }} ms-1"></i>
+                            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
                         {% else %}
-                            <i class="fas fa-sort text-muted ms-1 sort-icon"></i>
+                            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-sort"></use></svg>
+                        {% endif %}
+                        {% else %}
+                        {% if sort_key == col.key %}
+                            <i class="fas fa-sort-{{ sort_order|default:'asc' }} aw-ms-1"></i>
+                        {% else %}
+                            <i class="fas fa-sort aw-muted aw-ms-1 sort-icon"></i>
+                        {% endif %}
                         {% endif %}
                     </th>
                     {% endfor %}
@@ -174,15 +154,23 @@
                         role="button"
                         tabindex="0">
                         <span>{{ col }}</span>
+                        {% if view == "course" or view == "lesson" or view == "quiz" %}
                         {% if request.GET.sort == col %}
-                            <i class="fas fa-sort-{{ request.GET.order|default:'up' }} ms-1"></i>
+                            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
                         {% else %}
-                            <i class="fas fa-sort text-muted ms-1 sort-icon"></i>
+                            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-sort"></use></svg>
+                        {% endif %}
+                        {% else %}
+                        {% if request.GET.sort == col %}
+                            <i class="fas fa-sort-{{ request.GET.order|default:'up' }} aw-ms-1"></i>
+                        {% else %}
+                            <i class="fas fa-sort aw-muted aw-ms-1 sort-icon"></i>
+                        {% endif %}
                         {% endif %}
                     </th>
                     {% endfor %}
                     {% endif %}
-                    <th class="column-actions text-center">
+                    <th class="column-actions aw-ta-c">
                         {% translate "Actions" %}
                     </th>
                 </tr>
@@ -192,8 +180,15 @@
                 {% if view == "application" %}
                 {% for u in page_obj.object_list %}
                 <tr data-id="{{ u.id }}">
-                    <td class="column-checkbox"><input type="checkbox" class="user-checkbox" value="{{ u.id }}" aria-label="{% blocktranslate with name=u.get_full_name|default:u.username %}Select {{ name }}{% endblocktranslate %}"></td>
-                    <td>{{ u.get_full_name|default:u.username }}</td>
+                    <td class="aw-cell-check"><input type="checkbox" class="user-checkbox" value="{{ u.id }}" aria-label="{% blocktranslate with name=u.get_full_name|default:u.username %}Select {{ name }}{% endblocktranslate %}"></td>
+                    <td>
+                        <div class="aw-cell-main">
+                            <div class="aw-cell-main-text">
+                                <b>{{ u.get_full_name|default:u.username }}</b>
+                                {% if u.get_full_name %}<span>{{ u.username }}</span>{% endif %}
+                            </div>
+                        </div>
+                    </td>
                     <td>{{ u.phone|default:"-" }}</td>
                     <td>{{ u.city|default:"-" }}</td>
                     <td>{% if u.study_mode %}{{ u.get_study_mode_display }}{% else %}<span class="aw-muted">-</span>{% endif %}</td>
@@ -204,7 +199,7 @@
                     <td>
                         <div class="aw-row-actions">
                             <a href="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}"
-                               class="aw-btn aw-btn--ghost aw-btn--sm">
+                               class="aw-btn aw-btn--sm">
                                 <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg> {% translate "Review" %}
                             </a>
                             <form method="post"
@@ -218,8 +213,8 @@
                                   class="ps-inline-form"
                                   data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
                                 {% csrf_token %}
-                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg> {% translate "Delete" %}
+                                <button type="submit" class="aw-icon-btn" aria-label="{% translate 'Delete' %}" title="{% translate 'Delete' %}">
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
                                 </button>
                             </form>
                         </div>
@@ -246,95 +241,64 @@
                 <tr data-id="{{ values.id }}">
                     <td class="column-checkbox">
                         <input type="checkbox"
-                               class="form-check-input row-checkbox"
+                               class="aw-check-input row-checkbox"
+                               aria-label="{% translate 'Select row' %}"
                                :value="'{{ values.id }}'"
                                x-model="selected"
                                @change="updateSelectAll()">
                     </td>
                     {% for value in values.rows %}
                     <td x-show="columns[{{ forloop.counter0 }}].visible">
-                        <span class="cell-content">{{ value }}</span>
+                        {% if view == "course" or view == "lesson" or view == "quiz" %}
+                            {% if forloop.first %}
+                        <div class="aw-cell-main">
+                            <div class="aw-cell-main-text">
+                                {% if values.url %}<a href="{{ values.url }}"><b>{{ value|default_if_none:"-" }}</b></a>{% else %}<b>{{ value|default_if_none:"-" }}</b>{% endif %}
+                                {% if values.level %}<span class="aw-cell-sub">{{ values.level }}</span>{% endif %}
+                            </div>
+                        </div>
+                            {% else %}
+                        <span class="cell-content">{{ value|default_if_none:"-" }}</span>
+                            {% endif %}
+                        {% else %}
+                        <span class="cell-content">{{ value|default_if_none:"-" }}</span>
+                        {% endif %}
                     </td>
                     {% endfor %}
 
-                    <!-- Action Buttons -->
+                    <!-- Action Buttons: one compact icon cluster. The label
+                         lives in title/aria-label so six actions fit in the
+                         column without wrapping into a button wall. -->
                     <td class="column-actions{% if submission_view %} quiz-actions-cell{% endif %}">
+                        <div class="aw-row-actions">
                         {% if submission_view %}
-                        <div class="quiz-actions aw-row-actions">
-                            <div class="aw-row-actions quiz-actions-row">
-                                <a href="{{ values.url }}" class="aw-btn aw-btn--outline aw-btn--sm">
-                                    <i class="fas fa-question-circle me-1"></i>
-                                    <span>{% translate "Quiz Details" %}</span>
-                                </a>
-                                <button class="aw-btn aw-btn--primary aw-btn--sm"
-                                        hx-get="{{ values.url }}view-submission/"
-                                        hx-swap="innerHTML"
-                                        hx-target="#display-page"
-                                        hx-trigger="click"
-                                        hx-push-url="true"
-                                        hx-select="#page-region">
-                                    <i class="fas fa-users me-1"></i>
-                                    <span>{% translate "View Submissions" %}</span>
-                                </button>
-                            </div>
-                        {% endif %}
-                        {% if submission_user %}
-                        <div class="aw-row-actions{% if submission_view %} quiz-actions-row{% endif %}">
-                            <button class="aw-btn aw-btn--primary aw-btn--sm"
+                            <a href="{{ values.url }}" class="aw-icon-btn" title="{% translate 'Quiz Details' %}" aria-label="{% translate 'Quiz Details' %}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                            </a>
+                            <button class="aw-icon-btn" title="{% translate 'View Submissions' %}" aria-label="{% translate 'View Submissions' %}"
+                                    hx-get="{{ values.url }}view-submission/"
+                                    hx-swap="innerHTML"
+                                    hx-target="#display-page"
+                                    hx-trigger="click"
+                                    hx-push-url="true"
+                                    hx-select="#page-region">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+                            </button>
+                        {% elif submission_user %}
+                            <button class="aw-icon-btn" title="{% translate 'View' %}" aria-label="{% translate 'View' %}"
                                     hx-get="{{ values.url }}"
                                     hx-swap="innerHTML"
                                     hx-target="#display-page"
                                     hx-trigger="click"
                                     hx-push-url="true"
                                     hx-select="#page-region">
-                                <i class="fas fa-eye me-1"></i>
-                                <span>{% translate "View" %}</span>
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
                             </button>
                             <a href="{% url 'export-submission-csv' grade_id=values.submission_id %}"
-                               class="aw-btn aw-btn--outline aw-btn--sm">
-                                <i class="fas fa-download me-1"></i>
-                                <span>{% translate "Export" %}</span>
+                               class="aw-icon-btn" title="{% translate 'Export' %}" aria-label="{% translate 'Export' %}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
                             </a>
-                        </div>
-                        {% else %}
-                        <div class="aw-row-actions{% if submission_view %} quiz-actions-row{% endif %}">
-                            {% if view == 'quiz' and caps.manage_academic_setup %}
-                            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
-                                    @click="recalculateQuizzes('single', {{ values.id }})"
-                                    :disabled="recalculationBusy || !!recalculationStatusUrl">
-                                <i class="fas fa-calculator me-1" aria-hidden="true"></i>{% translate "Recalculate submissions" %}
-                            </button>
-                                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
-                                    @click="recalculateQuizzes('single', {{ values.id }}, 'reconcile')"
-                                    :disabled="recalculationBusy || !!recalculationStatusUrl">
-                                    {% translate "Reconcile snapshots" %}
-                                </button>
-                            {% endif %}
-                            <button class="aw-btn aw-btn--ghost aw-btn--sm"
-                                    hx-get="{{ values.url }}update/"
-                                    hx-swap="innerHTML"
-                                    hx-target="#display-page"
-                                    hx-trigger="click"
-                                    hx-push-url="true"
-                                    hx-select="#page-region">
-                                <i class="fas fa-edit me-1"></i>
-                                <span>{% translate "Edit" %}</span>
-                            </button>
-
-                            <button class="aw-btn aw-btn--danger aw-btn--sm"
-                                    hx-delete="{{ values.url }}delete/"
-                                    hx-swap="delete"
-                                    hx-target="closest tr"
-                                    hx-trigger="click"
-                                    hx-confirm="{% translate 'Are you sure you want to delete this item?' %}"
-                                    hx-on::after:request="if (event.detail.ctx && event.detail.ctx.response && event.detail.ctx.response.status < 400 && window.Alpine && window.Alpine.store) { window.Alpine.store('notifications').add('{% translate "Item deleted successfully" %}', 'success'); }">
-                                <i class="fas fa-trash me-1"></i>
-                                <span>{% translate "Delete" %}</span>
-                            </button>
-                        </div>
-                        {% endif %}
-                        {% if submission_user and can_delete_submission %}
-                        <div class="aw-row-actions quiz-actions-row">
+                            {% if can_delete_submission %}
                             <form method="post"
                                   action="{% url 'quiz-submission-delete' quiz_id=quiz_id grade_id=values.submission_id %}{% if submission_filter_query %}?{{ submission_filter_query }}{% endif %}"
                                   hx-post="{% url 'quiz-submission-delete' quiz_id=quiz_id grade_id=values.submission_id %}{% if submission_filter_query %}?{{ submission_filter_query }}{% endif %}"
@@ -345,16 +309,46 @@
                                   hx-push-url="true"
                                   data-confirm-message="{% translate 'Delete this quiz submission?' %}">
                                 {% csrf_token %}
-                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">
-                                    <i class="fas fa-trash me-1" aria-hidden="true"></i>
-                                    {% translate "Delete submission" %}
+                                <button type="submit" class="aw-icon-btn is-danger" title="{% translate 'Delete submission' %}" aria-label="{% translate 'Delete submission' %}">
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
                                 </button>
                             </form>
-                        </div>
+                            {% endif %}
+                        {% else %}
+                            {% if view == 'quiz' and caps.manage_academic_setup %}
+                            <button type="button" class="aw-icon-btn"
+                                    title="{% translate 'Recalculate submissions' %}" aria-label="{% translate 'Recalculate submissions' %}"
+                                    @click="recalculateQuizzes('single', {{ values.id }})"
+                                    :disabled="recalculationBusy || !!recalculationStatusUrl">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                            </button>
+                            <button type="button" class="aw-icon-btn"
+                                    title="{% translate 'Reconcile snapshots' %}" aria-label="{% translate 'Reconcile snapshots' %}"
+                                    @click="recalculateQuizzes('single', {{ values.id }}, 'reconcile')"
+                                    :disabled="recalculationBusy || !!recalculationStatusUrl">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+                            </button>
+                            {% endif %}
+                            <button class="aw-icon-btn" title="{% translate 'Edit' %}" aria-label="{% translate 'Edit' %}"
+                                    hx-get="{{ values.url }}update/"
+                                    hx-swap="innerHTML"
+                                    hx-target="#display-page"
+                                    hx-trigger="click"
+                                    hx-push-url="true"
+                                    hx-select="#page-region">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                            </button>
+                            <button class="aw-icon-btn is-danger" title="{% translate 'Delete' %}" aria-label="{% translate 'Delete' %}"
+                                    hx-delete="{{ values.url }}delete/"
+                                    hx-swap="delete"
+                                    hx-target="closest tr"
+                                    hx-trigger="click"
+                                    hx-confirm="{% translate 'Are you sure you want to delete this item?' %}"
+                                    hx-on::after:request="if (event.detail.ctx && event.detail.ctx.response && event.detail.ctx.response.status < 400 && window.Alpine && window.Alpine.store) { window.Alpine.store('notifications').add('{% translate "Item deleted successfully" %}', 'success'); }">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                            </button>
                         {% endif %}
-                        {% if submission_view %}
                         </div>
-                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
@@ -378,6 +372,39 @@
     {% else %}
     {% translate "Page navigation" as pagination_aria_label %}
     {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query hx_target="#table-container" hx_indicator="#table-loading" aria_label=pagination_aria_label %}
+    {% endif %}
+
+    {% if view != "application" %}
+    <!-- Bulk actions sit below the table footer, as in the prototype: a sticky
+         bar that only exists while rows are selected. -->
+    <div class="aw-bulkbar" x-show="selected.length > 0" x-transition x-cloak
+         role="region" aria-label="{% translate 'Bulk actions' %}">
+        <span class="aw-count">
+            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-check-square"></use></svg>
+            <span x-text="selectionLabel()"></span>
+        </span>
+        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
+                @click="clearSelection()">
+            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-x"></use></svg>
+            <span>{% translate "Clear" %}</span>
+        </button>
+        <span class="aw-ms-auto"></span>
+        {% if view == 'quiz' and caps.manage_academic_setup %}
+        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
+                @click="recalculateQuizzes('selected')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+            {% translate "Recalculate selected quizzes" %}
+        </button>
+        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" @click="recalculateQuizzes('selected', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+            {% translate "Reconcile selected quizzes" %}
+        </button>
+        {% endif %}
+        <button type="button" class="aw-btn aw-btn--danger aw-btn--sm"
+                @click="deleteSelected()"
+                :disabled="selected.length === 0">
+            <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-trash"></use></svg>
+            <span>{% translate "Delete Selected" %}</span>
+        </button>
+    </div>
     {% endif %}
 </div>
 {# tableManager function is now in static/js/alpine/components/tableManager.js #}

@@ -1,10 +1,12 @@
 {% load i18n %}
 {% comment %}
-Confirm Broadcast workspace. Presentation only: both POST forms keep their
-action, method, csrf token, hx-* contract and confirm message; the academic
-year, target, recipient preview count, message and attachments remain the
-server-projected values. The page has no actions, so it uses the complete
-shared page head.
+Confirm Broadcast workspace.
+
+Presentation only. Both POST forms keep their action, method, csrf token,
+hx-* contract and confirm message; the academic year, target, recipient preview
+count, message and attachments remain the server-projected values. The page has
+no actions, so it uses the complete shared page head. No boolean field exists on
+this page, so no .aw-switch is rendered.
 {% endcomment %}
 {% translate "Engagement" as page_eyebrow %}
 {% translate "Confirm Broadcast" as page_title %}
@@ -17,6 +19,23 @@ shared page head.
         <div>{% translate "Sending cannot be undone. Confirming snapshots the recipients and queues delivery immediately." %}</div>
     </div>
 
+    <div class="aw-context-strip">
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            {% translate "Audience" %} <b>{{ target_label }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+            <b>{{ recipient_preview_count }}</b> {% translate "Recipients" %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            {% translate "Academic Year" %} <b>{{ broadcast.academic_year.name }}</b>
+        </span>
+    </div>
+
     <section class="aw-card">
         <div class="aw-card-head">
             <div class="aw-card-title">
@@ -25,7 +44,7 @@ shared page head.
             </div>
         </div>
         <div class="aw-card-body">
-            <dl class="mb-0">
+            <dl class="aw-dl">
                 <div class="aw-kv">
                     <dt>{% translate "Academic Year" %}</dt>
                     <dd>{{ broadcast.academic_year.name }}</dd>

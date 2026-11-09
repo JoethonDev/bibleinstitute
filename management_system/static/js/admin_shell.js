@@ -62,23 +62,36 @@
             var ctx = event.detail && event.detail.ctx;
             var target = (ctx && ctx.target) || event.target;
             if (!target || !(target instanceof Element)) return;
-            if (target.id !== 'display-page' && target.id !== 'page-region') return;
+            // Page-level swaps are any region that carries the workspace body:
+            // sidebar/rail navigations target #display-page, while table, form
+            // and pagination links target #content. Both replace the persistent
+            // OOB sidebar, so both must re-initialize Alpine on it.
+            var pageRegionIds = ['display-page', 'page-region', 'content'];
+            if (pageRegionIds.indexOf(target.id) === -1) return;
             closeAdminMenu();
-            try {
-                if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+            // Each tree gets its own guard: a throw while initializing the
+            // swapped page must not skip the persistent OOB regions, or the
+            // sidebar toggle loses its Alpine binding after navigation.
+            if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                try {
                     window.Alpine.initTree(target);
-                    // Page navigation also replaces the persistent sidebar and
-                    // mobile navigation through hx-select-oob. Those regions are
-                    // new DOM after the swap and carry Alpine bindings, so they
-                    // are initialized here instead of rebuilding the shell.
-                    var persistent = ['#aw-sidebar-body', '#aw-mobile-nav'];
-                    for (var p = 0; p < persistent.length; p++) {
-                        var regionNode = document.querySelector(persistent[p]);
-                        if (regionNode) window.Alpine.initTree(regionNode);
-                    }
+                } catch (error) { /* Alpine owns its scope; a missed tree stays as-is. */ }
+                // Page navigation also replaces the persistent sidebar and
+                // mobile navigation through hx-select-oob. Those regions are
+                // new DOM after the swap and carry Alpine bindings, so they
+                // are initialized here instead of rebuilding the shell.
+                var persistent = ['#aw-sidebar-body', '#aw-mobile-nav'];
+                for (var p = 0; p < persistent.length; p++) {
+                    var regionNode = document.querySelector(persistent[p]);
+                    if (!regionNode) continue;
+                    try {
+                        window.Alpine.initTree(regionNode);
+                    } catch (error) { /* A missed region keeps its markup. */ }
                 }
-            } catch (error) { /* Alpine owns its scope; a missed tree stays as-is. */ }
-            var region = target.id === 'page-region' ? target : target.querySelector('#page-region');
+            }
+            var region = target.id === 'page-region'
+                ? target
+                : (target.querySelector('#page-region') || document.getElementById('page-region'));
             if (region && typeof region.animate === 'function'
                     && window.matchMedia
                     && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -152,6 +165,18 @@
         document.body.style.removeProperty('padding-right');
     }
 
+    // Bootstrap marks a dialog aria-hidden while a descendant (usually its
+    // close button) can still hold focus, which browsers now reject with a
+    // console warning. Move focus out of the dialog before it hides.
+    document.addEventListener('hide.bs.modal', function (event) {
+        var modal = event.target;
+        if (!modal || typeof modal.contains !== 'function') return;
+        var active = document.activeElement;
+        if (active && active !== modal && modal.contains(active) && typeof active.blur === 'function') {
+            active.blur();
+        }
+    }, true);
+
     document.addEventListener('DOMContentLoaded', function () {
         scanDriveSentinels();
         document.addEventListener('htmx:after:swap', scanDriveSentinels);
@@ -178,6 +203,34 @@
                 loadDriveNextPage(sentinel);
             }
         });
+    });
+
+    // ---- Tab panels -------------------------------------------------------
+    // Real panels for tabbed workspaces (academic setup, promotion): one tab
+    // is selected and the others are hidden. Markup opts in with data-aw-tab /
+    // data-aw-tabpanel inside a [data-aw-tabs] root, so no page needs its own
+    // inline script and HTMX swaps keep working through delegation.
+    function selectWorkspaceTab(tab) {
+        var root = tab.closest('[data-aw-tabs]');
+        if (!root) return;
+        var name = tab.getAttribute('data-aw-tab');
+        root.querySelectorAll('[data-aw-tab]').forEach(function (item) {
+            var active = item === tab;
+            item.classList.toggle('is-active', active);
+            item.setAttribute('aria-selected', active ? 'true' : 'false');
+            item.setAttribute('tabindex', active ? '0' : '-1');
+        });
+        root.querySelectorAll('[data-aw-tabpanel]').forEach(function (panel) {
+            panel.hidden = panel.getAttribute('data-aw-tabpanel') !== name;
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest) return;
+        var tab = event.target.closest('[data-aw-tab]');
+        if (!tab) return;
+        event.preventDefault();
+        selectWorkspaceTab(tab);
     });
 
     // ---- Workspace top-bar menus and the one peek drawer -------------------

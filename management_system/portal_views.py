@@ -52,10 +52,10 @@ class BannerForm(forms.ModelForm):
         model = StudentBanner
         fields = ["title", "body", "action_label", "action_url"]
         widgets = {
-            "title": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 200}),
-            "body": forms.Textarea(attrs={"class": "form-control", "required": True, "rows": 3, "maxlength": 500}),
-            "action_label": forms.TextInput(attrs={"class": "form-control", "maxlength": 80}),
-            "action_url": forms.TextInput(attrs={"class": "form-control", "maxlength": 2048}),
+            "title": forms.TextInput(attrs={"class": "aw-input", "required": True, "maxlength": 200}),
+            "body": forms.Textarea(attrs={"class": "aw-textarea", "required": True, "rows": 3, "maxlength": 500}),
+            "action_label": forms.TextInput(attrs={"class": "aw-input", "maxlength": 80}),
+            "action_url": forms.TextInput(attrs={"class": "aw-input", "maxlength": 2048}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -282,10 +282,21 @@ def app_release_manage(request):
     policies = {}
     for platform in ("android", "ios"):
         policies[platform], _created = MobileAppUpdatePolicy.objects.get_or_create(platform=platform)
+
+    # Drawer fragment: the publish form for the shared peek drawer. A direct
+    # browser hit returns to the page instead of rendering a bare fragment.
+    if request.GET.get("fragment") == "form":
+        if request.headers.get("HX-Request") != "true":
+            return redirect("app-release-manage")
+        return render(request, "partials/drawer/app_release_form.html")
+
     return render_page(request, "app_release_manage.html", "partials/app_release_manage_content.html", {
         "releases_page_obj": releases_page_obj,
         "update_policies": policies,
         "download_policy": MobileDownloadPolicy.load(),
+        # The inline card is the no-JS path (?new=1); the normal path opens the
+        # shared drawer instead.
+        "show_form": request.GET.get("new") == "1",
         "pagination_query": pagination_query_string(request),
         "pagination_aria_label": _("Page navigation"),
         "breadcrumb_items": generate_breadcrumb([
@@ -332,6 +343,14 @@ def banner_manage(request):
         # Keep the bound values and every field/nonfield error on the page.
     else:
         form = BannerForm()
+
+    # Drawer fragment: the publish form for the shared peek drawer. A direct
+    # browser hit returns to the page instead of rendering a bare fragment.
+    if request.GET.get("fragment") == "form":
+        if request.headers.get("HX-Request") != "true":
+            return redirect("banner-manage")
+        return render(request, "partials/drawer/banner_form.html", {"form": form})
+
     page_obj = Paginator(
         StudentBanner.objects.order_by("-created_at", "-pk"),
         25,
@@ -341,6 +360,9 @@ def banner_manage(request):
         "pagination_query": pagination_query_string(request),
         "pagination_aria_label": _("Page navigation"),
         "form": form,
+        # The inline card is the no-JS path (?new=1) and the error path; the
+        # normal path opens the shared drawer instead.
+        "show_form": request.method == "POST" or request.GET.get("new") == "1",
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Banners"), None),

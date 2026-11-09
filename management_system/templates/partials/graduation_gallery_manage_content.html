@@ -3,15 +3,30 @@
 Graduation gallery management workspace. The album scope select, the R2
 staging upload authorize flow, the job status polling hooks, the per-item
 delete forms, the signed display URLs and the permission gates stay exactly
-as the view projects them. Presentation only: the upload/jobs/photos cards use
-the admin workspace primitives and are reachable through in-page anchor tabs;
-no JS tab widget is introduced. The page script stays outside #content because
-its ids and contract are unchanged.
+as the view projects them. Presentation only: the shared admin head, tabs,
+KPI strip, upload dropzone, gallery grid, jobs table and album rail are used.
+The page script stays outside #content because its ids and contract are
+unchanged.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
     {% translate "Media" as page_eyebrow %}
     {% translate "Graduation Gallery" as page_title %}
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+    {% translate "Publish the graduation album without exposing private R2 objects." as page_description %}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <a class="aw-btn" href="{% url 'r2-management-dashboard' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-server"></use></svg>
+                <span>{% translate "R2 Storage Management" %}</span>
+            </a>
+            {% if scope %}
+            <a class="aw-btn aw-btn--primary" href="#gallery-upload">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <span>{% translate "Upload" %}</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="htmx-indicator aw-table-loading" id="gallery-manage-loading" aria-hidden="true">
         <div class="spinner-border text-primary" role="status">
@@ -19,12 +34,25 @@ its ids and contract are unchanged.
         </div>
     </div>
 
+    {% if scope %}
     {% translate "Sections" as gallery_sections_label %}
     <nav class="aw-tabs" aria-label="{{ gallery_sections_label }}">
-        <a class="aw-tab" href="#gallery-upload">{% translate "Upload" %}</a>
-        <a class="aw-tab" href="#gallery-jobs">{% translate "Background jobs" %}</a>
-        <a class="aw-tab" href="#gallery-photos">{% translate "Photos" %}</a>
+        <a class="aw-tab is-active" href="#gallery-upload">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+            <span>{% translate "Upload" %}</span>
+        </a>
+        <a class="aw-tab" href="#gallery-jobs">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+            <span>{% translate "Background jobs" %}</span>
+            <span class="aw-count">{{ jobs_page_obj.paginator.count }}</span>
+        </a>
+        <a class="aw-tab" href="#gallery-photos">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-image"></use></svg>
+            <span>{% translate "Photos" %}</span>
+            <span class="aw-count">{{ page_obj.paginator.count }}</span>
+        </a>
     </nav>
+    {% endif %}
 
     <div class="aw-card aw-dashboard-filters">
         <div class="aw-card-head">
@@ -48,9 +76,6 @@ its ids and contract are unchanged.
                     </div>
                 </div>
             </form>
-            {% if scope %}
-            <p class="aw-small aw-muted mt-2 mb-0">{% translate "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them." %}</p>
-            {% endif %}
         </div>
     </div>
 
@@ -76,98 +101,156 @@ its ids and contract are unchanged.
         </div>
     </div>
 
-    <section class="aw-card" id="gallery-upload" aria-labelledby="gallery-upload-title">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-cloud"></use></svg>
-                <h3 id="gallery-upload-title">{% translate "Upload photos or a zip" %}</h3>
-            </div>
-        </div>
-        <div class="aw-card-body">
-            <div class="aw-form-grid">
-                <div class="aw-field">
-                    <label for="gallery-files">{% translate "Images, videos, or one zip" %}</label>
-                    <input id="gallery-files" class="form-control" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.m4v,.zip">
-                </div>
-                <div class="aw-flex">
-                    <button type="button" class="aw-btn aw-btn--primary" id="gallery-upload-btn">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
-                        <span>{% translate "Upload" %}</span>
-                    </button>
-                </div>
-            </div>
-            <div id="gallery-upload-status" class="aw-small aw-muted mt-2" role="status" aria-live="polite"></div>
-        </div>
-    </section>
-
-    <section class="aw-card" id="gallery-jobs" aria-labelledby="gallery-jobs-title">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
-                <h3 id="gallery-jobs-title">{% translate "Recent background jobs" %}</h3>
-            </div>
-        </div>
-        {% if jobs_page_obj and jobs_page_obj.object_list %}
-        <div class="aw-table-wrap">
-            <table class="aw-table">
-                <caption class="visually-hidden">{% translate "Gallery background jobs" %}</caption>
-                <thead><tr><th scope="col">{% translate "File" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Processed" %}</th><th scope="col">{% translate "Failed" %}</th><th scope="col">{% translate "Error" %}</th></tr></thead>
-                <tbody>
-                {% for job in jobs_page_obj.object_list %}
-                <tr><td class="aw-cell-strong">{{ job.original_filename }}</td><td>{% include "partials/components/aw_status_pill.html" with label=job.get_status_display status=job.status %}</td><td class="aw-num">{{ job.processed_files }}/{{ job.total_files }}</td><td class="aw-num">{{ job.failed_files }}</td><td>{{ job.last_error|truncatechars:120 }}</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% translate "Page navigation" as jobs_pagination_label %}
-        {% include "partials/pagination.html" with page_obj=jobs_page_obj pagination_query=jobs_pagination_query page_param="job_page" aria_label=jobs_pagination_label %}
-        {% else %}
-        <div class="aw-card-body">
-            {% translate "No uploads yet for this album." as gallery_jobs_empty %}
-            {% include "partials/components/aw_empty.html" with icon="i-layers" description=gallery_jobs_empty %}
-        </div>
-        {% endif %}
-    </section>
-
-    <section class="aw-card" id="gallery-photos" aria-labelledby="gallery-photos-title">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-image"></use></svg>
-                <h3 id="gallery-photos-title">{% translate "Photos" %}</h3>
-                {% if page_obj %}<span class="aw-pill aw-pill--teal aw-pill--plain">{{ page_obj.paginator.count }}</span>{% endif %}
-            </div>
-        </div>
-        {% if page_obj and page_obj.object_list %}
-        <div class="aw-card-body">
-            <div class="aw-gallery-grid">
-                {% for item in page_obj.object_list %}
-                <figure class="aw-gallery-item mb-0">
-                    {% if item.kind == "video" %}
-                    <video class="gg-manage-img" src="{{ item.display_url }}" preload="metadata" muted playsinline></video>
-                    {% else %}
-                    <img class="gg-manage-img" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async">
-                    {% endif %}
-                    <figcaption class="aw-g-meta"><b>{{ item.original_filename|truncatechars:28 }}</b></figcaption>
-                    <div class="aw-g-actions">
-                        <form method="post" action="{% url 'gallery-item-delete' item.pk %}" hx-post="{% url 'gallery-item-delete' item.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this photo?' %}">
-                            {% csrf_token %}
-                            <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete" %}</button>
-                        </form>
+    <div class="aw-grid aw-grid--main-rail">
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card" id="gallery-upload" aria-labelledby="gallery-upload-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-cloud"></use></svg>
+                        <h3 id="gallery-upload-title">{% translate "Upload photos or a zip" %}</h3>
                     </div>
-                </figure>
-                {% endfor %}
-            </div>
+                </div>
+                <div class="aw-card-body">
+                    <label class="aw-dropzone" for="gallery-files">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                        <b>{% translate "Images, videos, or one zip" %}</b>
+                        <span>{% translate "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them." %}</span>
+                        <input id="gallery-files" class="visually-hidden" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.m4v,.zip">
+                    </label>
+                    <div class="aw-flex">
+                        <button type="button" class="aw-btn aw-btn--primary" id="gallery-upload-btn">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                            <span>{% translate "Upload" %}</span>
+                        </button>
+                    </div>
+                    <div id="gallery-upload-status" class="aw-small aw-muted" role="status" aria-live="polite"></div>
+                </div>
+            </section>
+
+            <section class="aw-card" id="gallery-photos" aria-labelledby="gallery-photos-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-image"></use></svg>
+                        <h3 id="gallery-photos-title">{% translate "Photos" %}</h3>
+                        {% if page_obj %}<span class="aw-pill aw-pill--teal aw-pill--plain">{{ page_obj.paginator.count }}</span>{% endif %}
+                    </div>
+                </div>
+                {% if page_obj and page_obj.object_list %}
+                <div class="aw-card-body">
+                    <div class="aw-gallery-grid">
+                        {% for item in page_obj.object_list %}
+                        <div class="aw-gallery-item">
+                            <div class="aw-gallery-thumb">
+                                {% if item.kind == "video" %}
+                                <video class="gg-manage-img" src="{{ item.display_url }}" preload="metadata" muted playsinline></video>
+                                {% else %}
+                                <img class="gg-manage-img" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async">
+                                {% endif %}
+                            </div>
+                            <div class="aw-g-meta"><b>{{ item.original_filename|truncatechars:28 }}</b></div>
+                            <div class="aw-g-actions">
+                                <form method="post" action="{% url 'gallery-item-delete' item.pk %}" class="aw-inline-form" hx-post="{% url 'gallery-item-delete' item.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this photo?' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="aw-icon-btn is-danger" aria-label="{% translate 'Delete' %}">
+                                        <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% translate "photos" as photos_label %}
+                {% translate "Gallery management pages" as gallery_pages_label %}
+                {% include "partials/pagination.html" with page_obj=page_obj item_label=photos_label aria_label=gallery_pages_label %}
+                {% else %}
+                <div class="aw-card-body">
+                    {% translate "This album is empty. Upload the first photos above." as gallery_photos_empty %}
+                    {% include "partials/components/aw_empty.html" with icon="i-image" description=gallery_photos_empty %}
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="aw-card" id="gallery-jobs" aria-labelledby="gallery-jobs-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                        <h3 id="gallery-jobs-title">{% translate "Recent background jobs" %}</h3>
+                    </div>
+                </div>
+                {% if jobs_page_obj and jobs_page_obj.object_list %}
+                <div class="aw-table-wrap">
+                    <table class="aw-table">
+                        <caption class="visually-hidden">{% translate "Gallery background jobs" %}</caption>
+                        <thead><tr><th scope="col">{% translate "File" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Processed" %}</th><th scope="col">{% translate "Failed" %}</th><th scope="col">{% translate "Error" %}</th></tr></thead>
+                        <tbody>
+                        {% for job in jobs_page_obj.object_list %}
+                        <tr><td class="aw-cell-strong">{{ job.original_filename }}</td><td>{% include "partials/components/aw_status_pill.html" with label=job.get_status_display status=job.status %}</td><td class="aw-num">{{ job.processed_files }}/{{ job.total_files }}</td><td class="aw-num">{{ job.failed_files }}</td><td>{{ job.last_error|truncatechars:120 }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% translate "Page navigation" as jobs_pagination_label %}
+                {% include "partials/pagination.html" with page_obj=jobs_page_obj pagination_query=jobs_pagination_query page_param="job_page" aria_label=jobs_pagination_label %}
+                {% else %}
+                <div class="aw-card-body">
+                    {% translate "No uploads yet for this album." as gallery_jobs_empty %}
+                    {% include "partials/components/aw_empty.html" with icon="i-layers" description=gallery_jobs_empty %}
+                </div>
+                {% endif %}
+            </section>
         </div>
-        {% translate "photos" as photos_label %}
-        {% translate "Gallery management pages" as gallery_pages_label %}
-        {% include "partials/pagination.html" with page_obj=page_obj item_label=photos_label aria_label=gallery_pages_label %}
-        {% else %}
-        <div class="aw-card-body">
-            {% translate "This album is empty. Upload the first photos above." as gallery_photos_empty %}
-            {% include "partials/components/aw_empty.html" with icon="i-image" description=gallery_photos_empty %}
-        </div>
-        {% endif %}
-    </section>
+
+        <aside class="aw-stack aw-stack--lg" aria-label="{% translate 'Album rules' %}">
+            <section class="aw-card" aria-labelledby="gallery-rules-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+                        <h3 id="gallery-rules-title">{% translate "Album rules" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <div class="aw-checklist">
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "One album per graduation-level scope." %}</span>
+                        </div>
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "Only graduates and staff can view." %}</span>
+                        </div>
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "Display derivatives are private and signed." %}</span>
+                        </div>
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "Deleting an item invalidates cached URLs." %}</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {% if picker %}
+            <section class="aw-card" aria-labelledby="gallery-scopes-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>
+                        <h3 id="gallery-scopes-title">{% translate "Scopes" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    {% for option in picker %}
+                    <div class="aw-kv">
+                        <dt>{{ option.academic_year.name }} - {{ option.level.display_name }}</dt>
+                        <dd>{{ option.items_count }}</dd>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </aside>
+    </div>
     {{ scope.pk|json_script:"gallery-scope-id" }}
     {% else %}
     <div class="aw-card">

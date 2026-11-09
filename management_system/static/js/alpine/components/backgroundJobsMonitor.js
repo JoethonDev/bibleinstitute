@@ -88,6 +88,14 @@ function backgroundJobsMonitor() {
                     });
                     const bar = row.querySelector('progress');
                     if (bar) bar.value = job.percent;
+                    // The workspace progress bar is a div + inner span, not a
+                    // native <progress>, so mirror the percentage onto it.
+                    const awBar = row.querySelector('.aw-progress');
+                    if (awBar) {
+                        const fill = awBar.querySelector('span');
+                        if (fill) fill.style.width = `${job.percent || 0}%`;
+                        awBar.setAttribute('aria-valuenow', String(job.percent || 0));
+                    }
                 });
                 this.$el.querySelector('[data-job-poll-error]').hidden = true;
                 this.delay = 2000;

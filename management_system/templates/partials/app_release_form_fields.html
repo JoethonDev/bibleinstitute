@@ -1,0 +1,35 @@
+{% load i18n %}
+{% comment %}
+Android build publish form. Single definition: rendered inline when the page is
+opened with ?new=1 and fetched into the shared drawer through ?fragment=form, so
+the field ids are never duplicated in one document.
+{% endcomment %}
+<form method="post" action="{% url 'app-release-manage' %}" enctype="multipart/form-data" hx-post="{% url 'app-release-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+    {% csrf_token %}
+    <div class="aw-form-section">
+        <div class="aw-form-grid">
+            <div class="aw-field">
+                <label for="id_version_name">{% translate "Version name" %}</label>
+                <input id="id_version_name" class="aw-input" type="text" name="version_name" maxlength="50" required placeholder="1.2.0">
+            </div>
+            <div class="aw-field">
+                <label for="id_version_code">{% translate "Version code" %}</label>
+                <input id="id_version_code" class="aw-input" type="number" name="version_code" min="1" required placeholder="12">
+            </div>
+            <div class="aw-field">
+                <label for="id_apk">{% translate "APK file" %}</label>
+                <input id="id_apk" class="aw-input" type="file" name="apk" accept=".apk" required>
+            </div>
+            <div class="aw-field">
+                <label for="id_release_notes">{% translate "Release notes" %}</label>
+                <input id="id_release_notes" class="aw-input" type="text" name="release_notes" maxlength="2000">
+            </div>
+        </div>
+        <div class="aw-form-actions">
+            <button type="submit" class="aw-btn aw-btn--primary">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <span>{% translate "Publish" %}</span>
+            </button>
+        </div>
+    </div>
+</form>

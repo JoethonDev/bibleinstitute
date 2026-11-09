@@ -37,38 +37,34 @@ pagination include arguments are unchanged.
     <div class="aw-card aw-dashboard-filters">
         <div class="aw-card-body aw-card-body--tight">
             <div class="aw-filter-bar">
-                <form method="get" class="row g-3 align-items-end" role="search"
+                <form method="get" class="aw-form-grid" role="search"
                       hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace">
                     {{ filter_form.non_field_errors }}
                     {% for field in filter_form %}
-                    {% if field.is_hidden %}{{ field }}{% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}{% else %}
-                    <div class="col-12 col-md-6 col-xl-4">
-                        <div class="aw-field">
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {{ field }}
-                            {% if field.errors %}<div class="aw-field-error" role="alert">{{ field.errors }}</div>{% endif %}
-                        </div>
+                    {% if field.is_hidden %}{{ field }}{% if field.errors %}<div class="aw-field-error">{{ field.errors }}</div>{% endif %}{% else %}
+                    <div class="aw-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="aw-field-error" role="alert">{{ field.errors }}</div>{% endif %}
                     </div>
                     {% endif %}
                     {% endfor %}
-                    <div class="col-12">
-                        <div class="aw-flex aw-flex-wrap">
-                            <button type="submit" class="aw-btn aw-btn--primary">
-                                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                                <span>{% translate "Search and filter" %}</span>
-                            </button>
-                            <a class="aw-btn aw-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
-                                <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
-                                <span>{% translate "Clear" %}</span>
-                            </a>
-                        </div>
+                    <div class="aw-form-actions">
+                        <button type="submit" class="aw-btn aw-btn--primary">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                            <span>{% translate "Search and filter" %}</span>
+                        </button>
+                        <a class="aw-btn aw-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                            <span>{% translate "Clear" %}</span>
+                        </a>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
+    <p class="aw-field-error" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
 
     {% if jobs_page %}
     <div class="aw-card aw-table-card">
@@ -93,9 +89,9 @@ pagination include arguments are unchanged.
                     <tr data-job-record data-family="{{ job.family }}" data-id="{{ job.id }}" data-active="{{ job.active|yesno:'true,false' }}" data-next-poll-at="{{ job.next_poll|date:'c' }}">
                         <td><span class="aw-cell-strong">{{ job.label }}</span><span class="aw-cell-sub">{{ job.family_label }}</span></td>
                         <td>{{ job.actor }}</td>
-                        <td class="text-break">{{ job.target }}</td>
+                        <td class="aw-break">{{ job.target }}</td>
                         <td><span class="aw-pill aw-pill--muted" data-job-field="status_label">{{ job.status_label }}</span><span class="aw-cell-sub" data-job-field="phase_label">{{ job.phase_label }}</span></td>
-                        <td><progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress><span class="aw-cell-sub" data-job-field="progress_label">{{ job.progress_label }}</span></td>
+                        <td><progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress aw-w-100"></progress><span class="aw-cell-sub" data-job-field="progress_label">{{ job.progress_label }}</span></td>
                         <td class="aw-date"><time datetime="{{ job.created|date:'c' }}">{{ job.created|date:"SHORT_DATETIME_FORMAT" }}</time></td>
                         <td class="aw-date" data-job-field="updated_label">{{ job.updated_label }}</td>
                         <td>

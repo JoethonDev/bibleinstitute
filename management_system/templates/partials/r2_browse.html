@@ -9,7 +9,7 @@ segment is the requested folder path and intermediate ancestors are not links.
 {% endcomment %}
 <div class="aw-card-body">
 {% if not is_root %}
-<nav aria-label="{% translate 'Breadcrumb' %}" class="aw-breadcrumb-path mb-3">
+<nav aria-label="{% translate 'Breadcrumb' %}" class="aw-breadcrumb-path">
     <a href="{% url 'r2-management-dashboard' %}"
        hx-get="{% url 'r2-management-dashboard' %}"
        hx-target="#file-list-container"
@@ -25,7 +25,7 @@ segment is the requested folder path and intermediate ancestors are not links.
 {% endif %}
 
 {% if not is_root %}
-<div class="mb-3">
+<div class="aw-mt-2">
     <button class="aw-btn aw-btn--ghost aw-btn--sm"
             type="button"
             hx-get="{% if parent_folder %}{% url 'r2-management-dashboard' %}?folder={{ parent_folder|urlencode }}{% else %}{% url 'r2-management-dashboard' %}{% endif %}"
@@ -46,8 +46,8 @@ segment is the requested folder path and intermediate ancestors are not links.
      role="button"
      tabindex="0"
      aria-label="{% translate 'Load more files' %}"
-     class="drive-next-sentinel mt-3">
-    <span class="drive-next-idle"><i class="fas fa-chevron-down me-1" aria-hidden="true"></i>{% translate "Load more files" %}</span>
+     class="drive-next-sentinel aw-mt-3">
+    <span class="drive-next-idle"><svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>{% translate "Load more files" %}</span>
     <span class="drive-next-loading"><span class="drive-next-spinner" aria-hidden="true"></span>{% translate "Loading more files..." %}</span>
 </div>
 {% endif %}

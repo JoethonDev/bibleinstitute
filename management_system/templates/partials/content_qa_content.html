@@ -1,58 +1,62 @@
 {% load i18n %}
 {% comment %}
 Content QA - read-only counts plus bounded 25-row samples from
-content_qa.py. No writes and no R2 calls: every row links to its owning
-dashboard. Counts and sample titles keep the previous page's labels; the
-Open-all control stays a presentation helper over the same bounded links.
-The prototype's Last scan / Runbook rail has no stored source in this
-projection, so no timestamp or refresh action is rendered here.
+content_qa.py. No writes and no R2 calls: every sample row links to its
+owning dashboard. The view exposes a true count for four checks; the two
+JSON-link checks expose only the bounded sample list, so their card count is
+the number of sampled rows and is labelled as such. No refresh endpoint or
+last-scan timestamp exists in the current context, so neither is rendered.
 {% endcomment %}
-{% translate "No data" as qa_no_data %}
+{% translate "Needs attention" as qa_needs_attention %}
+{% translate "Completed" as qa_completed %}
+{% translate "Up to 25 sample rows." as qa_sample_note %}
 <div id="content" class="aw-dashboard-page">
 
     {% translate "Curriculum" as page_eyebrow %}
     {% translate "Content QA" as page_title %}
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+    {% translate "A fast, read-only sweep for the content problems students feel first." as page_description %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
 
     <div class="aw-kpi-grid">
-        <div class="aw-kpi">
+        <div class="aw-kpi aw-kpi--green">
             <div class="aw-kpi-top">
-                <span class="aw-kpi-label">{% translate "Lessons" %}</span>
+                <span class="aw-kpi-label">{% translate "Published lessons" %}</span>
                 <span class="aw-kpi-icon">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
                 </span>
             </div>
-            <div class="aw-kpi-value">{{ counts.empty_lessons }}</div>
-            <div class="aw-kpi-meta">{% translate "No data" %}</div>
+            <div class="aw-kpi-value">{{ counts.published_lessons }}</div>
+            <div class="aw-kpi-meta">{% translate "Lessons" %}</div>
         </div>
-        <div class="aw-kpi aw-kpi--green">
+        <div class="aw-kpi aw-kpi--gold">
             <div class="aw-kpi-top">
-                <span class="aw-kpi-label">{% translate "Total Lessons" %}</span>
+                <span class="aw-kpi-label">{% translate "Lessons with no content" %}</span>
                 <span class="aw-kpi-icon">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-play"></use></svg>
                 </span>
             </div>
-            <div class="aw-kpi-value">{{ counts.published_lessons }}</div>
+            <div class="aw-kpi-value">{{ counts.empty_lessons }}</div>
+            <div class="aw-kpi-meta">{% translate "No playable content" %}</div>
         </div>
-        <div class="aw-kpi aw-kpi--gold">
+        <div class="aw-kpi aw-kpi--blue">
             <div class="aw-kpi-top">
-                <span class="aw-kpi-label">{% translate "Quizzes" %}</span>
+                <span class="aw-kpi-label">{% translate "Quizzes without type" %}</span>
                 <span class="aw-kpi-icon">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
                 </span>
             </div>
             <div class="aw-kpi-value">{{ counts.null_type_quizzes }}</div>
-            <div class="aw-kpi-meta">{% translate "No data" %}</div>
+            <div class="aw-kpi-meta">{% translate "Type: Unassigned" %}</div>
         </div>
         <div class="aw-kpi aw-kpi--red">
             <div class="aw-kpi-top">
-                <span class="aw-kpi-label">{% translate "Total Quizzes" %}</span>
+                <span class="aw-kpi-label">{% translate "Zero-question quizzes" %}</span>
                 <span class="aw-kpi-icon">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-help"></use></svg>
                 </span>
             </div>
             <div class="aw-kpi-value">{{ counts.quizzes_no_questions }}</div>
-            <div class="aw-kpi-meta">0 {% translate "Questions" %}</div>
+            <div class="aw-kpi-meta">{% translate "Questions" %}</div>
         </div>
     </div>
 
@@ -61,25 +65,39 @@ projection, so no timestamp or refresh action is rendered here.
             <div class="aw-card-head">
                 <div class="aw-card-title">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
-                    <h3 id="aw-qa-empty-lessons">{% translate "Lessons" %}: {% translate "No data" %} ({{ samples.empty_lessons|length }})</h3>
+                    <h3 id="aw-qa-empty-lessons">{% translate "Lessons with no content" %}</h3>
                 </div>
-                {% if samples.empty_lessons %}
-                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-open-all>{% translate "Open all" %}</button>
-                {% endif %}
             </div>
             <div class="aw-card-body">
-                {% if samples.empty_lessons %}
-                <div class="aw-stack">
+                {% with group_count=counts.empty_lessons %}
+                <div class="aw-flex-between">
+                    <span class="aw-kpi-value">{{ group_count }}</span>
+                    {% if group_count %}
+                    {% include "partials/components/aw_status_pill.html" with status="warning" label=qa_needs_attention %}
+                    {% else %}
+                    {% include "partials/components/aw_status_pill.html" with status="completed" label=qa_completed %}
+                    {% endif %}
+                </div>
+                <p class="aw-small aw-muted aw-mt-2">{% translate "No file links have been added to this lesson yet." %}</p>
+                {% if group_count %}
+                <div class="aw-stack aw-mt-3">
                     {% for l in samples.empty_lessons %}
-                    <div>
-                        <b class="aw-small"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></b>
-                        <div class="aw-small aw-muted">{{ l.course_offering.course.name|default:"" }}</div>
+                    <div class="aw-flex-between">
+                        <div>
+                            <b class="aw-small"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></b>
+                            <div class="aw-small aw-muted">{{ l.course_offering.course.name|default:"" }}</div>
+                        </div>
+                        <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{% translate "Open" %}</a>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                {% include "partials/components/aw_empty.html" with icon="i-video" description=qa_no_data %}
+                <div class="aw-alert aw-alert--success aw-mt-3" role="status">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <div>{% translate "No issues found." %}</div>
+                </div>
                 {% endif %}
+                {% endwith %}
             </div>
         </section>
 
@@ -87,25 +105,40 @@ projection, so no timestamp or refresh action is rendered here.
             <div class="aw-card-head">
                 <div class="aw-card-title">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-play"></use></svg>
-                    <h3 id="aw-qa-no-media">{% translate "No playable content" %} ({{ samples.published_no_media|length }})</h3>
+                    <h3 id="aw-qa-no-media">{% translate "No playable content" %}</h3>
                 </div>
-                {% if samples.published_no_media %}
-                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-open-all>{% translate "Open all" %}</button>
-                {% endif %}
             </div>
             <div class="aw-card-body">
-                {% if samples.published_no_media %}
-                <div class="aw-stack">
+                {% with group_count=samples.published_no_media|length %}
+                <div class="aw-flex-between">
+                    <span class="aw-kpi-value">{{ group_count }}</span>
+                    {% if group_count %}
+                    {% include "partials/components/aw_status_pill.html" with status="warning" label=qa_needs_attention %}
+                    {% else %}
+                    {% include "partials/components/aw_status_pill.html" with status="completed" label=qa_completed %}
+                    {% endif %}
+                </div>
+                <p class="aw-small aw-muted aw-mt-2">{% translate "Published lessons with no video, audio, or book link." %}</p>
+                {% if group_count %}
+                <div class="aw-stack aw-mt-3">
                     {% for l in samples.published_no_media %}
-                    <div>
-                        <b class="aw-small"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></b>
-                        <div class="aw-small aw-muted">{{ l.course_offering.course.name|default:"" }}</div>
+                    <div class="aw-flex-between">
+                        <div>
+                            <b class="aw-small"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></b>
+                            <div class="aw-small aw-muted">{{ l.course_offering.course.name|default:"" }}</div>
+                        </div>
+                        <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{% translate "Open" %}</a>
                     </div>
                     {% endfor %}
                 </div>
+                <p class="aw-small aw-muted aw-mt-2">{{ qa_sample_note }}</p>
                 {% else %}
-                {% include "partials/components/aw_empty.html" with icon="i-play" description=qa_no_data %}
+                <div class="aw-alert aw-alert--success aw-mt-3" role="status">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <div>{% translate "No issues found." %}</div>
+                </div>
                 {% endif %}
+                {% endwith %}
             </div>
         </section>
 
@@ -113,25 +146,40 @@ projection, so no timestamp or refresh action is rendered here.
             <div class="aw-card-head">
                 <div class="aw-card-title">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-link"></use></svg>
-                    <h3 id="aw-qa-malformed">{% translate "Lessons" %}: {% translate "Media processing" %} ({{ samples.malformed_links|length }})</h3>
+                    <h3 id="aw-qa-malformed">{% translate "Malformed media links" %}</h3>
                 </div>
-                {% if samples.malformed_links %}
-                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-open-all>{% translate "Open all" %}</button>
-                {% endif %}
             </div>
             <div class="aw-card-body">
-                {% if samples.malformed_links %}
-                <div class="aw-stack">
+                {% with group_count=samples.malformed_links|length %}
+                <div class="aw-flex-between">
+                    <span class="aw-kpi-value">{{ group_count }}</span>
+                    {% if group_count %}
+                    {% include "partials/components/aw_status_pill.html" with status="failed" label=qa_needs_attention %}
+                    {% else %}
+                    {% include "partials/components/aw_status_pill.html" with status="completed" label=qa_completed %}
+                    {% endif %}
+                </div>
+                <p class="aw-small aw-muted aw-mt-2">{% translate "The lesson media links are invalid." %}</p>
+                {% if group_count %}
+                <div class="aw-stack aw-mt-3">
                     {% for l in samples.malformed_links %}
-                    <div>
-                        <b class="aw-small"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></b>
-                        <div class="aw-small aw-muted">{% translate "Media processing" %}</div>
+                    <div class="aw-flex-between">
+                        <div>
+                            <b class="aw-small"><a href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{{ l.name }}</a></b>
+                            <div class="aw-small aw-muted">{{ l.course_offering.course.name|default:"" }}</div>
+                        </div>
+                        <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'lesson-view' l.pk %}" target="_blank" rel="noopener">{% translate "Open" %}</a>
                     </div>
                     {% endfor %}
                 </div>
+                <p class="aw-small aw-muted aw-mt-2">{{ qa_sample_note }}</p>
                 {% else %}
-                {% include "partials/components/aw_empty.html" with icon="i-link" description=qa_no_data %}
+                <div class="aw-alert aw-alert--success aw-mt-3" role="status">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <div>{% translate "No issues found." %}</div>
+                </div>
                 {% endif %}
+                {% endwith %}
             </div>
         </section>
 
@@ -139,25 +187,39 @@ projection, so no timestamp or refresh action is rendered here.
             <div class="aw-card-head">
                 <div class="aw-card-title">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
-                    <h3 id="aw-qa-null-type">{% translate "Quizzes" %}: {% translate "No data" %} ({{ samples.null_type_quizzes|length }})</h3>
+                    <h3 id="aw-qa-null-type">{% translate "Quizzes without type" %}</h3>
                 </div>
-                {% if samples.null_type_quizzes %}
-                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-open-all>{% translate "Open all" %}</button>
-                {% endif %}
             </div>
             <div class="aw-card-body">
-                {% if samples.null_type_quizzes %}
-                <div class="aw-stack">
+                {% with group_count=counts.null_type_quizzes %}
+                <div class="aw-flex-between">
+                    <span class="aw-kpi-value">{{ group_count }}</span>
+                    {% if group_count %}
+                    {% include "partials/components/aw_status_pill.html" with status="warning" label=qa_needs_attention %}
+                    {% else %}
+                    {% include "partials/components/aw_status_pill.html" with status="completed" label=qa_completed %}
+                    {% endif %}
+                </div>
+                <p class="aw-small aw-muted aw-mt-2">{% translate "Quiz type must be weekly or final." %}</p>
+                {% if group_count %}
+                <div class="aw-stack aw-mt-3">
                     {% for q in samples.null_type_quizzes %}
-                    <div>
-                        <b class="aw-small"><a href="{% url 'quiz-view' q.pk %}" target="_blank" rel="noopener">{{ q.name }}</a></b>
-                        <div class="aw-small aw-muted">{{ q.course_offering.course.name|default:"" }}</div>
+                    <div class="aw-flex-between">
+                        <div>
+                            <b class="aw-small"><a href="{% url 'quiz-view' q.pk %}" target="_blank" rel="noopener">{{ q.name }}</a></b>
+                            <div class="aw-small aw-muted">{{ q.course_offering.course.name|default:"" }}</div>
+                        </div>
+                        <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'quiz-view' q.pk %}" target="_blank" rel="noopener">{% translate "Open" %}</a>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                {% include "partials/components/aw_empty.html" with icon="i-check-square" description=qa_no_data %}
+                <div class="aw-alert aw-alert--success aw-mt-3" role="status">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <div>{% translate "No issues found." %}</div>
+                </div>
                 {% endif %}
+                {% endwith %}
             </div>
         </section>
 
@@ -165,41 +227,40 @@ projection, so no timestamp or refresh action is rendered here.
             <div class="aw-card-head">
                 <div class="aw-card-title">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-help"></use></svg>
-                    <h3 id="aw-qa-no-questions">{% translate "Total Quizzes" %}: 0 {% translate "Questions" %} ({{ samples.quizzes_no_questions|length }})</h3>
+                    <h3 id="aw-qa-no-questions">{% translate "Zero-question quizzes" %}</h3>
                 </div>
-                {% if samples.quizzes_no_questions %}
-                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-open-all>{% translate "Open all" %}</button>
-                {% endif %}
             </div>
             <div class="aw-card-body">
-                {% if samples.quizzes_no_questions %}
-                <div class="aw-stack">
+                {% with group_count=counts.quizzes_no_questions %}
+                <div class="aw-flex-between">
+                    <span class="aw-kpi-value">{{ group_count }}</span>
+                    {% if group_count %}
+                    {% include "partials/components/aw_status_pill.html" with status="warning" label=qa_needs_attention %}
+                    {% else %}
+                    {% include "partials/components/aw_status_pill.html" with status="completed" label=qa_completed %}
+                    {% endif %}
+                </div>
+                <p class="aw-small aw-muted aw-mt-2">{% translate "No questions have been added to this quiz yet." %}</p>
+                {% if group_count %}
+                <div class="aw-stack aw-mt-3">
                     {% for q in samples.quizzes_no_questions %}
-                    <div>
-                        <b class="aw-small"><a href="{% url 'quiz-view' q.pk %}" target="_blank" rel="noopener">{{ q.name }}</a></b>
-                        <div class="aw-small aw-muted">{{ q.course_offering.course.name|default:"" }}</div>
+                    <div class="aw-flex-between">
+                        <div>
+                            <b class="aw-small"><a href="{% url 'quiz-view' q.pk %}" target="_blank" rel="noopener">{{ q.name }}</a></b>
+                            <div class="aw-small aw-muted">{{ q.course_offering.course.name|default:"" }}</div>
+                        </div>
+                        <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'quiz-view' q.pk %}" target="_blank" rel="noopener">{% translate "Open" %}</a>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                {% include "partials/components/aw_empty.html" with icon="i-help" description=qa_no_data %}
+                <div class="aw-alert aw-alert--success aw-mt-3" role="status">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <div>{% translate "No issues found." %}</div>
+                </div>
                 {% endif %}
+                {% endwith %}
             </div>
         </section>
     </div>
 </div>
-<script>
-(function () {
-  // One delegated listener; guarded so HTMX re-swaps never double-bind.
-  if (window.__qaOpenAllBound) return;
-  window.__qaOpenAllBound = true;
-  document.addEventListener("click", function (e) {
-    var btn = e.target && e.target.closest ? e.target.closest("[data-open-all]") : null;
-    if (!btn) return;
-    var card = btn.closest(".aw-card");
-    if (!card) return;
-    var links = card.querySelectorAll('a[target="_blank"]');
-    for (var i = 0; i < links.length && i < 25; i++) window.open(links[i].href, "_blank", "noopener");
-  });
-})();
-</script>

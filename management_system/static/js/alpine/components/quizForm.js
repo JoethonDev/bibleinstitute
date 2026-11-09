@@ -145,17 +145,16 @@ function quizForm() {
 
         buildChoiceRow(questionNumber, choice = '') {
             return `
-                <div class="d-flex align-items-center mb-2" data-choice-row>
-                    <div class="flex-grow-1 me-2">
-                        <input class="form-control choice-input" type="text"
-                               name="questions[${questionNumber}][choices]"
-                               value="${this.escapeHtml(choice)}">
-                    </div>
+                <div class="aw-choice-row aw-flex" data-choice-row>
+                    <input class="aw-input choice-input" type="text"
+                           name="questions[${questionNumber}][choices]"
+                           value="${this.escapeHtml(choice)}">
                     <button type="button"
-                            class="btn btn-outline-danger btn-sm btn-icon-sm d-flex align-items-center justify-content-center"
+                            class="aw-icon-btn is-danger"
                             data-action="remove-choice"
+                            title="${this.t('delete')}"
                             aria-label="${this.t('delete')}">
-                        <i class="fa-solid fa-xmark"></i>
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
                     </button>
                 </div>
             `;
@@ -326,39 +325,30 @@ function quizForm() {
 
         buildQuestionCard(questionNumber, type = 'mcq') {
             return `
-                <div class="card shadow-sm border-0 mb-4 question-card" data-question-card>
-                    <div class="card-body p-4 position-relative">
-                        <input type="hidden" name="questions[${questionNumber}][id]" value="">
-                        <button type="button" class="btn btn-danger delete-question mb-3" data-action="remove-question" title="${this.t("delete")}" aria-label="${this.t("delete")}">
-                            <i class="fa fa-trash"></i>
+                <div class="aw-q-card question-card" data-question-card>
+                    <div class="aw-q-head">
+                        <span class="aw-q-num">${questionNumber + 1}</span>
+                        <select class="aw-select question-type" id="question-${questionNumber}-type" name="questions[${questionNumber}][type]" aria-label="${this.t("questionType")}">
+                            <option value="mcq" ${type === "mcq" ? "selected" : ""}>${this.t("mcq")}</option>
+                            <option value="written" ${type === "written" ? "selected" : ""}>${this.t("written")}</option>
+                            <option value="complete" ${type === "complete" ? "selected" : ""}>${this.t("complete")}</option>
+                            <option value="order_events" ${type === "order_events" ? "selected" : ""}>${this.t("orderEvents")}</option>
+                            <option value="match_related" ${type === "match_related" ? "selected" : ""}>${this.t("matchRelated")}</option>
+                        </select>
+                        <input type="number" id="question-${questionNumber}-grade" name="questions[${questionNumber}][grade]" class="aw-input aw-input--points" required value="1" min="0" aria-label="${this.t("grade")}">
+                        <button type="button" class="aw-icon-btn is-danger delete-question aw-ms-auto" data-action="remove-question" title="${this.t("delete")}" aria-label="${this.t("delete")}">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
                         </button>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-primary" for="question-${questionNumber}-type">${this.t("questionType")}</label>
-                            <select class="form-select question-type" id="question-${questionNumber}-type" name="questions[${questionNumber}][type]">
-                                <option value="mcq" ${type === "mcq" ? "selected" : ""}>${this.t("mcq")}</option>
-                                <option value="written" ${type === "written" ? "selected" : ""}>${this.t("written")}</option>
-                                <option value="complete" ${type === "complete" ? "selected" : ""}>${this.t("complete")}</option>
-                                <option value="order_events" ${type === "order_events" ? "selected" : ""}>${this.t("orderEvents")}</option>
-                                <option value="match_related" ${type === "match_related" ? "selected" : ""}>${this.t("matchRelated")}</option>
-                            </select>
+                    </div>
+                    <div class="aw-q-body">
+                        <input type="hidden" name="questions[${questionNumber}][id]" value="">
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="question-${questionNumber}-name">${this.t("question")}</label>
+                            <input type="text" value="" required class="aw-input" id="question-${questionNumber}-name" name="questions[${questionNumber}][name]" placeholder="${this.t("questionPlaceholder")}">
                         </div>
-
-                        <div class="row mb-3">
-                            <div class="col-12 col-md-8 mb-2 mb-md-0">
-                                <label class="form-label fw-semibold" for="question-${questionNumber}-name">${this.t("question")}</label>
-                                <input type="text" value="" required class="form-control" id="question-${questionNumber}-name" name="questions[${questionNumber}][name]" placeholder="${this.t("questionPlaceholder")}">
-                            </div>
-                            <div class="col-12 col-md-4">
-                                <label class="form-label fw-semibold" for="question-${questionNumber}-grade">${this.t("grade")}</label>
-                                <input type="number" id="question-${questionNumber}-grade" name="questions[${questionNumber}][grade]" class="form-control" required value="1" min="0">
-                            </div>
-                        </div>
-
-                        <div class="answers-section mb-3">
+                        <div class="answers-section">
                             ${this.createAnswerForm(questionNumber, type)}
                         </div>
-
                         <div class="correct-answer-section">
                             ${this.createAnswerField(questionNumber, type)}
                         </div>
@@ -370,6 +360,12 @@ function quizForm() {
         reindexQuestions() {
             this.getQuestionCards().forEach((card, index) => {
                 card.dataset.questionIndex = index;
+
+                // Keep the visible question number in step with the DOM order.
+                const numberBadge = card.querySelector('.aw-q-num');
+                if (numberBadge) {
+                    numberBadge.textContent = String(index + 1);
+                }
 
                 const idInput = card.querySelector('input[type="hidden"]');
                 if (idInput) {
@@ -465,7 +461,7 @@ function quizForm() {
          */
         changeQuestionType(selectElement) {
             const value = selectElement.value;
-            const parentCard = selectElement.closest('.card-body');
+            const parentCard = selectElement.closest('.aw-q-body, .card-body');
             const questionNumber = this.getQuestionIndex(parentCard.closest('.question-card'));
 
             const answersSection = parentCard.querySelector('.answers-section');

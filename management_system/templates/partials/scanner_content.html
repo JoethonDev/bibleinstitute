@@ -2,8 +2,11 @@
 {% load static %}
 {% comment %}
 Attendance scanner page content. The camera panel keeps its exact element ids
-and d-none show/hide contract used by scanner.js; the page is a focused camera
+(#scanner-video, #start-camera, #stop-camera, #camera-error, #scan-result) and
+the `hidden` show/hide contract used by scanner.js; the page is a focused camera
 workspace inside the admin shell on desktop and off-canvas navigation on phone.
+The scan feedback region is the live region scanner.js writes to; no last-scan
+or recent-scan record is rendered because the view passes no such context.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
     {% translate "Attendance" as page_eyebrow %}
@@ -12,56 +15,135 @@ workspace inside the admin shell on desktop and off-canvas navigation on phone.
     {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
 
     <div class="aw-grid aw-grid--2-even">
-        <section class="aw-card" aria-labelledby="scanner-camera-title">
-            <div class="aw-card-head">
-                <div class="aw-card-title">
-                    <svg class="aw-ico" aria-hidden="true"><use href="#i-camera"></use></svg>
-                    <h3 id="scanner-camera-title">{% translate "Scan Camera" %}</h3>
-                </div>
-            </div>
-            <div class="aw-card-body">
-                <div class="aw-scan-frame mb-3">
-                    <video id="scanner-video" playsinline
-                           data-jsqr-url="{% static 'vendor/jsqr/jsQR.js' %}?v={{ static_asset_version }}"
-                           class="scanner-video aw-w-100 d-none" autoplay muted></video>
-                </div>
-                <div class="d-flex gap-2 flex-wrap">
-                    <button id="start-camera" class="aw-btn aw-btn--primary" type="button">
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card" aria-labelledby="scanner-camera-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
                         <svg class="aw-ico" aria-hidden="true"><use href="#i-camera"></use></svg>
-                        {% translate "Open Camera" %}
-                    </button>
-                    <button id="stop-camera" class="aw-btn aw-btn--ghost d-none" type="button">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
-                        {% translate "Stop Camera" %}
-                    </button>
-                </div>
-                <div id="camera-error" class="aw-alert aw-alert--danger mt-3 d-none" role="alert"></div>
-                <div id="scan-result" class="mt-2 aw-small" aria-live="polite"></div>
-            </div>
-        </section>
-
-        <section class="aw-card" aria-labelledby="scanner-lookup-title">
-            <div class="aw-card-head">
-                <div class="aw-card-title">
-                    <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                    <h3 id="scanner-lookup-title">{% translate "Find Student" %}</h3>
-                </div>
-            </div>
-            <div class="aw-card-body">
-                <form id="student-lookup-form" method="post" action="{% url 'student-lookup' %}">
-                    {% csrf_token %}
-                    <div class="aw-field mb-3">
-                        <label class="form-label" for="query">{% translate "Username or ID" %}</label>
-                        <input type="text" name="query" id="query" class="aw-input"
-                               placeholder="{% translate 'Enter username or numeric ID' %}" required>
+                        <div>
+                            <h3 id="scanner-camera-title">{% translate "Scan Camera" %}</h3>
+                        </div>
                     </div>
-                    <button type="submit" class="aw-btn aw-btn--primary aw-w-100">
+                </div>
+                <div class="aw-card-body">
+                    <div class="aw-scan-frame">
+                        <div class="aw-scan-box" aria-hidden="true"></div>
+                        <div class="aw-scan-hint">{% translate "Align the QR inside the frame" %}</div>
+                        <video id="scanner-video" playsinline
+                               data-jsqr-url="{% static 'vendor/jsqr/jsQR.js' %}?v={{ static_asset_version }}"
+                               class="scanner-video aw-w-100" hidden autoplay muted></video>
+                    </div>
+                    <div class="aw-flex aw-flex-wrap aw-mt-3">
+                        <button id="start-camera" class="aw-btn aw-btn--primary" type="button">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-camera"></use></svg>
+                            {% translate "Open Camera" %}
+                        </button>
+                        <button id="stop-camera" class="aw-btn aw-btn--ghost" type="button" hidden>
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                            {% translate "Stop Camera" %}
+                        </button>
+                    </div>
+                    <div id="camera-error" class="aw-alert aw-alert--danger aw-mt-3" role="alert" hidden></div>
+                    <div id="scan-result" class="aw-small aw-mt-2" aria-live="polite"></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card" aria-labelledby="scanner-lookup-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
                         <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                        {% translate "Look up" %}
-                    </button>
-                </form>
-                <div id="lookup-error" class="aw-alert aw-alert--danger mt-3 d-none" role="alert"></div>
-            </div>
-        </section>
+                        <h3 id="scanner-lookup-title">{% translate "Find Student" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <form id="student-lookup-form" method="post" action="{% url 'student-lookup' %}">
+                        {% csrf_token %}
+                        <div class="aw-field">
+                            <label for="query">{% translate "Username or ID" %}</label>
+                            <input type="text" name="query" id="query" class="aw-input"
+                                   placeholder="{% translate 'Enter username or numeric ID' %}" required>
+                        </div>
+                        <button type="submit" class="aw-btn aw-btn--primary aw-w-100 aw-mt-3">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                            {% translate "Look up" %}
+                        </button>
+                    </form>
+                    <div id="lookup-error" class="aw-alert aw-alert--danger aw-mt-3" role="alert" hidden></div>
+                </div>
+            </section>
+
+            <section class="aw-card" aria-labelledby="scanner-recent-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                        <h3 id="scanner-recent-title">{% translate "Recent scans" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body aw-card-body--flush">
+                    {% if recent_scans %}
+                    <div class="aw-table-wrap">
+                        <table class="aw-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">{% translate "Time" %}</th>
+                                    <th scope="col">{% translate "Student" %}</th>
+                                    <th scope="col">{% translate "Action" %}</th>
+                                    <th scope="col">{% translate "Source" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scan in recent_scans %}
+                                <tr>
+                                    <td>{{ scan.scanned_at|date:"H:i" }}</td>
+                                    <td>
+                                        <span class="aw-cell-main">
+                                            <span class="aw-cell-main-text">
+                                                <b>{{ scan.student.get_full_name|default:scan.student.username }}</b>
+                                                <span>{{ scan.student.username }}</span>
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if scan.action == "entrance" %}
+                                        {% include "partials/components/aw_status_pill.html" with tone="green" label=scan.get_action_display %}
+                                        {% else %}
+                                        {% include "partials/components/aw_status_pill.html" with tone="blue" label=scan.get_action_display %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ scan.get_source_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="aw-empty">{% translate "No scans recorded yet." %}</div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="aw-card" aria-labelledby="scanner-checklist-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-help"></use></svg>
+                        <h3 id="scanner-checklist-title">{% translate "Scanner checklist" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <div class="aw-checklist">
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "If the QR code is rejected, use the manual lookup." %}</span>
+                        </div>
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "A repeated scan is rejected and the recorded entrance or exit is kept." %}</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 </div>

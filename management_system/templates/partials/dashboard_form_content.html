@@ -1,4 +1,3 @@
-{% load crispy_forms_tags %}
 {% load i18n %}
 {% load aw_ui %}
 <div id="content"
@@ -19,21 +18,6 @@
     {% include "partials/components/aw_page_head.html" %}
     {% endwith %}
 
-    {# Return navigation to the owning list, kept on the same HTMX page-nav contract. #}
-    <div class="aw-flex aw-flex-wrap">
-        {% with dynamic_view=view_name dynamic_slug=view_slug %}
-        <a class="aw-btn aw-btn--ghost aw-btn--sm aw-ms-auto"
-           href="{% url dynamic_slug|add:'-dashboard' %}"
-           hx-get="{% url dynamic_slug|add:'-dashboard' %}"
-           hx-select="#page-region"
-           hx-push-url="true"
-           hx-trigger="click"
-           hx-target="#display-page">
-            <span>{% blocktranslate with view_name=dynamic_view %}Back to {{ view_name }}s{% endblocktranslate %}</span>
-        </a>
-        {% endwith %}
-    </div>
-
     <!-- Auto-save Indicator: Draft Saved -->
     <div class="aw-alert aw-alert--success"
          x-show="lastSaved"
@@ -50,78 +34,120 @@
         <span>{% translate "Saving draft..." %}</span>
     </div>
 
-    <section class="aw-card">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
-                <h3>{% translate "Details" %}</h3>
+    <div class="aw-editor-grid">
+        <section class="aw-card">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                    <h3>{% translate "Details" %}</h3>
+                </div>
             </div>
-        </div>
 
-        <div class="aw-card-body aw-card-body--flush">
-            <!-- Form with validation -->
-            <div x-data="formValidation()" @htmx:finally:request.window="submitting = false">
-                <form action=""
-                      method="post"
-                      enctype="multipart/form-data"
-                      hx-post=""
-                      hx-encoding="multipart/form-data"
-                      hx-target="#display-page"
-                      hx-select="#page-region"
-                      hx-select-oob="#toast-stack"
-                      hx-push-url="true"
-                      class="admin-form"
-                      @submit="handleSubmit($event)"
-                      novalidate>
+            <div class="aw-card-body aw-card-body--flush">
+                <!-- Form with validation -->
+                <div x-data="formValidation()" @htmx:finally:request.window="submitting = false">
+                    <form action=""
+                          method="post"
+                          enctype="multipart/form-data"
+                          hx-post=""
+                          hx-encoding="multipart/form-data"
+                          hx-target="#display-page"
+                          hx-select="#page-region"
+                          hx-select-oob="#toast-stack"
+                          hx-push-url="true"
+                          class="admin-form"
+                          @submit="handleSubmit($event)"
+                          novalidate>
 
-                    {% csrf_token %}
+                        {% csrf_token %}
 
-                    <div class="aw-form-section">
-                        <!-- Non-field Errors -->
-                        {% if form.non_field_errors %}
-                        <div class="aw-alert aw-alert--danger mb-3" role="alert">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-                            <span>{{ form.non_field_errors }}</span>
-                        </div>
-                        {% endif %}
-
-                        <!-- Form Fields -->
-                        <div class="aw-form-grid" @focusout="validateField($event.target)">
-                            {% for field in form.visible_fields %}
-                            <div class="aw-field{% if field.field.widget.input_type == 'textarea' or field.field.widget.input_type == 'file' or field.field.widget.input_type == 'checkbox' or field.field.widget.allow_multiple_selected %} aw-span-2{% endif %}">
-                                {{ field|as_crispy_field }}
+                        <div class="aw-form-section">
+                            <!-- Non-field Errors -->
+                            {% if form.non_field_errors %}
+                            <div class="aw-alert aw-alert--danger" role="alert">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                                <span>{{ form.non_field_errors }}</span>
                             </div>
-                            {% endfor %}
-                        </div>
-                        {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+                            {% endif %}
 
-                        <!-- Form Actions -->
-                        <div class="aw-form-actions">
-                            <button type="submit"
-                                    class="aw-btn aw-btn--primary"
-                                    :disabled="submitting"
-                                    :class="{ 'is-disabled': submitting }">
-                                <span x-show="!submitting">
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-                                    {% translate "Submit" %}
-                                </span>
-                                <span x-show="submitting" x-cloak>
-                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                    {% translate "Submitting..." %}
-                                </span>
-                            </button>
+                            <!-- Form Fields -->
+                            <div class="aw-form-grid" @focusout="validateField($event.target)">
+                                {% include "partials/components/aw_form_fields.html" with form=form %}
+                            </div>
 
-                            <button type="button"
-                                    class="aw-btn aw-btn--ghost"
-                                    @click="$el.closest('form').reset(); clearDraft(); $dispatch('form-reset')"
-                                    :disabled="submitting">
-                                <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
-                                {% translate "Reset" %}
-                            </button>
+                            <!-- Form Actions -->
+                            <div class="aw-form-actions">
+                                <button type="submit"
+                                        class="aw-btn aw-btn--primary"
+                                        :disabled="submitting"
+                                        :class="{ 'is-disabled': submitting }">
+                                    <span x-show="!submitting">
+                                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                                        {% translate "Submit" %}
+                                    </span>
+                                    <span x-show="submitting" x-cloak>
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        {% translate "Submitting..." %}
+                                    </span>
+                                </button>
+
+                                <button type="button"
+                                        class="aw-btn aw-btn--ghost"
+                                        @click="$el.closest('form').reset(); clearDraft(); $dispatch('form-reset')"
+                                        :disabled="submitting">
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                                    {% translate "Reset" %}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
-        </div>
-    </section>
+        </section>
+
+        {# Record summary is built only from the render context: object, view_name and action. #}
+        <aside class="aw-editor-rail">
+            <section class="aw-card">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+                        <h3>{% translate "Record summary" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <div class="aw-kv">
+                        <dt>{% translate "Action" %}</dt>
+                        <dd>{{ action|capfirst }}</dd>
+                    </div>
+                    <div class="aw-kv">
+                        <dt>{% translate "Record type" %}</dt>
+                        <dd>{{ view_name|capfirst }}</dd>
+                    </div>
+                    {% if object %}
+                    <div class="aw-kv">
+                        <dt>{% translate "Record" %}</dt>
+                        <dd>{{ object|aw_display_name }}</dd>
+                    </div>
+                    {% endif %}
+
+                    <hr class="aw-divider">
+
+                    {# Return navigation to the owning list, kept on the same HTMX page-nav contract. #}
+                    <div class="aw-flex">
+                        {% with dynamic_view=view_name dynamic_slug=view_slug %}
+                        <a class="aw-btn aw-btn--ghost aw-btn--sm"
+                           href="{% url dynamic_slug|add:'-dashboard' %}"
+                           hx-get="{% url dynamic_slug|add:'-dashboard' %}"
+                           hx-select="#page-region"
+                           hx-push-url="true"
+                           hx-trigger="click"
+                           hx-target="#display-page">
+                            <span>{% blocktranslate with view_name=dynamic_view %}Back to {{ view_name }}s{% endblocktranslate %}</span>
+                        </a>
+                        {% endwith %}
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
 </div>

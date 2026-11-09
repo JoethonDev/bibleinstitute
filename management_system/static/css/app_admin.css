@@ -2553,8 +2553,6 @@
 .analytics-city-options { display: flex; flex-direction: column; gap: .1rem; }
 .analytics-city-option { display: flex; align-items: center; gap: .5rem; padding: .2rem .3rem; margin: 0; border-radius: .4rem; cursor: pointer; }
 .analytics-city-option:hover { background: var(--ps-mist); }
-.analytics-city-option .form-check-input { margin: 0; flex: 0 0 auto; }
-.analytics-city-option .form-check-label { cursor: pointer; }
 
 /* -- Attendance daily roster and scan coverage -- */
 

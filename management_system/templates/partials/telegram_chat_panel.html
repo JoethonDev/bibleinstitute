@@ -1,39 +1,92 @@
 {% load i18n %}
-{% translate "Unread" as unread_label %}
-{% translate "Read" as read_label %}
 {% translate "Blocked" as blocked_label %}
 {% translate "Open" as open_label %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-<div class="tg-chat-detail-head aw-chat-head">
-    <div class="tg-chat-detail-user">
-        <span class="tg-chat-avatar tg-chat-avatar--lg aw-avatar aw-avatar--lg d-flex" aria-hidden="true">
+<div class="aw-chat-main">
+    <div class="aw-chat-head">
+        <span class="aw-avatar aw-avatar--lg" aria-hidden="true">
             {% if conversation.user.profile_image_key %}
-            <img class="tg-chat-avatar-img"
+            <img class="aw-avatar-img"
                  src="{% url 'application-document' conversation.user.pk 'profile' %}"
                  alt=""
                  loading="lazy" decoding="async"
-                 referrerpolicy="no-referrer">
+                 referrerpolicy="no-referrer"
+                 >
             {% else %}
-            <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
+            <span>{{ student_name|first|default:"?"|upper }}</span>
             {% endif %}
         </span>
-        <div class="tg-chat-detail-title aw-chat-title">
-            <h4 class="mb-1">
-                {% blocktranslate with student=student_name %}Conversation with {{ student }}{% endblocktranslate %}
-            </h4>
-            <div class="tg-chat-student-meta">
-                <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
-                <span class="tg-chat-user-level aw-small aw-muted">{{ conversation_level }}</span>
-            </div>
+        <div class="aw-chat-title">
+            <b>{{ student_name }}</b>
+            <span>{{ conversation_level }} - @{{ conversation.user.username }}</span>
+        </div>
+        <div class="aw-row-actions">
+            <a class="aw-btn aw-btn--outline aw-btn--sm" href="{% url 'student-overview' conversation.user.pk %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                <span>{% translate "Student 360" %}</span>
+            </a>
+
+            {% if conversation.status == "open" %}
+            <form method="post" action="{{ claim_url }}" hx-post="{{ claim_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="aw-inline-form">
+                {% csrf_token %}
+                <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Claim conversation" %}</button>
+            </form>
+            {% elif conversation.status == "claimed" and conversation.claimed_by_id == request.user.pk %}
+            <form method="post" action="{{ release_url }}" hx-post="{{ release_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="aw-inline-form">
+                {% csrf_token %}
+                <button type="submit" class="aw-btn aw-btn--outline aw-btn--sm">{% translate "Release conversation" %}</button>
+            </form>
+            {% endif %}
+
+            {% if conversation.is_unread %}
+            <form method="post"
+                  action="{{ mark_read_url }}"
+                  hx-post="{{ mark_read_url }}?fragment=panel"
+                  hx-target="#telegram-chat-panel"
+                  hx-swap="innerHTML"
+                  class="aw-inline-form">
+                {% csrf_token %}
+                <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    <span>{% translate "Mark as read" %}</span>
+                </button>
+            </form>
+            {% endif %}
         </div>
     </div>
-    <div class="tg-chat-detail-actions aw-row-actions">
-        {% if conversation.is_unread %}
-        {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=unread_label %}
-        {% else %}
-        {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=read_label %}
-        {% endif %}
 
+    {% if panel_notice %}
+    <div class="aw-alert aw-alert--success" role="status">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+        <span>{{ panel_notice }}</span>
+    </div>
+    {% endif %}
+
+    {% include 'partials/telegram_message_list.html' %}
+</div>
+
+<aside class="aw-chat-context" aria-label="{% translate 'Telegram Support Chat' %}">
+    <div class="aw-flex">
+        <span class="aw-avatar aw-avatar--lg" aria-hidden="true">
+            {% if conversation.user.profile_image_key %}
+            <img class="aw-avatar-img"
+                 src="{% url 'application-document' conversation.user.pk 'profile' %}"
+                 alt=""
+                 loading="lazy" decoding="async"
+                 referrerpolicy="no-referrer"
+                 >
+            {% else %}
+            <span>{{ student_name|first|default:"?"|upper }}</span>
+            {% endif %}
+        </span>
+        <div>
+            <b>{{ student_name }}</b>
+            <div class="aw-small aw-muted">@{{ conversation.user.username }}</div>
+        </div>
+    </div>
+
+    <div class="aw-chip-row">
+        <span class="aw-chip aw-chip--teal">{{ conversation_level }}</span>
         {% if conversation.status == "claimed" and conversation.claimed_by %}
         {% blocktranslate with admin=conversation.claimed_by.username asvar assigned_label %}Assigned to @{{ admin }}{% endblocktranslate %}
         {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=assigned_label %}
@@ -45,72 +98,46 @@
         {% else %}
         {% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=open_label %}
         {% endif %}
+    </div>
 
-        {% if conversation.status == "open" %}
-        <form method="post" action="{{ claim_url }}" hx-post="{{ claim_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="ps-inline-form">
-            {% csrf_token %}
-            <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Claim conversation" %}</button>
-        </form>
-        {% elif conversation.status == "claimed" and conversation.claimed_by_id == request.user.pk %}
-        <form method="post" action="{{ release_url }}" hx-post="{{ release_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="ps-inline-form">
-            {% csrf_token %}
-            <button type="submit" class="aw-btn aw-btn--outline aw-btn--sm">{% translate "Release conversation" %}</button>
-        </form>
+    <hr class="aw-divider">
+    <h4>{% translate "Student context" %}</h4>
+    <dl>
+        {% if conversation.user.phone %}
+        <div class="aw-kv"><dt>{% translate "Phone" %}</dt><dd dir="ltr">{{ conversation.user.phone }}</dd></div>
         {% endif %}
-
-        {% if conversation.is_unread %}
-        <form method="post"
-              action="{{ mark_read_url }}"
-              hx-post="{{ mark_read_url }}?fragment=panel"
-              hx-target="#telegram-chat-panel"
-              hx-swap="innerHTML"
-              class="ps-inline-form">
-            {% csrf_token %}
-            <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
-                <i class="fas fa-envelope-open-text me-1" aria-hidden="true"></i>{% translate "Mark as read" %}
-            </button>
-        </form>
+        {% if conversation.user.email %}
+        <div class="aw-kv"><dt>{% translate "Email" %}</dt><dd>{{ conversation.user.email }}</dd></div>
         {% endif %}
+        <div class="aw-kv"><dt>{% translate "Level" %}</dt><dd>{{ conversation_level }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Created" %}</dt><dd>{{ conversation.created_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>
+        {% if conversation.last_message_at %}
+        <div class="aw-kv"><dt>{% translate "Last message" %}</dt><dd>{{ conversation.last_message_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>
+        {% endif %}
+    </dl>
 
-        <a class="aw-btn aw-btn--ghost aw-btn--sm"
-           href="{{ detail_url }}"
-           hx-get="{{ panel_url }}?fragment=panel"
-           hx-target="#telegram-chat-panel"
-           hx-swap="innerHTML">
-            <i class="fas fa-sync-alt me-1" aria-hidden="true"></i>{% translate "Refresh" %}
+    <hr class="aw-divider">
+    <h4>{% translate "Quick links" %}</h4>
+    <div class="aw-quick-links">
+        <a class="aw-btn aw-btn--sm" href="{% url 'student-overview' conversation.user.pk %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+            <span>{% translate "Student 360" %}</span>
         </a>
-        <a class="aw-btn aw-btn--ghost aw-btn--sm"
-           href="{{ conversation_list_url }}">
-            <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
+        <a class="aw-btn aw-btn--sm" href="{% url 'attendance-management' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+            <span>{% translate "Attendance" %}</span>
+        </a>
+        <a class="aw-btn aw-btn--sm" href="{% url 'grades-matrix-dashboard' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-chart-line"></use></svg>
+            <span>{% translate "Grades" %}</span>
+        </a>
+        <a class="aw-btn aw-btn--sm" href="{% url 'payments-matrix-dashboard' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-receipt"></use></svg>
+            <span>{% translate "Payments" %}</span>
         </a>
     </div>
-</div>
 
-<div class="tg-chat-kv aw-kv aw-muted">
-    {% if conversation.claimed_by and conversation.claimed_at %}
-    <span>{% translate "Assigned to" %}: @{{ conversation.claimed_by.username }} - {{ conversation.claimed_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-    {% endif %}
-    {% if conversation.handled_by and conversation.handled_at %}
-    <span>{% translate "Resolved by" %}: @{{ conversation.handled_by.username }} - {{ conversation.handled_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-    {% endif %}
-    {% if conversation.admin_read_by and conversation.admin_read_at %}
-    <span>{% translate "Last read by" %}: @{{ conversation.admin_read_by.username }} - {{ conversation.admin_read_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-    {% endif %}
-</div>
-
-<div class="tg-chat-kv aw-kv aw-muted">
-    {% if conversation.last_message_at %}
-    <span><i class="far fa-clock me-1" aria-hidden="true"></i>{% translate "Last message" %}: {{ conversation.last_message_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-    {% endif %}
-    <span><i class="far fa-calendar-alt me-1" aria-hidden="true"></i>{% translate "Created" %}: {{ conversation.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-</div>
-
-{% if panel_notice %}
-<div class="aw-alert aw-alert--success" role="status">
-    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-    <span>{{ panel_notice }}</span>
-</div>
-{% endif %}
-
-{% include 'partials/telegram_message_list.html' %}
+    <hr class="aw-divider">
+    <p class="aw-small aw-muted">{% translate 'Access to this conversation is admin-only. Replies are sent as "Admin".' %}</p>
+</aside>
 {% endwith %}

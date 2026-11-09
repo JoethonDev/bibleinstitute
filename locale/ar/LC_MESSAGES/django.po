@@ -14221,3 +14221,216 @@ msgstr "لم تتم الموافقة على طلبك"
 
 msgid "An update on your application"
 msgstr "تحديث بشأن طلبك"
+
+msgid "Media parts"
+msgstr "أجزاء الوسائط"
+
+msgid "Add part"
+msgstr "إضافة جزء"
+
+msgid "Attach existing file"
+msgstr "إرفاق ملف موجود"
+
+msgid "Choose a video, audio recording or book from the Drive browser."
+msgstr "اختر فيديو أو تسجيلًا صوتيًا أو كتابًا من متصفح الملفات."
+
+msgid "Files sharing a part number are grouped into one part."
+msgstr "تُجمع الملفات التي تحمل رقم الجزء نفسه في جزء واحد."
+
+msgid "The total grade is calculated from the question points when the quiz is saved."
+msgstr "تُحسب الدرجة الكلية من درجات الأسئلة عند حفظ الاختبار."
+
+msgid "A fast, read-only sweep for the content problems students feel first."
+msgstr "فحص سريع للقراءة فقط لمشكلات المحتوى التي يلاحظها الطلاب أولًا."
+
+msgid "Lessons with no content"
+msgstr "دروس بلا محتوى"
+
+msgid "Published lessons with no video, audio, or book link."
+msgstr "دروس منشورة بلا رابط فيديو أو صوت أو كتاب."
+
+msgid "Malformed media links"
+msgstr "روابط وسائط غير صالحة"
+
+msgid "Quizzes without type"
+msgstr "اختبارات بلا نوع"
+
+msgid "Zero-question quizzes"
+msgstr "اختبارات بلا أسئلة"
+
+msgid "No issues found."
+msgstr "لا توجد مشكلات."
+
+msgid "Up to 25 sample rows."
+msgstr "حتى 25 صفًا كنموذج."
+
+msgid "No limit"
+msgstr "بلا حد"
+
+msgid "No time limit: your attempt ends when the quiz closes."
+msgstr "لا يوجد حد زمني: تنتهي محاولتك عند إغلاق الاختبار."
+
+msgid "No time limit: your attempt ends at closing time."
+msgstr "لا يوجد حد زمني: تنتهي محاولتك عند وقت الإغلاق."
+
+msgid "0 means no time limit: the attempt is bounded only by the quiz closing date."
+msgstr "0 تعني عدم وجود حد زمني: تنتهي المحاولة عند تاريخ إغلاق الاختبار فقط."
+
+msgid "Please enter a duration"
+msgstr "يرجى إدخال مدة."
+
+msgid "Dismiss"
+msgstr "إغلاق"
+
+msgid "Publish Android builds, enforce a minimum version, and control saving."
+msgstr "انشر إصدارات أندرويد، وحدد أقل إصدار مسموح، وتحكم في إمكانية الحفظ."
+
+msgid "Short, dismissible messages that appear above student pages."
+msgstr "رسائل قصيرة قابلة للإغلاق تظهر أعلى صفحات الطلاب."
+
+msgid "Jobs"
+msgstr "المهام"
+
+msgid "Drop video, audio, or PDF files"
+msgstr "أفلت ملفات الفيديو أو الصوت أو PDF"
+
+msgid "Processing jobs"
+msgstr "مهام المعالجة"
+
+msgid "Queue rules"
+msgstr "قواعد قائمة الانتظار"
+
+msgid "Pipeline"
+msgstr "خط المعالجة"
+
+msgid "Publish the graduation album without exposing private R2 objects."
+msgstr "انشر ألبوم التخرج دون كشف كائنات R2 الخاصة."
+
+msgid "Album rules"
+msgstr "قواعد الألبوم"
+
+msgid "One album per graduation-level scope."
+msgstr "ألبوم واحد لكل نطاق تخرج."
+
+msgid "Only graduates and staff can view."
+msgstr "يراه الخريجون وفريق العمل فقط."
+
+msgid "Display derivatives are private and signed."
+msgstr "نسخ العرض خاصة وموقعة."
+
+msgid "Deleting an item invalidates cached URLs."
+msgstr "حذف عنصر يلغي صلاحية الروابط المخزنة."
+
+msgid "Unread Telegram"
+msgstr "رسائل تلجرام غير المقروءة"
+
+msgid "Waiting on a decision"
+msgstr "بانتظار قرار"
+
+msgid "Need a retry"
+msgstr "تحتاج إعادة محاولة"
+
+msgid "Waiting for a grade"
+msgstr "بانتظار التصحيح"
+
+msgid "Unanswered conversations"
+msgstr "محادثات بلا رد"
+
+msgid "Across all levels"
+msgstr "في كل المستويات"
+
+msgid "Scans recorded today"
+msgstr "عمليات مسح اليوم"
+
+msgid "Review queue"
+msgstr "مراجعة القائمة"
+
+msgid "Open pipeline"
+msgstr "فتح خط المعالجة"
+
+msgid "Open Content QA"
+msgstr "فتح مراجعة المحتوى"
+
+msgid "Open inbox"
+msgstr "فتح صندوق الوارد"
+
+msgid "Jobs for this search"
+msgstr "مهام هذا البحث"
+
+msgid "In this scope"
+msgstr "في هذا النطاق"
+
+msgid "At least one scan"
+msgstr "مسح واحد على الأقل"
+
+msgid "In this window"
+msgstr "في هذه الفترة"
+
+msgid "Recent scans"
+msgstr "أحدث عمليات المسح"
+
+msgid "Time"
+msgstr "الوقت"
+
+msgid "No scans recorded yet."
+msgstr "لم تُسجل أي عمليات مسح بعد."
+
+msgid "Admin-only report"
+msgstr "تقرير خاص بالمسؤول"
+
+msgid "Eligible accounts"
+msgstr "الحسابات المؤهلة"
+
+msgid "Needs review"
+msgstr "تحتاج مراجعة"
+
+msgid "of accounts"
+msgstr "من الحسابات"
+
+msgid "Broadcast"
+msgstr "بث"
+
+msgid "Confirmed"
+msgstr "مؤكد"
+
+msgid "Activated"
+msgstr "مفعّل"
+
+msgid "Admin-only config"
+msgstr "إعدادات خاصة بالمسؤول"
+
+msgid "Bot ID"
+msgstr "معرّف البوت"
+
+msgid "Deactivated"
+msgstr "معطّل"
+
+msgid "Last validated"
+msgstr "آخر تحقق"
+
+msgid "Not connected"
+msgstr "غير متصل"
+
+msgid "Private chats only"
+msgstr "المحادثات الخاصة فقط"
+
+msgid "Student 360"
+msgstr "ملف الطالب الشامل"
+
+msgid "%(kind)s in %(course)s"
+msgstr "%(kind)s في %(course)s"
+
+msgid "Shortcut"
+msgstr "اختصار"
+
+msgid "Select all rows on this page"
+msgstr "تحديد كل الصفوف في هذه الصفحة"
+
+msgid "Select row"
+msgstr "تحديد الصف"
+
+msgid "Select all rows matching the filter"
+msgstr "تحديد كل الصفوف المطابقة للتصفية"
+
+msgid "Search accounts"
+msgstr "البحث في الحسابات"

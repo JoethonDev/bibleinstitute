@@ -1,4 +1,3 @@
-{% load crispy_forms_tags %}
 {% load i18n %}
 <div class="aw-dashboard-page" id="content">
     {% translate "Users" as page_eyebrow %}
@@ -26,8 +25,8 @@
     <div class="aw-alert aw-alert--danger" role="alert">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
         <div>
-            <h5 class="fw-bold">{% translate "Row errors" %}</h5>
-            <ul class="mb-0 small">
+            <h5 class="aw-section-title">{% translate "Row errors" %}</h5>
+            <ul class="aw-small aw-m-0">
                 {% for item in bulk_errors %}<li>{% translate "Line" %} {{ item.line }}: {{ item.message }}</li>{% endfor %}
             </ul>
         </div>
@@ -38,16 +37,16 @@
     <div class="aw-alert aw-alert--info" role="alert">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-help"></use></svg>
         <div>
-            <h5 class="fw-bold">{% translate "CSV File Instructions" %}</h5>
+            <h5 class="aw-section-title">{% translate "CSV File Instructions" %}</h5>
             <p>
                 {% translate "Please ensure your CSV file has the following columns in this exact order:" %}
             </p>
             <code>username, first_name, last_name, password, role</code>
             <hr />
-            <p class="mb-0">
+            <p class="aw-m-0">
                 {% translate "The 'role' should be one of the existing roles in the system (e.g., admin, teacher, junior, senior)." %}
             </p>
-            <p class="mb-0 mt-2">
+            <p class="aw-m-0 aw-mt-2">
                 {% translate "The whole file is validated first. Any invalid row creates no accounts at all; the import runs on the management worker." %}
             </p>
         </div>
@@ -72,7 +71,7 @@
         >
             {% csrf_token %}
             <div class="aw-form-section">
-                {{ form|crispy }}
+                <div class="aw-form-grid">{% include "partials/components/aw_form_fields.html" with form=form %}</div>
                 <div class="aw-form-actions">
                     <button type="submit" class="aw-btn aw-btn--primary">
                         <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>

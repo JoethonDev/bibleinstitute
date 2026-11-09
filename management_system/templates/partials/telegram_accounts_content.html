@@ -1,11 +1,19 @@
 {% load i18n %}
 {% comment %}
 Telegram accounts report workspace.
-Presentation only: the filter form keeps its GET contract (search/status/level),
+
+Presentation only. Every filter keeps its GET contract (search/status/level),
 the hx-get/hx-target/hx-select/hx-swap/hx-push-url/hx-sync/hx-indicator hooks,
-the four server-projected counts, the link/unlink rows, the unlink POST contract
-with the search/status/level/page round-trip fields, the paginator query and the
-shared pagination include. No last-seen or delivery metric is added.
+the four server-projected aggregates, the link/unlink rows, the unlink POST
+contract with the search/status/level/page round-trip fields, the paginator
+query and the shared pagination include.
+
+The context strip reports the link-status facts the view computes (linked,
+unlinked and phone mismatch); it deliberately renders no "active chats" metric
+because the view supplies no conversation aggregate. The identity cell links to
+the existing Student 360 route and the level chip comes from the row's current
+active-year level, which the view already projects. No last-seen or delivery
+metric is added.
 {% endcomment %}
 {% translate "Engagement" as page_eyebrow %}
 {% translate "Telegram Accounts" as page_title %}
@@ -15,15 +23,79 @@ shared pagination include. No last-seen or delivery metric is added.
 <div id="content" class="aw-dashboard-page">
   {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
 
-  <span id="telegram-accounts-loading" class="htmx-indicator" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+  <span id="telegram-accounts-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
 
-  <div class="aw-card aw-dashboard-filters">
+  <div class="aw-context-strip">
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-link"></use></svg>
+      <b>{{ linked_count }}</b> {% translate "Linked" %}
+    </span>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+      <b>{{ unlinked_count }}</b> {% translate "Not linked" %}
+    </span>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+      <b>{{ mismatch_count }}</b> {% translate "Phone mismatch" %}
+    </span>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+      {% translate "Admin-only report" %}
+    </span>
+  </div>
+
+  <div class="aw-kpi-grid">
+    <div class="aw-kpi">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Accounts" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ all_count }}</div>
+      <div class="aw-kpi-meta">{% translate "Eligible accounts" %}</div>
+    </div>
+    <div class="aw-kpi aw-kpi--green">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Linked" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-link"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ linked_count }}</div>
+      <div class="aw-kpi-meta">{% widthratio linked_count all_count 100 %}% {% translate "of accounts" %}</div>
+    </div>
+    <div class="aw-kpi">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Not linked" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ unlinked_count }}</div>
+      <div class="aw-kpi-meta">{% widthratio unlinked_count all_count 100 %}% {% translate "of accounts" %}</div>
+    </div>
+    <div class="aw-kpi aw-kpi--red">
+      <div class="aw-kpi-top">
+        <span class="aw-kpi-label">{% translate "Phone mismatch" %}</span>
+        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg></span>
+      </div>
+      <div class="aw-kpi-value">{{ mismatch_count }}</div>
+      <div class="aw-kpi-meta">{% translate "Needs review" %}</div>
+    </div>
+  </div>
+
+  <section class="aw-card aw-table-card">
+    <div class="aw-card-head">
+      <div class="aw-card-title">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+        <h3>{% translate "Telegram link status by account" %}</h3>
+      </div>
+      <span class="aw-pill aw-pill--muted">{% blocktranslate with count=page_obj.paginator.count %}{{ count }} Accounts shown{% endblocktranslate %}</span>
+    </div>
     <div class="aw-card-body aw-card-body--tight">
-      <form method="get" action="{% url 'telegram-accounts' %}" class="aw-filter-bar" role="search" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#telegram-accounts-loading">
-        <div class="aw-table-tools">
+      <div class="aw-filter-bar">
+        <form method="get" action="{% url 'telegram-accounts' %}" class="aw-table-tools" role="search" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#telegram-accounts-loading">
           <div class="aw-search-wrap">
             <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-            <input id="telegram-accounts-search" type="search" name="search" value="{{ search }}" maxlength="120" placeholder="{% translate 'Name, username, or phone' %}" class="aw-input aw-input--search" hx-preserve hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#telegram-accounts-loading">
+            <input id="telegram-accounts-search" type="search" name="search" value="{{ search }}" maxlength="120" aria-label="{% translate 'Search accounts' %}" placeholder="{% translate 'Name, username, or phone' %}" class="aw-input aw-input--search" hx-preserve hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#telegram-accounts-loading">
           </div>
           <label class="visually-hidden" for="telegram-accounts-status">{% translate "Link status" %}</label>
           <select id="telegram-accounts-status" name="status" class="aw-select" hx-get="{% url 'telegram-accounts' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#telegram-accounts-loading">
@@ -43,53 +115,12 @@ shared pagination include. No last-seen or delivery metric is added.
             <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
             <span>{% translate "Filter" %}</span>
           </button>
-          <a href="{% url 'telegram-accounts' %}" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="telegram-accounts-search" class="aw-btn aw-btn--ghost aw-btn--sm">
+          <a href="{% url 'telegram-accounts' %}" hx-get="{% url 'telegram-accounts' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="telegram-accounts-search" class="aw-btn aw-btn--ghost aw-btn--sm aw-ms-auto">
             <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
             <span>{% translate "Clear" %}</span>
           </a>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="aw-kpi-grid">
-    <div class="aw-kpi">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Accounts" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
+        </form>
       </div>
-      <div class="aw-kpi-value">{{ all_count }}</div>
-    </div>
-    <div class="aw-kpi aw-kpi--green">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Linked" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-link"></use></svg></span>
-      </div>
-      <div class="aw-kpi-value">{{ linked_count }}</div>
-    </div>
-    <div class="aw-kpi aw-kpi--red">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Not linked" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg></span>
-      </div>
-      <div class="aw-kpi-value">{{ unlinked_count }}</div>
-    </div>
-    <div class="aw-kpi aw-kpi--gold">
-      <div class="aw-kpi-top">
-        <span class="aw-kpi-label">{% translate "Phone mismatch" %}</span>
-        <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg></span>
-      </div>
-      <div class="aw-kpi-value">{{ mismatch_count }}</div>
-    </div>
-  </div>
-
-  <section class="aw-card aw-table-card">
-    <div class="aw-card-head">
-      <div class="aw-card-title">
-        <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
-        <h3>{% translate "Telegram link status by account" %}</h3>
-      </div>
-      <span class="aw-pill aw-pill--muted">{% blocktranslate with count=page_obj.paginator.count %}{{ count }} Accounts shown{% endblocktranslate %}</span>
     </div>
     {% if page_obj.object_list %}
     <div class="aw-table-wrap">
@@ -112,11 +143,29 @@ shared pagination include. No last-seen or delivery metric is added.
           {% for row in rows %}
           <tr>
             <td>
-              <span class="aw-cell-strong">{{ row.user.get_full_name|default:row.user.username }}</span>
-              <span class="aw-cell-sub">{{ row.user.username }}</span>
+              <div class="aw-cell-main">
+                {% include "partials/components/aw_avatar.html" with name=row.user tone="teal" %}
+                <div>
+                  <a href="{% url 'student-overview' row.user.pk %}"
+                     hx-get="{% url 'student-overview' row.user.pk %}"
+                     hx-target="#display-page"
+                     hx-select="#page-region"
+                     hx-swap="innerHTML"
+                     hx-push-url="true"><b>{{ row.user.get_full_name|default:row.user.username }}</b></a>
+                  <span class="aw-cell-sub">
+                    {% if row.level_name %}{{ row.level_name }} - {% endif %}{{ row.user.username }}
+                  </span>
+                </div>
+              </div>
             </td>
             <td>{{ row.role_name|default:"-" }}</td>
-            <td>{{ row.level_name|default:"-" }}</td>
+            <td>
+              {% if row.level_name %}
+              <span class="aw-chip">{{ row.level_name }}</span>
+              {% else %}
+              <span class="aw-muted">-</span>
+              {% endif %}
+            </td>
             <td dir="ltr">{{ row.user.phone|default:"-" }}</td>
             <td>
               {% if row.is_linked %}
@@ -133,13 +182,13 @@ shared pagination include. No last-seen or delivery metric is added.
             <td>
               {% if row.match_label %}
                 {% if row.match_tone == "success" %}
-                {% include "partials/components/aw_status_pill.html" with tone="green" label=row.match_label %}
+                {% include "partials/components/aw_status_pill.html" with status="linked" label=row.match_label %}
                 {% elif row.match_tone == "danger" %}
-                {% include "partials/components/aw_status_pill.html" with tone="red" label=row.match_label %}
+                {% include "partials/components/aw_status_pill.html" with status="failed" label=row.match_label %}
                 {% elif row.match_tone == "warning" %}
-                {% include "partials/components/aw_status_pill.html" with tone="amber" label=row.match_label %}
+                {% include "partials/components/aw_status_pill.html" with status="pending" label=row.match_label %}
                 {% else %}
-                {% include "partials/components/aw_status_pill.html" with tone="muted" label=row.match_label %}
+                {% include "partials/components/aw_status_pill.html" with status="inactive" label=row.match_label %}
                 {% endif %}
               {% else %}-{% endif %}
             </td>

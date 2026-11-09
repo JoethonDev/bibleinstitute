@@ -2,6 +2,13 @@
 {% translate "Academic" as page_eyebrow %}
 {% translate "Calendar Management" as page_title %}
 {% translate "Meetings, holidays and the month grid for one academic year." as page_description %}
+{% comment %}
+Calendar management workspace. Presentation only: the scope summary, month
+counts, grid, agenda, modals and every action keep their ids, data-* hooks,
+HTMX targets and POST endpoints. The month grid is rendered inside the joined
+`aw-cal-joined` surface so the weekday row and the day cells read as one
+bordered calendar.
+{% endcomment %}
 <div class="aw-dashboard-page" id="content">
 
   {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
@@ -70,48 +77,12 @@
       </div>
     </div>
 
-    {# Scope selector + month navigator #}
-    <div class="aw-card">
-      <div class="aw-card-body">
-        <div class="aw-flex aw-flex-wrap">
-          <form id="year-form" method="get" action="{% url 'calendar-management' %}" class="aw-flex"
-                hx-get="{% url 'calendar-management' %}"
-                hx-target="#calendar-content"
-                hx-select="#calendar-content"
-                hx-swap="outerHTML"
-                hx-push-url="true"
-                hx-sync="#calendar-content:abort"
-                hx-indicator="#calendar-loading">
-            <label for="year-select" class="form-label mb-0">{% translate "Academic Year" %}</label>
-            <input type="hidden" name="month" value="{{ cur_month }}">
-            <select id="year-select" name="academic_year" class="form-select w-auto"
-                    onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
-              {% for y in years %}
-              <option value="{{ y.id }}" {% if y.id == year_id %}selected{% endif %}>{{ y.name }}{% if y.is_active %} - {% translate "Active" %}{% endif %}</option>
-              {% endfor %}
-            </select>
-          </form>
-
-          <div class="aw-flex position-relative" role="group" aria-label="{% translate 'Month navigation' %}">
-            {% if prev_month %}
-            <a class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon"
-               href="?academic_year={{ year_id }}&{{ prev_month }}"
-               hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ prev_month }}"
-               hx-target="#calendar-content"
-               hx-select="#calendar-content"
-               hx-swap="outerHTML"
-               hx-push-url="true"
-               hx-indicator="#calendar-loading"
-               aria-label="{% translate 'Previous month' %}">
-              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-            </a>
-            {% else %}
-            <span class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon is-disabled" aria-disabled="true" aria-label="{% translate 'Previous month' %}">
-              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
-            </span>
-            {% endif %}
-
-            <form id="month-year-form" method="get" action="{% url 'calendar-management' %}" class="aw-flex"
+    {# Scope selector + month navigator, one toolbar row. #}
+    <div class="aw-card aw-dashboard-filters">
+      <div class="aw-card-body aw-card-body--tight">
+        <div class="aw-filter-bar">
+          <div class="aw-table-tools">
+            <form id="year-form" method="get" action="{% url 'calendar-management' %}" class="aw-flex"
                   hx-get="{% url 'calendar-management' %}"
                   hx-target="#calendar-content"
                   hx-select="#calendar-content"
@@ -119,63 +90,100 @@
                   hx-push-url="true"
                   hx-sync="#calendar-content:abort"
                   hx-indicator="#calendar-loading">
-              <input type="hidden" name="academic_year" value="{{ year_id }}">
-              <label for="month-select" class="visually-hidden">{% translate "Choose a month" %}</label>
-              <select id="month-select" name="month" class="form-select w-auto"
-                      aria-label="{% translate 'Choose a month' %}"
+              <label class="visually-hidden" for="year-select">{% translate "Academic Year" %}</label>
+              <input type="hidden" name="month" value="{{ cur_month }}">
+              <select id="year-select" name="academic_year" class="aw-select"
                       onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
-                {% for option in month_options %}
-                <option value="{{ option.value }}" {% if option.is_current %}selected{% endif %}>{{ option.label }}</option>
+                {% for y in years %}
+                <option value="{{ y.id }}" {% if y.id == year_id %}selected{% endif %}>{{ y.name }}{% if y.is_active %} - {% translate "Active" %}{% endif %}</option>
                 {% endfor %}
               </select>
             </form>
 
-            {% if next_month %}
-            <a class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon"
-               href="?academic_year={{ year_id }}&{{ next_month }}"
-               hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ next_month }}"
-               hx-target="#calendar-content"
-               hx-select="#calendar-content"
-               hx-swap="outerHTML"
-               hx-push-url="true"
-               hx-indicator="#calendar-loading"
-               aria-label="{% translate 'Next month' %}">
-              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-            </a>
-            {% else %}
-            <span class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon is-disabled" aria-disabled="true" aria-label="{% translate 'Next month' %}">
-              <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
-            </span>
-            {% endif %}
+            <div class="aw-flex position-relative" role="group" aria-label="{% translate 'Month navigation' %}">
+              {% if prev_month %}
+              <a class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon"
+                 href="?academic_year={{ year_id }}&{{ prev_month }}"
+                 hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ prev_month }}"
+                 hx-target="#calendar-content"
+                 hx-select="#calendar-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true"
+                 hx-indicator="#calendar-loading"
+                 aria-label="{% translate 'Previous month' %}">
+                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+              </a>
+              {% else %}
+              <span class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon is-disabled" aria-disabled="true" aria-label="{% translate 'Previous month' %}">
+                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}" aria-hidden="true"></i>
+              </span>
+              {% endif %}
 
-            <span id="calendar-loading" class="htmx-indicator" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
-          </div>
+              <form id="month-year-form" method="get" action="{% url 'calendar-management' %}" class="aw-flex"
+                    hx-get="{% url 'calendar-management' %}"
+                    hx-target="#calendar-content"
+                    hx-select="#calendar-content"
+                    hx-swap="outerHTML"
+                    hx-push-url="true"
+                    hx-sync="#calendar-content:abort"
+                    hx-indicator="#calendar-loading">
+                <input type="hidden" name="academic_year" value="{{ year_id }}">
+                <label for="month-select" class="visually-hidden">{% translate "Choose a month" %}</label>
+                <select id="month-select" name="month" class="aw-select"
+                        aria-label="{% translate 'Choose a month' %}"
+                        onchange="this.form.dispatchEvent(new Event('submit', {bubbles: true}))">
+                  {% for option in month_options %}
+                  <option value="{{ option.value }}" {% if option.is_current %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </form>
 
-          <div class="aw-flex aw-ms-auto">
-            {% if today_query %}
-            <a class="aw-btn aw-btn--outline aw-btn--sm"
-               href="?academic_year={{ year_id }}&{{ today_query }}"
-               hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ today_query }}"
-               hx-target="#calendar-content"
-               hx-select="#calendar-content"
-               hx-swap="outerHTML"
-               hx-push-url="true"
-               hx-indicator="#calendar-loading">
-              <i class="fas fa-calendar-day" aria-hidden="true"></i>
-              <span>{% translate "Today" %}</span>
-            </a>
-            {% endif %}
+              {% if next_month %}
+              <a class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon"
+                 href="?academic_year={{ year_id }}&{{ next_month }}"
+                 hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ next_month }}"
+                 hx-target="#calendar-content"
+                 hx-select="#calendar-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true"
+                 hx-indicator="#calendar-loading"
+                 aria-label="{% translate 'Next month' %}">
+                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+              </a>
+              {% else %}
+              <span class="aw-btn aw-btn--ghost aw-btn--sm aw-btn--icon is-disabled" aria-disabled="true" aria-label="{% translate 'Next month' %}">
+                <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+              </span>
+              {% endif %}
+
+              <span id="calendar-loading" class="htmx-indicator" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+            </div>
+
+            <div class="aw-flex aw-ms-auto">
+              {% if today_query %}
+              <a class="aw-btn aw-btn--outline aw-btn--sm"
+                 href="?academic_year={{ year_id }}&{{ today_query }}"
+                 hx-get="{% url 'calendar-management' %}?academic_year={{ year_id }}&{{ today_query }}"
+                 hx-target="#calendar-content"
+                 hx-select="#calendar-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true"
+                 hx-indicator="#calendar-loading">
+                <i class="fas fa-calendar-day" aria-hidden="true"></i>
+                <span>{% translate "Today" %}</span>
+              </a>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    {# Calendar grid - canonical shared partial (read-only variant is used on the student calendar) #}
-    <div class="aw-card">
-      <div class="aw-card-body">
-        {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
-      </div>
-      <div class="aw-card-foot">
+    {# Calendar grid - canonical shared partial (the read-only variant is used on the student calendar). The admin variant wraps itself in the joined calendar surface. #}
+    {% include "partials/calendar_month_grid.html" with cell_variant="admin" %}
+
+    <div class="aw-card aw-mt-3">
+      <div class="aw-card-body aw-card-body--tight">
         <div class="aw-cal-legend aw-calendar-legend" role="group" aria-label="{% translate 'Legend' %}">
           <span><span class="is-meeting aw-legend-swatch aw-pill">&nbsp;&nbsp;&nbsp;</span> {% translate "Meeting day" %}</span>
           <span><span class="has-meeting aw-legend-swatch aw-pill">&nbsp;&nbsp;&nbsp;</span> {% translate "Scheduled meeting" %}</span>
@@ -212,13 +220,15 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">{% translate "Date" %}</label>
-              <p class="form-control-plaintext" id="modal-date-display"></p>
-            </div>
-            <div class="mb-3">
-              <label for="holiday-name" class="form-label">{% translate "Holiday Name" %}</label>
-              <input type="text" name="name" id="holiday-name" class="form-control" required>
+            <div class="aw-stack">
+              <div class="aw-field">
+                <span class="aw-field-label">{% translate "Date" %}</span>
+                <div class="aw-small" id="modal-date-display"></div>
+              </div>
+              <div class="aw-field">
+                <label for="holiday-name">{% translate "Holiday Name" %}</label>
+                <input type="text" name="name" id="holiday-name" class="aw-input" required>
+              </div>
             </div>
           </div>
           <div class="modal-footer">
@@ -243,14 +253,16 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">{% translate "Date" %}</label>
-              <p class="form-control-plaintext" id="meeting-modal-date-display"></p>
-            </div>
-            <div class="mb-3">
-              <span class="form-label d-block" id="meeting-offering-label">{% translate "Course Offering" %}</span>
-              <p class="form-text mt-0" id="meeting-offering-hint">{% translate "Select one or more offerings. Each level can have one meeting per date." %}</p>
-              <div id="meeting-course-offering" class="aw-calendar-choice-list" role="group" aria-labelledby="meeting-offering-label" aria-describedby="meeting-offering-hint"></div>
+            <div class="aw-stack">
+              <div class="aw-field">
+                <span class="aw-field-label">{% translate "Date" %}</span>
+                <div class="aw-small" id="meeting-modal-date-display"></div>
+              </div>
+              <div class="aw-field">
+                <span class="aw-field-label" id="meeting-offering-label">{% translate "Course Offering" %}</span>
+                <div class="aw-field-hint" id="meeting-offering-hint">{% translate "Select one or more offerings. Each level can have one meeting per date." %}</div>
+                <div id="meeting-course-offering" class="aw-calendar-choice-list" role="group" aria-labelledby="meeting-offering-label" aria-describedby="meeting-offering-hint"></div>
+              </div>
             </div>
           </div>
           <div class="modal-footer">

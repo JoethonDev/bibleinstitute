@@ -13,68 +13,69 @@
 {% translate "No messages yet." as no_messages_label %}
 {% if oob_state %}<div hx-swap-oob="innerHTML:#telegram-message-items"><li hidden data-state-value="{{ message_state }}"></li>{% endif %}
 {% if include_older_sentinel and messages_page_obj and messages_page_obj.has_previous %}
-<li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
+<li data-scroll-page data-direction="older"
     data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
     aria-hidden="true"></li>
 {% endif %}
 {% for message in message_items %}
-<li class="tg-chat-msg tg-chat-msg--{{ message.direction }} aw-msg{% if message.direction == 'inbound' %} aw-msg--in{% else %} aw-msg--out{% endif %}" data-msg-pk="{{ message.pk }}">
-    <div class="tg-chat-msg-head{% if message.direction == 'outbound' %} text-white{% endif %}">
-        <span class="tg-chat-msg-role{% if message.direction == 'outbound' %} text-white{% endif %}">{% if message.direction == "inbound" %}{% if message.sender_user %}{{ message.sender_user.telegram_display_identity }}{% else %}{% translate "Student" %}{% endif %}{% else %}{% translate "Admin" %}{% endif %}</span>
-        <span class="tg-chat-msg-type">{{ message.get_content_type_display }}</span>
-        <time class="tg-chat-msg-time{% if message.direction == 'outbound' %} text-white{% endif %}" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
-    </div>
-    {% if message.text %}<div class="tg-chat-msg-body{% if message.direction == 'outbound' %} text-white{% endif %}">{{ message.text|linebreaksbr }}</div>{% endif %}
+{% ifchanged message.created_at|date:"Y-m-d" %}<li class="aw-msg-day">{{ message.created_at|date:"DATE_FORMAT" }}</li>{% endifchanged %}
+<li class="aw-msg{% if message.direction == 'inbound' %} aw-msg--in{% else %} aw-msg--out{% endif %}" data-msg-pk="{{ message.pk }}">
+    {% if message.text %}<div>{{ message.text|linebreaksbr }}</div>{% endif %}
     {% with attachments=message.attachments.all %}
-    {% if attachments %}
-    <ul class="tg-chat-attachments list-unstyled mb-0">
-        {% for attachment in attachments %}
-        {% url 'telegram-attachment' attachment_id=attachment.pk as attachment_url %}
-        <li class="tg-chat-attachment-row">
-            {% if attachment.is_available %}
-                {% if attachment.media_type == "voice" or attachment.media_type == "audio" %}
-                <audio class="tg-chat-audio" controls preload="none" src="{{ attachment_url }}">
-                    <a class="tg-chat-attachment" href="{{ attachment_url }}?download=1">{{ attachment.original_name|default:attachment.media_type }}</a>
-                </audio>
-                <a class="tg-chat-attachment" href="{{ attachment_url }}?download=1">
-                    <i class="fas fa-download" aria-hidden="true"></i><span>{% translate "Download" %}</span>
-                </a>
-                {% elif attachment.media_type == "photo" %}
-                <a class="tg-chat-photo" href="{{ attachment_url }}" target="_blank" rel="noopener">
-                    <img src="{{ attachment_url }}" alt="{{ attachment.original_name }}" loading="lazy" decoding="async">
-                </a>
-                {% elif attachment.media_type == "video" %}
-                <video class="tg-chat-video" controls preload="none" src="{{ attachment_url }}"></video>
-                <a class="tg-chat-attachment" href="{{ attachment_url }}?download=1">
-                    <i class="fas fa-download" aria-hidden="true"></i><span>{% translate "Download" %} {{ attachment.original_name }}</span>
-                </a>
-                {% else %}
-                <a class="tg-chat-attachment" href="{{ attachment_url }}">
-                    <i class="fas fa-paperclip" aria-hidden="true"></i><span>{{ attachment.original_name|default:attachment.media_type }}</span>
-                </a>
-                {% endif %}
-            {% else %}
-            <span class="tg-chat-attachment tg-chat-attachment--error">
-                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>{% translate "Attachment unavailable" %}</span>
-            </span>
-            {% endif %}
-        </li>
-        {% endfor %}
-    </ul>
+    {% for attachment in attachments %}
+    {% url 'telegram-attachment' attachment_id=attachment.pk as attachment_url %}
+    {% if attachment.is_available %}
+        {% if attachment.media_type == "voice" or attachment.media_type == "audio" %}
+        <audio controls preload="none" src="{{ attachment_url }}">
+            <a href="{{ attachment_url }}?download=1">{{ attachment.original_name|default:attachment.media_type }}</a>
+        </audio>
+        <span class="aw-msg-attach">
+            <a href="{{ attachment_url }}?download=1">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
+                {% translate "Download" %}
+            </a>
+        </span>
+        {% elif attachment.media_type == "photo" %}
+        <a href="{{ attachment_url }}" target="_blank" rel="noopener">
+            <img class="aw-msg-image" src="{{ attachment_url }}" alt="{{ attachment.original_name }}" loading="lazy" decoding="async">
+        </a>
+        {% elif attachment.media_type == "video" %}
+        <video class="aw-msg-video" controls preload="none" src="{{ attachment_url }}"></video>
+        <span class="aw-msg-attach">
+            <a href="{{ attachment_url }}?download=1">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
+                {% translate "Download" %} {{ attachment.original_name }}
+            </a>
+        </span>
+        {% else %}
+        <span class="aw-msg-attach">
+            <a href="{{ attachment_url }}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-paperclip"></use></svg>
+                {{ attachment.original_name|default:attachment.media_type }}
+            </a>
+        </span>
+        {% endif %}
+    {% else %}
+    <span class="aw-msg-attach">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        {% translate "Attachment unavailable" %}
+    </span>
     {% endif %}
+    {% endfor %}
     {% endwith %}
     {% if message.delivery_status == "unknown" %}
-    <div class="aw-alert aw-alert--warn mt-1" role="status">
+    <div class="aw-alert aw-alert--warn" role="status">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
         <span>{{ delivery_unknown_label }}</span>
     </div>
     {% endif %}
-    <div class="tg-chat-msg-meta aw-msg-meta{% if message.direction == 'outbound' %} text-white{% endif %}">
+    <div class="aw-msg-meta aw-flex-wrap">
+        <span>{% if message.direction == "inbound" %}{% if message.sender_user %}{{ message.sender_user.telegram_display_identity }}{% else %}{% translate "Student" %}{% endif %}{% else %}{% translate "Admin" %}{% endif %} - {{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
         {% include "partials/components/aw_status_pill.html" with status=message.delivery_status label=message.get_delivery_status_display %}
         {% if message.origin %}{% include "partials/components/aw_status_pill.html" with status=message.origin label=message.get_origin_display %}{% endif %}
-        {% if message.direction == "outbound" and message.sender_user %}<span class="tg-chat-msg-sender{% if message.direction == 'outbound' %} text-white{% endif %}">@{{ message.sender_user.username }}</span>{% endif %}
-        {% if message.sent_at %}<time class="tg-chat-msg-time{% if message.direction == 'outbound' %} text-white{% endif %}" datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
-        {% if message.delivery_error %}<span class="tg-chat-msg-error" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
+        {% if message.direction == "outbound" and message.sender_user %}<span>@{{ message.sender_user.username }}</span>{% endif %}
+        {% if message.sent_at %}<time datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
+        {% if message.delivery_error %}<span title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
         {% if message.content_type == "digest" %}
         {% if message.resolved_at %}
         {% if message.resolved_by %}
@@ -102,12 +103,14 @@
         {% elif message.telegram_deletion_status == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=deletion_expired_label %}
         {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=deletion_failed_label %}{% endif %}
         {% endif %}
-        {% if message.telegram_deleted_by %}<span class="tg-chat-msg-sender{% if message.direction == 'outbound' %} text-white{% endif %}">{% translate "Removed by" %} @{{ message.telegram_deleted_by.username }}</span>{% endif %}
-        {% if message.telegram_deletion_error %}<span class="tg-chat-msg-error">{{ message.telegram_deletion_error }}</span>{% endif %}
+        {% if message.telegram_deleted_by %}<span>{% translate "Removed by" %} @{{ message.telegram_deleted_by.username }}</span>{% endif %}
+        {% if message.telegram_deletion_error %}<span>{{ message.telegram_deletion_error }}</span>{% endif %}
+    </div>
+    <div class="aw-flex aw-flex-wrap">
         {% if message.direction == "inbound" and message.content_type != "digest" %}
-        <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
         {% elif message.content_type == "digest" and message.source_message_id %}
-        <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.source_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.source_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
         {% endif %}
         {% if message.direction == "outbound" and message.delivery_status == "sent" and message.telegram_deletion_status != "deleted" and message.telegram_deletion_status != "expired" %}
         {% if message.sender_user_id == request.user.pk or message.content_type == "digest" and message.telegram_chat_id == own_admin_chat_id %}
@@ -116,10 +119,10 @@
               hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}?fragment=panel"
               hx-target="#telegram-chat-panel"
               hx-swap="innerHTML"
-              class="ps-inline-form"
+              class="aw-inline-form"
               data-confirm-message="{% translate 'Delete this message from Telegram? The local conversation history will remain.' %}">
             {% csrf_token %}
-            <button type="submit" class="tg-chat-reply-link aw-btn aw-btn--ghost aw-btn--sm{% if message.direction == 'outbound' %} text-white{% endif %}">{% translate "Delete from Telegram" %}</button>
+            <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete from Telegram" %}</button>
         </form>
         {% endif %}
         {% endif %}

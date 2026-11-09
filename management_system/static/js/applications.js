@@ -71,7 +71,7 @@
             });
         }
         var allButton = root.querySelector('#select-all-records');
-        if (allButton) allButton.classList.toggle('d-none', !root.querySelector('#select-all')?.checked || state.all);
+        if (allButton) allButton.hidden = !root.querySelector('#select-all')?.checked || state.all;
     }
 
     function handleSelection(root, checkbox) {
@@ -129,7 +129,8 @@
                         parts.push(summary.dataset.notificationFailedLabel + ': ' + notificationFailed);
                     }
                     summary.textContent = parts.join(' - ');
-                    summary.classList.remove('d-none', 'aw-alert--danger', 'aw-alert--info', 'aw-alert--warn', 'aw-alert--success');
+                    summary.classList.remove('aw-alert--danger', 'aw-alert--info', 'aw-alert--warn', 'aw-alert--success');
+        summary.hidden = false;
                     summary.classList.add(
                         stale || failed || notificationFailed ? 'aw-alert--warn' : 'aw-alert--success'
                     );

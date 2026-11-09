@@ -1,0 +1,45 @@
+{% load i18n %}
+{% comment %}
+Banner publish form. Single definition: rendered inline when the page is opened
+with ?new=1 (or after a validation error), and fetched into the shared drawer
+through ?fragment=form. Wrapping cards differ, the form contract does not.
+{% endcomment %}
+<form method="post" action="{% url 'banner-manage' %}" hx-post="{% url 'banner-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+    {% csrf_token %}
+    <div class="aw-form-section">
+        <div class="aw-form-grid">
+            <div class="aw-field aw-span-2">
+                <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                {{ form.title }}
+                {% if form.title.errors %}<div class="aw-field-error">{{ form.title.errors }}</div>{% endif %}
+            </div>
+            <div class="aw-field aw-span-2">
+                <label for="{{ form.body.id_for_label }}">{{ form.body.label }}</label>
+                {{ form.body }}
+                {% if form.body.errors %}<div class="aw-field-error">{{ form.body.errors }}</div>{% endif %}
+            </div>
+            <div class="aw-field">
+                <label for="{{ form.action_label.id_for_label }}">{{ form.action_label.label }}</label>
+                {{ form.action_label }}
+                {% if form.action_label.errors %}<div class="aw-field-error">{{ form.action_label.errors }}</div>{% endif %}
+            </div>
+            <div class="aw-field">
+                <label for="{{ form.action_url.id_for_label }}">{{ form.action_url.label }}</label>
+                {{ form.action_url }}
+                {% if form.action_url.errors %}<div class="aw-field-error">{{ form.action_url.errors }}</div>{% endif %}
+            </div>
+        </div>
+        {% if form.non_field_errors %}
+        <div class="aw-alert aw-alert--danger aw-mt-3" role="alert">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+            <div>{{ form.non_field_errors }}</div>
+        </div>
+        {% endif %}
+        <div class="aw-form-actions">
+            <button type="submit" class="aw-btn aw-btn--primary">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                <span>{% translate "Publish" %}</span>
+            </button>
+        </div>
+    </div>
+</form>

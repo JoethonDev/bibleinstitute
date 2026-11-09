@@ -1,6 +1,8 @@
 {% load i18n aw_ui %}
 {# Sticky contextual sidebar shell. #aw-sidebar-body is the OOB region. #}
-<aside id="aw-sidebar" class="aw-sidebar" aria-label="{% translate 'Domain sections' %}"
-       x-bind:aria-hidden="$store.ui.sidebarCollapsed ? 'true' : 'false'">
+{# No aria-hidden binding: the collapse control lives inside this aside, so
+   hiding it from assistive tech while it holds focus is invalid. The collapsed
+   state hides the sidebar content visually and keeps the toggle reachable. #}
+<aside id="aw-sidebar" class="aw-sidebar" aria-label="{% translate 'Domain sections' %}">
     {% include 'partials/components/admin_sidebar_body.html' %}
 </aside>

@@ -1,256 +1,399 @@
 {% load i18n aw_ui %}
 {% comment %}
 Student 360 - read-only admin workspace page.
-One root #content, canonical page head, context strip, in-page anchor tabs
-and one card per preserved section. Every section stays server-rendered and
-every value, link and id from the previous page is kept: the only client
-script is the existing bounded 10-row pager for long cards. Phone masking is
-resolved server-side in views.student_overview (telegram_phone_display plus
-show_phone); this page never mutates or impersonates the account and its
-access is audit-logged there.
+One root #content, canonical page head, identity hero, one context strip,
+real tab panels over the preserved server-rendered sections, and the existing
+bounded 10-row pager for long cards. Every value, link and id from the previous
+page is kept: the only client script is that pager. Phone masking is resolved
+server-side in views.student_overview (telegram_phone_display plus show_phone);
+this page never mutates or impersonates the account and its access is
+audit-logged there.
 {% endcomment %}
 {% aw_capabilities as caps %}
 {% translate "No data" as ov_no_data %}
 {% translate "Aggregate" as ov_aggregate %}
+{% translate "Student 360" as ov_page_title %}
+{% if student.is_active %}{% translate "Active" as ov_account_state %}{% else %}{% translate "Inactive" as ov_account_state %}{% endif %}
 <div id="content" class="aw-dashboard-page">
     {% translate "People" as ov_eyebrow %}
     {% translate "Read-only overview of this account." as ov_description %}
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=ov_eyebrow page_title=student.get_full_name|default:student.username page_description=ov_description %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=ov_eyebrow page_title=ov_page_title page_description=ov_description %}
 
-    {% if enrollments or telegram_account %}
-    <div class="aw-context-strip">
-        {% if enrollments %}
-        <span class="aw-ctx-item">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
-            <b>{{ enrollments.0.academic_year_level.academic_year.name }}</b>
-        </span>
-        <span class="aw-ctx-sep" aria-hidden="true"></span>
-        <span class="aw-ctx-item">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
-            {{ enrollments.0.academic_year_level.level.display_name }}
-        </span>
-        <span class="aw-ctx-sep" aria-hidden="true"></span>
-        <span class="aw-ctx-item">
-            {% include "partials/components/aw_status_pill.html" with status=enrollments.0.status label=enrollments.0.get_status_display %}
-        </span>
-        {% endif %}
-        {% if telegram_account %}
-        {% if enrollments %}<span class="aw-ctx-sep" aria-hidden="true"></span>{% endif %}
-        <span class="aw-ctx-item">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
-            {{ telegram_phone_display|default:"-" }}
-        </span>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <nav class="aw-tabs" aria-label="{% translate 'Sections' %}">
-        <a class="aw-tab is-active" href="#aw-ov-overview" aria-current="location">{% translate "Overview" %}</a>
-        <a class="aw-tab" href="#aw-ov-academics">{% translate "Academics" %}</a>
-        <a class="aw-tab" href="#aw-ov-attendance">{% translate "Attendance" %}</a>
-        <a class="aw-tab" href="#aw-ov-finance">{% translate "Finance" %}</a>
-        <a class="aw-tab" href="#aw-ov-engagement">{% translate "Engagement" %}</a>
-    </nav>
-
-    <section id="aw-ov-overview" aria-labelledby="aw-h-overview">
-        <h2 id="aw-h-overview" class="visually-hidden">{% translate "Overview" %}</h2>
-        <section class="aw-card" aria-labelledby="aw-c-profile">
-            <div class="aw-card-head">
-                <div class="aw-card-title">
-                    <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
-                    <h3 id="aw-c-profile">{% translate "Profile" %}</h3>
+    {# Identity hero: person summary at the top of the 360, reusing the shared identity block. #}
+    <section class="aw-card" aria-labelledby="aw-ov-student-name">
+        <div class="aw-identity aw-identity-hero aw-flex-wrap">
+            {% include "partials/components/aw_avatar.html" with name=student size="xl" tone="teal" %}
+            <div class="aw-identity-main">
+                <h2 id="aw-ov-student-name">{{ student.get_full_name|default:student.username }}</h2>
+                <div class="aw-identity-meta">
+                    <span dir="ltr">@{{ student.username }}</span>
                 </div>
+                <div class="aw-identity-chips">
+                    {% if student.role %}
+                    <span class="aw-chip">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+                        {{ student.role.get_role_display }}
+                    </span>
+                    {% endif %}
+                    {% include "partials/components/aw_status_pill.html" with status=student.application_status label=student.get_application_status_display %}
+                    {% if enrollments %}
+                    <span class="aw-chip aw-chip--teal">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                        {{ enrollments.0.academic_year_level.level.display_name }}
+                    </span>
+                    {% endif %}
+                    {% include "partials/components/aw_status_pill.html" with status=student.is_active|yesno:"active,inactive" label=ov_account_state %}
+                </div>
+            </div>
+            {% if caps.manage_content or caps.view_reports or caps.manage_academic_setup and telegram_account %}
+            <div class="aw-row-actions">
                 {% if caps.manage_content %}
-                <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'user-profile' student.pk %}">
+                <a class="aw-btn aw-btn--outline" href="{% url 'user-profile' student.pk %}">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
                     <span>{% translate "User details" %}</span>
                 </a>
                 {% endif %}
+                {% if caps.manage_academic_setup and telegram_account %}
+                {% if conversations %}
+                <a class="aw-btn aw-btn--outline" href="{% url 'telegram-conversation-detail' conversations.0.pk %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
+                    <span>{% translate "Message" %}</span>
+                </a>
+                {% else %}
+                <a class="aw-btn aw-btn--outline" href="{% url 'telegram-conversations' %}?search={{ student.username|urlencode }}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
+                    <span>{% translate "Message" %}</span>
+                </a>
+                {% endif %}
+                {% endif %}
+                {% if caps.view_reports %}
+                <a class="aw-btn aw-btn--outline" href="{% url 'promotion-history' %}?search={{ student.username|urlencode }}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                    <span>{% translate "History" %}</span>
+                </a>
+                {% endif %}
             </div>
-            <div class="aw-card-body">
-                <div class="aw-grid aw-grid--2">
-                    <div class="aw-stack aw-stack--lg">
-                        <div class="aw-flex">
-                            {% include "partials/components/aw_avatar.html" with name=student size="lg" tone="teal" %}
-                            <div>
-                                <b class="aw-strong">{{ student.get_full_name|default:student.username }}</b>
-                                <div class="aw-small aw-muted">{{ student.username }}</div>
-                            </div>
-                        </div>
-                        <div class="aw-chip-row">
-                            {% if student.is_active %}{% translate "Active" as ov_account_state %}{% else %}{% translate "Inactive" as ov_account_state %}{% endif %}
-                            {% include "partials/components/aw_status_pill.html" with status=student.is_active|yesno:"active,inactive" label=ov_account_state %}
-                        </div>
-                    </div>
-                    <div>
-                        <dl class="aw-kv">
-                            <dt>{% translate "Username" %}</dt>
-                            <dd>{{ student.username }}</dd>
-                        </dl>
-                        <dl class="aw-kv">
-                            <dt>{% translate "Role" %}</dt>
-                            <dd>{% if student.role %}{{ student.role.get_role_display }}{% else %}-{% endif %}</dd>
-                        </dl>
-                        <dl class="aw-kv">
-                            <dt>{% translate "Application status" %}</dt>
-                            <dd>{% include "partials/components/aw_status_pill.html" with status=student.application_status label=student.get_application_status_display %}</dd>
-                        </dl>
-                        <dl class="aw-kv">
-                            <dt>{% translate "Study mode" %}</dt>
-                            <dd>{% if student.study_mode %}{{ student.get_study_mode_display }}{% else %}-{% endif %}</dd>
-                        </dl>
-                        <dl class="aw-kv">
-                            <dt>{% translate "Joined" %}</dt>
-                            <dd>{% if student.joined_date %}{{ student.joined_date|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
-                        </dl>
-                        <dl class="aw-kv">
-                            <dt>{% translate "Last login" %}</dt>
-                            <dd>{% if student.last_login %}{{ student.last_login|date:"Y-m-d H:i" }}{% else %}-{% endif %}</dd>
-                        </dl>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </section>
-
-    <section id="aw-ov-academics" aria-labelledby="aw-h-academics">
-        <h2 id="aw-h-academics" class="visually-hidden">{% translate "Academics" %}</h2>
-        <div class="aw-grid aw-grid--2-even">
-            <section class="aw-card" aria-labelledby="aw-c-enrollments">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
-                        <h3 id="aw-c-enrollments">{% translate "Enrollments" %} ({{ enrollments|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if enrollments %}
-                    <div class="aw-stack" data-pager-body>
-                        {% for e in enrollments %}
-                        <div class="aw-flex-between" data-pager-row>
-                            <div>
-                                <b class="aw-small">{{ e.academic_year_level.level.display_name }} - {{ e.academic_year_level.academic_year.name }}</b>
-                                <div class="aw-small aw-muted">{{ e.course_offering.course.name|default:e.get_enrollment_type_display }}</div>
-                            </div>
-                            {% include "partials/components/aw_status_pill.html" with status=e.status label=e.get_status_display %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-book" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-grades">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
-                        <h3 id="aw-c-grades">{% translate "Grades matrix" %} ({{ grades|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if grades %}
-                    <div class="aw-stack" data-pager-body>
-                        {% for g in grades %}
-                        <div class="aw-flex-between" data-pager-row>
-                            <div>
-                                <b class="aw-small">{{ g.quiz.name }}</b>
-                                <div class="aw-small aw-muted">
-                                    {% if g.quiz.quiz_type %}{% if request.LANGUAGE_CODE == 'ar' %}{{ g.quiz.quiz_type.name_ar|default:g.quiz.quiz_type.name_en }}{% else %}{{ g.quiz.quiz_type.name_en|default:g.quiz.quiz_type.name_ar }}{% endif %} - {% endif %}<a href="{% url 'submission-user' g.quiz.pk student.pk %}">{% translate "View" %}</a>
-                                </div>
-                                <div class="aw-small aw-muted">{{ g.submitted_at|date:"Y-m-d H:i" }}</div>
-                            </div>
-                            <span class="aw-chip">{{ g.total_grade }} / {{ g.quiz.total_grade }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-chart" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-progress">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-chart-line"></use></svg>
-                        <h3 id="aw-c-progress">{% translate "Progress" %} ({{ progress|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if progress %}
-                    <div class="aw-stack" data-pager-body>
-                        {% for p in progress %}
-                        <div data-pager-row>
-                            <div class="aw-progress-label">
-                                <span class="aw-truncate">{{ p.lesson.name }}</span>
-                                <b>{{ p.percent }}%</b>
-                            </div>
-                            <div class="aw-progress" aria-hidden="true">
-                                <span style="width:{{ p.percent }}%"></span>
-                            </div>
-                            <div class="aw-small aw-muted">{{ p.part_id }}</div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-chart-line" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-evaluation">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>
-                        <h3 id="aw-c-evaluation">{% translate "Evaluation results" %} ({{ evaluation_results|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if evaluation_results %}
-                    <div class="aw-timeline" data-pager-body>
-                        {% for r in evaluation_results %}
-                        <div class="aw-tl-item" data-pager-row>
-                            <b>{{ r.formula.academic_year_level.level.display_name }} - {{ r.computed_status }} -> {{ r.final_status }} - {{ r.computed_score }}</b>
-                            <span>{{ r.course_offering.course.name|default:ov_aggregate }} - {{ r.saved_at|date:"Y-m-d" }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-graduation" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-promotion">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
-                        <h3 id="aw-c-promotion">{% translate "Promotion history" %} ({{ promotion_history|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if promotion_history %}
-                    <div class="aw-timeline" data-pager-body>
-                        {% for h in promotion_history %}
-                        <div class="aw-tl-item" data-pager-row>
-                            <b>{{ h.source_year_level.level.display_name }} -> {{ h.destination_year_level.level.display_name|default:"-" }} - {{ h.outcome }}</b>
-                            <span>{{ h.created_at|date:"Y-m-d" }} - {{ h.actor.username|default:"" }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-arrow-up" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
+            {% endif %}
         </div>
     </section>
 
-    <section id="aw-ov-attendance" aria-labelledby="aw-h-attendance">
-        <h2 id="aw-h-attendance" class="visually-hidden">{% translate "Attendance" %}</h2>
-        <div class="aw-grid aw-grid--2-even">
+    {# At-a-glance facts the view already provides; bounded lists report their loaded count. #}
+    <div class="aw-context-strip">
+        {% if enrollments %}
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+            <span>{% translate "Level" %}</span>
+            <b>{{ enrollments.0.academic_year_level.level.display_name }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            <span>{% translate "Academic year" %}</span>
+            <b>{{ enrollments.0.academic_year_level.academic_year.name }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+            {% include "partials/components/aw_status_pill.html" with status=enrollments.0.status label=enrollments.0.get_status_display %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        {% endif %}
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
+            <span>{% translate "Enrollments" %}</span>
+            <b>{{ enrollments|length }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            <span>{% translate "Joined" %}</span>
+            <b>{% if student.joined_date %}{{ student.joined_date|date:"Y-m-d" }}{% else %}-{% endif %}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+            <span>{% translate "Last login" %}</span>
+            <b>{% if student.last_login %}{{ student.last_login|date:"Y-m-d H:i" }}{% else %}-{% endif %}</b>
+        </span>
+        {% if telegram_account %}
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
+            <span class="visually-hidden">{% translate "Telegram" %}</span>
+            <b>{{ telegram_phone_display|default:"-" }}</b>
+        </span>
+        {% endif %}
+    </div>
+
+    <div data-aw-tabs>
+        {# Real tabs: the delegated controller owns is-active / aria-selected / hidden. #}
+        <nav class="aw-tabs" role="tablist" aria-label="{% translate 'Sections' %}">
+            <button type="button"
+                    class="aw-tab is-active"
+                    id="aw-ov-overview-tab"
+                    data-aw-tab="overview"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="aw-ov-overview"
+                    tabindex="0">{% translate "Overview" %}</button>
+            <button type="button"
+                    class="aw-tab"
+                    id="aw-ov-academics-tab"
+                    data-aw-tab="academics"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="aw-ov-academics"
+                    tabindex="-1">{% translate "Academics" %}</button>
+            <button type="button"
+                    class="aw-tab"
+                    id="aw-ov-attendance-tab"
+                    data-aw-tab="attendance"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="aw-ov-attendance"
+                    tabindex="-1">{% translate "Attendance" %}</button>
+            <button type="button"
+                    class="aw-tab"
+                    id="aw-ov-finance-tab"
+                    data-aw-tab="finance"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="aw-ov-finance"
+                    tabindex="-1">{% translate "Finance" %}</button>
+            <button type="button"
+                    class="aw-tab"
+                    id="aw-ov-engagement-tab"
+                    data-aw-tab="engagement"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="aw-ov-engagement"
+                    tabindex="-1">{% translate "Engagement" %}</button>
+        </nav>
+
+        {# --- Overview: identity facts plus the read-only student preview --- #}
+        <div class="aw-tabpanel"
+             id="aw-ov-overview"
+             data-aw-tabpanel="overview"
+             role="tabpanel"
+             aria-labelledby="aw-ov-overview-tab">
+            <h2 id="aw-h-overview" class="visually-hidden">{% translate "Overview" %}</h2>
+            <div class="aw-stack aw-stack--lg">
+                <section class="aw-card" aria-labelledby="aw-c-profile">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                            <h3 id="aw-c-profile">{% translate "Profile" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <div class="aw-grid aw-grid--2-even">
+                            <div>
+                                <dl class="aw-kv">
+                                    <dt>{% translate "Username" %}</dt>
+                                    <dd>{{ student.username }}</dd>
+                                </dl>
+                                <dl class="aw-kv">
+                                    <dt>{% translate "Role" %}</dt>
+                                    <dd>{% if student.role %}{{ student.role.get_role_display }}{% else %}-{% endif %}</dd>
+                                </dl>
+                                <dl class="aw-kv">
+                                    <dt>{% translate "Application status" %}</dt>
+                                    <dd>{% include "partials/components/aw_status_pill.html" with status=student.application_status label=student.get_application_status_display %}</dd>
+                                </dl>
+                            </div>
+                            <div>
+                                <dl class="aw-kv">
+                                    <dt>{% translate "Study mode" %}</dt>
+                                    <dd>{% if student.study_mode %}{{ student.get_study_mode_display }}{% else %}-{% endif %}</dd>
+                                </dl>
+                                <dl class="aw-kv">
+                                    <dt>{% translate "Joined" %}</dt>
+                                    <dd>{% if student.joined_date %}{{ student.joined_date|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
+                                </dl>
+                                <dl class="aw-kv">
+                                    <dt>{% translate "Last login" %}</dt>
+                                    <dd>{% if student.last_login %}{{ student.last_login|date:"Y-m-d H:i" }}{% else %}-{% endif %}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="student-view" class="aw-card" aria-labelledby="aw-c-student-view">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                            <h3 id="aw-c-student-view">{% translate "Student view" %} - {% translate "Read-only preview" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <p class="aw-small aw-muted">{% translate "What the student sees. Actions are disabled in preview." %}</p>
+                        {% if readonly_offerings %}
+                        <div class="aw-timeline" data-pager-body>
+                            {% for o in readonly_offerings %}
+                            <div class="aw-tl-item" data-pager-row>
+                                <b>{{ o.course.name }} - {{ o.academic_year_level.level.display_name }}</b>
+                                <span>{{ o.published_lesson_count }} {% translate "Lessons" %} - {{ o.published_quiz_count }} {% translate "Quizzes" %}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-eye" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        {# --- Academics: enrollment, grades, progress, evaluation and promotion --- #}
+        <div class="aw-tabpanel"
+             id="aw-ov-academics"
+             data-aw-tabpanel="academics"
+             role="tabpanel"
+             aria-labelledby="aw-ov-academics-tab"
+             hidden>
+            <h2 id="aw-h-academics" class="visually-hidden">{% translate "Academics" %}</h2>
+            <div class="aw-grid aw-grid--2-even">
+                <section class="aw-card" aria-labelledby="aw-c-enrollments">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
+                            <h3 id="aw-c-enrollments">{% translate "Enrollments" %} ({{ enrollments|length }})</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if enrollments %}
+                        <div class="aw-stack" data-pager-body>
+                            {% for e in enrollments %}
+                            <div class="aw-flex-between" data-pager-row>
+                                <div>
+                                    <b class="aw-small">{{ e.academic_year_level.level.display_name }} - {{ e.academic_year_level.academic_year.name }}</b>
+                                    <div class="aw-small aw-muted">{{ e.course_offering.course.name|default:e.get_enrollment_type_display }}</div>
+                                </div>
+                                {% include "partials/components/aw_status_pill.html" with status=e.status label=e.get_status_display %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-book" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="aw-c-grades">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
+                            <h3 id="aw-c-grades">{% translate "Grades matrix" %} ({{ grades|length }})</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if grades %}
+                        <div class="aw-stack" data-pager-body>
+                            {% for g in grades %}
+                            <div class="aw-flex-between" data-pager-row>
+                                <div>
+                                    <b class="aw-small">{{ g.quiz.name }}</b>
+                                    <div class="aw-small aw-muted">
+                                        {% if g.quiz.quiz_type %}{% if request.LANGUAGE_CODE == 'ar' %}{{ g.quiz.quiz_type.name_ar|default:g.quiz.quiz_type.name_en }}{% else %}{{ g.quiz.quiz_type.name_en|default:g.quiz.quiz_type.name_ar }}{% endif %} - {% endif %}<a href="{% url 'submission-user' g.quiz.pk student.pk %}">{% translate "View" %}</a>
+                                    </div>
+                                    <div class="aw-small aw-muted">{{ g.submitted_at|date:"Y-m-d H:i" }}</div>
+                                </div>
+                                <span class="aw-chip">{{ g.total_grade }} / {{ g.quiz.total_grade }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-chart" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="aw-c-progress">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-chart-line"></use></svg>
+                            <h3 id="aw-c-progress">{% translate "Progress" %} ({{ progress|length }})</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if progress %}
+                        <div class="aw-stack" data-pager-body>
+                            {% for p in progress %}
+                            <div data-pager-row>
+                                <div class="aw-progress-label">
+                                    <span class="aw-truncate">{{ p.lesson.name }}</span>
+                                    <b>{{ p.percent }}%</b>
+                                </div>
+                                <div class="aw-progress" aria-hidden="true">
+                                    <span style="width:{{ p.percent }}%"></span>
+                                </div>
+                                <div class="aw-small aw-muted">{{ p.part_id }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-chart-line" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="aw-c-evaluation">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>
+                            <h3 id="aw-c-evaluation">{% translate "Evaluation results" %} ({{ evaluation_results|length }})</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if evaluation_results %}
+                        <div class="aw-timeline" data-pager-body>
+                            {% for r in evaluation_results %}
+                            <div class="aw-tl-item" data-pager-row>
+                                <b>{{ r.formula.academic_year_level.level.display_name }} - {{ r.computed_status }} -> {{ r.final_status }} - {{ r.computed_score }}</b>
+                                <span>{{ r.course_offering.course.name|default:ov_aggregate }} - {{ r.saved_at|date:"Y-m-d" }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-graduation" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="aw-c-promotion">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+                            <h3 id="aw-c-promotion">{% translate "Promotion history" %} ({{ promotion_history|length }})</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if promotion_history %}
+                        <div class="aw-timeline" data-pager-body>
+                            {% for h in promotion_history %}
+                            <div class="aw-tl-item" data-pager-row>
+                                <b>{{ h.source_year_level.level.display_name }} -> {{ h.destination_year_level.level.display_name|default:"-" }} - {{ h.outcome }}</b>
+                                <span>{{ h.created_at|date:"Y-m-d" }} - {{ h.actor.username|default:"" }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-arrow-up" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        {# --- Attendance --- #}
+        <div class="aw-tabpanel"
+             id="aw-ov-attendance"
+             data-aw-tabpanel="attendance"
+             role="tabpanel"
+             aria-labelledby="aw-ov-attendance-tab"
+             hidden>
+            <h2 id="aw-h-attendance" class="visually-hidden">{% translate "Attendance" %}</h2>
             <section class="aw-card" aria-labelledby="aw-c-attendance">
                 <div class="aw-card-head">
                     <div class="aw-card-title">
@@ -274,11 +417,15 @@ access is audit-logged there.
                 </div>
             </section>
         </div>
-    </section>
 
-    <section id="aw-ov-finance" aria-labelledby="aw-h-finance">
-        <h2 id="aw-h-finance" class="visually-hidden">{% translate "Finance" %}</h2>
-        <div class="aw-grid aw-grid--2-even">
+        {# --- Finance --- #}
+        <div class="aw-tabpanel"
+             id="aw-ov-finance"
+             data-aw-tabpanel="finance"
+             role="tabpanel"
+             aria-labelledby="aw-ov-finance-tab"
+             hidden>
+            <h2 id="aw-h-finance" class="visually-hidden">{% translate "Finance" %}</h2>
             <section class="aw-card" aria-labelledby="aw-c-payments">
                 <div class="aw-card-head">
                     <div class="aw-card-title">
@@ -302,131 +449,113 @@ access is audit-logged there.
                 </div>
             </section>
         </div>
-    </section>
 
-    <section id="aw-ov-engagement" aria-labelledby="aw-h-engagement">
-        <h2 id="aw-h-engagement" class="visually-hidden">{% translate "Engagement" %}</h2>
-        <div class="aw-grid aw-grid--2-even">
-            <section class="aw-card" aria-labelledby="aw-c-conversations">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
-                        <h3 id="aw-c-conversations">{% translate "Telegram Chat" %} ({{ conversations|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if conversations %}
-                    <div class="aw-timeline" data-pager-body>
-                        {% for c in conversations %}
-                        <div class="aw-tl-item" data-pager-row>
-                            <b><a href="{% url 'telegram-conversation-detail' c.pk %}">#{{ c.pk }} - {{ c.status }}</a></b>
-                            <span>{{ c.last_message_at|date:"Y-m-d H:i" }}</span>
+        {# --- Engagement: support chat, notifications, Telegram account and devices --- #}
+        <div class="aw-tabpanel"
+             id="aw-ov-engagement"
+             data-aw-tabpanel="engagement"
+             role="tabpanel"
+             aria-labelledby="aw-ov-engagement-tab"
+             hidden>
+            <h2 id="aw-h-engagement" class="visually-hidden">{% translate "Engagement" %}</h2>
+            <div class="aw-grid aw-grid--2-even">
+                <section class="aw-card" aria-labelledby="aw-c-conversations">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
+                            <h3 id="aw-c-conversations">{% translate "Telegram Chat" %} ({{ conversations|length }})</h3>
                         </div>
-                        {% endfor %}
                     </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-message" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-notifications">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
-                        <h3 id="aw-c-notifications">{% translate "Notifications" %} ({{ notifications|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if notifications %}
-                    <div class="aw-timeline" data-pager-body>
-                        {% for n in notifications %}
-                        <div class="aw-tl-item" data-pager-row>
-                            <b>{{ n.title_en|default:n.title_ar }}</b>
-                            <span>{{ n.notification_type }} - {{ n.created_at|date:"Y-m-d H:i" }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-bell" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-telegram">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
-                        <h3 id="aw-c-telegram">{% translate "Telegram account" %}</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if telegram_account %}
-                    <div class="aw-stack">
-                        <div class="aw-flex-between">
-                            <div>
-                                <b class="aw-small">{{ telegram_phone_display|default:"-" }}</b>
-                                <div class="aw-small aw-muted">{{ telegram_account.linked_at|date:"Y-m-d" }}</div>
+                    <div class="aw-card-body">
+                        {% if conversations %}
+                        <div class="aw-timeline" data-pager-body>
+                            {% for c in conversations %}
+                            <div class="aw-tl-item" data-pager-row>
+                                <b><a href="{% url 'telegram-conversation-detail' c.pk %}">#{{ c.pk }} - {{ c.status }}</a></b>
+                                <span>{{ c.last_message_at|date:"Y-m-d H:i" }}</span>
                             </div>
-                            {% if telegram_account.is_active %}{% translate "Active" as ov_tg_state %}{% else %}{% translate "Inactive" as ov_tg_state %}{% endif %}
-                            {% include "partials/components/aw_status_pill.html" with status=telegram_account.is_active|yesno:"active,inactive" label=ov_tg_state %}
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-message" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="aw-c-notifications">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+                            <h3 id="aw-c-notifications">{% translate "Notifications" %} ({{ notifications|length }})</h3>
                         </div>
                     </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-send" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="aw-card" aria-labelledby="aw-c-devices">
-                <div class="aw-card-head">
-                    <div class="aw-card-title">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-mobile"></use></svg>
-                        <h3 id="aw-c-devices">{% translate "Devices" %} ({{ devices|length }}/{{ sessions|length }})</h3>
-                    </div>
-                </div>
-                <div class="aw-card-body">
-                    {% if devices %}
-                    <div class="aw-stack" data-pager-body>
-                        {% for d in devices %}
-                        <div class="aw-flex-between" data-pager-row>
-                            <b class="aw-small">{{ d.platform }} - {{ d.installation_id|slice:":8" }}</b>
-                            {% if d.is_active %}{% translate "Active" as ov_dev_state %}{% else %}{% translate "Inactive" as ov_dev_state %}{% endif %}
-                            {% include "partials/components/aw_status_pill.html" with status=d.is_active|yesno:"active,inactive" label=ov_dev_state %}
+                    <div class="aw-card-body">
+                        {% if notifications %}
+                        <div class="aw-timeline" data-pager-body>
+                            {% for n in notifications %}
+                            <div class="aw-tl-item" data-pager-row>
+                                <b>{{ n.title_en|default:n.title_ar }}</b>
+                                <span>{{ n.notification_type }} - {{ n.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-bell" description=ov_no_data %}
+                        {% endif %}
                     </div>
-                    {% else %}
-                    {% include "partials/components/aw_empty.html" with icon="i-mobile" description=ov_no_data %}
-                    {% endif %}
-                </div>
-            </section>
-        </div>
-    </section>
+                </section>
 
-    <section id="student-view" class="aw-card" aria-labelledby="aw-c-student-view">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
-                <h3 id="aw-c-student-view">{% translate "Student view" %} - {% translate "Read-only preview" %}</h3>
+                <section class="aw-card" aria-labelledby="aw-c-telegram">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+                            <h3 id="aw-c-telegram">{% translate "Telegram account" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if telegram_account %}
+                        <div class="aw-stack">
+                            <div class="aw-flex-between">
+                                <div>
+                                    <b class="aw-small">{{ telegram_phone_display|default:"-" }}</b>
+                                    <div class="aw-small aw-muted">{{ telegram_account.linked_at|date:"Y-m-d" }}</div>
+                                </div>
+                                {% if telegram_account.is_active %}{% translate "Active" as ov_tg_state %}{% else %}{% translate "Inactive" as ov_tg_state %}{% endif %}
+                                {% include "partials/components/aw_status_pill.html" with status=telegram_account.is_active|yesno:"active,inactive" label=ov_tg_state %}
+                            </div>
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-send" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="aw-card" aria-labelledby="aw-c-devices">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-mobile"></use></svg>
+                            <h3 id="aw-c-devices">{% translate "Devices" %} ({{ devices|length }}/{{ sessions|length }})</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        {% if devices %}
+                        <div class="aw-stack" data-pager-body>
+                            {% for d in devices %}
+                            <div class="aw-flex-between" data-pager-row>
+                                <b class="aw-small">{{ d.platform }} - {{ d.installation_id|slice:":8" }}</b>
+                                {% if d.is_active %}{% translate "Active" as ov_dev_state %}{% else %}{% translate "Inactive" as ov_dev_state %}{% endif %}
+                                {% include "partials/components/aw_status_pill.html" with status=d.is_active|yesno:"active,inactive" label=ov_dev_state %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {% include "partials/components/aw_empty.html" with icon="i-mobile" description=ov_no_data %}
+                        {% endif %}
+                    </div>
+                </section>
             </div>
         </div>
-        <div class="aw-card-body">
-            <p class="aw-small aw-muted">{% translate "What the student sees. Actions are disabled in preview." %}</p>
-            {% if readonly_offerings %}
-            <div class="aw-timeline" data-pager-body>
-                {% for o in readonly_offerings %}
-                <div class="aw-tl-item" data-pager-row>
-                    <b>{{ o.course.name }} - {{ o.academic_year_level.level.display_name }}</b>
-                    <span>{{ o.published_lesson_count }} {% translate "Lessons" %} - {{ o.published_quiz_count }} {% translate "Quizzes" %}</span>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            {% include "partials/components/aw_empty.html" with icon="i-eye" description=ov_no_data %}
-            {% endif %}
-        </div>
-    </section>
+    </div>
 
     <p class="aw-small aw-muted">{% translate "Access to this page is logged." %}</p>
 

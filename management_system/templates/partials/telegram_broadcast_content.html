@@ -1,10 +1,18 @@
 {% load i18n %}
 {% comment %}
-Compose Broadcast workspace. Presentation only: the compose POST keeps its
-action, multipart encoding, hx-* contract, csrf token, bound field ids/names,
-the telegram-broadcast-level-help description hook and the active-year/level
-projections. The page head main block is shared; the only action is the
-existing Back link, kept inline with its page-navigation attributes.
+Compose Broadcast workspace.
+
+Presentation only. The compose POST keeps its action, multipart encoding,
+hx-* contract, csrf token, bound field ids/names, the
+telegram-broadcast-level-help description hook, the level choices injected by
+the view and the active-year/level projections. The page head main block is
+shared; the only action is the existing Back link, kept inline with its
+page-navigation attributes.
+
+The level widget is the same bound ChoiceField rendered with the workspace
+.aw-select class; name, id, required state, description hook, injected choices
+and submitted value are unchanged. The form exposes no boolean field, so no
+.aw-switch is rendered, and no field the view does not define is added.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
     {% translate "Engagement" as page_eyebrow %}
@@ -48,49 +56,59 @@ existing Back link, kept inline with its page-navigation attributes.
         <form method="post" action="{{ compose_url }}" hx-post="{{ compose_url }}" hx-encoding="multipart/form-data" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="aw-form-section">
-                {% if broadcast_form.non_field_errors %}
-                <div class="aw-alert aw-alert--danger mb-3" role="alert">
-                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-                    <div>{{ broadcast_form.non_field_errors }}</div>
-                </div>
-                {% endif %}
-
-                <div class="aw-form-grid">
-                    <div class="aw-field aw-span-2">
-                        <label for="{{ broadcast_form.message.id_for_label }}">{{ broadcast_form.message.label }}</label>
-                        {{ broadcast_form.message }}
-                        {% if broadcast_form.message.errors %}<div class="aw-field-error">{{ broadcast_form.message.errors }}</div>{% endif %}
-                        <div class="aw-field-hint">{% blocktranslate with limit=4000 %}The message must not exceed {{ limit }} characters and will be sent exactly as written.{% endblocktranslate %}</div>
+                <div class="aw-stack">
+                    {% if broadcast_form.non_field_errors %}
+                    <div class="aw-alert aw-alert--danger" role="alert">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                        <div>{{ broadcast_form.non_field_errors }}</div>
                     </div>
+                    {% endif %}
 
-                    <div class="aw-field aw-span-2">
-                        <label for="{{ broadcast_form.level.id_for_label }}">{{ broadcast_form.level.label }}</label>
-                        {{ broadcast_form.level }}
-                        {% if broadcast_form.level.errors %}<div class="aw-field-error">{{ broadcast_form.level.errors }}</div>{% endif %}
-                        <div id="telegram-broadcast-level-help" class="aw-field-hint">
-                            {% if levels %}
-                            {% translate "Choose one level or send to all levels of the active academic year. Available levels:" %}
-                            <span class="aw-chip-row mt-1">
-                                {% for level in levels %}
-                                <span class="aw-pill aw-pill--muted aw-pill--plain">{% firstof level.level.display_name level.display_name %}</span>
-                                {% endfor %}
-                            </span>
-                            {% else %}
-                            {% translate "No levels are opened in the active academic year yet." %}
-                            {% endif %}
+                    <div class="aw-form-grid">
+                        <div class="aw-field aw-span-2">
+                            <label class="aw-field-label" for="{{ broadcast_form.message.id_for_label }}">{{ broadcast_form.message.label }}</label>
+                            {{ broadcast_form.message }}
+                            {% if broadcast_form.message.errors %}<div class="aw-field-error">{{ broadcast_form.message.errors }}</div>{% endif %}
+                            <div class="aw-field-hint">{% blocktranslate with limit=4000 %}The message must not exceed {{ limit }} characters and will be sent exactly as written.{% endblocktranslate %}</div>
                         </div>
-                    </div>
 
-                    <div class="aw-field aw-span-2">
-                        <label for="{{ broadcast_form.attachments.id_for_label }}">{{ broadcast_form.attachments.label }}</label>
-                        {{ broadcast_form.attachments }}
-                        {% if broadcast_form.attachments.errors %}<div class="aw-field-error">{{ broadcast_form.attachments.errors }}</div>{% endif %}
-                        <div class="aw-field-hint">
-                            {% if max_attachment_bytes %}
-                            {% blocktranslate with size=max_attachment_bytes|filesizeformat %}Optional. You may attach several files; each attachment must be at most {{ size }}.{% endblocktranslate %}
-                            {% else %}
-                            {% translate "Optional. You may attach several files to be sent with the broadcast." %}
-                            {% endif %}
+                        <div class="aw-field aw-span-2">
+                            <label class="aw-field-label" for="{{ broadcast_form.level.id_for_label }}">{{ broadcast_form.level.label }}</label>
+                            <select name="{{ broadcast_form.level.name }}"
+                                    id="{{ broadcast_form.level.id_for_label }}"
+                                    class="aw-select"
+                                    aria-describedby="telegram-broadcast-level-help"
+                                    {% if broadcast_form.level.field.required %}required{% endif %}>
+                                {% for choice_value, choice_label in broadcast_form.level.field.choices %}
+                                <option value="{{ choice_value }}"{% if broadcast_form.level.value|stringformat:"s" == choice_value|stringformat:"s" %} selected{% endif %}>{{ choice_label }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if broadcast_form.level.errors %}<div class="aw-field-error">{{ broadcast_form.level.errors }}</div>{% endif %}
+                            <div id="telegram-broadcast-level-help" class="aw-field-hint">
+                                {% if levels %}
+                                {% translate "Choose one level or send to all levels of the active academic year. Available levels:" %}
+                                <span class="aw-chip-row aw-mt-2">
+                                    {% for level in levels %}
+                                    <span class="aw-chip">{% firstof level.level.display_name level.display_name %}</span>
+                                    {% endfor %}
+                                </span>
+                                {% else %}
+                                {% translate "No levels are opened in the active academic year yet." %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="aw-field aw-span-2">
+                            <label class="aw-field-label" for="{{ broadcast_form.attachments.id_for_label }}">{{ broadcast_form.attachments.label }}</label>
+                            {{ broadcast_form.attachments }}
+                            {% if broadcast_form.attachments.errors %}<div class="aw-field-error">{{ broadcast_form.attachments.errors }}</div>{% endif %}
+                            <div class="aw-field-hint">
+                                {% if max_attachment_bytes %}
+                                {% blocktranslate with size=max_attachment_bytes|filesizeformat %}Optional. You may attach several files; each attachment must be at most {{ size }}.{% endblocktranslate %}
+                                {% else %}
+                                {% translate "Optional. You may attach several files to be sent with the broadcast." %}
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
