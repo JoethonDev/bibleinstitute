@@ -1,0 +1,14 @@
+{% extends 'emails/base_email.txt' %}{% load i18n %}{% block content %}{% autoescape off %}{% translate "An update on your application" %}
+
+{% translate "Hello" %} {{ name }},
+
+{% translate "After careful review, we regret to inform you that your application has not been approved at this time." %}
+
+{% translate "If you believe this is an error or would like more information, please contact our administration." %}
+
+{% translate "Visit the website" %}:
+{{ site_domain }}
+
+{% translate "We appreciate your interest in Bible Institute and wish you God's blessing." %}
+
+{% translate "Bible Institute Administration" %}{% endautoescape %}{% endblock %}

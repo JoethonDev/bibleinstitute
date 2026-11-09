@@ -13602,3 +13602,30 @@ msgstr "Each rule's weight determines its contribution to the weighted final sco
 
 msgid "Audio validation is unavailable on this server."
 msgstr "Audio validation is unavailable on this server."
+
+msgid "Account security"
+msgstr "Account security"
+
+msgid "We received your application"
+msgstr "We received your application"
+
+msgid "Visit the website"
+msgstr "Visit the website"
+
+msgid "If the button does not open, copy this link:"
+msgstr "If the button does not open, copy this link:"
+
+msgid "This is an automated message; please do not reply."
+msgstr "This is an automated message; please do not reply."
+
+msgid "Hello"
+msgstr "Hello"
+
+msgid "Your application was approved"
+msgstr "Your application was approved"
+
+msgid "Your application was not approved"
+msgstr "Your application was not approved"
+
+msgid "An update on your application"
+msgstr "An update on your application"

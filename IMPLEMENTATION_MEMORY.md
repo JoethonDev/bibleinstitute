@@ -48,6 +48,15 @@ download are included; the later production port keeps the existing `sd-*` /
 Psalmodia layer; progress/average values use existing bounded facts or fall back
 to counts/omit; mobile uses bottom tabs at 720px and below.
 
+Review pass (9 November 2026): all 16 operator comments are included. Arabic now
+uses a larger Tahoma/Segoe UI reading stack; filled buttons and pills use
+stronger contrast; My learning has collapsible year groups with previous years;
+the wide next-meeting card is present; course content is direct lectures plus a
+separate quiz group; lesson parts are stacked with no
+tabs and a PDF viewer with production-style controls; the quiz has no exit X or
+Save and exit, has high-contrast selection, unanswered-question validation and
+detailed question/answer review; calendar stays on the active scope.
+
 Validation: 11 English and 11 Arabic pages at 1440/1024/768/390/360 with no body
 overflow or console errors; Arabic pages are `lang="ar"` / `dir="rtl"` with no
 untranslated visible English except technical tokens; language switch, quiz
@@ -683,6 +692,25 @@ stage (FFmpeg/FFprobe) and `FFPROBE_BINARY` is configurable in settings,
 `.env.example`, `.env` and both Compose environment blocks. The native FFmpeg
 media pipeline remains limited to the media queue. `docker build --check` passes
 and `docker compose ... config` resolves the new variable in every app service.
+
+Email flow hardening (2026-11-09): all four transactional emails
+(`password_reset`, `application_received`, `application_activated`,
+`application_declined`) now extend one RTL-aware table template with the
+workspace palette (cream, teal, gold, paper), the institute emblem, a centered
+CTA and a copied-link fallback. Subjects are Arabic for reset, received,
+approved and not-approved. `tasks.py` now reads the canonical site domain from
+settings instead of a second module-level env read, and application status
+emails share one broker-failure fallback in `utils/email.py` so a missing
+Celery broker cannot break signup or a decision. Validation used the locmem
+backend and eager Celery: password reset returned 302 and sent one Arabic email;
+received/approved/not-approved tasks each sent Arabic RTL HTML; HTTP decline and
+activate decisions returned 302, changed status and sent the matching Arabic
+email; English renders LTR with no Arabic leakage; a forced broker failure still
+delivered the application email synchronously. Remaining email gate: `.env`
+still has empty `DJANGO_EMAIL_HOST_USER`/`DJANGO_EMAIL_HOST_PASSWORD`, and the
+`noreply@bibleinstitute.edu` sender must be an authenticated/verified mailbox or
+a transactional provider must be configured; the plain-text alternative is still
+empty and should be added before release.
 
 Known follow-ups (not done): provider acceptance (R2 stats/search, Telegram
 delivery, media workers) remains

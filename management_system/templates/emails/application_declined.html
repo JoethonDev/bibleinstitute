@@ -1,9 +1,14 @@
 {% extends 'emails/base_email.html' %}{% load i18n %}
+{% block preheader %}{% translate "An update on your application" %}{% endblock %}
 {% block content %}
-<h2 style="color:#2F5D73;margin:0 0 15px;">{% translate "Application Status" %}</h2>
-<p style="color:#4B5563;line-height:1.6;">{% translate "Dear" %} <strong>{{ name }}</strong>,</p>
-<p style="color:#4B5563;line-height:1.6;">{% translate "After careful review, we regret to inform you that your application has not been approved at this time." %}</p>
-<p style="color:#4B5563;line-height:1.6;">{% translate "If you believe this is an error or would like more information, please contact our administration." %}</p>
-<p style="color:#4B5563;line-height:1.6;">{% translate "We appreciate your interest in Bible Institute and wish you God's blessing." %}</p>
-<p style="color:#4B5563;line-height:1.6;"><strong>{% translate "Bible Institute Administration" %}</strong></p>
+<p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#b98a3e;">{% translate "Admissions" %}</p>
+<h1 style="margin:0 0 18px;font-family:Georgia,'Palatino Linotype','Sakkal Majalla',serif;font-size:25px;line-height:1.5;font-weight:700;color:#142c34;">{% translate "An update on your application" %}</h1>
+<p style="margin:0 0 12px;font-size:14px;line-height:1.9;color:#4b5563;">{% translate "Hello" %} <strong style="color:#142c34;">{{ name }}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;line-height:1.9;color:#4b5563;">{% translate "After careful review, we regret to inform you that your application has not been approved at this time." %}</p>
+<p style="margin:0 0 12px;font-size:14px;line-height:1.9;color:#4b5563;">{% translate "If you believe this is an error or would like more information, please contact our administration." %}</p>
+<div style="text-align:center;margin:26px 0;"><a href="{{ site_domain }}" style="display:inline-block;padding:13px 32px;background-color:#2e6474;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:14px;font-weight:700;line-height:1.4;color:#fffdf9;text-decoration:none;border-radius:10px;">{% translate "Visit the website" %}</a></div>
+<p style="margin:0 0 6px;font-size:12px;line-height:1.8;color:#6e7c82;">{% translate "If the button does not open, copy this link:" %}</p>
+<p dir="ltr" style="margin:0 0 18px;font-size:12px;line-height:1.8;color:#2e6474;word-break:break-all;text-align:left;"><a href="{{ site_domain }}" style="color:#2e6474;text-decoration:underline;">{{ site_domain }}</a></p>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.9;color:#4b5563;">{% translate "We appreciate your interest in Bible Institute and wish you God's blessing." %}</p>
+<p style="margin:0;padding-top:14px;border-top:1px solid #e4dac6;font-size:13px;line-height:1.9;color:#142c34;"><strong>{% translate "Bible Institute Administration" %}</strong></p>
 {% endblock %}

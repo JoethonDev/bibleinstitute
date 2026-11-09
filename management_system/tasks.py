@@ -4,7 +4,6 @@ Autodiscovered by learning_platform.celery.app.
 """
 from __future__ import annotations
 
-import os
 from datetime import timedelta
 from logging import getLogger
 from uuid import uuid4
@@ -108,20 +107,18 @@ def reconcile_closed_quiz_snapshots() -> None:
         except Exception:
             logger.exception("Snapshot reconciliation failed for quiz %s", quiz_id)
 
-SITE_DOMAIN = os.getenv("DJANGO_SITE_DOMAIN", "http://localhost:8000")
-
-
 def _send_html_email(subject: str, template_name: str, context: dict, recipient_email: str) -> None:
-    """Low-level render-and-send helper used only by tasks. Does not catch exceptions."""
+    """Render the HTML and plain-text alternatives, then send one multipart email."""
     ctx = {
         **context,
-        "site_domain": SITE_DOMAIN.rstrip("/"),
+        "site_domain": _site_domain(),
         "static_asset_version": settings.STATIC_ASSET_VERSION,
     }
     html_message = render_to_string(template_name, ctx)
+    text_message = render_to_string(template_name[:-5] + ".txt", ctx)
     send_mail(
         subject=subject,
-        message="",
+        message=text_message,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient_email],
         html_message=html_message,
@@ -129,8 +126,13 @@ def _send_html_email(subject: str, template_name: str, context: dict, recipient_
     )
 
 
+def _site_domain() -> str:
+    """Return the canonical public site base URL from settings."""
+    return (getattr(settings, "DJANGO_SITE_DOMAIN", "") or "http://localhost:8000").rstrip("/")
+
+
 def _absolute_login_url() -> str:
-    return f"{SITE_DOMAIN}{reverse(settings.LOGIN_URL_REVERSE)}"
+    return f"{_site_domain()}{reverse(settings.LOGIN_URL_REVERSE)}"
 
 
 def _send_or_skip(user_id: int, subject: str, template_name: str, extra_context: dict | None = None) -> None:
@@ -159,7 +161,7 @@ def _send_or_skip(user_id: int, subject: str, template_name: str, extra_context:
 def send_application_received_task(user_id: int) -> None:
     _send_or_skip(
         user_id,
-        subject=_("Application Received"),
+        subject=_("We received your application"),
         template_name="emails/application_received.html",
     )
 
@@ -173,7 +175,7 @@ def send_application_received_task(user_id: int) -> None:
 def send_application_activated_task(user_id: int) -> None:
     _send_or_skip(
         user_id,
-        subject=_("Application Approved"),
+        subject=_("Your application was approved"),
         template_name="emails/application_activated.html",
         extra_context={"login_url": _absolute_login_url()},
     )
@@ -188,7 +190,7 @@ def send_application_activated_task(user_id: int) -> None:
 def send_application_declined_task(user_id: int) -> None:
     _send_or_skip(
         user_id,
-        subject=_("Application Status"),
+        subject=_("Your application was not approved"),
         template_name="emails/application_declined.html",
     )
 

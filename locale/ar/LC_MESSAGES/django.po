@@ -14194,3 +14194,30 @@ msgstr "يحدد وزن كل قاعدة مساهمتها في الدرجة ال�
 
 msgid "Audio validation is unavailable on this server."
 msgstr "التحقق من الصوت غير متاح على هذا الخادم."
+
+msgid "Account security"
+msgstr "أمان الحساب"
+
+msgid "We received your application"
+msgstr "استلمنا طلبك"
+
+msgid "Visit the website"
+msgstr "زيارة الموقع"
+
+msgid "If the button does not open, copy this link:"
+msgstr "إذا لم يعمل الزر، فانسخ هذا الرابط:"
+
+msgid "This is an automated message; please do not reply."
+msgstr "هذه رسالة آلية؛ يرجى عدم الرد عليها."
+
+msgid "Hello"
+msgstr "مرحبًا"
+
+msgid "Your application was approved"
+msgstr "تمت الموافقة على طلبك"
+
+msgid "Your application was not approved"
+msgstr "لم تتم الموافقة على طلبك"
+
+msgid "An update on your application"
+msgstr "تحديث بشأن طلبك"
