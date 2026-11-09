@@ -1,4 +1,5 @@
-{% load i18n %}
+{% load i18n aw_ui %}
+{% aw_capabilities as caps %}
 
 <!-- Resolve bulk-delete URL for the current view -->
 {% if view == "user" %}{% url "bulk-delete-users" as bulk_delete_url %}
@@ -9,7 +10,7 @@
 
 <!-- Table and Pagination Component -->
 {% if view == "application" %}
-<div class="ad-table-shell">
+<div class="aw-table-card">
 {% else %}
 <div x-data="{
         ...tableManager(),
@@ -17,39 +18,39 @@
         viewKey: '{{ view|default:'default'|escapejs }}',
          bulkDeleteUrl: '{{ bulk_delete_url|default:'' }}',
         selectionToken: '{{ bulk_selection_token|default:''|escapejs }}',
-        {% if view == 'quiz' and request.user.role.role == 'admin' %}
+        {% if view == 'quiz' and caps.manage_academic_setup %}
         quizRecalculateUrl: '{% url "quiz-recalculate" %}',
         operatorId: '{{ request.user.pk }}',
         {% endif %}
         tableTotal: {{ page_obj.paginator.count|default:0 }},
         pageSize: {{ page_obj.paginator.per_page|default:15 }}
-     }" class="ad-table-shell">
+     }" class="aw-table-card">
 
         <!-- Bulk Actions & Column Controls -->
-    <div class="ad-toolbar">
+    <div class="aw-table-tools">
         <!-- Bulk Actions (shown when items selected) -->
-        <div class="bulk-actions" x-show="selected.length > 0" x-transition x-cloak>
+        <div class="aw-bulkbar" x-show="selected.length > 0" x-transition x-cloak>
             <span class="bulk-count">
                 <i class="fas fa-check-circle me-1"></i>
                 <span x-text="selectionLabel()"></span>
             </span>
-            <button class="ad-btn ad-btn--danger ad-btn--sm"
+            <button class="aw-btn aw-btn--danger aw-btn--sm"
                     @click="deleteSelected()"
                     :disabled="selected.length === 0">
                 <i class="fas fa-trash me-1"></i>
                 <span>{% translate "Delete Selected" %}</span>
             </button>
-            <button class="ad-btn ad-btn--ghost ad-btn--sm"
+            <button class="aw-btn aw-btn--ghost aw-btn--sm"
                     @click="clearSelection()">
                 <i class="fas fa-times me-1"></i>
                 <span>{% translate "Clear" %}</span>
             </button>
-            {% if view == 'quiz' and request.user.role.role == 'admin' %}
-            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm"
+            {% if view == 'quiz' and caps.manage_academic_setup %}
+            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
                     @click="recalculateQuizzes('selected')" :disabled="recalculationBusy || !!recalculationStatusUrl">
                 {% translate "Recalculate selected quizzes" %}
             </button>
-            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" @click="recalculateQuizzes('selected', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" @click="recalculateQuizzes('selected', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
                 {% translate "Reconcile selected quizzes" %}
             </button>
             {% endif %}
@@ -57,17 +58,17 @@
 
         <!-- Column Visibility Toggle -->
         <div class="column-controls">
-            {% if view == 'quiz' and request.user.role.role == 'admin' %}
-            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm"
+            {% if view == 'quiz' and caps.manage_academic_setup %}
+            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
                     @click="recalculateQuizzes('all')" :disabled="!tableTotal || recalculationBusy || !!recalculationStatusUrl">
                 {% translate "Recalculate all matching quizzes" %}
             </button>
-            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm" @click="recalculateQuizzes('all', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
+            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" @click="recalculateQuizzes('all', null, 'reconcile')" :disabled="recalculationBusy || !!recalculationStatusUrl">
                 {% translate "Reconcile all matching quizzes" %}
             </button>
             {% endif %}
             <div class="dropdown">
-                <button class="btn ad-btn ad-btn--ghost ad-btn--sm dropdown-toggle"
+                <button class="aw-btn aw-btn--ghost aw-btn--sm dropdown-toggle"
                         type="button"
                         data-bs-toggle="dropdown"
                         aria-expanded="false">
@@ -99,27 +100,31 @@
     </div>
 
     <!-- Select-all-matching hint (non-application branch) -->
-    <div class="ad-alert ad-alert--info" x-show="showSelectAllHint()" x-cloak role="status">
+    <div class="aw-alert aw-alert--info" x-show="showSelectAllHint()" x-cloak role="status">
         <i class="fas fa-check-double me-2" aria-hidden="true"></i>
         <span>{% translate "All rows on this page are selected." %}</span>
-        <button type="button" class="ad-btn ad-btn--teal ad-btn--sm ms-2" @click="selectAllMatching()">
+        <button type="button" class="aw-btn aw-btn--primary aw-btn--sm ms-2" @click="selectAllMatching()">
             <span x-text="selectAllMatchingLabel()"></span>
         </button>
     </div>
 {% endif %}
 
     <!-- Responsive Table -->
-    {% if view == 'quiz' and request.user.role.role == 'admin' %}
-    <div class="ad-alert ad-alert--info" x-show="!!recalculationStatus" x-cloak role="status" aria-live="polite">
+    {% if view == 'quiz' and caps.manage_academic_setup %}
+    <div class="aw-alert aw-alert--info" x-show="!!recalculationStatus" x-cloak role="status" aria-live="polite">
         <span x-text="recalculationStatus"></span>
-        <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm"
+        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
                 x-show="!!recalculationStatusUrl && !recalculationBusy" @click="pollRecalculation()">
             {% translate "Refresh recalculation status" %}
         </button>
     </div>
     {% endif %}
-    <div class="ad-table-wrap">
-        <table class="ad-table{% if view == 'application' %} mb-0{% endif %}">
+    <div class="aw-table-scroll-hint" aria-hidden="true">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+        {% translate "Scroll horizontally to see all columns." %}
+    </div>
+    <div class="aw-table-wrap">
+        <table class="aw-table{% if view == 'application' %} mb-0{% endif %} aw-table">
             <thead>
                 {% if view == "application" %}
                 <tr>
@@ -127,6 +132,8 @@
                     <th>{% translate "Name" %}</th>
                     <th>{% translate "Phone" %}</th>
                     <th>{% translate "City" %}</th>
+                    <th>{% translate "Mode" %}</th>
+                    <th>{% translate "Submitted" %}</th>
                     <th>{% translate "Status" %}</th>
                     <th class="column-actions">{% translate "Actions" %}</th>
                 </tr>
@@ -184,17 +191,21 @@
             <tbody>
                 {% if view == "application" %}
                 {% for u in page_obj.object_list %}
-                <tr>
+                <tr data-id="{{ u.id }}">
                     <td class="column-checkbox"><input type="checkbox" class="user-checkbox" value="{{ u.id }}" aria-label="{% blocktranslate with name=u.get_full_name|default:u.username %}Select {{ name }}{% endblocktranslate %}"></td>
                     <td>{{ u.get_full_name|default:u.username }}</td>
                     <td>{{ u.phone|default:"-" }}</td>
                     <td>{{ u.city|default:"-" }}</td>
-                    <td><span class="ad-pill {% if u.application_status == 'active' %}ad-pill--success{% elif u.application_status == 'declined' %}ad-pill--danger{% else %}ad-pill--warning{% endif %}">{{ u.get_application_status_display }}</span></td>
+                    <td>{% if u.study_mode %}{{ u.get_study_mode_display }}{% else %}<span class="aw-muted">-</span>{% endif %}</td>
+                    <td class="aw-date">{{ u.date_joined|date:"Y-m-d" }}</td>
                     <td>
-                        <div class="ad-actions">
+                        {% include "partials/components/aw_status_pill.html" with status=u.application_status label=u.get_application_status_display %}
+                    </td>
+                    <td>
+                        <div class="aw-row-actions">
                             <a href="{% url 'application-review' u.id %}?status={{ current_status }}&amp;page={{ page_obj.number }}"
-                               class="ad-btn ad-btn--ghost ad-btn--sm">
-                                <i class="fas fa-eye"></i> {% translate "Review" %}
+                               class="aw-btn aw-btn--ghost aw-btn--sm">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg> {% translate "Review" %}
                             </a>
                             <form method="post"
                                   action="{% url 'application-delete' u.id %}"
@@ -207,8 +218,8 @@
                                   class="ps-inline-form"
                                   data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
                                 {% csrf_token %}
-                                <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
-                                    <i class="fas fa-trash"></i> {% translate "Delete" %}
+                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg> {% translate "Delete" %}
                                 </button>
                             </form>
                         </div>
@@ -216,17 +227,20 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="ad-empty">
+                    <td colspan="8" class="aw-cell-empty">
                         {% translate "No applications found." as applications_empty_desc %}
-                        {% include "partials/empty_state.html" with icon="fa-inbox" description=applications_empty_desc %}
+                        {% include "partials/components/aw_empty.html" with icon="i-file" description=applications_empty_desc %}
                     </td>
                 </tr>
                 {% endfor %}
                 {% else %}
+                {% if row_template %}
+                {% include row_template %}
+                {% else %}
                 {% for values in page_obj %}
                 {% if group_by_level and values.level %}
                 {% ifchanged values.level %}
-                <tr class="ad-level-group"><td colspan="{% if table_columns %}{{ table_columns|length|add:2 }}{% else %}{{ columns|length|add:2 }}{% endif %}">{{ values.level }}</td></tr>
+                <tr class="aw-level-group"><td colspan="{% if table_columns %}{{ table_columns|length|add:2 }}{% else %}{{ columns|length|add:2 }}{% endif %}">{{ values.level }}</td></tr>
                 {% endifchanged %}
                 {% endif %}
                 <tr data-id="{{ values.id }}">
@@ -246,13 +260,13 @@
                     <!-- Action Buttons -->
                     <td class="column-actions{% if submission_view %} quiz-actions-cell{% endif %}">
                         {% if submission_view %}
-                        <div class="quiz-actions">
-                            <div class="ad-actions quiz-actions-row">
-                                <a href="{{ values.url }}" class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                        <div class="quiz-actions aw-row-actions">
+                            <div class="aw-row-actions quiz-actions-row">
+                                <a href="{{ values.url }}" class="aw-btn aw-btn--outline aw-btn--sm">
                                     <i class="fas fa-question-circle me-1"></i>
                                     <span>{% translate "Quiz Details" %}</span>
                                 </a>
-                                <button class="ad-btn ad-btn--teal ad-btn--sm"
+                                <button class="aw-btn aw-btn--primary aw-btn--sm"
                                         hx-get="{{ values.url }}view-submission/"
                                         hx-swap="innerHTML"
                                         hx-target="#display-page"
@@ -265,8 +279,8 @@
                             </div>
                         {% endif %}
                         {% if submission_user %}
-                        <div class="ad-actions{% if submission_view %} quiz-actions-row{% endif %}">
-                            <button class="ad-btn ad-btn--teal ad-btn--sm"
+                        <div class="aw-row-actions{% if submission_view %} quiz-actions-row{% endif %}">
+                            <button class="aw-btn aw-btn--primary aw-btn--sm"
                                     hx-get="{{ values.url }}"
                                     hx-swap="innerHTML"
                                     hx-target="#display-page"
@@ -277,50 +291,26 @@
                                 <span>{% translate "View" %}</span>
                             </button>
                             <a href="{% url 'export-submission-csv' grade_id=values.submission_id %}"
-                               class="ad-btn ad-btn--outline-gold ad-btn--sm">
+                               class="aw-btn aw-btn--outline aw-btn--sm">
                                 <i class="fas fa-download me-1"></i>
                                 <span>{% translate "Export" %}</span>
                             </a>
                         </div>
                         {% else %}
-                        <div class="ad-actions{% if submission_view %} quiz-actions-row{% endif %}">
-                            {% if view == "user" %}
-                            <a class="ad-btn ad-btn--outline-gold ad-btn--sm"
-                               href="{{ values.url }}"
-                               hx-get="{{ values.url }}"
-                               hx-swap="innerHTML"
-                               hx-target="#display-page"
-                               hx-trigger="click"
-                               hx-push-url="true"
-                               hx-select="#page-region">
-                                <i class="fas fa-eye me-1"></i>
-                                <span>{% translate "View" %}</span>
-                            </a>
-                            <a class="ad-btn ad-btn--teal ad-btn--sm"
-                               href="{% url 'student-overview' values.id %}"
-                               hx-get="{% url 'student-overview' values.id %}"
-                               hx-swap="innerHTML"
-                               hx-target="#display-page"
-                               hx-trigger="click"
-                               hx-push-url="true"
-                               hx-select="#page-region">
-                                <i class="fas fa-id-card me-1"></i>
-                                <span>{% translate "Overview" %}</span>
-                            </a>
-                            {% endif %}
-                            {% if view == 'quiz' and request.user.role.role == 'admin' %}
-                            <button type="button" class="ad-btn ad-btn--outline-gold ad-btn--sm"
+                        <div class="aw-row-actions{% if submission_view %} quiz-actions-row{% endif %}">
+                            {% if view == 'quiz' and caps.manage_academic_setup %}
+                            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
                                     @click="recalculateQuizzes('single', {{ values.id }})"
                                     :disabled="recalculationBusy || !!recalculationStatusUrl">
                                 <i class="fas fa-calculator me-1" aria-hidden="true"></i>{% translate "Recalculate submissions" %}
                             </button>
-                                <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm"
+                                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
                                     @click="recalculateQuizzes('single', {{ values.id }}, 'reconcile')"
                                     :disabled="recalculationBusy || !!recalculationStatusUrl">
                                     {% translate "Reconcile snapshots" %}
                                 </button>
                             {% endif %}
-                            <button class="ad-btn ad-btn--ghost ad-btn--sm"
+                            <button class="aw-btn aw-btn--ghost aw-btn--sm"
                                     hx-get="{{ values.url }}update/"
                                     hx-swap="innerHTML"
                                     hx-target="#display-page"
@@ -331,7 +321,7 @@
                                 <span>{% translate "Edit" %}</span>
                             </button>
 
-                            <button class="ad-btn ad-btn--danger ad-btn--sm"
+                            <button class="aw-btn aw-btn--danger aw-btn--sm"
                                     hx-delete="{{ values.url }}delete/"
                                     hx-swap="delete"
                                     hx-target="closest tr"
@@ -344,7 +334,7 @@
                         </div>
                         {% endif %}
                         {% if submission_user and can_delete_submission %}
-                        <div class="ad-actions quiz-actions-row">
+                        <div class="aw-row-actions quiz-actions-row">
                             <form method="post"
                                   action="{% url 'quiz-submission-delete' quiz_id=quiz_id grade_id=values.submission_id %}{% if submission_filter_query %}?{{ submission_filter_query }}{% endif %}"
                                   hx-post="{% url 'quiz-submission-delete' quiz_id=quiz_id grade_id=values.submission_id %}{% if submission_filter_query %}?{{ submission_filter_query }}{% endif %}"
@@ -355,7 +345,7 @@
                                   hx-push-url="true"
                                   data-confirm-message="{% translate 'Delete this quiz submission?' %}">
                                 {% csrf_token %}
-                                <button type="submit" class="ad-btn ad-btn--danger ad-btn--sm">
+                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">
                                     <i class="fas fa-trash me-1" aria-hidden="true"></i>
                                     {% translate "Delete submission" %}
                                 </button>
@@ -369,13 +359,13 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if submission_view %}{% if table_columns %}{{ table_columns|length|add:3 }}{% else %}{{ columns|length|add:3 }}{% endif %}{% else %}{% if table_columns %}{{ table_columns|length|add:2 }}{% else %}{{ columns|length|add:2 }}{% endif %}{% endif %}" class="ad-empty">
-                        {% translate "No Data Available" as table_empty_title %}
+                    <td colspan="{% if submission_view %}{% if table_columns %}{{ table_columns|length|add:3 }}{% else %}{{ columns|length|add:3 }}{% endif %}{% else %}{% if table_columns %}{{ table_columns|length|add:2 }}{% else %}{{ columns|length|add:2 }}{% endif %}{% endif %}" class="aw-cell-empty">
                         {% translate "No records found matching your criteria." as table_empty_desc %}
-                        {% include "partials/empty_state.html" with icon="fa-inbox" title=table_empty_title description=table_empty_desc %}
+                        {% include "partials/components/aw_empty.html" with icon="i-file" description=table_empty_desc %}
                     </td>
                 </tr>
                 {% endfor %}
+                {% endif %}
                 {% endif %}
             </tbody>
         </table>

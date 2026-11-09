@@ -30,6 +30,9 @@ from .models import (
 )
 from .mobile_auth import revoke_user_mobile_access, revoke_users_mobile_access
 
+from .admin_operations import AdminOperationError, assert_admin_operation_progress, require_admin_operation_actor
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -841,7 +844,6 @@ def execute_bulk_promotion(job, token) -> dict:
     bounded and reported without stopping the remaining selection.
     """
 
-    from .admin_operations import AdminOperationError, assert_admin_operation_progress, require_admin_operation_actor
 
     require_admin_operation_actor(job)
     _require_admin(job.actor)

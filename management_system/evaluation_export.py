@@ -12,6 +12,7 @@ from tempfile import SpooledTemporaryFile
 
 import openpyxl
 from django.utils import timezone
+from django.utils import translation
 from django.utils.translation import gettext as _
 
 from .models import (
@@ -23,6 +24,16 @@ from .models import (
     QuizType,
 )
 from .xlsx_export import unique_sheet_title, xlsx_safe_cell
+
+from .admin_operations import (
+    AdminOperationError,
+    assert_admin_operation_progress,
+    create_admin_operation,
+    finalize_admin_operation_export,
+    require_admin_operation_actor,
+)
+from .utils.decorators import can_view_reports
+
 
 
 def _formula_ids(formula) -> list[int]:
@@ -257,7 +268,6 @@ def _export_filename(formula) -> str:
 def enqueue_evaluation_export(*, actor, formula: PromotionFormula, language: str = "ar") -> AdminOperationJob:
     """Freeze the requested aggregate export and create one idempotent job."""
 
-    from .admin_operations import create_admin_operation
 
     result_count = _results(formula).count()
     return create_admin_operation(
@@ -280,16 +290,8 @@ def enqueue_evaluation_export(*, actor, formula: PromotionFormula, language: str
 def execute_evaluation_export(job: AdminOperationJob, token) -> dict:
     """J01 executor: build the aggregate workbook and store one private artifact."""
 
-    from django.utils import translation
 
-    from .admin_operations import (
-        AdminOperationError,
-        assert_admin_operation_progress,
-        finalize_admin_operation_export,
-    )
-    from .utils.decorators import can_view_reports
 
-    from .admin_operations import require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if not can_view_reports(job.actor):

@@ -1,55 +1,67 @@
 {% load i18n %}
+{% comment %}
+Drive folder/file picker shared by the lesson editor and the upload page.
+Presentation only: the #drive-files target, the Back and folder hx-get /
+hx-target / hx-swap navigation (including the folders_only query), the
+.col wrappers read by lessonForm.js, the .card-body / .file-icon / data-id /
+@click hooks read by addFile(), the .card-title name hook, and the empty state
+are unchanged.
+{% endcomment %}
 <div>
     {% if not is_root %}
     <div class="mb-3">
-        <button class="ad-btn ad-btn--ghost ad-btn--sm"
+        <button type="button"
+                class="aw-btn aw-btn--ghost aw-btn--sm"
                 hx-get="{% if parent_folder %}{% url 'navigate-folder' parent_folder %}{% else %}{% url 'navigate-folder-root' %}{% endif %}{% if folders_only %}?folders_only=true{% endif %}"
                 hx-trigger="click"
                 hx-swap="innerHTML"
                 hx-target="#drive-files">
-            <i class="fas fa-arrow-left me-2"></i>
-            {% translate "Back" %}
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
+            <span>{% translate "Back" %}</span>
         </button>
     </div>
     {% endif %}
 
-    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-2">
+    {% if drive %}
+    <div class="aw-file-grid">
         {% for data in drive %}
         <div class="col">
-            <div class="ad-drive-item{% if data.type == 'folder' %} is-folder{% endif %}">
-                <div class="card-body text-center p-2">
-                    {% if data.type == 'folder' and data.id %}
-                    <div class="ad-drive-ic is-folder is-clickable"
-                         role="button"
-                         tabindex="0"
-                         hx-get="{% url 'navigate-folder' data.id %}{% if folders_only %}?folders_only=true{% endif %}"
-                         hx-trigger="click"
-                         hx-swap="innerHTML"
-                         hx-target="#drive-files">
-                        <i class="fas fa-folder fa-2x"></i>
-                    </div>
-                    {% else %}
-                    <div class="ad-drive-ic file-icon"
-                         data-id="{{ data.id }}"
-                         @click="addFile($event)"
-                         role="button"
-                         tabindex="0">
-                        <i class="fas fa-file-alt fa-2x"></i>
-                    </div>
-                    {% endif %}
-                    <div class="ad-drive-name card-title mt-2" title="{{ data.name }}">
-                        {{ data.name }}
-                    </div>
+            {% if data.type == 'folder' and data.id %}
+            <div class="aw-folder-card">
+                <div class="is-clickable p-1"
+                     role="button"
+                     tabindex="0"
+                     hx-get="{% url 'navigate-folder' data.id %}{% if folders_only %}?folders_only=true{% endif %}"
+                     hx-trigger="click"
+                     hx-swap="innerHTML"
+                     hx-target="#drive-files">
+                    <svg class="aw-ico aw-ico--lg" aria-hidden="true"><use href="#i-folder"></use></svg>
                 </div>
+                <b class="card-title mb-0 text-break" title="{{ data.name }}">{{ data.name }}</b>
             </div>
-        </div>
-        {% empty %}
-        <div class="col-12">
-            <div class="ad-alert ad-alert--info text-center">
-                <i class="fas fa-folder-open fa-2x mb-2 d-block"></i>
-                {% translate "This folder is empty." %}
+            {% else %}
+            <div class="aw-file-card card-body text-center">
+                <div class="aw-file-icon file-icon mx-auto"
+                     data-id="{{ data.id }}"
+                     @click="addFile($event)"
+                     role="button"
+                     tabindex="0">
+                    {% if data.kind == 'video' %}
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
+                    {% elif data.kind == 'audio' %}
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-audio"></use></svg>
+                    {% else %}
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                    {% endif %}
+                </div>
+                <b class="card-title mb-0 mt-2 text-break" title="{{ data.name }}">{{ data.name }}</b>
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
+    {% else %}
+    {% translate "This folder is empty." as empty_description %}
+    {% include "partials/components/aw_empty.html" with icon="i-folder" description=empty_description %}
+    {% endif %}
 </div>

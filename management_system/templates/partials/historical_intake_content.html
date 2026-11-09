@@ -1,50 +1,72 @@
 {% load i18n %}
 {% translate "Promoted" as promoted_label %}
-<div class="ad-pane is-active" id="content">
-    <div class="ad-toolbar">
-        <div>
-            <h2 class="h5 mb-1"><i class="fas fa-clock-rotate-left me-2"></i>{% translate "Historical Academic Intake" %}<span id="historical-intake-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h2>
-            <p class="ad-pane-desc mb-0">{% translate "Review previous academic records, find or create student accounts, and promote students safely." %}</p>
+<div id="content" class="aw-dashboard-page">
+    {% translate "People" as page_eyebrow %}
+    {% translate "Historical Intake" as page_title %}
+    {% translate "Review previous academic records, find or create student accounts, and promote students safely." as page_description %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+
+    <div class="htmx-indicator aw-table-loading" id="historical-intake-loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{% translate "Loading..." %}</span>
         </div>
     </div>
 
-    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    {# In-page modes, no JS: every section stays server-rendered and reachable. #}
+    <nav class="aw-tabs" aria-label="{% translate 'Historical intake sections' %}">
+        <a class="aw-tab" href="#historical-single">{% translate "Add one student" %}</a>
+        <a class="aw-tab" href="#historical-existing">{% translate "Add history to existing students" %}</a>
+        <a class="aw-tab" href="#historical-csv">{% translate "CSV/XLSX reviewed upload" %}</a>
+        <a class="aw-tab" href="#historical-records">{% translate "Historical records" %}</a>
+    </nav>
 
-    <div class="ad-card mb-4">
-        <div class="ad-card-head"><h5 class="mb-0">{% translate "Add one student" %}</h5></div>
-        <div class="ad-card-body">
+    {% if form.non_field_errors %}<div class="aw-alert aw-alert--danger" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ form.non_field_errors }}</div></div>{% endif %}
+
+    <div class="aw-card" id="historical-single">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-user-plus"></use></svg>
+                <h3>{% translate "Add one student" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
             <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-3" x-data="{ mode: 'find' }" x-init="mode = ($el.querySelector('[name=account_action]') || {}).value || 'find'" @change="if ($event.target && $event.target.name === 'account_action') { mode = $event.target.value; }">
                 {% csrf_token %}
-                <div class="col-md-4">{{ form.source_year_level.label_tag }}{{ form.source_year_level }}{{ form.source_year_level.errors }}</div>
-                <div class="col-md-4">{{ form.source_name.label_tag }}{{ form.source_name }}{{ form.source_name.errors }}</div>
-                <div class="col-md-4">{{ form.account_action.label_tag }}{{ form.account_action }}{{ form.account_action.errors }}</div>
-                <div class="col-md-4" x-show="mode === 'find'">{{ form.lms_user_id.label_tag }}{{ form.lms_user_id }}{{ form.lms_user_id.errors }}</div>
-                <div class="col-md-4" x-show="mode === 'find'">{{ form.lms_username.label_tag }}{{ form.lms_username }}{{ form.lms_username.errors }}</div>
-                <div class="col-md-4" x-show="mode === 'find'">{{ form.lms_email.label_tag }}{{ form.lms_email }}{{ form.lms_email.errors }}</div>
-                <div class="col-md-4" x-show="mode === 'create'">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
-                <div class="col-md-4" x-show="mode === 'create'">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
-                <div class="col-md-4" x-show="mode === 'create'">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
-                <div class="col-md-4">{{ form.historical_outcome.label_tag }}{{ form.historical_outcome }}{{ form.historical_outcome.errors }}</div>
-                <div class="col-md-4">{{ form.destination_scope.label_tag }}{{ form.destination_scope }}{{ form.destination_scope.errors }}</div>
-                <div class="col-md-4">{{ form.exceptional_offering_ids.label_tag }}{{ form.exceptional_offering_ids }}{{ form.exceptional_offering_ids.errors }}</div>
-                <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
-                <div class="col-12">{{ form.promotion_reason.label_tag }}{{ form.promotion_reason }}{{ form.promotion_reason.errors }}</div>
+                <div class="col-md-4 aw-field">{{ form.source_year_level.label_tag }}{{ form.source_year_level }}{{ form.source_year_level.errors }}</div>
+                <div class="col-md-4 aw-field">{{ form.source_name.label_tag }}{{ form.source_name }}{{ form.source_name.errors }}</div>
+                <div class="col-md-4 aw-field">{{ form.account_action.label_tag }}{{ form.account_action }}{{ form.account_action.errors }}</div>
+                <div class="col-md-4 aw-field" x-show="mode === 'find'">{{ form.lms_user_id.label_tag }}{{ form.lms_user_id }}{{ form.lms_user_id.errors }}</div>
+                <div class="col-md-4 aw-field" x-show="mode === 'find'">{{ form.lms_username.label_tag }}{{ form.lms_username }}{{ form.lms_username.errors }}</div>
+                <div class="col-md-4 aw-field" x-show="mode === 'find'">{{ form.lms_email.label_tag }}{{ form.lms_email }}{{ form.lms_email.errors }}</div>
+                <div class="col-md-4 aw-field" x-show="mode === 'create'">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
+                <div class="col-md-4 aw-field" x-show="mode === 'create'">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
+                <div class="col-md-4 aw-field" x-show="mode === 'create'">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
+                <div class="col-md-4 aw-field">{{ form.historical_outcome.label_tag }}{{ form.historical_outcome }}{{ form.historical_outcome.errors }}</div>
+                <div class="col-md-4 aw-field">{{ form.destination_scope.label_tag }}{{ form.destination_scope }}{{ form.destination_scope.errors }}</div>
+                <div class="col-md-4 aw-field">{{ form.exceptional_offering_ids.label_tag }}{{ form.exceptional_offering_ids }}{{ form.exceptional_offering_ids.errors }}</div>
+                <div class="col-12 aw-field">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+                <div class="col-12 aw-field">{{ form.promotion_reason.label_tag }}{{ form.promotion_reason }}{{ form.promotion_reason.errors }}</div>
                 <div class="col-12 d-flex gap-3 align-items-center">
                     <label class="form-check">{{ form.promote_now }} <span class="form-check-label">{% translate "Promote after review" %}</span></label>
-                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-save me-1"></i>{% translate "Save historical record" %}</button>
+                    <button class="aw-btn aw-btn--primary" type="submit"><i class="fas fa-save me-1"></i>{% translate "Save historical record" %}</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="ad-card mb-4">
-        <div class="ad-card-head"><h5 class="mb-0">{% translate "Add history to existing students" %}</h5></div>
-        <div class="ad-card-body">
-            <p class="text-muted">{% translate "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled." %}</p>
-            {% if existing_form.non_field_errors %}<div class="alert alert-danger">{{ existing_form.non_field_errors }}</div>{% endif %}
+    <div class="aw-card" id="historical-existing">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+                <h3>{% translate "Add history to existing students" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <p class="aw-small aw-muted">{% translate "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled." %}</p>
+            {% if existing_form.non_field_errors %}<div class="aw-alert aw-alert--danger" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ existing_form.non_field_errors }}</div></div>{% endif %}
             <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-3">
                 {% csrf_token %}<input type="hidden" name="action" value="existing_preview">
-                <div class="col-md-4">{{ existing_form.student_search.label_tag }}{{ existing_form.student_search }}{{ existing_form.student_search.errors }}</div>
+                <div class="col-md-4 aw-field">{{ existing_form.student_search.label_tag }}{{ existing_form.student_search }}{{ existing_form.student_search.errors }}</div>
                 <div class="col-md-8" id="existing-student-picker" role="group" aria-labelledby="existing-students-label">
                     <span id="existing-students-label" class="form-label">{% translate "Existing students" %} ({{ selected_users|length }}/50)</span>
                     <p class="small text-muted mt-1 mb-1">{% translate "Tick students to select them (up to 50); untick to remove." %}</p>
@@ -68,15 +90,15 @@
                     {% endif %}
                     {{ existing_form.students.errors }}
                 </div>
-                <div class="col-md-4">{{ existing_form.source_year_level.label_tag }}{{ existing_form.source_year_level }}{{ existing_form.source_year_level.errors }}</div>
-                <div class="col-md-4">{{ existing_form.historical_outcome.label_tag }}{{ existing_form.historical_outcome }}{{ existing_form.historical_outcome.errors }}</div>
-                <div class="col-md-4">{{ existing_form.destination_scope.label_tag }}{{ existing_form.destination_scope }}{{ existing_form.destination_scope.errors }}</div>
-                <div class="col-md-4">{{ existing_form.exceptional_offering_ids.label_tag }}{{ existing_form.exceptional_offering_ids }}{{ existing_form.exceptional_offering_ids.errors }}</div>
-                <div class="col-12">{{ existing_form.notes.label_tag }}{{ existing_form.notes }}{{ existing_form.notes.errors }}</div>
-                <div class="col-12">{{ existing_form.promotion_reason.label_tag }}{{ existing_form.promotion_reason }}{{ existing_form.promotion_reason.errors }}</div>
+                <div class="col-md-4 aw-field">{{ existing_form.source_year_level.label_tag }}{{ existing_form.source_year_level }}{{ existing_form.source_year_level.errors }}</div>
+                <div class="col-md-4 aw-field">{{ existing_form.historical_outcome.label_tag }}{{ existing_form.historical_outcome }}{{ existing_form.historical_outcome.errors }}</div>
+                <div class="col-md-4 aw-field">{{ existing_form.destination_scope.label_tag }}{{ existing_form.destination_scope }}{{ existing_form.destination_scope.errors }}</div>
+                <div class="col-md-4 aw-field">{{ existing_form.exceptional_offering_ids.label_tag }}{{ existing_form.exceptional_offering_ids }}{{ existing_form.exceptional_offering_ids.errors }}</div>
+                <div class="col-12 aw-field">{{ existing_form.notes.label_tag }}{{ existing_form.notes }}{{ existing_form.notes.errors }}</div>
+                <div class="col-12 aw-field">{{ existing_form.promotion_reason.label_tag }}{{ existing_form.promotion_reason }}{{ existing_form.promotion_reason.errors }}</div>
                 <div class="col-12 d-flex gap-3 align-items-center">
                     <label class="form-check">{{ existing_form.promote_now }} <span class="form-check-label">{% translate "Promote after review" %}</span></label>
-                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-search me-1"></i>{% translate "Preview selected students" %}</button>
+                    <button class="aw-btn aw-btn--primary" type="submit"><i class="fas fa-search me-1"></i>{% translate "Preview selected students" %}</button>
                 </div>
             </form>
             {% if existing_preview_rows %}
@@ -89,11 +111,11 @@
                 <input type="hidden" name="notes" value="{{ existing_form.notes.value|default:'' }}">
                 <input type="hidden" name="promotion_reason" value="{{ existing_form.promotion_reason.value|default:'' }}">
                 {% if existing_form.promote_now.value %}<input type="hidden" name="promote_now" value="on">{% endif %}
-                <div class="ad-table-wrap"><table class="ad-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Destination" %}</th><th>{% translate "Failed offering IDs" %}</th><th>{% translate "Status" %}</th></tr></thead><tbody>
+                <div class="aw-table-wrap"><table class="aw-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Destination" %}</th><th>{% translate "Failed offering IDs" %}</th><th>{% translate "Status" %}</th></tr></thead><tbody>
                 {% for row in existing_preview_rows %}<tr><td>{{ row.user.get_full_name|default:row.user.username }}<br><span class="small text-muted">{{ row.user.username }}</span></td><td><input type="hidden" name="students" value="{{ row.user.pk }}"><select name="er_source_{{ row.user.pk }}" class="form-select form-select-sm" aria-label="{% translate 'Historical scope' %}">{% for scope in existing_form.source_year_level.field.queryset %}<option value="{{ scope.pk }}"{% if row.source_id == scope.pk %} selected{% endif %}>{{ scope }}</option>{% endfor %}</select></td><td><select name="er_outcome_{{ row.user.pk }}" class="form-select form-select-sm" aria-label="{% translate 'Outcome' %}">{% for value, label in outcome_choices %}<option value="{{ value }}"{% if row.outcome == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></td><td><select name="er_dest_{{ row.user.pk }}" class="form-select form-select-sm" aria-label="{% translate 'Destination' %}"><option value="">{% translate "Destination" %}</option>{% for scope in existing_form.destination_scope.field.queryset %}<option value="{{ scope.pk }}"{% if row.dest_id == scope.pk %} selected{% endif %}>{{ scope }}</option>{% endfor %}</select></td><td><input class="form-control form-control-sm" name="er_failed_{{ row.user.pk }}" value="{{ row.failed }}" placeholder="{% translate 'Failed offering IDs' %}" aria-label="{% translate 'Failed offering IDs' %}"></td><td><span class="small">{{ row.message }}</span>{% if row.has_record %}<br><span class="small text-muted">{% translate "Already recorded" %}</span>{% endif %}{% if row.already_promoted %}<br><span class="small text-danger">{% translate "Already promoted" %}</span>{% endif %}</td></tr>{% endfor %}
                 </tbody></table></div>
                 <div class="col-12 d-flex gap-3 align-items-center mt-3">
-                    <button class="ad-btn ad-btn--teal" type="submit"><i class="fas fa-check me-1"></i>{% translate "Apply reviewed intake" %}</button>
+                    <button class="aw-btn aw-btn--primary" type="submit"><i class="fas fa-check me-1"></i>{% translate "Apply reviewed intake" %}</button>
                     <span class="small text-muted">{% translate "Runs transactionally; any error rolls back all rows." %}</span>
                 </div>
             </form>
@@ -101,55 +123,68 @@
         </div>
     </div>
 
-    <div class="ad-card mb-4">
-        <div class="ad-card-head"><h5 class="mb-0">{% translate "CSV/XLSX reviewed upload" %}</h5></div>
-        <div class="ad-card-body">
-            <p class="text-muted">{% translate "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid." %}</p>
+    <div class="aw-card" id="historical-csv">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <h3>{% translate "CSV/XLSX reviewed upload" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <p class="aw-small aw-muted">{% translate "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid." %}</p>
             {% if intake_job %}
             {% include "partials/admin_operation_status.html" with operation_job=intake_job status_url=intake_status_url status=intake_job.status total=intake_job.total processed=intake_job.processed %}
             {% endif %}
             <details class="mb-2"><summary class="small">{% translate "Expected columns" %}</summary><p class="mt-2">{% for column in intake_columns %}<code class="me-1">{{ column }}</code>{% endfor %}</p></details>
             <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="d-flex flex-wrap gap-2 align-items-end">
                 {% csrf_token %}
-                <div><label for="intake-file" class="form-label">{% translate "Intake CSV or XLSX" %}</label><input id="intake-file" class="form-control" type="file" name="intake_file" accept=".csv,.xlsx" required></div>
-                <button class="ad-btn ad-btn--outline-gold" type="submit" name="preview_upload" value="yes"><i class="fas fa-search me-1"></i>{% translate "Validate upload" %}</button>
-                {% if preview %}<button class="ad-btn ad-btn--teal" type="submit" name="apply_upload" value="yes"><i class="fas fa-check me-1"></i>{% translate "Queue reviewed upload" %}</button>{% endif %}
+                <div class="aw-field"><label for="intake-file" class="form-label">{% translate "Intake CSV or XLSX" %}</label><input id="intake-file" class="form-control" type="file" name="intake_file" accept=".csv,.xlsx" required></div>
+                <button class="aw-btn aw-btn--outline" type="submit" name="preview_upload" value="yes"><i class="fas fa-search me-1"></i>{% translate "Validate upload" %}</button>
+                {% if preview %}<button class="aw-btn aw-btn--primary" type="submit" name="apply_upload" value="yes"><i class="fas fa-check me-1"></i>{% translate "Queue reviewed upload" %}</button>{% endif %}
             </form>
             {% if preview %}
             <p class="small text-muted mt-2">{% translate "Applying queues one row at a time; a failing row is reported without stopping the remaining rows." %}</p>
-            <div class="ad-table-wrap mt-3"><table class="ad-table"><thead><tr><th>{% translate "Row" %}</th><th>{% translate "Source student" %}</th><th>{% translate "Account" %}</th><th>{% translate "Result" %}</th><th>{% translate "Message" %}</th></tr></thead><tbody>{% for item in preview %}<tr><td>{{ item.row }}</td><td>{{ item.source_name }}</td><td>{{ item.account }}</td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}</tbody></table></div>
+            <div class="aw-table-wrap mt-3"><table class="aw-table"><thead><tr><th>{% translate "Row" %}</th><th>{% translate "Source student" %}</th><th>{% translate "Account" %}</th><th>{% translate "Result" %}</th><th>{% translate "Message" %}</th></tr></thead><tbody>{% for item in preview %}<tr><td>{{ item.row }}</td><td>{{ item.source_name }}</td><td>{{ item.account }}</td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}</tbody></table></div>
             {% endif %}
         </div>
     </div>
 
-    <div class="ad-card mb-4">
-        <div class="ad-card-head"><h5 class="mb-0">{% translate "Assign exceptional failed courses" %}</h5></div>
-        <div class="ad-card-body">
-            <p class="text-muted">{% translate "Select a student and only the active-year course offerings they must complete. This creates targeted access, not full-year access." %}</p>
-            {% if exceptional_form.non_field_errors %}<div class="alert alert-danger">{{ exceptional_form.non_field_errors }}</div>{% endif %}
+    <div class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
+                <h3>{% translate "Assign exceptional failed courses" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <p class="aw-small aw-muted">{% translate "Select a student and only the active-year course offerings they must complete. This creates targeted access, not full-year access." %}</p>
+            {% if exceptional_form.non_field_errors %}<div class="aw-alert aw-alert--danger" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ exceptional_form.non_field_errors }}</div></div>{% endif %}
             <form method="post" hx-post="" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="row g-3">
                 {% csrf_token %}<input type="hidden" name="action" value="assign_exceptional">
-                <div class="col-md-4">{{ exceptional_form.student_identifier.label_tag }}{{ exceptional_form.student_identifier }}{{ exceptional_form.student_identifier.errors }}</div>
-                <div class="col-12">{{ exceptional_form.course_offerings.label_tag }}{{ exceptional_form.course_offerings }}{{ exceptional_form.course_offerings.errors }}</div>
-                <div class="col-12"><button class="ad-btn ad-btn--outline-gold" type="submit"><i class="fas fa-book-open me-1"></i>{% translate "Assign failed courses" %}</button></div>
+                <div class="col-md-4 aw-field">{{ exceptional_form.student_identifier.label_tag }}{{ exceptional_form.student_identifier }}{{ exceptional_form.student_identifier.errors }}</div>
+                <div class="col-12 aw-field">{{ exceptional_form.course_offerings.label_tag }}{{ exceptional_form.course_offerings }}{{ exceptional_form.course_offerings.errors }}</div>
+                <div class="col-12"><button class="aw-btn aw-btn--outline" type="submit"><i class="fas fa-book-open me-1"></i>{% translate "Assign failed courses" %}</button></div>
             </form>
         </div>
     </div>
 
-    <div class="ad-card">
-        <div class="ad-card-head"><h5 class="mb-0">{% translate "Historical records" %}</h5></div>
-        <div class="ad-card-body pb-0">
-            <form method="get" action="" role="search" class="d-flex flex-wrap gap-2 align-items-center mb-3">
-                <div class="ad-search">
-                    <i class="fas fa-search" aria-hidden="true"></i>
-                    <input id="record-search" type="search" name="record_search" value="{{ record_search }}" placeholder="{% translate 'Search student or source name' %}" aria-label="{% translate 'Search records' %}" hx-preserve hx-get="" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-include="closest form" hx-sync="closest form:replace" hx-indicator="#historical-intake-loading" hx-trigger="input changed delay:200ms, search">
-                </div>
-                <button class="ad-btn ad-btn--outline-gold" type="submit"><i class="fas fa-search me-1"></i>{% translate "Search" %}</button>
-                {% if record_search %}<a class="ad-btn ad-btn--ghost" href="{% url 'historical-intake' %}" hx-get="{% url 'historical-intake' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="record-search">{% translate "Clear" %}</a>{% endif %}
-            </form>
+    <div class="aw-table-card" id="historical-records">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                <h3>{% translate "Historical records" %}</h3>
+            </div>
         </div>
-        <div class="ad-table-wrap"><table class="ad-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Account" %}</th><th>{% translate "Promotion" %}</th></tr></thead><tbody>
-            {% for summary in summaries %}<tr><td>{{ summary.student.get_full_name|default:summary.student.username }}</td><td>{{ summary.academic_year_level }}</td><td>{{ summary.get_outcome_display }}</td><td>{{ summary.student.username }}</td><td>{% if summary.promoted_at %}<div class="d-flex flex-column gap-1 align-items-start">{% if summary.promotion_history %}{% if summary.promotion_history.promotion_method == "manual_historical" %}<span class="ad-pill ad-pill--brand">{% translate "Manual historical" %}</span>{% else %}<span class="ad-pill ad-pill--success">{{ summary.promotion_history.get_promotion_method_display|default:promoted_label }}</span>{% endif %}<span class="small text-muted">{% translate "Recorded by" %} {{ summary.promotion_history.actor.get_full_name|default:summary.promotion_history.actor.username }}</span>{% if summary.promotion_history.reason %}<span class="small text-muted">{% translate "Reason" %}: {{ summary.promotion_history.reason }}</span>{% endif %}{% else %}<span class="ad-pill ad-pill--success">{{ promoted_label }}</span>{% endif %}</div>{% else %}<form method="post" action="{% url 'historical-promote' summary.pk %}" hx-post="{% url 'historical-promote' summary.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="d-flex flex-wrap gap-1" data-confirm-message="{% translate 'Are you sure?' %}">{% csrf_token %}<select name="destination_scope" class="form-select form-select-sm" aria-label="{% translate 'Destination academic scope' %}"><option value="">{% translate "Destination" %}</option>{% for scope in form.destination_scope.field.queryset %}<option value="{{ scope.pk }}">{{ scope }}</option>{% endfor %}</select><input class="form-control form-control-sm" name="exceptional_offering_ids" placeholder="{% translate 'Failed offering IDs' %}" aria-label="{% translate 'Failed offering IDs' %}"><input class="form-control form-control-sm" name="promotion_reason" required placeholder="{% translate 'Promotion reason' %}" aria-label="{% translate 'Promotion reason' %}"><button class="ad-btn ad-btn--teal ad-btn--sm" type="submit">{% translate "Promote" %}</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="ad-empty">{% if record_search %}{% translate "No matching historical records." %}{% else %}{% translate "No historical records yet." %}{% endif %}</td></tr>{% endfor %}
+        <form method="get" action="" role="search" class="aw-table-tools">
+            <div class="aw-search-wrap">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                <input id="record-search" class="aw-input aw-input--search" type="search" name="record_search" value="{{ record_search }}" placeholder="{% translate 'Search student or source name' %}" aria-label="{% translate 'Search records' %}" hx-preserve hx-get="" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-include="closest form" hx-sync="closest form:replace" hx-indicator="#historical-intake-loading" hx-trigger="input changed delay:200ms, search">
+            </div>
+            <button class="aw-btn aw-btn--outline" type="submit"><i class="fas fa-search me-1"></i>{% translate "Search" %}</button>
+            {% if record_search %}<a class="aw-btn aw-btn--ghost" href="{% url 'historical-intake' %}" hx-get="{% url 'historical-intake' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="record-search"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>{% translate "Clear" %}</a>{% endif %}
+        </form>
+        <div class="aw-table-wrap"><table class="aw-table"><thead><tr><th>{% translate "Student" %}</th><th>{% translate "Historical scope" %}</th><th>{% translate "Outcome" %}</th><th>{% translate "Account" %}</th><th>{% translate "Promotion" %}</th></tr></thead><tbody>
+            {% for summary in summaries %}<tr><td>{{ summary.student.get_full_name|default:summary.student.username }}</td><td>{{ summary.academic_year_level }}</td><td>{{ summary.get_outcome_display }}</td><td>{{ summary.student.username }}</td><td>{% if summary.promoted_at %}<div class="d-flex flex-column gap-1 align-items-start">{% if summary.promotion_history %}{% if summary.promotion_history.promotion_method == "manual_historical" %}<span class="aw-pill aw-pill--violet">{% translate "Manual historical" %}</span>{% else %}<span class="aw-pill aw-pill--green">{{ summary.promotion_history.get_promotion_method_display|default:promoted_label }}</span>{% endif %}<span class="small text-muted">{% translate "Recorded by" %} {{ summary.promotion_history.actor.get_full_name|default:summary.promotion_history.actor.username }}</span>{% if summary.promotion_history.reason %}<span class="small text-muted">{% translate "Reason" %}: {{ summary.promotion_history.reason }}</span>{% endif %}{% else %}<span class="aw-pill aw-pill--green">{{ promoted_label }}</span>{% endif %}</div>{% else %}<form method="post" action="{% url 'historical-promote' summary.pk %}" hx-post="{% url 'historical-promote' summary.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="d-flex flex-wrap gap-1" data-confirm-message="{% translate 'Are you sure?' %}">{% csrf_token %}<select name="destination_scope" class="form-select form-select-sm" aria-label="{% translate 'Destination academic scope' %}"><option value="">{% translate "Destination" %}</option>{% for scope in form.destination_scope.field.queryset %}<option value="{{ scope.pk }}">{{ scope }}</option>{% endfor %}</select><input class="form-control form-control-sm" name="exceptional_offering_ids" placeholder="{% translate 'Failed offering IDs' %}" aria-label="{% translate 'Failed offering IDs' %}"><input class="form-control form-control-sm" name="promotion_reason" required placeholder="{% translate 'Promotion reason' %}" aria-label="{% translate 'Promotion reason' %}"><button class="aw-btn aw-btn--primary aw-btn--sm" type="submit">{% translate "Promote" %}</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="aw-cell-empty">{% if record_search %}{% translate "No matching historical records." as records_empty %}{% else %}{% translate "No historical records yet." as records_empty %}{% endif %}{% include "partials/components/aw_empty.html" with icon="i-clock" description=records_empty %}</td></tr>{% endfor %}
         </tbody></table></div>
         {% translate "Historical intake pagination" as pagination_aria_label %}
         {% include "partials/pagination.html" with page_obj=summary_page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#historical-intake-loading" %}

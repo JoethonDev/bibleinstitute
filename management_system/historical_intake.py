@@ -33,6 +33,15 @@ from .models import (
 from .utils.decorators import can_manage_academic_setup
 from .utils.validators import normalize_username
 
+from .admin_operations import (
+    AdminOperationError,
+    MAX_ROW_ERRORS,
+    assert_admin_operation_progress,
+    create_admin_operation,
+    require_admin_operation_actor,
+)
+
+
 
 INTAKE_COLUMNS = (
     "source_name",
@@ -476,7 +485,6 @@ def enqueue_historical_intake(
     reuses the same per-row source keys.
     """
 
-    from .admin_operations import create_admin_operation
 
     normalized = [normalize_intake_row(row) for row in rows]
     _require_rows(normalized)
@@ -504,13 +512,7 @@ def enqueue_historical_intake(
 def execute_historical_intake(job, token) -> dict:
     """J01 executor: apply frozen rows with per-row atomic, idempotent intake."""
 
-    from .admin_operations import (
-        MAX_ROW_ERRORS,
-        AdminOperationError,
-        assert_admin_operation_progress,
-    )
 
-    from .admin_operations import require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if not can_manage_academic_setup(job.actor):

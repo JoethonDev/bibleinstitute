@@ -19,6 +19,9 @@ from django.urls import reverse, reverse_lazy
 
 from .mobile_auth import revoke_user_mobile_access
 
+from .tasks import send_password_reset_email_task
+
+
 logger = logging.getLogger(__name__)
 
 #: One address may request this many links per window. Keyed on the address (not
@@ -84,7 +87,6 @@ class QueuedPasswordResetForm(PasswordResetForm):
         if user_id is None:
             return
 
-        from .tasks import send_password_reset_email_task
 
         reset_url = _reset_url(context)
         try:

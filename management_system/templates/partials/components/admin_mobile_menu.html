@@ -1,0 +1,28 @@
+{% load i18n aw_ui %}
+{# Mobile offcanvas navigation. #mobileAdminMenu is a preserved shell hook. #}
+<div class="offcanvas offcanvas-start aw-offcanvas"
+     tabindex="-1"
+     id="mobileAdminMenu"
+     aria-labelledby="mobileAdminMenuLabel">
+    <div class="offcanvas-header aw-offcanvas-head">
+        <h5 class="offcanvas-title" id="mobileAdminMenuLabel">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-grid"></use></svg>
+            {% translate "Admin Panel" %}
+        </h5>
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="offcanvas"
+                aria-label="{% translate 'Close' %}"></button>
+    </div>
+    <div class="offcanvas-body aw-offcanvas-body">
+        {% include 'partials/components/admin_mobile_nav.html' %}
+
+        <div class="aw-actor-chip">
+            <span class="aw-avatar aw-avatar--gold" aria-hidden="true">{{ request.user|aw_initials }}</span>
+            <div>
+                <b>{{ request.user|aw_display_name }}</b>
+                <span>{% if request.user.role %}{{ request.user.role.get_role_display }}{% endif %}</span>
+            </div>
+        </div>
+    </div>
+</div>

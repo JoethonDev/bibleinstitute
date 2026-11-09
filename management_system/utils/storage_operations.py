@@ -13,6 +13,10 @@ from django.conf import settings
 
 from management_system.utils.r2_filters import R2FileFilter, FileFilterConfig, file_extension, file_kind
 
+from ..storage_ownership import is_operation_artifact_key
+from ..storage_coordination import guarded_storage_write
+
+
 logger = getLogger(__name__)
 
 # Search scan budget: the provider has no server-side name filter, so one
@@ -307,8 +311,6 @@ def upload_to_bucket(cloud_client, bucket_name, file_data, file_key, content_typ
         Boolean indicating success
     """
     try:
-        from ..storage_ownership import is_operation_artifact_key
-        from ..storage_coordination import guarded_storage_write
 
         extra_args = {}
         if content_type:
@@ -348,8 +350,6 @@ def delete_from_bucket(cloud_client, bucket_name, file_key):
         Boolean indicating success
     """
     try:
-        from ..storage_ownership import is_operation_artifact_key
-        from ..storage_coordination import guarded_storage_write
 
         guard = (
             guarded_storage_write(str(file_key))

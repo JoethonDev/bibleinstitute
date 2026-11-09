@@ -16,11 +16,18 @@ from django.utils.timezone import now
 from logging import getLogger
 from urllib.parse import unquote, urlsplit
 from management_system.utils.decorators import check_role_permission
-from management_system.models import AcademicYear, User, MANAGEMENT_ROLES, Grade, QuizStudentOpening
+from management_system.models import (
+    AcademicYear,
+    User,
+    MANAGEMENT_ROLES,
+    Grade,
+    QuizAnswerSnapshot,
+    QuizStudentOpening,
+)
 from management_system.academic_access import user_can_write_offering_activity
 from management_system.admin_tables import TABLE_VIEWS, create_selection_token
 from .timezones import ensure_aware
-from .quiz_access import QUIZ_SUBMISSION_GRACE, quiz_status_from, quiz_window
+from .quiz_access import quiz_attempt_status_from
 
 logger = getLogger(__name__)
 
@@ -91,24 +98,24 @@ def get_student_quiz_status(quiz, user, current_time=None):
     """
     current_time = ensure_aware(current_time or now())
     grade = Grade.objects.filter(user=user, quiz=quiz).first()
-    if grade is not None:
-        return quiz_status_from(quiz, grade, None, current_time, False)
-
-    return quiz_status_from(
+    opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first()
+    snapshot = QuizAnswerSnapshot.objects.filter(quiz=quiz, user=user).first()
+    mode, grade = quiz_attempt_status_from(
         quiz,
-        None,
-        QuizStudentOpening.objects.filter(quiz=quiz, student=user).first(),
+        grade,
+        opening,
         current_time,
         is_quiz_in_user_window(quiz, user),
+        snapshot,
     )
+    return mode, grade, snapshot
 
 
 def get_student_quiz_status_map(quizzes, user, current_time=None) -> dict:
     """Return ``{quiz_id: (mode, grade)}`` for many quizzes.
 
-    Replaces the per-quiz Grade + QuizStudentOpening queries of
-    ``get_student_quiz_status`` with two queries plus one access check per
-    offering, while applying the identical mode rule.
+    Replaces per-quiz Grade, QuizStudentOpening and attempt-snapshot queries
+    with bounded offering-wide reads while applying the same mode rule.
     """
     quizzes = list(quizzes)
     if not quizzes:
@@ -123,6 +130,10 @@ def get_student_quiz_status_map(quizzes, user, current_time=None) -> dict:
         row.quiz_id: row
         for row in QuizStudentOpening.objects.filter(student=user, quiz_id__in=quiz_ids)
     }
+    snapshots = {
+        row.quiz_id: row
+        for row in QuizAnswerSnapshot.objects.filter(user=user, quiz_id__in=quiz_ids)
+    }
     can_write_by_offering: dict = {}
     statuses = {}
     for quiz in quizzes:
@@ -131,20 +142,15 @@ def get_student_quiz_status_map(quizzes, user, current_time=None) -> dict:
             can_write_by_offering[offering_id] = bool(
                 offering_id and is_quiz_in_user_window(quiz, user)
             )
-        statuses[quiz.pk] = quiz_status_from(
+        statuses[quiz.pk] = quiz_attempt_status_from(
             quiz,
             grades.get(quiz.pk),
             openings.get(quiz.pk),
             current_time,
             can_write_by_offering[offering_id],
+            snapshots.get(quiz.pk),
         )
     return statuses
-
-
-def is_quiz_open(quiz, current_time=None, user=None) -> bool:
-    opening_date, closing_date = quiz_window(quiz, user)
-    current_time = ensure_aware(current_time or now())
-    return ensure_aware(opening_date) <= current_time <= ensure_aware(closing_date) + QUIZ_SUBMISSION_GRACE
 
 
 def pagination_query_string(request, exclude=("page",)):
@@ -227,7 +233,8 @@ def paginate_obj(request, obj, page_size=15):
     return page
 
 
-def render_dashboard(request, obj, view, context, parameters=[]):
+def render_dashboard(request, obj, view, context, parameters=None):
+    parameters = list(parameters or ())
     """
     Render dashboard with pagination and filters.
     Handles both full page and HTMX partial rendering.
@@ -288,35 +295,42 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     sort_params.pop("sort", None)
     sort_params.pop("order", None)
     context["sort_query"] = sort_params.urlencode()
-    year_filter = "academic_year_filter.html" if context.get("academic_year_filter") else "year_filter.html"
-    filters = [year_filter, "naming_filter.html"]
-    if "filters" in context:
-        context['filters'].extend(filters)
-    else:
-        context['filters'] = filters
     
     logger.info(f"User: {user} accesses page {page_obj.number} in {view} dashboard")
-    
-    # Handle HTMX partial rendering
-    if hx_target_id(request) == "table-container":
-        return render(request, "partials/table_and_pagination.html", {
-            "page_obj": page_obj,
-            "header": _(view.capitalize()),
-            "view": view,
-            "url": reverse(f"{view}-dashboard", args=parameters),
-            "parameters": parameters,
-            **context
-        })
-    
-    # Full page rendering
-    return render(request, context.get("template_name", "dashboard.html"), {
+
+    render_context = {
         "page_obj": page_obj,
         "header": _(view.capitalize()),
         "view": view,
         "url": reverse(f"{view}-dashboard", args=parameters),
         "parameters": parameters,
-        **context
-    })
+        **context,
+    }
+
+    # Handle HTMX partial rendering
+    if hx_target_id(request) == "table-container":
+        return render(
+            request,
+            "partials/table_and_pagination.html",
+            render_context,
+        )
+
+    # Page-level responses. Converted dashboards render their #content partial
+    # through render_page(), which keeps the #page-region contract for HTMX page
+    # navigation and the full shell for direct URLs. Dashboards that still own
+    # their whole template keep the existing full-page response until their
+    # phase converts them.
+    content_template = context.get("content_template_name")
+    if content_template is None and context.get("template_name", "dashboard.html") == "dashboard.html":
+        content_template = "partials/dashboard_content.html"
+    if content_template:
+        return render_page(
+            request,
+            context.get("template_name", "dashboard.html"),
+            content_template,
+            render_context,
+        )
+    return render(request, context.get("template_name", "dashboard.html"), render_context)
 
 
 def select_content_academic_year(request):
@@ -501,7 +515,15 @@ def render_page(request, full_template, partial_template, context, status=200):
     keep their HTTP status in both render modes.
     """
     if is_htmx(request):
-        wrapped_context = {**context, "page_region_partial": partial_template}
+        wrapped_context = {
+            **context,
+            "page_region_partial": partial_template,
+            # Page navigation targets #display-page; its response must also
+            # carry the persistent rail/sidebar/mobile/crumb regions so the
+            # capability-filtered active state follows the new route. Local
+            # #content/table/drawer swaps stay single-region responses.
+            "shell_nav_oob": hx_target_id(request) == "display-page",
+        }
         return append_message_toasts(
             request,
             render(request, "partials/page_region.html", wrapped_context, status=status),

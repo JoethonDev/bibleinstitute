@@ -1,24 +1,38 @@
 {% load i18n %}
-<div class="ad-card-body">
+{% comment %}
+R2 browse region. Presentation only: the #file-list-container /
+#drive-files / #drive-next-sentinel contract, the Root and Back hx-get /
+hx-target / hx-push-url navigation, the next-page URL data attribute and the
+infinite-scroll markup read by admin_shell.js are unchanged. The trail uses the
+workspace breadcrumb path; the view projects parent_folder only, so the current
+segment is the requested folder path and intermediate ancestors are not links.
+{% endcomment %}
+<div class="aw-card-body">
 {% if not is_root %}
-<nav aria-label="{% translate 'Breadcrumb' %}" class="ad-drive-crumb mb-3">
+<nav aria-label="{% translate 'Breadcrumb' %}" class="aw-breadcrumb-path mb-3">
     <a href="{% url 'r2-management-dashboard' %}"
        hx-get="{% url 'r2-management-dashboard' %}"
        hx-target="#file-list-container"
        hx-push-url="true">
-        <i class="fas fa-home"></i> {% translate "Root" %}
+        <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-home"></use></svg>
+        <span>{% translate "Root" %}</span>
     </a>
+    {% if request.GET.folder %}
+    <span class="aw-sep" aria-hidden="true">/</span>
+    <span dir="auto" title="{{ request.GET.folder }}" aria-current="page">{{ request.GET.folder }}</span>
+    {% endif %}
 </nav>
 {% endif %}
 
 {% if not is_root %}
 <div class="mb-3">
-    <button class="ad-btn ad-btn--ghost"
+    <button class="aw-btn aw-btn--ghost aw-btn--sm"
+            type="button"
             hx-get="{% if parent_folder %}{% url 'r2-management-dashboard' %}?folder={{ parent_folder|urlencode }}{% else %}{% url 'r2-management-dashboard' %}{% endif %}"
             hx-target="#file-list-container"
             hx-push-url="true">
-        <i class="fas fa-arrow-left me-2"></i>
-        {% translate "Back" %}
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
+        <span>{% translate "Back" %}</span>
     </button>
 </div>
 {% endif %}

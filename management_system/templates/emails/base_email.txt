@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{% block content %}{% endblock %}
+
+--
+{% translate "Bible Institute" %}
+{% translate "Bible Institute - Light for every nation" %}
+{% translate "This is an automated message; please do not reply." %}
+{{ site_domain }}
+{% endautoescape %}

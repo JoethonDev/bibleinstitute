@@ -18,9 +18,24 @@ from .admin_operations import (
     claim_admin_operation,
     fail_admin_operation,
     finish_admin_operation,
+    purge_expired_admin_operation_artifacts,
     wait_for_notification_delivery,
 )
 from .models import AdminOperationJob
+
+from .notification_redelivery import refresh_notification_redeliveries as refresh
+from .notification_redelivery import execute_notification_redelivery
+from .academic_evaluation import execute_formula_recalculation
+from .academic_enrollment import execute_bulk_promotion
+from .historical_intake import execute_historical_intake
+from .legacy_user_import import execute_legacy_user_import
+from .utils.attendance import execute_attendance_reconcile
+from .academic_copy import execute_course_copy
+from .evaluation_export import execute_evaluation_export
+from .report_export import execute_report_export
+from .storage_jobs import execute_storage_delete, execute_storage_rename, execute_storage_usage
+from .utils.csv_export import execute_quiz_export
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +45,6 @@ RECOVERY_RETRY_SECONDS = 180
 
 @shared_task(ignore_result=True, name="management_system.admin_operation_tasks.refresh_notification_redeliveries")
 def refresh_notification_redeliveries() -> dict:
-    from .notification_redelivery import refresh_notification_redeliveries as refresh
 
     return {"checked": refresh()}
 
@@ -45,58 +59,45 @@ def execute_admin_operation(job: AdminOperationJob, token: uuid.UUID) -> dict:
     """
 
     if job.kind == AdminOperationJob.Kind.NOTIFICATION_REDELIVERY:
-        from .notification_redelivery import execute_notification_redelivery
 
         return execute_notification_redelivery(job, token)
     if job.kind == AdminOperationJob.Kind.FORMULA_RECALCULATION:
-        from .academic_evaluation import execute_formula_recalculation
 
         return execute_formula_recalculation(job, token)
     if job.kind == AdminOperationJob.Kind.BULK_PROMOTION:
-        from .academic_enrollment import execute_bulk_promotion
 
         return execute_bulk_promotion(job, token)
     if job.kind == AdminOperationJob.Kind.HISTORICAL_INTAKE:
-        from .historical_intake import execute_historical_intake
 
         return execute_historical_intake(job, token)
     if job.kind == AdminOperationJob.Kind.LEGACY_USER_IMPORT:
-        from .legacy_user_import import execute_legacy_user_import
 
         return execute_legacy_user_import(job, token)
     if job.kind == AdminOperationJob.Kind.ATTENDANCE_RECONCILE:
-        from .utils.attendance import execute_attendance_reconcile
 
         return execute_attendance_reconcile(job, token)
     if job.kind == AdminOperationJob.Kind.COURSE_COPY:
-        from .academic_copy import execute_course_copy
 
         return execute_course_copy(job, token)
     if job.kind == AdminOperationJob.Kind.EVALUATION_EXPORT:
-        from .evaluation_export import execute_evaluation_export
 
         return execute_evaluation_export(job, token)
     if job.kind == AdminOperationJob.Kind.GRADES_REPORT_EXPORT:
-        from .report_export import execute_report_export
 
         return execute_report_export(job, token)
     if job.kind == AdminOperationJob.Kind.STORAGE_RENAME:
-        from .storage_jobs import execute_storage_rename
 
         return execute_storage_rename(job, token)
     if job.kind == AdminOperationJob.Kind.STORAGE_USAGE_REFRESH:
-        from .storage_jobs import execute_storage_usage
 
         return execute_storage_usage(job, token)
     if job.kind == AdminOperationJob.Kind.STORAGE_DELETE:
-        from .storage_jobs import execute_storage_delete
 
         return execute_storage_delete(job, token)
     if job.kind in {
         AdminOperationJob.Kind.QUIZ_DETAIL_EXPORT,
         AdminOperationJob.Kind.QUIZ_SUMMARY_EXPORT,
     }:
-        from .utils.csv_export import execute_quiz_export
 
         return execute_quiz_export(job, token)
 
@@ -205,7 +206,6 @@ def recover_admin_operations() -> dict:
 def cleanup_admin_operation_artifacts() -> dict:
     """Delete expired private job inputs from one bounded provider page."""
 
-    from .admin_operations import purge_expired_admin_operation_artifacts
 
     deleted = purge_expired_admin_operation_artifacts()
     return {"deleted": deleted}

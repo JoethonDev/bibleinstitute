@@ -1,0 +1,14 @@
+{% extends 'emails/base_email.txt' %}{% load i18n %}{% block content %}{% autoescape off %}{% translate "Your application was approved" %}
+
+{% translate "Hello" %} {{ name }},
+
+{% translate "We are pleased to inform you that your application has been approved!" %}
+
+{% translate "You can now log in to your account and start accessing courses and materials." %}
+
+{% translate "Login to Your Account" %}:
+{{ login_url }}
+
+{% translate "Welcome to Bible Institute! May God bless your studies." %}
+
+{% translate "Bible Institute Administration" %}{% endautoescape %}{% endblock %}

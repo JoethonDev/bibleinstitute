@@ -29,6 +29,7 @@ from .academic_access import get_accessible_offering_or_403
 from .models import CourseOffering, LectureProgressEvent, Lesson, PublicationStatus, ViewingSession
 from .storage_ownership import is_private_storage_key
 from .utils.file_validator import downloadable_audio_key, validate_downloadable_audio_key
+from .utils.lesson_access import lesson_is_available
 from .utils.helpers import user_has_management_role
 from .utils.hls_parser import get_segment_number
 from .utils.storage_operations import generate_unique_url
@@ -222,6 +223,8 @@ def resolve_media_link(
         allow_unpublished and user_has_management_role(user)
     ):
         raise MediaAccessError("forbidden", _("You do not have access to this lesson."))
+    if not lesson_is_available(lesson) and not user_has_management_role(user):
+        raise MediaAccessError("forbidden", _("This lesson is not available yet."))
     try:
         links = json.loads(lesson.links or "[]")
     except (TypeError, ValueError, json.JSONDecodeError):

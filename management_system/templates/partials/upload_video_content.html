@@ -1,0 +1,130 @@
+{% load i18n %}
+{% load static %}
+<div id="content" class="aw-dashboard-page"
+     data-job-create-url="{{ media_job_collection_url }}"
+     data-source-complete-url-template="{{ media_job_source_complete_url_template }}"
+     data-status-url-template="{{ media_job_status_url_template }}"
+     data-retry-url-template="{{ media_job_retry_url_template }}"
+     data-attachment-retry-url-template="{{ media_job_attachment_retry_url_template }}"
+     data-placeholder-uuid="00000000-0000-0000-0000-000000000000"
+
+     data-trans-uploading-source="{% translate 'Uploading...' %}"
+     data-trans-waiting-for-upload="{% translate 'Waiting for upload' %}"
+     data-trans-source-complete="{% translate 'Source upload complete' %}"
+     data-trans-upload-failed="{% translate 'Upload failed' %}"
+     data-trans-network-error="{% translate 'Network error during upload' %}"
+     data-trans-invalid-file-type="{% translate 'Invalid file type: {type}. Allowed types: MP4, MP3, PDF' %}"
+     data-trans-file-size-exceeded="{% translate 'File size exceeds maximum: {size}MB. Maximum: 2048MB' %}"
+     data-trans-no-files="{% translate 'No files selected' %}"
+     data-trans-invalid-files="{% translate 'Some files are invalid and will not be uploaded' %}"
+     data-trans-valid="{% translate 'Valid' %}"
+      data-trans-retry="{% translate 'Retry' %}"
+      data-trans-retry-attachment="{% translate 'Retry lesson attachment' %}"
+     data-trans-retrying="{% translate 'Retrying...' %}"
+     data-trans-retry-unavailable="{% translate 'Retry is not available because the original source is no longer retained.' %}"
+     data-trans-csrf-missing="{% translate 'The page security token is missing. Reload the page and try again.' %}"
+     data-trans-job-create-failed="{% translate 'Could not start the media upload.' %}"
+     data-trans-status-fetch-failed="{% translate 'Could not load the job status.' %}"
+     data-trans-type-mp4="{% translate 'MP4 Video' %}"
+     data-trans-type-mp3="{% translate 'MP3 Audio' %}"
+     data-trans-type-pdf="{% translate 'PDF Document' %}"
+     data-status-labels='{"awaiting_upload":"{% translate "Awaiting upload"|escapejs %}","queued":"{% translate "Queued"|escapejs %}","processing":"{% translate "Processing"|escapejs %}","uploading":"{% translate "Uploading"|escapejs %}","verifying":"{% translate "Verifying"|escapejs %}","succeeded":"{% translate "Succeeded"|escapejs %}","failed":"{% translate "Failed"|escapejs %}","cancelled":"{% translate "Cancelled"|escapejs %}"}'
+     data-phase-labels='{"upload":"{% translate "Upload"|escapejs %}","queued":"{% translate "Queued"|escapejs %}","download":"{% translate "Downloading source"|escapejs %}","probe":"{% translate "Inspecting source"|escapejs %}","encode":"{% translate "Processing media"|escapejs %}","upload_output":"{% translate "Uploading output"|escapejs %}","verify":"{% translate "Verifying output"|escapejs %}","attach":"{% translate "Attaching to lesson"|escapejs %}","complete":"{% translate "Complete"|escapejs %}","failed":"{% translate "Failed"|escapejs %}"}'>
+
+    {% translate "Media" as page_eyebrow %}
+    {% translate "Upload files" as page_title %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+
+    {% translate "Media" as media_label %}
+    <nav class="aw-tabs" aria-label="{{ media_label }}">
+        <a class="aw-tab" href="{% url 'media-processing-status' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+            <span>{% translate "Media processing" %}</span>
+        </a>
+        <a class="aw-tab is-active" href="{% url 'upload-files' %}" aria-current="page">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+            <span>{% translate "Upload files" %}</span>
+        </a>
+    </nav>
+
+    <section class="aw-card" aria-labelledby="aw-upload-title">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <h3 id="aw-upload-title">{% translate "Upload media" %}</h3>
+            </div>
+            <a href="{% url 'lesson-create' %}" class="aw-btn aw-btn--outline aw-btn--sm">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                <span>{% translate "Create Lesson" %}</span>
+            </a>
+        </div>
+        <div class="aw-card-body">
+            <div class="aw-form-grid">
+                <div class="aw-field">
+                    <label for="folder-name">{% translate "Folder" %}</label>
+                    <input class="aw-input" type="text" id="folder-name" name="folder" dir="ltr">
+                </div>
+                <div class="aw-field">
+                    <label for="lesson-select">{% translate "Optional lesson (editable draft)" %}</label>
+                    <select id="lesson-select" class="aw-select">
+                        <option value="">{% translate "None / Standalone output" %}</option>
+                        {% for lesson in editable_lessons %}
+                        <option value="{{ lesson.pk }}">
+                            {{ lesson.name }} - {{ lesson.course_offering.course.name }} - {{ lesson.course_offering.academic_year_level.level.display_name }} - {{ lesson.course_offering.academic_year_level.academic_year.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <span class="aw-field-hint">
+                        {% translate "The selected draft lesson is metadata only; the server validates and attaches verified output." %}
+                    </span>
+                </div>
+            </div>
+
+            <section class="aw-card mt-3" aria-labelledby="aw-drive-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-folder"></use></svg>
+                        <h3 id="aw-drive-title">{% translate "Select Folder from Drive" %}</h3>
+                    </div>
+                </div>
+                <div id="drive-files" class="aw-card-body">
+                    {% include 'drive_files.html' with folders_only=True %}
+                </div>
+            </section>
+
+            <div class="aw-field mt-3">
+                <label for="formFileMultiple">{% translate "Upload Files" %}</label>
+                <input class="form-control" type="file" id="formFileMultiple"
+                       accept="video/mp4,audio/mp3,audio/mpeg,application/pdf,.mp4,.mp3,.pdf"
+                       multiple>
+                <span class="aw-field-hint">
+                    {% translate "Allowed file types: MP4 (video), MP3 (audio), PDF (document). Maximum size: 2GB per file." %}
+                </span>
+            </div>
+
+            <div id="validation-errors" class="aw-alert aw-alert--danger d-none mt-3" role="alert">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                <div>
+                    <h6 class="mb-1">{% translate "Invalid Files" %}</h6>
+                    <ul id="validation-error-list" class="mb-0 ps-3"></ul>
+                </div>
+            </div>
+
+            <div id="file-list" class="mt-3 d-none">
+                <h6>{% translate "Selected Files" %}</h6>
+                <ul id="file-list-items" class="list-group"></ul>
+            </div>
+
+            <div id="progress-container" class="aw-stack mt-3"></div>
+
+            <div class="mt-3">
+                <button class="aw-btn aw-btn--primary" type="button" id="upload-btn">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                    <span>{% translate "Upload Files" %}</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <script src="{% static 'js/media_upload.js' %}?v={{ static_asset_version }}"></script>
+</div>

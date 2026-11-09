@@ -6,18 +6,31 @@ from collections import defaultdict
 from tempfile import SpooledTemporaryFile
 
 from django.http import HttpResponse, StreamingHttpResponse
-from django.utils.translation import gettext as _
 from django.utils import timezone
-from ..models import User, Quiz, Submission, Question, Grade
+from django.utils import translation
+from django.utils.translation import gettext as _
+from ..models import AdminOperationJob, Grade, Question, Quiz, Submission
+from ..admin_tables import user_queryset
 from .timezones import format_application_datetime
+from ..admin_operations import (
+    AdminOperationError,
+    assert_admin_operation_progress,
+    create_admin_operation,
+    finalize_admin_operation_export,
+    require_admin_operation_actor,
+)
+from ..utils.decorators import can_grade
 
 
-def export_users_to_csv():
+
+def export_users_to_csv(scope=None):
     """
-    Stream every user as CSV.
+    Stream users as CSV for the Students table's normalized filter scope.
 
-    The row iterator keeps one page of users in memory, and the single
-    select_related removes the per-row role lookup the old loop performed.
+    ``scope`` is the same dictionary the dashboard signs into its bulk
+    selection, so the export contains exactly the rows the operator filtered.
+    An empty scope keeps the full roster. The row iterator keeps one batch in
+    memory and the canonical queryset already selects the role relation.
     """
     headers = [
         f"  {_('Username')}  ",
@@ -36,7 +49,7 @@ def export_users_to_csv():
         writer.writerow(headers)
         yield output.getvalue()
         users = (
-            User.objects.select_related("role")
+            user_queryset(scope or {})
             .order_by("joined_date", "pk")
             .iterator(chunk_size=500)
         )
@@ -260,8 +273,6 @@ def build_quiz_summary_csv(quiz, progress=None):
 
 def enqueue_quiz_export(*, actor, quiz, kind, language="ar"):
     """Create or reuse one durable whole-population quiz export job."""
-    from ..admin_operations import create_admin_operation
-    from ..models import AdminOperationJob
 
     if kind not in {
         AdminOperationJob.Kind.QUIZ_DETAIL_EXPORT,
@@ -283,17 +294,8 @@ def enqueue_quiz_export(*, actor, quiz, kind, language="ar"):
 
 def execute_quiz_export(job, token) -> dict:
     """J01 executor: build one private CSV artifact and publish it on completion."""
-    from django.utils import translation
 
-    from ..models import AdminOperationJob
-    from ..admin_operations import (
-        AdminOperationError,
-        assert_admin_operation_progress,
-        finalize_admin_operation_export,
-    )
-    from ..utils.decorators import can_grade
 
-    from ..admin_operations import require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if not can_grade(job.actor):

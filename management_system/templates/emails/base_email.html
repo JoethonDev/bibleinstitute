@@ -1,22 +1,38 @@
-{% load i18n %}{% load static %}<!DOCTYPE html>
-<html lang="{{ request.LANGUAGE_CODE|default:'ar' }}">
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#F7F3EA;font-family:'Segoe UI',Tahoma,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F3EA;padding:20px;">
-<tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(30,41,59,0.1);">
-<tr><td style="background:#2F5D73;padding:20px;text-align:center;">
-<img src="{{ site_domain }}{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="Logo" width="125" height="40" style="display:block;margin:0 auto;">
-<h1 style="color:#fff;margin:10px 0 0;font-size:20px;">{% translate "Bible Institute" %}</h1>
-</td></tr>
-<tr><td style="padding:30px;">
+{% load i18n static %}{% get_current_language as lang %}<!DOCTYPE html>
+<html lang="{{ lang|default:'ar' }}" dir="{% if lang == 'ar' %}rtl{% else %}ltr{% endif %}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<title>{% block title %}{% translate "Bible Institute" %}{% endblock %}</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f0e6;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">{% block preheader %}{% endblock %}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#f5f0e6;margin:0;padding:0;">
+<tr>
+<td align="center" style="padding:28px 14px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#fffdf9;border:1px solid #e4dac6;border-radius:14px;overflow:hidden;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
+<tr>
+<td style="background:#2e6474;padding:22px 28px;text-align:center;">
+<img src="{{ site_domain }}{% static 'login-logo.png' %}?v={{ static_asset_version }}" alt="{% translate 'Bible Institute' %}" width="72" height="58" style="display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">
+<div style="font-family:Georgia,'Palatino Linotype','Sakkal Majalla',serif;font-size:21px;font-weight:700;color:#fffdf9;line-height:1.4;">{% translate "Bible Institute" %}</div>
+</td>
+</tr>
+<tr>
+<td style="padding:32px 30px;color:#142c34;text-align:{% if lang == 'ar' %}right{% else %}left{% endif %};">
 {% block content %}{% endblock %}
-</td></tr>
-<tr><td style="background:#EDE5D5;padding:15px;text-align:center;font-size:12px;color:#5F6F7E;">
+</td>
+</tr>
+<tr>
+<td style="padding:18px 24px;background:#f5f0e6;border-top:1px solid #e4dac6;text-align:center;font-size:11px;line-height:1.8;color:#6e7c82;">
 <p style="margin:0;">{% translate "Bible Institute - Light for every nation" %}</p>
-</td></tr>
+<p style="margin:4px 0 0;">{% translate "This is an automated message; please do not reply." %}</p>
+</td>
+</tr>
 </table>
-</td></tr>
+</td>
+</tr>
 </table>
 </body>
 </html>

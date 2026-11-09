@@ -20,11 +20,14 @@ from ..models import (
     TelegramNotificationDelivery,
     QuizStudentOpening,
 )
+from ..notification_redelivery import eligible_redelivery_notification_ids, redelivery_source_queryset
 from ..student_notifications import is_active_published_lesson, is_active_published_quiz
+from ..utils.lesson_access import lesson_is_available
 from ..utils.timezones import ensure_aware
 from .media import audio_links
 from .navigation import format_lesson, format_quiz, lesson_detail_keyboard, quiz_detail_keyboard
 from .configuration import stored_token
+from .deletion import delete_bot_message
 
 logger = logging.getLogger(__name__)
 
@@ -36,27 +39,63 @@ RETRY_DELAYS = (60, 300, 900)
 
 def _claim_due_ids(limit: int) -> list[int]:
     now = timezone.now()
+    batch_limit = max(1, min(limit, NOTIFICATION_BATCH_SIZE))
     stale_before = now - timedelta(minutes=15)
-    stale_deliveries = TelegramNotificationDelivery.objects.filter(
-        status=TelegramNotificationDelivery.Status.SENDING,
-        updated_at__lt=stale_before,
-    )
-    stale_deliveries.filter(
-        attempt_count__gte=MAX_DELIVERY_ATTEMPTS,
-    ).update(
-        status=TelegramNotificationDelivery.Status.FAILED,
-        last_error=_("Telegram message delivery failed."),
-        updated_at=now,
-    )
-    stale_deliveries.filter(
-        attempt_count__lt=MAX_DELIVERY_ATTEMPTS,
-    ).update(
-        status=TelegramNotificationDelivery.Status.QUEUED,
-        scheduled_for=now,
-        last_error=_("A previous delivery worker stopped before completion."),
-        updated_at=now,
-    )
     with transaction.atomic():
+        stale_rows = list(
+            TelegramNotificationDelivery.objects.filter(
+                status=TelegramNotificationDelivery.Status.SENDING,
+                updated_at__lt=stale_before,
+            )
+            .order_by("updated_at", "pk")
+            .values_list("pk", "student_notification_id")[:batch_limit]
+        )
+        if stale_rows:
+            notification_ids = sorted({notification_id for _, notification_id in stale_rows if notification_id})
+            notifications = {
+                notification.pk: notification
+                for notification in StudentNotification.objects.select_for_update(skip_locked=True)
+                .filter(pk__in=notification_ids)
+                .order_by("pk")
+            }
+            stale_ids = [
+                delivery_id
+                for delivery_id, notification_id in stale_rows
+                if notification_id is None
+                or notification_id not in notification_ids
+                or notification_id in notifications
+            ]
+            stale_deliveries = list(
+                TelegramNotificationDelivery.objects.select_for_update(skip_locked=True)
+                .filter(pk__in=stale_ids, status=TelegramNotificationDelivery.Status.SENDING)
+                .order_by("updated_at", "pk")
+            )
+            for delivery in stale_deliveries:
+                notification = notifications.get(delivery.student_notification_id)
+                if notification is None:
+                    delivery.status = TelegramNotificationDelivery.Status.SKIPPED
+                    delivery.last_error = _("Recipient is no longer authorized.")
+                elif notification.withdrawn_at is not None:
+                    delivery.status = TelegramNotificationDelivery.Status.SKIPPED
+                    delivery.last_error = _("The notification was withdrawn before delivery.")
+                elif notification.cancelled_at is not None:
+                    delivery.status = TelegramNotificationDelivery.Status.SKIPPED
+                    delivery.last_error = _("The notification was cancelled before delivery.")
+                elif delivery.attempt_count >= MAX_DELIVERY_ATTEMPTS:
+                    delivery.status = TelegramNotificationDelivery.Status.FAILED
+                    delivery.last_error = _("Telegram message delivery failed.")
+                else:
+                    delivery.status = TelegramNotificationDelivery.Status.QUEUED
+                    delivery.scheduled_for = now
+                    delivery.last_error = _("A previous delivery worker stopped before completion.")
+                delivery.updated_at = now
+            if stale_deliveries:
+                TelegramNotificationDelivery.objects.bulk_update(
+                    stale_deliveries,
+                    ["status", "scheduled_for", "last_error", "updated_at"],
+                    batch_size=NOTIFICATION_BATCH_SIZE,
+                )
+
         ids = list(
             TelegramNotificationDelivery.objects.select_for_update(
                 of=("self",),
@@ -66,9 +105,10 @@ def _claim_due_ids(limit: int) -> list[int]:
                 status=TelegramNotificationDelivery.Status.QUEUED,
                 scheduled_for__lte=now,
                 student_notification__cancelled_at__isnull=True,
+                student_notification__withdrawn_at__isnull=True,
             )
             .order_by("scheduled_for", "pk")
-            .values_list("pk", flat=True)[:max(1, min(limit, NOTIFICATION_BATCH_SIZE))]
+            .values_list("pk", flat=True)[:batch_limit]
         )
         if ids:
             TelegramNotificationDelivery.objects.filter(pk__in=ids).update(
@@ -89,13 +129,19 @@ def _authorized_delivery(
         account is None
         or not account.is_active
         or account.user_id != delivery.user_id
+        or delivery.telegram_chat_id is None
+        or account.telegram_chat_id != delivery.telegram_chat_id
         or delivery.pk not in authorized_ids
     ):
+        return False
+    notification = delivery.student_notification
+    if notification is None or notification.cancelled_at is not None or notification.withdrawn_at is not None:
         return False
     if delivery.lesson_id:
         lesson = is_active_published_lesson(delivery.lesson)
         return bool(
             lesson
+            and lesson_is_available(lesson)
             and delivery.pk in authorized_ids
         )
     if delivery.quiz_id:
@@ -128,7 +174,7 @@ def _quiz_delivery_is_open(
         (delivery.quiz.opening_date, delivery.quiz.closing_date),
     )
     current = timezone.now()
-    return ensure_aware(opening) <= current <= ensure_aware(closing) + timedelta(minutes=30)
+    return ensure_aware(opening) <= current < ensure_aware(closing)
 
 
 def _authorized_delivery_ids(deliveries) -> set[int]:
@@ -195,32 +241,38 @@ def _mark_skipped(delivery_id: int, message: str) -> None:
     )
 
 
-def _mark_failed_or_retry(delivery_id: int, attempt_count: int | None, message: str) -> None:
-    if attempt_count is None:
-        attempt_count = int(TelegramNotificationDelivery.objects.filter(pk=delivery_id).values_list(
-            "attempt_count", flat=True
-        ).first() or 1)
-    attempt = int(attempt_count)
-    if attempt >= MAX_DELIVERY_ATTEMPTS:
-        TelegramNotificationDelivery.objects.filter(
-            pk=delivery_id,
-            status=TelegramNotificationDelivery.Status.SENDING,
-        ).update(
-            status=TelegramNotificationDelivery.Status.FAILED,
-            last_error=message[:500],
-            updated_at=timezone.now(),
-        )
+@transaction.atomic
+def _mark_failed_or_retry(delivery_id: int, message: str) -> None:
+    notification_id = TelegramNotificationDelivery.objects.filter(pk=delivery_id).values_list(
+        "student_notification_id", flat=True,
+    ).first()
+    notification = None
+    if notification_id is not None:
+        notification = StudentNotification.objects.select_for_update().filter(pk=notification_id).first()
+    delivery = TelegramNotificationDelivery.objects.select_for_update().filter(pk=delivery_id).first()
+    if delivery is None or delivery.status != TelegramNotificationDelivery.Status.SENDING:
         return
-    delay = RETRY_DELAYS[min(attempt - 1, len(RETRY_DELAYS) - 1)]
-    TelegramNotificationDelivery.objects.filter(
-        pk=delivery_id,
-        status=TelegramNotificationDelivery.Status.SENDING,
-    ).update(
-        status=TelegramNotificationDelivery.Status.QUEUED,
-        scheduled_for=timezone.now() + timedelta(seconds=delay),
-        last_error=message[:500],
-        updated_at=timezone.now(),
-    )
+
+    now = timezone.now()
+    if notification is None:
+        delivery.status = TelegramNotificationDelivery.Status.SKIPPED
+        delivery.last_error = _("Recipient is no longer authorized.")
+    elif notification.withdrawn_at is not None:
+        delivery.status = TelegramNotificationDelivery.Status.SKIPPED
+        delivery.last_error = _("The notification was withdrawn before delivery.")
+    elif notification.cancelled_at is not None:
+        delivery.status = TelegramNotificationDelivery.Status.SKIPPED
+        delivery.last_error = _("The notification was cancelled before delivery.")
+    elif delivery.attempt_count >= MAX_DELIVERY_ATTEMPTS:
+        delivery.status = TelegramNotificationDelivery.Status.FAILED
+        delivery.last_error = message[:500]
+    else:
+        delay = RETRY_DELAYS[min(delivery.attempt_count - 1, len(RETRY_DELAYS) - 1)]
+        delivery.status = TelegramNotificationDelivery.Status.QUEUED
+        delivery.scheduled_for = now + timedelta(seconds=delay)
+        delivery.last_error = message[:500]
+    delivery.updated_at = now
+    delivery.save(update_fields=["status", "scheduled_for", "last_error", "updated_at"])
 
 
 def _send_delivery(
@@ -233,7 +285,7 @@ def _send_delivery(
             links = audio_links(json.loads(delivery.lesson.links))
         except (TypeError, ValueError, json.JSONDecodeError):
             links = []
-        text = "\n\n".join((_("Lesson published"), format_lesson(delivery.lesson, bool(links), delivery.user)))
+        text = "\n\n".join((_("Lesson now available"), format_lesson(delivery.lesson, bool(links), delivery.user)))
         markup = lesson_detail_keyboard(delivery.lesson.course_offering_id, delivery.lesson.pk, links)
     elif delivery.notification_type == TelegramNotificationDelivery.NotificationType.ANNOUNCEMENT:
         announcement = delivery.announcement
@@ -248,7 +300,7 @@ def _send_delivery(
         opening, closing = exceptional_windows.get(
             (delivery.quiz_id, delivery.user_id), (delivery.quiz.opening_date, delivery.quiz.closing_date),
         )
-        text = "\n\n".join((_("Exam opening"), format_quiz(delivery.quiz, delivery.user, opening, closing)))
+        text = "\n\n".join((_("Exam now available"), format_quiz(delivery.quiz, delivery.user, opening, closing)))
         markup = quiz_detail_keyboard(delivery.quiz.course_offering_id, delivery.quiz.pk)
     if delivery.content_snapshot:
         text = delivery.content_snapshot
@@ -263,7 +315,7 @@ def _send_delivery(
             if not text:
                 raise ValueError("Notification delivery is no longer claimed.")
         delivery.content_snapshot = text
-    return bot.send_message(delivery.telegram_account.telegram_chat_id, text, reply_markup=markup)
+    return bot.send_message(delivery.telegram_chat_id, text, reply_markup=markup)
 
 
 @transaction.atomic
@@ -293,6 +345,7 @@ def _materialize_due_deliveries(limit: int) -> int:
             is_manual_redelivery=False,
             scheduled_for__lte=now,
             cancelled_at__isnull=True,
+            withdrawn_at__isnull=True,
             notification_type__in=(
                 TelegramNotificationDelivery.NotificationType.LESSON_PUBLISHED,
                 TelegramNotificationDelivery.NotificationType.QUIZ_OPENING,
@@ -312,26 +365,29 @@ def _materialize_due_deliveries(limit: int) -> int:
         for delivery in notification.telegram_deliveries.all():
             existing_keys.add(delivery.idempotency_key)
 
-    account_ids = dict(
-        TelegramAccount.objects.filter(
+    account_ids = {
+        user_id: (account_id, chat_id)
+        for user_id, account_id, chat_id in TelegramAccount.objects.filter(
             user_id__in=[notification.student_id for notification in notifications],
             is_active=True,
-        ).values_list("user_id", "pk")
-    )
+        ).values_list("user_id", "pk", "telegram_chat_id")
+    }
 
     rows: list[TelegramNotificationDelivery] = []
     for notification in notifications:
         if notification.idempotency_key in existing_keys:
             continue
-        account_id = account_ids.get(notification.student_id)
-        if account_id is None:
+        account = account_ids.get(notification.student_id)
+        if account is None:
             continue
+        account_id, chat_id = account
         rows.append(
             TelegramNotificationDelivery(
                 idempotency_key=notification.idempotency_key,
                 notification_type=notification.notification_type,
                 user_id=notification.student_id,
                 telegram_account_id=account_id,
+                telegram_chat_id=chat_id,
                 student_notification_id=notification.pk,
                 lesson_id=notification.lesson_id,
                 quiz_id=notification.quiz_id,
@@ -359,18 +415,11 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
     ids = _claim_due_ids(limit)
     if not ids:
         return {"sent": 0, "skipped": 0, "failed": 0}
-    attempt_counts = dict(
-        TelegramNotificationDelivery.objects.filter(pk__in=ids).values_list(
-            "pk", "attempt_count"
-        )
-    )
-
     config = TelegramBotConfig.objects.filter(is_active=True).first()
     if config is None:
         for delivery_id in ids:
             _mark_failed_or_retry(
                 delivery_id,
-                attempt_counts.get(delivery_id),
                 _("The Telegram bot is inactive."),
             )
         logger.warning(
@@ -389,7 +438,6 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
         for delivery_id in ids:
             _mark_failed_or_retry(
                 delivery_id,
-                attempt_counts.get(delivery_id),
                 _("Telegram message delivery failed."),
             )
         logger.warning(
@@ -422,13 +470,12 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
     manual_ids = {d.student_notification_id for d in delivery_list
                   if d.student_notification is not None and d.student_notification.is_manual_redelivery}
     if manual_ids:
-        from ..notification_redelivery import eligible_redelivery_notification_ids, redelivery_source_queryset
-
         allowed_manual = eligible_redelivery_notification_ids(list(redelivery_source_queryset().filter(pk__in=manual_ids)))
         authorized_ids.difference_update(d.pk for d in delivery_list
                                         if d.student_notification_id in manual_ids and d.student_notification_id not in allowed_manual)
     counts = {"sent": 0, "skipped": 0, "failed": 0}
     outbound_account_ids = set()
+    sent_for_withdrawal = []
     for delivery in delivery_list:
         if not _authorized_delivery(delivery, authorized_ids, exceptional_windows):
             _mark_skipped(delivery.pk, _("Recipient is no longer authorized."))
@@ -437,21 +484,50 @@ def process_due_notifications(bot=None, limit: int = NOTIFICATION_BATCH_SIZE) ->
         try:
             response = _send_delivery(bot, delivery, exceptional_windows)
             message_id = getattr(response, "message_id", None)
+            sent_at = timezone.now()
             TelegramNotificationDelivery.objects.filter(
                 pk=delivery.pk,
                 status=TelegramNotificationDelivery.Status.SENDING,
             ).update(
                 status=TelegramNotificationDelivery.Status.SENT,
                 telegram_message_id=message_id,
-                sent_at=timezone.now(),
+                sent_at=sent_at,
                 last_error="",
                 updated_at=timezone.now(),
             )
+            sent_for_withdrawal.append((
+                delivery.pk,
+                delivery.student_notification_id,
+                delivery.telegram_chat_id,
+                message_id,
+                sent_at,
+            ))
             outbound_account_ids.add(delivery.telegram_account_id)
             counts["sent"] += 1
         except Exception:
-            _mark_failed_or_retry(delivery.pk, delivery.attempt_count, _("Telegram message delivery failed."))
+            _mark_failed_or_retry(delivery.pk, _("Telegram message delivery failed."))
             counts["failed"] += 1
+    if sent_for_withdrawal:
+        notification_ids = {row[1] for row in sent_for_withdrawal if row[1] is not None}
+        withdrawn_ids = set(StudentNotification.objects.filter(
+            pk__in=notification_ids,
+            withdrawn_at__isnull=False,
+        ).values_list("pk", flat=True))
+        for delivery_id, notification_id, chat_id, message_id, sent_at in sent_for_withdrawal:
+            if notification_id not in withdrawn_ids:
+                continue
+            deletion_status, deletion_error = delete_bot_message(
+                bot,
+                chat_id=chat_id,
+                message_id=message_id,
+                sent_at=sent_at,
+            )
+            TelegramNotificationDelivery.objects.filter(pk=delivery_id).update(
+                telegram_deletion_status=deletion_status,
+                telegram_deleted_at=timezone.now() if deletion_status == "deleted" else None,
+                telegram_deletion_error=deletion_error,
+                updated_at=timezone.now(),
+            )
     if outbound_account_ids:
         TelegramAccount.objects.filter(pk__in=outbound_account_ids).update(
             last_outbound_at=timezone.now(),

@@ -6,23 +6,23 @@
   function save(list) { try { localStorage.setItem(key(), JSON.stringify(list.slice(0, 20))); } catch (e) {} }
   function currentQuery() { return window.location.search || ""; }
   function init() {
-    var bar = document.querySelector(".ad-filters");
-    if (!bar || document.getElementById("ad-preset-wrap")) { sync(); return; }
+    var bar = document.querySelector(".aw-filter-bar");
+    if (!bar || document.getElementById("aw-preset-wrap")) { sync(); return; }
     var wrap = document.createElement("div");
-    wrap.id = "ad-preset-wrap";
-    wrap.className = "d-flex align-items-center gap-2";
+    wrap.id = "aw-preset-wrap";
+    wrap.className = "aw-flex aw-flex-wrap";
     var select = document.createElement("select");
-    select.id = "ad-preset-select";
-    select.className = "form-select form-select-sm";
+    select.id = "aw-preset-select";
+    select.className = "aw-select aw-input--sm";
     select.style.maxWidth = "16rem";
     select.setAttribute("aria-label", t("Saved filters"));
     var btnSave = document.createElement("button");
     btnSave.type = "button";
-    btnSave.className = "ad-btn ad-btn--outline-gold ad-btn--sm";
+    btnSave.className = "aw-btn aw-btn--outline aw-btn--sm";
     btnSave.textContent = t("Save");
     var btnDel = document.createElement("button");
     btnDel.type = "button";
-    btnDel.className = "ad-btn ad-btn--danger ad-btn--sm";
+    btnDel.className = "aw-btn aw-btn--danger aw-btn--sm";
     btnDel.textContent = t("Delete");
     btnSave.addEventListener("click", function () {
       var name = window.prompt(t("Name this filter"));
@@ -32,7 +32,7 @@
       save(list); sync();
     });
     btnDel.addEventListener("click", function () {
-      var sel = document.getElementById("ad-preset-select");
+      var sel = document.getElementById("aw-preset-select");
       if (!sel || sel.value === "") return;
       var list = load();
       list.splice(parseInt(sel.value, 10), 1);
@@ -50,7 +50,7 @@
   function sync() {
     // Highlight the preset matching the current URL so the active filter
     // stays visible (and deletable) after navigation and HTMX swaps.
-    var sel = document.getElementById("ad-preset-select");
+    var sel = document.getElementById("aw-preset-select");
     if (!sel) return;
     var list = load();
     var q = currentQuery();

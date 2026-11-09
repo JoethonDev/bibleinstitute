@@ -355,6 +355,11 @@ class LessonEditorForm(forms.Form):
     lesson_name = forms.CharField(max_length=255, label=_("Lesson Name"))
     description = forms.CharField(required=False, label=_("Lesson Description"))
     course_offering = forms.ModelChoiceField(queryset=CourseOffering.objects.none(), label=_("Course Offering"))
+    opening_date = forms.CharField(
+        required=False,
+        label=_("Available from"),
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+    )
     status = forms.ChoiceField(choices=PublicationStatus.choices, label=_("Status"))
 
     def __init__(self, *args, current_offering_id=None, **kwargs):
@@ -364,6 +369,15 @@ class LessonEditorForm(forms.Form):
         ).select_related(
             "course", "academic_year_level__level", "academic_year_level__academic_year"
         ).order_by("academic_year_level__level__ordering", "course__name", "academic_year_level__academic_year__ordering", "pk")
+
+    def clean_opening_date(self):
+        value = self.cleaned_data["opening_date"]
+        if not value:
+            return None
+        try:
+            return parse_application_datetime(value)
+        except (TypeError, ValueError):
+            raise forms.ValidationError(_("Enter a valid date and time."))
 
 
 class CourseForm(forms.ModelForm):
@@ -653,6 +667,10 @@ class HistoricalExistingBulkForm(forms.Form):
     promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
 
     def __init__(self, *args, student_options=None, **kwargs):
+        # The single-intake form is rendered on the same page and owns the
+        # unprefixed field ids; prefix this form's DOM ids so the two forms
+        # never emit duplicate id attributes. POST field names are unchanged.
+        kwargs.setdefault("auto_id", "id_existing_%s")
         super().__init__(*args, **kwargs)
         self.fields["source_year_level"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=False).select_related("academic_year", "level").order_by("academic_year__ordering", "level__ordering")
         self.fields["destination_scope"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by("level__ordering")

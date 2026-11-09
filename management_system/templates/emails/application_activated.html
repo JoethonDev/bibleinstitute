@@ -1,10 +1,14 @@
 {% extends 'emails/base_email.html' %}{% load i18n %}
+{% block preheader %}{% translate "Your application was approved" %}{% endblock %}
 {% block content %}
-<h2 style="color:#2F5D73;margin:0 0 15px;">{% translate "Application Approved" %}</h2>
-<p style="color:#4B5563;line-height:1.6;">{% translate "Dear" %} <strong>{{ name }}</strong>,</p>
-<p style="color:#4B5563;line-height:1.6;">{% translate "We are pleased to inform you that your application has been approved!" %}</p>
-<p style="color:#4B5563;line-height:1.6;">{% translate "You can now log in to your account and start accessing courses and materials." %}</p>
-<p style="text-align:center;margin:25px 0;"><a href="{{ login_url }}" style="background:#2F5D73;color:#fff;padding:12px 30px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">{% translate "Login to Your Account" %}</a></p>
-<p style="color:#4B5563;line-height:1.6;">{% translate "Welcome to Bible Institute! May God bless your studies." %}</p>
-<p style="color:#4B5563;line-height:1.6;"><strong>{% translate "Bible Institute Administration" %}</strong></p>
+<p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#b98a3e;">{% translate "Admissions" %}</p>
+<h1 style="margin:0 0 18px;font-family:Georgia,'Palatino Linotype','Sakkal Majalla',serif;font-size:25px;line-height:1.5;font-weight:700;color:#142c34;">{% translate "Your application was approved" %}</h1>
+<p style="margin:0 0 12px;font-size:14px;line-height:1.9;color:#4b5563;">{% translate "Hello" %} <strong style="color:#142c34;">{{ name }}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;line-height:1.9;color:#4b5563;">{% translate "We are pleased to inform you that your application has been approved!" %}</p>
+<p style="margin:0 0 12px;font-size:14px;line-height:1.9;color:#4b5563;">{% translate "You can now log in to your account and start accessing courses and materials." %}</p>
+<div style="text-align:center;margin:26px 0;"><a href="{{ login_url }}" style="display:inline-block;padding:13px 32px;background-color:#2e6474;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:14px;font-weight:700;line-height:1.4;color:#fffdf9;text-decoration:none;border-radius:10px;">{% translate "Login to Your Account" %}</a></div>
+<p style="margin:0 0 6px;font-size:12px;line-height:1.8;color:#6e7c82;">{% translate "If the button does not open, copy this link:" %}</p>
+<p dir="ltr" style="margin:0 0 18px;font-size:12px;line-height:1.8;color:#2e6474;word-break:break-all;text-align:left;"><a href="{{ login_url }}" style="color:#2e6474;text-decoration:underline;">{{ login_url }}</a></p>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.9;color:#4b5563;">{% translate "Welcome to Bible Institute! May God bless your studies." %}</p>
+<p style="margin:0;padding-top:14px;border-top:1px solid #e4dac6;font-size:13px;line-height:1.9;color:#142c34;"><strong>{% translate "Bible Institute Administration" %}</strong></p>
 {% endblock %}

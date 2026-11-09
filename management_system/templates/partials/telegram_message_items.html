@@ -1,17 +1,30 @@
 {% load i18n %}
+{% translate "Answered" as answered_label %}
+{% translate "Alert removed from Telegram" as alert_removed_label %}
+{% translate "Alert updated in Telegram" as alert_edited_label %}
+{% translate "Alert remains in Telegram because the 48-hour deletion window expired" as alert_expired_label %}
+{% translate "Telegram could not update this alert" as alert_failed_label %}
+{% translate "The original bot is no longer active, so this alert cannot be updated" as alert_unavailable_label %}
+{% translate "Awaiting a reply to this student message" as awaiting_reply_label %}
+{% translate "Deleted from Telegram" as deleted_from_telegram_label %}
+{% translate "Telegram deletion window expired" as deletion_expired_label %}
+{% translate "Telegram deletion failed" as deletion_failed_label %}
+{% translate "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying." as delivery_unknown_label %}
+{% translate "No messages yet." as no_messages_label %}
+{% if oob_state %}<div hx-swap-oob="innerHTML:#telegram-message-items"><li hidden data-state-value="{{ message_state }}"></li>{% endif %}
 {% if include_older_sentinel and messages_page_obj and messages_page_obj.has_previous %}
 <li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
     data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
     aria-hidden="true"></li>
 {% endif %}
 {% for message in message_items %}
-<li class="tg-chat-msg tg-chat-msg--{{ message.direction }}" data-msg-pk="{{ message.pk }}">
-    <div class="tg-chat-msg-head">
-        <span class="tg-chat-msg-role">{% if message.direction == "inbound" %}{% if message.sender_user %}{{ message.sender_user.telegram_display_identity }}{% else %}{% translate "Student" %}{% endif %}{% else %}{% translate "Admin" %}{% endif %}</span>
+<li class="tg-chat-msg tg-chat-msg--{{ message.direction }} aw-msg{% if message.direction == 'inbound' %} aw-msg--in{% else %} aw-msg--out{% endif %}" data-msg-pk="{{ message.pk }}">
+    <div class="tg-chat-msg-head{% if message.direction == 'outbound' %} text-white{% endif %}">
+        <span class="tg-chat-msg-role{% if message.direction == 'outbound' %} text-white{% endif %}">{% if message.direction == "inbound" %}{% if message.sender_user %}{{ message.sender_user.telegram_display_identity }}{% else %}{% translate "Student" %}{% endif %}{% else %}{% translate "Admin" %}{% endif %}</span>
         <span class="tg-chat-msg-type">{{ message.get_content_type_display }}</span>
-        <time class="tg-chat-msg-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+        <time class="tg-chat-msg-time{% if message.direction == 'outbound' %} text-white{% endif %}" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
     </div>
-    {% if message.text %}<div class="tg-chat-msg-body">{{ message.text|linebreaksbr }}</div>{% endif %}
+    {% if message.text %}<div class="tg-chat-msg-body{% if message.direction == 'outbound' %} text-white{% endif %}">{{ message.text|linebreaksbr }}</div>{% endif %}
     {% with attachments=message.attachments.all %}
     {% if attachments %}
     <ul class="tg-chat-attachments list-unstyled mb-0">
@@ -50,17 +63,69 @@
     </ul>
     {% endif %}
     {% endwith %}
-    <div class="tg-chat-msg-meta">
-        <span class="ad-pill ad-pill--muted">{{ message.get_delivery_status_display }}</span>
-        {% if message.origin %}<span class="ad-pill ad-pill--muted">{{ message.get_origin_display }}</span>{% endif %}
-        {% if message.direction == "outbound" and message.sender_user %}<span class="tg-chat-msg-sender">@{{ message.sender_user.username }}</span>{% endif %}
-        {% if message.sent_at %}<time class="tg-chat-msg-time" datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
+    {% if message.delivery_status == "unknown" %}
+    <div class="aw-alert aw-alert--warn mt-1" role="status">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <span>{{ delivery_unknown_label }}</span>
+    </div>
+    {% endif %}
+    <div class="tg-chat-msg-meta aw-msg-meta{% if message.direction == 'outbound' %} text-white{% endif %}">
+        {% include "partials/components/aw_status_pill.html" with status=message.delivery_status label=message.get_delivery_status_display %}
+        {% if message.origin %}{% include "partials/components/aw_status_pill.html" with status=message.origin label=message.get_origin_display %}{% endif %}
+        {% if message.direction == "outbound" and message.sender_user %}<span class="tg-chat-msg-sender{% if message.direction == 'outbound' %} text-white{% endif %}">@{{ message.sender_user.username }}</span>{% endif %}
+        {% if message.sent_at %}<time class="tg-chat-msg-time{% if message.direction == 'outbound' %} text-white{% endif %}" datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
         {% if message.delivery_error %}<span class="tg-chat-msg-error" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
-        {% if message.telegram_message_id and message.content_type != "digest" %}
-        <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.telegram_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        {% if message.content_type == "digest" %}
+        {% if message.resolved_at %}
+        {% if message.resolved_by %}
+        {% blocktranslate with admin=message.resolved_by.username asvar answered_by_label %}Answered by @{{ admin }}{% endblocktranslate %}
+        {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=answered_by_label %}
+        {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="green" label=answered_label %}{% endif %}
+        {% if message.resolution == "deleted" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_removed_label %}
+        {% elif message.resolution == "edited" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_edited_label %}
+        {% elif message.resolution == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_expired_label %}
+        {% elif message.resolution == "unavailable" %}{% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=alert_unavailable_label %}
+        {% elif message.resolution == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=alert_failed_label %}{% endif %}
+        {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=awaiting_reply_label %}
+        {% endif %}
+        {% endif %}
+        {% if message.direction == "inbound" and message.content_type != "digest" %}
+        {% if message.answered_at and message.answered_by %}
+        {% blocktranslate with admin=message.answered_by.username asvar inbound_answered_label %}Answered by @{{ admin }}{% endblocktranslate %}
+        {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=inbound_answered_label %}
+        {% else %}
+        {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=awaiting_reply_label %}
+        {% endif %}
+        {% endif %}
+        {% if message.telegram_deletion_status %}
+        {% if message.telegram_deletion_status == "deleted" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=deleted_from_telegram_label %}
+        {% elif message.telegram_deletion_status == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=deletion_expired_label %}
+        {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=deletion_failed_label %}{% endif %}
+        {% endif %}
+        {% if message.telegram_deleted_by %}<span class="tg-chat-msg-sender{% if message.direction == 'outbound' %} text-white{% endif %}">{% translate "Removed by" %} @{{ message.telegram_deleted_by.username }}</span>{% endif %}
+        {% if message.telegram_deletion_error %}<span class="tg-chat-msg-error">{{ message.telegram_deletion_error }}</span>{% endif %}
+        {% if message.direction == "inbound" and message.content_type != "digest" %}
+        <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        {% elif message.content_type == "digest" and message.source_message_id %}
+        <a class="tg-chat-reply-link" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.source_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><i class="fas fa-reply" aria-hidden="true"></i>{% translate "Reply" %}</a>
+        {% endif %}
+        {% if message.direction == "outbound" and message.delivery_status == "sent" and message.telegram_deletion_status != "deleted" and message.telegram_deletion_status != "expired" %}
+        {% if message.sender_user_id == request.user.pk or message.content_type == "digest" and message.telegram_chat_id == own_admin_chat_id %}
+        <form method="post"
+              action="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}"
+              hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}?fragment=panel"
+              hx-target="#telegram-chat-panel"
+              hx-swap="innerHTML"
+              class="ps-inline-form"
+              data-confirm-message="{% translate 'Delete this message from Telegram? The local conversation history will remain.' %}">
+            {% csrf_token %}
+            <button type="submit" class="tg-chat-reply-link aw-btn aw-btn--ghost aw-btn--sm{% if message.direction == 'outbound' %} text-white{% endif %}">{% translate "Delete from Telegram" %}</button>
+        </form>
+        {% endif %}
         {% endif %}
     </div>
 </li>
 {% empty %}
-{% if show_empty %}<li class="ad-empty"><i class="fas fa-inbox" aria-hidden="true"></i>{% translate "No messages yet." %}</li>{% endif %}
+{% if show_empty %}<li>{% include "partials/components/aw_empty.html" with icon="i-message" title=no_messages_label %}</li>{% endif %}
 {% endfor %}
+{% if oob_state %}</div>{% endif %}

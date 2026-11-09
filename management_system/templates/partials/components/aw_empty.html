@@ -1,0 +1,12 @@
+{% load i18n %}
+{# Canonical empty state. Optional: icon (sprite id), title, description, action_url, action_label. #}
+<div class="aw-empty">
+    <span class="aw-empty-icon">
+        <svg class="aw-ico" aria-hidden="true"><use href="#{{ icon|default:'i-file' }}"></use></svg>
+    </span>
+    {% if title %}<h4>{{ title }}</h4>{% endif %}
+    {% if description %}<p>{{ description }}</p>{% endif %}
+    {% if action_url and action_label %}
+    <a class="aw-btn aw-btn--sm{% if action_variant %} aw-btn--{{ action_variant }}{% endif %}" href="{{ action_url }}">{{ action_label }}</a>
+    {% endif %}
+</div>

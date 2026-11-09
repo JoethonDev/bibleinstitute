@@ -1,0 +1,90 @@
+﻿{% load i18n aw_ui %}
+{% comment %}
+Students table row template. One row per serialized user from
+User.serialize_pagination(); column indexes match the Students
+table_columns contract in views.user_dashboard.
+{% endcomment %}
+{% for values in page_obj %}
+<tr data-id="{{ values.id }}">
+    <td class="column-checkbox aw-cell-check">
+        <input type="checkbox"
+               class="form-check-input row-checkbox"
+               :value="'{{ values.id }}'"
+               x-model="selected"
+               @change="updateSelectAll()">
+    </td>
+    <td class="aw-cell-identity" x-show="columns[0].visible">
+        <div class="aw-cell-main">
+            {% include "partials/components/aw_avatar.html" with name=values.display_name tone="teal" %}
+            <div class="aw-cell-main-text">
+                <b><a href="{{ values.url }}"
+                      hx-get="{{ values.url }}"
+                      hx-target="#display-page"
+                      hx-select="#page-region"
+                      hx-swap="innerHTML"
+                      hx-push-url="true">{{ values.display_name }}</a></b>
+                <span>{{ values.username }}</span>
+            </div>
+        </div>
+    </td>
+    <td x-show="columns[1].visible">
+        {% include "partials/components/aw_status_pill.html" with status=values.application_status label=values.application_status_label %}
+        {% if not values.is_active %}<span class="aw-cell-sub">{% translate "Account inactive" %}</span>{% endif %}
+    </td>
+    <td x-show="columns[2].visible">
+        {% if values.study_mode_label %}{{ values.study_mode_label }}{% else %}<span class="aw-muted">-</span>{% endif %}
+    </td>
+    <td x-show="columns[3].visible">{{ values.role_label }}</td>
+    <td x-show="columns[4].visible" class="aw-date">{{ values.joined_date }}</td>
+    <td x-show="columns[5].visible" class="aw-date">
+        {% if values.last_login %}{{ values.last_login|date:"Y-m-d H:i" }}{% else %}<span class="aw-muted">-</span>{% endif %}
+    </td>
+    <td class="column-actions">
+        <div class="aw-row-actions">
+            <a class="aw-icon-btn" href="{{ values.url }}"
+               hx-get="{{ values.url }}"
+               hx-target="#display-page"
+               hx-select="#page-region"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               aria-label="{% translate 'View' %}" title="{% translate 'View' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+            </a>
+            <a class="aw-icon-btn" href="{% url 'student-overview' values.id %}"
+               hx-get="{% url 'student-overview' values.id %}"
+               hx-target="#display-page"
+               hx-select="#page-region"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               aria-label="{% translate 'Overview' %}" title="{% translate 'Overview' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+            </a>
+            <a class="aw-icon-btn" href="{{ values.url }}update/"
+               hx-get="{{ values.url }}update/"
+               hx-target="#display-page"
+               hx-select="#page-region"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               aria-label="{% translate 'Edit' %}" title="{% translate 'Edit' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+            </a>
+            <button class="aw-icon-btn" type="button"
+                    hx-delete="{{ values.url }}delete/"
+                    hx-swap="delete"
+                    hx-target="closest tr"
+                    hx-confirm="{% translate 'Are you sure you want to delete this item?' %}"
+                    hx-on::after:request="if (event.detail.ctx && event.detail.ctx.response && event.detail.ctx.response.status < 400 && window.Alpine && window.Alpine.store) { window.Alpine.store('notifications').add('{% translate "Item deleted successfully" %}', 'success'); }"
+                    aria-label="{% translate 'Delete' %}" title="{% translate 'Delete' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+            </button>
+        </div>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="7" class="aw-cell-empty">
+        {% translate "No records found matching your criteria." as students_empty_desc %}
+        {% include "partials/components/aw_empty.html" with icon="i-users" description=students_empty_desc %}
+    </td>
+</tr>
+{% endfor %}

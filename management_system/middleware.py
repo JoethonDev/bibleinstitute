@@ -247,7 +247,15 @@ def _log_request_outcome(context: dict, response, log) -> None:
         duration_ms = 0.0
     if status >= 500:
         context["event"] = "http_request_error"
-        log.error("server error")
+        exception_info = context.get("exception_info")
+        if exception_info:
+            log.error(
+                "server error",
+                exc_info=exception_info,
+                extra={"exception_type": exception_info[0].__name__},
+            )
+        else:
+            log.error("server error")
         return
     if status >= 400:
         if status == 404 and route == "unmatched":
@@ -393,6 +401,16 @@ class RequestObservabilityMiddleware:
                 _log_request_outcome(context, response, logger)
                 response["X-Request-ID"] = request_id
             _request_context.reset(token)
+
+    def process_exception(self, request, exception):
+        """Keep a safe traceback for the request's final 500 log record."""
+        context = _request_context.get()
+        if context:
+            context["exception_info"] = (
+                type(exception),
+                exception,
+                exception.__traceback__,
+            )
 
 class SessionExpiryUpdate:
     """Renew a browser session's 7-day lifetime at most once per rolling 24 hours.

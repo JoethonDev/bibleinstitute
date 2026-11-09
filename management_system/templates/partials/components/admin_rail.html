@@ -1,0 +1,43 @@
+{% load i18n aw_ui %}
+{# Desktop domain rail. #admin-sidebar is a preserved shell contract hook. #}
+<aside id="admin-sidebar" class="aw-rail" aria-label="{% translate 'Workspace domains' %}">
+    <a class="aw-rail-logo" href="{% url 'admin-panel' %}"
+       hx-get="{% url 'admin-panel' %}"
+       hx-target="#display-page"
+       hx-select="#page-region"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-select-oob="#aw-rail-nav,#aw-sidebar-body,#aw-mobile-nav,#aw-topbar-crumbs"
+       aria-label="{% translate 'Admin Panel' %}">
+        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 3.5c-4.6 0-8 3.1-8 7.2 0 2.6 1.5 4.7 3.7 5.8-2.6.8-4.7 2.7-4.7 5.3 0 3.9 3.9 6.7 9 6.7s9-2.8 9-6.7c0-2.6-2.1-4.5-4.7-5.3 2.2-1.1 3.7-3.2 3.7-5.8 0-4.1-3.4-7.2-8-7.2z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M16 8v15M12 12.5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+    </a>
+
+    {% include 'partials/components/admin_rail_nav.html' %}
+
+    <div class="aw-rail-foot">
+        <button type="button" class="aw-rail-link" data-open-palette
+                data-tip="{% translate 'Quick jump' %}" aria-label="{% translate 'Quick jump' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+        </button>
+        <button type="button" class="aw-rail-link" data-bs-toggle="modal"
+                data-bs-target="#shortcutsHelpModal"
+                data-tip="{% translate 'Keyboard shortcuts' %}" aria-label="{% translate 'Keyboard shortcuts' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-help"></use></svg>
+        </button>
+        <a class="aw-rail-link" href="{% url 'home' %}"
+           data-tip="{% translate 'Public Home' %}" aria-label="{% translate 'Public Home' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-globe"></use></svg>
+        </a>
+        {# Collapsing hides the contextual sidebar; this rail control restores it. #}
+        <button type="button" class="aw-rail-link" x-cloak
+                x-show="$store.ui.sidebarCollapsed"
+                @click="$store.ui.toggleSidebar()"
+                data-tip="{% translate 'Expand Sidebar' %}" aria-label="{% translate 'Expand Sidebar' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-columns"></use></svg>
+        </button>
+        <span class="aw-rail-avatar" aria-hidden="true">{{ request.user|aw_initials }}</span>
+    </div>
+</aside>

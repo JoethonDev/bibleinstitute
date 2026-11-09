@@ -1256,6 +1256,14 @@ body,
     padding: 2px 8px;
     font-weight: 600;
 }
+.quiz-badge-upcoming {
+    font-size: .72rem;
+    background: #d1ecf1;
+    color: #0c5460;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
 .quiz-badge-done {
     font-size: .72rem;
     background: #cce5ff;
@@ -1314,6 +1322,10 @@ body,
 [data-bs-theme="dark"] .quiz-badge-closed {
     background: rgba(108,117,125,.22);
     color: #adb5bd;
+}
+[data-bs-theme="dark"] .quiz-badge-upcoming {
+    background: rgba(13,202,240,.18);
+    color: #6edff6;
 }
 [data-bs-theme="dark"] .quiz-badge-done {
     background: rgba(13,110,253,.2);

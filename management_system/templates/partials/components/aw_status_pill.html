@@ -1,0 +1,11 @@
+{% load aw_ui %}
+{% comment %}
+Canonical label + tone pair. Label source order: the owning model display
+method passed in as `label`, a translated msgid passed in as `status`, and
+never a hardcoded English string in the page template.
+{% endcomment %}
+{% with status_value=status|default:label %}
+{% with tone_value=tone|default:status_value|aw_status_tone %}
+<span class="aw-pill aw-pill--{{ tone_value }}{% if plain %} aw-pill--plain{% endif %}{% if large %} aw-pill--lg{% endif %}">{{ label|default:status }}</span>
+{% endwith %}
+{% endwith %}

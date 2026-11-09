@@ -123,8 +123,10 @@
                                 <span class="sd-lesson-name flex-grow-1 text-truncate">{{ quiz.name }}</span>
                                 <!-- Status badge (Alpine-driven) -->
                                 <span x-show="$store.quizStatus.loaded" class="sd-lesson-dur">
-                                    <span x-show="$store.quizStatus.get({{ quiz.id }}) === 'exam'"
+                                    <span x-show="['exam', 'ready'].includes($store.quizStatus.get({{ quiz.id }}))"
                                           class="quiz-badge-open sd-pill sd-pill--open">{% translate "Open" %}</span>
+                                    <span x-show="$store.quizStatus.get({{ quiz.id }}) === 'upcoming'"
+                                          class="quiz-badge-upcoming sd-pill">{% translate "Upcoming" %}</span>
                                     <span x-show="$store.quizStatus.get({{ quiz.id }}) === 'view'"
                                           class="quiz-badge-done sd-pill sd-pill--done">{% translate "Done" %}</span>
                                     <span x-show="$store.quizStatus.get({{ quiz.id }}) === 'closed_unsolved'"

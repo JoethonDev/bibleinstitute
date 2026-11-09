@@ -1,0 +1,107 @@
+{% load i18n %}
+{% comment %}
+Telegram bot configuration workspace. Presentation only: the config POST form
+keeps its exact method, action, action values (save/activate/rotate/deactivate),
+csrf token, hx-* contract and the deactivate confirm message. The webhook URL,
+bot username and status remain the server-projected values; no token value is
+ever rendered.
+{% endcomment %}
+{% translate "Engagement" as page_eyebrow %}
+{% translate "Telegram Bot Configuration" as page_title %}
+<div id="content" class="aw-dashboard-page">
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+
+    <div class="aw-alert aw-alert--info" role="note">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+        <div>{% translate "The bot token is encrypted and never shown again after it is saved. Saving a token does not activate the bot." %}</div>
+    </div>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-server"></use></svg>
+                <h3>{% translate "Bot Status" %}</h3>
+            </div>
+            {% if config.is_active %}
+            {% include "partials/components/aw_status_pill.html" with status="active" tone="green" label=status_label %}
+            {% else %}
+            {% include "partials/components/aw_status_pill.html" with status="inactive" tone="muted" label=status_label %}
+            {% endif %}
+        </div>
+        <div class="aw-card-body">
+            <dl class="mb-0">
+                <div class="aw-kv">
+                    <dt>{% translate "Status" %}</dt>
+                    <dd>{{ status_label }}</dd>
+                </div>
+                {% if config.bot_username %}
+                <div class="aw-kv">
+                    <dt>{% translate "Bot Username" %}</dt>
+                    <dd dir="ltr">@{{ config.bot_username }}</dd>
+                </div>
+                {% endif %}
+                <div class="aw-kv">
+                    <dt>{% translate "Webhook URL" %}</dt>
+                    <dd dir="ltr">{{ webhook_url }}</dd>
+                </div>
+            </dl>
+            {% if config_error %}
+            <div class="aw-alert aw-alert--danger mt-3" role="alert">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                <div>{{ config_error }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
+                <h3>{% translate "Bot Token" %}</h3>
+            </div>
+        </div>
+        <form method="post" action="{% url 'telegram-config' %}" hx-post="{% url 'telegram-config' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+            {% csrf_token %}
+            <div class="aw-form-section">
+                {% if config_form.non_field_errors %}
+                <div class="aw-alert aw-alert--danger mb-3" role="alert">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                    <div>{{ config_form.non_field_errors }}</div>
+                </div>
+                {% endif %}
+
+                <div class="aw-form-grid">
+                    <div class="aw-field aw-span-2">
+                        <label for="{{ config_form.token.id_for_label }}">{% translate "Bot Token" %}</label>
+                        {{ config_form.token }}
+                        {% if config_form.token.errors %}<div class="aw-field-error">{{ config_form.token.errors }}</div>{% endif %}
+                        <span class="aw-field-hint">{% translate "Enter a new token to save or replace the current one. The saved token is encrypted and never displayed again." %}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="aw-form-actions">
+                {% if config.is_active %}
+                <button type="submit" name="action" value="rotate" class="aw-btn aw-btn--primary">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                    <span>{% translate "Rotate Token" %}</span>
+                </button>
+                <button type="submit" name="action" value="deactivate" class="aw-btn aw-btn--danger" hx-confirm="{% translate 'Are you sure?' %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                    <span>{% translate "Deactivate Bot" %}</span>
+                </button>
+                {% else %}
+                <button type="submit" name="action" value="save" class="aw-btn aw-btn--ghost">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
+                    <span>{% translate "Save Token" %}</span>
+                </button>
+                <button type="submit" name="action" value="activate" class="aw-btn aw-btn--primary">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-play"></use></svg>
+                    <span>{% translate "Activate Bot" %}</span>
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+</div>

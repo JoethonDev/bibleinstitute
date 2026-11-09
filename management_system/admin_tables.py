@@ -15,12 +15,21 @@ from typing import Any
 
 from django.core import signing
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
 
-from .models import Course, CourseOffering, Lesson, Level, Quiz, Role, User
+from .models import (
+    Course,
+    CourseOffering,
+    Lesson,
+    Level,
+    PublicationStatus,
+    Quiz,
+    Role,
+    User,
+)
 from .utils.search import normalized_contains_q, normalize_search_text
 from .utils.validators import parse_strict_bool
 
@@ -28,6 +37,11 @@ BULK_SELECTION_SALT = "bulk-table-selection"
 SELECTION_MAX_AGE_SECONDS = 3600
 MAX_EXPLICIT_SELECTION = 1000
 TABLE_VIEWS = ("user", "course", "lesson", "quiz")
+
+#: Account-state filter values accepted by the Students table. The account
+#: state is ``User.is_active``; it is deliberately separate from the
+#: application decision so "inactive" can never be read as "declined".
+USER_ACCOUNT_FILTERS = ("active", "inactive")
 
 
 def _clean_search(value: str | None) -> str:
@@ -41,19 +55,50 @@ def _int_or_none(value: Any) -> int | None:
         return None
 
 
+def _choice_code(value: Any, choices) -> str:
+    """Return the stored code for a submitted display label or raw code."""
+    raw = str(value or "").strip()[:64]
+    if not raw:
+        return ""
+    for code, label in choices:
+        if raw == code or raw == str(label):
+            return code
+    return ""
+
+
 def user_scope(request) -> dict[str, Any]:
-    """Normalize the user dashboard filters into a JSON-safe scope."""
+    """Normalize the user dashboard filters into a JSON-safe scope.
+
+    The scope is the single normalized description of the Students table
+    filters: search, role, application decision, study mode and account
+    state. Counts, ordering, SQL pagination, the signed bulk selection and
+    the CSV export consume this same dictionary.
+    """
     search = _clean_search(request.GET.get("name"))
     raw_role = str(request.GET.get("filtering") or "").strip()[:64]
     role_code = ""
     role_value = ""
     if raw_role:
         for code, label in Role.ROLES:
-            if raw_role == str(label):
+            if raw_role in (code, str(label)):
                 role_code = code
-                role_value = raw_role
+                role_value = str(label)
                 break
-    return {"search": search, "role": role_code, "role_value": role_value}
+    application_status = _choice_code(
+        request.GET.get("application_status"), User.APPLICATION_STATUSES
+    )
+    study_mode = _choice_code(request.GET.get("study_mode"), User.STUDY_MODES)
+    account = str(request.GET.get("account") or "").strip().lower()[:16]
+    if account not in USER_ACCOUNT_FILTERS:
+        account = ""
+    return {
+        "search": search,
+        "role": role_code,
+        "role_value": role_value,
+        "application_status": application_status,
+        "study_mode": study_mode,
+        "account": account,
+    }
 
 
 def user_queryset(scope: dict[str, Any]) -> QuerySet:
@@ -67,7 +112,46 @@ def user_queryset(scope: dict[str, Any]) -> QuerySet:
     role_code = str(scope.get("role") or "")
     if role_code:
         query &= Q(role__role=role_code)
-    return User.objects.filter(query)
+    application_status = str(scope.get("application_status") or "")
+    if application_status:
+        query &= Q(application_status=application_status)
+    study_mode = str(scope.get("study_mode") or "")
+    if study_mode:
+        query &= Q(study_mode=study_mode)
+    account = str(scope.get("account") or "")
+    if account == "active":
+        query &= Q(is_active=True)
+    elif account == "inactive":
+        query &= Q(is_active=False)
+    # select_related removes the per-row role lookup the table and CSV both do.
+    return User.objects.select_related("role").filter(query)
+
+
+def user_tab_counts(scope: dict[str, Any]) -> dict[str, Any]:
+    """Return the accurate filter-tab counts for the Students table.
+
+    Each dimension is counted against the same normalized scope with its own
+    filter removed, in one aggregate statement per dimension. This keeps the
+    tab counts equal to the destination list counts without loading rows.
+    """
+    application_base = user_queryset(
+        {**scope, "application_status": ""}
+    )
+    application_counts = application_base.aggregate(
+        total=Count("id"),
+        pending=Count("id", filter=Q(application_status="pending")),
+        active=Count("id", filter=Q(application_status="active")),
+        declined=Count("id", filter=Q(application_status="declined")),
+    )
+    account_base = user_queryset({**scope, "account": ""})
+    account_counts = account_base.aggregate(
+        active=Count("id", filter=Q(is_active=True)),
+        inactive=Count("id", filter=Q(is_active=False)),
+    )
+    return {
+        "application": application_counts,
+        "account": account_counts,
+    }
 
 
 def course_scope(request) -> dict[str, Any]:
@@ -78,9 +162,9 @@ def course_scope(request) -> dict[str, Any]:
     level_value = ""
     if raw_level:
         for level in Level.objects.order_by("ordering"):
-            if level.display_name == raw_level:
+            if raw_level in (str(level.ordering), level.display_name):
                 level_ordering = level.ordering
-                level_value = raw_level
+                level_value = level.display_name
                 break
     return {"search": search, "level": level_ordering, "level_value": level_value}
 
@@ -108,7 +192,30 @@ def content_scope(request, *, year_id: int) -> dict[str, Any]:
         academic_year_level__academic_year_id=year_id,
     ).exists():
         offering_id = None
-    return {"year": int(year_id), "search": search, "offering": offering_id}
+    status = str(request.GET.get("status") or "").strip()[:24]
+    if status not in PublicationStatus.values:
+        status = ""
+    return {
+        "year": int(year_id),
+        "search": search,
+        "offering": offering_id,
+        "status": status,
+    }
+
+
+def content_status_counts(view: str, scope: dict[str, Any]) -> dict[str, int]:
+    """Publication-status counts for the lesson/quiz tables.
+
+    One aggregate statement over the same normalized scope with the status
+    filter removed, so each tab count equals its filtered list count.
+    """
+    queryset = scope_queryset(view, {**scope, "status": ""})
+    return queryset.aggregate(
+        total=Count("id"),
+        draft=Count("id", filter=Q(status=PublicationStatus.DRAFT)),
+        published=Count("id", filter=Q(status=PublicationStatus.PUBLISHED)),
+        archived=Count("id", filter=Q(status=PublicationStatus.ARCHIVED)),
+    )
 
 
 def lesson_queryset(scope: dict[str, Any]) -> QuerySet:
@@ -119,6 +226,9 @@ def lesson_queryset(scope: dict[str, Any]) -> QuerySet:
     offering_id = _int_or_none(scope.get("offering"))
     if offering_id is not None:
         query &= Q(course_offering_id=offering_id)
+    status = str(scope.get("status") or "")
+    if status:
+        query &= Q(status=status)
     return Lesson.objects.filter(query)
 
 
@@ -133,6 +243,9 @@ def quiz_queryset(scope: dict[str, Any]) -> QuerySet:
     offering_id = _int_or_none(scope.get("offering"))
     if offering_id is not None:
         query &= Q(course_offering_id=offering_id)
+    status = str(scope.get("status") or "")
+    if status:
+        query &= Q(status=status)
     return Quiz.objects.filter(query)
 
 

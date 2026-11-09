@@ -1,0 +1,16 @@
+{% load i18n %}
+{% comment %}
+Top-bar breadcrumb trail: active domain and its active section. The id is a
+persistent HTMX OOB region so cross-domain navigation updates the crumb.
+{% endcomment %}
+<nav id="aw-topbar-crumbs" class="aw-crumbs" aria-label="{% translate 'Breadcrumb' %}">
+    {% if aw.active_domain %}
+    <a href="{% url aw.active_domain.sections.0.url_name %}">{{ aw.active_domain.label }}</a>
+    {% if aw.active_section and aw.active_section.key != aw.active_domain.sections.0.key %}
+    <span class="aw-crumb-sep" aria-hidden="true">/</span>
+    <span class="aw-crumb-current" aria-current="page">{{ aw.active_section.label }}</span>
+    {% endif %}
+    {% else %}
+    <span class="aw-crumb-current">{% translate "Admin Panel" %}</span>
+    {% endif %}
+</nav>

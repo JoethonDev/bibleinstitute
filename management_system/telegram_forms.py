@@ -58,7 +58,7 @@ class TelegramSupportReplyForm(forms.Form):
     A reply carries either text or one Telegram-supported file (JPEG/PNG photo,
     MP4 video, or PDF document). This is a trust-boundary validator only.
     View-layer admin authorization, conversation ownership of
-    ``reply_to_telegram_message_id``, and the shared claim/reply service belong
+    ``reply_to_message_id``, and the shared claim/reply service belong
     to ``management_system/telegram/support.py``.
     """
 
@@ -93,7 +93,7 @@ class TelegramSupportReplyForm(forms.Form):
             }
         ),
     )
-    reply_to_telegram_message_id = forms.IntegerField(
+    reply_to_message_id = forms.IntegerField(
         required=False,
         min_value=1,
         error_messages={

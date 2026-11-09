@@ -19,6 +19,7 @@ from .models import (
     ViewingSession,
 )
 from .utils.hls_parser import get_lesson_segments
+from .utils.lesson_access import lesson_is_available
 from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
 
 WATCH_SESSION_GAP = timedelta(minutes=10)
@@ -462,6 +463,8 @@ def apply_progress_heartbeat(
         raise ProgressHeartbeatError("forbidden", _("Session belongs to another user."))
     if timezone.now() >= session.expires_at:
         raise ProgressHeartbeatError("expired", _("Session expired."))
+    if not lesson_is_available(session.lesson):
+        raise ProgressHeartbeatError("forbidden", _("This lesson is not available yet."))
 
     def result(note=None) -> ProgressHeartbeatResult:
         current = LectureProgress.objects.filter(

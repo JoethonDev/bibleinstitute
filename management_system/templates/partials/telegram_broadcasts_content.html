@@ -1,0 +1,17 @@
+{% load i18n %}
+<div id="content" class="aw-dashboard-page">
+    {% translate "Engagement" as page_eyebrow %}
+    {% translate "Telegram Broadcasts" as page_title %}
+    {% translate "Announcements sent to every student of the active academic year through Telegram." as page_description %}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <a class="aw-btn aw-btn--primary" href="{{ compose_url }}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                <span>{% translate "Compose Broadcast" %}</span>
+            </a>
+        </div>
+    </div>
+
+    {% include 'partials/telegram_broadcast_list.html' %}
+</div>

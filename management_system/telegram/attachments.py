@@ -22,8 +22,10 @@ from django.utils.translation import gettext as _
 
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
 FILE_MAX_BYTES = 50 * 1024 * 1024
+AUDIO_MAX_BYTES = 20 * 1024 * 1024
+AUDIO_MAX_SECONDS = 300
 CAPTION_MAX_LENGTH = 1_024
-SUPPORT_ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.mp4,.pdf"
+SUPPORT_ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.mp4,.pdf,.ogg,.opus,.mp3,.m4a,.webm"
 
 # Inbound Telegram documents can carry any MIME type chosen by the sender.
 # Only these are safe to serve inline from the LMS origin; everything else is
@@ -59,10 +61,11 @@ _PHOTO_MIME_TYPES = {
 class SupportAttachmentSpec:
     """A validated outbound attachment ready for one Telegram send call."""
 
-    kind: str  # "photo" | "video" | "document"
+    kind: str  # "photo" | "video" | "document" | "voice" | "audio"
     mime_type: str
     filename: str
     size: int
+    duration_seconds: float | None = None
 
 
 def safe_filename(name: str, fallback: str) -> str:
@@ -131,7 +134,35 @@ def classify_attachment(*, filename: str, size: int, head: bytes) -> SupportAtta
             raise ValueError(_("The attachment content does not match its file type."))
         return SupportAttachmentSpec("document", "application/pdf", safe, size)
 
-    raise ValueError(_("The attachment must be a JPEG, PNG, MP4, or PDF file."))
+    if extension in {".ogg", ".opus"}:
+        if size > AUDIO_MAX_BYTES:
+            raise ValueError(_("Audio files must be 20 MB or smaller."))
+        if not _is_ogg(head):
+            raise ValueError(_("The attachment content does not match its file type."))
+        return SupportAttachmentSpec("voice", "audio/ogg", safe, size)
+
+    if extension == ".mp3":
+        if size > AUDIO_MAX_BYTES:
+            raise ValueError(_("Audio files must be 20 MB or smaller."))
+        if not _is_mp3(head):
+            raise ValueError(_("The attachment content does not match its file type."))
+        return SupportAttachmentSpec("audio", "audio/mpeg", safe, size)
+
+    if extension == ".m4a":
+        if size > AUDIO_MAX_BYTES:
+            raise ValueError(_("Audio files must be 20 MB or smaller."))
+        if not _is_m4a(head):
+            raise ValueError(_("The attachment content does not match its file type."))
+        return SupportAttachmentSpec("audio", "audio/mp4", safe, size)
+
+    if extension == ".webm":
+        if size > AUDIO_MAX_BYTES:
+            raise ValueError(_("Audio files must be 20 MB or smaller."))
+        if not _is_webm(head):
+            raise ValueError(_("The attachment content does not match its file type."))
+        return SupportAttachmentSpec("document", "audio/webm", safe, size)
+
+    raise ValueError(_("The attachment must be a JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM file."))
 
 
 def _extension(filename: str) -> str:
@@ -154,3 +185,19 @@ def _is_pdf(head: bytes) -> bool:
 
 def _is_mp4(head: bytes) -> bool:
     return len(head) >= 12 and bytes(head[4:8]) == b"ftyp"
+
+
+def _is_ogg(head: bytes) -> bool:
+    return bytes(head[:4]) == b"OggS"
+
+
+def _is_mp3(head: bytes) -> bool:
+    return bytes(head[:3]) == b"ID3" or (len(head) >= 2 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0)
+
+
+def _is_m4a(head: bytes) -> bool:
+    return len(head) >= 12 and bytes(head[4:8]) == b"ftyp"
+
+
+def _is_webm(head: bytes) -> bool:
+    return bytes(head[:4]) == b"\x1aE\xdf\xa3"

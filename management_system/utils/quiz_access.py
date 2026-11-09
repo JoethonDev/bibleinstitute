@@ -1,13 +1,12 @@
-from datetime import timedelta
+from datetime import datetime
+
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.utils.translation import gettext_lazy as _
 
-from ..models import Enrollment, Grade, QuizStudentOpening, User
+from ..models import Enrollment, Grade, Quiz, QuizStudentOpening, User
 from .timezones import ensure_aware
-
-
-QUIZ_SUBMISSION_GRACE = timedelta(minutes=30)
 
 
 def eligible_quiz_students(quiz):
@@ -42,6 +41,11 @@ def quiz_window(quiz, user=None):
     return quiz.opening_date, quiz.closing_date
 
 
+def quiz_window_is_open(opening_date: datetime, closing_date: datetime, current_time: datetime) -> bool:
+    current_time = ensure_aware(current_time)
+    return ensure_aware(opening_date) <= current_time < ensure_aware(closing_date)
+
+
 def quiz_status_from(quiz, grade, opening, current_time, can_write):
     """Canonical quiz-mode decision for one quiz with grade/opening pre-loaded.
 
@@ -53,15 +57,28 @@ def quiz_status_from(quiz, grade, opening, current_time, can_write):
 
     opening_date = opening.opening_date if opening is not None else quiz.opening_date
     closing_date = opening.closing_date if opening is not None else quiz.closing_date
-    if (
-        can_write
-        and ensure_aware(opening_date)
-        <= current_time
-        <= ensure_aware(closing_date) + QUIZ_SUBMISSION_GRACE
-    ):
+    if current_time < ensure_aware(opening_date):
+        return "upcoming", None
+    if not can_write:
+        return "closed_unsolved", None
+    if quiz_window_is_open(opening_date, closing_date, current_time):
         return "exam", None
 
     return "closed_unsolved", None
+
+
+def quiz_attempt_status_from(quiz, grade, opening, current_time, can_write, snapshot=None):
+    """Resolve one student-facing state, including the server-owned attempt."""
+    mode, grade = quiz_status_from(quiz, grade, opening, current_time, can_write)
+    if grade is not None or not can_write or mode != "exam":
+        return mode, grade
+    if snapshot is not None:
+        if ensure_aware(snapshot.deadline_at) <= ensure_aware(current_time):
+            return "closed_unsolved", None
+        return "exam", None
+    if mode == "exam":
+        return "ready", None
+    return mode, None
 
 
 def answers_releasable(grade: Grade | None) -> bool:
@@ -76,7 +93,12 @@ def answers_releasable(grade: Grade | None) -> bool:
     return grade is not None
 
 
+@transaction.atomic
 def grant_quiz_openings(quiz, students, opening_date, closing_date, granted_by) -> int:
+    # Attempt creation locks this same row before reading per-student windows.
+    quiz = Quiz.objects.select_for_update(of=("self",)).select_related(
+        "course_offering",
+    ).get(pk=quiz.pk)
     if closing_date <= opening_date:
         raise ValidationError({"closing_date": _("Closing date must be after opening date.")})
 

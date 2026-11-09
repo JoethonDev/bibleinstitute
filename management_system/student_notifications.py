@@ -26,9 +26,8 @@ from .models import (
     TelegramNotificationDelivery,
     User,
 )
-from .telegram.navigation import format_lesson, website_url
 from .telegram.recipients import eligible_student_queryset
-from .utils.timezones import ensure_aware, format_user_datetime
+from .utils.timezones import ensure_aware, format_human_datetime, timezone_name
 
 logger = logging.getLogger(__name__)
 
@@ -130,15 +129,17 @@ def eligible_student_offering_pairs(
     }
 
 
-def _telegram_account_ids_for_offering(offering) -> dict[int, int]:
-    """Return linked Telegram accounts for the same authorized offering scope."""
-    return dict(
-        eligible_student_queryset(
+def _telegram_account_ids_for_offering(offering) -> dict[int, tuple[int, int]]:
+    """Return each linked account ID and chat ID for the authorized offering scope."""
+    return {
+        student_id: (account_id, chat_id)
+        for student_id, account_id, chat_id in eligible_student_queryset(
             academic_year_id=offering.academic_year_level.academic_year_id,
             academic_year_level_id=offering.academic_year_level_id,
             course_offering_id=offering.pk,
-        ).values_list("pk", "telegram_account__pk")
-    )
+        ).values_list("pk", "telegram_account__pk", "telegram_account__telegram_chat_id")
+        if account_id is not None and chat_id is not None
+    }
 
 
 def _datetime_key(value: datetime) -> str:
@@ -156,52 +157,66 @@ def _quiz_snapshot_body(quiz: Quiz, user: User, opening: datetime, closing: date
     if quiz.quiz_type:
         quiz_type_name = quiz.quiz_type.name_ar if language == "ar" else quiz.quiz_type.name_en
     lines = [
-        _("Course: %(name)s") % {"name": quiz.course_offering.course.name},
-        _("Exam: %(name)s") % {"name": quiz.name},
+        _("Opens: %(date)s") % {"date": format_human_datetime(opening, user)},
+        _("Closes: %(date)s") % {"date": format_human_datetime(closing, user)},
+        _("Time zone: %(name)s") % {"name": timezone_name(user)},
+        _("Allowed time: up to %(minutes)s minutes after starting.") % {
+            "minutes": quiz.duration_minutes,
+        },
+        _("Your attempt ends at closing if that comes first."),
+        _("Open the exam to view instructions and start."),
         _("Type: %(type)s") % {"type": quiz_type_name or _("Unassigned")},
         _("Total grade: %(grade)s") % {"grade": quiz.total_grade},
-        _("Opens: %(date)s") % {"date": format_user_datetime(opening, user, "%d/%m/%Y %H:%M")},
-        _("Closes: %(date)s") % {"date": format_user_datetime(closing, user, "%d/%m/%Y %H:%M")},
     ]
-    link = website_url("quiz-details", [quiz.course_offering_id, quiz.pk])
-    if link:
-        lines.append(_("Open exam on the website: %(link)s") % {"link": link})
     return "\n".join(lines)
 
 
-def _lesson_snapshot_body(lesson: Lesson, language: str) -> str:
-    """English/lesson body snapshot for a publication event.
-
-    Lesson and course names are stored unlocalized, so the body uses the
-    current UI language labels and includes the HTTPS access link, keeping the
-    same semantic message as the Arabic snapshot.
-    """
-    lines = [
-        _("Course: %(name)s") % {"name": lesson.course_offering.course.name},
-        _("Lesson: %(name)s") % {"name": lesson.name},
-    ]
-    link = website_url("lesson-details", [lesson.course_offering_id, lesson.pk])
-    if link:
-        lines.append(_("Open the lesson on the website: %(link)s") % {"link": link})
+def _lesson_snapshot_body(lesson: Lesson, user: User) -> str:
+    """Build concise lesson timing and action text for in-app and push use."""
+    lines = []
+    if lesson.opening_date is not None:
+        lines.append(_("Available from: %(date)s") % {
+            "date": format_human_datetime(lesson.opening_date, user),
+        })
+        lines.append(_("Time zone: %(name)s") % {"name": timezone_name(user)})
+    else:
+        lines.append(_("This lesson is available now."))
+    lines.append(_("Open the lesson to view its content."))
     return "\n".join(lines)
 
 
 def _snapshot(event_type: str, source, user: User, opening: datetime | None, closing: datetime | None) -> tuple[str, str, str, str]:
     if event_type == StudentNotification.NotificationType.LESSON_PUBLISHED:
         with translation.override("ar"):
-            title_ar = _("Lesson published")
-            body_ar = format_lesson(source, False, user)
+            title_ar = _("Lesson available: %(course)s - %(name)s") % {
+                "course": source.course_offering.course.name,
+                "name": source.name,
+            }
+            body_ar = _lesson_snapshot_body(source, user)
         with translation.override("en"):
-            title_en = _("Lesson published")
-            body_en = _lesson_snapshot_body(source, "en")
+            title_en = _("Lesson available: %(course)s - %(name)s") % {
+                "course": source.course_offering.course.name,
+                "name": source.name,
+            }
+            body_en = _lesson_snapshot_body(source, user)
+        title_ar = title_ar[:255]
+        title_en = title_en[:255]
         return title_ar, body_ar, title_en, body_en
 
     with translation.override("ar"):
-        title_ar = _("Exam opening")
+        title_ar = _("Exam available: %(course)s - %(name)s") % {
+            "course": source.course_offering.course.name,
+            "name": source.name,
+        }
         body_ar = _quiz_snapshot_body(source, user, opening, closing, "ar")
     with translation.override("en"):
-        title_en = _("Exam opening")
+        title_en = _("Exam available: %(course)s - %(name)s") % {
+            "course": source.course_offering.course.name,
+            "name": source.name,
+        }
         body_en = _quiz_snapshot_body(source, user, opening, closing, "en")
+    title_ar = title_ar[:255]
+    title_en = title_en[:255]
     return title_ar, body_ar, title_en, body_en
 
 
@@ -210,7 +225,7 @@ def _persist_event_batch(
     source,
     event_type: str,
     specs: list[tuple[User, str, datetime | None, datetime | None]],
-    telegram_account_ids: dict[int, int],
+    telegram_account_ids: dict[int, tuple[int, int]],
 ) -> tuple[int, bool]:
     if not specs:
         return 0, False
@@ -258,16 +273,18 @@ def _persist_event_batch(
 
     telegram_rows = []
     for user, event_key, opening, _closing in specs:
-        account_id = telegram_account_ids.get(user.pk)
+        account = telegram_account_ids.get(user.pk)
         notification = persisted.get(event_key)
-        if account_id is None or notification is None:
+        if account is None or notification is None:
             continue
+        account_id, chat_id = account
         telegram_rows.append(
             TelegramNotificationDelivery(
                 idempotency_key=event_key,
                 notification_type=event_type,
                 user_id=user.pk,
                 telegram_account_id=account_id,
+                telegram_chat_id=chat_id,
                 student_notification_id=notification.pk,
                 lesson_id=source.pk if is_lesson else None,
                 quiz_id=None if is_lesson else source.pk,
@@ -295,7 +312,7 @@ def _persist_event_specs(
     source,
     event_type: str,
     specs: Iterable[tuple[User, str, datetime | None, datetime | None]],
-    telegram_account_ids: dict[int, int],
+    telegram_account_ids: dict[int, tuple[int, int]],
 ) -> int:
     created = 0
     has_telegram_rows = False
@@ -344,7 +361,7 @@ def create_lesson_publication_event(lesson: Lesson) -> int:
         (
             user,
             f"lesson:{lesson.pk}:user:{user.pk}:publication:{lesson.publication_event_version or lesson.updated_date.isoformat()}",
-            None,
+            lesson.opening_date,
             None,
         )
         for user in _eligible_students_for_offering(offering).iterator(
@@ -369,6 +386,45 @@ def create_lesson_publication_event(lesson: Lesson) -> int:
             },
         )
     return created
+
+
+def cancel_future_lesson_publication_events(lesson: Lesson) -> int:
+    """Cancel not-yet-delivered lesson events when a published schedule changes."""
+    cancellation_time = timezone.now()
+    stale_notifications = StudentNotification.objects.filter(
+        lesson_id=lesson.pk,
+        cancelled_at__isnull=True,
+        scheduled_for__gt=cancellation_time,
+    )
+    stale_ids = Subquery(stale_notifications.values("pk"))
+    TelegramNotificationDelivery.objects.filter(
+        student_notification_id__in=stale_ids,
+        status=TelegramNotificationDelivery.Status.QUEUED,
+    ).update(
+        status=TelegramNotificationDelivery.Status.SKIPPED,
+        last_error=_("Superseded by a newer lesson availability time."),
+        updated_at=cancellation_time,
+    )
+    PushDelivery.objects.filter(
+        notification_id__in=stale_ids,
+        status=PushDelivery.Status.QUEUED,
+    ).update(
+        status=PushDelivery.Status.SKIPPED,
+        error_code="notification_cancelled",
+        error_message="The academic notification was cancelled.",
+        next_attempt_at=cancellation_time,
+        updated_at=cancellation_time,
+    )
+    cancelled = stale_notifications.update(
+        cancelled_at=cancellation_time,
+        updated_at=cancellation_time,
+    )
+    if cancelled:
+        logger.info(
+            "future lesson events cancelled",
+            extra={"event": "lesson_events_cancelled", "lesson_id": lesson.pk, "count": cancelled},
+        )
+    return cancelled
 
 
 def cancel_future_quiz_opening_events(quiz: Quiz) -> int:
@@ -445,7 +501,7 @@ def schedule_quiz_opening_events(quiz: Quiz, *, locked: bool = False) -> int:
             window_key = f"{_datetime_key(opening)}:{_datetime_key(closing)}"
             yield (
                 user,
-                f"quiz:{quiz.pk}:user:{user.pk}:window:{window_key}",
+                f"quiz:{quiz.pk}:user:{user.pk}:publication:{quiz.publication_event_version}:window:{window_key}",
                 opening,
                 closing,
             )

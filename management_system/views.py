@@ -3,11 +3,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404, HttpRequest, HttpResponse, FileResponse, JsonResponse, StreamingHttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy
 from django.utils import translation
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import views, update_session_auth_hash
-from django.db.models import Avg, Case, Count, IntegerField, Prefetch, Q, Sum, When
+from django.db.models import Case, Count, IntegerField, Prefetch, Q, Sum, When
 from django.db import IntegrityError, transaction
 from django.contrib import messages
 from django.contrib.messages import success, error
@@ -34,7 +34,6 @@ from urllib.parse import quote, urlencode
 
 # Third Party
 from logging import getLogger
-import boto3
 import json
 import re
 import os
@@ -62,9 +61,12 @@ from .grade_matrix import (
 )
 from .quiz_grading import regrade_quiz_submissions
 from .tasks import recalculate_quizzes_task
-from .models import QuizAnswerSnapshot, QuizOperationJob
-from .utils.quiz_access import QUIZ_SUBMISSION_GRACE
-from .quiz_attempts import submit_answers, save_snapshot, reconcile_snapshots
+from .quiz_attempts import (
+    reconcile_snapshots,
+    quiz_snapshot_result,
+    start_quiz_attempt,
+    submit_answers,
+)
 from .attendance_matrix import (
     ATTENDANCE_MATRIX_PAGE_SIZE,
     ATTENDANCE_MATRIX_STATUS_VALUES,
@@ -81,18 +83,19 @@ from .application_analytics import (
 from .utils.reports import build_report_page_rows, iter_report_data, report_enrollments
 from .utils.student_data import student_course_progress_data, student_next_actions
 from .command_palette import PALETTE_TYPES, palette_results
+from .admin_today import build_today_context
 from .student_overview import build_student_overview
 from .content_qa import qa_counts, qa_samples
 from .utils.r2_filters import FileFilterConfig, filter_preset_choices, get_filter_preset
 from .utils.r2_manager import R2Manager
-from .utils.cloudflare_provider import CloudflareR2Client
+from .storage_clients import CLOUD_CLIENT, bucket_name, cloudflare_client
 from .utils.file_validator import (
     downloadable_audio_key,
     validate_downloadable_audio_key,
     validate_hls_object_key,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, generate_unique_url, get_r2_client
-from .utils.helpers import build_scan_url, render_dashboard, select_content_academic_year, unpack_quiz_form, get_student_quiz_status, get_student_quiz_status_map, is_quiz_in_user_window, is_quiz_open, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, render_page
+from .utils.helpers import build_scan_url, render_dashboard, select_content_academic_year, unpack_quiz_form, get_student_quiz_status, get_student_quiz_status_map, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, is_htmx, render_page
 from .utils.decorators import ajax_login_required, capability_required, can_manage_content, can_delete_content, can_grade, can_view_reports, can_manage_applications, can_manage_academic_setup, can_scan_attendance, can_correct_attendance
 from .utils.email import send_application_received, send_application_status_notification
 from .progress_activity import (
@@ -130,20 +133,28 @@ from .utils.attendance import (
     attendance_scan_availability,
     is_expected_date,
 )
-from .utils.timezones import parse_application_datetime, ensure_aware, format_user_datetime
+from .utils.timezones import (
+    parse_application_datetime,
+    format_human_datetime,
+    timezone_name,
+)
+from .utils.lesson_access import lesson_is_available
 from .utils.validators import normalize_username, parse_strict_bool
 from .utils.search import normalize_search_text, normalized_contains_q
+from .admin_navigation import quick_create_actions_for
 from .admin_tables import (
     load_selection_token,
     MAX_EXPLICIT_SELECTION,
     bulk_delete_records,
     content_scope,
+    content_status_counts,
     course_queryset,
     course_scope,
     lesson_queryset,
     quiz_queryset,
     user_queryset,
     user_scope,
+    user_tab_counts,
 )
 from .utils.quiz_access import answers_releasable, grant_quiz_openings, quiz_window
 from .quiz_questions import MAX_QUESTIONS, build_question_instance
@@ -259,6 +270,7 @@ from .media_storage import (
 from .telegram.linking import TelegramLinkError, current_telegram_link
 from .student_notifications import (
     cancel_future_quiz_opening_events,
+    cancel_future_lesson_publication_events,
     create_lesson_publication_event,
     schedule_quiz_opening_events,
 )
@@ -273,22 +285,13 @@ import qrcode
 # Django
 from django.core.paginator import Paginator
 
+from .admin_operations import create_admin_operation, enqueue_admin_operation
+from django.http import QueryDict
+
+
 # Constants
 LOGIN_URL = reverse_lazy("user_login")
 logger = getLogger(__name__)
-CLOUD_CLIENT = boto3.client(
-    's3',
-    endpoint_url=getattr(settings, "R2_ENDPOINT_URL", None),
-    aws_access_key_id=getattr(settings, "R2_ACCESS_KEY_ID", None),
-    aws_secret_access_key=getattr(settings, "R2_SECRET_ACCESS_KEY", None),
-    region_name='auto'
-)
-
-bucket_name = getattr(settings, "R2_BUCKET_NAME", "")
-
-cf_account_id = getattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
-cf_api_token = getattr(settings, "CLOUDFLARE_API_TOKEN", "")
-cloudflare_client = CloudflareR2Client(cf_account_id, cf_api_token) if cf_account_id and cf_api_token else None
 
 PromotionRuleFormSet = formset_factory(PromotionRuleForm, extra=0, can_delete=True)
 
@@ -483,10 +486,27 @@ class FormBase(AdminPermissionView, FormView):
         context["object_id"] = self.object.pk if self.object else 'new'
         return context
 
+    def render_to_response(self, context, **response_kwargs):
+        """Return the page-region fragment for HTMX form navigation.
+
+        Direct requests keep the full shell; HTMX page navigation and invalid
+        bound forms return the #page-region wrapper so the shell is not
+        re-rendered and bound values/errors stay at the page root.
+        """
+        if not is_htmx(self.request):
+            return super().render_to_response(context, **response_kwargs)
+        return render_page(
+            self.request,
+            self.get_template_names()[0],
+            "partials/dashboard_form_content.html",
+            context,
+            status=response_kwargs.get("status", 200),
+        )
+
 class UserBaseView(FormBase):
     model = User
     pk_url_kwarg = "user_id"
-    view_name = _("user") # Translate view_name
+    view_name = gettext_lazy("user")
     view_slug = "user"
 
     def dispatch(self, request, *args, **kwargs):
@@ -497,20 +517,20 @@ class UserBaseView(FormBase):
 class CourseBaseView(FormBase):
     model = Course
     pk_url_kwarg = "course_id"
-    view_name = _("course") # Translate view_name
+    view_name = gettext_lazy("course")
     view_slug = "course"
     form_class = CourseForm
 
 class LessonBaseView(FormBase):
     model = Lesson
     pk_url_kwarg = "lesson_id"
-    view_name = _("lesson") # Translate view_name
+    view_name = gettext_lazy("lesson")
     view_slug = "lesson"
 
 class QuizBaseView(FormBase):
     model = Quiz
     pk_url_kwarg = "quiz_id"
-    view_name = _("quiz") # Translate view_name
+    view_name = gettext_lazy("quiz")
     view_slug = "quiz"
 
 # # Create your views here.
@@ -635,16 +655,10 @@ class ProfileDetail(LoginProtection, DetailView):
                 "course__name",
             )
         offerings = list(offerings)
-        offering_ids = [offering.pk for offering in offerings]
         course_progress = student_course_progress_data(
             user,
             offerings,
             include_unpublished=management_preview,
-            attendance_policy=(
-                AttendancePolicy.load()
-                if offering_ids and user.study_mode != "online"
-                else None
-            ),
         )
 
         for offering in offerings:
@@ -818,6 +832,8 @@ def view_lesson_details(request, offering_id, lesson_id):
     if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
         raise PermissionDenied(_("You do not have access to this lesson."))
     management_preview = user_has_management_role(user)
+    if not management_preview and not lesson_is_available(lesson):
+        raise PermissionDenied(_("This lesson is not available yet."))
     lesson_links = json.loads(lesson.links)
     context = {
         "offering": offering,
@@ -883,6 +899,21 @@ def stream_lesson(request, offering_id, lesson_id, file_index):
     
 
 @login_required(login_url=LOGIN_URL)
+@require_POST
+def quiz_start(request, offering_id: int, quiz_id: int) -> HttpResponse:
+    user = User.objects.get(pk=request.user.pk)
+    offering = get_accessible_offering_or_403(user, offering_id, write=True)
+    quiz = get_object_or_404(
+        Quiz,
+        pk=quiz_id,
+        course_offering=offering,
+        status=PublicationStatus.PUBLISHED,
+    )
+    start_quiz_attempt(quiz.pk, user)
+    return redirect("quiz-details", offering_id=offering.pk, quiz_id=quiz.pk)
+
+
+@login_required(login_url=LOGIN_URL)
 def take_exam(request, offering_id, quiz_id, *, allow_management=False):
     preview_requested = request.GET.get("preview") == "1"
     if request.method == "POST" and preview_requested:
@@ -909,12 +940,15 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
         quiz = get_object_or_404(Quiz, **quiz_filters)
 
         submission_datetime = now()
-        # Quiz can be submitted from opening time through the 30-minute closing buffer
-        can_submit = is_quiz_open(quiz, submission_datetime, user)
-        _effective_opening_date, effective_closing_date = quiz_window(quiz, user)
+        effective_opening_date, effective_closing_date = quiz_window(quiz, user)
+        quiz_mode, grade, snapshot = get_student_quiz_status(quiz, user, submission_datetime)
+        if not preview_requested and not user_has_management_role(user) and grade is None:
+            if snapshot is not None and snapshot.deadline_at <= submission_datetime:
+                reconcile_snapshots(quiz.pk, user_id=user.pk)
+                grade = Grade.objects.filter(quiz=quiz, user=user).first()
+                snapshot = None
+                quiz_mode = "view" if grade is not None else "closed_unsolved"
 
-        # Check if user has previously taken this quiz
-        quiz_mode, grade = get_student_quiz_status(quiz, user, submission_datetime)
         total_grade = grade.total_grade if grade else 0
 
         if request.method == "GET":
@@ -933,6 +967,8 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             elif quiz_mode == "exam":
                 quiz_mode = "exam"
                 query_set = Question.objects.filter(quiz_id=quiz_id)
+            elif quiz_mode in {"ready", "upcoming"}:
+                query_set = Question.objects.none()
             else:
                 # Quiz is closed or re-opened for a newer cohort; student never submitted
                 quiz_mode = "closed_unsolved"
@@ -963,11 +999,14 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                             q.pop("answer_payload", None)
                             q.pop("answer_payload_json", None)
 
-            snapshot = QuizAnswerSnapshot.objects.filter(quiz=quiz, user=user).first() if not preview_requested and not grade else None
+            active_snapshot = snapshot if quiz_mode == "exam" else None
+            server_time = now()
             return render(request, "display_quiz.html", {
-                "snapshot_data": {"answers": snapshot.answers if snapshot else {}, "revision": snapshot.revision if snapshot else 0},
+                "snapshot_data": {
+                    "answers": active_snapshot.answers if active_snapshot else {},
+                    "revision": active_snapshot.revision if active_snapshot else 0,
+                },
                 "snapshot_url": reverse("quiz-snapshot", args=[offering_id, quiz_id]),
-                "snapshot_reconcile": bool(snapshot and quiz_mode == "closed_unsolved" and now() > ensure_aware(effective_closing_date) + QUIZ_SUBMISSION_GRACE),
                 "quiz_name": quiz.name,
                 "username": request.user.username,
                 "questions": questions,
@@ -976,20 +1015,19 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "extended_view": "base.html",
                 "id": "container",
                 "total_grade": total_grade,
-                "closing_date": ensure_aware(effective_closing_date).timestamp(),
+                "attempt_deadline": active_snapshot.deadline_at.timestamp() if active_snapshot else None,
+                "server_now_ms": int(server_time.timestamp() * 1000),
+                "quiz_duration_minutes": quiz.duration_minutes,
                 "exam_taken": True if grade else False,
                 "back_url": reverse("quiz-view", args=[quiz_id]) if preview_requested else reverse("course-details", args=[offering_id]),
-                "quiz_closing_date_str": format_user_datetime(effective_closing_date, user, "%d/%m/%Y %H:%M"),
+                "quiz_opening_date_str": format_human_datetime(effective_opening_date, user),
+                "quiz_closing_date_str": format_human_datetime(effective_closing_date, user),
+                "quiz_start_url": reverse("quiz-start", args=[offering_id, quiz_id]),
             })
         
         elif request.method == "POST":
             # Prevent another submission
             if not grade:
-                # Guard: reject if quiz is no longer submittable
-                if not can_submit or not is_quiz_in_user_window(quiz, user):
-                    # Send back to main page with error message TODO
-                    return HttpResponse(_("Invalid Request, submission is closed!")) # Translate
-                
                 questions_data, not_used = unpack_quiz_form(request.POST)
                 try:
                     answers = {str(data["id"]): data.get("answer", "") for data in questions_data.values()}
@@ -1030,15 +1068,7 @@ def quiz_snapshot(request, offering_id, quiz_id):
         reconcile = payload.get("reconcile") is True
         offering = get_accessible_offering_or_403(request.user, offering_id, write=not reconcile)
         quiz = get_object_or_404(Quiz, pk=quiz_id, course_offering=offering, status=PublicationStatus.PUBLISHED)
-        if reconcile:
-            count, _more = reconcile_snapshots(quiz.pk, user_id=request.user.pk)
-            submitted = Grade.objects.filter(quiz=quiz, user=request.user).exists()
-            return JsonResponse({"submitted": submitted})
-        revision = payload.get("revision")
-        if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
-            raise ValueError
-        snapshot = save_snapshot(quiz.pk, request.user, payload.get("answers"), revision)
-        return JsonResponse({"submitted": snapshot is None, "revision": snapshot.revision if snapshot else 0})
+        return JsonResponse(quiz_snapshot_result(quiz=quiz, user=request.user, payload=payload))
     except ValidationError as exc:
         return JsonResponse({"error": "; ".join(exc.messages)}, status=409 if getattr(exc, "code", None) == "snapshot_conflict" else 400)
     except (ValueError, TypeError, UnicodeDecodeError):
@@ -1071,122 +1101,31 @@ def _admin_panel_store_context(cache_key: str, context: dict) -> None:
         logger.warning("admin dashboard cache write failed", extra={"event": "admin_dashboard_cache_error"})
 
 
-@capability_required(can_manage_content)
-def admin_panel(request):
-    today = timezone.now().date()
-    cache_key = _admin_panel_cache_key(today)
-    cached_context = _admin_panel_cached_context(cache_key)
-    if cached_context is not None:
-        return render(request, "admin_panel.html", cached_context)
+def _build_admin_panel_shared_context(today):
+    """Shared, actor-independent Today aggregates.
 
-    first_of_month = today.replace(day=1)
-    week_ago = today - timedelta(days=7)
-
-    # ====== 1. USER ANALYTICS ======
+    These are population-wide read aggregates with no actor-owned rows, so
+    they stay behind the short shared cache. Actor-scoped queues are built
+    fresh per request by ``admin_today.build_today_context``.
+    """
     users_total = User.objects.count()
-
-    users_by_role = list(
-        User.objects.values('role__role').annotate(count=Count('id'))
-    )
-    users_by_app_status = list(
-        User.objects.values('application_status').annotate(count=Count('id'))
-    )
-    users_by_study_mode = list(
-        User.objects.values('study_mode').annotate(count=Count('id'))
-    )
-
-    new_users_month = User.objects.filter(joined_date__gte=first_of_month).count()
-    new_users_week = User.objects.filter(joined_date__gte=week_ago).count()
-
-    top_cities = list(
-        User.objects.values('city')
-        .annotate(count=Count('id'))
-        .filter(city__isnull=False)
-        .exclude(city='')
-        .order_by('-count')[:10]
-    )
-
-    # ====== 2. COURSE & LESSON ANALYTICS ======
     courses_total = Course.objects.count()
-    courses_by_level = list(
-        Course.objects.values('level__ordering').annotate(count=Count('id')).order_by('level__ordering')
-    )
-
     lessons_total = Lesson.objects.count()
-    lessons_by_status = list(
-        Lesson.objects.values('status').annotate(count=Count('id'))
-    )
-    avg_lessons_per_course = round(lessons_total / courses_total, 1) if courses_total else 0
-
-    # ====== 3. OFFERING & ACADEMIC YEAR ANALYTICS ======
+    quizzes_total = Quiz.objects.count()
     offerings_total = CourseOffering.objects.count()
-    offerings_by_status = list(
-        CourseOffering.objects.values('status').annotate(count=Count('id'))
-    )
     academic_years_total = AcademicYear.objects.count()
     current_academic_years = list(AcademicYear.objects.filter(is_active=True))
-
-    # ====== 4. ENROLLMENT ANALYTICS ======
-    enrollments_total = Enrollment.objects.count()
-    enrollments_by_status = list(
-        Enrollment.objects.values('status').annotate(count=Count('id'))
-    )
-    enrollments_by_type = list(
-        Enrollment.objects.values('enrollment_type').annotate(count=Count('id'))
-    )
-    enrollments_by_year = list(
-        Enrollment.objects.values('academic_year_level__academic_year__name', 'academic_year_level__academic_year__pk')
-        .annotate(count=Count('id'))
-        .order_by('-academic_year_level__academic_year__starts_on')
-    )
-    enrollments_by_level = list(
-        Enrollment.objects.values('academic_year_level__level__ordering')
-        .annotate(count=Count('id'))
-        .order_by('academic_year_level__level__ordering')
-    )
-
-    # ====== 5. QUIZ & GRADE ANALYTICS ======
-    quizzes_total = Quiz.objects.count()
-    quizzes_by_status = list(
-        Quiz.objects.values('status').annotate(count=Count('id'))
-    )
-    total_submissions = Grade.objects.count()
-    avg_grade = Grade.objects.aggregate(avg=Avg('total_grade'))['avg'] or 0
-
-    # ====== 6. LECTURE PROGRESS ANALYTICS ======
-    progress_total = LectureProgress.objects.count()
-    students_with_progress = (
-        LectureProgress.objects.values('student').distinct().count()
-    )
-    completed_lectures = LectureProgress.objects.filter(
-        completed_at__isnull=False
-    ).count()
-    avg_completion = (
-        LectureProgress.objects.aggregate(avg=Avg('percent'))['avg'] or 0
-    )
-
-    # ====== 7. ATTENDANCE ANALYTICS ======
-    attendance_total = AttendanceRecord.objects.count()
     today_attendance = AttendanceRecord.objects.filter(
         attendance_date=today
     ).count()
-    today_students = (
-        AttendanceRecord.objects.filter(attendance_date=today)
-        .values('student')
-        .distinct()
-        .count()
-    )
-
-    # ====== 8. RECENT ACTIVITY ======
     recent_enrollments = list(Enrollment.objects.select_related(
         'student', 'academic_year_level__academic_year'
     ).order_by('-enrolled_at')[:5])
-
     recent_submissions = list(Grade.objects.select_related(
         'user', 'quiz__course_offering__course'
     ).order_by('-submitted_at')[:5])
 
-    context = {
+    return {
         "today": today,
         "admin_metrics": {
             "users": users_total,
@@ -1196,49 +1135,242 @@ def admin_panel(request):
             "academic_years": academic_years_total,
             "offerings": offerings_total,
         },
-        # User Analytics
-        "users_by_role": users_by_role,
-        "users_by_app_status": users_by_app_status,
-        "users_by_study_mode": users_by_study_mode,
-        "new_users_month": new_users_month,
-        "new_users_week": new_users_week,
-        "top_cities": top_cities,
-        # Course & Lesson Analytics
-        "courses_by_level": courses_by_level,
-        "lessons_by_status": lessons_by_status,
-        "avg_lessons_per_course": avg_lessons_per_course,
-        # Offering & Academic Year Analytics
-        "offerings_by_status": offerings_by_status,
         "current_academic_years": current_academic_years,
-        # Enrollment Analytics
-        "enrollments_total": enrollments_total,
-        "enrollments_by_status": enrollments_by_status,
-        "enrollments_by_type": enrollments_by_type,
-        "enrollments_by_year": enrollments_by_year,
-        "enrollments_by_level": enrollments_by_level,
-        # Quiz & Grade Analytics
-        "quizzes_by_status": quizzes_by_status,
-        "total_submissions": total_submissions,
-        "avg_grade": round(avg_grade, 1),
-        # Progress Analytics
-        "progress_total": progress_total,
-        "students_with_progress": students_with_progress,
-        "completed_lectures": completed_lectures,
-        "avg_completion": round(avg_completion, 1),
-        # Attendance Analytics
-        "attendance_total": attendance_total,
         "today_attendance": today_attendance,
-        "today_students": today_students,
-        # Recent Activity
         "recent_enrollments": recent_enrollments,
         "recent_submissions": recent_submissions,
     }
-    _admin_panel_store_context(cache_key, context)
-    return render(request, "admin_panel.html", context)
+
+
+def _admin_panel_today_context(request, shared_context):
+    """Build the actor-scoped Today cockpit contract.
+
+    Queues are capability-filtered with the same canonical functions as their
+    destination views. Staff media ownership is enforced inside the adapter.
+    """
+    user = request.user
+    active_year = (shared_context.get("current_academic_years") or [None])[0]
+    today_context = build_today_context(
+        actor=user,
+        active_year=active_year,
+        can_see_admin_queues=can_manage_academic_setup(user),
+        can_grade=can_grade(user),
+    )
+    metrics = shared_context.get("admin_metrics", {})
+    today_kpis = [
+        {
+            "key": "active_students",
+            "label": _("Active students"),
+            "value": today_context["stats"]["active_students"],
+            "icon": "i-users",
+            "tone": "teal",
+        },
+        {
+            "key": "attendance_today",
+            "label": _("Attendance today"),
+            "value": shared_context.get("today_attendance", 0),
+            "icon": "i-check-square",
+            "tone": "blue",
+        },
+        {
+            "key": "courses",
+            "label": _("Courses"),
+            "value": metrics.get("courses", 0),
+            "icon": "i-book",
+            "tone": "gold",
+        },
+        {
+            "key": "lessons",
+            "label": _("Lessons"),
+            "value": metrics.get("lessons", 0),
+            "icon": "i-video",
+            "tone": "green",
+        },
+        {
+            "key": "quizzes",
+            "label": _("Quizzes"),
+            "value": metrics.get("quizzes", 0),
+            "icon": "i-check-square",
+            "tone": "violet",
+        },
+        {
+            "key": "offerings",
+            "label": _("Offerings"),
+            "value": metrics.get("offerings", 0),
+            "icon": "i-layers",
+            "tone": "teal",
+        },
+    ]
+    actions = [
+        {
+            "label": _("Calendar"),
+            "url": reverse("calendar-management"),
+            "icon": "i-calendar",
+            "variant": "ghost",
+        },
+    ]
+    if can_manage_academic_setup(user):
+        actions.append({
+            "label": _("Academic Setup"),
+            "url": reverse("academic-setup"),
+            "icon": "i-layers",
+            "variant": "ghost",
+        })
+        actions.append({
+            "label": _("New announcement"),
+            "url": reverse("notifications-management"),
+            "icon": "i-plus",
+            "variant": "primary",
+        })
+    return {
+        **today_context,
+        "active_academic_year": active_year,
+        "today_kpis": today_kpis,
+        "today_actions": actions,
+        "quick_actions": quick_create_actions_for(user),
+    }
+
+
+@capability_required(can_manage_content)
+def admin_panel(request):
+    """Today cockpit: shared cached aggregates plus fresh actor-scoped queues."""
+    today = timezone.now().date()
+    cache_key = _admin_panel_cache_key(today)
+    shared_context = _admin_panel_cached_context(cache_key)
+    if shared_context is None:
+        shared_context = _build_admin_panel_shared_context(today)
+        _admin_panel_store_context(cache_key, shared_context)
+
+    context = dict(shared_context)
+    context["today"] = today
+    context.update(_admin_panel_today_context(request, shared_context))
+    return render_page(
+        request,
+        "admin_panel.html",
+        "partials/today_content.html",
+        context,
+    )
 
 @capability_required(can_manage_content)
 def export_users_csv(request):
-    return export_users_to_csv()
+    return export_users_to_csv(user_scope(request))
+
+
+def _user_filter_fields(scope):
+    """Return the Students filter bar contract for the normalized scope."""
+    application_options = [
+        {"value": code, "label": label}
+        for code, label in User.APPLICATION_STATUSES
+    ]
+    mode_options = [
+        {"value": code, "label": label}
+        for code, label in User.STUDY_MODES
+    ]
+    role_options = [
+        {"value": code, "label": label}
+        for code, label in Role.ROLES
+    ]
+    return [
+        {
+            "name": "filtering",
+            "label": _("Role"),
+            "value": scope["role"],
+            "all_label": _("All roles"),
+            "options": role_options,
+        },
+        {
+            "name": "application_status",
+            "label": _("Application"),
+            "value": scope["application_status"],
+            "all_label": _("All application statuses"),
+            "options": application_options,
+        },
+        {
+            "name": "study_mode",
+            "label": _("Mode"),
+            "value": scope["study_mode"],
+            "all_label": _("All study modes"),
+            "options": mode_options,
+        },
+        {
+            "name": "account",
+            "label": _("Account"),
+            "value": scope["account"],
+            "all_label": _("All account states"),
+            "options": [
+                {"value": "active", "label": _("Active")},
+                {"value": "inactive", "label": _("Inactive")},
+            ],
+        },
+    ]
+
+
+def _user_status_tabs(request, scope, counts):
+    """Build the application-decision tabs with accurate bounded counts."""
+    tabs = []
+    current = scope["application_status"]
+    for code, label in (("", _("All")),) + tuple(User.APPLICATION_STATUSES):
+        params = request.GET.copy()
+        params.pop("page", None)
+        if code:
+            params["application_status"] = code
+        else:
+            params.pop("application_status", None)
+        tabs.append({
+            "key": code or "all",
+            "label": label,
+            "url": f"{reverse('user-dashboard')}?{params.urlencode()}",
+            "is_active": current == code,
+            "count": counts["application"]["total"] if not code else counts["application"][code],
+        })
+    return tabs
+
+
+def _content_filter_fields(*, scope, academic_years, selected_year, subjects):
+    """Return the lesson/quiz filter bar contract for the normalized scope."""
+    year_options = [
+        {"value": str(year.pk), "label": year.name}
+        for year in academic_years
+    ]
+    return [
+        {
+            "name": "academic_year",
+            "label": _("Academic Year"),
+            "value": str(selected_year.pk),
+            "all_label": "",
+            "options": year_options,
+            "page_target": True,
+        },
+        {
+            "name": "course",
+            "label": _("Course Filter"),
+            "value": str(scope["offering"]) if scope["offering"] else "",
+            "all_label": _("All Courses"),
+            "groups": subjects,
+        },
+    ]
+
+
+def _content_status_tabs(request, *, view, scope, counts):
+    """Build the publication-status tabs with accurate bounded counts."""
+    tabs = []
+    options = (("", _("All")),) + tuple(PublicationStatus.choices)
+    for code, label in options:
+        params = request.GET.copy()
+        params.pop("page", None)
+        if code:
+            params["status"] = code
+        else:
+            params.pop("status", None)
+        tabs.append({
+            "key": code or "all",
+            "label": label,
+            "url": f"{reverse(f'{view}-dashboard')}?{params.urlencode()}",
+            "is_active": scope["status"] == code,
+            "count": counts["total"] if not code else counts[code],
+        })
+    return tabs
+
 
 @capability_required(can_manage_content)
 def user_dashboard(request):
@@ -1247,37 +1379,77 @@ def user_dashboard(request):
 
     scope = user_scope(request)
     users = user_queryset(scope)
+    counts = user_tab_counts(scope)
 
     logger.info(
-        "User : %s filters users using %s name and %s role",
+        "User : %s filters users using search=%s role=%s application=%s mode=%s account=%s",
         user,
         scope["search"],
         scope["role"],
+        scope["application_status"],
+        scope["study_mode"],
+        scope["account"],
     )
 
+    export_query = request.GET.copy()
+    export_query.pop("page", None)
+    export_url = reverse("export-users-csv")
+    if export_query:
+        export_url = f"{export_url}?{export_query.urlencode()}"
+
+    page_actions = []
+    if can_manage_applications(request.user):
+        page_actions.append({
+            "label": _("Create student"),
+            "url": reverse("user-create"),
+            "icon": "i-user-plus",
+            "variant": "primary",
+        })
+        page_actions.append({
+            "label": _("Bulk Import"),
+            "url": reverse("user-bulk-create"),
+            "icon": "i-upload",
+            "variant": "ghost",
+        })
+    page_actions.append({
+        "label": _("Export CSV"),
+        "url": export_url,
+        "icon": "i-download",
+        "variant": "ghost",
+        "download": True,
+    })
+
     context = {
-        "name_value" : scope["search"],
-        "filtering" : scope["role_value"],
-        "columns" : User.get_columns(),
+        "name_value": scope["search"],
+        "search_placeholder": _("Search username, email, name, phone, or national ID"),
+        "filter_fields": _user_filter_fields(scope),
+        "filter_tabs": _user_status_tabs(request, scope, counts),
         "table_columns": [
-            {"label": _("Username"), "key": "username"},
-            {"label": _("Name"), "key": "name"},
+            {"label": _("Students"), "key": "student"},
+            {"label": _("Application"), "key": "application_status"},
+            {"label": _("Mode"), "key": "study_mode"},
             {"label": _("Role"), "key": "role"},
             {"label": _("Joined Date"), "key": "joined_date"},
             {"label": _("Last Login"), "key": "last_login"},
         ],
         "sort_fields": {
-            "username": "username",
-            "name": ("last_name", "first_name", "username"),
+            "student": ("last_name", "first_name", "username"),
+            "application_status": "application_status",
+            "study_mode": "study_mode",
             "role": "role__role",
             "joined_date": "joined_date",
             "last_login": "last_login",
         },
-        "default_sort": "name",
+        "default_sort": "student",
         "default_ordering": ["last_name", "first_name", "username", "pk"],
-        "options" : [_('Choose Role'), *Role.get_readable_values()],
-        "search_placeholder": _("Search username, email, name, phone, or national ID"),
         "table_scope": scope,
+        "row_template": "partials/tables/user_rows.html",
+        "page_eyebrow": _("People"),
+        "page_title": _("Students"),
+        "page_description": _(
+            "Manage student accounts, application decisions and study mode access."
+        ),
+        "page_actions": page_actions,
     }
 
     return render_dashboard(request, users, view, context)
@@ -1379,7 +1551,7 @@ def user_profile(request, user_id):
                 })
 
     telegram_account = TelegramAccount.objects.filter(user=user, is_active=True).first()
-    return render(request, "user_detail.html", {
+    return render_page(request, "user_detail.html", "partials/user_detail_content.html", {
         "profile_user": user,
         "edit_form": form,
         "can_edit_user": can_manage_applications(request.user),
@@ -1605,9 +1777,8 @@ def historical_intake(request):
                         language=translation.get_language() or "ar",
                     )
                     try:
-                        from .admin_operation_tasks import run_admin_operation
 
-                        run_admin_operation.apply_async(args=[str(intake_job.pk)], queue="admin")
+                        enqueue_admin_operation(intake_job.pk, queue="admin")
                     except Exception:
                         # The queued row is picked up by the recovery schedule.
                         logger.warning("historical intake awaits worker recovery", exc_info=True)
@@ -1791,9 +1962,8 @@ def user_bulk_create(request):
                 error(request, storage_error, extra_tags="alert-danger")
                 return redirect('user-bulk-create')
             try:
-                from .admin_operation_tasks import run_admin_operation
 
-                run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+                enqueue_admin_operation(job.pk, queue="admin")
             except Exception:
                 # The queued row is picked up by the recovery schedule.
                 logger.warning("legacy user import awaits worker recovery", exc_info=True)
@@ -1820,7 +1990,7 @@ def user_bulk_create(request):
     bulk_errors = []
     if bulk_job is not None and isinstance(bulk_job.result, dict):
         bulk_errors = list(bulk_job.result.get("row_errors") or [])[:20]
-    return render(request, 'user_bulk_form.html', {
+    return render_page(request, 'user_bulk_form.html', "partials/user_bulk_form_content.html", {
         'form': form,
         'bulk_job': bulk_job,
         'bulk_status_url': (
@@ -1833,7 +2003,7 @@ def user_bulk_create(request):
 class CreateUser(UserBaseView, CreateView):
     form_class = UserCreationForm
     success_url = reverse_lazy("user-create")
-    action = _("create") # Translate action
+    action = gettext_lazy("create")
 
 def _restrict_user_update_form(form, actor):
     actor_role = getattr(getattr(actor, "role", None), "role", None)
@@ -1846,7 +2016,7 @@ def _restrict_user_update_form(form, actor):
 
 class UpdateUser(UserBaseView, UpdateView):
     form_class = UserUpdateForm
-    action = _("update") # Translate action
+    action = gettext_lazy("update")
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
@@ -1935,8 +2105,14 @@ def course_dashboard(request):
     view = "course"
 
     scope = course_scope(request)
-    courses = course_queryset(scope)
-    
+    # Distinct counts keep the three content joins from multiplying rows; one
+    # page query supplies every course row, no per-row fact lookup.
+    courses = course_queryset(scope).annotate(
+        offering_count=Count("offerings", distinct=True),
+        lesson_count=Count("offerings__lessons", distinct=True),
+        quiz_count=Count("offerings__quizzes", distinct=True),
+    )
+
     logger.info(
         "User : %s filters courses using %s name and %s level",
         user,
@@ -1944,38 +2120,61 @@ def course_dashboard(request):
         scope["level_value"],
     )
 
-
+    level_options = [
+        {"value": str(level.ordering), "label": level.display_name}
+        for level in Level.objects.order_by("ordering")
+    ]
     context = {
         "name_value" : scope["search"],
-        "filtering" : scope["level_value"],
+        "filter_fields": [{
+            "name": "filtering",
+            "label": _("Level"),
+            "value": str(scope["level"]) if scope["level"] is not None else "",
+            "all_label": _("All levels"),
+            "options": level_options,
+        }],
         "columns" : Course.get_columns(),
         "table_columns": [
             {"label": _("Name"), "key": "name"},
             {"label": _("Description"), "key": "description"},
             {"label": _("Level"), "key": "level"},
             {"label": _("Instructor"), "key": "instructor"},
+            {"label": _("Offerings"), "key": "offering_count"},
+            {"label": _("Lessons"), "key": "lesson_count"},
+            {"label": _("Quizzes"), "key": "quiz_count"},
         ],
         "sort_fields": {
             "name": "name",
             "description": "description",
             "level": "level__ordering",
             "instructor": "instructor",
+            "offering_count": "offering_count",
+            "lesson_count": "lesson_count",
+            "quiz_count": "quiz_count",
         },
         "default_sort": "name",
         "default_ordering": ["level__ordering", "name", "pk"],
         "group_by_level": True,
-        "options" : [_("Choose Academic Year"), *[l.display_name for l in Level.objects.order_by("ordering")]],
         "table_scope": scope,
+        "page_eyebrow": _("Curriculum"),
+        "page_title": _("Courses"),
+        "page_description": _("Manage the course catalog for each academic level."),
+        "page_actions": [{
+            "label": _("Create course"),
+            "url": reverse("course-create"),
+            "icon": "i-plus",
+            "variant": "primary",
+        }],
     }
 
     return render_dashboard(request, courses, view, context)
 
 class CreateCourse(CourseBaseView, CreateView):
-    action = _("create") # Translate action
+    action = gettext_lazy("create")
     success_url = reverse_lazy("course-create")
 
 class UpdateCourse(CourseBaseView, UpdateView):
-    action = _("update") # Translate action
+    action = gettext_lazy("update")
 
     def get_success_url(self):
         return reverse_lazy("course-update", args=[self.kwargs.get(self.pk_url_kwarg)])
@@ -2036,7 +2235,7 @@ def lesson_detail(request, lesson_id):
                 "file_id": link.get("file_id", ""),
                 "type": link.get("type", ""),
             })
-    return render(request, "content_detail.html", {
+    return render_page(request, "content_detail.html", "partials/content_detail_content.html", {
         "content": lesson,
         "content_kind": "lesson",
         "offering": lesson.course_offering,
@@ -2075,7 +2274,7 @@ def quiz_detail(request, quiz_id):
     )
     can_preview_quiz = can_manage_academic_setup(request.user)
     exception_form = QuizExceptionalOpeningForm(quiz=quiz) if can_preview_quiz else None
-    return render(request, "content_detail.html", {
+    return render_page(request, "content_detail.html", "partials/content_detail_content.html", {
         "content": quiz,
         "content_kind": "quiz",
         "offering": quiz.course_offering,
@@ -2087,6 +2286,7 @@ def quiz_detail(request, quiz_id):
         "exception_form": exception_form,
         "exceptional_openings": getattr(quiz, "exceptional_openings", []),
         "can_preview_quiz": can_preview_quiz,
+        "application_timezone": timezone_name(),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Quizzes"), reverse("quiz-dashboard")),
@@ -2241,18 +2441,29 @@ def lesson_dashboard(request):
         "course_offering__academic_year_level__level",
         "course_offering__academic_year_level__academic_year",
     )
-    
+    status_counts = content_status_counts(view, scope)
+    subjects = _content_offering_filter_options(selected_year.pk)
+
     logger.info(
-        "User %s filters lessons using %s name, academic year %s, and %s course",
+        "User %s filters lessons using %s name, academic year %s, %s course and %s status",
         user,
         scope["search"],
         selected_year.pk,
         scope["offering"],
+        scope["status"],
     )
 
     context = {
         "name_value" : scope["search"],
-        "course_value" : str(scope["offering"]) if scope["offering"] else "",
+        "filter_fields": _content_filter_fields(
+            scope=scope,
+            academic_years=academic_years,
+            selected_year=selected_year,
+            subjects=subjects,
+        ),
+        "filter_tabs": _content_status_tabs(
+            request, view=view, scope=scope, counts=status_counts
+        ),
         "columns" : Lesson.get_columns(),
         "table_columns": [
             {"label": _("Name"), "key": "name"},
@@ -2276,12 +2487,16 @@ def lesson_dashboard(request):
             "pk",
         ],
         "group_by_level": True,
-        "academic_year_filter": True,
-        "academic_years": academic_years,
-        "selected_academic_year_id": selected_year.pk,
-        "subjects" : _content_offering_filter_options(selected_year.pk),
-        "filters" : ["course_filter.html"],
         "table_scope": scope,
+        "page_eyebrow": _("Curriculum"),
+        "page_title": _("Lessons"),
+        "page_description": _("Author lessons, attach media and control publication."),
+        "page_actions": [{
+            "label": _("Create lesson"),
+            "url": reverse("lesson-create"),
+            "icon": "i-plus",
+            "variant": "primary",
+        }],
     }
 
     return render_dashboard(request, lessons, view, context)
@@ -2322,7 +2537,7 @@ def _render_lesson_editor(request: HttpRequest, lesson: Lesson | None, form: Les
     draft_saved = request.session.get("saved_content_form") == form_key
     if draft_saved:
         request.session.pop("saved_content_form", None)
-    return render(request, "lesson_form.html", {
+    return render_page(request, "lesson_form.html", "partials/lesson_editor_content.html", {
         "offering_groups": offering_option_groups(form.fields["course_offering"].queryset, include_year=True),
         "drive": filter_content_storage_entries(list_current_folder(CLOUD_CLIENT, bucket_name)[0]),
         "is_root": True,
@@ -2330,12 +2545,15 @@ def _render_lesson_editor(request: HttpRequest, lesson: Lesson | None, form: Les
         "selected_offering_id": form["course_offering"].value(),
         "lesson_name": form["lesson_name"].value() or "",
         "lesson_description": form["description"].value() or "",
+        "opening_date": form["opening_date"].value() or "",
+        "application_timezone": timezone_name(),
         "videos": videos,
         "content_status": form["status"].value(),
         "publication_statuses": PublicationStatus.choices,
         "editor_form": form,
         "has_form_errors": form.is_bound,
         "draft_saved": draft_saved,
+        "lesson_id": lesson.pk if lesson else None,
     })
 
 
@@ -2344,6 +2562,7 @@ def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResp
         "lesson_name": lesson.name if lesson else "",
         "description": lesson.description if lesson else "",
         "course_offering": lesson.course_offering_id if lesson else None,
+        "opening_date": format_application_datetime(lesson.opening_date, "%Y-%m-%dT%H:%M") if lesson and lesson.opening_date else "",
         "status": lesson.status if lesson else PublicationStatus.DRAFT,
     }
     form = LessonEditorForm(request.POST if request.method == "POST" else None,
@@ -2362,16 +2581,37 @@ def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResp
                         check_media_cleanup=False,
                     )
                 previous_status = saved.status
+                previous_notification_facts = (
+                    saved.name,
+                    saved.course_offering_id,
+                    saved.opening_date,
+                )
                 saved.name = form.cleaned_data["lesson_name"]
                 saved.description = form.cleaned_data["description"] or None
                 saved.course_offering = form.cleaned_data["course_offering"]
                 saved.links = json.dumps(links)
+                saved.opening_date = form.cleaned_data["opening_date"]
                 saved.status = form.cleaned_data["status"]
-                publish = saved.status == PublicationStatus.PUBLISHED and (not saved.pk or previous_status != PublicationStatus.PUBLISHED)
+                current_notification_facts = (
+                    saved.name,
+                    saved.course_offering_id,
+                    saved.opening_date,
+                )
+                reschedule = (
+                    bool(saved.pk)
+                    and previous_status == PublicationStatus.PUBLISHED
+                    and saved.status == PublicationStatus.PUBLISHED
+                    and previous_notification_facts != current_notification_facts
+                )
+                publish = saved.status == PublicationStatus.PUBLISHED and (
+                    not saved.pk or previous_status != PublicationStatus.PUBLISHED or reschedule
+                )
                 if publish:
                     saved.publication_event_version += 1
                 saved.save()
                 if publish:
+                    if reschedule:
+                        cancel_future_lesson_publication_events(saved)
                     create_lesson_publication_event(saved)
             request.session["saved_content_form"] = f"lesson-{lesson.pk if lesson else 'new'}"
             success(request, _("Lesson is updated successfully") if lesson else _("Lesson is created successfully"), extra_tags="alert-success")
@@ -2968,7 +3208,7 @@ def upload_file(request):
         "course_offering__course__name",
         "name",
     )
-    return render(request, "upload_video.html", {
+    return render_page(request, "upload_video.html", "partials/upload_video_content.html", {
         "drive" : list_current_folder(CLOUD_CLIENT, bucket_name, folders_only=True)[0],
         "is_root" : True,
         "course_offerings": course_offerings,
@@ -3052,7 +3292,6 @@ def promotion_formula(request):
         # Promotion can consume a scope after its academic year is archived.
         # Keep the submitting administrator's exact job redirect reviewable.
         if request.method == "GET" and request.GET.get("promotion_job"):
-            from .models import AdminOperationJob
 
             try:
                 job_id = uuid.UUID(request.GET["promotion_job"])
@@ -3136,10 +3375,9 @@ def promotion_formula(request):
                         actor=request.user,
                         language=translation.get_language() or "ar",
                     )
-                    from .admin_operation_tasks import run_admin_operation
 
                     try:
-                        run_admin_operation.apply_async(args=[str(calculation_job.pk)], queue="admin")
+                        enqueue_admin_operation(calculation_job.pk, queue="admin")
                     except Exception:
                         # The queued row is picked up by the recovery schedule.
                         logger.warning("formula calculation awaits worker recovery", exc_info=True)
@@ -3230,12 +3468,17 @@ def promotion_formula(request):
         preview_page_obj = Paginator(enrollments, 25).get_page(request.GET.get("page", 1))
         preview_rows = evaluate_enrollment_page(preview_page_obj, plan) if plan else []
         preview_grading_errors = plan.grading_errors if plan else ()
-        saved_results = EvaluationResult.objects.filter(
-            formula=formula,
-            course_offering__isnull=formula.course_offering_id is None,
-        ).select_related(
-            "enrollment__student", "enrollment__academic_year_level__level", "overridden_by", "promotion_history"
-        ).order_by("enrollment__student__last_name", "enrollment__student__first_name", "enrollment__student__username")
+        if formula is not None:
+            saved_results = EvaluationResult.objects.filter(
+                formula=formula,
+                course_offering__isnull=formula.course_offering_id is None,
+            ).select_related(
+                "enrollment__student", "enrollment__academic_year_level__level", "overridden_by", "promotion_history"
+            ).order_by("enrollment__student__last_name", "enrollment__student__first_name", "enrollment__student__username")
+        else:
+            # Preview without a saved formula must render an empty results
+            # section instead of dereferencing the missing formula.
+            saved_results = EvaluationResult.objects.none()
         if result_search:
             saved_results = saved_results.filter(
                 normalized_contains_q(
@@ -3271,7 +3514,6 @@ def promotion_formula(request):
     promotion_job = None
     export_job = None
     if selected_scope:
-        from .models import AdminOperationJob
 
         calculation_job = (
             AdminOperationJob.objects.filter(
@@ -3411,9 +3653,6 @@ def bulk_promotion_results(request):
     if not result_ids:
         messages.error(request, _("Select at least one student result."))
         return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
-    from .admin_operation_tasks import run_admin_operation
-    from .admin_operations import create_admin_operation
-    from .models import AdminOperationJob
 
     if (not scope_id.isascii() or not scope_id.isdigit() or len(scope_id) > 10
             or not 0 < int(scope_id) <= 2_147_483_647):
@@ -3438,7 +3677,7 @@ def bulk_promotion_results(request):
         messages.error(request, "; ".join(exc.messages))
         return redirect(f"{reverse('promotion-formula')}?scope={scope_id}")
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("bulk promotion awaits worker recovery", exc_info=True)
@@ -3494,24 +3733,38 @@ def quiz_dashboard(request):
         return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
 
     scope = content_scope(request, year_id=selected_year.pk)
-    quizzes = quiz_queryset(scope).annotate(submissions_count=Count("grade", distinct=True)).select_related(
+    quizzes = quiz_queryset(scope).annotate(
+        submissions_count=Count("grade", distinct=True),
+        question_count=Count("questions", distinct=True),
+    ).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
         "course_offering__academic_year_level__academic_year",
         "quiz_type",
     )
-    
+    status_counts = content_status_counts(view, scope)
+    subjects = _content_offering_filter_options(selected_year.pk)
+
     logger.info(
-        "User %s filters quizzes using %s name, academic year %s, and %s course",
+        "User %s filters quizzes using %s name, academic year %s, %s course and %s status",
         user,
         scope["search"],
         selected_year.pk,
         scope["offering"],
+        scope["status"],
     )
 
     context = {
         "name_value" : scope["search"],
-        "course_value" : str(scope["offering"]) if scope["offering"] else "",
+        "filter_fields": _content_filter_fields(
+            scope=scope,
+            academic_years=academic_years,
+            selected_year=selected_year,
+            subjects=subjects,
+        ),
+        "filter_tabs": _content_status_tabs(
+            request, view=view, scope=scope, counts=status_counts
+        ),
         "columns" : Quiz.get_columns(),
         "table_columns": [
             {"label": _("Name"), "key": "name"},
@@ -3522,6 +3775,8 @@ def quiz_dashboard(request):
             {"label": _("Grades"), "key": "grades"},
             {"label": _("Opening Date"), "key": "opening_date"},
             {"label": _("Closing Date"), "key": "closing_date"},
+            {"label": _("Duration (minutes)"), "key": "duration_minutes"},
+            {"label": _("Questions"), "key": "questions"},
             {"label": _("Submissions"), "key": "submissions"},
         ],
         "sort_fields": {
@@ -3533,6 +3788,8 @@ def quiz_dashboard(request):
             "grades": "total_grade",
             "opening_date": "opening_date",
             "closing_date": "closing_date",
+            "duration_minutes": "duration_minutes",
+            "questions": "question_count",
             "submissions": "submissions_count",
         },
         "default_sort": "opening_date",
@@ -3544,14 +3801,28 @@ def quiz_dashboard(request):
             "pk",
         ],
         "group_by_level": True,
-        "academic_year_filter": True,
-        "academic_years": academic_years,
-        "selected_academic_year_id": selected_year.pk,
-        "subjects" : _content_offering_filter_options(selected_year.pk),
-        "filters" : ["course_filter.html"],
         "submission_view" : True,
         "page_size" : 10,
         "table_scope": scope,
+        "page_eyebrow": _("Curriculum"),
+        "page_title": _("Quizzes"),
+        "page_description": _(
+            "Build quizzes, review attempts and keep grading consistent."
+        ),
+        "page_actions": [
+            {
+                "label": _("Create quiz"),
+                "url": reverse("quiz-create"),
+                "icon": "i-plus",
+                "variant": "primary",
+            },
+            {
+                "label": _("Import JSON"),
+                "url": f"{reverse('quiz-create')}?import=1",
+                "icon": "i-file",
+                "variant": "ghost",
+            },
+        ],
     }
 
     return render_dashboard(request, quizzes, view, context)
@@ -3586,7 +3857,6 @@ def _rejected_quiz_context(request, key):
     raw = request.session.pop(key, None)
     if not raw:
         return {}
-    from django.http import QueryDict
     post = QueryDict("", mutable=True)
     for name, values in raw.items():
         post.setlist(name, values)
@@ -3611,7 +3881,7 @@ def _rejected_quiz_context(request, key):
             config = {}
         rows.append({**row, "config": config, "config_json": json.dumps(config),
                      "correct_answer": row.get("answer", ""), "answer_payload_json": row.get("answer", "")})
-    return {**{key: fields.get(key, "") for key in ("quiz_name", "opening_date", "closing_date")}, "questions": rows, "selected_offering_id": fields.get("course_offering"),
+    return {**{key: fields.get(key, "") for key in ("quiz_name", "opening_date", "closing_date", "duration_minutes")}, "questions": rows, "selected_offering_id": fields.get("course_offering"),
             "selected_quiz_type_id": int(fields["quiz_type"]) if str(fields.get("quiz_type", "")).isdigit() else None,
             "content_status": fields.get("status", PublicationStatus.DRAFT), "form_errors": True}
 
@@ -3628,11 +3898,13 @@ def create_quiz(request):
             "academic_year_level__academic_year__ordering", "pk",
         )
 
-        return render(request, "quiz_form.html", {
+        return render_page(request, "quiz_form.html", "partials/quiz_form_content.html", {
             "offering_groups" : offering_option_groups(course_offerings, include_year=True),
             "quiz_types": QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code"),
             "question_types" : Question.QUESTION_TYPES,
             "questions" : [],
+            "duration_minutes": 60,
+            "application_timezone": timezone_name(),
             "content_status" : PublicationStatus.DRAFT,
             "content_status_display" : PublicationStatus.DRAFT.label,
             "publication_statuses" : PublicationStatus.choices,
@@ -3654,6 +3926,9 @@ def create_quiz(request):
                 return redirect(reverse("quiz-create"))
             opening_date = parse_application_datetime(quiz.get("opening_date", ""))
             closing_date = parse_application_datetime(quiz.get("closing_date", ""))
+            duration_minutes = Quiz._meta.get_field("duration_minutes").clean(
+                quiz.get("duration_minutes", 60), None
+            )
             
             offering_id = request.POST.get("course_offering")
             course_offering = get_object_or_404(
@@ -3671,6 +3946,8 @@ def create_quiz(request):
                 total_grade=quiz.get("total_grade", 0),
                 opening_date=opening_date,
                 closing_date=closing_date,
+                duration_minutes=duration_minutes,
+                publication_event_version=1 if publication_status == PublicationStatus.PUBLISHED else 0,
             )
             # Create Questions
             raise_exception = False
@@ -3714,6 +3991,9 @@ def create_quiz(request):
         except Http404:
             error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
             logger.error("Offering %s is not found to create a quiz!", request.POST.get("course_offering"))
+
+        except ValidationError as exc:
+            error(request, "; ".join(str(message) for message in exc.messages), extra_tags="alert-danger")
         
         except Exception as e:
             error(request, _("Create quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
@@ -3735,7 +4015,7 @@ def update_quiz(request, quiz_id):
                 "academic_year_level__level__ordering", "course__name",
                 "academic_year_level__academic_year__ordering", "pk",
             )
-            return render(request, "quiz_form.html", {
+            return render_page(request, "quiz_form.html", "partials/quiz_form_content.html", {
                 "offering_groups" : offering_option_groups(course_offerings, include_year=True),
                 "selected_offering_id" : quiz.course_offering_id,
                 "selected_quiz_type_id" : quiz.quiz_type_id,
@@ -3752,6 +4032,7 @@ def update_quiz(request, quiz_id):
                 ),
                 "quiz_mode" : "update",
                 "draft_saved": request.session.pop("saved_content_form", None) == f"quiz-{quiz_id}",
+                "application_timezone": timezone_name(),
                 **_rejected_quiz_context(request, f"rejected-quiz-{quiz_id}"),
             })
         except Http404:
@@ -3781,10 +4062,14 @@ def update_quiz(request, quiz_id):
                             return redirect(reverse("quiz-update", args=[quiz_id]))
                         previous_status = quiz.status
                         quiz.status = publication_status
-                        quiz.save(update_fields=["status"])
+                        update_fields = ["status"]
                         if previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
                             cancel_future_quiz_opening_events(quiz)
                         elif publication_status == PublicationStatus.PUBLISHED:
+                            quiz.publication_event_version += 1
+                            update_fields.append("publication_event_version")
+                        quiz.save(update_fields=update_fields)
+                        if publication_status == PublicationStatus.PUBLISHED:
                             schedule_quiz_opening_events(quiz, locked=True)
                         request.session.pop(f"rejected-quiz-{quiz_id}", None)
                         request.session["saved_content_form"] = f"quiz-{quiz_id}"
@@ -3793,6 +4078,9 @@ def update_quiz(request, quiz_id):
             requested_name = quiz_data['quiz_name']
             requested_opening_date = parse_application_datetime(quiz_data['opening_date'])
             requested_closing_date = parse_application_datetime(quiz_data['closing_date'])
+            requested_duration_minutes = Quiz._meta.get_field("duration_minutes").clean(
+                quiz_data.get("duration_minutes", 60), None
+            )
             if requested_closing_date <= requested_opening_date:
                 raise ValidationError(_("Closing date must be after opening date."))
             requested_total_grade = quiz_data['total_grade']
@@ -3855,13 +4143,37 @@ def update_quiz(request, quiz_id):
 
                 removed_ids = set(current_questions) - set(questions_id)
                 previous_status = quiz.status
+                previous_notification_facts = (
+                    quiz.name,
+                    quiz.course_offering_id,
+                    quiz.quiz_type_id,
+                    quiz.total_grade,
+                    quiz.opening_date,
+                    quiz.closing_date,
+                    quiz.duration_minutes,
+                )
                 quiz.name = requested_name
                 quiz.opening_date = requested_opening_date
                 quiz.closing_date = requested_closing_date
+                quiz.duration_minutes = requested_duration_minutes
                 quiz.total_grade = requested_total_grade
                 quiz.status = publication_status
                 quiz.quiz_type = requested_quiz_type
                 quiz.course_offering = requested_offering
+                current_notification_facts = (
+                    quiz.name,
+                    quiz.course_offering_id,
+                    quiz.quiz_type_id,
+                    quiz.total_grade,
+                    quiz.opening_date,
+                    quiz.closing_date,
+                    quiz.duration_minutes,
+                )
+                notification_facts_changed = previous_notification_facts != current_notification_facts
+                if publication_status == PublicationStatus.PUBLISHED and (
+                    previous_status != PublicationStatus.PUBLISHED or notification_facts_changed
+                ):
+                    quiz.publication_event_version += 1
                 # Delete Removed Questions
                 Question.objects.filter(quiz=quiz).exclude(pk__in=questions_id).delete()
 
@@ -3878,15 +4190,15 @@ def update_quiz(request, quiz_id):
                         reset_manual_ids=reset_manual_ids,
                         clamp_manual_ids=clamp_manual_ids,
                     )
-                # Notifications fire only on first publication: a newly
-                # published quiz, or a draft/archived quiz switching to
-                # published. Editing an already-published quiz (questions,
-                # dates, offering) never re-notifies and never cancels the
-                # already-queued opening notifications.
+                # Refresh only pending opening events when their copied exam
+                # facts change; already-delivered messages remain historical.
                 if publication_status == PublicationStatus.PUBLISHED and previous_status != PublicationStatus.PUBLISHED:
                     schedule_quiz_opening_events(quiz, locked=True)
                 elif previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
                     cancel_future_quiz_opening_events(quiz)
+                elif previous_status == PublicationStatus.PUBLISHED and notification_facts_changed:
+                    cancel_future_quiz_opening_events(quiz)
+                    schedule_quiz_opening_events(quiz, locked=True)
 
             logger.info(
                 "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",
@@ -3905,6 +4217,9 @@ def update_quiz(request, quiz_id):
 
         except PermissionDenied:
             raise
+
+        except ValidationError as exc:
+            error(request, "; ".join(str(message) for message in exc.messages), extra_tags="alert-danger")
 
         except Exception as e:
             error(request, _("Update quiz is failed, Try again Please"), extra_tags="alert-danger") # Translate
@@ -3933,9 +4248,8 @@ def _queue_quiz_export(request, quiz_id, kind):
         language=translation.get_language() or "ar",
     )
     try:
-        from .admin_operation_tasks import run_admin_operation
 
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         logger.warning("quiz export awaits worker recovery", exc_info=True)
     messages.success(
@@ -4287,6 +4601,7 @@ def submission_dashboard(request, quiz_id):
         ),
     }
 
+    context["content_template_name"] = "partials/submission_dashboard_content.html"
     return render_dashboard(request, grades, view, context, parameters=[quiz_id, ])
 
 
@@ -4840,9 +5155,8 @@ def api_rename_file(request):
         except ValidationError as exc:
             return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
         try:
-            from .admin_operation_tasks import run_admin_operation
 
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             logger.warning("storage rename awaits worker recovery", exc_info=True)
         status_url = reverse('admin-operation-status', args=[job.pk])
@@ -4991,9 +5305,8 @@ def api_delete_folder(request):
             except ValidationError as exc:
                 return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
             try:
-                from .admin_operation_tasks import run_admin_operation
 
-                run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+                enqueue_admin_operation(job.pk, queue="admin")
             except Exception:
                 logger.warning("storage delete awaits worker recovery", exc_info=True)
             logger.info(
@@ -5093,8 +5406,7 @@ def api_get_storage_stats(request):
             actor=request.user, prefix=prefix, language=translation.get_language() or "ar",
         )
         try:
-            from .admin_operation_tasks import run_admin_operation
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             logger.warning("storage usage awaits worker recovery", exc_info=True)
         response = JsonResponse({
@@ -5201,9 +5513,14 @@ def api_quiz_status(request, offering_id):
 
         return JsonResponse({"quizzes": result})
 
-    except Exception as e:
-        logger.error(f"api_quiz_status error: {e}")
-        return JsonResponse({"error": str(e)}, status=500)
+    except PermissionDenied:
+        return JsonResponse(
+            {"error": _("You do not have access to this offering.")},
+            status=403,
+        )
+    except Exception:
+        logger.exception("api_quiz_status_failed")
+        return JsonResponse({"error": _("Server error.")}, status=500)
 
 @capability_required(can_manage_content)
 def api_list_files(request):
@@ -5325,7 +5642,6 @@ def r2_management_dashboard(request):
         'filter_presets': filter_preset_choices(),
         'storage_stats': stats,
         'total_size_formatted': R2_MANAGER.format_file_size(stats.get('total_size', 0)) if isinstance(stats.get('total_size'), int) else '...',
-        'load_stats': load_stats,
         'next_page_url': None,
     }
     if next_token:
@@ -5340,7 +5656,7 @@ def r2_management_dashboard(request):
     if hx_target == 'drive-files':
         return render(request, 'partials/r2_file_list.html', context)
     
-    return render(request, 'r2_management.html', context)
+    return render_page(request, 'r2_management.html', "partials/r2_management_content.html", context)
 
 # ============================================================================
 # PHASE 3 - Student Applications
@@ -5483,12 +5799,12 @@ def _applications_dashboard_context(request):
             Q(application_status__in=["pending", "active", "declined"])
         ).only(
             "id", "username", "first_name", "last_name", "phone", "city",
-            "application_status", "date_joined",
+            "application_status", "study_mode", "date_joined",
         ).order_by(*application_order)
     elif status_filter in ("pending", "active", "declined"):
         users = User.objects.filter(application_status=status_filter).only(
             "id", "username", "first_name", "last_name", "phone", "city",
-            "application_status", "date_joined",
+            "application_status", "study_mode", "date_joined",
         ).order_by(*application_order)
     else:
         status_filter = "all"
@@ -5496,7 +5812,7 @@ def _applications_dashboard_context(request):
             Q(application_status__in=["pending", "active", "declined"])
         ).only(
             "id", "username", "first_name", "last_name", "phone", "city",
-            "application_status", "date_joined",
+            "application_status", "study_mode", "date_joined",
         ).order_by(*application_order)
     if application_search:
         users = users.filter(_application_search_query(application_search))
@@ -5505,11 +5821,54 @@ def _applications_dashboard_context(request):
     page_obj = paginator.get_page(page_number)
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
+
+    # Accurate decision-tab counts: one aggregate over the search-filtered
+    # population with the status filter removed, so every tab count equals the
+    # destination list count.
+    counts_base = User.objects.filter(
+        application_status__in=["pending", "active", "declined"]
+    )
+    if application_search:
+        counts_base = counts_base.filter(_application_search_query(application_search))
+    status_counts = counts_base.aggregate(
+        total=Count("id"),
+        pending=Count("id", filter=Q(application_status="pending")),
+        active=Count("id", filter=Q(application_status="active")),
+        declined=Count("id", filter=Q(application_status="declined")),
+    )
+    filter_tabs = []
+    for code, label in (("", _("All")),) + tuple(User.APPLICATION_STATUSES):
+        params = request.GET.copy()
+        params.pop("page", None)
+        if code:
+            params["status"] = code
+        else:
+            params.pop("status", None)
+        filter_tabs.append({
+            "key": code or "all",
+            "label": label,
+            "url": f"{reverse('applications-dashboard')}?{params.urlencode()}",
+            "is_active": status_filter == (code or "all"),
+            "count": status_counts["total"] if not code else status_counts[code],
+        })
+
     return {
         "page_obj": page_obj,
         "current_status": status_filter,
         "application_search": application_search,
         "pagination_query": pagination_params.urlencode(),
+        "filter_tabs": filter_tabs,
+        "page_eyebrow": _("People"),
+        "page_title": _("Student Applications"),
+        "page_description": _(
+            "Review applications, record decisions and open the student record."
+        ),
+        "page_actions": [{
+            "label": _("Signup Settings"),
+            "url": reverse("signup-settings"),
+            "icon": "i-settings",
+            "variant": "ghost",
+        }],
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Applications"), None),
@@ -5528,7 +5887,12 @@ def _applications_dashboard_context(request):
 
 @capability_required(can_manage_applications)
 def applications_dashboard(request):
-    return render(request, "applications_dashboard.html", _applications_dashboard_context(request))
+    return render_page(
+        request,
+        "applications_dashboard.html",
+        "partials/applications_dashboard_content.html",
+        _applications_dashboard_context(request),
+    )
 
 @capability_required(can_manage_applications)
 def signup_settings(request):
@@ -5655,9 +6019,28 @@ def application_review(request, user_id):
             (_("Applications"), reverse("applications-dashboard")),
             (user.get_full_name() or user.username, None),
         ]),
+        # The detail trail lives inside #content because the decision forms swap
+        # that root; the page region must not render a second copy.
+        "page_region_breadcrumbs": False,
+        "page_eyebrow": _("People"),
+        "page_title": _("Application Review"),
+        "page_description": _(
+            "Review the application, documents and the decision for this student."
+        ),
+        "page_actions": [{
+            "label": _("Applications"),
+            "url": reverse("applications-dashboard"),
+            "icon": "i-chevron-left",
+            "variant": "ghost",
+        }],
         "COURSE_LEVELS": Level.objects.order_by("ordering"),
     }
-    return render(request, "application_review.html", context)
+    return render_page(
+        request,
+        "application_review.html",
+        "partials/application_review_content.html",
+        context,
+    )
 
 
 def _delete_user_storage(document_keys: list[str], telegram_keys: list[str]) -> None:
@@ -6107,8 +6490,6 @@ def copy_course_offerings(request):
         if conflict:
             messages.error(request, _("The target scope already contains one or more selected courses."))
             return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
-        from .admin_operation_tasks import run_admin_operation
-        from .admin_operations import create_admin_operation
 
         try:
             job = create_admin_operation(
@@ -6131,7 +6512,7 @@ def copy_course_offerings(request):
             messages.error(request, "; ".join(exc.messages))
             return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
         try:
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             # The queued row is picked up by the recovery schedule.
             logger.warning("course offering copy awaits worker recovery", exc_info=True)
@@ -6169,7 +6550,7 @@ def levels_dashboard(request):
             "course_count": entry.course_count,
             "enrollment_count": entry.enrollment_count,
         })
-    return render(request, "levels.html", {
+    return render_page(request, "levels.html", "partials/levels_content.html", {
         "levels": level_list,
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
@@ -6564,8 +6945,6 @@ def duplicate_course(request, course_id):
     if source_offering.course.level_id != target_scope.level_id:
         return HttpResponse(_("The source offering level does not match the target academic scope."), status=400)
 
-    from .admin_operation_tasks import run_admin_operation
-    from .admin_operations import create_admin_operation
 
     try:
         job = create_admin_operation(
@@ -6588,7 +6967,7 @@ def duplicate_course(request, course_id):
         messages.error(request, "; ".join(exc.messages))
         return redirect(f"{reverse('academic-setup')}?scope={target_scope.pk}")
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("course duplication awaits worker recovery", exc_info=True)
@@ -6856,7 +7235,7 @@ def calendar_management(request):
         month_course_count = len({meeting.course_offering_id for meeting in meetings})
         month_holiday_count = len(holidays)
 
-    return render(request, "calendar_management.html", {
+    return render_page(request, "calendar_management.html", "partials/calendar_management_content.html", {
         "years": years,
         "year": year,
         "year_id": year_id,
@@ -7203,7 +7582,12 @@ def regenerate_qr(request, user_id):
 
 @capability_required(can_scan_attendance)
 def scanner(request):
-    return render(request, "scanner.html")
+    return render_page(
+        request,
+        "scanner.html",
+        "partials/scanner_content.html",
+        {},
+    )
 
 @capability_required(can_scan_attendance)
 def student_lookup(request):
@@ -7305,7 +7689,7 @@ def record_attendance(request, token, action):
         "scanned_at": timezone.localtime(rec.scanned_at).strftime("%H:%M:%S"),
     })
 
-@capability_required(can_scan_attendance)
+@capability_required(can_view_reports)
 def attendance_management(request):
     academic_year_id = int(request.GET["academic_year"]) if request.GET.get("academic_year", "").isdigit() else None
     level_id = int(request.GET["level"]) if request.GET.get("level", "").isdigit() else None
@@ -7459,8 +7843,6 @@ def attendance_reconcile(request):
         except (TypeError, ValueError):
             messages.error(request, _("Invalid date format."))
             return redirect("attendance-management")
-    from .admin_operation_tasks import run_admin_operation
-    from .admin_operations import create_admin_operation
 
     job = create_admin_operation(
         actor=request.user,
@@ -7470,7 +7852,7 @@ def attendance_reconcile(request):
         language=translation.get_language() or "ar",
     )
     try:
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("attendance reconciliation awaits worker recovery", exc_info=True)
@@ -7517,7 +7899,7 @@ def attendance_correction(request, record_id):
         record.save()
         messages.success(request, _("Attendance record corrected."))
         return redirect("attendance-management")
-    return render(request, "attendance_correction.html", {
+    return render_page(request, "attendance_correction.html", "partials/attendance_correction_content.html", {
         "record": record,
         "breadcrumb_items": generate_breadcrumb([
             (_("Attendance"), reverse("attendance-management")),
@@ -7886,7 +8268,6 @@ def report_dashboard(request):
             selected_year,
             course_offering_id=offering_pk,
         )
-        from .models import AdminOperationJob
 
         report_export_job = (
             AdminOperationJob.objects.filter(
@@ -7950,7 +8331,7 @@ def export_report_csv(request):
         writer.writerow([
             _("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Study Mode"),
             _("Level"), _("Academic Year"), _("Grade Earned"), _("Grade Available"), _("Grade %"),
-            _("Expected"), _("Full days"), _("Partial"), _("Absent"), _("Attendance Score"),
+            _("Expected"), _("Full days"), _("Fully scanned days"), _("Partial"), _("Absent"), _("Attendance Score"),
             _("Attendance %"), _("Absence %"),
         ])
         yield output.getvalue()
@@ -7963,7 +8344,7 @@ def export_report_csv(request):
                 _csv_safe_cell(_("Online") if row["study_mode"] == "online" else _("Offline") if row["study_mode"] == "offline" else row["study_mode"]),
                 row["level"],
                 _csv_safe_cell(row["year_name"]), row["grade_earned"], row["grade_available"],
-                row["grade_percent"], row["expected"], row["valid"], row["invalid"], row["absent"],
+                row["grade_percent"], row["expected"], row["valid"], row["fully_scanned"], row["invalid"], row["absent"],
                 row["attendance_score"], row["attendance_rate"], row["absence_rate"],
             ])
             yield output.getvalue()
@@ -8001,9 +8382,8 @@ def export_report_xlsx(request):
     except ValidationError as exc:
         return HttpResponse("; ".join(exc.messages), status=400)
     try:
-        from .admin_operation_tasks import run_admin_operation
 
-        run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+        enqueue_admin_operation(job.pk, queue="admin")
     except Exception:
         # The queued row is picked up by the recovery schedule.
         logger.warning("report export awaits worker recovery", exc_info=True)
@@ -8093,9 +8473,8 @@ def export_evaluation_xlsx(request):
             messages.error(request, "; ".join(exc.messages))
             return redirect(f"{reverse('promotion-formula')}?scope={formula.academic_year_level_id}")
         try:
-            from .admin_operation_tasks import run_admin_operation
 
-            run_admin_operation.apply_async(args=[str(job.pk)], queue="admin")
+            enqueue_admin_operation(job.pk, queue="admin")
         except Exception:
             # The queued row is picked up by the recovery schedule.
             logger.warning("evaluation export awaits worker recovery", exc_info=True)

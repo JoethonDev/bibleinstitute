@@ -1,0 +1,22 @@
+{% load i18n %}
+{% comment %}
+Domain rail links. The id is a persistent HTMX OOB region: page navigation
+replaces this element so the active domain follows cross-domain links.
+{% endcomment %}
+<nav id="aw-rail-nav" class="aw-rail-nav" aria-label="{% translate 'Workspace domains' %}">
+    {% for domain in aw.domains %}
+    <a class="aw-rail-link{% if domain.key == aw.active_domain_key %} is-active{% endif %}"
+       href="{% url domain.sections.0.url_name %}"
+       hx-get="{% url domain.sections.0.url_name %}"
+       hx-target="#display-page"
+       hx-select="#page-region"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-select-oob="#aw-rail-nav,#aw-sidebar-body,#aw-mobile-nav,#aw-topbar-crumbs"
+       data-tip="{{ domain.label }}"
+       aria-label="{{ domain.label }}"
+       {% if domain.key == aw.active_domain_key %}aria-current="true"{% endif %}>
+        <svg class="aw-ico" aria-hidden="true"><use href="#{{ domain.icon }}"></use></svg>
+    </a>
+    {% endfor %}
+</nav>

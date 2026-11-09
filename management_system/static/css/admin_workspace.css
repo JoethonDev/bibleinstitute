@@ -1,0 +1,2899 @@
+/* ==========================================================================
+   Bible Institute LMS - Admin workspace
+
+   Port of the maintained prototype (prototype/admin-redesign) into the Django
+   admin shell. Every token and component value is taken from the prototype;
+   proto.css is NOT imported. All rules are scoped under the admin-only body
+   theme owner (body.aw-admin) or the workspace roots (.aw-shell, #aw-drawer,
+   .aw-drawer-overlay, .aw-modal, #toast-stack), so student, public, login and
+   Bootstrap surfaces are untouched.
+
+   Layer order on admin pages:
+     Bootstrap 5.3.3 -> app.css -> psalmodia.css -> app_admin.css ->
+     admin_workspace.css (this file, last so .aw-* wins inside the shell).
+
+   !important is used only for documented override boundaries:
+     1. [hidden] on the drawer/menu, because component rules set display:flex.
+     2. Legacy shell grid/flex neutralisers are not used here; the new shell
+        uses its own .aw-shell grid, so no !important is needed for layout.
+     3. Document-level overflow guards on body.aw-admin.
+
+   Logical properties (margin-inline, padding-inline, inset-inline) are used
+   throughout so RTL mirrors as a real layout; [dir="rtl"] appears only for
+   icon direction and transforms.
+
+   Responsive: 991.98px is the preserved navigation breakpoint (prototype uses
+   920px); 720px is the phone density boundary; 575.98px compacts tables.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens (admin-only theme owner; inherited by the shell and every overlay)
+   -------------------------------------------------------------------------- */
+body.aw-admin {
+    --aw-ink: #142c34;
+    --aw-ink-2: #0c2027;
+    --aw-ink-3: #1d3a44;
+    --aw-ink-4: #274b57;
+    --aw-teal: #2e6474;
+    --aw-teal-2: #24505e;
+    --aw-teal-3: #1c414d;
+    --aw-teal-soft: #e4eff2;
+    --aw-teal-mist: #f0f6f7;
+    --aw-gold: #b98a3e;
+    --aw-gold-2: #946a26;
+    --aw-gold-soft: #f6ecd8;
+    --aw-cream: #f5f0e6;
+    --aw-cream-2: #efe8da;
+    --aw-paper: #fffdf9;
+    --aw-paper-2: #fbf7ef;
+    --aw-paper-3: #f7f2e8;
+    --aw-line: #e4dac6;
+    --aw-line-2: #d7cbb4;
+    --aw-line-cool: #dbe4e7;
+    --aw-row-line: #eee6d7;
+    --aw-muted: #6e7c82;
+    --aw-slate: #465a63;
+    --aw-green: #2e7a5b;
+    --aw-green-soft: #e2f1ea;
+    --aw-red: #b2453f;
+    --aw-red-soft: #f7e5e3;
+    --aw-amber: #a56a1c;
+    --aw-amber-soft: #f8efdc;
+    --aw-blue: #356c9b;
+    --aw-blue-soft: #e6eff7;
+    --aw-violet: #6b5b95;
+    --aw-violet-soft: #eeeaf7;
+    --aw-shadow-sm: 0 1px 2px rgba(20, 44, 52, .05);
+    --aw-shadow-md: 0 12px 30px rgba(20, 44, 52, .09);
+    --aw-shadow-lg: 0 30px 80px rgba(12, 32, 39, .28);
+    --aw-radius: 10px;
+    --aw-radius-lg: 14px;
+    --aw-radius-sm: 7px;
+    --aw-rail-w: 68px;
+    --aw-sidebar-w: 250px;
+    --aw-topbar-h: 60px;
+    --aw-font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Noto Sans", sans-serif;
+    --aw-font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Sakkal Majalla", serif;
+    --aw-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+    --aw-motion: .18s cubic-bezier(.22, .61, .36, 1);
+}
+
+body.aw-admin {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(60rem 26rem at 82% -12rem, rgba(185, 138, 62, .10), transparent 62%),
+        var(--aw-cream);
+    color: var(--aw-ink);
+    font-family: var(--aw-font-ui);
+    font-size: 13.5px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+}
+
+body.aw-admin.aw-drawer-open { overflow: hidden; }
+
+body.aw-admin h1,
+body.aw-admin h2,
+body.aw-admin h3,
+body.aw-admin h4,
+body.aw-admin h5,
+body.aw-admin p { margin: 0; }
+
+body.aw-admin a { color: var(--aw-teal); text-decoration: none; }
+body.aw-admin a:hover { color: var(--aw-teal-2); }
+body.aw-admin ul,
+body.aw-admin ol { margin: 0; padding: 0; list-style: none; }
+
+body.aw-admin :focus-visible {
+    outline: 2px solid var(--aw-gold);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+/* Icon primitives (prototype .ico) */
+body.aw-admin .aw-ico {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    stroke-width: 1.8;
+}
+body.aw-admin .aw-ico--sm { width: 15px; height: 15px; }
+body.aw-admin .aw-ico--lg { width: 22px; height: 22px; }
+
+body.aw-admin .aw-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Utility subset scoped to the workspace. */
+body.aw-admin .aw-muted { color: var(--aw-muted); }
+body.aw-admin .aw-small { font-size: 11.5px; }
+body.aw-admin .aw-strong { font-weight: 700; }
+
+body.aw-admin .aw-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.aw-admin .aw-flex { display: flex; align-items: center; gap: 8px; }
+body.aw-admin .aw-flex-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+body.aw-admin .aw-flex-wrap { flex-wrap: wrap; }
+body.aw-admin .aw-stack { display: flex; flex-direction: column; gap: 8px; }
+body.aw-admin .aw-stack--lg { gap: 16px; }
+body.aw-admin .aw-ms-auto { margin-inline-start: auto; }
+body.aw-admin .aw-w-100 { width: 100%; }
+
+
+/* --------------------------------------------------------------------------
+   2. Shell grid: rail 68px + contextual sidebar 250px + main
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-shell {
+    display: grid;
+    grid-template-columns: var(--aw-rail-w) var(--aw-sidebar-w) minmax(0, 1fr);
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+body.aw-admin .aw-shell.is-sidebar-collapsed {
+    grid-template-columns: var(--aw-rail-w) 0 minmax(0, 1fr);
+}
+
+body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar { display: none; }
+
+/* ---- Domain rail ---- */
+body.aw-admin .aw-rail {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: var(--aw-rail-w);
+    height: 100vh;
+    padding: 12px 0 14px;
+    background: linear-gradient(180deg, var(--aw-ink-2), var(--aw-ink));
+    border-inline-end: 1px solid rgba(255, 255, 255, .06);
+}
+
+body.aw-admin .aw-rail-logo {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(185, 138, 62, .35);
+    color: var(--aw-gold);
+}
+body.aw-admin .aw-rail-logo svg { width: 27px; height: 27px; }
+body.aw-admin .aw-rail-logo:hover { color: var(--aw-gold); background: rgba(255, 255, 255, .1); }
+
+body.aw-admin .aw-rail-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    padding: 0 9px;
+}
+
+body.aw-admin .aw-rail-link {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 50px;
+    height: 46px;
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: rgba(255, 255, 255, .62);
+    appearance: none;
+    cursor: pointer;
+    transition: background var(--aw-motion), color var(--aw-motion);
+}
+body.aw-admin .aw-rail-link:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+body.aw-admin .aw-rail-link.is-active { background: rgba(185, 138, 62, .15); color: var(--aw-gold); }
+body.aw-admin .aw-rail-link.is-active::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: -9px;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--aw-gold);
+}
+[dir="rtl"] body.aw-admin .aw-rail-link.is-active::before { border-radius: 3px 0 0 3px; }
+body.aw-admin .aw-rail-link .aw-ico { width: 20px; height: 20px; }
+
+/* Rail tooltip (prototype data-tip pattern) */
+body.aw-admin .aw-rail-link[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    inset-inline-start: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    z-index: 90;
+    padding: 5px 9px;
+    border-radius: 6px;
+    background: var(--aw-ink-2);
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--aw-motion), transform var(--aw-motion);
+    box-shadow: var(--aw-shadow-md);
+}
+[dir="rtl"] body.aw-admin .aw-rail-link[data-tip]::after { transform: translateY(-50%) translateX(4px); }
+body.aw-admin .aw-rail-link[data-tip]:hover::after,
+body.aw-admin .aw-rail-link[data-tip]:focus-visible::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+body.aw-admin .aw-rail-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+    width: 100%;
+    padding: 0 9px;
+}
+
+body.aw-admin .aw-rail-avatar {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    margin: 8px auto 0;
+    border-radius: 50%;
+    background: var(--aw-gold-soft);
+    color: var(--aw-ink);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    border: 2px solid rgba(255, 255, 255, .18);
+}
+
+/* ---- Contextual sidebar ---- */
+body.aw-admin .aw-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    width: var(--aw-sidebar-w);
+    height: 100vh;
+    background: var(--aw-paper-2);
+    border-inline-end: 1px solid var(--aw-line);
+    overflow: hidden;
+}
+
+body.aw-admin .aw-sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 10px 14px;
+}
+body.aw-admin .aw-sidebar-scroll::-webkit-scrollbar { width: 6px; }
+body.aw-admin .aw-sidebar-scroll::-webkit-scrollbar-thumb { background: var(--aw-line-2); border-radius: 99px; }
+
+body.aw-admin .aw-sidebar-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--aw-topbar-h);
+    margin: 0 -10px 14px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+}
+body.aw-admin .aw-domain-mark {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-2);
+}
+body.aw-admin .aw-domain-mark .aw-ico { width: 17px; height: 17px; }
+body.aw-admin .aw-sidebar-head-text { min-width: 0; }
+body.aw-admin .aw-sidebar-head-text h2 {
+    font-size: 13.5px;
+    font-weight: 750;
+    letter-spacing: -.01em;
+    color: var(--aw-ink);
+}
+body.aw-admin .aw-sidebar-head-text p {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--aw-gold-2);
+    font-weight: 750;
+}
+body.aw-admin .aw-sidebar-toggle { margin-inline-start: auto; }
+
+body.aw-admin .aw-side-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    margin: 14px 0 5px;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-side-label:first-child { margin-top: 0; }
+body.aw-admin .aw-side-label .aw-ico { width: 12px; height: 12px; color: var(--aw-gold-2); }
+
+body.aw-admin .aw-side-nav { display: flex; flex-direction: column; gap: 2px; }
+
+body.aw-admin .aw-side-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 36px;
+    padding: 7px 9px;
+    border-radius: 8px;
+    color: var(--aw-slate);
+    font-size: 12.5px;
+    font-weight: 550;
+    transition: background var(--aw-motion), color var(--aw-motion);
+}
+body.aw-admin .aw-side-link .aw-ico { width: 16px; height: 16px; color: var(--aw-muted); }
+body.aw-admin .aw-side-link:hover { background: var(--aw-paper-3); color: var(--aw-ink); }
+body.aw-admin .aw-side-link:hover .aw-ico { color: var(--aw-teal); }
+body.aw-admin .aw-side-link.is-active {
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-3);
+    font-weight: 700;
+}
+body.aw-admin .aw-side-link.is-active .aw-ico { color: var(--aw-teal-2); }
+body.aw-admin .aw-side-link.is-active::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--aw-gold);
+}
+body.aw-admin .aw-side-link--sub { margin-inline-start: 10px; }
+
+body.aw-admin .aw-actor-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 14px;
+    padding: 9px 10px;
+    border: 1px solid var(--aw-line);
+    border-radius: 9px;
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-actor-chip b { display: block; font-size: 12px; color: var(--aw-ink); }
+body.aw-admin .aw-actor-chip div > span { display: block; font-size: 10px; color: var(--aw-muted); }
+
+/* ---- Main column and top bar ---- */
+body.aw-admin .aw-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+body.aw-admin .aw-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: var(--aw-topbar-h);
+    padding: 8px 22px;
+    background: rgba(255, 253, 249, .88);
+    border-bottom: 1px solid var(--aw-line);
+    backdrop-filter: blur(14px);
+}
+
+body.aw-admin .aw-mobile-toggle { display: none; }
+
+body.aw-admin .aw-crumbs {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 11.5px;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-crumbs a { color: var(--aw-muted); font-weight: 600; }
+body.aw-admin .aw-crumbs a:hover { color: var(--aw-teal); }
+body.aw-admin .aw-crumb-sep { opacity: .45; }
+body.aw-admin .aw-crumb-current { color: var(--aw-ink); font-weight: 700; }
+
+body.aw-admin .aw-top-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: min(360px, 30vw);
+    min-width: 190px;
+    height: 36px;
+    margin-inline-start: auto;
+    padding: 0 9px 0 11px;
+    border: 1px solid var(--aw-line);
+    border-radius: 9px;
+    background: var(--aw-paper);
+    color: var(--aw-muted);
+    text-align: start;
+    cursor: pointer;
+    transition: border-color var(--aw-motion), box-shadow var(--aw-motion);
+}
+body.aw-admin .aw-top-search:hover { border-color: var(--aw-line-2); box-shadow: var(--aw-shadow-sm); }
+body.aw-admin .aw-top-search .aw-ico { width: 15px; height: 15px; }
+body.aw-admin .aw-top-search span { flex: 1; font-size: 12px; }
+
+body.aw-admin .aw-kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    border: 1px solid var(--aw-line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--aw-paper-2);
+    color: var(--aw-muted);
+    font-family: var(--aw-font-ui);
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+body.aw-admin .aw-top-actions { display: flex; align-items: center; gap: 6px; }
+
+/* The base icon-button display must not resurrect the mobile toggle on desktop. */
+body.aw-admin .aw-topbar .aw-mobile-toggle { display: none; }
+
+body.aw-admin .aw-icon-btn {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--aw-slate);
+    cursor: pointer;
+    transition: background var(--aw-motion), color var(--aw-motion), border-color var(--aw-motion);
+}
+body.aw-admin .aw-icon-btn:hover { background: var(--aw-paper-3); color: var(--aw-ink); border-color: var(--aw-line); }
+body.aw-admin .aw-icon-btn .aw-ico { width: 18px; height: 18px; }
+
+body.aw-admin .aw-avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-3);
+    font-size: 10.5px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: .02em;
+    border: 1px solid rgba(46, 100, 116, .16);
+}
+body.aw-admin .aw-avatar--lg { width: 46px; height: 46px; font-size: 14px; }
+body.aw-admin .aw-avatar--xl { width: 64px; height: 64px; font-size: 19px; }
+body.aw-admin .aw-avatar--gold { background: var(--aw-gold-soft); color: var(--aw-gold-2); border-color: #e7d3ae; }
+body.aw-admin .aw-avatar--green { background: var(--aw-green-soft); color: var(--aw-green); border-color: #cbe5d9; }
+body.aw-admin .aw-avatar--red { background: var(--aw-red-soft); color: var(--aw-red); border-color: #ecc9c6; }
+body.aw-admin .aw-avatar--violet { background: var(--aw-violet-soft); color: var(--aw-violet); border-color: #ddd6ee; }
+body.aw-admin .aw-avatar--blue { background: var(--aw-blue-soft); color: var(--aw-blue); border-color: #cfe0ef; }
+body.aw-admin .aw-avatar--ink { background: var(--aw-ink); color: #fff; border-color: var(--aw-ink); }
+
+body.aw-admin .aw-top-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 5px 3px 8px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    cursor: pointer;
+}
+body.aw-admin .aw-top-user:hover { border-color: var(--aw-line); background: var(--aw-paper); }
+body.aw-admin .aw-top-user b { font-size: 11.5px; line-height: 1.2; display: block; }
+body.aw-admin .aw-top-user-text > span { display: block; font-size: 9.5px; color: var(--aw-muted); line-height: 1.2; }
+
+body.aw-admin .aw-lang-select {
+    min-height: 30px;
+    padding: 3px 8px;
+    border: 1px solid var(--aw-line);
+    border-radius: 7px;
+    background: var(--aw-paper);
+    color: var(--aw-slate);
+    font-size: 11px;
+    font-weight: 700;
+}
+body.aw-admin .aw-inline-form { display: inline-flex; align-items: center; margin: 0; }
+
+/* Menus (one delegated controller in admin_shell.js) */
+body.aw-admin .aw-menu-wrap { position: relative; }
+body.aw-admin .aw-menu {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 4px);
+    z-index: 50;
+    min-width: 190px;
+    padding: 4px;
+    border: 1px solid var(--aw-line);
+    border-radius: 9px;
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-md);
+    display: block;
+}
+body.aw-admin .aw-menu[hidden] { display: none !important; }
+body.aw-admin .aw-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--aw-slate);
+    font-size: 11.5px;
+    text-align: start;
+    cursor: pointer;
+}
+body.aw-admin .aw-menu-item:hover { background: var(--aw-paper-3); color: var(--aw-ink); }
+body.aw-admin .aw-menu-item .aw-ico { width: 14px; height: 14px; color: var(--aw-muted); }
+body.aw-admin .aw-menu-item--danger { color: var(--aw-red); }
+body.aw-admin .aw-menu-item--danger .aw-ico { color: var(--aw-red); }
+body.aw-admin .aw-menu-sep { height: 1px; margin: 4px; background: var(--aw-line); }
+
+/* ---- Workspace canvas ---- */
+body.aw-admin .aw-workspace {
+    width: 100%;
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 24px 28px 64px;
+    min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   3. Page head, context strip, tabs
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 22px;
+    margin-bottom: 18px;
+}
+body.aw-admin .aw-page-head-main { min-width: 0; }
+body.aw-admin .aw-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 4px;
+    color: var(--aw-gold-2);
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+body.aw-admin .aw-eyebrow::before { content: ""; width: 18px; height: 1px; background: var(--aw-gold); }
+body.aw-admin .aw-page-title {
+    font-family: var(--aw-font-display);
+    font-size: clamp(24px, 2.4vw, 32px);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    color: var(--aw-ink);
+}
+body.aw-admin .aw-page-desc { margin-top: 5px; max-width: 760px; color: var(--aw-muted); font-size: 12.5px; }
+body.aw-admin .aw-page-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; flex: 0 0 auto; }
+
+body.aw-admin .aw-context-strip {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: -4px 0 18px;
+    padding: 9px 12px;
+    border: 1px solid var(--aw-line);
+    border-radius: 9px;
+    background: var(--aw-paper-2);
+    font-size: 11.5px;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-context-strip b { color: var(--aw-ink); }
+body.aw-admin .aw-ctx-item { display: flex; align-items: center; gap: 6px; }
+body.aw-admin .aw-context-strip .aw-ico { width: 14px; height: 14px; color: var(--aw-gold-2); }
+body.aw-admin .aw-ctx-sep { width: 1px; height: 16px; background: var(--aw-line); }
+
+body.aw-admin .aw-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--aw-line);
+    scrollbar-width: none;
+}
+body.aw-admin .aw-tabs::-webkit-scrollbar { display: none; }
+body.aw-admin .aw-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--aw-muted);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+body.aw-admin .aw-tab:hover { color: var(--aw-ink); }
+body.aw-admin .aw-tab.is-active { color: var(--aw-teal-3); font-weight: 750; }
+body.aw-admin .aw-tab.is-active::after {
+    content: "";
+    position: absolute;
+    inset-inline: 10px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--aw-gold);
+}
+body.aw-admin .aw-tab .aw-count {
+    padding: 1px 6px;
+    border-radius: 99px;
+    background: var(--aw-paper-3);
+    border: 1px solid var(--aw-line);
+    font-size: 9.5px;
+    font-weight: 750;
+    color: var(--aw-slate);
+}
+body.aw-admin .aw-tab.is-active .aw-count {
+    background: var(--aw-teal-soft);
+    border-color: #cfe2e7;
+    color: var(--aw-teal-3);
+}
+
+
+
+
+
+/* --------------------------------------------------------------------------
+   4. Buttons
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 6px 12px;
+    border: 1px solid var(--aw-line-2);
+    border-radius: 8px;
+    background: var(--aw-paper);
+    color: var(--aw-slate);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--aw-motion), border-color var(--aw-motion), color var(--aw-motion), box-shadow var(--aw-motion);
+}
+body.aw-admin .aw-btn:hover { background: var(--aw-paper-2); border-color: var(--aw-line-2); color: var(--aw-ink); box-shadow: var(--aw-shadow-sm); }
+body.aw-admin .aw-btn .aw-ico { width: 15px; height: 15px; }
+body.aw-admin .aw-btn--primary { background: var(--aw-teal); border-color: var(--aw-teal); color: #fff; }
+body.aw-admin .aw-btn--primary:hover { background: var(--aw-teal-2); border-color: var(--aw-teal-2); color: #fff; }
+body.aw-admin .aw-btn--gold { background: var(--aw-gold); border-color: var(--aw-gold); color: var(--aw-ink-2); }
+body.aw-admin .aw-btn--gold:hover { background: var(--aw-gold-2); border-color: var(--aw-gold-2); color: #fff; }
+body.aw-admin .aw-btn--ghost { background: transparent; border-color: transparent; color: var(--aw-slate); }
+body.aw-admin .aw-btn--ghost:hover { background: var(--aw-paper-3); border-color: var(--aw-line); }
+body.aw-admin .aw-btn--outline { background: transparent; border-color: var(--aw-line-2); }
+body.aw-admin .aw-btn--danger { background: var(--aw-red-soft); border-color: #e8c5c2; color: var(--aw-red); }
+body.aw-admin .aw-btn--danger:hover { background: var(--aw-red); border-color: var(--aw-red); color: #fff; }
+body.aw-admin .aw-btn--sm { min-height: 28px; padding: 4px 9px; font-size: 11px; border-radius: 6px; }
+body.aw-admin .aw-btn--lg { min-height: 38px; padding: 8px 16px; font-size: 12.5px; }
+body.aw-admin .aw-btn--icon { width: 32px; padding: 0; }
+body.aw-admin .aw-btn:disabled,
+body.aw-admin .aw-btn.is-disabled { opacity: .5; pointer-events: none; }
+
+/* --------------------------------------------------------------------------
+   5. Inputs and fields
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+body.aw-admin .aw-field > label,
+body.aw-admin .aw-field-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-field .aw-req { color: var(--aw-red); }
+body.aw-admin .aw-input,
+body.aw-admin .aw-select,
+body.aw-admin .aw-textarea {
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid var(--aw-line-2);
+    border-radius: 8px;
+    background: var(--aw-paper);
+    color: var(--aw-ink);
+    font-size: 12.5px;
+    transition: border-color var(--aw-motion), box-shadow var(--aw-motion);
+}
+body.aw-admin .aw-input::placeholder,
+body.aw-admin .aw-textarea::placeholder { color: #98a3a7; }
+body.aw-admin .aw-input:focus,
+body.aw-admin .aw-select:focus,
+body.aw-admin .aw-textarea:focus {
+    outline: none;
+    border-color: var(--aw-teal);
+    box-shadow: 0 0 0 3px rgba(46, 100, 116, .12);
+}
+body.aw-admin .aw-textarea { min-height: 88px; resize: vertical; }
+body.aw-admin .aw-field-hint { font-size: 10.5px; color: var(--aw-muted); }
+body.aw-admin .aw-field-error { font-size: 10.5px; color: var(--aw-red); font-weight: 650; }
+
+body.aw-admin .aw-search-wrap { position: relative; }
+body.aw-admin .aw-search-wrap > .aw-ico {
+    position: absolute;
+    inset-inline-start: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 15px;
+    color: var(--aw-muted);
+    pointer-events: none;
+}
+body.aw-admin .aw-input--search { padding-inline-start: 32px; }
+
+/* Crispy/Bootstrap fields rendered inside the shell. */
+body.aw-admin .aw-shell .form-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-shell .form-control,
+body.aw-admin .aw-shell .form-select {
+    min-height: 36px;
+    border: 1px solid var(--aw-line-2);
+    border-radius: 8px;
+    background-color: var(--aw-paper);
+    color: var(--aw-ink);
+    font-size: 12.5px;
+}
+body.aw-admin .aw-shell .form-control:focus,
+body.aw-admin .aw-shell .form-select:focus {
+    border-color: var(--aw-teal);
+    box-shadow: 0 0 0 3px rgba(46, 100, 116, .12);
+}
+body.aw-admin .aw-shell .form-check-input:checked {
+    background-color: var(--aw-teal);
+    border-color: var(--aw-teal);
+}
+body.aw-admin .aw-shell .invalid-feedback { font-size: 10.5px; }
+
+/* --------------------------------------------------------------------------
+   6. Cards, KPIs, grids
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-card {
+    min-width: 0;
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-sm);
+}
+body.aw-admin .aw-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 46px;
+    padding: 11px 15px;
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-card-head h3 { font-size: 12.5px; font-weight: 750; letter-spacing: -.005em; }
+body.aw-admin .aw-card-head p { font-size: 10.5px; color: var(--aw-muted); margin-top: 1px; }
+body.aw-admin .aw-card-head .aw-ico { color: var(--aw-gold-2); }
+body.aw-admin .aw-card-title { display: flex; align-items: center; gap: 7px; }
+body.aw-admin .aw-card-body { padding: 15px; }
+body.aw-admin .aw-card-body--tight { padding: 10px 12px; }
+body.aw-admin .aw-card-body--flush { padding: 0; }
+body.aw-admin .aw-card-foot {
+    padding: 10px 15px;
+    border-top: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+    border-radius: 0 0 var(--aw-radius) var(--aw-radius);
+}
+
+body.aw-admin .aw-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+body.aw-admin .aw-kpi {
+    position: relative;
+    min-width: 0;
+    padding: 13px 14px 12px;
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-sm);
+    overflow: hidden;
+}
+body.aw-admin .aw-kpi::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--aw-teal);
+    opacity: .7;
+}
+body.aw-admin .aw-kpi--gold::before { background: var(--aw-gold); }
+body.aw-admin .aw-kpi--green::before { background: var(--aw-green); }
+body.aw-admin .aw-kpi--red::before { background: var(--aw-red); }
+body.aw-admin .aw-kpi--blue::before { background: var(--aw-blue); }
+body.aw-admin .aw-kpi--violet::before { background: var(--aw-violet); }
+body.aw-admin .aw-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+body.aw-admin .aw-kpi-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-kpi-icon {
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    border-radius: 7px;
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-2);
+}
+body.aw-admin .aw-kpi--gold .aw-kpi-icon { background: var(--aw-gold-soft); color: var(--aw-gold-2); }
+body.aw-admin .aw-kpi--green .aw-kpi-icon { background: var(--aw-green-soft); color: var(--aw-green); }
+body.aw-admin .aw-kpi--red .aw-kpi-icon { background: var(--aw-red-soft); color: var(--aw-red); }
+body.aw-admin .aw-kpi--blue .aw-kpi-icon { background: var(--aw-blue-soft); color: var(--aw-blue); }
+body.aw-admin .aw-kpi--violet .aw-kpi-icon { background: var(--aw-violet-soft); color: var(--aw-violet); }
+body.aw-admin .aw-kpi-icon .aw-ico { width: 15px; height: 15px; }
+body.aw-admin .aw-kpi-value {
+    margin-top: 7px;
+    font-family: var(--aw-font-display);
+    font-size: 27px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.02em;
+}
+body.aw-admin .aw-kpi-value small { font-family: var(--aw-font-ui); font-size: 12px; color: var(--aw-muted); font-weight: 500; }
+body.aw-admin .aw-kpi-meta { display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 10.5px; color: var(--aw-muted); }
+
+
+
+body.aw-admin .aw-delta .aw-ico { width: 11px; height: 11px; }
+
+body.aw-admin .aw-grid { display: grid; gap: 14px; }
+body.aw-admin .aw-grid--2 { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); }
+body.aw-admin .aw-grid--2-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body.aw-admin .aw-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+body.aw-admin .aw-grid--main-rail { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; }
+
+
+/* --------------------------------------------------------------------------
+   7. Attention list, quick actions, timeline, stat bars, progress
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-attn-list { display: flex; flex-direction: column; }
+body.aw-admin .aw-attn-item {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 15px;
+    border-bottom: 1px solid var(--aw-line);
+    transition: background var(--aw-motion);
+}
+body.aw-admin .aw-attn-item:last-child { border-bottom: 0; }
+body.aw-admin .aw-attn-item:hover { background: var(--aw-paper-2); }
+body.aw-admin .aw-attn-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--aw-amber-soft);
+    color: var(--aw-amber);
+}
+body.aw-admin .aw-attn-icon--red { background: var(--aw-red-soft); color: var(--aw-red); }
+
+
+
+body.aw-admin .aw-attn-icon .aw-ico { width: 16px; height: 16px; }
+body.aw-admin .aw-attn-main { min-width: 0; }
+body.aw-admin .aw-attn-main b { display: block; font-size: 12px; }
+body.aw-admin .aw-attn-main span { display: block; margin-top: 1px; font-size: 10.5px; color: var(--aw-muted); }
+body.aw-admin .aw-attn-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--aw-teal);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+body.aw-admin .aw-attn-go .aw-ico { width: 13px; height: 13px; }
+
+body.aw-admin .aw-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+body.aw-admin .aw-quick-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    border: 1px solid var(--aw-line);
+    border-radius: 8px;
+    background: var(--aw-paper);
+    color: var(--aw-slate);
+    font-size: 11.5px;
+    font-weight: 650;
+    text-align: start;
+    transition: border-color var(--aw-motion), background var(--aw-motion), transform var(--aw-motion);
+}
+body.aw-admin .aw-quick-action:hover {
+    border-color: var(--aw-gold);
+    background: var(--aw-gold-soft);
+    color: var(--aw-ink);
+    transform: translateY(-1px);
+}
+body.aw-admin .aw-quick-action .aw-ico { width: 15px; height: 15px; color: var(--aw-teal); }
+body.aw-admin .aw-quick-action:hover .aw-ico { color: var(--aw-gold-2); }
+
+body.aw-admin .aw-timeline { position: relative; padding-inline-start: 16px; }
+body.aw-admin .aw-timeline::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: var(--aw-line);
+}
+body.aw-admin .aw-tl-item { position: relative; padding: 0 0 14px; }
+body.aw-admin .aw-tl-item:last-child { padding-bottom: 0; }
+body.aw-admin .aw-tl-item::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: -15px;
+    top: 5px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--aw-paper);
+    border: 2px solid var(--aw-gold);
+}
+body.aw-admin .aw-tl-item b { display: block; font-size: 11.5px; font-weight: 650; }
+body.aw-admin .aw-tl-item span { display: block; margin-top: 1px; font-size: 10px; color: var(--aw-muted); }
+
+
+
+body.aw-admin .aw-stat-row .aw-label { color: var(--aw-slate); font-weight: 600; }
+body.aw-admin .aw-stat-row .aw-value { text-align: end; font-weight: 750; font-variant-numeric: tabular-nums; }
+body.aw-admin .aw-bar { height: 7px; border-radius: 99px; background: var(--aw-paper-3); overflow: hidden; }
+body.aw-admin .aw-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--aw-teal); }
+
+
+
+
+
+body.aw-admin .aw-progress { height: 6px; border-radius: 99px; background: var(--aw-paper-3); overflow: hidden; }
+body.aw-admin .aw-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--aw-teal), #3f8497);
+}
+
+
+
+body.aw-admin .aw-progress-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 3px;
+    font-size: 10px;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-progress-label b { color: var(--aw-ink); font-size: 10.5px; }
+
+/* --------------------------------------------------------------------------
+   8. Tables
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-table-card {
+    min-width: 0;
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-sm);
+    overflow: hidden;
+}
+body.aw-admin .aw-card-body--flush > .aw-table-card { border: 0; border-radius: 0; box-shadow: none; }
+
+body.aw-admin .aw-table-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-table-tools .aw-search-wrap { flex: 1 1 220px; max-width: 320px; }
+body.aw-admin .aw-table-tools .aw-select { width: auto; min-width: 120px; }
+body.aw-admin .aw-table-tools .aw-spacer { flex: 1; }
+body.aw-admin .aw-table-count { font-size: 10.5px; color: var(--aw-muted); white-space: nowrap; }
+
+body.aw-admin .aw-table-scroll-hint {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 11px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+    color: var(--aw-muted);
+    font-size: 9.5px;
+    font-weight: 650;
+}
+
+body.aw-admin .aw-table-wrap {
+    width: 100%;
+    overflow: auto;
+    max-height: 68vh;
+    -webkit-overflow-scrolling: touch;
+}
+body.aw-admin .aw-table-wrap::-webkit-scrollbar { height: 8px; width: 8px; }
+body.aw-admin .aw-table-wrap::-webkit-scrollbar-thumb { background: var(--aw-line-2); border-radius: 99px; }
+
+body.aw-admin .aw-table { width: 100%; font-size: 11.8px; border-collapse: collapse; }
+/* Fixed-width rule editor table (promotion formula): mirrors the legacy
+   former rules-table geometry under the canonical aw-* namespace. */
+body.aw-admin .aw-rules-table { min-width: 48rem; table-layout: fixed; }
+body.aw-admin .aw-rules-table th:nth-child(1),
+body.aw-admin .aw-rules-table td:nth-child(1) { width: 25%; }
+body.aw-admin .aw-rules-table th:nth-child(2),
+body.aw-admin .aw-rules-table td:nth-child(2) { width: 23%; }
+body.aw-admin .aw-rules-table th:nth-child(3),
+body.aw-admin .aw-rules-table td:nth-child(3),
+body.aw-admin .aw-rules-table th:nth-child(4),
+body.aw-admin .aw-rules-table td:nth-child(4) { width: 18%; }
+body.aw-admin .aw-rules-table th:nth-child(5),
+body.aw-admin .aw-rules-table td:nth-child(5) { width: 16%; }
+body.aw-admin .aw-rules-table td > .form-control,
+body.aw-admin .aw-rules-table td > .form-select { width: 100%; min-width: 0; }
+body.aw-admin .aw-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 8px 11px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+    color: var(--aw-muted);
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    text-align: start;
+    white-space: nowrap;
+}
+body.aw-admin .aw-table thead th[data-sort],
+body.aw-admin .aw-table thead th.sortable-column { cursor: pointer; user-select: none; }
+body.aw-admin .aw-table thead th[data-sort]:hover,
+body.aw-admin .aw-table thead th.sortable-column:hover { color: var(--aw-ink); }
+body.aw-admin .aw-table tbody td {
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--aw-row-line);
+    vertical-align: middle;
+}
+body.aw-admin .aw-table tbody tr:last-child td { border-bottom: 0; }
+body.aw-admin .aw-table tbody tr { transition: background var(--aw-motion); }
+body.aw-admin .aw-table tbody tr:hover { background: var(--aw-teal-mist); }
+body.aw-admin .aw-table tbody tr.is-selected { background: var(--aw-teal-soft); }
+body.aw-admin .aw-table .aw-num,
+body.aw-admin .aw-table .aw-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+body.aw-admin .aw-table .aw-date { color: var(--aw-muted); }
+body.aw-admin .aw-table .aw-cell-check { width: 32px; padding-inline-end: 0; }
+body.aw-admin .aw-table .aw-cell-check input { width: 14px; height: 14px; accent-color: var(--aw-teal); }
+body.aw-admin .aw-table .aw-cell-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+body.aw-admin .aw-table .aw-cell-main b { display: block; font-size: 11.8px; font-weight: 650; color: var(--aw-ink); }
+/* Only the text block under the name; never the avatar/badge span itself. */
+body.aw-admin .aw-table .aw-cell-main > div > span { display: block; font-size: 10px; color: var(--aw-muted); }
+body.aw-admin .aw-table .aw-cell-main a b { color: var(--aw-ink); }
+body.aw-admin .aw-table .aw-cell-main a:hover b { color: var(--aw-teal); }
+body.aw-admin .aw-table .aw-row-actions { display: flex; align-items: center; gap: 2px; justify-content: flex-end; }
+body.aw-admin .aw-table .aw-row-actions .aw-icon-btn { width: 27px; height: 27px; }
+body.aw-admin .aw-table .aw-row-actions .aw-icon-btn .aw-ico { width: 14px; height: 14px; }
+body.aw-admin .aw-table .aw-sticky-col { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--aw-paper); }
+body.aw-admin .aw-table tbody tr:hover .aw-sticky-col { background: var(--aw-teal-mist); }
+body.aw-admin .aw-table thead .aw-sticky-col { z-index: 3; background: var(--aw-paper-2); }
+body.aw-admin .aw-table .aw-cell-strong { font-weight: 700; color: var(--aw-ink); }
+body.aw-admin .aw-table .aw-cell-sub { display: block; font-size: 9.8px; color: var(--aw-muted); font-weight: 500; }
+body.aw-admin .aw-table .aw-cell-empty { padding: 34px 14px; text-align: center; color: var(--aw-muted); }
+
+body.aw-admin .aw-table-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 9px 12px;
+    border-top: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+}
+
+body.aw-admin .aw-pager { display: flex; align-items: center; gap: 3px; }
+body.aw-admin .aw-pager a,
+body.aw-admin .aw-pager span {
+    display: inline-grid;
+    place-items: center;
+    min-width: 27px;
+    height: 27px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--aw-slate);
+    font-size: 11px;
+    font-weight: 650;
+}
+body.aw-admin .aw-pager a:hover { background: var(--aw-paper); border-color: var(--aw-line); }
+body.aw-admin .aw-pager .is-active { background: var(--aw-teal); color: #fff; border-color: var(--aw-teal); }
+body.aw-admin .aw-pager .is-disabled { opacity: .35; pointer-events: none; }
+body.aw-admin .aw-pager .is-gap { border: 0; pointer-events: none; }
+body.aw-admin .aw-page-info { font-size: 10.5px; color: var(--aw-muted); }
+
+body.aw-admin .aw-bulkbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 9px 12px;
+    background: var(--aw-ink);
+    color: #fff;
+    border-top: 1px solid var(--aw-ink-2);
+}
+body.aw-admin .aw-bulkbar .aw-count { font-size: 11.5px; font-weight: 700; }
+body.aw-admin .aw-bulkbar .aw-count b { color: var(--aw-gold); }
+body.aw-admin .aw-bulkbar .aw-btn {
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(255, 255, 255, .16);
+    color: #fff;
+}
+body.aw-admin .aw-bulkbar .aw-btn:hover { background: rgba(255, 255, 255, .16); }
+body.aw-admin .aw-bulkbar .aw-btn--danger { background: rgba(178, 69, 63, .28); border-color: rgba(255, 255, 255, .12); }
+body.aw-admin .aw-bulkbar .aw-clear {
+    color: rgba(255, 255, 255, .7);
+    font-size: 11px;
+    text-decoration: underline;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   9. Pills, chips, tags
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 20px;
+    padding: 2px 8px;
+    border: 1px solid var(--aw-line);
+    border-radius: 99px;
+    background: var(--aw-paper-2);
+    color: var(--aw-slate);
+    font-size: 9.8px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+body.aw-admin .aw-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .8; }
+body.aw-admin .aw-pill--plain::before { display: none; }
+body.aw-admin .aw-pill--green { background: var(--aw-green-soft); border-color: #cbe5d9; color: var(--aw-green); }
+body.aw-admin .aw-pill--red { background: var(--aw-red-soft); border-color: #ecc9c6; color: var(--aw-red); }
+body.aw-admin .aw-pill--amber { background: var(--aw-amber-soft); border-color: #ecd7b4; color: var(--aw-amber); }
+body.aw-admin .aw-pill--teal { background: var(--aw-teal-soft); border-color: #cfe2e7; color: var(--aw-teal-3); }
+body.aw-admin .aw-pill--blue { background: var(--aw-blue-soft); border-color: #cfe0ef; color: var(--aw-blue); }
+body.aw-admin .aw-pill--violet { background: var(--aw-violet-soft); border-color: #ddd6ee; color: var(--aw-violet); }
+body.aw-admin .aw-pill--gold { background: var(--aw-gold-soft); border-color: #e8d4ad; color: var(--aw-gold-2); }
+body.aw-admin .aw-pill--muted { background: var(--aw-paper-3); border-color: var(--aw-line); color: var(--aw-muted); }
+body.aw-admin .aw-pill--lg { min-height: 24px; padding: 3px 10px; font-size: 10.5px; }
+
+body.aw-admin .aw-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border: 1px solid var(--aw-line);
+    border-radius: 6px;
+    background: var(--aw-paper);
+    color: var(--aw-slate);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+body.aw-admin .aw-chip .aw-ico { width: 12px; height: 12px; color: var(--aw-gold-2); }
+body.aw-admin .aw-chip--teal { background: var(--aw-teal-soft); border-color: #cfe2e7; color: var(--aw-teal-3); }
+body.aw-admin .aw-chip--gold { background: var(--aw-gold-soft); border-color: #e8d4ad; color: var(--aw-gold-2); }
+
+body.aw-admin .aw-chip-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+
+
+
+
+
+
+
+/* --------------------------------------------------------------------------
+   10. Empty states, alerts, meta and kv rows
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 42px 18px;
+    text-align: center;
+}
+body.aw-admin .aw-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: var(--aw-paper-3);
+    color: var(--aw-muted);
+    margin-bottom: 10px;
+}
+body.aw-admin .aw-empty-icon .aw-ico { width: 22px; height: 22px; }
+body.aw-admin .aw-empty h4 { font-size: 13px; font-weight: 750; }
+body.aw-admin .aw-empty p { max-width: 340px; margin-top: 3px; font-size: 11px; color: var(--aw-muted); }
+
+body.aw-admin .aw-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--aw-line);
+    border-radius: 8px;
+    background: var(--aw-paper-2);
+    font-size: 11.5px;
+    color: var(--aw-slate);
+}
+body.aw-admin .aw-alert .aw-ico { width: 16px; height: 16px; flex: 0 0 auto; }
+body.aw-admin .aw-alert b { color: var(--aw-ink); }
+body.aw-admin .aw-alert--info { background: var(--aw-blue-soft); border-color: #cfe0ef; color: #2c587e; }
+body.aw-admin .aw-alert--info .aw-ico { color: var(--aw-blue); }
+body.aw-admin .aw-alert--warn { background: var(--aw-amber-soft); border-color: #ecd7b4; color: #7a5318; }
+body.aw-admin .aw-alert--warn .aw-ico { color: var(--aw-amber); }
+body.aw-admin .aw-alert--danger { background: var(--aw-red-soft); border-color: #ecc9c6; color: #84332f; }
+body.aw-admin .aw-alert--danger .aw-ico { color: var(--aw-red); }
+body.aw-admin .aw-alert--success { background: var(--aw-green-soft); border-color: #cbe5d9; color: #226147; }
+body.aw-admin .aw-alert--success .aw-ico { color: var(--aw-green); }
+
+body.aw-admin .aw-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px 16px;
+}
+body.aw-admin .aw-meta-item .aw-label {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-meta-item .aw-value { display: block; margin-top: 2px; font-size: 12px; font-weight: 650; }
+body.aw-admin .aw-meta-item .aw-value a { font-weight: 650; }
+
+body.aw-admin .aw-kv {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--aw-row-line);
+    font-size: 11.5px;
+}
+body.aw-admin .aw-kv:last-child { border-bottom: 0; }
+body.aw-admin .aw-kv dt { color: var(--aw-muted); }
+body.aw-admin .aw-kv dd { margin: 0; text-align: end; font-weight: 650; }
+
+/* --------------------------------------------------------------------------
+   11. Overlays: drawer, modal skin, toast skin, palette skin
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(12, 32, 39, .42);
+    backdrop-filter: blur(3px);
+    opacity: 1;
+    transition: opacity var(--aw-motion);
+}
+body.aw-admin .aw-drawer-overlay[hidden] { display: none !important; }
+
+body.aw-admin .aw-drawer {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 85;
+    display: flex;
+    flex-direction: column;
+    width: min(470px, 94vw);
+    background: var(--aw-paper);
+    border-inline-start: 1px solid var(--aw-line);
+    box-shadow: var(--aw-shadow-lg);
+    animation: aw-drawer-in .24s cubic-bezier(.22, .61, .36, 1) both;
+}
+body.aw-admin .aw-drawer[hidden] { display: none !important; }
+@keyframes aw-drawer-in {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+[dir="rtl"] body.aw-admin .aw-drawer { border-inline-start: 0; border-inline-end: 1px solid var(--aw-line); }
+[dir="rtl"] body.aw-admin .aw-drawer { animation-name: aw-drawer-in-rtl; }
+@keyframes aw-drawer-in-rtl {
+    from { opacity: 0; transform: translateX(-24px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+body.aw-admin .aw-drawer-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-drawer-head h2 { font-family: var(--aw-font-display); font-size: 20px; font-weight: 600; }
+body.aw-admin .aw-drawer-head p { margin-top: 2px; font-size: 11px; color: var(--aw-muted); }
+body.aw-admin .aw-drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+body.aw-admin .aw-drawer-state { padding: 28px 8px; text-align: center; color: var(--aw-muted); font-size: 11.5px; }
+
+
+
+
+
+
+
+/* Bootstrap modal skin: keeps #globalConfirmModal and every page modal. */
+body.aw-admin .aw-modal .modal-content {
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius-lg);
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-lg);
+    color: var(--aw-slate);
+    font-family: var(--aw-font-ui);
+}
+body.aw-admin .aw-modal .modal-header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-modal .modal-title {
+    font-family: var(--aw-font-display);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--aw-ink);
+}
+body.aw-admin .aw-modal .modal-body { padding: 15px 18px; font-size: 12px; color: var(--aw-slate); }
+body.aw-admin .aw-modal .modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+    border-radius: 0 0 calc(var(--aw-radius-lg) - 1px) calc(var(--aw-radius-lg) - 1px);
+}
+
+/* Toast skin over the existing Alpine store and #toast-stack. */
+body.aw-admin #toast-stack .ps-toast {
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 9px;
+    background: var(--aw-ink);
+    color: #fff;
+    box-shadow: var(--aw-shadow-lg);
+    font-size: 11.5px;
+    font-family: var(--aw-font-ui);
+}
+body.aw-admin #toast-stack .ps-toast i { color: var(--aw-gold); }
+body.aw-admin #toast-stack .ps-toast .ps-toast-body { color: #fff; }
+body.aw-admin #toast-stack .ps-toast-close { color: rgba(255, 255, 255, .65); }
+
+/* Palette skin over the existing command palette modal. */
+body.aw-admin #commandPaletteModal .modal-content.cmd-palette {
+    border: 1px solid var(--aw-line);
+    border-radius: 13px;
+    background: var(--aw-paper);
+    box-shadow: 0 40px 100px rgba(0, 0, 0, .38);
+    font-family: var(--aw-font-ui);
+}
+body.aw-admin #commandPaletteModal .modal-header { border-bottom: 1px solid var(--aw-line); }
+body.aw-admin #commandPaletteModal .modal-title {
+    font-family: var(--aw-font-display);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--aw-ink);
+}
+body.aw-admin #commandPaletteModal #command-palette-input {
+    min-height: 38px;
+    border: 1px solid var(--aw-line-2);
+    border-radius: 8px;
+    background: var(--aw-paper-2);
+    font-size: 14px;
+}
+body.aw-admin #commandPaletteModal .list-group-item { font-size: 12px; }
+body.aw-admin #commandPaletteModal .list-group-item.active {
+    background: var(--aw-teal-soft);
+    border-color: #cfe2e7;
+    color: var(--aw-ink);
+}
+
+/* --------------------------------------------------------------------------
+   12. Forms and editors
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+body.aw-admin .aw-form-grid .aw-span-2 { grid-column: 1 / -1; }
+body.aw-admin .aw-form-section { padding: 16px; border-bottom: 1px solid var(--aw-line); }
+body.aw-admin .aw-form-section:last-child { border-bottom: 0; }
+body.aw-admin .aw-form-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+body.aw-admin .aw-form-section-head h3 { font-size: 12.5px; font-weight: 800; }
+body.aw-admin .aw-form-section-head p { margin-top: 2px; font-size: 10.5px; color: var(--aw-muted); }
+body.aw-admin .aw-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    padding: 12px 16px;
+    background: var(--aw-paper);
+    border-top: 1px solid var(--aw-line);
+    border-radius: 0 0 calc(var(--aw-radius) - 1px) calc(var(--aw-radius) - 1px);
+}
+body.aw-admin .aw-form-section:last-child > .aw-form-actions:last-child { margin: 16px -16px -16px; }
+body.aw-admin .aw-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+body.aw-admin .aw-editor-rail {
+    position: sticky;
+    top: calc(var(--aw-topbar-h) + 14px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+body.aw-admin .aw-checklist { display: flex; flex-direction: column; gap: 7px; }
+body.aw-admin .aw-check-item { display: flex; align-items: flex-start; gap: 8px; font-size: 11.2px; color: var(--aw-slate); }
+body.aw-admin .aw-check-item .aw-ico { width: 14px; height: 14px; margin-top: 1px; color: var(--aw-green); flex: 0 0 auto; }
+body.aw-admin .aw-check-item--todo .aw-ico { color: var(--aw-line-2); }
+body.aw-admin .aw-check-item b { color: var(--aw-ink); }
+
+/* --------------------------------------------------------------------------
+   13. Offcanvas navigation
+   -------------------------------------------------------------------------- */
+body.aw-admin .offcanvas#mobileAdminMenu.aw-offcanvas {
+    width: min(320px, 88vw);
+    background: var(--aw-paper-2);
+    color: var(--aw-ink);
+    border-inline-end: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-offcanvas-head {
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+}
+body.aw-admin .aw-offcanvas-head .offcanvas-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 750;
+    color: var(--aw-ink);
+}
+body.aw-admin .aw-offcanvas-body { padding: 14px 12px 18px; overflow-y: auto; }
+body.aw-admin .aw-mobile-nav { display: flex; flex-direction: column; gap: 2px; }
+
+/* --------------------------------------------------------------------------
+   14. Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 1280px) {
+    body.aw-admin { --aw-sidebar-w: 228px; }
+    body.aw-admin .aw-workspace { padding-inline: 20px; }
+    body.aw-admin .aw-grid--main-rail { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+
+@media (max-width: 1080px) {
+    body.aw-admin .aw-grid--2,
+    body.aw-admin .aw-grid--2-even,
+    body.aw-admin .aw-grid--3,
+    body.aw-admin .aw-grid--main-rail{ grid-template-columns: minmax(0, 1fr); }
+    body.aw-admin .aw-editor-grid { grid-template-columns: minmax(0, 1fr) 290px; }
+    body.aw-admin .aw-top-search { width: 250px; }
+    body.aw-admin .aw-top-user b { display: none; }
+}
+
+/* Preserved navigation breakpoint (prototype uses 920px; behavior contract
+   stays at 991.98px so the offcanvas and HTMX navigation match the app). */
+@media (max-width: 991.98px) {
+    body.aw-admin .aw-shell,
+    body.aw-admin .aw-shell.is-sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+    body.aw-admin .aw-rail,
+    body.aw-admin .aw-sidebar,
+    body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar { display: none; }
+    body.aw-admin .aw-topbar .aw-mobile-toggle { display: inline-grid; }
+    body.aw-admin .aw-workspace { padding: 18px 16px 56px; }
+    body.aw-admin .aw-page-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+    body.aw-admin .aw-page-actions { width: 100%; }
+    body.aw-admin .aw-topbar { padding-inline: 14px; }
+    body.aw-admin .aw-top-search { width: auto; flex: 1; max-width: 320px; }
+    body.aw-admin .aw-top-user-text { display: none; }
+    body.aw-admin .aw-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.aw-admin .aw-table-scroll-hint { display: flex; }
+    body.aw-admin .aw-editor-grid { grid-template-columns: 1fr; }
+    body.aw-admin .aw-editor-rail { position: static; }
+}
+
+@media (max-width: 720px) {
+    body.aw-admin .aw-workspace { padding: 14px 12px 48px; }
+    body.aw-admin .aw-page-title { font-size: 24px; }
+    body.aw-admin .aw-page-desc { font-size: 11.5px; }
+    body.aw-admin .aw-crumbs { display: none; }
+    body.aw-admin .aw-topbar { gap: 6px; }
+    body.aw-admin .aw-top-search span { display: none; }
+    body.aw-admin .aw-top-search {
+        min-width: 0;
+        width: 38px;
+        max-width: 38px;
+        flex: 0 0 38px;
+        padding: 0;
+        justify-content: center;
+    }
+    body.aw-admin .aw-top-search .aw-kbd { display: none; }
+    body.aw-admin .aw-table-tools .aw-select { flex: 1 1 140px; min-width: 140px; }
+    body.aw-admin .aw-top-actions { gap: 0; }
+    body.aw-admin .aw-top-create { width: 34px; min-width: 34px; padding: 0; }
+    body.aw-admin .aw-top-create-label { display: none; }
+    body.aw-admin .aw-top-user { padding: 0; border: 0; }
+    body.aw-admin .aw-kpi-value { font-size: 23px; }
+    body.aw-admin .aw-form-grid { grid-template-columns: 1fr; }
+    body.aw-admin .aw-form-grid .aw-span-2 { grid-column: auto; }
+    body.aw-admin .aw-grid--2,
+    body.aw-admin .aw-grid--2-even,
+    body.aw-admin .aw-grid--3{ grid-template-columns: 1fr; }
+    body.aw-admin .aw-table-wrap { max-height: none; }
+    body.aw-admin .aw-table { font-size: 11px; }
+    body.aw-admin .aw-table thead th,
+    body.aw-admin .aw-table tbody td { padding: 7px 8px; }
+    body.aw-admin .aw-table-tools { padding: 8px; }
+    body.aw-admin .aw-table-tools .aw-search-wrap { max-width: none; flex-basis: 100%; }
+    body.aw-admin .aw-table-tools .aw-select { flex: 1; min-width: 0; }
+    body.aw-admin .aw-page-actions .aw-btn span { display: none; }
+    body.aw-admin .aw-page-actions .aw-btn .aw-ico { margin: 0; }
+    body.aw-admin .aw-quick-grid { grid-template-columns: 1fr; }
+    body.aw-admin .aw-context-strip { gap: 8px; font-size: 10.5px; }
+    body.aw-admin .aw-ctx-sep { display: none; }
+    body.aw-admin .aw-drawer { width: 100vw; }
+    body.aw-admin .aw-bulkbar { position: sticky; bottom: 0; z-index: 5; }
+    body.aw-admin .aw-empty { padding: 28px 14px; }
+}
+
+@media (max-width: 575.98px) {
+    body.aw-admin .aw-kpi-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
+    body.aw-admin .aw-kpi { padding: 10px; }
+    body.aw-admin .aw-kpi-value { font-size: 21px; }
+    body.aw-admin .aw-kpi-label { font-size: 8.5px; }
+    body.aw-admin .aw-page-actions { gap: 4px; }
+    body.aw-admin .aw-btn { padding-inline: 9px; }
+    body.aw-admin .aw-attn-item { grid-template-columns: 32px minmax(0, 1fr); }
+    body.aw-admin .aw-attn-go { grid-column: 2; }
+}
+
+/* --------------------------------------------------------------------------
+   15. Motion
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    body.aw-admin *,
+    body.aw-admin *::before,
+    body.aw-admin *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+        scroll-behavior: auto !important;
+    }
+    body.aw-admin .aw-drawer { animation: none; }
+    body.aw-admin .aw-quick-action:hover { transform: none; }
+}
+
+@media print {
+    body.aw-admin .aw-rail,
+    body.aw-admin .aw-sidebar,
+    body.aw-admin .aw-topbar,
+    body.aw-admin .aw-page-actions,
+    body.aw-admin .aw-table-tools,
+    body.aw-admin .aw-bulkbar,
+    body.aw-admin .aw-pager { display: none !important; }
+    body.aw-admin .aw-shell { display: block; }
+    body.aw-admin .aw-workspace { max-width: none; padding: 0; }
+    body.aw-admin .aw-card,
+    body.aw-admin .aw-table-card { box-shadow: none; break-inside: avoid; }
+    body.aw-admin { background: #fff; }
+}
+
+/* --------------------------------------------------------------------------
+   16. Matrices, scores and attendance cells
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-matrix-wrap { overflow: auto; max-height: 70vh; }
+body.aw-admin .aw-matrix { width: 100%; font-size: 11px; border-collapse: collapse; }
+body.aw-admin .aw-matrix th,
+body.aw-admin .aw-matrix td {
+    border-bottom: 1px solid var(--aw-row-line);
+    padding: 6px 7px;
+    text-align: center;
+    white-space: nowrap;
+}
+body.aw-admin .aw-matrix thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--aw-paper-2);
+    font-size: 8.8px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-matrix .aw-sticky-col {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 1;
+    background: var(--aw-paper);
+    text-align: start;
+    min-width: 185px;
+}
+body.aw-admin .aw-matrix thead .aw-sticky-col { z-index: 3; background: var(--aw-paper-2); }
+body.aw-admin .aw-matrix tbody tr:hover td { background: var(--aw-teal-mist); }
+body.aw-admin .aw-matrix tbody tr:hover .aw-sticky-col { background: var(--aw-teal-mist); }
+
+body.aw-admin .aw-score {
+    display: inline-grid;
+    place-items: center;
+    min-width: 28px;
+    height: 21px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--aw-paper-3);
+    font-size: 9.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+
+
+body.aw-admin .aw-score--none { color: #b5bcbe; }
+
+body.aw-admin .aw-attend-cell { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; }
+body.aw-admin .aw-attend-cell .aw-ico { width: 12px; height: 12px; }
+body.aw-admin .aw-attend-cell--full { background: var(--aw-green-soft); color: var(--aw-green); }
+body.aw-admin .aw-attend-cell--partial { background: var(--aw-amber-soft); color: var(--aw-amber); }
+body.aw-admin .aw-attend-cell--absent { background: var(--aw-red-soft); color: var(--aw-red); }
+body.aw-admin .aw-attend-cell--none { background: var(--aw-paper-3); color: #b5bcbe; }
+
+/* --------------------------------------------------------------------------
+   17. Learning progress (verified segments, heatmap, daily breakdown)
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-progress-list { display: flex; flex-direction: column; gap: 10px; }
+body.aw-admin .aw-progress-card {
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-sm);
+    overflow: hidden;
+}
+body.aw-admin .aw-progress-card > summary {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.45fr) minmax(170px, 1fr) repeat(4, minmax(78px, .55fr)) 24px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    list-style: none;
+}
+body.aw-admin .aw-progress-card > summary::-webkit-details-marker { display: none; }
+body.aw-admin .aw-progress-card > summary:hover { background: var(--aw-teal-mist); }
+body.aw-admin .aw-progress-card[open] > summary {
+    background: var(--aw-paper-2);
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-progress-identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
+body.aw-admin .aw-progress-identity-text { min-width: 0; }
+body.aw-admin .aw-progress-identity-text b { display: block; font-size: 12px; }
+body.aw-admin .aw-progress-identity-text span {
+    display: block;
+    font-size: 10.5px;
+    color: var(--aw-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body.aw-admin .aw-progress-meter { min-width: 0; }
+body.aw-admin .aw-progress-meter .aw-progress-label { margin-bottom: 4px; }
+body.aw-admin .aw-progress-meter .aw-progress { height: 7px; }
+body.aw-admin .aw-progress-metric { min-width: 0; }
+body.aw-admin .aw-progress-metric b { display: block; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+body.aw-admin .aw-progress-metric span { display: block; margin-top: 1px; font-size: 9.5px; color: var(--aw-muted); }
+body.aw-admin .aw-progress-date { min-width: 0; }
+body.aw-admin .aw-progress-date span {
+    display: block;
+    font-size: 9px;
+    color: var(--aw-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+body.aw-admin .aw-progress-date b { display: block; margin-top: 1px; font-size: 10.5px; font-weight: 650; }
+body.aw-admin .aw-progress-date small { display: block; color: var(--aw-muted); font-size: 9px; }
+body.aw-admin .aw-progress-toggle {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: var(--aw-paper-3);
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-progress-toggle .aw-ico { width: 13px; height: 13px; transition: transform var(--aw-motion); }
+body.aw-admin .aw-progress-card[open] .aw-progress-toggle .aw-ico { transform: rotate(180deg); }
+body.aw-admin .aw-progress-expanded {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+    gap: 14px;
+    align-items: start;
+    padding: 14px;
+    background: var(--aw-paper-2);
+}
+body.aw-admin .aw-progress-panel {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--aw-line);
+    border-radius: 8px;
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-progress-panel h4 { font-size: 11.5px; font-weight: 800; }
+body.aw-admin .aw-progress-panel p { margin-top: 2px; font-size: 9.8px; color: var(--aw-muted); }
+body.aw-admin .aw-heatmap { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 3px; margin-top: 11px; }
+body.aw-admin .aw-heat-cell {
+    aspect-ratio: 1;
+    min-height: 10px;
+    border-radius: 3px;
+    background: var(--aw-paper-3);
+    border: 1px solid transparent;
+}
+body.aw-admin .aw-heat-cell[data-level="low"] { background: #cfe2e7; }
+body.aw-admin .aw-heat-cell[data-level="medium"] { background: #7fb3c1; }
+body.aw-admin .aw-heat-cell[data-level="high"] { background: var(--aw-teal); }
+body.aw-admin .aw-heat-cell:hover { border-color: var(--aw-gold); }
+body.aw-admin .aw-heat-labels {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    color: var(--aw-muted);
+    font-size: 8.5px;
+}
+body.aw-admin .aw-heat-legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    color: var(--aw-muted);
+    font-size: 9px;
+}
+body.aw-admin .aw-heat-legend span { display: inline-flex; align-items: center; gap: 4px; }
+body.aw-admin .aw-heat-legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--aw-paper-3); }
+body.aw-admin .aw-heat-legend i[data-level="low"] { background: #cfe2e7; }
+body.aw-admin .aw-heat-legend i[data-level="medium"] { background: #7fb3c1; }
+body.aw-admin .aw-heat-legend i[data-level="high"] { background: var(--aw-teal); }
+body.aw-admin .aw-daily-list { margin-top: 9px; border-top: 1px solid var(--aw-line); }
+body.aw-admin .aw-daily-item { border-bottom: 1px solid var(--aw-line); }
+body.aw-admin .aw-daily-item:last-child { border-bottom: 0; }
+body.aw-admin .aw-daily-item > summary {
+    display: grid;
+    grid-template-columns: 1.2fr .9fr 1.1fr 18px;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    cursor: pointer;
+    list-style: none;
+}
+body.aw-admin .aw-daily-item > summary::-webkit-details-marker { display: none; }
+body.aw-admin .aw-daily-date { font-size: 10.5px; font-weight: 650; }
+body.aw-admin .aw-daily-time { font-size: 10px; color: var(--aw-muted); }
+body.aw-admin .aw-daily-share { display: flex; align-items: center; gap: 6px; font-size: 9.5px; }
+body.aw-admin .aw-daily-share .aw-bar { flex: 1; height: 5px; }
+body.aw-admin .aw-daily-share b { width: 30px; text-align: end; }
+body.aw-admin .aw-daily-chevron { width: 12px; height: 12px; color: var(--aw-muted); transition: transform var(--aw-motion); }
+body.aw-admin .aw-daily-item[open] .aw-daily-chevron { transform: rotate(180deg); }
+body.aw-admin .aw-daily-sessions { padding: 4px 0 9px; }
+body.aw-admin .aw-session-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 7px;
+    border-radius: 5px;
+    background: var(--aw-paper-2);
+    font-size: 9.5px;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-session-row + .aw-session-row { margin-top: 4px; }
+body.aw-admin .aw-session-row b { color: var(--aw-ink); font-size: 9.8px; }
+body.aw-admin .aw-session-row .aw-ms-auto { font-variant-numeric: tabular-nums; }
+body.aw-admin .aw-progress-highlights {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-progress-highlights span {
+    display: block;
+    font-size: 8.5px;
+    color: var(--aw-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+body.aw-admin .aw-progress-highlights b { display: block; margin-top: 2px; font-size: 10.5px; }
+body.aw-admin .aw-progress-span-note {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 2px;
+    color: var(--aw-muted);
+    font-size: 9.5px;
+}
+body.aw-admin .aw-progress-history-note {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 7px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    background: var(--aw-amber-soft);
+    color: #7a5318;
+    font-size: 10px;
+}
+body.aw-admin .aw-progress-history-note .aw-ico { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+
+@media (max-width: 1180px) {
+    body.aw-admin .aw-progress-card > summary {
+        grid-template-columns: minmax(200px, 1.4fr) minmax(150px, 1fr) repeat(2, minmax(76px, .55fr)) 24px;
+    }
+    body.aw-admin .aw-progress-card > summary .aw-progress-date:nth-of-type(2) { display: none; }
+}
+@media (max-width: 991.98px) {
+    body.aw-admin .aw-progress-card > summary {
+        grid-template-columns: minmax(0, 1fr) minmax(150px, .8fr) 24px;
+        gap: 9px;
+    }
+    body.aw-admin .aw-progress-card > summary .aw-progress-metric { display: none; }
+    body.aw-admin .aw-progress-card > summary .aw-progress-date { display: none; }
+    body.aw-admin .aw-progress-expanded { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+    body.aw-admin .aw-progress-card > summary { grid-template-columns: minmax(0, 1fr) 24px; }
+    body.aw-admin .aw-progress-card > summary .aw-progress-meter { grid-column: 1 / -1; grid-row: 2; }
+    body.aw-admin .aw-progress-expanded { padding: 10px; }
+    body.aw-admin .aw-heatmap { grid-template-columns: repeat(15, minmax(0, 1fr)); }
+    body.aw-admin .aw-daily-item > summary { grid-template-columns: 1fr .9fr 1fr 16px; }
+}
+
+/* --------------------------------------------------------------------------
+   18. Charts, donuts and stepper
+   -------------------------------------------------------------------------- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+body.aw-admin .aw-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+    margin-bottom: 16px;
+    overflow-x: auto;
+}
+body.aw-admin .aw-step {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 13px;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    white-space: nowrap;
+    color: var(--aw-muted);
+    font-size: 11px;
+    font-weight: 650;
+}
+body.aw-admin .aw-step:first-child { padding-inline-start: 0; }
+body.aw-admin .aw-step:last-child { padding-inline-end: 0; }
+body.aw-admin .aw-step-num {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--aw-line-2);
+    font-size: 9.5px;
+    font-weight: 800;
+}
+body.aw-admin .aw-step.is-active { color: var(--aw-ink); }
+body.aw-admin .aw-step.is-active .aw-step-num { background: var(--aw-teal); border-color: var(--aw-teal); color: #fff; }
+body.aw-admin .aw-step.is-done { color: var(--aw-green); }
+body.aw-admin .aw-step.is-done .aw-step-num { background: var(--aw-green-soft); border-color: #cbe5d9; color: var(--aw-green); }
+body.aw-admin .aw-step-line { flex: 1; min-width: 18px; height: 1px; background: var(--aw-line); }
+
+@media (max-width: 720px) {
+    body.aw-admin .aw-stepper { padding: 10px; }
+    body.aw-admin .aw-step { padding-inline: 8px; }
+    body.aw-admin .aw-step span:not(.aw-step-num) { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   19. Calendar
+   -------------------------------------------------------------------------- */
+
+
+
+
+
+
+
+
+
+
+
+
+body.aw-admin .aw-cal-add .aw-ico { width: 11px; height: 11px; }
+
+body.aw-admin .aw-cal-event .aw-ico { width: 9px; height: 9px; }
+
+
+body.aw-admin .aw-cal-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 10px; color: var(--aw-muted); }
+body.aw-admin .aw-cal-legend span { display: inline-flex; align-items: center; gap: 4px; }
+
+
+
+
+
+
+/* --------------------------------------------------------------------------
+   20. Chat (Telegram inbox)
+   -------------------------------------------------------------------------- */
+
+
+
+
+
+body.aw-admin .aw-conv-item {
+    display: flex;
+    gap: 9px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--aw-row-line);
+    cursor: pointer;
+}
+body.aw-admin .aw-conv-item:hover { background: var(--aw-paper-2); }
+body.aw-admin .aw-conv-item.is-active { background: var(--aw-teal-soft); }
+body.aw-admin .aw-conv-main { min-width: 0; flex: 1; }
+body.aw-admin .aw-conv-main b { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; }
+body.aw-admin .aw-conv-main b span { font-size: 9px; color: var(--aw-muted); font-weight: 500; }
+body.aw-admin .aw-conv-main p {
+    margin-top: 1px;
+    font-size: 10.2px;
+    color: var(--aw-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body.aw-admin .aw-conv-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+
+body.aw-admin .aw-chat-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+}
+body.aw-admin .aw-chat-head .aw-chat-title { min-width: 0; flex: 1; }
+body.aw-admin .aw-chat-head b { display: block; font-size: 12px; }
+body.aw-admin .aw-chat-head .aw-chat-title > span { display: block; font-size: 10px; color: var(--aw-muted); }
+
+body.aw-admin .aw-msg { max-width: 78%; padding: 7px 10px; border-radius: 10px; font-size: 11.5px; line-height: 1.5; }
+body.aw-admin .aw-msg--in { align-self: flex-start; background: var(--aw-paper); border: 1px solid var(--aw-line); border-start-start-radius: 3px; }
+body.aw-admin .aw-msg--out { align-self: flex-end; background: var(--aw-teal); color: #fff; border-end-end-radius: 3px; }
+body.aw-admin .aw-msg .aw-msg-meta { display: flex; gap: 5px; margin-top: 3px; font-size: 8.5px; opacity: .65; }
+body.aw-admin .aw-msg--out .aw-msg-meta { justify-content: flex-end; }
+
+body.aw-admin .aw-composer { display: flex; align-items: flex-end; gap: 7px; padding: 9px 11px; border-top: 1px solid var(--aw-line); background: var(--aw-paper); }
+body.aw-admin .aw-composer .aw-textarea { min-height: 38px; max-height: 90px; }
+
+
+body.aw-admin .aw-chat-context .aw-kv { font-size: 10.5px; }
+
+
+
+@media (max-width: 720px) {
+
+
+
+
+
+    body.aw-admin .aw-msg { max-width: 88%; }
+}
+
+/* --------------------------------------------------------------------------
+   21. Editors: dropzones, part cards, question cards, file rows
+   -------------------------------------------------------------------------- */
+
+
+body.aw-admin .aw-dropzone .aw-ico { width: 25px; height: 25px; color: var(--aw-gold-2); }
+
+
+
+
+body.aw-admin .aw-part-card {
+    border: 1px solid var(--aw-line);
+    border-radius: 9px;
+    background: var(--aw-paper);
+    margin-bottom: 9px;
+    overflow: hidden;
+}
+body.aw-admin .aw-part-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--aw-paper-2);
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-part-head b { font-size: 11.5px; }
+body.aw-admin .aw-part-head .aw-tag { margin-inline-start: 2px; }
+body.aw-admin .aw-part-body { padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+body.aw-admin .aw-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border: 1px solid var(--aw-line);
+    border-radius: 7px;
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-file-row .aw-file-ic {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-2);
+}
+body.aw-admin .aw-file-row .aw-file-ic .aw-ico { width: 14px; height: 14px; }
+body.aw-admin .aw-file-row .aw-file-main { min-width: 0; flex: 1; }
+body.aw-admin .aw-file-row .aw-file-main b { display: block; font-size: 10.8px; }
+body.aw-admin .aw-file-row .aw-file-main span { display: block; font-size: 9.5px; color: var(--aw-muted); }
+body.aw-admin .aw-file-row .aw-file-actions { display: flex; gap: 1px; }
+
+
+
+
+
+
+body.aw-admin .aw-choice-row .aw-input { flex: 1; }
+
+/* --------------------------------------------------------------------------
+   22. Files, folders, gallery, storage stats, scanner frame
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 9px; }
+body.aw-admin .aw-gallery-item {
+    position: relative;
+    border: 1px solid var(--aw-line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--aw-paper-2);
+}
+
+body.aw-admin .aw-gallery-thumb .aw-ico { width: 26px; height: 26px; opacity: .65; }
+body.aw-admin .aw-gallery-item .aw-g-meta { padding: 6px 7px; }
+body.aw-admin .aw-gallery-item .aw-g-meta b {
+    display: block;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body.aw-admin .aw-gallery-item .aw-g-meta span { display: block; font-size: 9px; color: var(--aw-muted); }
+body.aw-admin .aw-gallery-item .aw-g-actions {
+    position: absolute;
+    top: 5px;
+    inset-inline-end: 5px;
+    display: flex;
+    gap: 3px;
+}
+body.aw-admin .aw-gallery-item .aw-g-actions .aw-icon-btn { width: 24px; height: 24px; background: rgba(255, 253, 249, .9); }
+
+body.aw-admin .aw-folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+body.aw-admin .aw-folder-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--aw-line);
+    border-radius: 8px;
+    background: var(--aw-paper);
+    text-align: start;
+}
+body.aw-admin .aw-folder-card:hover { border-color: var(--aw-gold); background: var(--aw-gold-soft); }
+body.aw-admin .aw-folder-card .aw-ico { color: var(--aw-gold-2); }
+body.aw-admin .aw-folder-card b { display: block; font-size: 11px; }
+body.aw-admin .aw-folder-card span { display: block; font-size: 9.5px; color: var(--aw-muted); }
+
+body.aw-admin .aw-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; }
+body.aw-admin .aw-file-card {
+    position: relative;
+    padding: 11px;
+    border: 1px solid var(--aw-line);
+    border-radius: 8px;
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-file-card:hover { border-color: var(--aw-line-2); box-shadow: var(--aw-shadow-sm); }
+body.aw-admin .aw-file-card .aw-file-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-2);
+    margin-bottom: 7px;
+}
+body.aw-admin .aw-file-card .aw-file-icon .aw-ico { width: 16px; height: 16px; }
+body.aw-admin .aw-file-card b { display: block; font-size: 10.5px; line-height: 1.35; word-break: break-word; }
+body.aw-admin .aw-file-card span { display: block; margin-top: 2px; font-size: 9px; color: var(--aw-muted); }
+body.aw-admin .aw-file-card .aw-file-menu { position: absolute; top: 7px; inset-inline-end: 7px; }
+
+body.aw-admin .aw-storage-stats { display: flex; gap: 18px; flex-wrap: wrap; }
+body.aw-admin .aw-storage-stat b { display: block; font-family: var(--aw-font-display); font-size: 18px; line-height: 1.1; }
+body.aw-admin .aw-storage-stat span {
+    display: block;
+    font-size: 9.5px;
+    color: var(--aw-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+body.aw-admin .aw-breadcrumb-path { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11px; color: var(--aw-muted); }
+body.aw-admin .aw-breadcrumb-path a { color: var(--aw-slate); }
+body.aw-admin .aw-breadcrumb-path .aw-sep { opacity: .45; }
+
+body.aw-admin .aw-scan-frame {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    max-height: 360px;
+    border-radius: 12px;
+    background: radial-gradient(circle at 50% 45%, #2b4a54, #0d2229);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+}
+body.aw-admin .aw-scan-frame .aw-scan-box {
+    width: 54%;
+    aspect-ratio: 1;
+    border: 2px solid rgba(255, 255, 255, .8);
+    border-radius: 12px;
+    position: relative;
+}
+body.aw-admin .aw-scan-frame .aw-scan-box::after {
+    content: "";
+    position: absolute;
+    inset-inline: 6%;
+    top: 48%;
+    height: 2px;
+    background: var(--aw-gold);
+    box-shadow: 0 0 12px var(--aw-gold);
+    animation: aw-scan 2.4s ease-in-out infinite;
+}
+@keyframes aw-scan {
+    0%, 100% { transform: translateY(-46px); opacity: .5; }
+    50% { transform: translateY(46px); opacity: 1; }
+}
+body.aw-admin .aw-scan-frame .aw-scan-hint {
+    position: absolute;
+    bottom: 14px;
+    color: rgba(255, 255, 255, .75);
+    font-size: 10px;
+}
+
+
+
+
+
+
+/* --------------------------------------------------------------------------
+   23. Dashboard page composition (page head + filter bar + table container)
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-dashboard-page { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+body.aw-admin .aw-dashboard-filters { min-width: 0; }
+body.aw-admin .aw-filter-bar { display: flex; flex-direction: column; min-width: 0; }
+body.aw-admin .aw-filter-bar .aw-tabs {
+    margin: -10px -12px 10px;
+    padding-inline: 8px;
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-filter-bar .aw-table-tools { padding: 0; border-bottom: 0; background: transparent; }
+body.aw-admin .aw-table-section { min-width: 0; }
+body.aw-admin .aw-table-loading {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+}
+body.aw-admin .aw-table-loading.htmx-indicator { display: none; }
+body.aw-admin .aw-table-loading.htmx-request,
+body.aw-admin .htmx-request .aw-table-loading { display: flex; }
+body.aw-admin .aw-cell-identity { min-width: 190px; }
+body.aw-admin .aw-cell-main-text { min-width: 0; }
+body.aw-admin .aw-cell-main-text b { display: block; font-size: 11.8px; font-weight: 650; }
+body.aw-admin .aw-cell-main-text a { color: var(--aw-ink); }
+body.aw-admin .aw-cell-main-text a:hover { color: var(--aw-teal); }
+body.aw-admin .aw-cell-main-text span { display: block; font-size: 10px; color: var(--aw-muted); }
+
+/* Table group rows and inline action alignment. */
+body.aw-admin .aw-table tbody tr.aw-level-group td {
+    padding: 6px 11px;
+    background: var(--aw-paper-2);
+    border-bottom: 1px solid var(--aw-line);
+    color: var(--aw-gold-2);
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+body.aw-admin .aw-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+body.aw-admin .aw-row-actions form { margin: 0; }
+
+/* Page breadcrumbs (resource trail) inside #page-region. */
+body.aw-admin .aw-page-crumbs { margin-bottom: 12px; }
+body.aw-admin .aw-page-crumbs.mb-2 { margin-bottom: 8px; }
+body.aw-admin .aw-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-breadcrumb-item { display: inline-flex; align-items: center; gap: 6px; }
+body.aw-admin .aw-breadcrumb-item + .aw-breadcrumb-item::before {
+    content: "/";
+    color: var(--aw-line-2);
+}
+body.aw-admin .aw-breadcrumb-item a { color: var(--aw-muted); font-weight: 600; }
+body.aw-admin .aw-breadcrumb-item a:hover { color: var(--aw-teal); }
+body.aw-admin .aw-breadcrumb-item.is-current { color: var(--aw-ink); font-weight: 700; }
+body.aw-admin .aw-tabs { margin-bottom: 14px; }
+
+/* Scanner video fills the focused camera frame. */
+body.aw-admin .aw-scan-frame .scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #0d2229;
+}
+
+/* Anchor tab targets clear the sticky top bar when jumped to. */
+body.aw-admin .aw-dashboard-page section[id^="aw-ov-"] {
+    scroll-margin-top: calc(var(--aw-topbar-h) + 12px);
+}
+
+/* --------------------------------------------------------------------------
+   24. Calendar management (admin interactive calendar)
+   --------------------------------------------------------------------------
+   The admin calendar moved off the legacy `ad-calmg-*`, `ad-calendar-*`,
+   `ad-legend-swatch` and `ad-action-btn` hooks. The rules below reproduce the
+   rendered legacy geometry and appearance exactly (same sizes, gaps, colors,
+   states and RTL-safe logical properties). Values are copied from the calendar
+   block of `app_admin.css`; the legacy rules are left in place because other
+   admin-only surfaces still depend on `ad-*` names.
+
+   Three legacy declarations are intentionally not restated because the workspace
+   stylesheet already wins their cascade and restating them would change the
+   current rendering:
+   - `.ad-calendar-legend` flex/gap/font-size: `.aw-cal-legend` (kept on the
+     legend element) owns those values.
+   - `.ad-calendar-legend .ad-legend-swatch` display/padding/border-radius:
+     `body.aw-admin .aw-pill` (kept on each swatch) wins with higher
+     specificity. Only the properties that actually applied are restated.
+   - `.ad-calendar-legend .ad-pill.*` swatch colors never applied because the
+     legend emits `aw-pill`, so they are not translated.
+   -------------------------------------------------------------------------- */
+
+/* Month grid and weekday header. */
+body.aw-admin .aw-calmg-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .35rem;
+}
+
+body.aw-admin .aw-calmg-wd {
+    text-align: center;
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--ps-muted);
+    padding: .25rem 0;
+}
+
+/* Day cell and its state classes. */
+body.aw-admin .aw-calmg-cell {
+    position: relative;
+    min-width: 0;
+    min-height: 3.2rem;
+    padding: .4rem .5rem;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .7rem;
+    background: #fff;
+    font-size: .8rem;
+    font-weight: 650;
+    color: var(--ps-ink);
+    text-align: end;
+    cursor: pointer;
+    transition: border-color var(--ps-motion), box-shadow var(--ps-motion), transform var(--ps-motion);
+}
+
+body.aw-admin .aw-calmg-cell:hover {
+    border-color: var(--ps-gold);
+    box-shadow: var(--ps-shadow);
+    transform: translateY(-1px);
+}
+
+body.aw-admin .aw-calmg-cell.is-out { opacity: .38; border-style: dashed; cursor: default; }
+body.aw-admin .aw-calmg-cell.is-meeting { background: var(--ps-teal-soft); border-color: var(--ps-teal); }
+body.aw-admin .aw-calmg-cell.is-holiday { background: var(--ps-gold-soft); border-color: var(--ps-gold); }
+body.aw-admin .aw-calmg-cell.is-today { border: 2px solid var(--ps-gold-deep); box-shadow: 0 0 0 3px rgba(180, 133, 58, .18); }
+
+body.aw-admin .aw-calmg-cell small {
+    display: block;
+    text-align: start;
+    font-size: .62rem;
+    font-weight: 700;
+    color: var(--ps-muted);
+    margin-top: .2rem;
+}
+
+body.aw-admin .aw-calmg-cell .is-meeting { background: var(--ps-teal-soft); border-color: var(--ps-teal); }
+body.aw-admin .aw-calmg-cell .is-holiday { background: var(--ps-gold-soft); border-color: var(--ps-gold); }
+body.aw-admin .aw-calmg-cell .is-today { border: 2px solid var(--ps-gold-deep); }
+
+/* A day that actually carries a scheduled meeting. */
+body.aw-admin .aw-calmg-cell.has-meeting:not(.is-holiday) {
+    background: rgba(47, 93, 115, .18);
+    border-inline-start: 4px solid var(--ps-teal);
+}
+
+/* Cell content column: day number, holidays, meetings, add actions. */
+body.aw-admin .aw-calendar-cell-content {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    min-height: 5rem;
+    min-width: 0;
+}
+
+body.aw-admin .aw-calendar-day-number {
+    font-weight: 700;
+    font-size: .82rem;
+    color: var(--ps-ink);
+    line-height: 1.2;
+    padding-block-end: .1rem;
+}
+
+body.aw-admin .is-out .aw-calendar-day-number {
+    color: var(--ps-muted);
+    font-weight: 600;
+    font-size: .72rem;
+}
+
+/* Holiday block: label and delete form. */
+body.aw-admin .aw-calendar-holiday {
+    display: flex;
+    align-items: flex-start;
+    gap: .2rem;
+    font-size: .68rem;
+    font-weight: 600;
+    color: var(--ps-gold-deep);
+    padding: .1rem .3rem;
+    border-radius: .35rem;
+    background: var(--ps-gold-soft);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.25;
+}
+
+body.aw-admin .aw-calendar-holiday small {
+    flex: 1;
+    min-width: 0;
+}
+
+body.aw-admin .aw-calendar-holiday .ps-inline-form {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: flex-start;
+}
+
+body.aw-admin .aw-calendar-holiday .btn-close {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: .75rem;
+    opacity: .55;
+    transition: opacity var(--ps-motion);
+}
+
+body.aw-admin .aw-calendar-holiday .btn-close:hover,
+body.aw-admin .aw-calendar-holiday .btn-close:focus-visible {
+    opacity: 1;
+}
+
+/* Meeting block: level label and course name. */
+body.aw-admin .aw-calendar-meeting {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+    margin-top: .25rem;
+    padding: .25rem .35rem;
+    border-inline-start: 2px solid var(--ps-gold);
+    color: var(--ps-ink);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+body.aw-admin .aw-calendar-meeting strong { font-size: .68rem; }
+body.aw-admin .aw-calendar-meeting span { font-size: .7rem; color: var(--ps-muted); }
+
+body.aw-admin .aw-calendar-meeting-level {
+    font-size: .63rem;
+    font-weight: 700;
+    color: var(--ps-teal);
+    line-height: 1.2;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+body.aw-admin .aw-calendar-meeting-course {
+    font-size: .68rem;
+    font-weight: 600;
+    color: var(--ps-ink);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.25;
+}
+
+/* Compact meeting rows inside calendar cells: one row per level with the
+   delete action pinned to the row end so it never wraps away from its meeting. */
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: .3rem;
+    margin-top: 0;
+    padding: .12rem .3rem;
+    border-inline-start-width: 2px;
+    min-width: 0;
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 .3rem;
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting-course {
+    min-width: 0;
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting .ps-inline-form {
+    margin-inline-start: 0;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting .btn-close {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: .75rem;
+    opacity: .5;
+    transition: opacity var(--ps-motion);
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting .btn-close:hover,
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting .btn-close:focus-visible {
+    opacity: 1;
+}
+
+/* Add-action row per cell. Teal is the meeting action, gold the holiday one. */
+body.aw-admin .aw-calendar-add-actions {
+    display: flex;
+    gap: .55rem;
+    flex-wrap: wrap;
+    margin-top: auto;
+    padding-block-start: .2rem;
+    opacity: .82;
+    transition: opacity var(--ps-motion);
+}
+
+body.aw-admin .aw-calmg-cell:hover .aw-calendar-add-actions,
+body.aw-admin .aw-calmg-cell:focus-within .aw-calendar-add-actions {
+    opacity: 1;
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .aw-action-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: .8rem;
+    border-radius: .4rem;
+    border-color: var(--ps-line);
+    background: var(--ps-paper);
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .is-add-meeting { color: var(--ps-teal); }
+
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .is-add-meeting:hover,
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .is-add-meeting:focus-visible {
+    background: var(--ps-teal-soft);
+    color: var(--ps-teal);
+    border-color: var(--ps-teal);
+}
+
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .is-add-holiday { color: var(--ps-gold-deep); }
+
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .is-add-holiday:hover,
+body.aw-admin .aw-calmg-cell .aw-calendar-add-actions .is-add-holiday:focus-visible {
+    background: var(--ps-gold-soft);
+    color: var(--ps-gold-deep);
+    border-color: var(--ps-gold);
+}
+
+/* Calendar action button primitive (the interactive calendar is now its only
+   runtime emitter; the dead file components keep the legacy class). */
+body.aw-admin .aw-action-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: inline-grid;
+    place-items: center;
+    border-radius: .65rem;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ps-muted);
+    font-size: .8rem;
+    cursor: pointer;
+    transition: background-color var(--ps-motion), color var(--ps-motion), border-color var(--ps-motion), transform var(--ps-motion);
+}
+
+body.aw-admin .aw-action-btn:hover {
+    background: var(--ps-gold-soft);
+    color: var(--ps-gold-deep);
+    border-color: var(--ps-line);
+    transform: translateY(-1px);
+}
+
+body.aw-admin .aw-action-btn.is-danger:hover {
+    background: var(--ps-danger-soft);
+    color: var(--ps-danger);
+    border-color: var(--ps-danger);
+}
+
+body.aw-admin .aw-action-btn:focus-visible {
+    outline: 2px solid var(--ps-gold);
+    outline-offset: 1px;
+}
+
+/* Legend. `.aw-cal-legend` still owns the flex rhythm/font size; this rule
+   restores the legacy alignment and block padding only. */
+body.aw-admin .aw-calendar-legend {
+    align-items: center;
+    padding-block: .5rem;
+}
+
+/* Legend swatch: only the legacy properties that actually applied. */
+body.aw-admin .aw-legend-swatch {
+    width: 1.1rem;
+    height: 1.1rem;
+    min-width: 1.1rem;
+    vertical-align: middle;
+    margin-inline-end: .3rem;
+    overflow: hidden;
+}
+
+/* Add-meeting offering picker inside the modal. */
+body.aw-admin .aw-calendar-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    border: 1px solid var(--ps-line-cool);
+    border-radius: .6rem;
+    padding: .45rem .6rem;
+    background: #fff;
+}
+
+body.aw-admin .aw-calendar-choice-group {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    padding: .3rem .1rem;
+}
+
+body.aw-admin .aw-calendar-choice-group + .aw-calendar-choice-group {
+    border-top: 1px dashed var(--ps-line);
+}
+
+body.aw-admin .aw-calendar-choice-label {
+    font-size: .76rem;
+    font-weight: 700;
+    color: var(--ps-teal);
+}
+
+body.aw-admin .aw-calendar-choice-select { width: 100%; }
+
+/* Shared phone day sheet. The sheet clones the cell content outside the grid,
+   so the modal-scoped legacy rules must follow the renamed hooks. */
+body.aw-admin .cal-day-modal .aw-calendar-day-number { display: none; }
+
+body.aw-admin .cal-day-modal .aw-calendar-meeting-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 .35rem;
+}
+
+@media (max-width: 991.98px) {
+    /* Tablet/phone cells are too narrow to hold the meeting or holiday delete
+       control beside the text without squeezing the text to one character per
+       line, so the control wraps onto its own line below it. */
+    body.aw-admin .aw-calmg-cell .aw-calendar-meeting,
+    body.aw-admin .aw-calendar-holiday { flex-wrap: wrap; }
+
+    body.aw-admin .aw-calmg-cell .aw-calendar-meeting-text,
+    body.aw-admin .aw-calendar-holiday small { flex: 1 1 100%; }
+
+    body.aw-admin .aw-calmg-cell .aw-calendar-meeting .ps-inline-form,
+    body.aw-admin .aw-calendar-holiday .ps-inline-form { margin-inline-start: auto; }
+}
+
+@media (max-width: 575.98px) {
+    body.aw-admin .aw-calmg-cell { min-height: 3rem; padding: .3rem .2rem; font-size: .72rem; border-radius: .5rem; }
+    body.aw-admin .aw-calmg-grid { gap: .15rem; }
+
+    /* Phone cells show only the day number and status dots; the full day
+       (meetings, holiday, add/delete actions) lives in the shared day sheet.
+       !important beats Bootstrap's `.d-flex` utility on the action row. */
+    body.aw-admin .aw-calmg-cell .aw-calendar-cell-content > .aw-calendar-meeting,
+    body.aw-admin .aw-calmg-cell .aw-calendar-cell-content > .aw-calendar-holiday,
+    body.aw-admin .aw-calmg-cell .aw-calendar-cell-content > .aw-calendar-add-actions {
+        display: none !important;
+    }
+
+    body.aw-admin .aw-calmg-cell .aw-calendar-cell-content {
+        min-height: 0;
+        gap: .1rem;
+    }
+
+    body.aw-admin .aw-calendar-day-number { font-size: .78rem; }
+
+    /* The sheet renders the same classes outside the compact grid; only the
+       phone-scale type sizes below stay shared between cell and sheet. */
+    body.aw-admin .aw-calendar-holiday {
+        font-size: .6rem;
+        padding: .05rem .2rem;
+    }
+
+    body.aw-admin .aw-calendar-meeting-level { font-size: .58rem; }
+    body.aw-admin .aw-calendar-meeting-course { font-size: .62rem; }
+    body.aw-admin .aw-calendar-add-actions { opacity: 1; }
+
+    body.aw-admin .cal-day-modal .aw-calendar-add-actions .aw-action-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.aw-admin .aw-calmg-cell { transition: none; }
+    body.aw-admin .aw-calendar-add-actions { opacity: 1; transition: none; }
+    body.aw-admin .aw-calmg-cell .aw-calendar-meeting .btn-close { transition: none; }
+    body.aw-admin .aw-calendar-holiday .btn-close { transition: none; }
+    body.aw-admin .aw-calendar-add-actions .aw-action-btn { transition: none; }
+}
+
+/* --------------------------------------------------------------------------
+   25. Shared question rows, admin skin only
+   The question partial is shared with the student exam. The .aw-quiz-editor
+   wrapper is added only when is_student is false, so student markup and CSS
+   stay exactly as before; these rules restyle the Bootstrap controls the
+   shared partial still emits.
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-quiz-editor .sd-q-card {
+    background: var(--aw-paper);
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius-lg);
+    box-shadow: 0 1px 2px rgba(20, 44, 52, .05);
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+body.aw-admin .aw-quiz-editor .card-body { padding: 16px; }
+body.aw-admin .aw-quiz-editor .btn,
+body.aw-admin .aw-quiz-editor .sd-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 6px 12px;
+    border: 1px solid var(--aw-line-2);
+    border-radius: 8px;
+    background: var(--aw-paper);
+    color: var(--aw-slate);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+}
+body.aw-admin .aw-quiz-editor .btn:hover,
+body.aw-admin .aw-quiz-editor .sd-btn:hover { background: var(--aw-paper-3); color: var(--aw-ink); border-color: var(--aw-line); }
+body.aw-admin .aw-quiz-editor .btn:focus-visible,
+body.aw-admin .aw-quiz-editor .sd-btn:focus-visible { outline: 2px solid var(--aw-teal); outline-offset: 2px; }
+body.aw-admin .aw-quiz-editor .btn-danger {
+    background: var(--aw-red-soft);
+    border-color: #e8c5c2;
+    color: var(--aw-red);
+}
+body.aw-admin .aw-quiz-editor .btn-danger:hover { background: var(--aw-red); border-color: var(--aw-red); color: #fff; }
+body.aw-admin .aw-quiz-editor .btn-outline-danger { background: transparent; border-color: #e8c5c2; color: var(--aw-red); }
+body.aw-admin .aw-quiz-editor .btn-outline-danger:hover { background: var(--aw-red-soft); border-color: var(--aw-red); color: var(--aw-red); }
+body.aw-admin .aw-quiz-editor .btn-outline-secondary,
+body.aw-admin .aw-quiz-editor .btn-outline-primary { background: transparent; border-color: var(--aw-line-2); color: var(--aw-slate); }
+body.aw-admin .aw-quiz-editor .btn-outline-secondary:hover,
+body.aw-admin .aw-quiz-editor .btn-outline-primary:hover { background: var(--aw-teal-soft); border-color: var(--aw-teal); color: var(--aw-teal); }
+body.aw-admin .aw-quiz-editor .btn-sm { min-height: 28px; padding: 4px 9px; font-size: 11px; border-radius: 6px; }
+body.aw-admin .aw-quiz-editor .form-control,
+body.aw-admin .aw-quiz-editor .form-select {
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid var(--aw-line-2);
+    border-radius: 8px;
+    background-color: var(--aw-paper);
+    color: var(--aw-ink);
+    font-size: 12.5px;
+}
+body.aw-admin .aw-quiz-editor .form-control:focus,
+body.aw-admin .aw-quiz-editor .form-select:focus {
+    border-color: var(--aw-teal);
+    box-shadow: 0 0 0 3px var(--aw-teal-soft);
+    outline: 0;
+}
+body.aw-admin .aw-quiz-editor .form-control-sm,
+body.aw-admin .aw-quiz-editor .form-select-sm { min-height: 29px; font-size: 12px; }
+
+/* Lesson media part footer (server-rendered and JS-created cards). */
+body.aw-admin .aw-part-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 5px 8px;
+    border-top: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+}
+
+/* Success tone used by the scanner preview status panel. */
+body.aw-admin .aw-alert--success {
+    background: var(--aw-green-soft);
+    border-color: #cbe5d9;
+    color: var(--aw-green);
+}
+
+/* Support composer: the label drives the file picker, so hide the raw input. */
+body.aw-admin .tg-chat-file-input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    overflow: hidden;
+}

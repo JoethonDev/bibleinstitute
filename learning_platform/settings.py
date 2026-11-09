@@ -298,6 +298,11 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 15.0,
         "kwargs": {"limit": 500},
     },
+    "recover-stale-telegram-support-replies": {
+        "task": "management_system.telegram_tasks.recover_stale_telegram_support_replies",
+        "schedule": 60.0,
+        "kwargs": {"limit": 100},
+    },
 }
 
 # Expo Push Service is the only mobile push provider. The access token is
@@ -335,6 +340,9 @@ if MOBILE_PUSH_LESSON_TTL_SECONDS <= 0:
 # dedicated media worker; these values are also exposed in the worker's
 # Compose environment for operational inspection.
 MEDIA_WORK_DIR = os.getenv("MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
+# Support-chat audio uploads are validated synchronously in the web process, so
+# ffprobe (not the full FFmpeg pipeline) is present in the runtime image too.
+FFPROBE_BINARY = os.getenv("FFPROBE_BINARY", "ffprobe")
 MEDIA_MAX_SOURCE_SIZE = int(os.getenv("MEDIA_MAX_SOURCE_SIZE", str(2 * 1024 ** 3)))
 MEDIA_MAX_DURATION_SECONDS = int(os.getenv("MEDIA_MAX_DURATION_SECONDS", str(3 * 60 * 60)))
 MEDIA_JOB_TIMEOUT_SECONDS = int(os.getenv("MEDIA_JOB_TIMEOUT_SECONDS", str(2 * 60 * 60)))

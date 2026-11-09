@@ -1,0 +1,12 @@
+{% load i18n %}
+{% comment %}
+Standalone conversation page. The chat panel partial owns the detail head,
+status blocks, thread, composer and every /?fragment=panel target; this wrapper
+only provides the page root and the HTMX target the partial swaps into.
+{% endcomment %}
+<div id="content" class="aw-dashboard-page tg-chat-page">
+
+    <div id="telegram-chat-panel" class="tg-chat-panel">
+        {% include 'partials/telegram_chat_panel.html' %}
+    </div>
+</div>

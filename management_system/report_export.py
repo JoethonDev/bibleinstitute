@@ -17,6 +17,7 @@ from tempfile import SpooledTemporaryFile
 import openpyxl
 from django.core.exceptions import ValidationError
 from django.utils import formats, timezone
+from django.utils import translation
 from django.utils.translation import gettext as _
 
 from .models import AcademicYearLevel, AdminOperationJob, CourseOffering
@@ -30,6 +31,16 @@ from .utils.csv_export import _safe_filename
 from .utils.reports import iter_report_batches, load_report_facts, report_enrollments
 from .utils.search import normalize_search_text
 from .xlsx_export import RolloverSheet
+
+from .admin_operations import (
+    AdminOperationError,
+    assert_admin_operation_progress,
+    create_admin_operation,
+    finalize_admin_operation_export,
+    require_admin_operation_actor,
+)
+from .utils.decorators import can_view_reports
+
 
 REPORT_EXPORT_CONFLICT_PREFIX = "grades-report"
 
@@ -104,7 +115,7 @@ def build_report_workbook(
         str(_("Attendance Summary")),
         [
             _("Student ID"), _("Username"), _("First Name"), _("Last Name"),
-            _("Expected"), _("Full days"), _("Partial"), _("Absent"),
+            _("Expected"), _("Full days"), _("Fully scanned days"), _("Partial"), _("Absent"),
             _("Attendance Score"), _("Attendance %"), _("Absence %"),
         ],
         seen_titles,
@@ -136,7 +147,7 @@ def build_report_workbook(
                 ])
             attendance_sheet.append([
                 row["student_id"], row["username"], row["first_name"], row["last_name"],
-                row["expected"], row["valid"], row["invalid"], row["absent"],
+                row["expected"], row["valid"], row["fully_scanned"], row["invalid"], row["absent"],
                 row["attendance_score"], row["attendance_rate"], row["absence_rate"],
             ])
             days = batch.attendance_by_student.get(row["student_id"], {})
@@ -173,7 +184,6 @@ def enqueue_report_export(
 ) -> AdminOperationJob:
     """Freeze the validated report filters and create one idempotent export job."""
 
-    from .admin_operations import create_admin_operation
 
     raw_mode = str(study_mode or "").strip()
     if raw_mode and raw_mode not in ("online", "offline"):
@@ -227,16 +237,8 @@ def enqueue_report_export(
 def execute_report_export(job: AdminOperationJob, token) -> dict:
     """J01 executor: rebuild the frozen report workbook as a private artifact."""
 
-    from django.utils import translation
 
-    from .admin_operations import (
-        AdminOperationError,
-        assert_admin_operation_progress,
-        finalize_admin_operation_export,
-    )
-    from .utils.decorators import can_view_reports
 
-    from .admin_operations import require_admin_operation_actor
 
     require_admin_operation_actor(job)
     if not can_view_reports(job.actor):

@@ -7,7 +7,11 @@ from django.db.models import Count, Q, QuerySet
 
 from .academic_access import READABLE_ENROLLMENT_STATUSES
 from .models import AcademicYearLevel, AcademicYearLevelMeeting, AttendanceRecord, Enrollment, User
-from .utils.attendance import AttendanceDayStatus, grade_attendance_day
+from .utils.attendance import (
+    AttendanceDayStatus,
+    fully_scanned_attendance_day,
+    grade_attendance_day,
+)
 from .utils.search import normalized_contains_q, normalize_search_text
 
 
@@ -152,10 +156,11 @@ def attendance_matrix_page(
     rows = []
     for student in students:
         cells = []
-        full_days = partial_days = incomplete_days = absent_days = 0
+        full_days = fully_scanned_days = partial_days = incomplete_days = absent_days = 0
         score = 0
         for meeting in meetings:
             pair = record_map.get((student.pk, meeting["offering_id"], meeting["date"]), {})
+            fully_scanned_days += int(fully_scanned_attendance_day(pair))
             day = grade_attendance_day(pair.get("entrance"), pair.get("exit"), policy)
             if day.status == AttendanceDayStatus.ON_TIME:
                 full_days += 1
@@ -186,6 +191,7 @@ def attendance_matrix_page(
             "student": student,
             "cells": cells,
             "full_days": full_days,
+            "fully_scanned_days": fully_scanned_days,
             "partial_days": partial_days,
             "incomplete_days": incomplete_days,
             "absent_days": absent_days,

@@ -26,6 +26,18 @@ from .student_notifications import (
     is_active_published_lesson,
     is_active_published_quiz,
 )
+from .mobile_push_queries import active_push_devices
+from .telegram.broadcasts import (
+    BroadcastError,
+    _validate_target,
+    broadcast_redelivery_audience,
+    clone_broadcast_for_redelivery,
+)
+from .utils.lesson_access import lesson_is_available
+
+from celery import current_app
+from django.utils.dateparse import parse_datetime
+
 
 BATCH_SIZE = 100
 ACTIVE = ("queued", "running", "waiting")
@@ -56,7 +68,7 @@ def eligible_redelivery_notification_ids(notifications: list[StudentNotification
         )
     }
     for notification in notifications:
-        if notification.cancelled_at or notification.scheduled_for > now:
+        if notification.cancelled_at or notification.withdrawn_at or notification.scheduled_for > now:
             continue
         if notification.is_manual_redelivery:
             parent = notification.redelivery_job
@@ -74,7 +86,7 @@ def eligible_redelivery_notification_ids(notifications: list[StudentNotification
             if source is None:
                 continue
             if notification.notification_type == "lesson_published":
-                if not is_active_published_lesson(source):
+                if not is_active_published_lesson(source) or not lesson_is_available(source):
                     continue
             else:
                 if not is_active_published_quiz(source):
@@ -140,8 +152,6 @@ def enqueue_notification_redelivery(*, actor, source: str, source_id: int, mode:
             upper = original_audience(sample, audience=audience).aggregate(value=Max("pk"))["value"]
             key = f"notification-redelivery:{original.pk}"
         else:
-            from .telegram.broadcasts import BroadcastError, _validate_target, broadcast_redelivery_audience
-
             broadcast = TelegramBroadcast.objects.select_for_update(of=("self",)).select_related(
                 "academic_year", "level",
             ).get(pk=source_id)
@@ -186,8 +196,6 @@ def execute_notification_redelivery(job, token) -> dict:
     if (job.cursor or {}).get("prepared"):
         return {"status": AdminOperationJob.Status.WAITING, "result": job.result}
     if payload["source"] == "telegram":
-        from .telegram.broadcasts import BroadcastError, clone_broadcast_for_redelivery
-
         with transaction.atomic():
             try:
                 broadcast = clone_broadcast_for_redelivery(
@@ -199,8 +207,6 @@ def execute_notification_redelivery(job, token) -> dict:
             assert_admin_operation_progress(job.pk, token, processed=0, succeeded=0, failed=0, skipped=0,
                                             total=broadcast.recipient_count, cursor={"prepared": True}, result=result)
         return {"status": AdminOperationJob.Status.WAITING, "result": result}
-    from .mobile_push import active_push_devices
-
     source = StudentNotification.objects.get(pk=payload["source_id"])
     roots = original_audience(source, audience=payload["audience"], upper_pk=payload["upper_pk"])
     cursor = int((job.cursor or {}).get("last_pk", 0))
@@ -225,9 +231,12 @@ def execute_notification_redelivery(job, token) -> dict:
             by_student = defaultdict(list)
             for device in devices:
                 by_student[device.user_id].append(device)
-            accounts = dict(TelegramAccount.objects.filter(
+            accounts = {
+                user_id: (account_id, chat_id)
+                for user_id, account_id, chat_id in TelegramAccount.objects.filter(
                 user_id__in=[row.student_id for row in locked_batch], is_active=True,
-            ).values_list("user_id", "pk"))
+                ).values_list("user_id", "pk", "telegram_chat_id")
+            }
             latest_push, latest_telegram = _latest_channel_rows(locked_ids, devices)
             materializing_ids = notification_materializing_ids(locked_ids) if not failed_only else set()
             copies, plans = [], []
@@ -235,8 +244,8 @@ def execute_notification_redelivery(job, token) -> dict:
                 selected_devices = [d for d in by_student[original.student_id]
                                     if not failed_only or latest_push.get((original.pk, d.pk)) == "failed"]
                 tg = latest_telegram.get(original.pk, {})
-                account_id = accounts.get(original.student_id)
-                send_telegram = bool(account_id and (not failed_only or tg.get("status") == "failed"))
+                telegram_account = accounts.get(original.student_id)
+                send_telegram = bool(telegram_account and (not failed_only or tg.get("status") == "failed"))
                 # Never overlap live attempts or silently resend an already-recovered channel.
                 pending = not failed_only and (
                     original.pk in materializing_ids
@@ -268,15 +277,17 @@ def execute_notification_redelivery(job, token) -> dict:
                     scheduled_for=timezone.now(), push_expires_at=expires,
                 )
                 copies.append(copy)
-                plans.append((copy, selected_devices, account_id if send_telegram else None, tg.get("content_snapshot") or ""))
+                plans.append((copy, selected_devices, telegram_account if send_telegram else None, tg.get("content_snapshot") or ""))
             StudentNotification.objects.bulk_create(copies, batch_size=BATCH_SIZE)
             push_rows, telegram_rows = [], []
-            for copy, selected_devices, account_id, content in plans:
+            for copy, selected_devices, telegram_account, content in plans:
                 push_rows.extend(PushDelivery(notification=copy, device=device) for device in selected_devices)
-                if account_id:
+                if telegram_account:
+                    account_id, chat_id = telegram_account
                     telegram_rows.append(TelegramNotificationDelivery(
                         idempotency_key=copy.idempotency_key, notification_type=copy.notification_type,
                         user_id=copy.student_id, telegram_account_id=account_id, student_notification=copy,
+                        telegram_chat_id=chat_id,
                         lesson_id=copy.lesson_id, quiz_id=copy.quiz_id, announcement_id=copy.announcement_id,
                         scheduled_for=timezone.now(), content_snapshot=content,
                     ))
@@ -296,7 +307,6 @@ def execute_notification_redelivery(job, token) -> dict:
 
 
 def _wake_broadcast(broadcast_id: int) -> None:
-    from celery import current_app
 
     try:
         current_app.send_task("management_system.telegram_tasks.process_due_telegram_broadcasts", args=[broadcast_id])
@@ -322,7 +332,6 @@ def refresh_notification_redeliveries(*, limit: int = 25) -> int:
                     for row in broadcast.recipients.values("status").annotate(n=Count("pk")):
                         counts[row["status"]] += row["n"]
                     stamp = result.get("last_dispatch_at", "")
-                    from django.utils.dateparse import parse_datetime
                     last_dispatch = parse_datetime(stamp) if stamp else None
                     if (counts["queued"] or counts["sending"]) and (not last_dispatch or timezone.now() - last_dispatch > timedelta(seconds=60)):
                         result["last_dispatch_at"] = timezone.now().isoformat()

@@ -4,6 +4,7 @@ from django.db.models import Count, IntegerField, OuterRef, QuerySet, Subquery, 
 from django.db.models.functions import Coalesce
 
 from .models import CourseOffering, Lesson, PublicationStatus, Quiz
+from .utils.lesson_access import lesson_available_filter
 
 
 def with_offering_content_counts(
@@ -13,7 +14,7 @@ def with_offering_content_counts(
     lessons = Lesson.objects.filter(course_offering_id=OuterRef("pk"))
     quizzes = Quiz.objects.filter(course_offering_id=OuterRef("pk"))
     if not include_drafts:
-        lessons = lessons.filter(status=PublicationStatus.PUBLISHED)
+        lessons = lessons.filter(status=PublicationStatus.PUBLISHED).filter(lesson_available_filter())
         quizzes = quizzes.filter(status=PublicationStatus.PUBLISHED)
     lesson_counts = lessons.order_by().values("course_offering_id").annotate(
         total=Count("pk")
@@ -37,9 +38,9 @@ def course_navigation(
     lessons = Lesson.objects.filter(course_offering=offering)
     quizzes = Quiz.objects.filter(course_offering=offering)
     if not include_drafts:
-        lessons = lessons.filter(status=PublicationStatus.PUBLISHED)
+        lessons = lessons.filter(status=PublicationStatus.PUBLISHED).filter(lesson_available_filter())
         quizzes = quizzes.filter(status=PublicationStatus.PUBLISHED)
     return {
-        "lessons": lessons.only("id", "name", "course_offering_id"),
+        "lessons": lessons.only("id", "name", "course_offering_id", "opening_date"),
         "quizzes": quizzes.only("id", "name", "course_offering_id"),
     }

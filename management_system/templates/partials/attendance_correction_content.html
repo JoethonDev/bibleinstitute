@@ -1,0 +1,63 @@
+{% load i18n %}
+{% load aw_ui %}
+{% translate "Attendance" as page_eyebrow %}
+{% translate "Correct Attendance Record" as page_title %}
+<div id="content" class="aw-dashboard-page">
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=record.student|aw_display_name %}
+
+    <div class="aw-grid aw-grid--2">
+        <section class="aw-card" aria-labelledby="attendance-correction-form-title">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                    <h3 id="attendance-correction-form-title">{% translate "Correction" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body aw-card-body--flush">
+                <form method="post" hx-post="" hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <div class="aw-form-section">
+                        <div class="aw-form-grid">
+                            <div class="aw-field">
+                                <label for="attendance_date" class="form-label">{% translate "New Date" %}</label>
+                                <input type="date" name="attendance_date" id="attendance_date" class="form-control" value="{{ record.attendance_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="aw-field">
+                                <label for="action" class="form-label">{% translate "New Action" %}</label>
+                                <select name="action" id="action" class="form-select">
+                                    <option value="">{% translate "- Keep current -" %}</option>
+                                    <option value="entrance">{% translate "Entrance" %}</option>
+                                    <option value="exit">{% translate "Exit" %}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="aw-form-actions">
+                            <button type="submit" class="aw-btn aw-btn--primary">{% translate "Save Correction" %}</button>
+                            <a href="{% url 'attendance-management' %}" class="aw-btn aw-btn--ghost">{% translate "Cancel" %}</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="aw-card" aria-labelledby="attendance-correction-record-title">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                    <h3 id="attendance-correction-record-title">{% translate "Details" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-meta-grid">
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Student" %}</span><span class="aw-value">{{ record.student.get_full_name|default:record.student.username }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Course" %}</span><span class="aw-value">{{ record.course_offering.course.name }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Academic Year / Level" %}</span><span class="aw-value">{{ record.course_offering.academic_year_level.academic_year }} - {{ record.course_offering.academic_year_level.level.display_name }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Current Date" %}</span><span class="aw-value">{{ record.attendance_date }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Current Action" %}</span><span class="aw-value">{{ record.get_action_display }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Source" %}</span><span class="aw-value">{{ record.get_source_display }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Scanned at" %}</span><span class="aw-value">{{ record.scanned_at|date:"Y-m-d H:i:s" }}</span></div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>

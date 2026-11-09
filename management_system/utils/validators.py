@@ -1,7 +1,9 @@
 import re
 import unicodedata
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+
 
 def validate_egyptian_national_id(value):
     if not re.fullmatch(r'\d{14}', value):
@@ -104,9 +106,8 @@ def validate_unique_phone(value: str, *, exclude_user_id: int | None = None) -> 
     phone = normalize_phone(value)
     if not phone:
         raise ValidationError(_("Enter a valid international phone number."))
-    from ..models import User
 
-    conflicts = User.objects.filter(phone=phone)
+    conflicts = get_user_model().objects.filter(phone=phone)
     if exclude_user_id is not None:
         conflicts = conflicts.exclude(pk=exclude_user_id)
     if conflicts.exists():

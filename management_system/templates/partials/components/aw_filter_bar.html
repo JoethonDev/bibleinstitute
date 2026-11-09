@@ -1,0 +1,101 @@
+{% load i18n %}
+{% comment %}
+Canonical filter bar: search + whitelisted selects + cleared state.
+Every control posts the same normalized query parameters to the owning
+view; the table container keeps its single canonical target.
+{% endcomment %}
+<div class="aw-filter-bar">
+    {% if filter_tabs %}
+    <nav class="aw-tabs" aria-label="{% if filter_tabs_label %}{{ filter_tabs_label }}{% else %}{% translate 'Filter by status' %}{% endif %}">
+        {% for tab in filter_tabs %}
+        <a class="aw-tab{% if tab.is_active %} is-active{% endif %}"
+           href="{{ tab.url }}"
+           hx-get="{{ tab.url }}"
+           hx-target="#display-page"
+           hx-select="#page-region"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           {% if tab.is_active %}aria-current="page"{% endif %}>
+            <span>{{ tab.label }}</span>
+            <span class="aw-count">{{ tab.count }}</span>
+        </a>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
+    <div class="aw-table-tools">
+        <div class="aw-search-wrap">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input class="aw-input aw-input--search filters-fields"
+                   type="search"
+                   id="aw-filter-search"
+                   name="name"
+                   value="{{ name_value }}"
+                   placeholder="{{ search_placeholder|default:_('Search') }}"
+                   aria-label="{{ search_placeholder|default:_('Search') }}"
+                   hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}"
+                   hx-include=".filters-fields"
+                   hx-trigger="input changed delay:200ms, search"
+                   hx-target="#table-container"
+                   hx-swap="innerHTML"
+                   hx-replace-url="true"
+                   hx-indicator="#table-loading">
+        </div>
+
+        {% for field in filter_fields %}
+        <label class="visually-hidden" for="aw-filter-{{ field.name }}">{{ field.label }}</label>
+        {% if field.page_target %}
+        <select class="aw-select filters-fields"
+                id="aw-filter-{{ field.name }}"
+                name="{{ field.name }}"
+                aria-label="{{ field.label }}"
+                hx-get="{{ url }}"
+                hx-include=".filters-fields"
+                hx-trigger="change"
+                hx-target="#display-page"
+                hx-select="#page-region"
+                hx-swap="innerHTML"
+                hx-push-url="true">
+        {% else %}
+        <select class="aw-select filters-fields"
+                id="aw-filter-{{ field.name }}"
+                name="{{ field.name }}"
+                aria-label="{{ field.label }}"
+                hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}"
+                hx-include=".filters-fields"
+                hx-trigger="change"
+                hx-target="#table-container"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-indicator="#table-loading">
+        {% endif %}
+            <option value="">{{ field.all_label }}</option>
+            {% if field.groups %}
+            {% for group in field.groups %}
+            <optgroup label="{{ group.label }}">
+                {% for option in group.options %}
+                <option value="{{ option.value }}"{% if field.value|stringformat:"s" == option.value|stringformat:"s" %} selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </optgroup>
+            {% endfor %}
+            {% else %}
+            {% for option in field.options %}
+            <option value="{{ option.value }}"{% if field.value == option.value %} selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+            {% endif %}
+        </select>
+        {% endfor %}
+
+        <a class="aw-btn aw-btn--ghost aw-btn--sm aw-ms-auto"
+           href="{{ url }}"
+           hx-get="{{ url }}"
+           hx-target="#display-page"
+           hx-select="#page-region"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           data-clear-search="aw-filter-search">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+            <span>{% translate "Clear" %}</span>
+        </a>
+    </div>
+</div>

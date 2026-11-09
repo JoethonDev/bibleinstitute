@@ -1,0 +1,44 @@
+{% load i18n %}
+{% comment %}
+Contextual sidebar body for the active domain only. The id is a persistent
+HTMX OOB region replaced on every admin page navigation.
+{% endcomment %}
+<div id="aw-sidebar-body" class="aw-sidebar-scroll">
+    <div class="aw-sidebar-head">
+        <span class="aw-domain-mark">
+            <svg class="aw-ico" aria-hidden="true"><use href="#{{ aw.active_domain.icon|default:'i-grid' }}"></use></svg>
+        </span>
+        <div class="aw-sidebar-head-text">
+            <p>{% translate "Domain" %}</p>
+            <h2>{% if aw.active_domain %}{{ aw.active_domain.label }}{% else %}{% translate "Overview" %}{% endif %}</h2>
+        </div>
+        <button type="button" class="aw-icon-btn aw-sidebar-toggle"
+                @click="$store.ui.toggleSidebar()"
+                :aria-expanded="(!$store.ui.sidebarCollapsed).toString()"
+                aria-controls="aw-sidebar"
+                :title="$store.ui.sidebarCollapsed ? '{% translate "Expand Sidebar" %}' : '{% translate "Collapse Sidebar" %}'">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-columns"></use></svg>
+            <span class="visually-hidden">{% translate "Collapse Sidebar" %}</span>
+        </button>
+    </div>
+
+    <div class="aw-side-label">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-grid"></use></svg>{% translate "Sections" %}
+    </div>
+    <nav class="aw-side-nav" aria-label="{% translate 'Domain sections' %}">
+        {% for section in aw.active_domain.sections %}
+        <a class="aw-side-link{% if section.key == aw.active_section_key %} is-active{% endif %}"
+           href="{% url section.url_name %}"
+           hx-get="{% url section.url_name %}"
+           hx-target="#display-page"
+           hx-select="#page-region"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-select-oob="#aw-rail-nav,#aw-sidebar-body,#aw-mobile-nav,#aw-topbar-crumbs"
+           {% if section.key == aw.active_section_key %}aria-current="page"{% endif %}>
+            <svg class="aw-ico" aria-hidden="true"><use href="#{{ section.icon }}"></use></svg>
+            <span>{{ section.label }}</span>
+        </a>
+        {% endfor %}
+    </nav>
+</div>

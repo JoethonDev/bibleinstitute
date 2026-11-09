@@ -1,0 +1,215 @@
+{% load i18n %}
+{% comment %}
+Broadcast detail and delivery monitor. Presentation only: the monitor root keeps
+x-data, data-job-detail, data-job-status-url and data-unavailable-label; the
+summary card keeps data-job-record, data-primary-job, data-family, data-id,
+data-active, data-next-poll-at and every data-job-field; the progress element,
+the data-job-poll-error hook, the redelivery and recipient-delete POST forms, the
+status/readiness conditions and the pagination include arguments are unchanged.
+{% endcomment %}
+<div id="content" class="aw-dashboard-page"{% if monitor_job %} x-data="backgroundJobsMonitor" data-job-detail="true" data-job-status-url="{{ job_status_url }}" data-unavailable-label="{% translate 'Unavailable' %}"{% endif %}>
+    {% translate "Engagement" as page_eyebrow %}
+    {% translate "Broadcast Details" as page_title %}
+    {% translate "Inspect the recipient snapshot and delivery status. Support conversation history is not changed." as page_description %}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            {% if monitor_job %}
+            <div class="aw-flex">
+                {% include "partials/background_polling_toggle.html" %}
+            </div>
+            {% endif %}
+            <a class="aw-btn aw-btn--ghost"
+               href="{{ broadcast_list_url }}"
+               hx-get="{{ broadcast_list_url }}"
+               hx-target="#display-page"
+               hx-select="#page-region"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
+                <span>{% translate "Back" %}</span>
+            </a>
+        </div>
+    </div>
+
+    {% if monitor_job %}<p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>{% endif %}
+
+    <section class="aw-card"{% if monitor_job %} data-job-record data-primary-job="true" data-family="telegram" data-id="{{ monitor_job.id }}" data-active="{{ monitor_job.active|yesno:'true,false' }}" data-next-poll-at="{{ monitor_job.next_poll|date:'c' }}"{% endif %}>
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+                <h3>{% translate "Broadcast Summary" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <dl class="mb-0">
+                <div class="aw-kv">
+                    <dt>{% translate "Status" %}</dt>
+                    <dd{% if monitor_job %} data-job-field="status_label" aria-live="polite"{% endif %}>{% if monitor_job %}{{ monitor_job.status_label }}{% else %}{{ broadcast.get_status_display }}{% endif %}</dd>
+                </div>
+                <div class="aw-kv">
+                    <dt>{% translate "Academic Year" %}</dt>
+                    <dd>{{ broadcast.academic_year.name }}</dd>
+                </div>
+                <div class="aw-kv">
+                    <dt>{% translate "Target" %}</dt>
+                    <dd>{{ target_label }}</dd>
+                </div>
+                <div class="aw-kv">
+                    <dt>{% translate "Recipients" %}</dt>
+                    <dd class="aw-num">{{ broadcast.recipient_count }}</dd>
+                </div>
+                <div class="aw-kv">
+                    <dt>{% translate "Sent" %}</dt>
+                    <dd class="aw-num"{% if monitor_job %} data-job-field="succeeded"{% endif %}>{{ broadcast.sent_count }}</dd>
+                </div>
+                <div class="aw-kv">
+                    <dt>{% translate "Failed" %}</dt>
+                    <dd class="aw-num"{% if monitor_job %} data-job-field="failed"{% endif %}>{{ broadcast.failed_count }}</dd>
+                </div>
+                {% if monitor_job %}
+                <div class="aw-kv">
+                    <dt>{% translate "Skipped" %}</dt>
+                    <dd class="aw-num" data-job-field="skipped">{{ broadcast.skipped_count }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+            {% if monitor_job %}
+            <div class="mt-3">
+                <progress max="100" value="{{ monitor_job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress>
+                <p class="aw-small aw-muted mb-0 mt-1" data-job-field="progress_label">{{ monitor_job.progress_label }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
+                <h3>{% translate "Message" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <div class="tg-broadcast-message-preview">{{ broadcast.message }}</div>
+        </div>
+    </section>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                <h3>{% translate "Attachments" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            {% if attachments %}
+            <ul class="aw-stack">
+                {% for attachment in attachments %}
+                <li class="aw-file-row">
+                    <span class="aw-file-ic">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                    </span>
+                    <div class="aw-file-main">
+                        <b>{% firstof attachment.original_name "-" %}</b>
+                        <span>{{ attachment.mime_type|default:"-" }} - {{ attachment.size_bytes|filesizeformat }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            {% translate "No attachments." as no_attachments_label %}
+            {% include "partials/components/aw_empty.html" with icon="i-file" description=no_attachments_label %}
+            {% endif %}
+        </div>
+    </section>
+
+    {% if broadcast.status == 'failed' or broadcast.status == 'completed' %}
+    <form method="post" action="{{ redelivery_url }}" hx-post="{{ redelivery_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" data-confirm-message="{% translate 'Queue another delivery using this saved content?' %}">
+        {% csrf_token %}
+        <input type="hidden" name="audience" value="group">
+        <div class="aw-flex aw-flex-wrap">
+            <button type="submit" name="mode" value="failed" class="aw-btn aw-btn--outline">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                <span>{% translate "Retry failed deliveries" %}</span>
+            </button>
+            <button type="submit" name="mode" value="all" class="aw-btn aw-btn--danger">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+                <span>{% translate "Resend all" %}</span>
+            </button>
+        </div>
+    </form>
+    {% endif %}
+
+    {% if broadcast.status == 'draft' %}
+    <div class="aw-flex aw-flex-wrap">
+        <a class="aw-btn aw-btn--primary" href="{{ confirm_url }}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+            <span>{% translate "Review Broadcast" %}</span>
+        </a>
+        <form method="post" action="{{ cancel_url }}" hx-post="{{ cancel_url }}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this draft?' %}">
+            {% csrf_token %}
+            <button type="submit" class="aw-btn aw-btn--danger">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                <span>{% translate "Delete Draft" %}</span>
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <section class="aw-card aw-table-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+                <h3>{% translate "Recipient Delivery" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body aw-card-body--tight">
+            <p class="aw-small aw-muted">{% translate "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours." %}</p>
+        </div>
+        {% if recipient_page_obj.object_list %}
+        <div class="aw-table-wrap">
+            <table class="aw-table">
+                <caption class="visually-hidden">{% translate "Broadcast recipient delivery" %}</caption>
+                <thead><tr><th scope="col">{% translate "Student" %}</th><th scope="col">{% translate "Status" %}</th><th scope="col">{% translate "Attempts" %}</th><th scope="col">{% translate "Telegram removal" %}</th><th scope="col">{% translate "Error" %}</th><th scope="col">{% translate "Actions" %}</th></tr></thead>
+                <tbody>
+                {% for recipient in recipient_page_obj %}
+                    <tr>
+                        <td class="aw-cell-strong">{{ recipient.user_display_name|default:recipient.user_username }}</td>
+                        <td>
+                            {% if recipient.status == "sending" %}
+                            {% include "partials/components/aw_status_pill.html" with status=recipient.status tone="blue" label=recipient.get_status_display %}
+                            {% else %}
+                            {% include "partials/components/aw_status_pill.html" with status=recipient.status label=recipient.get_status_display %}
+                            {% endif %}
+                        </td>
+                        <td class="aw-num">{{ recipient.attempt_count }}</td>
+                        <td>
+                            {% if recipient.telegram_message_count %}
+                                {% blocktranslate with deleted=recipient.telegram_messages_deleted total=recipient.telegram_message_count expired=recipient.telegram_messages_expired failed=recipient.telegram_messages_failed %}{{ deleted }} of {{ total }} removed; {{ expired }} expired; {{ failed }} failed{% endblocktranslate %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ recipient.last_error|default:"-" }}</td>
+                        <td>
+                            {% if recipient.telegram_messages_remaining and recipient.status != 'queued' and recipient.status != 'sending' %}
+                            <form method="post" action="{% url 'telegram-broadcast-recipient-delete' broadcast.pk recipient.pk %}" class="aw-inline-form" data-confirm-message="{% translate 'Delete every recorded broadcast message for this recipient?' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete from Telegram" %}</button>
+                            </form>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="aw-card-body">
+            {% translate "No recipient records are available." as no_recipients_label %}
+            {% include "partials/components/aw_empty.html" with icon="i-users" description=no_recipients_label %}
+        </div>
+        {% endif %}
+        {% translate "Recipient pagination" as pagination_aria_label %}
+        {% include "partials/pagination.html" with page_obj=recipient_page_obj aria_label=pagination_aria_label %}
+    </section>
+</div>

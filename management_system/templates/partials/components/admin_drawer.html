@@ -1,0 +1,24 @@
+{% load i18n %}
+{% comment %}
+One right-side peek drawer. Editors stay full pages; only explicit drawer
+fragments load into #aw-drawer-body. The fallback href of every trigger
+opens the owning full page when scripting is unavailable.
+{% endcomment %}
+<div class="aw-drawer-overlay" id="aw-drawer-overlay" hidden></div>
+<aside class="aw-drawer" id="aw-drawer" role="dialog" aria-modal="true"
+       aria-labelledby="aw-drawer-title" hidden
+       data-aw-loading="{% translate 'Loading...' %}"
+       data-aw-error="{% translate 'This panel could not be loaded.' %}"
+       data-aw-forbidden="{% translate 'You do not have access to this panel.' %}">
+    <div class="aw-drawer-head">
+        <div>
+            <h2 id="aw-drawer-title"></h2>
+            <p id="aw-drawer-subtitle"></p>
+        </div>
+        <button type="button" class="aw-icon-btn" data-aw-drawer-close
+                aria-label="{% translate 'Close' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+    </div>
+    <div class="aw-drawer-body" id="aw-drawer-body"></div>
+</aside>

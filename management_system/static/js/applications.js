@@ -129,9 +129,9 @@
                         parts.push(summary.dataset.notificationFailedLabel + ': ' + notificationFailed);
                     }
                     summary.textContent = parts.join(' - ');
-                    summary.classList.remove('d-none', 'ad-alert--danger', 'ad-alert--info', 'ad-alert--warning', 'ad-alert--success');
+                    summary.classList.remove('d-none', 'aw-alert--danger', 'aw-alert--info', 'aw-alert--warn', 'aw-alert--success');
                     summary.classList.add(
-                        stale || failed || notificationFailed ? 'ad-alert--warning' : 'ad-alert--success'
+                        stale || failed || notificationFailed ? 'aw-alert--warn' : 'aw-alert--success'
                     );
                 }
                 var owner = stateOwner();

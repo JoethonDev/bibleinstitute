@@ -22,8 +22,21 @@ from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from django.core.cache import cache
+from celery import current_app
 
 from .models import AdminOperationJob, User
+import logging
+from django.db import connections
+import hashlib
+from .utils.storage_operations import (
+    delete_from_bucket,
+    download_from_bucket,
+    get_r2_client,
+    upload_to_bucket,
+)
+from .xlsx_export import XLSX_CONTENT_TYPE
+
 
 LEASE_SECONDS = 120
 MAX_ERROR_LENGTH = 2000
@@ -59,6 +72,14 @@ class AdminOperationError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+ADMIN_OPERATION_TASK_NAME = "management_system.admin_operation_tasks.run_admin_operation"
+
+
+def enqueue_admin_operation(job_id: str, *, queue: str = "admin") -> None:
+    """Dispatch a durable admin job without importing its worker executors."""
+    current_app.send_task(ADMIN_OPERATION_TASK_NAME, args=[str(job_id)], queue=queue)
 
 
 def _validate_kind(kind: str) -> str:
@@ -263,7 +284,6 @@ def record_admin_operation_progress(
 @contextmanager
 def admin_operation_heartbeat(job_id, token):
     """One lease heartbeat per running task, including long hashing/provider calls."""
-    import logging
 
     stopped = Event()
 
@@ -281,7 +301,6 @@ def admin_operation_heartbeat(job_id, token):
                 finally:
                     close_old_connections()
         finally:
-            from django.db import connections
             connections.close_all()
 
     thread = Thread(target=heartbeat, daemon=True, name="admin-operation-lease")
@@ -358,7 +377,6 @@ def wait_for_notification_delivery(job_id, token: str | uuid.UUID, result: dict)
 def _artifact_client_bucket():
     """Return the shared private-bucket client, or ``(None, "")`` when absent."""
 
-    from .utils.storage_operations import get_r2_client
 
     bucket = (getattr(settings, "R2_BUCKET_NAME", "") or "").strip()
     if not bucket:
@@ -389,7 +407,6 @@ def store_admin_operation_artifact(*, content: bytes, filename: str) -> str:
     AdminOperationError; the caller must not enqueue work then.
     """
 
-    from .utils.storage_operations import upload_to_bucket
 
     if not isinstance(content, (bytes, bytearray)) or not content:
         raise AdminOperationError("invalid_artifact", _("The uploaded file is empty."))
@@ -422,9 +439,7 @@ def store_admin_operation_artifact(*, content: bytes, filename: str) -> str:
 def read_admin_operation_artifact(job, *, expected_digest: str = "") -> bytes:
     """Read one bounded private input artifact, verifying the frozen digest."""
 
-    import hashlib
 
-    from .utils.storage_operations import download_from_bucket
 
     key = str((job.input or {}).get("artifact_key") or "")
     if not key.startswith(ARTIFACT_PREFIX):
@@ -449,9 +464,7 @@ def read_admin_operation_artifact(job, *, expected_digest: str = "") -> bytes:
 def delete_admin_operation_artifact(job, key: str | None = None) -> bool:
     """Delete one consumed private job artifact and record cleanup failures."""
 
-    import logging
 
-    from .utils.storage_operations import delete_from_bucket
 
     logger = logging.getLogger(__name__)
     artifact_key = key or str((job.input or {}).get("artifact_key") or job.artifact_key or "")
@@ -499,8 +512,6 @@ def store_admin_operation_export(
     request memory. Any failure raises a translated ``AdminOperationError``.
     """
 
-    from .utils.storage_operations import upload_to_bucket
-    from .xlsx_export import XLSX_CONTENT_TYPE
 
     client, bucket = _artifact_client_bucket()
     if client is None:
@@ -600,9 +611,6 @@ def purge_expired_admin_operation_artifacts(*, limit: int = ARTIFACT_CLEANUP_LIM
     retried from its current cursor on the next scheduled run.
     """
 
-    import logging
-    from django.core.cache import cache
-    from .utils.storage_operations import delete_from_bucket
 
     logger = logging.getLogger(__name__)
     client, bucket = _artifact_client_bucket()

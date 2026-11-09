@@ -3198,6 +3198,12 @@ msgstr "Edit"
 msgid "Delete this year?"
 msgstr "Delete this year?"
 
+msgid "Delete this lesson and its media links? Telegram delivery history is kept. This cannot be undone."
+msgstr "Delete this lesson and its media links? Telegram delivery history is kept. This cannot be undone."
+
+msgid "Delete lesson"
+msgstr "Delete lesson"
+
 #: .\management_system\templates\academic_setup.html:92
 #: .\management_system\templates\academic_setup.html:246
 #: .\management_system\templates\applications_dashboard.html:105
@@ -12396,8 +12402,8 @@ msgstr "Answers saved."
 msgid "Saving answers..."
 msgstr "Saving answers..."
 
-msgid "Submit saved snapshots after the grace period for %(count)s quizzes?"
-msgstr "Submit saved snapshots after the grace period for %(count)s quizzes?"
+msgid "Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
+msgstr "Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
 
 msgid "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
 msgstr "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
@@ -12652,6 +12658,9 @@ msgstr "Gallery uploads"
 
 msgid "Job category"
 msgstr "Job category"
+
+msgid "Job details"
+msgstr "Job details"
 
 msgid "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
 msgstr "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
@@ -12940,3 +12949,683 @@ msgstr "Waiting for delivery"
 
 msgid "device"
 msgstr "device"
+
+msgid "Time zone: %(name)s"
+msgstr "Time zone: %(name)s"
+
+msgid "Allowed time: up to %(minutes)s minutes after starting."
+msgstr "Allowed time: up to %(minutes)s minutes after starting."
+
+msgid "Your attempt ends at closing if that comes first."
+msgstr "Your attempt ends at closing if that comes first."
+
+msgid "Open the exam to view instructions and start."
+msgstr "Open the exam to view instructions and start."
+
+msgid "This lesson is available now."
+msgstr "This lesson is available now."
+
+msgid "Open the lesson to view its content."
+msgstr "Open the lesson to view its content."
+
+msgid "Lesson available: %(course)s - %(name)s"
+msgstr "Lesson available: %(course)s - %(name)s"
+
+msgid "Exam available: %(course)s - %(name)s"
+msgstr "Exam available: %(course)s - %(name)s"
+
+msgid "Scheduled times use %(timezone)s."
+msgstr "Scheduled times use %(timezone)s."
+
+msgid "All exam schedule times use %(timezone)s."
+msgstr "All exam schedule times use %(timezone)s."
+
+msgid "All schedule times use %(timezone)s."
+msgstr "All schedule times use %(timezone)s."
+
+msgid "%(count)s Telegram message(s) are older than 48 hours and remain in Telegram."
+msgstr "%(count)s Telegram message(s) are older than 48 hours and remain in Telegram."
+
+msgid "A reply to this message is already being sent."
+msgstr "A reply to this message is already being sent."
+
+msgid "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours."
+msgstr "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours."
+
+msgid "Alert marked as replied in Telegram"
+msgstr "Alert marked as replied in Telegram"
+
+msgid "Alert remains in Telegram because the 48-hour deletion window expired"
+msgstr "Alert remains in Telegram because the 48-hour deletion window expired"
+
+msgid "Alert removed from Telegram"
+msgstr "Alert removed from Telegram"
+
+msgid "Answered"
+msgstr "Answered"
+
+msgid "Answered by @%(admin)s"
+msgstr "Answered by @%(admin)s"
+
+msgid "Assigned to"
+msgstr "Assigned to"
+
+msgid "Assigned to @%(admin)s"
+msgstr "Assigned to @%(admin)s"
+
+msgid "Awaiting a reply to this student message"
+msgstr "Awaiting a reply to this student message"
+
+msgid "Claim conversation"
+msgstr "Claim conversation"
+
+msgid "Conversation assigned to you."
+msgstr "Conversation assigned to you."
+
+msgid "Conversation returned to the open queue."
+msgstr "Conversation returned to the open queue."
+
+msgid "Delete every recorded broadcast message for this recipient?"
+msgstr "Delete every recorded broadcast message for this recipient?"
+
+msgid "Delete from Telegram"
+msgstr "Delete from Telegram"
+
+msgid "Delete this message from Telegram? The local conversation history will remain."
+msgstr "Delete this message from Telegram? The local conversation history will remain."
+
+msgid "Deleted %(count)s Telegram message(s) for this recipient."
+msgstr "Deleted %(count)s Telegram message(s) for this recipient."
+
+msgid "Deleted from Telegram"
+msgstr "Deleted from Telegram"
+
+msgid "Last read by"
+msgstr "Last read by"
+
+msgid "Message deleted from Telegram."
+msgstr "Message deleted from Telegram."
+
+msgid "Message deleted from Telegram. The conversation is open again."
+msgstr "Message deleted from Telegram. The conversation is open again."
+
+msgid "Only a sent Telegram reply can be deleted."
+msgstr "Only a sent Telegram reply can be deleted."
+
+msgid "Only administrators can withdraw notifications."
+msgstr "Only administrators can withdraw notifications."
+
+msgid "Only the assigned administrator can release this conversation."
+msgstr "Only the assigned administrator can release this conversation."
+
+msgid "Original audience: %(count)s recipients. Current access and channel eligibility will be checked again."
+msgstr "Original audience: %(count)s recipients. Current access and channel eligibility will be checked again."
+
+msgid "Read"
+msgstr "Read"
+
+msgid "Release conversation"
+msgstr "Release conversation"
+
+msgid "Removed by"
+msgstr "Removed by"
+
+msgid "Resolved by"
+msgstr "Resolved by"
+
+msgid "Resolved by @%(admin)s"
+msgstr "Resolved by @%(admin)s"
+
+msgid "Retry Telegram deletion"
+msgstr "Retry Telegram deletion"
+
+msgid "Retry removing Telegram copies that previously failed?"
+msgstr "Retry removing Telegram copies that previously failed?"
+
+msgid "Telegram could not delete %(count)s message(s) for this recipient."
+msgstr "Telegram could not delete %(count)s message(s) for this recipient."
+
+msgid "Telegram could not delete this message."
+msgstr "Telegram could not delete this message."
+
+msgid "Telegram could not update this alert"
+msgstr "Telegram could not update this alert"
+
+msgid "Telegram deletion failed"
+msgstr "Telegram deletion failed"
+
+msgid "Telegram deletion window expired"
+msgstr "Telegram deletion window expired"
+
+msgid "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram."
+msgstr "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram."
+
+msgid "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs."
+msgstr "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs."
+
+msgid "Telegram message identifiers are unavailable."
+msgstr "Telegram message identifiers are unavailable."
+
+msgid "Telegram only allows deleting messages for 48 hours."
+msgstr "Telegram only allows deleting messages for 48 hours."
+
+msgid "Telegram removal"
+msgstr "Telegram removal"
+
+msgid "Telegram sent the reply without returning a message identifier."
+msgstr "Telegram sent the reply without returning a message identifier."
+
+msgid "The Telegram bot is not active."
+msgstr "The Telegram bot is not active."
+
+msgid "The Telegram message could not be deleted."
+msgstr "The Telegram message could not be deleted."
+
+msgid "The notification was withdrawn before delivery."
+msgstr "The notification was withdrawn before delivery."
+
+msgid "There are no Telegram messages left to delete for this recipient."
+msgstr "There are no Telegram messages left to delete for this recipient."
+
+msgid "This broadcast recipient is no longer available."
+msgstr "This broadcast recipient is no longer available."
+
+msgid "This conversation has already been resolved."
+msgstr "This conversation has already been resolved."
+
+msgid "This conversation is assigned to %(admin)s."
+msgstr "This conversation is assigned to %(admin)s."
+
+msgid "This conversation is not currently assigned."
+msgstr "This conversation is not currently assigned."
+
+msgid "This conversation was resolved by %(admin)s."
+msgstr "This conversation was resolved by %(admin)s."
+
+msgid "This message is older than 48 hours and remains in Telegram."
+msgstr "This message is older than 48 hours and remains in Telegram."
+
+msgid "This notification is no longer available."
+msgstr "This notification is no longer available."
+
+msgid "This sent message is no longer available."
+msgstr "This sent message is no longer available."
+
+msgid "Wait for the pending reply to finish before releasing this conversation."
+msgstr "Wait for the pending reply to finish before releasing this conversation."
+
+msgid "Wait for this recipient's broadcast delivery to finish."
+msgstr "Wait for this recipient's broadcast delivery to finish."
+
+msgid "Withdraw recipient notification"
+msgstr "Withdraw recipient notification"
+
+msgid "Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?"
+msgstr "Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?"
+
+msgid "You can delete only a Telegram alert sent to your linked account."
+msgstr "You can delete only a Telegram alert sent to your linked account."
+
+msgid "You can delete only a reply you sent."
+msgstr "You can delete only a reply you sent."
+
+msgid "%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
+msgstr "%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
+
+msgid "The notification was cancelled before delivery."
+msgstr "The notification was cancelled before delivery."
+
+msgid "Delivery outcome unknown"
+msgstr "Delivery outcome unknown"
+
+msgid "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."
+msgstr "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."
+
+#: management_system/admin_navigation.py
+msgid "Curriculum"
+msgstr "Curriculum"
+
+#: management_system/admin_navigation.py
+msgid "Academic"
+msgstr "Academic"
+
+#: management_system/admin_navigation.py
+msgid "Combined"
+msgstr "Combined"
+
+#: management_system/admin_navigation.py
+msgid "Payments"
+msgstr "Payments"
+
+#: management_system/admin_navigation.py
+msgid "Engagement"
+msgstr "Engagement"
+
+#: management_system/admin_navigation.py
+msgid "Site & Apps"
+msgstr "Site & Apps"
+
+#: management_system/admin_navigation.py
+msgid "Workspace domains"
+msgstr "Workspace domains"
+
+#: management_system/admin_navigation.py
+msgid "Domain sections"
+msgstr "Domain sections"
+
+#: management_system/admin_navigation.py
+msgid "Domain"
+msgstr "Domain"
+
+#: management_system/admin_navigation.py
+msgid "Sections"
+msgstr "Sections"
+
+#: management_system/admin_navigation.py
+msgid "Search everything"
+msgstr "Search everything"
+
+#: management_system/admin_navigation.py
+msgid "New lesson"
+msgstr "New lesson"
+
+#: management_system/admin_navigation.py
+msgid "New quiz"
+msgstr "New quiz"
+
+#: management_system/admin_navigation.py
+msgid "New course"
+msgstr "New course"
+
+#: management_system/admin_navigation.py
+msgid "Upload media"
+msgstr "Upload media"
+
+#: management_system/admin_navigation.py
+msgid "New announcement"
+msgstr "New announcement"
+
+#: management_system/admin_navigation.py
+msgid "Add student"
+msgstr "Add student"
+
+#: management_system/admin_navigation.py
+msgid "Add offering"
+msgstr "Add offering"
+
+#: management_system/admin_navigation.py
+msgid "Switch language"
+msgstr "Switch language"
+
+#: management_system/admin_navigation.py
+msgid "This panel could not be loaded."
+msgstr "This panel could not be loaded."
+
+#: management_system/admin_navigation.py
+msgid "You do not have access to this panel."
+msgstr "You do not have access to this panel."
+
+#: management_system/views.py
+msgid "Account inactive"
+msgstr "Account inactive"
+
+#: management_system/views.py
+msgid "Create student"
+msgstr "Create student"
+
+#: management_system/views.py
+msgid "Create course"
+msgstr "Create course"
+
+#: management_system/views.py
+msgid "Create quiz"
+msgstr "Create quiz"
+
+#: management_system/views.py
+msgid "Manage the course catalog for each academic level."
+msgstr "Manage the course catalog for each academic level."
+
+#: management_system/views.py
+msgid "Author lessons, attach media and control publication."
+msgstr "Author lessons, attach media and control publication."
+
+#: management_system/views.py
+msgid "Build quizzes, review attempts and keep grading consistent."
+msgstr "Build quizzes, review attempts and keep grading consistent."
+
+#: management_system/views.py
+msgid "Manage student accounts, application decisions and study mode access."
+msgstr "Manage student accounts, application decisions and study mode access."
+
+#: management_system/views.py
+msgid "Application"
+msgstr "Application"
+
+#: management_system/views.py
+msgid "All application statuses"
+msgstr "All application statuses"
+
+#: management_system/views.py
+msgid "All study modes"
+msgstr "All study modes"
+
+#: management_system/views.py
+msgid "All account states"
+msgstr "All account states"
+
+#: management_system/admin_today.py
+msgid "What needs a decision today, %(date)s."
+msgstr "What needs a decision today, %(date)s."
+
+#: management_system/admin_today.py
+msgid "Needs attention"
+msgstr "Needs attention"
+
+#: management_system/admin_today.py
+msgid "Upcoming"
+msgstr "Upcoming"
+
+#: management_system/admin_today.py
+msgid "Recent activity"
+msgstr "Recent activity"
+
+#: management_system/admin_today.py
+msgid "Failed media jobs"
+msgstr "Failed media jobs"
+
+#: management_system/admin_today.py
+msgid "Ungraded answers"
+msgstr "Ungraded answers"
+
+#: management_system/admin_today.py
+msgid "Unread Telegram conversations"
+msgstr "Unread Telegram conversations"
+
+#: management_system/admin_today.py
+msgid "No pending applications."
+msgstr "No pending applications."
+
+#: management_system/admin_today.py
+msgid "No failed media jobs."
+msgstr "No failed media jobs."
+
+#: management_system/admin_today.py
+msgid "No answers are waiting for grading."
+msgstr "No answers are waiting for grading."
+
+#: management_system/admin_today.py
+msgid "No unread support conversations."
+msgstr "No unread support conversations."
+
+#: management_system/admin_today.py
+msgid "Active students"
+msgstr "Active students"
+
+#: management_system/admin_today.py
+msgid "Attendance today"
+msgstr "Attendance today"
+
+#: management_system/admin_today.py
+msgid "As of"
+msgstr "As of"
+
+#: management_system/admin_today.py
+msgid "active"
+msgstr "active"
+
+#: management_system/admin_today.py
+msgid "Meeting"
+msgstr "Meeting"
+
+#: management_system/admin_today.py
+msgid "Academic holiday"
+msgstr "Academic holiday"
+
+#: management_system/admin_today.py
+msgid "Deleted question"
+msgstr "Deleted question"
+
+#: management_system/admin_today.py
+msgid "No meetings or holidays in the next two weeks."
+msgstr "No meetings or holidays in the next two weeks."
+
+#: management_system/admin_today.py
+msgid "No create actions are available for your role."
+msgstr "No create actions are available for your role."
+
+#: management_system/admin_today.py
+msgid "No recent enrollments or quiz submissions."
+msgstr "No recent enrollments or quiz submissions."
+
+#: management_system/templates/partials/today_content.html
+msgid "%(counter)s active student"
+msgid_plural "%(counter)s active students"
+msgstr[0] "%(counter)s active student"
+msgstr[1] "%(counter)s active students"
+
+#: management_system/models.py
+msgid "Duration (minutes)"
+msgstr "Duration (minutes)"
+
+#: management_system/views.py
+msgid "Review applications, record decisions and open the student record."
+msgstr "Review applications, record decisions and open the student record."
+
+#: management_system/templates/partials/historical_intake_content.html
+msgid "Historical intake sections"
+msgstr "Historical intake sections"
+
+#: management_system/views.py
+msgid "Review the application, documents and the decision for this student."
+msgstr "Review the application, documents and the decision for this student."
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Academics"
+msgstr "Academics"
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Finance"
+msgstr "Finance"
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Read-only overview of this account."
+msgstr "Read-only overview of this account."
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Devices"
+msgstr "Devices"
+
+#: management_system/templates/partials/table_and_pagination.html
+msgid "Scroll horizontally to see all columns."
+msgstr "Scroll horizontally to see all columns."
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Publish checklist"
+msgstr "Publish checklist"
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Based on the values in this form."
+msgstr "Based on the values in this form."
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Danger zone"
+msgstr "Danger zone"
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Available from"
+msgstr "Available from"
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Leave blank to make this lesson available as soon as it is published."
+msgstr "Leave blank to make this lesson available as soon as it is published."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Years, year levels, meeting weekdays and course offerings."
+msgstr "Years, year levels, meeting weekdays and course offerings."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Academic levels with their linked years, courses, offerings and enrollments."
+msgstr "Academic levels with their linked years, courses, offerings and enrollments."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Meetings, holidays and the month grid for one academic year."
+msgstr "Meetings, holidays and the month grid for one academic year."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Legend"
+msgstr "Legend"
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Fully scanned days"
+msgstr "Fully scanned days"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Weight (%)"
+msgstr "Weight (%)"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Min. Pass (%)"
+msgstr "Min. Pass (%)"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Total weight: 0%"
+msgstr "Total weight: 0%"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Fully scanned"
+msgstr "Fully scanned"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Mobile downloads"
+msgstr "Mobile downloads"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Save download policy"
+msgstr "Save download policy"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Allow saving in the app (offline library)"
+msgstr "Allow saving in the app (offline library)"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Allow saving on the device (share / gallery downloads)"
+msgstr "Allow saving on the device (share / gallery downloads)"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Turn off a switch to hide the matching save buttons in the app and refuse new saves. Files already saved stay readable."
+msgstr "Turn off a switch to hide the matching save buttons in the app and refuse new saves. Files already saved stay readable."
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Published app builds"
+msgstr "Published app builds"
+
+msgid "Level not assigned"
+msgstr "Level not assigned"
+
+msgid "Level: %(level)s"
+msgstr "Level: %(level)s"
+
+msgid "Answered by @%(username)s"
+msgstr "Answered by @%(username)s"
+
+msgid "Alert updated in Telegram"
+msgstr "Alert updated in Telegram"
+
+msgid "The original bot is no longer active, so this alert cannot be updated"
+msgstr "The original bot is no longer active, so this alert cannot be updated"
+
+msgid "Record voice"
+msgstr "Record voice"
+
+msgid "Use recording"
+msgstr "Use recording"
+
+msgid "Discard"
+msgstr "Discard"
+
+msgid "Voice recording is not available in this browser."
+msgstr "Voice recording is not available in this browser."
+
+msgid "Microphone access was denied or unavailable."
+msgstr "Microphone access was denied or unavailable."
+
+msgid "The recording was empty. Try again."
+msgstr "The recording was empty. Try again."
+
+msgid "The attachment field is unavailable."
+msgstr "The attachment field is unavailable."
+
+msgid "JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes."
+msgstr "JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes."
+
+msgid "Audio messages must be 5 minutes or shorter."
+msgstr "Audio messages must be 5 minutes or shorter."
+
+msgid "Audio files must be 20 MB or smaller."
+msgstr "Audio files must be 20 MB or smaller."
+
+msgid "The audio file could not be inspected."
+msgstr "The audio file could not be inspected."
+
+msgid "This media type is not supported."
+msgstr "This media type is not supported."
+
+msgid "This media file is too large to archive."
+msgstr "This media file is too large to archive."
+
+msgid "This document type is not supported."
+msgstr "This document type is not supported."
+
+msgid "This audio type is not supported."
+msgstr "This audio type is not supported."
+
+msgid "Reply to a support digest to send media."
+msgstr "Reply to a support digest to send media."
+
+msgid "The attachment must be a JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM file."
+msgstr "The attachment must be a JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM file."
+
+msgid "Exam not open yet"
+msgstr "Exam not open yet"
+
+msgid "Start Exam"
+msgstr "Start Exam"
+
+msgid "Choice"
+msgstr "Choice"
+
+msgid "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering."
+msgstr "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering."
+
+msgid "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%."
+msgstr "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%."
+
+msgid "Audio validation is unavailable on this server."
+msgstr "Audio validation is unavailable on this server."
+
+msgid "Account security"
+msgstr "Account security"
+
+msgid "We received your application"
+msgstr "We received your application"
+
+msgid "Visit the website"
+msgstr "Visit the website"
+
+msgid "If the button does not open, copy this link:"
+msgstr "If the button does not open, copy this link:"
+
+msgid "This is an automated message; please do not reply."
+msgstr "This is an automated message; please do not reply."
+
+msgid "Hello"
+msgstr "Hello"
+
+msgid "Your application was approved"
+msgstr "Your application was approved"
+
+msgid "Your application was not approved"
+msgstr "Your application was not approved"
+
+msgid "An update on your application"
+msgstr "An update on your application"

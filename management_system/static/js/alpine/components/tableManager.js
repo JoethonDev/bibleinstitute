@@ -132,7 +132,7 @@ function tableManager() {
             if (!count) return;
             const payload = {kind, selection_token: this.selectionToken, select_all: all,
                 ids: ids.map(Number), excluded_ids: mode === 'selected' && all ? this.excluded.map(Number) : []};
-            const message = interpolate(kind === 'reconcile' ? gettext('Submit saved snapshots after the grace period for %(count)s quizzes?') : gettext('Recalculate saved submissions for %(count)s quizzes? Manually awarded grades will be preserved.'), {count}, true);
+            const message = interpolate(kind === 'reconcile' ? gettext('Finalize saved attempts whose time limit has expired for %(count)s quizzes?') : gettext('Recalculate saved submissions for %(count)s quizzes? Manually awarded grades will be preserved.'), {count}, true);
             const start = () => this.startRecalculation(payload);
             if (typeof window.appConfirm === 'function') window.appConfirm(message, start);
             else start();
@@ -196,7 +196,7 @@ function tableManager() {
 
         rowCheckboxes() {
             // $el is the element the expression is evaluated on (the header
-            // checkbox); $root is always the .ad-table-shell component root.
+            // checkbox); $root is always the table component root.
             return Array.from(this.$root.querySelectorAll('.row-checkbox'));
         },
 

@@ -4,10 +4,5 @@
 {% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
 
 {% block body %}
-<div id="content" class="container-fluid py-3 ad-page tg-chat-page">
-
-    <div id="telegram-chat-panel" class="tg-chat-panel">
-        {% include 'partials/telegram_chat_panel.html' %}
-    </div>
-</div>
+{% include 'partials/telegram_conversation_detail_content.html' %}
 {% endblock %}

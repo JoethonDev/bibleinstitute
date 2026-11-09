@@ -1,148 +1,199 @@
 {% load i18n %}
-<div id="content" class="ad-page media-status-page"
+{% comment %}
+Media processing workspace. The server-paginated job rows keep every
+data-media-* polling and action hook, the fixed #media-status-csrf form, the
+search/status filter contract and the single status-poller interval owned by
+media_status.js. Presentation only: ad-* markup is replaced by the admin
+workspace primitives; no id, hx-* or data-media-* attribute changes.
+The view projects no per-status counts, so the KPI grid shows only the real
+paginator count and the current page.
+{% endcomment %}
+<div id="content" class="media-status-page aw-dashboard-page"
      data-status-labels="{{ status_labels_json|escapejs }}"
      data-batch-status-url="{% url 'media-job-status-batch' %}"
      data-trans-retry-failed="{% translate 'Retry failed' %}">
-    <div class="ad-pane-head">
-        <div>
-            <h1 class="ad-page-title">{% translate "Media processing" %}</h1>
-            <span id="media-status-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
-            <p class="ad-page-subtitle">{% translate "Each selected source file is processed independently." %}</p>
+    {% translate "Media" as page_eyebrow %}
+    {% translate "Media processing" as page_title %}
+    {% translate "Each selected source file is processed independently." as page_description %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+
+    <div class="htmx-indicator aw-table-loading" id="media-status-loading" aria-hidden="true">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{% translate "Loading..." %}</span>
         </div>
-        <a class="ad-btn ad-btn--teal" href="{% url 'upload-files' %}">
-            <i class="fas fa-upload me-1" aria-hidden="true"></i>{% translate "Upload files" %}
-        </a>
     </div>
 
-    <div class="ad-card ad-card-body media-status-filters mb-3">
-        <form method="get" class="row g-3 align-items-end" role="search"
-              hx-get="{% url 'media-processing-status' %}"
-              hx-target="#content"
-              hx-select="#content"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-              hx-sync="this:replace"
-              hx-indicator="#media-status-loading">
-            <div class="col-12 col-md-6 col-lg-5">
-                <label for="media-status-search" class="form-label">{% translate "Search media jobs" %}</label>
-                <div class="media-status-search">
-                    <i class="fas fa-search" aria-hidden="true"></i>
-                    <input id="media-status-search" class="form-control" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}" hx-preserve
-                           hx-get="{% url 'media-processing-status' %}"
-                           hx-include="closest form"
-                           hx-trigger="input changed delay:200ms, search"
-                           hx-target="#content"
-                           hx-select="#content"
-                           hx-swap="outerHTML"
-                           hx-replace-url="true"
-                           hx-sync="closest form:replace"
-                           hx-indicator="#media-status-loading">
+    {% translate "Media" as media_label %}
+    <nav class="aw-tabs" aria-label="{{ media_label }}">
+        <a class="aw-tab is-active" href="{% url 'media-processing-status' %}" aria-current="page">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+            <span>{% translate "Media processing" %}</span>
+        </a>
+        <a class="aw-tab" href="{% url 'upload-files' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+            <span>{% translate "Upload files" %}</span>
+        </a>
+    </nav>
+
+    <div class="aw-kpi-grid">
+        <div class="aw-kpi">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Total" %}</span>
+                <span class="aw-kpi-icon">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                </span>
+            </div>
+            <div class="aw-kpi-value">{{ jobs_page.paginator.count }}</div>
+        </div>
+        <div class="aw-kpi aw-kpi--gold">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Page" %}</span>
+                <span class="aw-kpi-icon">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                </span>
+            </div>
+            <div class="aw-kpi-value">{{ jobs_page.number }} <small>/ {{ jobs_page.paginator.num_pages }}</small></div>
+        </div>
+    </div>
+
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            <form method="get" class="aw-filter-bar" role="search"
+                  hx-get="{% url 'media-processing-status' %}"
+                  hx-target="#content"
+                  hx-select="#content"
+                  hx-swap="outerHTML"
+                  hx-push-url="true"
+                  hx-sync="this:replace"
+                  hx-indicator="#media-status-loading">
+                <div class="aw-table-tools">
+                    <div class="aw-search-wrap">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <input id="media-status-search" class="aw-input aw-input--search" type="search" name="q" value="{{ search }}" placeholder="{% translate 'Filename, lesson, or creator' %}" aria-label="{% translate 'Search media jobs' %}" hx-preserve
+                               hx-get="{% url 'media-processing-status' %}"
+                               hx-include="closest form"
+                               hx-trigger="input changed delay:200ms, search"
+                               hx-target="#content"
+                               hx-select="#content"
+                               hx-swap="outerHTML"
+                               hx-replace-url="true"
+                               hx-sync="closest form:replace"
+                               hx-indicator="#media-status-loading">
+                    </div>
+                    <label class="visually-hidden" for="media-status-filter">{% translate "Filter by status" %}</label>
+                    <select id="media-status-filter" class="aw-select" name="status"
+                            hx-get="{% url 'media-processing-status' %}"
+                            hx-include="closest form"
+                            hx-trigger="change"
+                            hx-target="#content"
+                            hx-select="#content"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-indicator="#media-status-loading">
+                        <option value="">{% translate "All statuses" %}</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="aw-btn aw-btn--primary aw-btn--sm" type="submit">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
+                        <span>{% translate "Filter" %}</span>
+                    </button>
+                    {% if search or status_filter %}
+                    <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{% url 'media-processing-status' %}"
+                       hx-get="{% url 'media-processing-status' %}"
+                       hx-target="#content"
+                       hx-select="#content"
+                       hx-swap="outerHTML"
+                       hx-push-url="true" hx-sync="closest form:replace" data-clear-search="media-status-search">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                        <span>{% translate "Clear" %}</span>
+                    </a>
+                    {% endif %}
                 </div>
-            </div>
-            <div class="col-12 col-md-4 col-lg-3">
-                <label for="media-status-filter" class="form-label">{% translate "Filter by status" %}</label>
-                <select id="media-status-filter" class="form-select" name="status"
-                        hx-get="{% url 'media-processing-status' %}"
-                        hx-include="closest form"
-                        hx-trigger="change"
-                        hx-target="#content"
-                        hx-select="#content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        hx-indicator="#media-status-loading">
-                    <option value="">{% translate "All statuses" %}</option>
-                    {% for value, label in status_choices %}
-                    <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
-                <button class="ad-btn ad-btn--teal ad-btn--sm" type="submit">{% translate "Filter" %}</button>
-                {% if search or status_filter %}
-                <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{% url 'media-processing-status' %}"
-                   hx-get="{% url 'media-processing-status' %}"
-                   hx-target="#content"
-                   hx-select="#content"
-                   hx-swap="outerHTML"
-                   hx-push-url="true" hx-sync="closest form:replace" data-clear-search="media-status-search">{% translate "Clear" %}</a>
-                {% endif %}
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 
     <form id="media-status-csrf" class="d-none">{% csrf_token %}</form>
-    <div class="ad-card ad-table-wrap">
+    <div class="aw-table-card aw-table-wrap">
         {% if jobs_page.object_list %}
-        <table class="ad-table">
-            <caption class="visually-hidden">{% translate "Media processing jobs" %}</caption>
-            <thead>
-                <tr>
-                    <th scope="col">{% translate "File" %}</th>
-                    <th scope="col">{% translate "Destination" %}</th>
-                    <th scope="col">{% translate "Lesson" %}</th>
-                    <th scope="col">{% translate "Status" %}</th>
-                    <th scope="col">{% translate "Progress" %}</th>
-                    <th scope="col">{% translate "Created" %}</th>
-                    <th scope="col"><span class="visually-hidden">{% translate "Actions" %}</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for job in jobs_page.object_list %}
-                <tr data-media-status-url="{% url 'media-job-status' job.public_id %}" data-media-job-id="{{ job.public_id }}" data-current-media-status="{{ job.status }}" data-current-cleanup-status="{{ job.cleanup_status }}" data-current-publication-pending="{{ job.publication_pending|yesno:'true,false' }}" data-cleanup-not-before="{{ job.cleanup_not_before|date:'c' }}">
-                    <td>
-                        <strong>{{ job.original_filename }}</strong>
-                        <small class="d-block text-muted">{{ job.source_kind|upper }} - {{ job.source_size|filesizeformat }}</small>
-                    </td>
-                    <td dir="ltr">{{ job.requested_folder|default:"/" }}</td>
-                    <td>
-                        {% if job.lesson %}{{ job.lesson.name }}{% else %}<span class="text-muted">{% translate "Standalone output" %}</span>{% endif %}
-                        {% if job.part_id %}<small class="d-block text-muted" dir="ltr">{{ job.part_id }}</small>{% endif %}
-                    </td>
-                    <td>
-                        <span class="ad-pill ad-pill--muted" data-media-status-value>{{ job.get_status_display }}</span>
-                        <small class="d-block text-muted" data-media-phase-value>{{ job.current_phase_label }}</small>
-                        {% if job.attachment_status == 'failed' %}<small class="d-block text-danger">{% translate "Lesson attachment failed" %}</small>{% endif %}
-                    </td>
-                    <td class="media-status-progress">
-                        <div class="progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ job.progress }}">
-                            <div class="progress-bar" data-media-progress-bar style="width: {{ job.progress }}%"></div>
-                        </div>
-                        <small data-media-progress-value>{{ job.progress }}%</small>
-                    </td>
-                    <td>{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
-                    <td>
-                        <div class="ad-actions">
-                            {% if job.can_retry %}
-                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-url="{% url 'media-job-retry' job.public_id %}">{% translate "Retry processing" %}</button>
-                            {% endif %}
-                            {% if job.can_retry_attachment %}
-                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-kind="attachment" data-media-retry-url="{% url 'media-job-attachment-retry' job.public_id %}">{% translate "Retry lesson attachment" %}</button>
-                            {% endif %}
-                            {% if job.can_publish %}
-                            <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-media-retry-kind="publish" data-media-retry-url="{% url 'media-job-publish-retry' job.public_id %}">{% translate "Continue publishing" %}</button>
-                            {% endif %}
-                            {% if job.can_stop %}
-                            <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" data-media-stop-url="{% url 'media-job-stop' job.public_id %}" data-media-confirm-message="{% translate 'Stop processing this upload and any companion files?' %}">{% translate "Stop" %}</button>
-                            {% endif %}
-                            {% if job.can_cleanup %}
-                            <button type="button" class="ad-btn ad-btn--danger ad-btn--sm" data-media-cleanup-url="{% url 'media-job-cleanup' job.public_id %}" data-media-confirm-message="{% translate "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed." %}">{% if job.cleanup_status == 'failed' %}{% translate "Retry cleanup" %}{% else %}{% translate "Clean up" %}{% endif %}</button>
-                            {% endif %}
-                        </div>
-                        <small class="d-block text-muted mt-1">{% translate "Next:" %} <span data-media-next-step>{{ job.next_step_label }}</span></small>
-                        <small class="d-block text-muted mt-1" data-media-completed{% if not job.completed_steps %} hidden{% endif %}>{% if job.completed_steps %}{% translate "Done:" %} {% for step in job.completed_steps %}{% if not forloop.first %} - {% endif %}{{ step }}{% endfor %}{% endif %}</small>
-                        <small class="d-block text-danger mt-1" data-media-error{% if not job.error_message %} hidden{% endif %}>{% if job.error_message %}{{ job.error_message }}{% endif %}</small>
-                        <small class="d-block text-danger mt-1" data-media-cleanup-error{% if not job.cleanup_error_message %} hidden{% endif %}>{{ job.cleanup_error_message }}</small>
-                        <small class="d-block text-success mt-1" data-media-cleanup-lesson{% if not job.lesson_deleted %} hidden{% endif %}>{% translate "Draft lesson removed." %}</small>
-                        <small class="d-block text-warning mt-1" data-media-cleanup-preserved{% if not job.cleanup_preserved_count %} hidden{% endif %}>{% translate "Shared or unverified files were kept." %}</small>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="aw-table-wrap">
+            <table class="aw-table">
+                <caption class="visually-hidden">{% translate "Media processing jobs" %}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">{% translate "File" %}</th>
+                        <th scope="col">{% translate "Destination" %}</th>
+                        <th scope="col">{% translate "Lesson" %}</th>
+                        <th scope="col">{% translate "Status" %}</th>
+                        <th scope="col">{% translate "Progress" %}</th>
+                        <th scope="col" class="aw-date">{% translate "Created" %}</th>
+                        <th scope="col"><span class="visually-hidden">{% translate "Actions" %}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs_page.object_list %}
+                    <tr data-media-status-url="{% url 'media-job-status' job.public_id %}" data-media-job-id="{{ job.public_id }}" data-current-media-status="{{ job.status }}" data-current-cleanup-status="{{ job.cleanup_status }}" data-current-publication-pending="{{ job.publication_pending|yesno:'true,false' }}" data-cleanup-not-before="{{ job.cleanup_not_before|date:'c' }}">
+                        <td class="aw-cell-identity">
+                            <div class="aw-cell-main">
+                                <div class="aw-cell-main-text">
+                                    <b>{{ job.original_filename }}</b>
+                                    <span dir="ltr">{{ job.source_kind|upper }} - {{ job.source_size|filesizeformat }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td dir="ltr">{{ job.requested_folder|default:"/" }}</td>
+                        <td>
+                            {% if job.lesson %}{{ job.lesson.name }}{% else %}<span class="aw-muted">{% translate "Standalone output" %}</span>{% endif %}
+                            {% if job.part_id %}<small class="aw-cell-sub" dir="ltr">{{ job.part_id }}</small>{% endif %}
+                        </td>
+                        <td>
+                            <span class="aw-pill{% if job.status == 'succeeded' %} aw-pill--green{% elif job.status == 'failed' %} aw-pill--red{% elif job.status == 'processing' or job.status == 'uploading' or job.status == 'verifying' %} aw-pill--blue{% elif job.status == 'queued' %} aw-pill--amber{% else %} aw-pill--muted{% endif %}" data-media-status-value>{{ job.get_status_display }}</span>
+                            <small class="aw-cell-sub" data-media-phase-value>{{ job.current_phase_label }}</small>
+                            {% if job.attachment_status == 'failed' %}<small class="d-block text-danger">{% translate "Lesson attachment failed" %}</small>{% endif %}
+                        </td>
+                        <td class="media-status-progress">
+                            <div class="aw-progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ job.progress }}">
+                                <span data-media-progress-bar style="width: {{ job.progress }}%"></span>
+                            </div>
+                            <small class="aw-small aw-muted" data-media-progress-value>{{ job.progress }}%</small>
+                        </td>
+                        <td class="aw-date">{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                        <td>
+                            <div class="aw-flex aw-flex-wrap">
+                                {% if job.can_retry %}
+                                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-media-retry-url="{% url 'media-job-retry' job.public_id %}">{% translate "Retry processing" %}</button>
+                                {% endif %}
+                                {% if job.can_retry_attachment %}
+                                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-media-retry-kind="attachment" data-media-retry-url="{% url 'media-job-attachment-retry' job.public_id %}">{% translate "Retry lesson attachment" %}</button>
+                                {% endif %}
+                                {% if job.can_publish %}
+                                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-media-retry-kind="publish" data-media-retry-url="{% url 'media-job-publish-retry' job.public_id %}">{% translate "Continue publishing" %}</button>
+                                {% endif %}
+                                {% if job.can_stop %}
+                                <button type="button" class="aw-btn aw-btn--danger aw-btn--sm" data-media-stop-url="{% url 'media-job-stop' job.public_id %}" data-media-confirm-message="{% translate 'Stop processing this upload and any companion files?' %}">{% translate "Stop" %}</button>
+                                {% endif %}
+                                {% if job.can_cleanup %}
+                                <button type="button" class="aw-btn aw-btn--danger aw-btn--sm" data-media-cleanup-url="{% url 'media-job-cleanup' job.public_id %}" data-media-confirm-message="{% translate "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed." %}">{% if job.cleanup_status == 'failed' %}{% translate "Retry cleanup" %}{% else %}{% translate "Clean up" %}{% endif %}</button>
+                                {% endif %}
+                            </div>
+                            <small class="d-block aw-small aw-muted mt-1">{% translate "Next:" %} <span data-media-next-step>{{ job.next_step_label }}</span></small>
+                            <small class="d-block aw-small aw-muted mt-1" data-media-completed{% if not job.completed_steps %} hidden{% endif %}>{% if job.completed_steps %}{% translate "Done:" %} {% for step in job.completed_steps %}{% if not forloop.first %} - {% endif %}{{ step }}{% endfor %}{% endif %}</small>
+                            <small class="d-block text-danger mt-1" data-media-error{% if not job.error_message %} hidden{% endif %}>{% if job.error_message %}{{ job.error_message }}{% endif %}</small>
+                            <small class="d-block text-danger mt-1" data-media-cleanup-error{% if not job.cleanup_error_message %} hidden{% endif %}>{{ job.cleanup_error_message }}</small>
+                            <small class="d-block text-success mt-1" data-media-cleanup-lesson{% if not job.lesson_deleted %} hidden{% endif %}>{% translate "Draft lesson removed." %}</small>
+                            <small class="d-block text-warning mt-1" data-media-cleanup-preserved{% if not job.cleanup_preserved_count %} hidden{% endif %}>{% translate "Shared or unverified files were kept." %}</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
-        {% translate "No media processing jobs found." as media_empty_desc %}
-        <div class="ad-empty">
-            {% include "partials/empty_state.html" with icon="fa-inbox" description=media_empty_desc %}
+        <div class="aw-card-body">
+            {% translate "No media processing jobs found." as media_empty_desc %}
+            {% include "partials/components/aw_empty.html" with icon="i-layers" description=media_empty_desc %}
         </div>
         {% endif %}
     </div>

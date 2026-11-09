@@ -25,6 +25,10 @@ from .announcements import (
 )
 from .forms import AnnouncementForm
 from .models import Announcement, StudentNotification
+from .notification_withdrawal import (
+    NotificationWithdrawalError,
+    withdraw_student_notification,
+)
 from .utils.decorators import can_manage_academic_setup, capability_required
 from .utils.helpers import (
     generate_breadcrumb,
@@ -392,6 +396,52 @@ def announcement_retry(request, announcement_id):
     else:
         messages.success(request, _("Notification queued for delivery."))
     return redirect("notifications-management")
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def notification_withdraw(request, notification_id):
+    """Withdraw one recipient's inbox event and remove its bot message if possible."""
+    try:
+        result = withdraw_student_notification(
+            notification_id=notification_id,
+            actor=request.user,
+        )
+    except NotificationWithdrawalError as exc:
+        messages.error(request, str(exc))
+        return redirect("notification-history")
+
+    if result.already_withdrawn:
+        messages.info(request, _("This notification was already withdrawn. Telegram removal was retried where possible."))
+    else:
+        messages.success(
+            request,
+            _("Notification withdrawn from the student's inbox and pending delivery."),
+        )
+    if result.telegram_deleted:
+        messages.success(
+            request,
+            _("Deleted %(count)s Telegram message(s).") % {"count": result.telegram_deleted},
+        )
+    if result.telegram_expired:
+        messages.warning(
+            request,
+            _("%(count)s Telegram message(s) are older than 48 hours and remain in Telegram.")
+            % {"count": result.telegram_expired},
+        )
+    if result.telegram_failed:
+        messages.error(
+            request,
+            _("Telegram could not delete %(count)s message(s). Check the delivery details.")
+            % {"count": result.telegram_failed},
+        )
+    if result.push_pending_recall:
+        messages.info(
+            request,
+            _("The mobile app will remove this push notification when it next syncs (%(count)s device(s)).")
+            % {"count": result.push_pending_recall},
+        )
+    return redirect("background-job-detail", family="notification", job_id=notification_id)
 
 
 @capability_required(can_manage_academic_setup)

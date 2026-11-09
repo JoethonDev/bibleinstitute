@@ -1,0 +1,100 @@
+{% load i18n aw_ui %}
+{% comment %}
+Sticky admin top bar: navigation trigger, crumbs, palette, quick create,
+authorized admin queues, language switch and account menu.
+{% endcomment %}
+<header class="aw-topbar">
+    <button type="button" class="aw-icon-btn aw-mobile-toggle"
+            data-bs-toggle="offcanvas" data-bs-target="#mobileAdminMenu"
+            aria-controls="mobileAdminMenu" aria-label="{% translate 'Open navigation menu' %}">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-menu"></use></svg>
+    </button>
+
+    {% include 'partials/components/admin_topbar_crumbs.html' %}
+
+    <button type="button" class="aw-top-search" data-open-palette
+            aria-label="{% translate 'Search everything' %}">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+        <span>{% translate "Search everything" %}</span>
+        <kbd class="aw-kbd">Ctrl K</kbd>
+    </button>
+
+    <div class="aw-top-actions">
+        {% if aw.quick_create %}
+        <div class="aw-menu-wrap">
+            <button type="button" class="aw-btn aw-btn--primary aw-btn--sm aw-top-create"
+                    data-aw-menu-trigger aria-haspopup="true" aria-expanded="false"
+                    aria-label="{% translate 'Create' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                <span class="aw-top-create-label">{% translate "Create" %}</span>
+                <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+            </button>
+            <div class="aw-menu" hidden>
+                {% for action in aw.quick_create %}
+                <a class="aw-menu-item" href="{% url action.url_name %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#{{ action.icon }}"></use></svg>
+                    <span>{{ action.label }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% for action in aw.top_actions %}
+        <a class="aw-icon-btn" href="{% url action.url_name %}"
+           aria-label="{{ action.label }}" title="{{ action.label }}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#{{ action.icon }}"></use></svg>
+        </a>
+        {% endfor %}
+
+        <form action="{% url 'set_language' %}" method="post" class="aw-inline-form">
+            {% csrf_token %}
+            <input name="next" type="hidden" value="{{ request.get_full_path }}">
+            {% get_current_language as aw_language_code %}
+            <label class="visually-hidden" for="aw-language-select">{% translate "Switch language" %}</label>
+            <select name="language" id="aw-language-select" class="aw-lang-select"
+                    onchange="this.form.submit()">
+                {% get_available_languages as aw_languages %}
+                {% for lang in aw_languages %}
+                <option value="{{ lang.0 }}"{% if lang.0 == aw_language_code %} selected{% endif %}>{{ lang.0|upper }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <div class="aw-menu-wrap">
+            <button type="button" class="aw-top-user" data-aw-menu-trigger
+                    aria-haspopup="true" aria-expanded="false"
+                    aria-label="{{ request.user|aw_display_name }}">
+                <span class="aw-avatar aw-avatar--gold" aria-hidden="true">{{ request.user|aw_initials }}</span>
+                <span class="aw-top-user-text">
+                    <b>{{ request.user|aw_display_name }}</b>
+                    <span>{% if request.user.role %}{{ request.user.role.get_role_display }}{% endif %}</span>
+                </span>
+                <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+            </button>
+            <div class="aw-menu" hidden>
+                <a class="aw-menu-item" href="{% url 'view-profile' %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                    <span>{% translate "Profile" %}</span>
+                </a>
+                <a class="aw-menu-item" href="{% url 'home' %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-globe"></use></svg>
+                    <span>{% translate "Public Home" %}</span>
+                </a>
+                <button type="button" class="aw-menu-item" data-bs-toggle="modal"
+                        data-bs-target="#shortcutsHelpModal">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+                    <span>{% translate "Keyboard shortcuts" %}</span>
+                </button>
+                <div class="aw-menu-sep"></div>
+                <form method="post" action="{% url 'logout' %}" class="aw-inline-form">
+                    {% csrf_token %}
+                    <button type="submit" class="aw-menu-item aw-menu-item--danger">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-log-out"></use></svg>
+                        <span>{% translate "Logout" %}</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</header>

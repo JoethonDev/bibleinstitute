@@ -8,6 +8,7 @@ outside this URLconf.
 from django.urls import path
 
 from . import mobile_api
+from . import mobile_notifications
 
 app_name = "mobile-v1"
 
@@ -43,6 +44,11 @@ urlpatterns = [
         name="quiz-detail",
     ),
     path(
+        "courses/<int:offering_id>/quizzes/<int:quiz_id>/start/",
+        mobile_api.quiz_start,
+        name="quiz-start",
+    ),
+    path(
         "courses/<int:offering_id>/quizzes/<int:quiz_id>/submit/",
         mobile_api.quiz_submit,
         name="quiz-submit",
@@ -56,6 +62,11 @@ urlpatterns = [
     path("progress/", mobile_api.progress, name="progress"),
     path("grades/", mobile_api.grades, name="grades"),
     path("notifications/", mobile_api.notifications, name="notifications"),
+    path(
+        "notifications/withdrawals/",
+        mobile_notifications.notification_withdrawals,
+        name="notification-withdrawals",
+    ),
     path(
         "notifications/unread-count/",
         mobile_api.notification_unread_count,

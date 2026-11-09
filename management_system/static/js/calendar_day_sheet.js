@@ -7,8 +7,8 @@
   window.__calendarDaySheetInstalled = true;
 
   var MOBILE_QUERY = '(max-width: 575.98px)';
-  var CELL_SELECTOR = '.ad-calmg-cell[data-cal-day], .sd-day[data-cal-day]';
-  var CONTENT_SELECTOR = '.ad-calendar-cell-content, .sd-day-body';
+  var CELL_SELECTOR = '.aw-calmg-cell[data-cal-day], .sd-day[data-cal-day]';
+  var CONTENT_SELECTOR = '.aw-calendar-cell-content, .sd-day-body';
   var mq = window.matchMedia(MOBILE_QUERY);
 
   function syncCellAccess() {
@@ -31,7 +31,7 @@
     if (!window.bootstrap || !window.bootstrap.Modal) return false;
     var date = trigger.getAttribute('data-cal-day');
     if (!date) return false;
-    var cell = document.querySelector('.ad-calmg-cell[data-cal-day="' + date + '"], .sd-day[data-cal-day="' + date + '"]');
+    var cell = document.querySelector('.aw-calmg-cell[data-cal-day="' + date + '"], .sd-day[data-cal-day="' + date + '"]');
     var content = cell ? cell.querySelector(CONTENT_SELECTOR) : null;
     var modalEl = document.getElementById('calendar-day-modal');
     var body = document.getElementById('calendar-day-body');
@@ -41,7 +41,7 @@
     var templates = fragment.querySelectorAll('template');
     for (var i = 0; i < templates.length; i++) templates[i].remove();
     body.replaceChildren.apply(body, Array.prototype.slice.call(fragment.childNodes));
-    if (!body.querySelector('.ad-calendar-meeting, .ad-calendar-holiday, .sd-day-meeting, .sd-day-holiday, .ad-calendar-add-actions')) {
+    if (!body.querySelector('.aw-calendar-meeting, .aw-calendar-holiday, .sd-day-meeting, .sd-day-holiday, .aw-calendar-add-actions')) {
       return false;
     }
     label.textContent = trigger.getAttribute('data-cal-label') || '';

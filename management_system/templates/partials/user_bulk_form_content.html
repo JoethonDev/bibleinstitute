@@ -1,0 +1,85 @@
+{% load crispy_forms_tags %}
+{% load i18n %}
+<div class="aw-dashboard-page" id="content">
+    {% translate "Users" as page_eyebrow %}
+    {% translate "Bulk Import" as page_title %}
+    {% translate "Bulk Create Users from CSV" as page_description %}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <a href="{% url 'user-dashboard' %}"
+               hx-get="{% url 'user-dashboard' %}"
+               hx-select="#page-region"
+               hx-push-url="true"
+               hx-trigger="click"
+               hx-target="#display-page"
+               class="aw-btn aw-btn--ghost">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
+                <span>{% translate "Back to Users" %}</span>
+            </a>
+        </div>
+    </div>
+
+    {% if bulk_job %}
+    {% include "partials/admin_operation_status.html" with operation_job=bulk_job status_url=bulk_status_url status=bulk_job.status total=bulk_job.total processed=bulk_job.processed %}
+    {% if bulk_errors %}
+    <div class="aw-alert aw-alert--danger" role="alert">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>
+            <h5 class="fw-bold">{% translate "Row errors" %}</h5>
+            <ul class="mb-0 small">
+                {% for item in bulk_errors %}<li>{% translate "Line" %} {{ item.line }}: {{ item.message }}</li>{% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div class="aw-alert aw-alert--info" role="alert">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-help"></use></svg>
+        <div>
+            <h5 class="fw-bold">{% translate "CSV File Instructions" %}</h5>
+            <p>
+                {% translate "Please ensure your CSV file has the following columns in this exact order:" %}
+            </p>
+            <code>username, first_name, last_name, password, role</code>
+            <hr />
+            <p class="mb-0">
+                {% translate "The 'role' should be one of the existing roles in the system (e.g., admin, teacher, junior, senior)." %}
+            </p>
+            <p class="mb-0 mt-2">
+                {% translate "The whole file is validated first. Any invalid row creates no accounts at all; the import runs on the management worker." %}
+            </p>
+        </div>
+    </div>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-upload"></use></svg>
+                <h3>{% translate "CSV File" %}</h3>
+            </div>
+        </div>
+        <form
+            action="{% url 'user-bulk-create' %}"
+            method="post"
+            hx-post="{% url 'user-bulk-create' %}"
+            hx-encoding="multipart/form-data"
+            hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true"
+            enctype="multipart/form-data"
+            class="needs-validation"
+            novalidate
+        >
+            {% csrf_token %}
+            <div class="aw-form-section">
+                {{ form|crispy }}
+                <div class="aw-form-actions">
+                    <button type="submit" class="aw-btn aw-btn--primary">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+                        <span>{% translate 'Upload and Create Users' %}</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+</div>

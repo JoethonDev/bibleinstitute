@@ -18,6 +18,9 @@ from .models import (
 )
 from .utils.search import normalize_search_text, normalized_contains_q
 
+from .notification_history import notification_history_queryset
+
+
 PAGE_SIZE = 25
 FAMILIES = (
     ("management", gettext_lazy("Management operations")),
@@ -37,6 +40,7 @@ STATUSES = (
     ("partial", gettext_lazy("Completed with failures")),
     ("failed", gettext_lazy("Failed")),
     ("cancelled", gettext_lazy("Cancelled")),
+    ("withdrawn", gettext_lazy("Withdrawn")),
 )
 ACTIVE_STATUSES = frozenset({"awaiting_upload", "queued", "running", "waiting"})
 MODELS = {
@@ -130,7 +134,6 @@ def _projection(family: str, *, ids: list[str] | None = None, search: str = "", 
         target, error_field = F("academic_year__name"), "last_error"
         monitor_status = Case(When(status="completed", skipped_count__gt=0, then=Value("partial")), default=F("status"))
     elif family == "notification":
-        from .notification_history import notification_history_queryset
 
         query = notification_history_queryset().order_by()
         actor = "redelivery_job__actor__username"

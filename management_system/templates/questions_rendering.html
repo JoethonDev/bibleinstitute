@@ -1,5 +1,5 @@
 {% load i18n %}
-<div class="questions-container">
+<div class="questions-container{% if not is_student %} aw-quiz-editor{% endif %}">
     {% for question in questions %}
         {% with counter=forloop.counter0 %}
             <div class="sd-q-card question-card" data-question-card>

@@ -46,6 +46,9 @@ from .utils.r2_references import (
 )
 from .utils.storage_operations import get_r2_client
 
+from .utils.cloudflare_provider import CloudflareR2Client
+
+
 logger = logging.getLogger(__name__)
 
 RENAME_COPY_PAGE_SIZE = 500
@@ -939,7 +942,6 @@ def execute_storage_usage(job: AdminOperationJob, token) -> dict:
     if prefix:
         _require_manage_actor(job.actor, prefix)
     manager = _manager()
-    from .utils.cloudflare_provider import CloudflareR2Client
 
     account = getattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
     api_token = getattr(settings, "CLOUDFLARE_API_TOKEN", "")
