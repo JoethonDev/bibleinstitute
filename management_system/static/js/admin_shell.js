@@ -38,10 +38,11 @@
 
         var offcanvas = document.getElementById('mobileAdminMenu');
         if (offcanvas) {
-            // The shared admin links use .ad-tab, not Bootstrap's .nav-link.
-            // Delegation also covers links added by an HTMX fragment.
+            // The shared admin links use the workspace navigation classes (the
+            // workspace rail/sidebar links are handled by delegation.
+            // also covers links added by an HTMX fragment.
             offcanvas.addEventListener('click', function (event) {
-                if (event.target.closest && event.target.closest('a.ad-tab')) closeAdminMenu();
+                if (event.target.closest && event.target.closest('a.aw-side-link, a.aw-rail-link')) closeAdminMenu();
             });
         }
         document.addEventListener('htmx:before:request', function (event) {
@@ -66,6 +67,15 @@
             try {
                 if (window.Alpine && typeof window.Alpine.initTree === 'function') {
                     window.Alpine.initTree(target);
+                    // Page navigation also replaces the persistent sidebar and
+                    // mobile navigation through hx-select-oob. Those regions are
+                    // new DOM after the swap and carry Alpine bindings, so they
+                    // are initialized here instead of rebuilding the shell.
+                    var persistent = ['#aw-sidebar-body', '#aw-mobile-nav'];
+                    for (var p = 0; p < persistent.length; p++) {
+                        var regionNode = document.querySelector(persistent[p]);
+                        if (regionNode) window.Alpine.initTree(regionNode);
+                    }
                 }
             } catch (error) { /* Alpine owns its scope; a missed tree stays as-is. */ }
             var region = target.id === 'page-region' ? target : target.querySelector('#page-region');
@@ -168,6 +178,190 @@
                 loadDriveNextPage(sentinel);
             }
         });
+    });
+
+    // ---- Workspace top-bar menus and the one peek drawer -------------------
+    // Registered once at load. HTMX replaces persistent navigation regions and
+    // drawer bodies without re-running this file, so every handler delegates
+    // from document instead of binding per element.
+    var openMenu = null;
+
+    function closeWorkspaceMenu() {
+        if (!openMenu) return;
+        openMenu.menu.hidden = true;
+        openMenu.trigger.setAttribute('aria-expanded', 'false');
+        openMenu = null;
+    }
+
+    function toggleWorkspaceMenu(trigger) {
+        var wrap = trigger.closest('.aw-menu-wrap');
+        var menu = wrap && wrap.querySelector('.aw-menu');
+        if (!menu) return;
+        var wasOpen = openMenu && openMenu.menu === menu;
+        closeWorkspaceMenu();
+        if (wasOpen) return;
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        openMenu = { menu: menu, trigger: trigger };
+        var first = menu.querySelector('.aw-menu-item');
+        if (first && typeof first.focus === 'function') first.focus();
+    }
+
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest && event.target.closest('[data-aw-menu-trigger]');
+        if (trigger) {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleWorkspaceMenu(trigger);
+            return;
+        }
+        if (openMenu && !(event.target.closest && event.target.closest('.aw-menu'))) {
+            closeWorkspaceMenu();
+        }
+    });
+
+    var drawer = document.getElementById('aw-drawer');
+    var drawerBody = document.getElementById('aw-drawer-body');
+    var drawerOverlay = document.getElementById('aw-drawer-overlay');
+    var drawerTitle = document.getElementById('aw-drawer-title');
+    var drawerSubtitle = document.getElementById('aw-drawer-subtitle');
+    var drawerSequence = 0;
+    var drawerReturnFocus = null;
+
+    function drawerLabels() {
+        return (drawer && drawer.dataset) || {};
+    }
+
+    function drawerIsOpen() {
+        return !!(drawer && !drawer.hasAttribute('hidden'));
+    }
+
+    function closeDrawer() {
+        if (!drawerIsOpen()) return;
+        // Fence any in-flight fragment: a late response must not reopen or
+        // overwrite the panel after the operator closed it.
+        drawerSequence += 1;
+        drawer.setAttribute('hidden', '');
+        drawer.setAttribute('aria-hidden', 'true');
+        if (drawerOverlay) drawerOverlay.setAttribute('hidden', '');
+        if (drawerBody) drawerBody.innerHTML = '';
+        document.body.classList.remove('aw-drawer-open');
+        if (drawerReturnFocus && typeof drawerReturnFocus.focus === 'function') drawerReturnFocus.focus();
+        drawerReturnFocus = null;
+    }
+
+    function showDrawer() {
+        if (!drawer) return;
+        drawer.removeAttribute('hidden');
+        drawer.setAttribute('aria-hidden', 'false');
+        if (drawerOverlay) drawerOverlay.removeAttribute('hidden');
+        document.body.classList.add('aw-drawer-open');
+    }
+
+    function drawerState(message, role) {
+        if (!drawerBody) return;
+        drawerBody.innerHTML = '';
+        var state = document.createElement('div');
+        state.className = 'aw-drawer-state';
+        state.setAttribute('role', role || 'status');
+        state.textContent = message;
+        drawerBody.appendChild(state);
+    }
+
+    function loadDrawer(trigger) {
+        var url = trigger.getAttribute('data-aw-drawer') || trigger.getAttribute('href');
+        if (!url || !drawerBody) return;
+        var labels = drawerLabels();
+        drawerReturnFocus = trigger;
+        if (drawerTitle) drawerTitle.textContent = trigger.getAttribute('data-aw-drawer-title') || '';
+        if (drawerSubtitle) drawerSubtitle.textContent = trigger.getAttribute('data-aw-drawer-subtitle') || '';
+        showDrawer();
+        var sequence = ++drawerSequence;
+        drawerState(labels.awLoading || '...');
+        fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'HX-Request': 'true', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (response) {
+            if (sequence !== drawerSequence) return null;
+            // An expired session navigates to the login page instead of
+            // rendering login markup inside the drawer.
+            if (response.status === 401 || (response.redirected && /\/login\//.test(response.url))) {
+                window.location.assign(response.url);
+                return null;
+            }
+            if (response.status === 403) {
+                drawerState(labels.awForbidden || '', 'alert');
+                return null;
+            }
+            if (!response.ok) throw new Error('drawer-load-failed');
+            return response.text();
+        }).then(function (html) {
+            if (html === null || sequence !== drawerSequence) return;
+            drawerBody.innerHTML = html;
+            if (window.htmx && typeof window.htmx.process === 'function') window.htmx.process(drawerBody);
+            if (window.Alpine && typeof window.Alpine.initTree === 'function') window.Alpine.initTree(drawerBody);
+            var focusTarget = drawerBody.querySelector('[autofocus], button, a, input, select, textarea');
+            if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
+        }).catch(function () {
+            if (sequence !== drawerSequence) return;
+            drawerState(labels.awError || '', 'alert');
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        var close = event.target.closest && event.target.closest('[data-aw-drawer-close]');
+        if (close) {
+            event.preventDefault();
+            closeDrawer();
+            return;
+        }
+        var trigger = event.target.closest && event.target.closest('[data-aw-drawer]');
+        if (trigger) {
+            event.preventDefault();
+            loadDrawer(trigger);
+        }
+    });
+
+    if (drawerOverlay) {
+        drawerOverlay.addEventListener('click', closeDrawer);
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (openMenu) {
+            closeWorkspaceMenu();
+            return;
+        }
+        if (!drawerIsOpen()) return;
+        event.preventDefault();
+        closeDrawer();
+    });
+
+    // Minimal focus trap: keep Tab inside the open drawer.
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Tab' || !drawerIsOpen() || !drawerBody) return;
+        var focusables = drawerBody.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables.length) return;
+        var first = focusables[0];
+        var last = focusables[focusables.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+
+    // Navigation is a teardown boundary: an open peek must not survive a page
+    // swap, and its pending request is fenced by closeDrawer().
+    document.addEventListener('htmx:before:request', function (event) {
+        var ctx = event.detail && event.detail.ctx;
+        var target = (ctx && ctx.target) || event.target;
+        if (!target || !(target instanceof Element)) return;
+        if (target.id === 'display-page' || target.id === 'page-region') closeDrawer();
     });
 
     var modal = document.getElementById('globalConfirmModal');

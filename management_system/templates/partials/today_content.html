@@ -1,0 +1,189 @@
+{% load i18n aw_ui %}
+{% comment %}
+Today cockpit: bounded queues from admin_today.build_today_context() plus
+the shared aggregate context. No mock rows: every number is a canonical
+count and every sample row links to its authorized destination list.
+{% endcomment %}
+<div id="content" class="aw-dashboard-page">
+    {% translate "Overview" as today_eyebrow %}
+    {% translate "Today" as today_title %}
+    {% blocktranslate asvar today_description with date=today|date:"l, j F Y" %}What needs a decision today, {{ date }}.{% endblocktranslate %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=today_eyebrow page_title=today_title page_description=today_description page_actions=today_actions %}
+
+    <div class="aw-context-strip">
+        {% if active_academic_year %}
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            <b>{{ active_academic_year.name }}</b> {% translate "active" %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        {% endif %}
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            {% blocktranslate count counter=stats.active_students %}{{ counter }} active student{% plural %}{{ counter }} active students{% endblocktranslate %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+            {{ admin_metrics.offerings|default:0 }} {% translate "Offerings" %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+            {% translate "As of" %} {{ as_of|date:"H:i" }}
+        </span>
+    </div>
+
+    <div class="aw-kpi-grid">
+        {% for kpi in today_kpis %}
+        <div class="aw-kpi aw-kpi--{{ kpi.tone }}">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{{ kpi.label }}</span>
+                <span class="aw-kpi-icon">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#{{ kpi.icon }}"></use></svg>
+                </span>
+            </div>
+            <div class="aw-kpi-value">{{ kpi.value }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="aw-grid aw-grid--main-rail">
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card" aria-labelledby="aw-today-attention">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                        <h3 id="aw-today-attention">{% translate "Needs attention" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body aw-card-body--flush">
+                    <div class="aw-attn-list">
+                        {% for queue in queues %}
+                        <div class="aw-attn-item">
+                            <span class="aw-attn-icon{% if queue.count %} aw-attn-icon--red{% endif %}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#{{ queue.icon }}"></use></svg>
+                            </span>
+                            <div class="aw-attn-main">
+                                <b>{{ queue.label }} ({{ queue.count }})</b>
+                                {% if queue.items %}
+                                <span>
+                                    {% for item in queue.items %}{% if not forloop.first %} - {% endif %}<a href="{{ item.url }}" title="{{ item.meta }}">{{ item.label }}</a>{% endfor %}
+                                </span>
+                                {% else %}
+                                <span>{{ queue.empty_label }}</span>
+                                {% endif %}
+                            </div>
+                            <a class="aw-attn-go" href="{{ queue.url }}">
+                                {% translate "View" %}
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="aw-card" aria-labelledby="aw-today-upcoming">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+                        <h3 id="aw-today-upcoming">{% translate "Upcoming" %}</h3>
+                    </div>
+                    <a class="aw-small" href="{% url 'calendar-management' %}">{% translate "Calendar" %}</a>
+                </div>
+                <div class="aw-card-body">
+                    {% if upcoming %}
+                    <div class="aw-stack">
+                        {% for row in upcoming %}
+                        <div class="aw-flex-between">
+                            <div>
+                                <b class="aw-small">{{ row.date|date:"l, j F Y" }}</b>
+                                <div class="aw-small aw-muted">{{ row.label }} - {{ row.meta }}</div>
+                            </div>
+                            {% if row.kind == "holiday" %}
+                            <span class="aw-chip aw-chip--gold">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-flag"></use></svg>
+                                {% translate "Holiday" %}
+                            </span>
+                            {% else %}
+                            <span class="aw-chip aw-chip--teal">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                                {% translate "Meeting" %}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {% translate "No meetings or holidays in the next two weeks." as upcoming_empty %}
+                    {% include "partials/components/aw_empty.html" with icon="i-calendar" description=upcoming_empty %}
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card" aria-labelledby="aw-today-quick">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-sparkle"></use></svg>
+                        <h3 id="aw-today-quick">{% translate "Quick actions" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <div class="aw-quick-grid">
+                        {% for action in quick_actions %}
+                        <a class="aw-quick-action" href="{% url action.url_name %}"
+                           hx-get="{% url action.url_name %}"
+                           hx-target="#display-page" hx-select="#page-region"
+                           hx-swap="innerHTML" hx-push-url="true">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#{{ action.icon }}"></use></svg>
+                            <span>{{ action.label }}</span>
+                        </a>
+                        {% empty %}
+                        {% translate "No create actions are available for your role." as quick_empty %}
+                        {% include "partials/components/aw_empty.html" with icon="i-sparkle" description=quick_empty %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="aw-card" aria-labelledby="aw-today-recent">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                        <h3 id="aw-today-recent">{% translate "Recent activity" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    {% if recent_enrollments or recent_submissions %}
+                    <div class="aw-timeline">
+                        {% for enrollment in recent_enrollments %}
+                        <div class="aw-tl-item">
+                            <b>{{ enrollment.student.get_full_name|default:enrollment.student.username }}</b>
+                            <span>
+                                {{ enrollment.academic_year_level.academic_year.name }}
+                                {% if enrollment.course_offering %}
+                                - {{ enrollment.course_offering.course.name }}
+                                {% endif %}
+                                - {{ enrollment.enrolled_at|date:"Y-m-d H:i" }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                        {% for submission in recent_submissions %}
+                        <div class="aw-tl-item">
+                            <b>{{ submission.user.get_full_name|default:submission.user.username }} - {{ submission.quiz.name }}</b>
+                            <span>{{ submission.total_grade }}/{{ submission.quiz.total_grade }} - {{ submission.submitted_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {% translate "No recent enrollments or quiz submissions." as recent_empty %}
+                    {% include "partials/components/aw_empty.html" with icon="i-clock" description=recent_empty %}
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>

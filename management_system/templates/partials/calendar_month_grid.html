@@ -6,12 +6,12 @@
 {# Cell state-class contract: is-out / is-holiday / is-meeting / has-meeting / is-today. #}
 {# has-meeting = a course meeting is scheduled on that day; is-meeting = configured meeting weekday. #}
 {% if cell_variant == "admin" %}
-<div class="ad-calmg-grid" role="grid">
+<div class="aw-calmg-grid" role="grid">
 {% else %}
 <div class="sd-cal-grid" role="grid">
 {% endif %}
   {% for weekday in weekday_names %}
-  <div class="{% if cell_variant == "admin" %}ad-calmg-wd{% else %}sd-cal-wd{% endif %}" role="columnheader">{{ weekday }}</div>
+  <div class="{% if cell_variant == "admin" %}aw-calmg-wd{% else %}sd-cal-wd{% endif %}" role="columnheader">{{ weekday }}</div>
   {% endfor %}
   {% for week in month_grid %}
     {% for day in week %}

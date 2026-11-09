@@ -196,7 +196,7 @@ function tableManager() {
 
         rowCheckboxes() {
             // $el is the element the expression is evaluated on (the header
-            // checkbox); $root is always the .ad-table-shell component root.
+            // checkbox); $root is always the table component root.
             return Array.from(this.$root.querySelectorAll('.row-checkbox'));
         },
 

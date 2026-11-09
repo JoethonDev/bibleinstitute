@@ -1,0 +1,207 @@
+{% load i18n %}
+{% load static %}
+{% load crispy_forms_tags %}
+<div id="content" class="aw-dashboard-page" x-data="{ applicationEditing: {% if edit_form.is_bound and edit_form.errors %}true{% else %}false{% endif %} }">
+    {% include "partials/breadcrumbs.html" with breadcrumb_items=breadcrumb_items variant="detail" %}
+
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description page_actions=page_actions %}
+
+    <div class="aw-flex-between aw-flex-wrap">
+        <div class="aw-flex aw-flex-wrap">
+            {% include "partials/components/aw_status_pill.html" with status=app_user.application_status label=app_user.get_application_status_display large=True %}
+        </div>
+        <button type="button"
+                class="aw-btn aw-btn--ghost"
+                x-show="!applicationEditing"
+                x-cloak
+                @click="applicationEditing = true"
+                aria-controls="application-edit-form"
+                :aria-expanded="applicationEditing">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+            {% translate "Edit" %}
+        </button>
+    </div>
+
+    <div id="application-edit-form" class="aw-card" x-show="applicationEditing" x-cloak>
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                <h3>{% translate "Edit student and application" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}" hx-post="{% url 'application-review' app_user.id %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                {% csrf_token %}
+                {{ edit_form|crispy }}
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="aw-btn aw-btn--primary">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                        {% translate "Save changes" %}
+                    </button>
+                    <button type="button" class="aw-btn aw-btn--ghost" @click="applicationEditing = false">
+                        {% translate "Cancel" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="!applicationEditing" x-cloak>
+    <div class="aw-grid aw-grid--2-even">
+        <section class="aw-card" aria-labelledby="aw-application-personal">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                    <h3 id="aw-application-personal">{% translate "Personal Information" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-meta-grid">
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Username" %}</span><span class="aw-value">{{ app_user.username }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Full Name" %}</span><span class="aw-value">{{ app_user.get_full_name|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Email" %}</span><span class="aw-value">{{ app_user.email|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Phone" %}</span><span class="aw-value">{{ app_user.phone|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Country" %}</span><span class="aw-value">{{ app_user.country|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "City" %}</span><span class="aw-value">{{ app_user.city|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Submitted" %}</span><span class="aw-value">{{ app_user.date_joined|date:"Y-m-d H:i" }}</span></div>
+<div class="aw-meta-item"><span class="aw-label">{% translate "Study Mode" %}</span><span class="aw-value">{{ app_user.get_study_mode_display|default:"-" }}</span></div>
+<div class="aw-meta-item"><span class="aw-label">{% translate "Account" %}</span><span class="aw-value">{% if app_user.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}</span></div>
+<div class="aw-meta-item"><span class="aw-label">{% translate "Educational qualification / occupation" %}</span><span class="aw-value">{{ app_user.education_or_job|default:"-" }}</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="aw-card" aria-labelledby="aw-application-church">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-home"></use></svg>
+                    <h3 id="aw-application-church">{% translate "Church Information" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-meta-grid">
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Confessor Name" %}</span><span class="aw-value">{{ app_user.priest_name|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Confessor Phone" %}</span><span class="aw-value">{{ app_user.priest_phone|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Church" %}</span><span class="aw-value">{{ app_user.church|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Service (if any)" %}</span><span class="aw-value">{{ app_user.service|default:"-" }}</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="aw-card" aria-labelledby="aw-application-identity">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-shield"></use></svg>
+                    <h3 id="aw-application-identity">{% translate "Identity" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-meta-grid">
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Identity Type" %}</span><span class="aw-value">{{ app_user.get_identity_type_display|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Identity Number" %}</span><span class="aw-value">{{ app_user.identity_number|default:"-" }}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Identity Front" %}</span><span class="aw-value">{% if app_user.identity_front_key %}<code>{{ app_user.identity_front_key }}</code>{% else %}-{% endif %}</span></div>
+                    <div class="aw-meta-item"><span class="aw-label">{% translate "Identity Back" %}</span><span class="aw-value">{% if app_user.identity_back_key %}<code>{{ app_user.identity_back_key }}</code>{% else %}-{% endif %}</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="aw-card" aria-labelledby="aw-application-documents">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                    <h3 id="aw-application-documents">{% translate "Documents" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                {% if documents %}
+                <div class="aw-stack aw-stack--lg">
+                    {% for document in documents %}
+                    <div class="aw-file-card">
+                        <div class="aw-flex aw-flex-wrap">
+                            <b>{{ document.label }}</b>
+                        </div>
+                        {% if document.is_image %}<img src="{{ document.url }}" alt="{{ document.label }}" class="img-fluid rounded border mt-2" loading="lazy" decoding="async">{% endif %}
+                        {% if document.is_pdf %}
+                        <details class="mt-2">
+                            <summary class="aw-small">{% translate "Preview" %}</summary>
+                            <div class="ratio ratio-4x3 mt-2">
+                                <iframe src="{{ document.url }}" title="{{ document.label }}" loading="lazy"></iframe>
+                            </div>
+                        </details>
+                        {% endif %}
+                        <div class="aw-flex aw-flex-wrap mt-2">
+                            <a class="aw-btn aw-btn--sm aw-btn--outline" href="{{ document.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
+                            <a class="aw-btn aw-btn--sm aw-btn--ghost" href="{{ document.download_url }}">{% translate "Download" %}</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                {% translate "No documents uploaded." as documents_empty %}
+                {% include "partials/components/aw_empty.html" with icon="i-file" description=documents_empty %}
+                {% endif %}
+            </div>
+        </section>
+    </div>
+    </div>
+
+    <div class="aw-card">
+        <div class="aw-card-body aw-flex aw-flex-wrap">
+            {% if app_user.application_status != "active" %}
+            <form method="post" action="{% url 'application-decision' app_user.id 'activate' %}" hx-post="{% url 'application-decision' app_user.id 'activate' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Activate this application?' %}">
+                {% csrf_token %}
+                <input type="hidden" name="expected_status" value="{{ app_user.application_status }}">
+                <button type="submit" class="aw-btn aw-btn--primary">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    {% translate "Activate" %}
+                </button>
+            </form>
+            {% endif %}
+            {% if app_user.application_status != "declined" %}
+            <form method="post" action="{% url 'application-decision' app_user.id 'decline' %}" hx-post="{% url 'application-decision' app_user.id 'decline' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Decline this application?' %}">
+                {% csrf_token %}
+                <input type="hidden" name="expected_status" value="{{ app_user.application_status }}">
+                <button type="submit" class="aw-btn aw-btn--danger">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                    {% translate "Decline" %}
+                </button>
+            </form>
+            {% endif %}
+            {% if app_user.application_status != "pending" %}
+            <form method="post" action="{% url 'application-decision' app_user.id 'pending' %}" hx-post="{% url 'application-decision' app_user.id 'pending' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="application-decision-form ps-inline-form" data-confirm-message="{% translate 'Reopen this application?' %}">
+                {% csrf_token %}
+                <input type="hidden" name="expected_status" value="{{ app_user.application_status }}">
+                <button type="submit" class="aw-btn aw-btn--outline">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                    {% translate "Reopen" %}
+                </button>
+            </form>
+            {% endif %}
+            <form method="post"
+                  action="{% url 'application-delete' app_user.id %}"
+                  class="ps-inline-form"
+                  hx-post="{% url 'application-delete' app_user.id %}"
+                  hx-target="#display-page"
+                  hx-swap="innerHTML"
+                  hx-select="#page-region"
+                  hx-select-oob="#toast-stack"
+                  hx-push-url="true"
+                  data-confirm-message="{% translate 'Permanently delete this application and student account? This cannot be undone.' %}">
+                {% csrf_token %}
+                <button type="submit" class="aw-btn aw-btn--danger">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                    {% translate "Delete Application" %}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if app_user.decided_by %}
+    <div class="aw-alert aw-alert--info">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+        <div>
+            <small>{% translate "Decided by" %}: {{ app_user.decided_by.get_full_name|default:app_user.decided_by.username }} - {{ app_user.decided_at|date:"Y-m-d H:i" }}</small>
+        </div>
+    </div>
+    {% endif %}
+</div>

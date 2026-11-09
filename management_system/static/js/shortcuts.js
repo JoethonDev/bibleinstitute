@@ -31,9 +31,15 @@
     if (window.bootstrap && m) bootstrap.Modal.getOrCreateInstance(m).toggle();
   }
   function goTo(path) {
-    // Click the matching sidebar link so HTMX navigation is preserved.
+    // Click the matching navigation link so HTMX navigation is preserved.
     // Suffix match: "/dashboard/" must not match "/dashboard/users/".
-    var link = document.querySelector('.ad-tab[href$="' + path + '"]');
+    // The workspace rail/sidebar links are matched by their aw-* classes.
+    var selectors = [
+            '.aw-rail-link[href$="' + path + '"]',
+      '.aw-side-link[href$="' + path + '"]',
+      '.aw-menu-item[href$="' + path + '"]'
+    ];
+    var link = document.querySelector(selectors.join(", "));
     if (link) { link.click(); return; }
     var lang = document.documentElement.lang || "en";
     window.location.href = "/" + lang + path;

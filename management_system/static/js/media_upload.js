@@ -223,10 +223,10 @@
     }
 
     function createJobCard(job) {
-        var card = el('div', 'ad-card mb-2 media-job-card');
+        var card = el('div', 'aw-card mb-2 media-job-card');
         card.id = cardIdFor(job.id, job.filename);
 
-        var body = el('div', 'ad-card-body');
+        var body = el('div', 'aw-card-body');
 
         var head = el('div', 'd-flex justify-content-between align-items-start gap-2 flex-wrap');
         var info = el('div', 'media-job-info');
@@ -234,12 +234,12 @@
         var meta = el('div', 'small text-muted media-job-meta', formatFileSize(job.source_size || 0));
         info.appendChild(name);
         info.appendChild(meta);
-         var retryBtn = el('button', 'ad-btn ad-btn--ghost ad-btn--sm media-job-retry d-none', T.retry);
-         var attachmentRetryBtn = el('button', 'ad-btn ad-btn--ghost ad-btn--sm media-job-attachment-retry d-none', T.retryAttachment);
+         var retryBtn = el('button', 'aw-btn aw-btn--ghost aw-btn--sm media-job-retry d-none', T.retry);
+         var attachmentRetryBtn = el('button', 'aw-btn aw-btn--ghost aw-btn--sm media-job-attachment-retry d-none', T.retryAttachment);
          retryBtn.type = 'button';
          attachmentRetryBtn.type = 'button';
          head.appendChild(info);
-         var actions = el('div', 'ad-actions');
+         var actions = el('div', 'aw-row-actions');
          actions.appendChild(retryBtn);
          actions.appendChild(attachmentRetryBtn);
          head.appendChild(actions);
@@ -628,7 +628,7 @@
         if (!csrf) {
             renderValidationErrors([]);
             renderSelectedFiles([]);
-            var errCard = el('div', 'ad-alert ad-alert--danger');
+            var errCard = el('div', 'aw-alert aw-alert--danger');
             errCard.setAttribute('role', 'alert');
             errCard.textContent = T.csrfMissing;
             progressContainer.appendChild(errCard);
@@ -668,7 +668,7 @@
                 });
             })
             .catch(function (err) {
-                var errCard = el('div', 'ad-alert ad-alert--danger');
+                var errCard = el('div', 'aw-alert aw-alert--danger');
                 errCard.setAttribute('role', 'alert');
                 errCard.textContent = (err && err.message) || T.jobCreateFailed;
                 progressContainer.appendChild(errCard);
@@ -700,7 +700,7 @@
             var files = Array.prototype.slice.call(fileInput ? fileInput.files : []);
             if (files.length === 0) {
                 renderValidationErrors([]);
-                var emptyCard = el('div', 'ad-alert ad-alert--warning');
+                var emptyCard = el('div', 'aw-alert aw-alert--warn');
                 emptyCard.setAttribute('role', 'alert');
                 emptyCard.textContent = T.noFilesSelected;
                 progressContainer.appendChild(emptyCard);
@@ -712,7 +712,7 @@
             renderValidationErrors(invalidFiles);
             renderSelectedFiles(validFiles);
             if (validFiles.length === 0) {
-                var invalidCard = el('div', 'ad-alert ad-alert--warning');
+                var invalidCard = el('div', 'aw-alert aw-alert--warn');
                 invalidCard.setAttribute('role', 'alert');
                 invalidCard.textContent = T.invalidFiles;
                 progressContainer.appendChild(invalidCard);

@@ -1,42 +1,82 @@
 {% load i18n %}
-<div id="content" class="ad-page" x-data="backgroundJobsMonitor" data-job-status-url="{% url 'background-job-status-batch' %}" data-unavailable-label="{% translate 'Unavailable' %}">
-    <div class="container-fluid py-3">
-        <div class="ad-pane-head flex-wrap gap-2">
-            <div>
-                <h1 class="ad-page-title">{% if notification_history %}{% translate "Notification history" %}{% else %}{% translate "Background jobs" %}{% endif %}</h1>
-                <p class="ad-page-subtitle">{% if notification_history %}{% translate "Saved system and admin notifications, per-recipient delivery progress and original content." %}{% else %}{% translate "Management, quizzes, media, gallery uploads, announcements and Telegram batches." %}{% endif %}</p>
-                <p class="small text-muted">{% translate "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed." %}</p>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-                {% include "partials/background_polling_toggle.html" %}
-                {% if not notification_history %}<a class="ad-btn ad-btn--ghost" href="{% url 'notification-history' %}" hx-get="{% url 'notification-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "Notification history" %}</a>{% endif %}
-                <a class="ad-btn ad-btn--ghost" href="?{{ request.GET.urlencode }}" hx-get="?{{ request.GET.urlencode }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML">{% translate "Refresh" %}</a>
+{% comment %}
+Background jobs and notification history workspace.
+Presentation only: the monitor root keeps x-data, data-job-status-url and
+data-unavailable-label; every row keeps data-job-record, data-family, data-id,
+data-active, data-next-poll-at and every data-job-field; the GET filter/search
+form, the queue links, the shared polling toggle, the table caption and the
+pagination include arguments are unchanged.
+{% endcomment %}
+<div id="content" class="aw-dashboard-page" x-data="backgroundJobsMonitor" data-job-status-url="{% url 'background-job-status-batch' %}" data-unavailable-label="{% translate 'Unavailable' %}">
+    {% translate "Overview" as page_eyebrow %}
+    {% if notification_history %}
+    {% translate "Notification history" as page_title %}
+    {% translate "Saved system and admin notifications, per-recipient delivery progress and original content." as page_description %}
+    {% else %}
+    {% translate "Background jobs" as page_title %}
+    {% translate "Management, quizzes, media, gallery uploads, announcements and Telegram batches." as page_description %}
+    {% endif %}
+    {% translate "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed." as page_head_note %}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description page_head_note=page_head_note %}
+        <div class="aw-page-actions">
+            {% include "partials/background_polling_toggle.html" %}
+            {% if not notification_history %}
+            <a class="aw-btn aw-btn--outline" href="{% url 'notification-history' %}" hx-get="{% url 'notification-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+                <span>{% translate "Notification history" %}</span>
+            </a>
+            {% endif %}
+            <a class="aw-btn aw-btn--ghost" href="?{{ request.GET.urlencode }}" hx-get="?{{ request.GET.urlencode }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                <span>{% translate "Refresh" %}</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-filter-bar">
+                <form method="get" class="row g-3 align-items-end" role="search"
+                      hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace">
+                    {{ filter_form.non_field_errors }}
+                    {% for field in filter_form %}
+                    {% if field.is_hidden %}{{ field }}{% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}{% else %}
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="aw-field">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}<div class="aw-field-error" role="alert">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    <div class="col-12">
+                        <div class="aw-flex aw-flex-wrap">
+                            <button type="submit" class="aw-btn aw-btn--primary">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                                <span>{% translate "Search and filter" %}</span>
+                            </button>
+                            <a class="aw-btn aw-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                                <span>{% translate "Clear" %}</span>
+                            </a>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
-        <div class="ad-card ad-card-body mb-3">
-            <form method="get" class="row g-3 align-items-end" role="search"
-                  hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace">
-                {{ filter_form.non_field_errors }}
-                {% for field in filter_form %}
-                {% if field.is_hidden %}{{ field }}{% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}{% else %}
-                <div class="col-12 col-md-6 col-xl-4">
-                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.errors %}<div class="text-danger small" role="alert">{{ field.errors }}</div>{% endif %}
-                </div>
-                {% endif %}
-                {% endfor %}
-                <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="ad-btn ad-btn--teal">{% translate "Search and filter" %}</button>
-                    <a class="ad-btn ad-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "Clear" %}</a>
-                </div>
-            </form>
+    </div>
+
+    <p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
+
+    {% if jobs_page %}
+    <div class="aw-card aw-table-card">
+        <div class="aw-table-tools">
+            <span class="aw-table-count">{% blocktranslate with count=jobs_page.paginator.count %}Matching jobs: {{ count }}{% endblocktranslate %}</span>
         </div>
-        <p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
-        {% if jobs_page %}
-        <p class="small text-muted">{% blocktranslate with count=jobs_page.paginator.count %}Matching jobs: {{ count }}{% endblocktranslate %}</p>
-        <div class="ad-card"><div class="table-responsive position-relative">
-            <table class="ad-table">
+        <div class="aw-table-wrap">
+            <table class="aw-table">
                 <caption class="visually-hidden">{% translate "Background jobs" %}</caption>
                 <thead><tr>
                     <th scope="col">{% translate "Operation" %}</th>
@@ -51,23 +91,33 @@
                 <tbody>
                 {% for job in jobs_page.object_list %}
                     <tr data-job-record data-family="{{ job.family }}" data-id="{{ job.id }}" data-active="{{ job.active|yesno:'true,false' }}" data-next-poll-at="{{ job.next_poll|date:'c' }}">
-                        <td><strong>{{ job.label }}</strong><small class="d-block text-muted">{{ job.family_label }}</small></td>
+                        <td><span class="aw-cell-strong">{{ job.label }}</span><span class="aw-cell-sub">{{ job.family_label }}</span></td>
                         <td>{{ job.actor }}</td>
                         <td class="text-break">{{ job.target }}</td>
-                        <td><span class="ad-pill ad-pill--muted" data-job-field="status_label">{{ job.status_label }}</span><small class="d-block" data-job-field="phase_label">{{ job.phase_label }}</small></td>
-                        <td><progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress><small class="d-block" data-job-field="progress_label">{{ job.progress_label }}</small></td>
-                        <td>{{ job.created|date:"SHORT_DATETIME_FORMAT" }}</td>
-                        <td data-job-field="updated_label">{{ job.updated_label }}</td>
-                        <td><a href="{{ job.detail_url }}" hx-get="{{ job.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="ad-btn ad-btn--ghost ad-btn--sm">{% translate "View details" %}<span class="visually-hidden">: {{ job.label }}</span></a></td>
+                        <td><span class="aw-pill aw-pill--muted" data-job-field="status_label">{{ job.status_label }}</span><span class="aw-cell-sub" data-job-field="phase_label">{{ job.phase_label }}</span></td>
+                        <td><progress max="100" value="{{ job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress><span class="aw-cell-sub" data-job-field="progress_label">{{ job.progress_label }}</span></td>
+                        <td class="aw-date"><time datetime="{{ job.created|date:'c' }}">{{ job.created|date:"SHORT_DATETIME_FORMAT" }}</time></td>
+                        <td class="aw-date" data-job-field="updated_label">{{ job.updated_label }}</td>
+                        <td>
+                            <div class="aw-row-actions">
+                                <a href="{{ job.detail_url }}" hx-get="{{ job.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="aw-btn aw-btn--ghost aw-btn--sm">
+                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                                    <span>{% translate "View details" %}</span><span class="visually-hidden">: {{ job.label }}</span>
+                                </a>
+                            </div>
+                        </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="8" class="text-center py-4">{% translate "No background jobs match these filters." %}</td></tr>
+                    <tr><td colspan="8" class="aw-cell-empty">
+                        {% translate "No background jobs match these filters." as job_empty_label %}
+                        {% include "partials/components/aw_empty.html" with icon="i-server" description=job_empty_label %}
+                    </td></tr>
                 {% endfor %}
                 </tbody>
             </table>
-        </div></div>
+        </div>
         {% translate "Background job pages" as job_pages_label %}
         {% include "partials/pagination.html" with page_obj=jobs_page pagination_query=pagination_query aria_label=job_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
-        {% endif %}
     </div>
+    {% endif %}
 </div>

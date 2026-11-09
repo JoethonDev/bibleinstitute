@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models import Count, F, Max, OuterRef, Q, Subquery
 from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -56,6 +56,7 @@ from .telegram.support import (
     SupportReplyError,
     claim_conversation,
     count_unread_conversations,
+    current_level_labels,
     delete_support_message,
     mark_all_conversations_read,
     mark_conversation_read,
@@ -122,14 +123,14 @@ def telegram_config(request):
         action = request.POST.get("action", "")
         requires_token_validation = action in {"save", "activate", "rotate"}
         if requires_token_validation and not form.is_valid():
-            return render(request, "telegram_config.html", _configuration_context(config, form))
+            return render_page(request, "telegram_config.html", "partials/telegram_config_content.html", _configuration_context(config, form))
 
         try:
             token = form.cleaned_data.get("token", "") if requires_token_validation else ""
             if action == "save":
                 if not token:
                     form.add_error("token", _("Enter a Telegram bot token to save."))
-                    return render(request, "telegram_config.html", _configuration_context(config, form))
+                    return render_page(request, "telegram_config.html", "partials/telegram_config_content.html", _configuration_context(config, form))
                 save_bot_token(config.pk, token)
                 messages.success(request, _("Telegram bot token saved securely. The bot remains inactive."))
             elif action == "activate":
@@ -149,7 +150,7 @@ def telegram_config(request):
             messages.error(request, _("Telegram configuration could not be updated."))
         return redirect("telegram-config")
 
-    return render(request, "telegram_config.html", _configuration_context(config, form))
+    return render_page(request, "telegram_config.html", "partials/telegram_config_content.html", _configuration_context(config, form))
 
 
 def _private_chat_id(payload: dict) -> int | None:
@@ -444,6 +445,14 @@ def _conversation_list_context(request):
         conversations = conversations.filter(processed_conversation_filter())
     conversations = conversations.order_by("-latest_user_message_at", "-pk")
     page_obj = Paginator(conversations, 25).get_page(request.GET.get("page", 1))
+    level_labels = current_level_labels(
+        conversation.user_id for conversation in page_obj
+    )
+    for conversation in page_obj:
+        conversation.current_level_label = level_labels.get(
+            conversation.user_id,
+            _("Level not assigned"),
+        )
     return {
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request, exclude=("page", "start_page")),
@@ -499,7 +508,7 @@ def telegram_conversations(request):
             request.GET.get("start_page", 1)
         ),
     })
-    return render(request, "telegram_conversations.html", context)
+    return render_page(request, "telegram_conversations.html", "partials/telegram_conversations_content.html", context)
 
 
 def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
@@ -513,8 +522,9 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
         return None
     if not TelegramMessage.objects.filter(
         conversation_id=conversation_id,
-        telegram_message_id=message_id,
-    ).exclude(content_type=TelegramMessage.ContentType.DIGEST).exists():
+        pk=message_id,
+        direction=TelegramMessage.Direction.INBOUND,
+    ).exists():
         return None
     return message_id
 
@@ -529,6 +539,7 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     ).select_related(
         "sender_user", "telegram_deleted_by", "resolved_by",
         "resolution_reply", "resolution_reply__sender_user",
+        "answered_by", "answer_reply",
     ).prefetch_related("attachments").order_by("created_at", "pk")
     if own_admin_chat_id is None:
         messages_queryset = messages_queryset.exclude(content_type=TelegramMessage.ContentType.DIGEST)
@@ -544,14 +555,41 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     message_items = None
     messages_page_obj = None
     latest_message_pk = None
+    oob_state = False
+    state_values = TelegramMessage.objects.filter(
+        conversation_id=conversation.pk,
+    ).aggregate(
+        max_pk=Max("pk"),
+        max_answered=Max("answered_at"),
+        max_resolved=Max("resolved_at"),
+        max_sent=Max("sent_at"),
+    )
+    message_state = "|".join(
+        str(value or "")
+        for value in (
+            state_values["max_pk"],
+            state_values["max_answered"],
+            state_values["max_resolved"],
+            state_values["max_sent"],
+        )
+    )
     if after_raw is not None:
         try:
             after_id = int(after_raw)
         except (TypeError, ValueError):
             after_id = 0
-        message_items = list(
-            messages_queryset.filter(pk__gt=after_id)[:TELEGRAM_MESSAGE_POLL_BATCH_SIZE]
-        )
+        poll_state = request.GET.get("state")
+        if poll_state and poll_state != message_state:
+            message_items = list(
+                messages_queryset.order_by("-created_at", "-pk")[
+                    :TELEGRAM_MESSAGE_POLL_BATCH_SIZE
+                ]
+            )[::-1]
+            oob_state = True
+        else:
+            message_items = list(
+                messages_queryset.filter(pk__gt=after_id)[:TELEGRAM_MESSAGE_POLL_BATCH_SIZE]
+            )
     else:
         paginator = Paginator(messages_queryset, 30)
         requested_page = request.GET.get("page")
@@ -565,15 +603,21 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     if reply_form is None:
         reply_form = TelegramSupportReplyForm(
             initial={
-                "reply_to_telegram_message_id": reply_to_message_id,
+                "reply_to_message_id": reply_to_message_id,
             }
         )
     return {
         "conversation": conversation,
+        "conversation_level": current_level_labels([conversation.user_id]).get(
+            conversation.user_id,
+            _("Level not assigned"),
+        ),
         "own_admin_chat_id": own_admin_chat_id,
         "messages_page_obj": messages_page_obj,
         "message_items": message_items,
         "latest_message_pk": latest_message_pk,
+        "message_state": message_state,
+        "oob_state": oob_state,
         "reply_form": reply_form,
         "reply_url": reverse("telegram-conversation-reply", kwargs={"conversation_id": conversation.pk}),
         "detail_url": reverse("telegram-conversation-detail", kwargs={"conversation_id": conversation.pk}),
@@ -614,7 +658,7 @@ def telegram_conversation_detail(request, conversation_id):
         if context.get("message_items") is not None:
             return render(request, "partials/telegram_message_items.html", context)
         return render(request, "partials/telegram_message_list.html", context)
-    return render(request, "telegram_conversation_detail.html", context)
+    return render_page(request, "telegram_conversation_detail.html", "partials/telegram_conversation_detail_content.html", context)
 
 
 @capability_required(can_manage_academic_setup)
@@ -625,8 +669,15 @@ def telegram_conversation_reply(request, conversation_id):
     panel_request = request.GET.get("fragment") == "panel"
     if not form.is_valid():
         context = _conversation_detail_context(request, conversation, form)
-        template = "partials/telegram_chat_panel.html" if panel_request else "telegram_conversation_detail.html"
-        return render(request, template, context, status=200 if panel_request else 400)
+        if panel_request:
+            return render(request, "partials/telegram_chat_panel.html", context, status=200)
+        return render_page(
+            request,
+            "telegram_conversation_detail.html",
+            "partials/telegram_conversation_detail_content.html",
+            context,
+            status=400,
+        )
 
     config = TelegramBotConfig.objects.filter(is_active=True).first()
     if not config:
@@ -650,7 +701,7 @@ def telegram_conversation_reply(request, conversation_id):
                 conversation_id=conversation.pk,
                 text=form.cleaned_data["message"],
                 uploaded_file=attachment,
-                reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
+                target_message_id=form.cleaned_data.get("reply_to_message_id"),
                 origin=TelegramMessage.Origin.WEB,
             )
         else:
@@ -659,7 +710,7 @@ def telegram_conversation_reply(request, conversation_id):
                 admin=request.user,
                 conversation_id=conversation.pk,
                 text=form.cleaned_data["message"],
-                reply_to_telegram_message_id=form.cleaned_data.get("reply_to_telegram_message_id"),
+                target_message_id=form.cleaned_data.get("reply_to_message_id"),
                 origin=TelegramMessage.Origin.WEB,
             )
     except SupportReplyError as exc:
@@ -964,7 +1015,7 @@ def telegram_broadcasts(request):
     }
     if request.GET.get("fragment") == "1":
         return render(request, "partials/telegram_broadcast_list.html", context)
-    return render(request, "telegram_broadcasts.html", context)
+    return render_page(request, "telegram_broadcasts.html", "partials/telegram_broadcasts_content.html", context)
 
 
 @capability_required(can_manage_academic_setup)
@@ -989,12 +1040,12 @@ def telegram_broadcast_create(request):
         "max_attachment_bytes": MAX_BROADCAST_ATTACHMENT_BYTES,
     }
     if request.method != "POST":
-        return render(request, "telegram_broadcast.html", context)
+        return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context)
     if not form.is_valid():
-        return render(request, "telegram_broadcast.html", context, status=400)
+        return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context, status=400)
     if active_year is None:
         form.add_error(None, _("There is no active academic year."))
-        return render(request, "telegram_broadcast.html", context, status=400)
+        return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context, status=400)
     level_value = form.cleaned_data["level"]
     level_id = None if level_value == ALL_LEVEL_VALUE else int(level_value)
     try:
@@ -1007,7 +1058,7 @@ def telegram_broadcast_create(request):
         )
     except (BroadcastError, ValueError) as exc:
         form.add_error(None, str(exc))
-        return render(request, "telegram_broadcast.html", context, status=400)
+        return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context, status=400)
     return redirect("telegram-broadcast-confirm-page", broadcast_id=broadcast.pk)
 
 
@@ -1029,9 +1080,10 @@ def telegram_broadcast_confirm_page(request, broadcast_id):
     except BroadcastError as exc:
         messages.error(request, str(exc))
         return redirect("telegram-broadcasts")
-    return render(
+    return render_page(
         request,
         "telegram_broadcast_confirm.html",
+        "partials/telegram_broadcast_confirm_content.html",
         {
             "broadcast": broadcast,
             "active_year": active_year,
@@ -1106,9 +1158,10 @@ def telegram_broadcast_detail(request, broadcast_id):
     ).order_by("pk")
     recipient_page_obj = Paginator(recipients, 50).get_page(request.GET.get("page", 1))
     monitor_row = monitored_jobs(family="telegram", selection={"telegram": [str(broadcast.pk)]}).first()
-    return render(
+    return render_page(
         request,
         "telegram_broadcast_detail.html",
+        "partials/telegram_broadcast_detail_content.html",
         {
             "broadcast": broadcast,
             "monitor_job": readable_job(monitor_row) if monitor_row else None,

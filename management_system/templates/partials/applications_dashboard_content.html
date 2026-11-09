@@ -1,0 +1,111 @@
+{% load i18n %}
+{% load static %}
+<div id="content" class="aw-dashboard-page">
+
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description page_actions=page_actions %}
+
+    <div id="application-bulk-result"
+         class="aw-alert aw-alert--info d-none"
+         role="status"
+         aria-live="polite"
+         data-processed-label="{% translate 'Processed' %}"
+         data-stale-label="{% translate 'Skipped as stale' %}"
+         data-failed-label="{% translate 'Mutation failures' %}"
+         data-notification-failed-label="{% translate 'Notification failures' %}"></div>
+
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-filter-bar">
+                <div class="aw-table-tools">
+                    <form class="aw-search-wrap" method="get" action="{% url 'applications-dashboard' %}" role="search" hx-get="{% url 'applications-dashboard' %}" hx-target="#applications-workspace" hx-select="#applications-workspace" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#applications-loading" hx-sync="this:replace">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <input class="aw-input aw-input--search"
+                               type="search"
+                               name="name"
+                               value="{{ application_search }}"
+                               placeholder="{% translate 'Search username, email, name, phone, or national ID' %}"
+                               aria-label="{% translate 'Search applications' %}"
+                               hx-get="{% url 'applications-dashboard' %}"
+                               hx-include="closest form"
+                               hx-trigger="input changed delay:200ms, search"
+                               hx-target="#applications-workspace"
+                               hx-select="#applications-workspace"
+                               hx-swap="outerHTML"
+                               hx-replace-url="true"
+                               hx-sync="closest form:replace">
+                        <input type="hidden" name="status" value="{{ current_status }}">
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="applications-workspace" class="aw-stack aw-stack--lg">
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-filter-bar">
+                <nav class="aw-tabs" aria-label="{% translate 'Filter by status' %}">
+                    {% for tab in filter_tabs %}
+                    <a class="aw-tab{% if tab.is_active %} is-active{% endif %}" href="{{ tab.url }}"
+                       {% if tab.is_active %}aria-current="page"{% endif %}
+                       hx-get="{{ tab.url }}"
+                       hx-target="#applications-workspace"
+                       hx-select="#applications-workspace"
+                       hx-swap="outerHTML"
+                       hx-push-url="true">
+                        <span>{{ tab.label }}</span>
+                        <span class="aw-count">{{ tab.count }}</span>
+                    </a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-table-section"
+         class="aw-stack"
+         data-bulk-url="{% url 'bulk-application-decision' %}"
+         data-csrf="{{ csrf_token }}"
+         data-selection-token="{{ bulk_selection_token }}"
+         data-selection-status="{{ current_status }}"
+         data-selection-scope="{{ current_status }}|{{ application_search }}"
+         data-no-selection-message="{% translate 'Please select at least one application.' %}"
+         data-request-failed-message="{% translate 'The request failed. Please try again.' %}"
+         data-bulk-confirm-message="{% translate 'Are you sure?' %}">
+
+    <div class="htmx-indicator aw-table-loading" id="applications-loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{% translate "Loading..." %}</span>
+        </div>
+    </div>
+
+    {% if page_obj.object_list %}
+    <div class="aw-card">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-flex aw-flex-wrap">
+                <button class="aw-btn aw-btn--primary aw-btn--sm" id="bulk-activate" data-decision="activate">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                    {% translate "Activate Selected" %}
+                </button>
+                <button class="aw-btn aw-btn--danger aw-btn--sm" id="bulk-decline" data-decision="decline">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                    {% translate "Decline Selected" %}
+                </button>
+                {% if current_status != "pending" %}
+                <button class="aw-btn aw-btn--outline aw-btn--sm" id="bulk-reopen" data-decision="pending">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                    {% translate "Reopen Selected" %}
+                </button>
+                {% endif %}
+                <button class="aw-btn aw-btn--outline aw-btn--sm d-none" id="select-all-records">
+                    {% translate "Select all matching records" %}
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include "partials/table_and_pagination.html" with view="application" %}
+</div>
+    </div>
+</div>

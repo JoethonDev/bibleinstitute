@@ -3329,6 +3329,12 @@ msgstr "تعديل"
 msgid "Delete this year?"
 msgstr "حذف هذه السنة؟"
 
+msgid "Delete this lesson and its media links? Telegram delivery history is kept. This cannot be undone."
+msgstr "هل تريد حذف هذا الدرس وروابط الوسائط الخاصة به؟ يتم الاحتفاظ بسجل تسليم تيليجرام. لا يمكن التراجع عن هذا الإجراء."
+
+msgid "Delete lesson"
+msgstr "حذف الدرس"
+
 #: .\management_system\templates\academic_setup.html:92
 #: .\management_system\templates\academic_setup.html:246
 #: .\management_system\templates\applications_dashboard.html:105
@@ -13250,6 +13256,9 @@ msgstr "رفع ملفات المعرض"
 msgid "Job category"
 msgstr "فئة المهمة"
 
+msgid "Job details"
+msgstr "تفاصيل المهمة"
+
 msgid "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
 msgstr "يتم تحديث المهام المعروضة تلقائيا. حدث الصفحة لعرض المهام الجديدة. لا تظهر أعمال الصيانة المجدولة التي لا تحتفظ بسجل."
 
@@ -13759,3 +13768,426 @@ msgstr "نتيجة التسليم غير معروفة"
 
 msgid "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."
 msgstr "تعذر تأكيد نتيجة الإرسال بعد انقطاع العملية. تحقق من Telegram قبل إرسال رد آخر."
+
+#: management_system/admin_navigation.py
+msgid "Curriculum"
+msgstr "المناهج"
+
+#: management_system/admin_navigation.py
+msgid "Academic"
+msgstr "الأكاديمية"
+
+#: management_system/admin_navigation.py
+msgid "Combined"
+msgstr "موجز"
+
+#: management_system/admin_navigation.py
+msgid "Payments"
+msgstr "المدفوعات"
+
+#: management_system/admin_navigation.py
+msgid "Engagement"
+msgstr "التواصل"
+
+#: management_system/admin_navigation.py
+msgid "Site & Apps"
+msgstr "الموقع والتطبيقات"
+
+#: management_system/admin_navigation.py
+msgid "Workspace domains"
+msgstr "نطاقات العمل"
+
+#: management_system/admin_navigation.py
+msgid "Domain sections"
+msgstr "أقسام النطاق"
+
+#: management_system/admin_navigation.py
+msgid "Domain"
+msgstr "النطاق"
+
+#: management_system/admin_navigation.py
+msgid "Sections"
+msgstr "الأقسام"
+
+#: management_system/admin_navigation.py
+msgid "Search everything"
+msgstr "ابحث في كل شيء"
+
+#: management_system/admin_navigation.py
+msgid "New lesson"
+msgstr "درس جديد"
+
+#: management_system/admin_navigation.py
+msgid "New quiz"
+msgstr "اختبار جديد"
+
+#: management_system/admin_navigation.py
+msgid "New course"
+msgstr "دورة جديدة"
+
+#: management_system/admin_navigation.py
+msgid "Upload media"
+msgstr "رفع وسائط"
+
+#: management_system/admin_navigation.py
+msgid "New announcement"
+msgstr "إشعار جديد"
+
+#: management_system/admin_navigation.py
+msgid "Add student"
+msgstr "إضافة طالب"
+
+#: management_system/admin_navigation.py
+msgid "Add offering"
+msgstr "إضافة مقرر"
+
+#: management_system/admin_navigation.py
+msgid "Switch language"
+msgstr "تغيير اللغة"
+
+#: management_system/admin_navigation.py
+msgid "This panel could not be loaded."
+msgstr "تعذر تحميل هذه اللوحة."
+
+#: management_system/admin_navigation.py
+msgid "You do not have access to this panel."
+msgstr "ليس لديك صلاحية الوصول إلى هذه اللوحة."
+
+#: management_system/views.py
+msgid "Account inactive"
+msgstr "الحساب غير نشط"
+
+#: management_system/views.py
+msgid "Create student"
+msgstr "إضافة طالب"
+
+#: management_system/views.py
+msgid "Create course"
+msgstr "إنشاء دورة"
+
+#: management_system/views.py
+msgid "Create quiz"
+msgstr "إنشاء اختبار"
+
+#: management_system/views.py
+msgid "Manage the course catalog for each academic level."
+msgstr "إدارة دليل الدورات لكل مستوى أكاديمي."
+
+#: management_system/views.py
+msgid "Author lessons, attach media and control publication."
+msgstr "إعداد الدروس وإرفاق الوسائط والتحكم في النشر."
+
+#: management_system/views.py
+msgid "Build quizzes, review attempts and keep grading consistent."
+msgstr "إنشاء الاختبارات ومراجعة المحاولات والحفاظ على اتساق التصحيح."
+
+#: management_system/views.py
+msgid "Manage student accounts, application decisions and study mode access."
+msgstr "إدارة حسابات الطلاب وقرارات الطلبات والوصول حسب نمط الدراسة."
+
+#: management_system/views.py
+msgid "Application"
+msgstr "الطلب"
+
+#: management_system/views.py
+msgid "All application statuses"
+msgstr "كل حالات الطلب"
+
+#: management_system/views.py
+msgid "All study modes"
+msgstr "كل أنماط الدراسة"
+
+#: management_system/views.py
+msgid "All account states"
+msgstr "كل حالات الحساب"
+
+#: management_system/admin_today.py
+msgid "What needs a decision today, %(date)s."
+msgstr "ما يحتاج إلى قرار اليوم، %(date)s."
+
+#: management_system/admin_today.py
+msgid "Needs attention"
+msgstr "يحتاج إلى انتباه"
+
+#: management_system/admin_today.py
+msgid "Upcoming"
+msgstr "القادم"
+
+#: management_system/admin_today.py
+msgid "Recent activity"
+msgstr "النشاط الأخير"
+
+#: management_system/admin_today.py
+msgid "Failed media jobs"
+msgstr "مهام الوسائط الفاشلة"
+
+#: management_system/admin_today.py
+msgid "Ungraded answers"
+msgstr "إجابات غير مصححة"
+
+#: management_system/admin_today.py
+msgid "Unread Telegram conversations"
+msgstr "محادثات تيليجرام غير المقروءة"
+
+#: management_system/admin_today.py
+msgid "No pending applications."
+msgstr "لا توجد طلبات معلقة."
+
+#: management_system/admin_today.py
+msgid "No failed media jobs."
+msgstr "لا توجد مهام وسائط فاشلة."
+
+#: management_system/admin_today.py
+msgid "No answers are waiting for grading."
+msgstr "لا توجد إجابات بانتظار التصحيح."
+
+#: management_system/admin_today.py
+msgid "No unread support conversations."
+msgstr "لا توجد محادثات دعم غير مقروءة."
+
+#: management_system/admin_today.py
+msgid "Active students"
+msgstr "الطلاب النشطون"
+
+#: management_system/admin_today.py
+msgid "Attendance today"
+msgstr "حضور اليوم"
+
+#: management_system/admin_today.py
+msgid "As of"
+msgstr "حتى"
+
+#: management_system/admin_today.py
+msgid "active"
+msgstr "نشط"
+
+#: management_system/admin_today.py
+msgid "Meeting"
+msgstr "لقاء"
+
+#: management_system/admin_today.py
+msgid "Academic holiday"
+msgstr "عطلة أكاديمية"
+
+#: management_system/admin_today.py
+msgid "Deleted question"
+msgstr "سؤال محذوف"
+
+#: management_system/admin_today.py
+msgid "No meetings or holidays in the next two weeks."
+msgstr "لا توجد لقاءات أو عطل خلال الأسبوعين القادمين."
+
+#: management_system/admin_today.py
+msgid "No create actions are available for your role."
+msgstr "لا توجد إجراءات إنشاء متاحة لدورك."
+
+#: management_system/admin_today.py
+msgid "No recent enrollments or quiz submissions."
+msgstr "لا توجد تسجيلات أو تسليمات اختبارات حديثة."
+
+#: management_system/templates/partials/today_content.html
+msgid "%(counter)s active student"
+msgid_plural "%(counter)s active students"
+msgstr[0] "%(counter)s طالب نشط"
+msgstr[1] "طالب نشط واحد"
+msgstr[2] "طالبان نشطان"
+msgstr[3] "%(counter)s طلاب نشطين"
+msgstr[4] "%(counter)s طالبا نشطا"
+msgstr[5] "%(counter)s طالب نشط"
+
+#: management_system/models.py
+msgid "Duration (minutes)"
+msgstr "المدة (بالدقائق)"
+
+#: management_system/views.py
+msgid "Review applications, record decisions and open the student record."
+msgstr "راجع الطلبات وسجل القرارات وافتح سجل الطالب."
+
+#: management_system/templates/partials/historical_intake_content.html
+msgid "Historical intake sections"
+msgstr "أقسام الإدخال التاريخي"
+
+#: management_system/views.py
+msgid "Review the application, documents and the decision for this student."
+msgstr "راجع الطلب والمستندات والقرار الخاص بهذا الطالب."
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Academics"
+msgstr "الأكاديمي"
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Finance"
+msgstr "المالية"
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Read-only overview of this account."
+msgstr "نظرة عامة للقراءة فقط على هذا الحساب."
+
+#: management_system/templates/partials/student_overview_content.html
+msgid "Devices"
+msgstr "الأجهزة"
+
+#: management_system/templates/partials/table_and_pagination.html
+msgid "Scroll horizontally to see all columns."
+msgstr "اسحب افقيا لعرض كل الاعمدة."
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Publish checklist"
+msgstr "قائمة التحقق قبل النشر"
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Based on the values in this form."
+msgstr "بناء على القيم الموجودة في هذا النموذج."
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Danger zone"
+msgstr "منطقة الخطر"
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Available from"
+msgstr "متاح من"
+
+#: management_system/templates/partials/lesson_editor_content.html
+msgid "Leave blank to make this lesson available as soon as it is published."
+msgstr "اتركه فارغا ليكون الدرس متاحا فور نشره."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Years, year levels, meeting weekdays and course offerings."
+msgstr "السنوات ومستويات السنة وأيام الاجتماعات والمقررات المطروحة."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Academic levels with their linked years, courses, offerings and enrollments."
+msgstr "المستويات الأكاديمية وما يرتبط بها من سنوات ومقررات وطرح وتسجيلات."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Meetings, holidays and the month grid for one academic year."
+msgstr "الاجتماعات والعطلات وشبكة الشهر لسنة أكاديمية واحدة."
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Legend"
+msgstr "مفتاح الرموز"
+
+#: management_system/templates/partials/academic_setup_content.html
+msgid "Fully scanned days"
+msgstr "أيام المسح الكامل"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Weight (%)"
+msgstr "الوزن (%)"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Min. Pass (%)"
+msgstr "الحد الأدنى للنجاح (%)"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Total weight: 0%"
+msgstr "إجمالي الوزن: 0%"
+
+#: management_system/templates/partials/promotion_evaluation_content.html
+msgid "Fully scanned"
+msgstr "تم المسح بالكامل"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Mobile downloads"
+msgstr "التنزيلات على الجوال"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Save download policy"
+msgstr "حفظ سياسة التنزيل"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Allow saving in the app (offline library)"
+msgstr "السماح بالحفظ داخل التطبيق (مكتبة دون اتصال)"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Allow saving on the device (share / gallery downloads)"
+msgstr "السماح بالحفظ على الجهاز (المشاركة / تنزيلات المعرض)"
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Turn off a switch to hide the matching save buttons in the app and refuse new saves. Files already saved stay readable."
+msgstr "أوقف أي مفتاح لإخفاء أزرار الحفظ المطابقة في التطبيق ورفض الحفظ الجديد. تبقى الملفات المحفوظة قابلة للقراءة."
+
+#: management_system/templates/partials/app_release_manage_content.html
+msgid "Published app builds"
+msgstr "إصدارات التطبيق المنشورة"
+
+msgid "Level not assigned"
+msgstr "المستوى غير محدد"
+
+msgid "Level: %(level)s"
+msgstr "المستوى: %(level)s"
+
+msgid "Answered by @%(username)s"
+msgstr "تمت الإجابة بواسطة @%(username)s"
+
+msgid "Alert updated in Telegram"
+msgstr "تم تحديث التنبيه في تيليجرام"
+
+msgid "The original bot is no longer active, so this alert cannot be updated"
+msgstr "البوت الأصلي لم يعد نشطًا، لذلك لا يمكن تحديث هذا التنبيه."
+
+msgid "Record voice"
+msgstr "تسجيل صوتي"
+
+msgid "Use recording"
+msgstr "استخدام التسجيل"
+
+msgid "Discard"
+msgstr "تجاهل"
+
+msgid "Voice recording is not available in this browser."
+msgstr "تسجيل الصوت غير متاح في هذا المتصفح."
+
+msgid "Microphone access was denied or unavailable."
+msgstr "تم رفض الوصول إلى الميكروفون أو أنه غير متاح."
+
+msgid "The recording was empty. Try again."
+msgstr "كان التسجيل فارغًا. حاول مرة أخرى."
+
+msgid "The attachment field is unavailable."
+msgstr "حقل المرفق غير متاح."
+
+msgid "JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes."
+msgstr "JPEG أو PNG أو MP4 أو PDF أو OGG/Opus أو MP3 أو M4A أو WebM. الصور حتى 10 ميغابايت، والفيديو/PDF حتى 50 ميغابايت، والصوت حتى 20 ميغابايت و5 دقائق."
+
+msgid "Audio messages must be 5 minutes or shorter."
+msgstr "يجب ألا تتجاوز الرسائل الصوتية 5 دقائق."
+
+msgid "Audio files must be 20 MB or smaller."
+msgstr "يجب ألا تتجاوز الملفات الصوتية 20 ميغابايت."
+
+msgid "The audio file could not be inspected."
+msgstr "تعذر فحص الملف الصوتي."
+
+msgid "This media type is not supported."
+msgstr "نوع الوسائط هذا غير مدعوم."
+
+msgid "This media file is too large to archive."
+msgstr "ملف الوسائط هذا أكبر من الحد المسموح للأرشفة."
+
+msgid "This document type is not supported."
+msgstr "نوع المستند هذا غير مدعوم."
+
+msgid "This audio type is not supported."
+msgstr "نوع الصوت هذا غير مدعوم."
+
+msgid "Reply to a support digest to send media."
+msgstr "رد على تنبيه الدعم لإرسال الوسائط."
+
+msgid "The attachment must be a JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM file."
+msgstr "يجب أن يكون المرفق ملف JPEG أو PNG أو MP4 أو PDF أو OGG/Opus أو MP3 أو M4A أو WebM."
+
+msgid "Exam not open yet"
+msgstr "لم يفتح الامتحان بعد"
+
+msgid "Start Exam"
+msgstr "بدء الامتحان"
+
+msgid "Choice"
+msgstr "خيار"
+
+msgid "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering."
+msgstr "اضبط معادلة تقييم الترقية لسنة ومستوى دراسي. حدد حد النجاح العام وتاريخي بدء وانتهاء التقييم وحد إعادة المقرر الراسب، ثم عرّف القواعد المرجحة للاختبارات أو الحضور. يحدد وزن كل قاعدة مساهمتها في الدرجة النهائية؛ وعند وجود قاعدة واحدة يعامل الوزن الفارغ كـ 100%. يجب أن تحقق كل قاعدة قابلة للتطبيق حد النجاح الأدنى الخاص بها، كما يجب أن تحقق الدرجة المرجحة حد النجاح العام. وتتجاوز معادلة المقرر المحدد معادلة جميع المقررات لذلك العرض."
+
+msgid "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%."
+msgstr "يحدد وزن كل قاعدة مساهمتها في الدرجة النهائية المرجحة. وعند وجود قاعدة واحدة يعامل الوزن الفارغ كـ 100%. وعند وجود قواعد متعددة يجب إدخال كل وزن صراحةً ويجب أن يكون المجموع 100% بالضبط."

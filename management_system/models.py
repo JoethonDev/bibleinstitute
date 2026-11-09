@@ -220,15 +220,27 @@ class User(AbstractUser):
         return name
 
     def serialize_pagination(self):
-        return {
-            "id" : self.pk,
-            "rows" : [self.username, f"{self.first_name} {self.last_name}", str(_(self.role.get_role_display())), self.joined_date.strftime("%d/%m/%Y"), self.last_login],
-            "url" : reverse_lazy("user-profile", args=[self.pk,])
-        }
+        """Students table row projection.
 
-    @staticmethod
-    def get_columns():
-        return [_("Username"), _("Name"), _("Role"), _("Joined Date"), _("Last Login")]
+        The Students table renders its own row template, so the projection
+        carries the identity, decision, mode and timestamps that template
+        consumes instead of a positional cell list.
+        """
+        return {
+            "id": self.pk,
+            "username": self.username,
+            "display_name": self.get_full_name() or self.username,
+            "application_status": self.application_status,
+            "application_status_label": self.get_application_status_display(),
+            "study_mode": self.study_mode or "",
+            "study_mode_label": self.get_study_mode_display() if self.study_mode else "",
+            "role_code": self.role.role if self.role else "",
+            "role_label": self.role.get_role_display() if self.role else "",
+            "is_active": self.is_active,
+            "joined_date": self.joined_date.strftime("%d/%m/%Y") if self.joined_date else "",
+            "last_login": self.last_login,
+            "url": reverse_lazy("user-profile", args=[self.pk]),
+        }
 
 
 class TelegramBotConfig(models.Model):
@@ -1045,6 +1057,7 @@ class TelegramMessage(models.Model):
         EDITED = "edited", _("Edited")
         EXPIRED = "expired", _("Expired")
         FAILED = "failed", _("Failed")
+        UNAVAILABLE = "unavailable", _("Bot unavailable")
 
     class DeletionStatus(models.TextChoices):
         DELETED = "deleted", _("Deleted")
@@ -1095,6 +1108,39 @@ class TelegramMessage(models.Model):
     delivery_error = models.CharField(max_length=500, blank=True, default="")
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolution = models.CharField(max_length=16, choices=Resolution.choices, blank=True, default="")
+    answered_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="answered_telegram_messages",
+        help_text="Admin whose confirmed reply answered this inbound student message.",
+    )
+    answered_at = models.DateTimeField(null=True, blank=True)
+    answer_reply = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="answered_messages",
+        help_text="The confirmed outbound reply that covered this inbound message.",
+    )
+    covered_message_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Inbound message IDs frozen into a queued reply's answer prefix.",
+    )
+    bot_config = models.ForeignKey(
+        TelegramBotConfig,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        related_name="support_messages",
+        help_text="Bot configuration used to send this message, when known.",
+    )
     telegram_deletion_status = models.CharField(
         max_length=16,
         choices=DeletionStatus.choices,
@@ -1130,6 +1176,7 @@ class TelegramMessage(models.Model):
         indexes = [
             models.Index(fields=["conversation", "created_at"], name="tg_message_conversation_idx"),
             models.Index(fields=["delivery_status", "created_at"], name="tg_message_delivery_idx"),
+            models.Index(fields=["conversation", "answered_at"], name="tg_message_answered_idx"),
         ]
 
     def __str__(self):
@@ -1148,6 +1195,7 @@ class TelegramAttachment(models.Model):
     original_name = models.CharField(max_length=255, blank=True, default="")
     mime_type = models.CharField(max_length=255, blank=True, default="")
     size_bytes = models.PositiveBigIntegerField(default=0)
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True)
     sha256 = models.CharField(max_length=64, blank=True, default="")
     is_available = models.BooleanField(default=False)
     error = models.CharField(max_length=500, blank=True, default="")
@@ -1447,11 +1495,24 @@ class Course(models.Model):
 
     # -- Instance methods -------------------------------------------
     def serialize_pagination(self):
+        """Course table row projection, including annotated content counts.
+
+        The counts come from the dashboard queryset's distinct annotations; a
+        caller that paginates courses must supply them (no per-row queries).
+        """
         return {
-            "id" : self.pk,
-            "level" : self.level.display_name,
-            "rows" : [self.name, self.description, self.level.display_name, self.instructor],
-            "url" : reverse_lazy("course-view", args=[self.pk,])
+            "id": self.pk,
+            "level": self.level.display_name,
+            "rows": [
+                self.name,
+                self.description,
+                self.level.display_name,
+                self.instructor,
+                getattr(self, "offering_count", 0),
+                getattr(self, "lesson_count", 0),
+                getattr(self, "quiz_count", 0),
+            ],
+            "url": reverse_lazy("course-view", args=[self.pk,]),
         }
 
     @staticmethod
@@ -2825,6 +2886,7 @@ class Quiz(models.Model):
                 format_human_datetime(self.opening_date),
                 format_human_datetime(self.closing_date),
                 self.duration_minutes,
+                getattr(self, "question_count", 0),
                 getattr(self, "submissions_count", 0),
             ],
             "url" : reverse_lazy("quiz-view", args=[self.pk,])
@@ -2834,7 +2896,8 @@ class Quiz(models.Model):
     def get_columns():
         return [
             _("Name"), _("Course"), _("Level"), _("Academic Year"), _("Quiz Type"),
-            _("Grades"), _("Opening Date"), _("Closing Date"), _("Duration (minutes)"), _("Submissions"),
+            _("Grades"), _("Opening Date"), _("Closing Date"), _("Duration (minutes)"),
+            _("Questions"), _("Submissions"),
         ]
 
 class QuizStudentOpening(models.Model):

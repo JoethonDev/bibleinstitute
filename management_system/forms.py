@@ -667,6 +667,10 @@ class HistoricalExistingBulkForm(forms.Form):
     promotion_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}), label=_("Promotion reason"))
 
     def __init__(self, *args, student_options=None, **kwargs):
+        # The single-intake form is rendered on the same page and owns the
+        # unprefixed field ids; prefix this form's DOM ids so the two forms
+        # never emit duplicate id attributes. POST field names are unchanged.
+        kwargs.setdefault("auto_id", "id_existing_%s")
         super().__init__(*args, **kwargs)
         self.fields["source_year_level"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=False).select_related("academic_year", "level").order_by("academic_year__ordering", "level__ordering")
         self.fields["destination_scope"].queryset = AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by("level__ordering")

@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 import logging
 import mimetypes
+import subprocess
+import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -18,14 +21,18 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from ..models import (
+    AcademicYear,
+    Enrollment,
     TelegramAccount,
     TelegramAttachment,
+    TelegramBotConfig,
     TelegramConversation,
     TelegramMessage,
     User,
 )
 from ..utils.storage_operations import get_r2_client, upload_to_bucket
 from .attachments import (
+    AUDIO_MAX_SECONDS,
     CAPTION_MAX_LENGTH,
     SupportAttachmentSpec,
     classify_attachment,
@@ -37,7 +44,7 @@ from .text import strip_telegram_links
 
 logger = logging.getLogger(__name__)
 
-SUPPORT_MAX_MEDIA_BYTES = 50 * 1024 * 1024
+SUPPORT_MAX_MEDIA_BYTES = 20 * 1024 * 1024
 SUPPORTED_MEDIA = {"photo", "document", "video", "voice", "audio"}
 # Telegram cannot edit or delete bot messages indefinitely.
 SUPPORT_DIGEST_ACTION_WINDOW = timedelta(hours=48)
@@ -357,6 +364,7 @@ def _message_payload(message: dict) -> dict:
             "file_size": voice.get("file_size") or 0,
             "file_name": "telegram-voice.oga",
             "mime_type": "audio/ogg",
+            "duration": int(voice.get("duration") or 0),
         }
     audio = message.get("audio")
     if isinstance(audio, dict):
@@ -368,6 +376,7 @@ def _message_payload(message: dict) -> dict:
             "file_size": audio.get("file_size") or 0,
             "file_name": original_name,
             "mime_type": audio.get("mime_type") or mimetypes.guess_type(original_name)[0] or "",
+            "duration": int(audio.get("duration") or 0),
         }
     for field, content_type in (("document", TelegramMessage.ContentType.DOCUMENT), ("video", TelegramMessage.ContentType.VIDEO)):
         value = message.get(field)
@@ -466,6 +475,7 @@ def persist_inbound_message(*, user: User, update_id: int, message: dict) -> tup
             original_name=safe_filename(payload.get("file_name", ""), f"telegram-{payload['content_type']}"),
             mime_type=str(payload.get("mime_type") or "")[:255],
             size_bytes=max(0, int(payload.get("file_size") or 0)),
+            duration_seconds=int(payload.get("duration") or 0) or None,
         )
     return conversation, stored, True
 
@@ -552,6 +562,54 @@ def _sent_replies_to_source(source_message_id: int):
     ).order_by("-sent_at", "-pk")
 
 
+def current_level_labels(user_ids) -> dict[int, str]:
+    """Resolve the active-year full-year level for the supplied students.
+
+    Exactly one active, normal, full-year enrollment in the active academic year
+    is required. Ambiguous or missing cases return the translated
+    "Level not assigned" label; no older, completed, or targeted enrollment is
+    used as a fallback.
+    """
+    ids = {int(user_id) for user_id in user_ids if user_id}
+    if not ids:
+        return {}
+    labels = {user_id: _("Level not assigned") for user_id in ids}
+    active_year_id = (
+        AcademicYear.objects.filter(is_active=True).values_list("id", flat=True).first()
+    )
+    if active_year_id is None:
+        return labels
+    enrollments = Enrollment.objects.filter(
+        student_id__in=ids,
+        status=Enrollment.Status.ACTIVE,
+        enrollment_type=Enrollment.Type.NORMAL,
+        course_offering__isnull=True,
+        academic_year_level__academic_year_id=active_year_id,
+    ).select_related("academic_year_level__level")
+    per_student: dict[int, dict[int, object]] = {}
+    for enrollment in enrollments:
+        level = enrollment.academic_year_level.level
+        per_student.setdefault(enrollment.student_id, {})[level.pk] = level
+    for user_id, levels in per_student.items():
+        if len(levels) == 1:
+            labels[user_id] = next(iter(levels.values())).display_name
+    return labels
+
+
+def _active_bot_config() -> TelegramBotConfig | None:
+    return TelegramBotConfig.objects.filter(is_active=True).only("id", "bot_id").first()
+
+
+def _digest_answer_text(digest: TelegramMessage, answer_line: str) -> str:
+    """Keep the original digest visible and append the answer line."""
+    base = digest.text.strip()
+    suffix = "\n\n" + answer_line
+    limit = 4096
+    if len(base) + len(suffix) > limit:
+        base = base[: max(0, limit - len(suffix) - 3)].rstrip() + "..."
+    return base + suffix
+
+
 def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: int) -> int:
     """Announce one inbound student message to every linked admin account."""
     try:
@@ -567,11 +625,17 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
         pk=message_id,
     ).prefetch_related("attachments").order_by("created_at", "pk"))
     sender_identity = conversation.user.telegram_display_identity
+    level_label = current_level_labels([conversation.user_id]).get(
+        conversation.user_id,
+        _("Level not assigned"),
+    )
+    active_config = _active_bot_config()
     stale_before = timezone.now() - SUPPORT_DIGEST_RECOVERY_WINDOW
     for message in inbound_messages:
         if _sent_replies_to_source(message.pk).exists():
             continue
         text = _("Support message from %(name)s") % {"name": sender_identity}
+        text += "\n" + _("Level: %(level)s") % {"level": level_label}
         text += "\n\n" + _message_text(message)
         for account in _admin_accounts().iterator(chunk_size=100):
             with transaction.atomic():
@@ -603,6 +667,7 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
                         content_type=TelegramMessage.ContentType.DIGEST,
                         text=text,
                         delivery_status=TelegramMessage.DeliveryStatus.SENDING,
+                        bot_config=active_config,
                     )
                 else:
                     digest.text = text
@@ -645,7 +710,7 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
                         try:
                             resolve_answered_announcements(
                                 bot,
-                                source_message_id=message.pk,
+                                source_message_ids=[message.pk],
                                 reply=reply,
                             )
                         except Exception:
@@ -694,18 +759,56 @@ def _answered_source_message(
     ).order_by("-created_at", "-pk").first()
 
 
+def _covered_source_ids(
+    conversation_id: int, source_message: TelegramMessage | None
+) -> list[int]:
+    """Freeze the still-unanswered inbound IDs from conversation start to source."""
+    if source_message is None:
+        return []
+    ordered_ids = list(
+        TelegramMessage.objects.filter(
+            conversation_id=conversation_id,
+            direction=TelegramMessage.Direction.INBOUND,
+        ).order_by("created_at", "pk").values_list("pk", flat=True)
+    )
+    try:
+        index = ordered_ids.index(source_message.pk)
+    except ValueError:
+        return []
+    prefix_ids = ordered_ids[: index + 1]
+    answered_ids = set(
+        TelegramMessage.objects.filter(
+            pk__in=prefix_ids,
+            answered_at__isnull=False,
+        ).values_list("pk", flat=True)
+    )
+    return [pk for pk in prefix_ids if pk not in answered_ids]
+
+
 def resolve_answered_announcements(
     bot: telebot.TeleBot,
     *,
-    source_message_id: int | None,
+    source_message_ids,
     reply: TelegramMessage,
 ) -> int:
-    """Close only the admin digests for the exact student message answered."""
-    if source_message_id is None:
+    """Annotate every delivered digest for the covered inbound messages.
+
+    The digest is kept and its original text stays visible; the answer line is
+    appended. Edits are never gated by the deletion age limit, and a failed edit
+    never blocks the website answer state.
+    """
+    ids = [int(message_id) for message_id in source_message_ids if message_id]
+    if not ids or reply.sender_user_id is None:
         return 0
     now = timezone.now()
+    active_config_id = (
+        TelegramBotConfig.objects.filter(is_active=True).values_list("id", flat=True).first()
+    )
+    answer_line = _("Answered by @%(username)s") % {
+        "username": reply.sender_user.username,
+    }
     digests = TelegramMessage.objects.filter(
-        source_message_id=source_message_id,
+        source_message_id__in=ids,
         content_type=TelegramMessage.ContentType.DIGEST,
         delivery_status=TelegramMessage.DeliveryStatus.SENT,
         resolved_at__isnull=True,
@@ -715,28 +818,26 @@ def resolve_answered_announcements(
         resolution = TelegramMessage.Resolution.FAILED
         if digest.telegram_message_id is None or digest.sent_at is None:
             resolution = TelegramMessage.Resolution.FAILED
-        elif now - digest.sent_at >= SUPPORT_DIGEST_ACTION_WINDOW:
-            resolution = TelegramMessage.Resolution.EXPIRED
+        elif (
+            digest.bot_config_id
+            and active_config_id
+            and digest.bot_config_id != active_config_id
+        ):
+            resolution = TelegramMessage.Resolution.UNAVAILABLE
         else:
             try:
-                bot.delete_message(digest.telegram_chat_id, digest.telegram_message_id)
+                bot.edit_message_text(
+                    _digest_answer_text(digest, answer_line),
+                    chat_id=digest.telegram_chat_id,
+                    message_id=digest.telegram_message_id,
+                )
             except Exception as exc:
                 if is_missing_message_error(exc):
                     resolution = TelegramMessage.Resolution.DELETED
                 else:
-                    try:
-                        bot.edit_message_text(
-                            _("Replied by @%(username)s") % {"username": reply.sender_user.username},
-                            chat_id=digest.telegram_chat_id,
-                            message_id=digest.telegram_message_id,
-                        )
-                    except Exception as edit_exc:
-                        if is_missing_message_error(edit_exc):
-                            resolution = TelegramMessage.Resolution.DELETED
-                    else:
-                        resolution = TelegramMessage.Resolution.EDITED
+                    resolution = TelegramMessage.Resolution.FAILED
             else:
-                resolution = TelegramMessage.Resolution.DELETED
+                resolution = TelegramMessage.Resolution.EDITED
         if resolution == TelegramMessage.Resolution.FAILED:
             logger.warning(
                 "telegram_support_resolution_failed digest=%s chat=%s",
@@ -764,12 +865,15 @@ def _queue_reply(
     reply_target_chat_id: int | None,
     origin: str,
     content_type: str = TelegramMessage.ContentType.TEXT,
+    target_message_id: int | None = None,
 ) -> tuple[TelegramMessage, int, int | None]:
     """Queue one reply under a short row lock, then release before API I/O."""
     _require_admin(admin)
     with transaction.atomic():
         try:
-            conversation = TelegramConversation.objects.select_for_update().select_related(
+            conversation = TelegramConversation.objects.select_for_update(
+                of=("self",),
+            ).select_related(
                 "claimed_by", "handled_by",
             ).get(pk=conversation_id)
         except TelegramConversation.DoesNotExist as exc:
@@ -778,7 +882,15 @@ def _queue_reply(
             raise SupportReplyError(_("This conversation is blocked."))
 
         reply_target = None
-        if reply_to_telegram_message_id is not None:
+        if target_message_id is not None:
+            reply_target = TelegramMessage.objects.filter(
+                conversation_id=conversation.pk,
+                pk=target_message_id,
+                direction=TelegramMessage.Direction.INBOUND,
+            ).first()
+            if reply_target is None:
+                raise SupportReplyError(_("The selected message is no longer available."))
+        elif reply_to_telegram_message_id is not None:
             reply_targets = TelegramMessage.objects.filter(
                 conversation_id=conversation.pk,
                 telegram_message_id=reply_to_telegram_message_id,
@@ -790,22 +902,27 @@ def _queue_reply(
                 raise SupportReplyError(_("The selected message is no longer available."))
 
         source_message = _answered_source_message(conversation, reply_target)
-        if source_message is not None:
-            prior_replies = TelegramMessage.objects.filter(
-                conversation=conversation,
-                direction=TelegramMessage.Direction.OUTBOUND,
-                source_message=source_message,
-            ).exclude(content_type=TelegramMessage.ContentType.DIGEST)
-            if prior_replies.filter(
-                delivery_status=TelegramMessage.DeliveryStatus.SENT,
-            ).exclude(sender_user=admin).exists():
-                raise SupportReplyError(_("This message was already answered by another admin."))
-            if prior_replies.filter(
-                delivery_status__in=(
-                    TelegramMessage.DeliveryStatus.QUEUED,
-                    TelegramMessage.DeliveryStatus.SENDING,
-                ),
-            ).exists():
+        if target_message_id is not None:
+            source_message = reply_target
+        covered_ids = _covered_source_ids(conversation.pk, source_message)
+        if source_message is not None and source_message.answered_at is not None:
+            # A reply to an already answered message is a threaded follow-up and
+            # does not rewrite the earlier per-message answer attribution.
+            covered_ids = []
+        pending_replies = TelegramMessage.objects.filter(
+            conversation=conversation,
+            direction=TelegramMessage.Direction.OUTBOUND,
+            delivery_status__in=(
+                TelegramMessage.DeliveryStatus.QUEUED,
+                TelegramMessage.DeliveryStatus.SENDING,
+            ),
+        ).exclude(content_type=TelegramMessage.ContentType.DIGEST)
+        covered_set = set(covered_ids)
+        for pending_reply in pending_replies.only("pk", "source_message_id", "covered_message_ids"):
+            pending_coverage = set(pending_reply.covered_message_ids or [])
+            if pending_reply.source_message_id:
+                pending_coverage.add(pending_reply.source_message_id)
+            if covered_set & pending_coverage:
                 raise SupportReplyError(_("A reply to this message is already being sent."))
 
         if conversation.claimed_by_id and conversation.claimed_by_id != admin.pk:
@@ -859,6 +976,8 @@ def _queue_reply(
             origin=origin,
             text=text,
             delivery_status=TelegramMessage.DeliveryStatus.QUEUED,
+            covered_message_ids=covered_ids,
+            bot_config=_active_bot_config(),
         )
         return outbound, student_account.telegram_chat_id, telegram_reply_to
 
@@ -891,7 +1010,9 @@ def _finalize_delivered_reply(
         conversation = TelegramConversation.objects.select_for_update().get(
             pk=outbound.conversation_id,
         )
-        outbound = TelegramMessage.objects.select_for_update().select_related("sender_user").get(pk=outbound.pk)
+        outbound = TelegramMessage.objects.select_for_update(
+            of=("self",),
+        ).select_related("sender_user").get(pk=outbound.pk)
         outbound.telegram_message_id = message_id
         outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
         outbound.sent_at = sent_at
@@ -901,6 +1022,18 @@ def _finalize_delivered_reply(
         outbound.save(update_fields=[
             "telegram_message_id", "delivery_status", "sent_at", "delivery_error",
         ])
+        covered_ids = [int(pk) for pk in (outbound.covered_message_ids or []) if pk]
+        if covered_ids:
+            TelegramMessage.objects.filter(
+                conversation_id=conversation.pk,
+                pk__in=covered_ids,
+                direction=TelegramMessage.Direction.INBOUND,
+                answered_at__isnull=True,
+            ).update(
+                answered_by=admin,
+                answered_at=sent_at,
+                answer_reply=outbound,
+            )
         latest_inbound = TelegramMessage.objects.filter(
             conversation_id=conversation.pk,
             direction=TelegramMessage.Direction.INBOUND,
@@ -948,7 +1081,7 @@ def _finalize_delivered_reply(
     try:
         resolve_answered_announcements(
             bot,
-            source_message_id=outbound.source_message_id,
+            source_message_ids=covered_ids,
             reply=outbound,
         )
     except Exception:
@@ -968,6 +1101,7 @@ def reply_to_conversation(
     origin: str,
     reply_to_telegram_message_id: int | None = None,
     reply_target_chat_id: int | None = None,
+    target_message_id: int | None = None,
 ) -> TelegramMessage:
     """Queue and deliver one anonymous admin reply for Telegram or web chat."""
     outbound, student_chat_id, telegram_reply_to = _queue_reply(
@@ -977,6 +1111,7 @@ def reply_to_conversation(
         reply_to_telegram_message_id=reply_to_telegram_message_id,
         reply_target_chat_id=reply_target_chat_id,
         origin=origin,
+        target_message_id=target_message_id,
     )
     _mark_reply_sending(outbound)
     try:
@@ -996,7 +1131,43 @@ def _attachment_content_type(kind: str) -> str:
         "photo": TelegramMessage.ContentType.PHOTO,
         "video": TelegramMessage.ContentType.VIDEO,
         "document": TelegramMessage.ContentType.DOCUMENT,
+        "voice": TelegramMessage.ContentType.VOICE,
+        "audio": TelegramMessage.ContentType.AUDIO,
     }[kind]
+
+
+def _probe_audio_seconds(uploaded_file) -> float:
+    """Return the duration of a validated audio upload using ffprobe."""
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as handle:
+            temporary_path = handle.name
+            uploaded_file.seek(0)
+            for chunk in uploaded_file.chunks():
+                handle.write(chunk)
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=nw=1:nk=1", temporary_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        duration = float((result.stdout or "").strip())
+    except Exception as exc:
+        raise SupportReplyError(_("The audio file could not be inspected.")) from exc
+    finally:
+        uploaded_file.seek(0)
+        if temporary_path:
+            try:
+                os.unlink(temporary_path)
+            except OSError:
+                pass
+    if duration <= 0 or duration > AUDIO_MAX_SECONDS:
+        raise SupportReplyError(_("Audio messages must be 5 minutes or shorter."))
+    return duration
 
 
 def _classify_uploaded_file(uploaded_file) -> SupportAttachmentSpec:
@@ -1004,11 +1175,19 @@ def _classify_uploaded_file(uploaded_file) -> SupportAttachmentSpec:
         uploaded_file.seek(0)
         head = uploaded_file.read(16)
         uploaded_file.seek(0)
-        return classify_attachment(
+        spec = classify_attachment(
             filename=str(getattr(uploaded_file, "name", "") or ""),
             size=int(getattr(uploaded_file, "size", 0) or 0),
             head=head,
         )
+        if spec.kind in {"voice", "audio"} or spec.mime_type == "audio/webm":
+            duration = _probe_audio_seconds(uploaded_file)
+            return SupportAttachmentSpec(
+                spec.kind, spec.mime_type, spec.filename, spec.size, duration,
+            )
+        return spec
+    except SupportReplyError:
+        raise
     except ValueError as exc:
         raise SupportReplyError(str(exc)) from exc
     except Exception as exc:
@@ -1050,6 +1229,7 @@ def _store_outbound_attachment(
             original_name=filename,
             mime_type=spec.mime_type,
             size_bytes=spec.size,
+            duration_seconds=int(spec.duration_seconds) if spec.duration_seconds else None,
             sha256=digest.hexdigest(),
             is_available=True,
         )
@@ -1092,6 +1272,7 @@ def reply_with_attachment_to_conversation(
     origin: str,
     reply_to_telegram_message_id: int | None = None,
     reply_target_chat_id: int | None = None,
+    target_message_id: int | None = None,
 ) -> TelegramMessage:
     """Queue and deliver one admin reply carrying a JPEG/PNG, MP4 or PDF file."""
     text = str(text or "").strip()
@@ -1106,6 +1287,7 @@ def reply_with_attachment_to_conversation(
         reply_target_chat_id=reply_target_chat_id,
         origin=origin,
         content_type=_attachment_content_type(spec.kind),
+        target_message_id=target_message_id,
     )
     try:
         _store_outbound_attachment(outbound, spec, uploaded_file)
@@ -1128,6 +1310,10 @@ def reply_with_attachment_to_conversation(
             result = bot.send_photo(student_chat_id, input_file, **send_kwargs)
         elif spec.kind == "video":
             result = bot.send_video(student_chat_id, input_file, **send_kwargs)
+        elif spec.kind == "voice":
+            result = bot.send_voice(student_chat_id, input_file, **send_kwargs)
+        elif spec.kind == "audio":
+            result = bot.send_audio(student_chat_id, input_file, **send_kwargs)
         else:
             result = bot.send_document(student_chat_id, input_file, **send_kwargs)
     except Exception as exc:
@@ -1138,6 +1324,78 @@ def reply_with_attachment_to_conversation(
             cleanup_stream.close()
         except Exception:
             pass
+    return _finalize_delivered_reply(bot, outbound, admin, result)
+
+
+def reply_with_provider_media_to_conversation(
+    bot: telebot.TeleBot,
+    *,
+    admin: User,
+    conversation_id: int,
+    provider_file_id: str,
+    media_kind: str,
+    caption: str,
+    filename: str,
+    mime_type: str,
+    size_bytes: int,
+    duration_seconds: float | None = None,
+    target_message_id: int | None = None,
+) -> TelegramMessage:
+    """Relay one admin media message that arrived through the support bot.
+
+    The provider file ID is bound to the sending bot, so the same bot must
+    remain active for the relay. The private R2 copy gives the website a stable
+    preview and keeps the provider URL and token out of the browser.
+    """
+    if media_kind not in {"photo", "video", "document", "voice", "audio"}:
+        raise SupportReplyError(_("This media type is not supported."))
+    if size_bytes and size_bytes > SUPPORT_MAX_MEDIA_BYTES:
+        raise SupportReplyError(_("This media file is too large to archive."))
+    if duration_seconds and duration_seconds > AUDIO_MAX_SECONDS:
+        raise SupportReplyError(_("Audio messages must be 5 minutes or shorter."))
+    text = str(caption or "").strip()
+    if len(text) > CAPTION_MAX_LENGTH:
+        raise SupportReplyError(_("Attachments support a message of 1,024 characters or fewer."))
+    outbound, student_chat_id, _telegram_reply_to = _queue_reply(
+        admin=admin,
+        conversation_id=conversation_id,
+        text=text,
+        reply_to_telegram_message_id=None,
+        reply_target_chat_id=None,
+        origin=TelegramMessage.Origin.TELEGRAM,
+        content_type=_attachment_content_type(media_kind),
+        target_message_id=target_message_id,
+    )
+    attachment = TelegramAttachment.objects.create(
+        message=outbound,
+        telegram_file_id=str(provider_file_id),
+        media_type=media_kind,
+        original_name=safe_filename(filename, "telegram-%s" % media_kind),
+        mime_type=str(mime_type or "")[:255],
+        size_bytes=max(0, int(size_bytes or 0)),
+        duration_seconds=int(duration_seconds) if duration_seconds else None,
+    )
+    if not store_attachment(bot, attachment):
+        _fail_reply(outbound, attachment.error or _("The media could not be stored."))
+        raise SupportReplyError(_("The media could not be stored."))
+    send_kwargs = {}
+    if text:
+        send_kwargs["caption"] = text
+    _mark_reply_sending(outbound)
+    try:
+        if media_kind == "photo":
+            result = bot.send_photo(student_chat_id, provider_file_id, **send_kwargs)
+        elif media_kind == "video":
+            result = bot.send_video(student_chat_id, provider_file_id, **send_kwargs)
+        elif media_kind == "voice":
+            result = bot.send_voice(student_chat_id, provider_file_id, **send_kwargs)
+        elif media_kind == "audio":
+            result = bot.send_audio(student_chat_id, provider_file_id, **send_kwargs)
+        else:
+            result = bot.send_document(student_chat_id, provider_file_id, **send_kwargs)
+    except Exception as exc:
+        _fail_reply(outbound, _("Telegram message delivery failed."))
+        raise SupportReplyError(_("The reply could not be delivered; the conversation remains open.")) from exc
     return _finalize_delivered_reply(bot, outbound, admin, result)
 
 
@@ -1192,28 +1450,47 @@ def delete_support_message(
             telegram_deleted_by_id=admin.pk if status == TelegramMessage.DeletionStatus.DELETED else None,
             telegram_deletion_error=error,
         )
+        reopened_inbound_ids: list[int] = []
+        if status == TelegramMessage.DeletionStatus.DELETED:
+            attributed_ids = list(
+                TelegramMessage.objects.filter(
+                    conversation_id=conversation.pk,
+                    answer_reply_id=message.pk,
+                    direction=TelegramMessage.Direction.INBOUND,
+                ).values_list("pk", flat=True)
+            )
+            for inbound_id in attributed_ids:
+                other_live_answer = TelegramMessage.objects.filter(
+                    conversation_id=conversation.pk,
+                    direction=TelegramMessage.Direction.OUTBOUND,
+                    delivery_status=TelegramMessage.DeliveryStatus.SENT,
+                ).exclude(
+                    pk=message.pk,
+                ).exclude(
+                    content_type=TelegramMessage.ContentType.DIGEST,
+                ).filter(
+                    Q(source_message_id=inbound_id)
+                    | Q(covered_message_ids__contains=[inbound_id])
+                ).exclude(
+                    telegram_deletion_status=TelegramMessage.DeletionStatus.DELETED,
+                ).exists()
+                if other_live_answer:
+                    continue
+                TelegramMessage.objects.filter(pk=inbound_id).update(
+                    answered_by=None,
+                    answered_at=None,
+                    answer_reply=None,
+                )
+                reopened_inbound_ids.append(inbound_id)
         latest_inbound = TelegramMessage.objects.filter(
             conversation_id=conversation.pk,
             direction=TelegramMessage.Direction.INBOUND,
         ).order_by("-created_at", "-pk").only("pk").first()
-        other_live_reply = bool(message.source_message_id) and TelegramMessage.objects.filter(
-            conversation_id=conversation.pk,
-            direction=TelegramMessage.Direction.OUTBOUND,
-            source_message_id=message.source_message_id,
-            delivery_status=TelegramMessage.DeliveryStatus.SENT,
-        ).exclude(
-            pk=message.pk,
-        ).exclude(
-            telegram_deletion_status=TelegramMessage.DeletionStatus.DELETED,
-        ).exists()
         if (
-            status == TelegramMessage.DeletionStatus.DELETED
-            and not other_live_reply
-            and message.source_message_id is not None
+            reopened_inbound_ids
             and latest_inbound is not None
-            and message.source_message_id == latest_inbound.pk
+            and latest_inbound.pk in reopened_inbound_ids
             and conversation.status == TelegramConversation.Status.HANDLED
-            and conversation.handled_by_id == message.sender_user_id
         ):
             conversation.status = TelegramConversation.Status.OPEN
             conversation.handled_at = None
@@ -1252,6 +1529,68 @@ def _reply_target(message: dict, admin_chat_id: int) -> tuple[TelegramConversati
     return None, None
 
 
+_DOCUMENT_MIME_ALLOWLIST = {
+    "application/pdf",
+    "audio/ogg",
+    "audio/opus",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/webm",
+}
+
+
+def _admin_media_payload(message: dict) -> dict | None:
+    """Normalize one admin media update into the shared relay contract."""
+    photos = message.get("photo")
+    if isinstance(photos, list) and photos:
+        largest = max(
+            (item for item in photos if isinstance(item, dict)),
+            key=lambda item: int(item.get("file_size") or 0),
+            default=None,
+        )
+        if largest and largest.get("file_id"):
+            return {
+                "kind": "photo",
+                "file_id": largest["file_id"],
+                "mime_type": "image/jpeg",
+                "filename": "telegram-photo.jpg",
+                "size_bytes": int(largest.get("file_size") or 0),
+                "duration": None,
+            }
+    for key, kind in (
+        ("video", "video"),
+        ("voice", "voice"),
+        ("audio", "audio"),
+        ("document", "document"),
+    ):
+        payload = message.get(key)
+        if not isinstance(payload, dict) or not payload.get("file_id"):
+            continue
+        mime_type = str(payload.get("mime_type") or "").lower()
+        if kind == "document" and mime_type not in _DOCUMENT_MIME_ALLOWLIST:
+            raise SupportReplyError(_("This document type is not supported."))
+        if kind in {"voice", "audio"} and mime_type and not mime_type.startswith("audio/"):
+            raise SupportReplyError(_("This audio type is not supported."))
+        size = int(payload.get("file_size") or 0)
+        if size and size > SUPPORT_MAX_MEDIA_BYTES:
+            raise SupportReplyError(_("This media file is too large to archive."))
+        duration = payload.get("duration")
+        if kind in {"voice", "audio"} and duration and float(duration) > AUDIO_MAX_SECONDS:
+            raise SupportReplyError(_("Audio messages must be 5 minutes or shorter."))
+        return {
+            "kind": kind,
+            "file_id": str(payload["file_id"]),
+            "mime_type": mime_type or ("application/pdf" if kind == "document" else ""),
+            "filename": str(
+                payload.get("file_name")
+                or ("telegram-%s" % kind)
+            ),
+            "size_bytes": size,
+            "duration": float(duration) if duration else None,
+        }
+    return None
+
+
 def handle_admin_message(bot: telebot.TeleBot, *, admin: User, message: dict) -> bool:
     try:
         admin_chat_id = int(message["chat"]["id"])
@@ -1265,6 +1604,42 @@ def handle_admin_message(bot: telebot.TeleBot, *, admin: User, message: dict) ->
     if text.startswith("/reply "):
         parts = text.split(maxsplit=2)
         text = parts[2] if len(parts) == 3 else ""
+    try:
+        media = _admin_media_payload(message)
+    except SupportReplyError as exc:
+        bot.send_message(admin_chat_id, str(exc))
+        return True
+    if media is not None:
+        digest = None
+        if reply_to is not None:
+            digest = TelegramMessage.objects.filter(
+                telegram_chat_id=admin_chat_id,
+                telegram_message_id=reply_to,
+                content_type=TelegramMessage.ContentType.DIGEST,
+            ).first()
+        if digest is None or digest.source_message_id is None:
+            bot.send_message(
+                admin_chat_id,
+                _("Reply to a support digest to send media."),
+            )
+            return True
+        try:
+            reply_with_provider_media_to_conversation(
+                bot,
+                admin=admin,
+                conversation_id=conversation.pk,
+                provider_file_id=media["file_id"],
+                media_kind=media["kind"],
+                caption=text,
+                filename=media["filename"],
+                mime_type=media["mime_type"],
+                size_bytes=media["size_bytes"],
+                duration_seconds=media["duration"],
+                target_message_id=digest.source_message_id,
+            )
+        except SupportReplyError as exc:
+            bot.send_message(admin_chat_id, str(exc))
+        return True
     if not text:
         bot.send_message(admin_chat_id, _("A reply message is required."))
         return True

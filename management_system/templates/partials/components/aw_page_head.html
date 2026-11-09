@@ -1,0 +1,26 @@
+{% comment %}
+Canonical page head: shared main block plus server-built page actions.
+The main partial renders its own .aw-page-head-main wrapper and an optional
+page_head_note line, so callers must not add a second wrapper.
+{% endcomment %}
+<div class="aw-page-head">
+    {% include "partials/components/aw_page_head_main.html" %}
+    {% if page_actions_include %}
+    <div class="aw-page-actions">
+        {% include page_actions_include %}
+    </div>
+    {% elif page_actions %}
+    <div class="aw-page-actions">
+        {% for action in page_actions %}
+        <a class="aw-btn{% if action.variant %} aw-btn--{{ action.variant }}{% endif %}"
+           href="{{ action.url }}"
+           {% if not action.download and not action.plain %}hx-get="{{ action.url }}"
+           hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-push-url="true"{% endif %}
+           {% if action.download %}download{% endif %}>
+            {% if action.icon %}<svg class="aw-ico" aria-hidden="true"><use href="#{{ action.icon }}"></use></svg>{% endif %}
+            <span>{{ action.label }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

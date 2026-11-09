@@ -1,0 +1,108 @@
+{% load i18n %}
+{% comment %}
+Confirm Broadcast workspace. Presentation only: both POST forms keep their
+action, method, csrf token, hx-* contract and confirm message; the academic
+year, target, recipient preview count, message and attachments remain the
+server-projected values. The page has no actions, so it uses the complete
+shared page head.
+{% endcomment %}
+{% translate "Engagement" as page_eyebrow %}
+{% translate "Confirm Broadcast" as page_title %}
+{% translate "Review the exact recipients, message, and attachments before sending." as page_description %}
+<div id="content" class="aw-dashboard-page">
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+
+    <div class="aw-alert aw-alert--warn" role="alert">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>{% translate "Sending cannot be undone. Confirming snapshots the recipients and queues delivery immediately." %}</div>
+    </div>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+                <h3>{% translate "Broadcast Summary" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <dl class="mb-0">
+                <div class="aw-kv">
+                    <dt>{% translate "Academic Year" %}</dt>
+                    <dd>{{ broadcast.academic_year.name }}</dd>
+                </div>
+                {% if broadcast.academic_year.starts_on and broadcast.academic_year.ends_on %}
+                <div class="aw-kv">
+                    <dt>{% translate "Academic Year Period" %}</dt>
+                    <dd>{{ broadcast.academic_year.starts_on|date:"Y-m-d" }} &rarr; {{ broadcast.academic_year.ends_on|date:"Y-m-d" }}</dd>
+                </div>
+                {% endif %}
+                <div class="aw-kv">
+                    <dt>{% translate "Target" %}</dt>
+                    <dd>{{ target_label }}</dd>
+                </div>
+                <div class="aw-kv">
+                    <dt>{% translate "Recipients" %}</dt>
+                    <dd class="aw-num">{{ recipient_preview_count }}</dd>
+                </div>
+            </dl>
+        </div>
+    </section>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
+                <h3>{% translate "Message" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <div class="tg-broadcast-message-preview">{{ broadcast.message }}</div>
+        </div>
+    </section>
+
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                <h3>{% translate "Attachments" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            {% if attachments %}
+            <ul class="aw-stack">
+                {% for attachment in attachments %}
+                <li class="aw-file-row">
+                    <span class="aw-file-ic">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                    </span>
+                    <div class="aw-file-main">
+                        <b>{% firstof attachment.original_name "-" %}</b>
+                        <span>{{ attachment.mime_type|default:"-" }} - {{ attachment.size_bytes|filesizeformat }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            {% translate "No attachments." as no_attachments_label %}
+            {% include "partials/components/aw_empty.html" with icon="i-file" description=no_attachments_label %}
+            {% endif %}
+        </div>
+    </section>
+
+    <div class="aw-flex aw-flex-wrap">
+        <form method="post" action="{{ confirm_url }}" hx-post="{{ confirm_url }}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
+            {% csrf_token %}
+            <button type="submit" class="aw-btn aw-btn--primary">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+                <span>{% translate "Confirm and Send" %}</span>
+            </button>
+        </form>
+        <form method="post" action="{{ cancel_url }}" hx-post="{{ cancel_url }}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this draft?' %}">
+            {% csrf_token %}
+            <button type="submit" class="aw-btn aw-btn--ghost">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                <span>{% translate "Delete Draft" %}</span>
+            </button>
+        </form>
+    </div>
+</div>

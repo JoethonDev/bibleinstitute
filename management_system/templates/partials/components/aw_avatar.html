@@ -1,0 +1,14 @@
+{% load aw_ui %}
+{% comment %}
+One avatar component for every surface (rail, top bar, table, chat, 360).
+Accepts name (user or string), size (md|lg|xl), tone (teal|gold|green|red|
+violet|blue|ink), optional href and label. Initials are computed once by
+the aw_initials filter, never duplicated in page templates.
+{% endcomment %}
+{% if href %}
+<a class="aw-avatar{% if size %} aw-avatar--{{ size }}{% endif %}{% if tone %} aw-avatar--{{ tone }}{% endif %}"
+   href="{{ href }}"{% if label %} title="{{ label }}" aria-label="{{ label }}"{% endif %}>{{ name|aw_initials }}</a>
+{% else %}
+<span class="aw-avatar{% if size %} aw-avatar--{{ size }}{% endif %}{% if tone %} aw-avatar--{{ tone }}{% endif %}"
+      {% if label %}title="{{ label }}" {% endif %}aria-hidden="true">{{ name|aw_initials }}</span>
+{% endif %}

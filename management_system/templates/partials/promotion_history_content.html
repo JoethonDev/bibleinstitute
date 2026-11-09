@@ -1,35 +1,76 @@
 {% load i18n %}
-<div class="container-fluid py-3 ad-page" id="content">
-    <div class="ad-pane-head ad-pane-head--bordered justify-content-between">
-        <h4 class="ad-pane-title mb-0"><i class="fas fa-history me-2 ad-page-header-icon"></i>{% translate "Immutable Promotion History" %}<span id="promotion-history-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span></h4>
-        <a class="ad-btn ad-btn--ghost ad-btn--sm" href="{% url 'promotion-formula' %}">
-            <i class="fas fa-calculator me-1"></i>{% translate "Evaluation" %}
-        </a>
+{% comment %}
+Immutable promotion ledger. The page head carries the existing evaluation
+link, the filter bar keeps its GET/HTMX contract and the single table renders
+only the values the view projects; no drawer or extra record field is added.
+The page head main block is shared; its action stays inline because it uses
+the standard HTMX page-navigation attributes.
+{% endcomment %}
+{% translate "Academic" as page_eyebrow %}
+{% translate "Immutable Promotion History" as page_title %}
+<div id="content" class="aw-dashboard-page">
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+        <div class="aw-page-actions">
+            <a class="aw-btn aw-btn--outline"
+               href="{% url 'promotion-formula' %}"
+               hx-get="{% url 'promotion-formula' %}"
+               hx-target="#display-page"
+               hx-select="#page-region"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
+                <span>{% translate "Evaluation" %}</span>
+            </a>
+        </div>
     </div>
-    <div class="ad-card">
-        <div class="ad-card-body">
-            <form method="get" class="row g-3 align-items-end mb-3" hx-get="{% url 'promotion-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-history-loading">
-                <div class="col-md-5">
-                    <label class="form-label" for="promotion-history-search">{% translate "Student" %}</label>
-                    <input id="promotion-history-search" class="form-control" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email...' %}" hx-preserve hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-history-loading" hx-trigger="input changed delay:200ms, search">
+
+    <div class="htmx-indicator aw-table-loading" id="promotion-history-loading" aria-hidden="true">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{% translate "Loading..." %}</span>
+        </div>
+    </div>
+
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-filter-bar">
+                <div class="aw-table-tools">
+                    <form method="get" hx-get="{% url 'promotion-history' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#promotion-history-loading" class="d-flex flex-wrap align-items-end gap-2 w-100">
+                        <div>
+                            <label class="form-label" for="promotion-history-search">{% translate "Student" %}</label>
+                            <div class="aw-search-wrap">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                                <input id="promotion-history-search" class="aw-input aw-input--search" type="search" name="search" value="{{ search }}" placeholder="{% translate 'Name or email...' %}" hx-preserve hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#promotion-history-loading" hx-trigger="input changed delay:200ms, search">
+                            </div>
+                        </div>
+                        <div class="aw-field">
+                            <label class="form-label" for="promotion-history-outcome">{% translate "Outcome" %}</label>
+                            <select id="promotion-history-outcome" class="aw-select" name="outcome" hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-history-loading" hx-trigger="change">
+                                <option value="">{% translate "All" %}</option>
+                                <option value="passed" {% if outcome == 'passed' %}selected{% endif %}>{% translate "Passed" %}</option>
+                                <option value="passed_with_exceptions" {% if outcome == 'passed_with_exceptions' %}selected{% endif %}>{% translate "Passed (with exceptions)" %}</option>
+                                <option value="repeated" {% if outcome == 'repeated' %}selected{% endif %}>{% translate "Repeated" %}</option>
+                                <option value="graduated" {% if outcome == 'graduated' %}selected{% endif %}>{% translate "Graduated" %}</option>
+                                <option value="last_level_exceptional" {% if outcome == 'last_level_exceptional' %}selected{% endif %}>{% translate "Last level (exceptional)" %}</option>
+                            </select>
+                        </div>
+                        <div class="aw-flex aw-flex-wrap">
+                            <button class="aw-btn aw-btn--primary aw-btn--sm" type="submit">
+                                <i class="fas fa-filter me-1" aria-hidden="true"></i>{% translate "Filter" %}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="promotion-history-outcome">{% translate "Outcome" %}</label>
-                    <select id="promotion-history-outcome" class="form-select" name="outcome" hx-get="{% url 'promotion-history' %}" hx-include="closest form" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#promotion-history-loading" hx-trigger="change">
-                        <option value="">{% translate "All" %}</option>
-                        <option value="passed" {% if outcome == 'passed' %}selected{% endif %}>{% translate "Passed" %}</option>
-                        <option value="passed_with_exceptions" {% if outcome == 'passed_with_exceptions' %}selected{% endif %}>{% translate "Passed (with exceptions)" %}</option>
-                        <option value="repeated" {% if outcome == 'repeated' %}selected{% endif %}>{% translate "Repeated" %}</option>
-                        <option value="graduated" {% if outcome == 'graduated' %}selected{% endif %}>{% translate "Graduated" %}</option>
-                        <option value="last_level_exceptional" {% if outcome == 'last_level_exceptional' %}selected{% endif %}>{% translate "Last level (exceptional)" %}</option>
-                    </select>
-                </div>
-                <div class="col-md-auto"><button class="ad-btn ad-btn--teal ad-btn--sm" type="submit">{% translate "Filter" %}</button></div>
-            </form>
-            <div class="ad-table-wrap">
-                <table class="ad-table">
-                    <caption class="visually-hidden">{% translate "Immutable promotion history" %}</caption>
-                    <thead><tr>
+            </div>
+        </div>
+    </div>
+
+    <section class="aw-table-card">
+        <div class="aw-table-wrap">
+            <table class="aw-table">
+                <caption class="visually-hidden">{% translate "Immutable promotion history" %}</caption>
+                <thead>
+                    <tr>
                         <th scope="col">{% translate "Student" %}</th>
                         <th scope="col">{% translate "From" %}</th>
                         <th scope="col">{% translate "To" %}</th>
@@ -40,63 +81,77 @@
                         <th scope="col">{% translate "Recorded by" %}</th>
                         <th scope="col">{% translate "Reason" %}</th>
                         <th scope="col">{% translate "Recorded" %}</th>
-                    </tr></thead>
-                    <tbody>
-                    {% for item in page_obj %}
-                    <tr>
-                        <td>{{ item.student.get_full_name|default:item.student.username }}</td>
-                        <td>{{ item.source_year_level.academic_year.name }} - {{ item.source_year_level.level.display_name }}</td>
-                        <td>{% if item.destination_year_level %}{{ item.destination_year_level.academic_year.name }} - {{ item.destination_year_level.level.display_name }}{% else %}<span class="ps-muted-text">{% translate "Graduated" %}</span>{% endif %}</td>
-                        <td>
-                            {% if item.outcome == "passed" %}
-                            <span class="ad-pill ad-pill--success">{% translate "Passed" %}</span>
-                            {% elif item.outcome == "passed_with_exceptions" %}
-                            <span class="ad-pill ad-pill--warning">{% translate "Passed (with exceptions)" %}</span>
-                            {% elif item.outcome == "repeated" %}
-                            <span class="ad-pill ad-pill--teal">{% translate "Repeated" %}</span>
-                            {% elif item.outcome == "graduated" %}
-                            <span class="ad-pill ad-pill--brand">{% translate "Graduated" %}</span>
-                            {% elif item.outcome == "last_level_exceptional" %}
-                            <span class="ad-pill ad-pill--muted">{% translate "Last level (exceptional)" %}</span>
-                            {% else %}
-                            {{ item.get_outcome_display|default:item.outcome }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% with method=item.get_promotion_method_display %}
-                            {% if item.promotion_method == "manual_historical" %}
-                            <span class="ad-pill ad-pill--brand">{% translate "Manual historical" %}</span>
-                            {% elif item.promotion_method == "system" %}
-                            <span class="ad-pill ad-pill--teal">{% translate "System" %}</span>
-                            {% elif method %}
-                            {{ method }}
-                            {% else %}
-                            <span class="ps-muted-text">-</span>
-                            {% endif %}
-                            {% endwith %}
-                        </td>
-                        <td>{% if item.score is not None %}{{ item.score|floatformat:1 }}%{% else %}<span class="ps-muted-text">-</span>{% endif %}</td>
-                        <td class="small">
-                            {% if item.exceptional_offering_ids %}
-                            <ul class="list-unstyled mb-0">
-                                {% for eid in item.exceptional_offering_ids %}
-                                <li><span class="ad-pill ad-pill--muted">#{{ eid }}</span></li>
-                                {% endfor %}
-                            </ul>
-                            {% else %}
-                            <span class="ps-muted-text">-</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ item.actor.get_full_name|default:item.actor.username }}</td>
-                        <td class="small">{% if item.reason %}<span class="ps-text-muted">{{ item.reason }}</span>{% else %}<span class="ps-muted-text">-</span>{% endif %}</td>
-                        <td>{{ item.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                     </tr>
-                    {% empty %}<tr><td colspan="10" class="ad-empty">{% translate "No promotion history found." %}</td></tr>{% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% translate "Promotion history pagination" as pagination_aria_label %}
-            {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#promotion-history-loading" %}
+                </thead>
+                <tbody>
+                {% for item in page_obj %}
+                <tr>
+                    <td>{{ item.student.get_full_name|default:item.student.username }}</td>
+                    <td>{{ item.source_year_level.academic_year.name }} - {{ item.source_year_level.level.display_name }}</td>
+                    <td>{% if item.destination_year_level %}{{ item.destination_year_level.academic_year.name }} - {{ item.destination_year_level.level.display_name }}{% else %}<span class="aw-muted">{% translate "Graduated" %}</span>{% endif %}</td>
+                    <td>
+                        {% if item.outcome == "passed" %}
+                        {% translate "Passed" as passed_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.outcome label=passed_label tone="green" %}
+                        {% elif item.outcome == "passed_with_exceptions" %}
+                        {% translate "Passed (with exceptions)" as exceptions_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.outcome label=exceptions_label tone="amber" %}
+                        {% elif item.outcome == "repeated" %}
+                        {% translate "Repeated" as repeated_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.outcome label=repeated_label tone="teal" %}
+                        {% elif item.outcome == "graduated" %}
+                        {% translate "Graduated" as graduated_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.outcome label=graduated_label tone="gold" %}
+                        {% elif item.outcome == "last_level_exceptional" %}
+                        {% translate "Last level (exceptional)" as last_level_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.outcome label=last_level_label tone="muted" %}
+                        {% else %}
+                        {{ item.get_outcome_display|default:item.outcome }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% with method=item.get_promotion_method_display %}
+                        {% if item.promotion_method == "manual_historical" %}
+                        {% translate "Manual historical" as manual_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.promotion_method label=manual_label tone="gold" %}
+                        {% elif item.promotion_method == "system" %}
+                        {% translate "System" as system_label %}
+                        {% include "partials/components/aw_status_pill.html" with status=item.promotion_method label=system_label tone="teal" %}
+                        {% elif method %}
+                        {{ method }}
+                        {% else %}
+                        <span class="aw-muted">-</span>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="aw-num">{% if item.score is not None %}{{ item.score|floatformat:1 }}%{% else %}<span class="aw-muted">-</span>{% endif %}</td>
+                    <td class="aw-small">
+                        {% if item.exceptional_offering_ids %}
+                        <ul class="list-unstyled mb-0">
+                            {% for eid in item.exceptional_offering_ids %}
+                            <li><span class="aw-pill aw-pill--muted">#{{ eid }}</span></li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <span class="aw-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.actor.get_full_name|default:item.actor.username }}</td>
+                    <td class="aw-small">{% if item.reason %}<span class="aw-muted">{{ item.reason }}</span>{% else %}<span class="aw-muted">-</span>{% endif %}</td>
+                    <td class="aw-date">{{ item.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="aw-cell-empty">
+                        {% translate "No promotion history found." as no_history %}
+                        {% include "partials/components/aw_empty.html" with icon="i-clock" description=no_history %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
+        {% translate "Promotion history pagination" as pagination_aria_label %}
+        {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#promotion-history-loading" %}
+    </section>
 </div>

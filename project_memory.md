@@ -128,8 +128,10 @@ relevant records without creating another ORM layer:
   Arabic/English notification text.
 - In-app/Telegram messages: Announcement, StudentNotification, TelegramBotConfig,
   TelegramAccount, TelegramLinkToken, TelegramWebhookUpdate,
-  TelegramNotificationDelivery, TelegramConversation, TelegramMessage,
-  TelegramAttachment, TelegramBroadcast, TelegramBroadcastAttachment,
+  TelegramNotificationDelivery, TelegramConversation, TelegramMessage
+(canonical per-inbound answered_by/answered_at/answer_reply, frozen
+covered_message_ids, sending bot_config),
+  TelegramAttachment (duration_seconds for audio), TelegramBroadcast, TelegramBroadcastAttachment,
   TelegramBroadcastRecipient.
 - Durable admin operations: AdminOperationJob ledger for formula recalculation, promotion,
   historical intake, legacy CSV, exports, course copy, attendance reconcile and storage work;
@@ -163,7 +165,8 @@ relevant records without creating another ORM layer:
 | Telegram | [telegram/recipients.py](management_system/telegram/recipients.py), policy.py, linking.py, [support.py](management_system/telegram/support.py), [deletion.py](management_system/telegram/deletion.py), [broadcasts.py](management_system/telegram/broadcasts.py), notifications.py | telegram_views.py/forms/tasks; configuration, attachments/media and independent webhook/delivery trust boundaries. Support claims/replies serialize on the conversation; inbound and outbound rows retain exact source/sender, current resolver and shared read marker. Interrupted support replies become `UNKNOWN` and a bounded Celery recovery task reopens only the matching stale claim; they are never resent automatically. Failed support digests remain visible in the LMS but do not have a retry action. Telegram deletion is limited to recorded private messages and the provider's 48-hour window; outbound rows do not retain bot identity, so deletion uses the active bot and can fail after switching to a different bot. Broadcasts retain each text/attachment message ID. See [TELEGRAM_SUPPORT_LIFECYCLE.md](docs/current/TELEGRAM_SUPPORT_LIFECYCLE.md) for transitions, multi-admin rules and withdrawal limits. |
 | Input identity | [utils/validators.py](management_system/utils/validators.py), [managers.py](management_system/managers.py) | Signup/profile/admin forms, canonical usernames, phone/identity normalization and unique constraints. |
 | Study mode/payment | [study_mode.py](management_system/study_mode.py), [payments.py](management_system/payments.py) | OfflineCity/user override, AcademicPayment and attendance/evaluation eligibility. |
-| Management selections | [admin_tables.py](management_system/admin_tables.py): scope_queryset, create/load_selection_token | Signed actor/view/filter/exclusions, strict boolean parsing and delete endpoints; the loader owns view/actor binding. Durable quiz selections consume the same contract. |
+| Management selections | [admin_tables.py](management_system/admin_tables.py): scope_queryset, create/load_selection_token | Signed actor/view/filter/exclusions, strict boolean parsing and delete endpoints; the loader owns view/actor binding. Durable quiz selections consume the same contract. Scope builders (`user_scope`, `course_scope`, `content_scope`) and their querysets are extended together with counts (`user_tab_counts`, `content_status_counts`), sorting, signed selection and exports. |
+| Admin workspace navigation and Today | [admin_navigation.py](management_system/admin_navigation.py), [admin_today.py](management_system/admin_today.py), [templatetags/aw_ui.py](management_system/templatetags/aw_ui.py) | The only rail/sidebar/top-bar/quick-create model (capability-filtered, URL names plus route aliases, no queries, no role strings in templates); `aw_admin_workspace`/`aw_capabilities` tags; bounded actor/ownership-scoped Today queues with one count and one <=5-row sample each, plus upcoming meetings/holidays. Admin page navigation refreshes the persistent rail, sidebar, mobile nav and crumb through `hx-select-oob` regions rendered by `render_page()`. |
 | Durable management jobs | [admin_operations.py](management_system/admin_operations.py), admin_operation_tasks.py, admin_operation_views.py | AdminOperationJob ledger: savepoint-safe creation with frozen-input equivalence, fresh active actor/capability checks, lease claim/takeover and task heartbeat, token-fenced progress/terminal commits, owner-bound status with shared calculation visibility, bounded private input/export artifacts (XLSX/CSV) with TTL cleanup and owner/admin streaming download, and the dedicated `admin` queue. Views enqueue named tasks through `enqueue_admin_operation` without importing the executor module. Operation executors stay in their owning domain modules. |
 | Background jobs and notification history | [job_monitor.py](management_system/job_monitor.py), [job_monitor_views.py](management_system/job_monitor_views.py), [notification_history.py](management_system/notification_history.py), background_jobs.html and backgroundJobsMonitor.js | Admin-only SQL-paged history for management, quiz, media, gallery, announcement and confirmed Telegram batches, plus per-recipient StudentNotification inbox/push/Telegram attempts and withdrawal actor/outcomes. Withdrawn notifications have their own terminal history status. Poll only visible IDs in bounded batches; shared pause/resume preference; explicit server-localized toggle labels. Saved Arabic/English content and exact Telegram snapshots are shown without provider credentials/IDs. |
 | Notification retry/redelivery | [notification_redelivery.py](management_system/notification_redelivery.py), student_notifications.py, mobile_push.py, telegram/notifications.py and telegram/broadcasts.py | AdminOperationJob-backed failed-only or resend-all copies; freeze the original audience, serialize overlapping event retries, and share bounded StudentNotification row locks with normal channel materializers so resend-all cannot race initial fan-out. Recheck actor/source/recipient eligibility at dispatch and preserve original attempts. Failed-only retries latest failed channel attempts without an inbox copy; resend-all makes a new visible inbox copy. Expo receipt and Telegram outcomes determine completion. Broadcast retries point to the original root and compare latest recipient outcomes. Missing historical Telegram text snapshots are rebuilt through the normal channel formatter; existing provider workers and inbox materialization remain the delivery owners. |
@@ -195,17 +198,27 @@ i18n/jsi18n are separate. Consult actual route modules for exact names/payloads.
 
 ## 6. Frontend locations and contracts
 
-- Shell/page/partial ownership lives under templates. admin_panel.html owns
-  management runtimes; course_detail.html owns the learning shell and lesson
+- Shell/page/partial ownership lives under templates. admin_panel.html owns the
+  single admin workspace shell (`.aw-shell`: domain rail, contextual sidebar,
+  sticky top bar, off-canvas mobile navigation, one peek drawer) and the default
+  Today cockpit include; course_detail.html owns the learning shell and lesson
   destination; display_quiz.html/questions_rendering.html own the student exam.
   Keep the authoring quiz_form.html/quizForm.js workflow separate.
+- Admin static CSS: `static/css/admin_workspace.css` loads last on admin pages
+  only and owns the `aw-*` tokens/components under the `body.aw-admin` theme
+  owner (including overlays); `app_admin.css` keeps the legacy `ad-*` layer for
+  pages not yet converted. Shared `aw_*` partials provide avatar, status pill,
+  page head, filter bar, empty state and the icon sprite.
 - Static CSS: app.css, app_admin.css, app_student.css, psalmodia.css,
   public_site.css and reference design styles. Repeated layers are intentional
   unless an exact stale override is proved; no mass cascade consolidation.
 - Alpine stores/components under static/js/alpine; admin_shell.js registers the
-  management components. HTMX navigation can need components loaded before a
-  destination exists. Do not strip all global scripts as unused.
+  management components, the top-bar menu controller and the drawer lifecycle.
+  HTMX navigation can need components loaded before a destination exists. Do not
+  strip all global scripts as unused.
 - Shared partials/components hold table/pagination/filter/form/toast primitives.
+  The table shell supports an optional `row_template` for domain rows (Students
+  first) while keeping `.ad-table-shell`/`.ad-table`/`#table-container` hooks.
   Match root IDs, targets, swap behavior, Alpine teardown and bound errors before
   extracting a common component. Do not invent a new generic frontend loader.
 - Keep stable media part IDs, form field names and public static URLs unless

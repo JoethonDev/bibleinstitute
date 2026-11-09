@@ -4,7 +4,7 @@
         {% for account in linked_user_page_obj %}
         {% with student_name=account.user.get_full_name|default:account.user.username %}
         <li class="tg-chat-linked-row">
-            <span class="tg-chat-avatar" aria-hidden="true">
+            <span class="tg-chat-avatar aw-avatar d-flex" aria-hidden="true">
                 {% if account.user.profile_image_key %}
                 <img class="tg-chat-avatar-img"
                      src="{% url 'application-document' account.user.pk 'profile' %}"
@@ -18,12 +18,12 @@
 
             <span class="tg-chat-linked-main">
                 <span class="tg-chat-linked-name">{{ student_name }}</span>
-                <span class="tg-chat-linked-username">{{ account.user.username }}</span>
+                <span class="tg-chat-linked-username aw-small">{{ account.user.username }}</span>
             </span>
 
             <span class="tg-chat-linked-actions">
                 {% if account.active_conversation_id %}
-                <a class="ad-btn ad-btn--ghost ad-btn--sm"
+                <a class="aw-btn aw-btn--ghost aw-btn--sm"
                    href="{% url 'telegram-conversation-detail' account.active_conversation_id %}"
                    aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
                     {% translate "Open" %}
@@ -31,7 +31,7 @@
                 {% else %}
                 <form method="post" action="{% url 'telegram-start-conversation' account.user.pk %}" hx-post="{% url 'telegram-start-conversation' account.user.pk %}" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
-                    <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+                    <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
                         {% translate "Start Telegram conversation" %}
                     </button>
                 </form>
@@ -40,10 +40,10 @@
         </li>
         {% endwith %}
         {% empty %}
-        <li class="ad-empty">
-            <i class="fas fa-user-slash" aria-hidden="true"></i>
-            <h5>{% translate "No linked users found" %}</h5>
-            <p>{% translate "No linked Telegram users match your search." %}</p>
+        <li>
+            {% translate "No linked users found" as no_linked_users_title %}
+            {% translate "No linked Telegram users match your search." as no_linked_users_description %}
+            {% include "partials/components/aw_empty.html" with icon="i-user" title=no_linked_users_title description=no_linked_users_description %}
         </li>
         {% endfor %}
     </ul>

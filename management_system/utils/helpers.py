@@ -233,7 +233,8 @@ def paginate_obj(request, obj, page_size=15):
     return page
 
 
-def render_dashboard(request, obj, view, context, parameters=[]):
+def render_dashboard(request, obj, view, context, parameters=None):
+    parameters = list(parameters or ())
     """
     Render dashboard with pagination and filters.
     Handles both full page and HTMX partial rendering.
@@ -294,35 +295,42 @@ def render_dashboard(request, obj, view, context, parameters=[]):
     sort_params.pop("sort", None)
     sort_params.pop("order", None)
     context["sort_query"] = sort_params.urlencode()
-    year_filter = "academic_year_filter.html" if context.get("academic_year_filter") else "year_filter.html"
-    filters = [year_filter, "naming_filter.html"]
-    if "filters" in context:
-        context['filters'].extend(filters)
-    else:
-        context['filters'] = filters
     
     logger.info(f"User: {user} accesses page {page_obj.number} in {view} dashboard")
-    
-    # Handle HTMX partial rendering
-    if hx_target_id(request) == "table-container":
-        return render(request, "partials/table_and_pagination.html", {
-            "page_obj": page_obj,
-            "header": _(view.capitalize()),
-            "view": view,
-            "url": reverse(f"{view}-dashboard", args=parameters),
-            "parameters": parameters,
-            **context
-        })
-    
-    # Full page rendering
-    return render(request, context.get("template_name", "dashboard.html"), {
+
+    render_context = {
         "page_obj": page_obj,
         "header": _(view.capitalize()),
         "view": view,
         "url": reverse(f"{view}-dashboard", args=parameters),
         "parameters": parameters,
-        **context
-    })
+        **context,
+    }
+
+    # Handle HTMX partial rendering
+    if hx_target_id(request) == "table-container":
+        return render(
+            request,
+            "partials/table_and_pagination.html",
+            render_context,
+        )
+
+    # Page-level responses. Converted dashboards render their #content partial
+    # through render_page(), which keeps the #page-region contract for HTMX page
+    # navigation and the full shell for direct URLs. Dashboards that still own
+    # their whole template keep the existing full-page response until their
+    # phase converts them.
+    content_template = context.get("content_template_name")
+    if content_template is None and context.get("template_name", "dashboard.html") == "dashboard.html":
+        content_template = "partials/dashboard_content.html"
+    if content_template:
+        return render_page(
+            request,
+            context.get("template_name", "dashboard.html"),
+            content_template,
+            render_context,
+        )
+    return render(request, context.get("template_name", "dashboard.html"), render_context)
 
 
 def select_content_academic_year(request):
@@ -507,7 +515,15 @@ def render_page(request, full_template, partial_template, context, status=200):
     keep their HTTP status in both render modes.
     """
     if is_htmx(request):
-        wrapped_context = {**context, "page_region_partial": partial_template}
+        wrapped_context = {
+            **context,
+            "page_region_partial": partial_template,
+            # Page navigation targets #display-page; its response must also
+            # carry the persistent rail/sidebar/mobile/crumb regions so the
+            # capability-filtered active state follows the new route. Local
+            # #content/table/drawer swaps stay single-region responses.
+            "shell_nav_oob": hx_target_id(request) == "display-page",
+        }
         return append_message_toasts(
             request,
             render(request, "partials/page_region.html", wrapped_context, status=status),

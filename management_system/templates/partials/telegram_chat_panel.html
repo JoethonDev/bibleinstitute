@@ -1,8 +1,12 @@
 {% load i18n %}
+{% translate "Unread" as unread_label %}
+{% translate "Read" as read_label %}
+{% translate "Blocked" as blocked_label %}
+{% translate "Open" as open_label %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-<div class="tg-chat-detail-head">
+<div class="tg-chat-detail-head aw-chat-head">
     <div class="tg-chat-detail-user">
-        <span class="tg-chat-avatar tg-chat-avatar--lg" aria-hidden="true">
+        <span class="tg-chat-avatar tg-chat-avatar--lg aw-avatar aw-avatar--lg d-flex" aria-hidden="true">
             {% if conversation.user.profile_image_key %}
             <img class="tg-chat-avatar-img"
                  src="{% url 'application-document' conversation.user.pk 'profile' %}"
@@ -13,41 +17,44 @@
             <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
             {% endif %}
         </span>
-        <div class="tg-chat-detail-title">
+        <div class="tg-chat-detail-title aw-chat-title">
             <h4 class="mb-1">
                 {% blocktranslate with student=student_name %}Conversation with {{ student }}{% endblocktranslate %}
             </h4>
             <div class="tg-chat-student-meta">
                 <span class="tg-chat-user-username">{{ conversation.user.username }}</span>
+                <span class="tg-chat-user-level aw-small aw-muted">{{ conversation_level }}</span>
             </div>
         </div>
     </div>
-    <div class="tg-chat-detail-actions">
+    <div class="tg-chat-detail-actions aw-row-actions">
         {% if conversation.is_unread %}
-        <span class="ad-pill ad-pill--warning">{% translate "Unread" %}</span>
+        {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=unread_label %}
         {% else %}
-        <span class="ad-pill ad-pill--success">{% translate "Read" %}</span>
+        {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=read_label %}
         {% endif %}
 
         {% if conversation.status == "claimed" and conversation.claimed_by %}
-        <span class="ad-pill ad-pill--warning">{% blocktranslate with admin=conversation.claimed_by.username %}Assigned to @{{ admin }}{% endblocktranslate %}</span>
+        {% blocktranslate with admin=conversation.claimed_by.username asvar assigned_label %}Assigned to @{{ admin }}{% endblocktranslate %}
+        {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=assigned_label %}
         {% elif conversation.status == "handled" and conversation.handled_by %}
-        <span class="ad-pill ad-pill--success">{% blocktranslate with admin=conversation.handled_by.username %}Resolved by @{{ admin }}{% endblocktranslate %}</span>
+        {% blocktranslate with admin=conversation.handled_by.username asvar resolved_label %}Resolved by @{{ admin }}{% endblocktranslate %}
+        {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=resolved_label %}
         {% elif conversation.status == "blocked" %}
-        <span class="ad-pill ad-pill--danger">{% translate "Blocked" %}</span>
+        {% include "partials/components/aw_status_pill.html" with status="" tone="red" label=blocked_label %}
         {% else %}
-        <span class="ad-pill ad-pill--muted">{% translate "Open" %}</span>
+        {% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=open_label %}
         {% endif %}
 
         {% if conversation.status == "open" %}
         <form method="post" action="{{ claim_url }}" hx-post="{{ claim_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="ps-inline-form">
             {% csrf_token %}
-            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">{% translate "Claim conversation" %}</button>
+            <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Claim conversation" %}</button>
         </form>
         {% elif conversation.status == "claimed" and conversation.claimed_by_id == request.user.pk %}
         <form method="post" action="{{ release_url }}" hx-post="{{ release_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="ps-inline-form">
             {% csrf_token %}
-            <button type="submit" class="ad-btn ad-btn--outline-gold ad-btn--sm">{% translate "Release conversation" %}</button>
+            <button type="submit" class="aw-btn aw-btn--outline aw-btn--sm">{% translate "Release conversation" %}</button>
         </form>
         {% endif %}
 
@@ -59,27 +66,27 @@
               hx-swap="innerHTML"
               class="ps-inline-form">
             {% csrf_token %}
-            <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm">
+            <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
                 <i class="fas fa-envelope-open-text me-1" aria-hidden="true"></i>{% translate "Mark as read" %}
             </button>
         </form>
         {% endif %}
 
-        <a class="ad-btn ad-btn--ghost ad-btn--sm"
+        <a class="aw-btn aw-btn--ghost aw-btn--sm"
            href="{{ detail_url }}"
            hx-get="{{ panel_url }}?fragment=panel"
            hx-target="#telegram-chat-panel"
            hx-swap="innerHTML">
             <i class="fas fa-sync-alt me-1" aria-hidden="true"></i>{% translate "Refresh" %}
         </a>
-        <a class="ad-btn ad-btn--ghost ad-btn--sm"
+        <a class="aw-btn aw-btn--ghost aw-btn--sm"
            href="{{ conversation_list_url }}">
             <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>{% translate "Back" %}
         </a>
     </div>
 </div>
 
-<div class="tg-chat-kv">
+<div class="tg-chat-kv aw-kv aw-muted">
     {% if conversation.claimed_by and conversation.claimed_at %}
     <span>{% translate "Assigned to" %}: @{{ conversation.claimed_by.username }} - {{ conversation.claimed_at|date:"SHORT_DATETIME_FORMAT" }}</span>
     {% endif %}
@@ -91,7 +98,7 @@
     {% endif %}
 </div>
 
-<div class="tg-chat-kv">
+<div class="tg-chat-kv aw-kv aw-muted">
     {% if conversation.last_message_at %}
     <span><i class="far fa-clock me-1" aria-hidden="true"></i>{% translate "Last message" %}: {{ conversation.last_message_at|date:"SHORT_DATETIME_FORMAT" }}</span>
     {% endif %}
@@ -99,8 +106,9 @@
 </div>
 
 {% if panel_notice %}
-<div class="ad-alert ad-alert--success" role="status">
-    <i class="fas fa-check-circle me-2" aria-hidden="true"></i>{{ panel_notice }}
+<div class="aw-alert aw-alert--success" role="status">
+    <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+    <span>{{ panel_notice }}</span>
 </div>
 {% endif %}
 

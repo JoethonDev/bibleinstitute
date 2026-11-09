@@ -1,173 +1,417 @@
 {% load i18n %}
-<div class="container-fluid py-3 ad-page attendance-matrix-page" id="content">
-  <div class="grade-matrix-header">
-    <div>
-      <div class="ad-kicker"><i class="fas fa-calendar-check"></i> {% translate "Attendance" %}</div>
-      <h3 class="ad-title mb-2">{% translate "Attendance matrix" %}</h3>
-      <p class="ad-lede mb-0">{% translate "Review attendance by student, scheduled meeting, and course." %}</p>
+{% load aw_ui %}
+{% comment %}
+Attendance workspace: page head, level tabs, filter card, the student x meeting
+matrix and the policy/reconciliation rail. Every filter, level tab and record
+action keeps its existing #content swap contract, exact form target, CSRF token
+and confirmation hook. The matrix keeps its bounded server rows; no metric,
+status or query is added here.
+{% endcomment %}
+{% aw_capabilities as caps %}
+<div id="content" class="aw-dashboard-page">
+    {% translate "Attendance" as page_eyebrow %}
+    {% translate "Attendance matrix" as page_title %}
+    {% translate "Review attendance by student, scheduled meeting, and course." as page_description %}
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+
+    <div class="aw-flex aw-flex-wrap">
+        {% if caps.scan_attendance %}
+        <a href="{% url 'scanner' %}" class="aw-btn aw-btn--primary aw-btn--sm aw-ms-auto">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-qr"></use></svg>
+            <span>{% translate "Scanner" %}</span>
+        </a>
+        {% endif %}
+        {% if caps.manage_content %}
+        <a href="{% url 'calendar-management' %}" class="aw-btn aw-btn--ghost aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            <span>{% translate "Calendar" %}</span>
+        </a>
+        {% endif %}
+        <span id="attendance-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
     </div>
-    <div class="grade-matrix-actions">
-      <a href="{% url 'scanner' %}" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-qrcode" aria-hidden="true"></i> {% translate "Scanner" %}</a>
-      <a href="{% url 'calendar-management' %}" class="ad-btn ad-btn--ghost ad-btn--sm"><i class="fas fa-calendar-days" aria-hidden="true"></i> {% translate "Calendar" %}</a>
-      <span id="attendance-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+
+    <div class="aw-context-strip">
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            <b>{{ selected_year.name }}</b>
+            {% if selected_year.is_active %}{% translate "Active year" %}{% else %}{% translate "Historical year" %}{% endif %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+            <b>{{ selected_scope.level.display_name }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+            {{ selected_date_from }} - {{ selected_date_to }}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            {{ student_count }} {% translate "Students" %}
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+            {{ meeting_count }} {% translate "Meetings" %}
+        </span>
     </div>
-  </div>
 
-  <nav class="grade-matrix-level-tabs ad-card" aria-label="{% translate 'Academic level' %}">
-    {% for tab in level_tabs %}
-      <a class="grade-matrix-level-tab{% if tab.selected %} is-active{% endif %}"
-{% if tab.selected %}aria-current="page"{% endif %}
-         href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
-         hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
-         hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-         <span>{{ tab.name }}</span>
-         <small>{{ tab.student_count }} {% translate "Students" %}</small>
-      </a>
-    {% endfor %}
-  </nav>
-
-  {% if can_manage_policy %}
-  <div class="attendance-matrix-toolbar ad-card">
-    <button type="button" class="ad-btn ad-btn--ghost ad-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-policy-panel" aria-expanded="false" aria-controls="attendance-policy-panel"><i class="fas fa-sliders" aria-hidden="true"></i> {% translate "Attendance settings" %}</button>
-    {% if selected_date %}
-    <form method="post" action="{% url 'attendance-reconcile' %}" hx-post="{% url 'attendance-reconcile' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Reconcile missing exits for this date?' %}">
-      {% csrf_token %}
-      <input type="hidden" name="date" value="{{ selected_date }}">
-      <button type="submit" class="ad-btn ad-btn--teal ad-btn--sm"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> {% translate "Reconcile missing exits" %}</button>
-    </form>
-    {% endif %}
-  </div>
-  {% if reconcile_job %}
-  {% include "partials/admin_operation_status.html" with operation_job=reconcile_job status_url=reconcile_status_url status=reconcile_job.status total=reconcile_job.total processed=reconcile_job.processed %}
-  {% endif %}
-  <div class="collapse" id="attendance-policy-panel">
-    <div class="ad-card mb-3">
-      <div class="ad-card-body">
-        <form method="post" action="{% url 'attendance-policy-save' %}" hx-post="{% url 'attendance-policy-save' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true">
-          {% csrf_token %}
-          <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-3"><label class="form-label" for="{{ policy_form.entrance_deadline.id_for_label }}">{{ policy_form.entrance_deadline.label }}</label>{{ policy_form.entrance_deadline }}</div>
-            <div class="col-12 col-md-3"><label class="form-label" for="{{ policy_form.exit_time.id_for_label }}">{{ policy_form.exit_time.label }}</label>{{ policy_form.exit_time }}</div>
-            <div class="col-12 col-md-3"><label class="form-label" for="{{ policy_form.buffer_minutes.id_for_label }}">{{ policy_form.buffer_minutes.label }}</label>{{ policy_form.buffer_minutes }}</div>
-          </div>
-          <p class="form-text mt-3 mb-0">{% blocktranslate with limit=policy.entrance_limit|time:"H:i" earliest=policy.exit_earliest|time:"H:i" buffer=policy.buffer_minutes %}Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits.{% endblocktranslate %}</p>
-          <button type="submit" class="ad-btn ad-btn--teal mt-3">{% translate "Save settings" %}</button>
-        </form>
-      </div>
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-filter-bar">
+                <nav class="aw-tabs" aria-label="{% translate 'Academic level' %}">
+                    {% for tab in level_tabs %}
+                    <a class="aw-tab{% if tab.selected %} is-active{% endif %}"
+                       {% if tab.selected %}aria-current="page"{% endif %}
+                       href="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
+                       hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ tab.level_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}&amp;course_offering={{ selected_offering|default:'' }}&amp;student={{ student_search|urlencode }}&amp;source={{ selected_source }}&amp;action={{ selected_action }}&amp;scan_status={{ selected_scan_status }}"
+                       hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                        <span>{{ tab.name }}</span>
+                        <span class="aw-count">{{ tab.student_count }}</span>
+                        <span class="visually-hidden">{% translate "Students" %}</span>
+                    </a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </div>
     </div>
-  </div>
-  {% endif %}
 
-  <section class="ad-card grade-matrix-controls" aria-label="{% translate 'Attendance filters' %}">
-    <form method="get" class="grade-matrix-filter-grid" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#attendance-loading">
-      <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-year">{% translate "Academic year" %}</label>
-        <select id="attendance-matrix-year" name="academic_year" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-          {% for year in years %}<option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} - {% translate "Active" %}{% endif %}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-course">{% translate "Course offering" %}</label>
-        <select id="attendance-matrix-course" name="course_offering" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-          <option value="">{% translate "All courses" %}</option>
-          {% for course in course_offerings %}<option value="{{ course.pk }}"{% if selected_offering == course.pk %} selected{% endif %}>{{ course.course.name }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-from">{% translate "From date" %}</label>
-        <input id="attendance-matrix-from" name="date_from" type="date" value="{{ selected_date_from }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-      </div>
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-to">{% translate "To date" %}</label>
-        <input id="attendance-matrix-to" name="date_to" type="date" value="{{ selected_date_to }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-      </div>
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-source">{% translate "Source" %}</label>
-        <select id="attendance-matrix-source" name="source" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-          <option value="">{% translate "All sources" %}</option><option value="scan"{% if selected_source == "scan" %} selected{% endif %}>{% translate "Scan" %}</option><option value="auto"{% if selected_source == "auto" %} selected{% endif %}>{% translate "Auto reconciliation" %}</option><option value="manual"{% if selected_source == "manual" %} selected{% endif %}>{% translate "Manual reconciliation" %}</option>
-        </select>
-      </div>
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-status">{% translate "Attendance status" %}</label>
-        <select id="attendance-matrix-status" name="scan_status" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-          <option value="all"{% if selected_scan_status == "all" %} selected{% endif %}>{% translate "All students" %}</option><option value="scanned"{% if selected_scan_status == "scanned" %} selected{% endif %}>{% translate "Scanned" %}</option><option value="not_scanned"{% if selected_scan_status == "not_scanned" %} selected{% endif %}>{% translate "Not scanned" %}</option><option value="complete"{% if selected_scan_status == "complete" %} selected{% endif %}>{% translate "Complete" %}</option><option value="incomplete"{% if selected_scan_status == "incomplete" %} selected{% endif %}>{% translate "Incomplete" %}</option><option value="absent"{% if selected_scan_status == "absent" %} selected{% endif %}>{% translate "Absent" %}</option>
-        </select>
-      </div>
-      <div class="grade-matrix-filter-field">
-        <label for="attendance-matrix-action">{% translate "Action" %}</label>
-        <select id="attendance-matrix-action" name="action" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
-          <option value="">{% translate "All actions" %}</option><option value="entrance"{% if selected_action == "entrance" %} selected{% endif %}>{% translate "Entrance" %}</option><option value="exit"{% if selected_action == "exit" %} selected{% endif %}>{% translate "Exit" %}</option>
-        </select>
-      </div>
-      <div class="grade-matrix-filter-field attendance-matrix-student-filter">
-        <label for="attendance-matrix-search">{% translate "Search student" %}</label>
-        <div class="grade-matrix-input-wrap"><i class="fas fa-search" aria-hidden="true"></i><input id="attendance-matrix-search" type="search" name="student" value="{{ student_search }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="form-control" hx-preserve hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#attendance-loading"></div>
-      </div>
-      <div class="grade-matrix-filter-actions"><button type="submit" class="ad-btn ad-btn--teal"><i class="fas fa-filter" aria-hidden="true"></i> {% translate "Apply" %}</button><a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="attendance-matrix-search" class="ad-btn ad-btn--ghost">{% translate "Clear" %}</a></div>
-    </form>
-    {% if date_error %}<div class="ad-alert ad-alert--info mt-3" role="alert"><i class="fas fa-circle-info" aria-hidden="true"></i> <span>{% translate "Enter a valid date range." %}</span></div>{% endif %}
-    <div class="grade-matrix-filter-summary"><span>{% translate "Showing" %}:</span><span class="ad-pill ad-pill--teal">{{ selected_scope.level.display_name }}</span><span class="ad-pill ad-pill--muted">{{ selected_year.name }}{% if selected_year.is_active %} - {% translate "Active year" %}{% else %} - {% translate "Historical year" %}{% endif %}</span><span class="grade-matrix-summary-spacer"></span><span>{{ student_count }} {% translate "Students" %} - {{ meeting_count }} {% translate "Meetings" %}</span></div>
-  </section>
+    <div class="aw-grid{% if caps.correct_attendance %} aw-grid--main-rail{% endif %}">
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card aw-dashboard-filters" aria-label="{% translate 'Attendance filters' %}">
+                <div class="aw-card-body aw-card-body--tight">
+                    <form method="get" class="aw-form-grid" hx-get="{% url 'attendance-management' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#attendance-loading">
+                        <input type="hidden" name="level" value="{{ selected_scope.level_id }}">
+                        <div class="aw-field">
+                            <label for="attendance-matrix-year">{% translate "Academic year" %}</label>
+                            <select id="attendance-matrix-year" name="academic_year" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                                {% for year in years %}<option value="{{ year.pk }}"{% if selected_year.pk == year.pk %} selected{% endif %}>{{ year.name }}{% if year.is_active %} - {% translate "Active" %}{% endif %}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="aw-field">
+                            <label for="attendance-matrix-course">{% translate "Course offering" %}</label>
+                            <select id="attendance-matrix-course" name="course_offering" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                                <option value="">{% translate "All courses" %}</option>
+                                {% for course in course_offerings %}<option value="{{ course.pk }}"{% if selected_offering == course.pk %} selected{% endif %}>{{ course.course.name }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="aw-field">
+                            <label for="attendance-matrix-from">{% translate "From date" %}</label>
+                            <input id="attendance-matrix-from" name="date_from" type="date" value="{{ selected_date_from }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                        </div>
+                        <div class="aw-field">
+                            <label for="attendance-matrix-to">{% translate "To date" %}</label>
+                            <input id="attendance-matrix-to" name="date_to" type="date" value="{{ selected_date_to }}" class="form-control" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                        </div>
+                        <div class="aw-field">
+                            <label for="attendance-matrix-source">{% translate "Source" %}</label>
+                            <select id="attendance-matrix-source" name="source" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                                <option value="">{% translate "All sources" %}</option><option value="scan"{% if selected_source == "scan" %} selected{% endif %}>{% translate "Scan" %}</option><option value="auto"{% if selected_source == "auto" %} selected{% endif %}>{% translate "Auto reconciliation" %}</option><option value="manual"{% if selected_source == "manual" %} selected{% endif %}>{% translate "Manual reconciliation" %}</option>
+                            </select>
+                        </div>
+                        <div class="aw-field">
+                            <label for="attendance-matrix-status">{% translate "Attendance status" %}</label>
+                            <select id="attendance-matrix-status" name="scan_status" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                                <option value="all"{% if selected_scan_status == "all" %} selected{% endif %}>{% translate "All students" %}</option><option value="scanned"{% if selected_scan_status == "scanned" %} selected{% endif %}>{% translate "Scanned" %}</option><option value="not_scanned"{% if selected_scan_status == "not_scanned" %} selected{% endif %}>{% translate "Not scanned" %}</option><option value="complete"{% if selected_scan_status == "complete" %} selected{% endif %}>{% translate "Complete" %}</option><option value="incomplete"{% if selected_scan_status == "incomplete" %} selected{% endif %}>{% translate "Incomplete" %}</option><option value="absent"{% if selected_scan_status == "absent" %} selected{% endif %}>{% translate "Absent" %}</option>
+                            </select>
+                        </div>
+                        <div class="aw-field">
+                            <label for="attendance-matrix-action">{% translate "Action" %}</label>
+                            <select id="attendance-matrix-action" name="action" class="form-select" hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#attendance-loading">
+                                <option value="">{% translate "All actions" %}</option><option value="entrance"{% if selected_action == "entrance" %} selected{% endif %}>{% translate "Entrance" %}</option><option value="exit"{% if selected_action == "exit" %} selected{% endif %}>{% translate "Exit" %}</option>
+                            </select>
+                        </div>
+                        <div class="aw-field aw-span-2">
+                            <label for="attendance-matrix-search">{% translate "Search student" %}</label>
+                            <div class="aw-search-wrap">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                                <input id="attendance-matrix-search" type="search" name="student" value="{{ student_search }}" maxlength="100" placeholder="{% translate 'Name or username' %}" class="aw-input aw-input--search" hx-preserve hx-get="{% url 'attendance-management' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#attendance-loading">
+                            </div>
+                        </div>
+                        <div class="aw-flex aw-flex-wrap aw-span-2">
+                            <button type="submit" class="aw-btn aw-btn--primary">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
+                                {% translate "Apply" %}
+                            </button>
+                            <a href="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-get="?academic_year={{ selected_year.pk }}&amp;level={{ selected_scope.level_id }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="attendance-matrix-search" class="aw-btn aw-btn--ghost">{% translate "Clear" %}</a>
+                        </div>
+                    </form>
+                    {% if date_error %}
+                    <div class="aw-alert aw-alert--info mt-3" role="alert">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                        <span>{% translate "Enter a valid date range." %}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
 
-  <section class="ad-card grade-matrix-card attendance-matrix-card" aria-labelledby="attendance-matrix-heading">
-    <div class="grade-matrix-card-head"><div><h4 id="attendance-matrix-heading" class="mb-1">{{ selected_scope.level.display_name }} - {{ selected_year.name }}</h4><p class="mb-0">{% translate "Expand a student row to view meeting times, scanner details, and actions." %}</p></div><span class="ad-pill ad-pill--success"><i class="fas fa-circle" aria-hidden="true"></i> {% if selected_year.is_active %}{% translate "Active year" %}{% else %}{% translate "Historical year" %}{% endif %}</span></div>
-    {% if meetings %}
-    <div class="grade-matrix-table-wrap attendance-matrix-table-wrap">
-      <table class="ad-table attendance-matrix-table">
-        <caption class="visually-hidden">{% translate "Attendance matrix by student and meeting" %}</caption>
-        <colgroup>
-          <col class="attendance-matrix-col-student"><col class="attendance-matrix-col-meetings">
-          <col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary">
-        </colgroup>
-        <thead><tr>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Student" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Meetings" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Fully scanned" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Full" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Partial" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Incomplete" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Absent" %}</th>
-          <th scope="col" class="attendance-matrix-summary-head">{% translate "Score" %}</th>
-        </tr></thead>
-        <tbody>
-          {% for row in matrix_rows %}
-          <tr>
-            <th scope="row" class="attendance-matrix-student"><span class="grade-matrix-student-name">{{ row.student.get_full_name|default:row.student.username }}</span><span class="grade-matrix-student-meta">{{ row.student.username }} - #{{ row.student.pk }}</span></th>
-            <td class="attendance-matrix-summary-cell"><button type="button" class="attendance-matrix-expand ad-btn ad-btn--ghost ad-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-meetings-{{ row.student.pk }}" aria-expanded="false" aria-controls="attendance-meetings-{{ row.student.pk }}" aria-label="{% translate 'Toggle meeting details' %}"><i class="fas fa-chevron-down" aria-hidden="true"></i><span>{{ row.cells|length }} {% translate "Meetings" %}</span></button></td>
-            <td class="attendance-matrix-summary-cell">{{ row.fully_scanned_days }}</td>
-            <td class="attendance-matrix-summary-cell">{{ row.full_days }}</td>
-            <td class="attendance-matrix-summary-cell">{{ row.partial_days }}</td>
-            <td class="attendance-matrix-summary-cell">{{ row.incomplete_days }}</td>
-            <td class="attendance-matrix-summary-cell">{{ row.absent_days }}</td>
-            <td class="attendance-matrix-summary-cell attendance-matrix-score">{{ row.score }}</td>
-          </tr>
-          <tr class="attendance-matrix-detail-row"><td colspan="8"><div class="collapse" id="attendance-meetings-{{ row.student.pk }}"><div class="attendance-matrix-meeting-list">
-            {% for cell in row.cells %}
-            <article class="attendance-matrix-meeting attendance-matrix-cell--{{ cell.status }}">
-              <header class="attendance-matrix-meeting-head"><div><strong>{{ cell.meeting.date|date:"DATE_FORMAT" }}</strong><span>{{ cell.meeting.course_name }}</span></div><div class="attendance-matrix-meeting-head-state"><span class="attendance-matrix-record-state{% if cell.entrance or cell.exit %} is-recorded{% else %} is-unrecorded{% endif %}"><i class="fas {% if cell.entrance or cell.exit %}fa-circle-check{% else %}fa-circle-xmark{% endif %}" aria-hidden="true"></i>{% if cell.entrance or cell.exit %}{% translate "Scan recorded" %}{% else %}{% translate "No scan recorded" %}{% endif %}</span><span class="attendance-matrix-meeting-grade"><strong>{{ cell.grade }}</strong> - {{ cell.status_label }}</span></div></header>
-              <div class="attendance-matrix-meeting-data">
-                <div><span class="attendance-matrix-data-label">{% translate "Entrance" %}</span>{% if cell.entrance %}<span class="attendance-matrix-time">{{ cell.entrance.scanned_at|date:"H:i:s" }}</span><span class="attendance-matrix-source">{{ cell.entrance_source_label }}</span>{% else %}<span class="attendance-matrix-missing">-</span>{% endif %}</div>
-                <div><span class="attendance-matrix-data-label">{% translate "Exit" %}</span>{% if cell.exit %}<span class="attendance-matrix-time">{{ cell.exit.scanned_at|date:"H:i:s" }}</span><span class="attendance-matrix-source">{{ cell.exit_source_label }}</span>{% else %}<span class="attendance-matrix-missing">-</span>{% endif %}</div>
-                <div class="attendance-matrix-meeting-actors"><span class="attendance-matrix-data-label">{% translate "By" %}</span><span>{% if cell.entrance %}{% translate "Entrance" %}: {{ cell.entrance_by_label }}{% endif %}{% if cell.entrance and cell.exit %}<br>{% endif %}{% if cell.exit %}{% translate "Exit" %}: {{ cell.exit_by_label }}{% endif %}{% if not cell.entrance and not cell.exit %}-{% endif %}</span></div>
-              </div>
-              <div class="attendance-matrix-meeting-actions">
-                {% if cell.entrance %}<div><span class="attendance-matrix-data-label">{% translate "Entrance" %}</span><a href="{% url 'attendance-correction' cell.entrance.pk %}" class="ad-action-btn" title="{% translate 'Correct entrance' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct entrance" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form></div>{% endif %}
-                {% if cell.exit %}<div><span class="attendance-matrix-data-label">{% translate "Exit" %}</span><a href="{% url 'attendance-correction' cell.exit.pk %}" class="ad-action-btn" title="{% translate 'Correct exit' %}"><i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{% translate "Correct exit" %}</span></a><form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">{% csrf_token %}<button type="submit" class="ad-action-btn is-danger" title="{% translate 'Delete' %}"><i class="fas fa-trash" aria-hidden="true"></i><span class="visually-hidden">{% translate "Delete" %}</span></button></form></div>{% endif %}
-              </div>
-            </article>
-            {% endfor %}
-          </div></div></td></tr>
-          {% empty %}
-          <tr><td colspan="7" class="ad-empty">{% translate "No students match the selected filters." %}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            <section class="aw-card" aria-labelledby="attendance-matrix-heading">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-grid"></use></svg>
+                        <div>
+                            <h3 id="attendance-matrix-heading">{{ selected_scope.level.display_name }} - {{ selected_year.name }}</h3>
+                            <p>{% translate "Expand a student row to view meeting times, scanner details, and actions." %}</p>
+                        </div>
+                    </div>
+                    {% if selected_year.is_active %}
+                    <span class="aw-pill aw-pill--green">{% translate "Active year" %}</span>
+                    {% else %}
+                    <span class="aw-pill aw-pill--muted">{% translate "Historical year" %}</span>
+                    {% endif %}
+                </div>
+                {% if meetings %}
+                <div class="aw-card-body aw-card-body--flush">
+                    <div class="aw-table-scroll-hint" aria-hidden="true">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+                        {% translate "Scroll horizontally to see all columns." %}
+                    </div>
+                    <div class="aw-matrix-wrap">
+                        <table class="aw-matrix">
+                            <caption class="visually-hidden">{% translate "Attendance matrix by student and meeting" %}</caption>
+                            <colgroup>
+                                <col class="attendance-matrix-col-student"><col class="attendance-matrix-col-meetings">
+                                <col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary"><col class="attendance-matrix-col-summary">
+                            </colgroup>
+                            <thead><tr>
+                                <th scope="col" class="aw-sticky-col">{% translate "Student" %}</th>
+                                <th scope="col">{% translate "Meetings" %}</th>
+                                <th scope="col">{% translate "Fully scanned" %}</th>
+                                <th scope="col">{% translate "Full" %}</th>
+                                <th scope="col">{% translate "Partial" %}</th>
+                                <th scope="col">{% translate "Incomplete" %}</th>
+                                <th scope="col">{% translate "Absent" %}</th>
+                                <th scope="col">{% translate "Score" %}</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for row in matrix_rows %}
+                                <tr>
+                                    <th scope="row" class="aw-sticky-col">
+                                        <div class="aw-flex">
+                                            {% include "partials/components/aw_avatar.html" with name=row.student tone="teal" %}
+                                            <div class="aw-cell-main-text">
+                                                <b>{{ row.student|aw_display_name }}</b>
+                                                <span>{{ row.student.username }} - #{{ row.student.pk }}</span>
+                                            </div>
+                                        </div>
+                                    </th>
+                                    <td>
+                                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-meetings-{{ row.student.pk }}" aria-expanded="false" aria-controls="attendance-meetings-{{ row.student.pk }}" aria-label="{% translate 'Toggle meeting details' %}">
+                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+                                            <span>{{ row.cells|length }} {% translate "Meetings" %}</span>
+                                        </button>
+                                    </td>
+                                    <td>{{ row.fully_scanned_days }}</td>
+                                    <td>{{ row.full_days }}</td>
+                                    <td>{{ row.partial_days }}</td>
+                                    <td>{{ row.incomplete_days }}</td>
+                                    <td>{{ row.absent_days }}</td>
+                                    <td><span class="aw-score">{{ row.score }}</span></td>
+                                </tr>
+                                <tr class="attendance-matrix-detail-row">
+                                    <td colspan="8" class="text-wrap">
+                                        <div class="collapse" id="attendance-meetings-{{ row.student.pk }}">
+                                            <div class="attendance-matrix-meeting-list">
+                                                {% for cell in row.cells %}
+                                                <article class="attendance-matrix-meeting attendance-matrix-cell--{{ cell.status }}">
+                                                    <header class="attendance-matrix-meeting-head">
+                                                        <div>
+                                                            <strong>{{ cell.meeting.date|date:"DATE_FORMAT" }}</strong>
+                                                            <span>{{ cell.meeting.course_name }}</span>
+                                                        </div>
+                                                        <div class="attendance-matrix-meeting-head-state">
+                                                            {% if cell.entrance or cell.exit %}
+                                                            <span class="aw-pill aw-pill--green">{% translate "Scan recorded" %}</span>
+                                                            {% else %}
+                                                            <span class="aw-pill aw-pill--muted">{% translate "No scan recorded" %}</span>
+                                                            {% endif %}
+                                                            <span class="attendance-matrix-meeting-grade">
+                                                                {% if cell.status == "on_time" %}
+                                                                <span class="aw-attend-cell aw-attend-cell--full" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg></span>
+                                                                {% elif cell.status == "incomplete" %}
+                                                                <span class="aw-attend-cell aw-attend-cell--none" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
+                                                                {% elif cell.status == "absent" %}
+                                                                <span class="aw-attend-cell aw-attend-cell--absent" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg></span>
+                                                                {% else %}
+                                                                <span class="aw-attend-cell aw-attend-cell--partial" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
+                                                                {% endif %}
+                                                                <strong>{{ cell.grade }}</strong> - {{ cell.status_label }}
+                                                            </span>
+                                                        </div>
+                                                    </header>
+                                                    <div class="attendance-matrix-meeting-data">
+                                                        <div>
+                                                            <span class="attendance-matrix-data-label">{% translate "Entrance" %}</span>
+                                                            {% if cell.entrance %}<span class="attendance-matrix-time">{{ cell.entrance.scanned_at|date:"H:i:s" }}</span><span class="attendance-matrix-source">{{ cell.entrance_source_label }}</span>{% else %}<span class="attendance-matrix-missing">-</span>{% endif %}
+                                                        </div>
+                                                        <div>
+                                                            <span class="attendance-matrix-data-label">{% translate "Exit" %}</span>
+                                                            {% if cell.exit %}<span class="attendance-matrix-time">{{ cell.exit.scanned_at|date:"H:i:s" }}</span><span class="attendance-matrix-source">{{ cell.exit_source_label }}</span>{% else %}<span class="attendance-matrix-missing">-</span>{% endif %}
+                                                        </div>
+                                                        <div class="attendance-matrix-meeting-actors">
+                                                            <span class="attendance-matrix-data-label">{% translate "By" %}</span>
+                                                            <span>{% if cell.entrance %}{% translate "Entrance" %}: {{ cell.entrance_by_label }}{% endif %}{% if cell.entrance and cell.exit %}<br>{% endif %}{% if cell.exit %}{% translate "Exit" %}: {{ cell.exit_by_label }}{% endif %}{% if not cell.entrance and not cell.exit %}-{% endif %}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="attendance-matrix-meeting-actions">
+                                                        {% if cell.entrance %}
+                                                        <div>
+                                                            <span class="attendance-matrix-data-label">{% translate "Entrance" %}</span>
+                                                            <a href="{% url 'attendance-correction' cell.entrance.pk %}" class="aw-icon-btn" title="{% translate 'Correct entrance' %}">
+                                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                                                                <span class="visually-hidden">{% translate "Correct entrance" %}</span>
+                                                            </a>
+                                                            <form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--icon" title="{% translate 'Delete' %}">
+                                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                                                    <span class="visually-hidden">{% translate "Delete" %}</span>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if cell.exit %}
+                                                        <div>
+                                                            <span class="attendance-matrix-data-label">{% translate "Exit" %}</span>
+                                                            <a href="{% url 'attendance-correction' cell.exit.pk %}" class="aw-icon-btn" title="{% translate 'Correct exit' %}">
+                                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                                                                <span class="visually-hidden">{% translate "Correct exit" %}</span>
+                                                            </a>
+                                                            <form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--icon" title="{% translate 'Delete' %}">
+                                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                                                    <span class="visually-hidden">{% translate "Delete" %}</span>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </article>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="aw-cell-empty">
+                                        {% translate "No students match the selected filters." as students_empty_desc %}
+                                        {% include "partials/components/aw_empty.html" with icon="i-users" description=students_empty_desc %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="aw-card-foot">
+                        <div class="aw-flex aw-flex-wrap">
+                            <span class="aw-ctx-item">
+                                <span class="aw-attend-cell aw-attend-cell--full" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg></span>
+                                {% translate "Complete" %}
+                            </span>
+                            <span class="aw-ctx-item">
+                                <span class="aw-attend-cell aw-attend-cell--partial" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
+                                {% translate "Partial" %}
+                            </span>
+                            <span class="aw-ctx-item">
+                                <span class="aw-attend-cell aw-attend-cell--none" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
+                                {% translate "Incomplete" %}
+                            </span>
+                            <span class="aw-ctx-item">
+                                <span class="aw-attend-cell aw-attend-cell--absent" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg></span>
+                                {% translate "Absent" %}
+                            </span>
+                            <span class="aw-small aw-muted">{% translate "Expand a student row to view meeting times, scanner details, and actions." %}</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="aw-card-body">
+                    {% translate "No scheduled meetings." as meetings_empty_title %}
+                    {% translate "Choose a different date range or course." as meetings_empty_desc %}
+                    {% include "partials/components/aw_empty.html" with icon="i-calendar" title=meetings_empty_title description=meetings_empty_desc %}
+                </div>
+                {% endif %}
+            </section>
+
+            {% translate "Attendance matrix pagination" as pagination_aria_label %}
+            {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
+        </div>
+
+        {% if caps.correct_attendance %}
+        <div class="aw-stack aw-stack--lg">
+            <section class="aw-card" aria-labelledby="attendance-policy-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg>
+                        <h3 id="attendance-policy-title">{% translate "Attendance settings" %}</h3>
+                    </div>
+                    <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-bs-toggle="collapse" data-bs-target="#attendance-policy-panel" aria-expanded="false" aria-controls="attendance-policy-panel">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                        <span>{% translate "Edit" %}</span>
+                    </button>
+                </div>
+                <div class="aw-card-body">
+                    <dl class="mb-0">
+                        <div class="aw-kv"><dt>{{ policy_form.entrance_deadline.label }}</dt><dd>{{ policy.entrance_deadline|time:"H:i" }}</dd></div>
+                        <div class="aw-kv"><dt>{{ policy_form.exit_time.label }}</dt><dd>{{ policy.exit_time|time:"H:i" }}</dd></div>
+                        <div class="aw-kv"><dt>{{ policy_form.buffer_minutes.label }}</dt><dd>{{ policy.buffer_minutes }}</dd></div>
+                    </dl>
+                    <div class="collapse mt-3" id="attendance-policy-panel">
+                        <form method="post" action="{% url 'attendance-policy-save' %}" hx-post="{% url 'attendance-policy-save' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true">
+                            {% csrf_token %}
+                            <div class="aw-stack">
+                                <div class="aw-field">
+                                    <label class="form-label" for="{{ policy_form.entrance_deadline.id_for_label }}">{{ policy_form.entrance_deadline.label }}</label>
+                                    {{ policy_form.entrance_deadline }}
+                                </div>
+                                <div class="aw-field">
+                                    <label class="form-label" for="{{ policy_form.exit_time.id_for_label }}">{{ policy_form.exit_time.label }}</label>
+                                    {{ policy_form.exit_time }}
+                                </div>
+                                <div class="aw-field">
+                                    <label class="form-label" for="{{ policy_form.buffer_minutes.id_for_label }}">{{ policy_form.buffer_minutes.label }}</label>
+                                    {{ policy_form.buffer_minutes }}
+                                </div>
+                            </div>
+                            <p class="aw-small aw-muted mt-3 mb-0">{% blocktranslate with limit=policy.entrance_limit|time:"H:i" earliest=policy.exit_earliest|time:"H:i" buffer=policy.buffer_minutes %}Entrance scans after {{ limit }} and exit scans before {{ earliest }} count as partial attendance; the buffer is {{ buffer }} minutes. Reconciled exits always count as on-time exits.{% endblocktranslate %}</p>
+                            <button type="submit" class="aw-btn aw-btn--primary mt-3">{% translate "Save settings" %}</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="aw-card" aria-labelledby="attendance-reconcile-title">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                        <h3 id="attendance-reconcile-title">{% translate "Reconcile missing exits" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <dl class="mb-0">
+                        <div class="aw-kv"><dt>{% translate "Date" %}</dt><dd>{% if selected_date %}{{ selected_date }}{% else %}{{ selected_date_from }} - {{ selected_date_to }}{% endif %}</dd></div>
+                    </dl>
+                    {% if selected_date %}
+                    <form method="post" action="{% url 'attendance-reconcile' %}" hx-post="{% url 'attendance-reconcile' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true" class="mt-3" data-confirm-message="{% translate 'Reconcile missing exits for this date?' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="date" value="{{ selected_date }}">
+                        <button type="submit" class="aw-btn aw-btn--primary aw-w-100">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+                            {% translate "Reconcile missing exits" %}
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% if reconcile_job %}
+            {% include "partials/admin_operation_status.html" with operation_job=reconcile_job status_url=reconcile_status_url status=reconcile_job.status total=reconcile_job.total processed=reconcile_job.processed %}
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
-    <div class="grade-matrix-legend"><span><i class="fas fa-circle grade-matrix-legend-dot"></i> {% translate "Complete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--gold"></i> {% translate "Partial" %} / {% translate "Incomplete" %}</span><span><i class="fas fa-circle grade-matrix-legend-dot grade-matrix-legend-dot--muted"></i> {% translate "Absent" %}</span><span class="grade-matrix-legend-note">{% translate "Expand a student row to view meeting times, scanner details, and actions." %}</span></div>
-    {% else %}<div class="ad-empty"><i class="fas fa-calendar-xmark" aria-hidden="true"></i><strong>{% translate "No scheduled meetings." %}</strong><span>{% translate "Choose a different date range or course." %}</span></div>{% endif %}
-  </section>
-
-    {% translate "Attendance matrix pagination" as pagination_aria_label %}
-    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label wrapper_class="mt-3" hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#attendance-loading" %}
 </div>

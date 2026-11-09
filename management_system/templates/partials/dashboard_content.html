@@ -1,0 +1,29 @@
+{% load i18n %}
+{% comment %}
+#content root for the generic dashboards. The panel owns the page head,
+the canonical filter bar and the single table container so a filter,
+sort or page swap never rebuilds the shell.
+{% endcomment %}
+<div id="content" class="aw-dashboard-page">
+    {% include "partials/components/aw_page_head.html" %}
+
+    <div class="aw-card aw-dashboard-filters">
+        <div class="aw-card-body aw-card-body--tight">
+            {% include "partials/components/aw_filter_bar.html" %}
+        </div>
+    </div>
+
+    <!-- Table Loading Indicator -->
+    <div class="htmx-indicator aw-table-loading" id="table-loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{% translate "Loading..." %}</span>
+        </div>
+    </div>
+
+    <!-- Table Section -->
+    <div id="table-container"
+         hx-indicator="#table-loading"
+         class="aw-table-section">
+        {% include 'partials/table_and_pagination.html' %}
+    </div>
+</div>

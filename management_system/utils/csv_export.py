@@ -9,7 +9,8 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.utils import translation
 from django.utils.translation import gettext as _
-from ..models import AdminOperationJob, Grade, Question, Quiz, Submission, User
+from ..models import AdminOperationJob, Grade, Question, Quiz, Submission
+from ..admin_tables import user_queryset
 from .timezones import format_application_datetime
 from ..admin_operations import (
     AdminOperationError,
@@ -22,12 +23,14 @@ from ..utils.decorators import can_grade
 
 
 
-def export_users_to_csv():
+def export_users_to_csv(scope=None):
     """
-    Stream every user as CSV.
+    Stream users as CSV for the Students table's normalized filter scope.
 
-    The row iterator keeps one page of users in memory, and the single
-    select_related removes the per-row role lookup the old loop performed.
+    ``scope`` is the same dictionary the dashboard signs into its bulk
+    selection, so the export contains exactly the rows the operator filtered.
+    An empty scope keeps the full roster. The row iterator keeps one batch in
+    memory and the canonical queryset already selects the role relation.
     """
     headers = [
         f"  {_('Username')}  ",
@@ -46,7 +49,7 @@ def export_users_to_csv():
         writer.writerow(headers)
         yield output.getvalue()
         users = (
-            User.objects.select_related("role")
+            user_queryset(scope or {})
             .order_by("joined_date", "pk")
             .iterator(chunk_size=500)
         )

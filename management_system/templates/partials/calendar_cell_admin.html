@@ -7,23 +7,17 @@
 {# Phone contract: data-cal-day/data-cal-label feed the shared day sheet; #}
 {# .cal-day-dots is the phone-only summary of the hidden in-cell rows. #}
 {# Frozen contracts: data-date/data-year, data-offerings-template, #addMeetingModal, #addHolidayModal. #}
-<div class="ad-calmg-cell
-  {% if day.outside_month %} is-out{% endif %}
-  {% if day.is_holiday %} is-holiday{% endif %}
-  {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %}
-  {% if day.in_year and day.meetings and not day.outside_month %} has-meeting{% endif %}
-  {% if day.is_today %} is-today{% endif %}
-"{% if day.in_year and not day.outside_month %} data-cal-day="{{ day.date }}" data-cal-label="{{ day.date_label }}"{% endif %}>
+<div class="aw-calmg-cell {% if day.outside_month %} is-out{% endif %} {% if day.is_holiday %} is-holiday{% endif %} {% if day.in_year and day.is_meeting and not day.outside_month %} is-meeting{% endif %} {% if day.in_year and day.meetings and not day.outside_month %} has-meeting{% endif %} {% if day.is_today %} is-today{% endif %}"{% if day.in_year and not day.outside_month %} data-cal-day="{{ day.date }}" data-cal-label="{{ day.date_label }}"{% endif %}>
   {% if day.in_year and not day.outside_month %}
-  <div class="ad-calendar-cell-content">
-  <div class="ad-calendar-day-number">{{ day.day }}</div>
+  <div class="aw-calendar-cell-content">
+  <div class="aw-calendar-day-number">{{ day.day }}</div>
   <div class="cal-day-dots" aria-hidden="true">
     {% for meeting in day.meetings|slice:":3" %}<span class="cal-dot"></span>{% endfor %}
     {% if day.is_holiday %}<span class="cal-dot is-holiday"></span>{% endif %}
     {% if day.meetings|length > 3 %}<span class="cal-dot-more">+{{ day.meetings|length|add:"-3" }}</span>{% endif %}
   </div>
    {% if day.is_holiday %}
-      <div class="ad-calendar-holiday">
+      <div class="aw-calendar-holiday">
         <small>{{ day.holiday_name }}</small>
       {% if can_manage_holidays %}
       <form method="post" action="{% url 'delete-holiday' day.holiday_id %}" hx-post="{% url 'delete-holiday' day.holiday_id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this holiday?' %}">
@@ -34,9 +28,9 @@
      </div>
      {% endif %}
      {% for meeting in day.meetings %}
-     <div class="ad-calendar-meeting" title="{{ meeting.course_name }}">
-       <span class="ad-calendar-meeting-text">
-         <strong class="ad-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="ad-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
+     <div class="aw-calendar-meeting" title="{{ meeting.course_name }}">
+       <span class="aw-calendar-meeting-text">
+         <strong class="aw-calendar-meeting-level">{{ meeting.level_name }}</strong>{% if meeting.course_name %}<span class="aw-calendar-meeting-course">{{ meeting.course_name }}</span>{% endif %}
        </span>
        {% if can_edit_meetings %}
        <form method="post" action="{% url 'delete-meeting' meeting.id %}" hx-post="{% url 'delete-meeting' meeting.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="ps-inline-form" data-confirm-message="{% translate 'Delete this meeting?' %}">
@@ -49,9 +43,9 @@
      {% if can_edit_meetings and day.meeting_offering_groups %}
        <template id="meeting-offerings-{{ day.date }}">
          {% for group in day.meeting_offering_groups %}
-         <div class="ad-calendar-choice-group">
-           <label class="ad-calendar-choice-label" for="meeting-offering-{{ day.date }}-{{ group.level_id }}">{{ group.level_name }}</label>
-           <select id="meeting-offering-{{ day.date }}-{{ group.level_id }}" name="course_offering_id" class="form-select form-select-sm ad-calendar-choice-select">
+         <div class="aw-calendar-choice-group">
+           <label class="aw-calendar-choice-label" for="meeting-offering-{{ day.date }}-{{ group.level_id }}">{{ group.level_name }}</label>
+           <select id="meeting-offering-{{ day.date }}-{{ group.level_id }}" name="course_offering_id" class="form-select form-select-sm aw-calendar-choice-select">
              <option value="">{% translate "No meeting" %}</option>
              {% for offering in group.offerings %}
              <option value="{{ offering.pk }}">{{ offering.course.name }}</option>
@@ -62,28 +56,28 @@
        </template>
      {% endif %}
      {% if can_edit_meetings and day.meeting_offering_groups or can_manage_holidays and not day.is_holiday %}
-       <div class="d-flex gap-1 mt-1 ad-calendar-add-actions">
+       <div class="d-flex gap-1 mt-1 aw-calendar-add-actions">
          {% if can_edit_meetings and day.meeting_offering_groups %}
-         <button type="button" class="ad-action-btn is-add-meeting" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
+         <button type="button" class="aw-action-btn is-add-meeting" data-bs-toggle="modal" data-bs-target="#addMeetingModal"
                  data-date="{{ day.date }}" data-year="{{ year_id }}"
                  data-offerings-template="meeting-offerings-{{ day.date }}"
                  title="{% translate 'Add meeting' %}"
                  aria-label="{% translate 'Add meeting' %}">
-           <i class="fas fa-church" aria-hidden="true"></i>
+           <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
          </button>
          {% endif %}
          {% if can_manage_holidays and not day.is_holiday %}
-         <button type="button" class="ad-action-btn is-add-holiday" data-bs-toggle="modal" data-bs-target="#addHolidayModal"
+         <button type="button" class="aw-action-btn is-add-holiday" data-bs-toggle="modal" data-bs-target="#addHolidayModal"
                  data-date="{{ day.date }}" data-year="{{ year_id }}"
                  title="{% translate 'Add holiday' %}"
                  aria-label="{% translate 'Add holiday' %}">
-           <i class="fas fa-plus" aria-hidden="true"></i>
+           <svg class="aw-ico" aria-hidden="true"><use href="#i-flag"></use></svg>
          </button>
          {% endif %}
        </div>
      {% endif %}
    </div>
    {% else %}
-   <div class="ps-muted-text ad-calendar-day-number">{{ day.day }}</div>
+   <div class="ps-muted-text aw-calendar-day-number">{{ day.day }}</div>
    {% endif %}
 </div>

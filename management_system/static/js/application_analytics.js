@@ -52,7 +52,7 @@
 
     function cardTitle(canvasId) {
         var canvas = document.getElementById(canvasId);
-        var body = canvas && canvas.closest('.ad-card-body');
+        var body = canvas && canvas.closest('.aw-card-body');
         var heading = body ? body.querySelector('h6') : null;
         return heading ? heading.textContent.trim() : '';
     }

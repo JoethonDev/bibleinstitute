@@ -1,0 +1,40 @@
+{% load i18n %}
+{# Mobile navigation body. #aw-mobile-nav is the OOB region. #}
+<div id="aw-mobile-nav" class="aw-mobile-nav">
+    <div class="aw-side-label">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-grid"></use></svg>{% translate "Workspace domains" %}
+    </div>
+    {% for domain in aw.domains %}
+    <a class="aw-side-link{% if domain.key == aw.active_domain_key %} is-active{% endif %}"
+       href="{% url domain.sections.0.url_name %}"
+       hx-get="{% url domain.sections.0.url_name %}"
+       hx-target="#display-page"
+       hx-select="#page-region"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-select-oob="#aw-rail-nav,#aw-sidebar-body,#aw-mobile-nav,#aw-topbar-crumbs"
+       {% if domain.key == aw.active_domain_key %}aria-current="true"{% endif %}>
+        <svg class="aw-ico" aria-hidden="true"><use href="#{{ domain.icon }}"></use></svg>
+        <span>{{ domain.label }}</span>
+    </a>
+    {% endfor %}
+    {% if aw.active_domain %}
+    <div class="aw-side-label">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>{{ aw.active_domain.label }}
+    </div>
+    {% for section in aw.active_domain.sections %}
+    <a class="aw-side-link aw-side-link--sub{% if section.key == aw.active_section_key %} is-active{% endif %}"
+       href="{% url section.url_name %}"
+       hx-get="{% url section.url_name %}"
+       hx-target="#display-page"
+       hx-select="#page-region"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-select-oob="#aw-rail-nav,#aw-sidebar-body,#aw-mobile-nav,#aw-topbar-crumbs"
+       {% if section.key == aw.active_section_key %}aria-current="page"{% endif %}>
+        <svg class="aw-ico" aria-hidden="true"><use href="#{{ section.icon }}"></use></svg>
+        <span>{{ section.label }}</span>
+    </a>
+    {% endfor %}
+    {% endif %}
+</div>

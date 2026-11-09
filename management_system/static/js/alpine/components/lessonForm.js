@@ -1,12 +1,12 @@
 /**
  * Alpine.js Component: lessonForm
- * 
+ *
  * Manages lesson form functionality including:
  * - File selection from Google Drive
  * - Lecture ordering (move up/down)
  * - File type selection (video/audio/book)
  * - Auto-detection of file types from names
- * 
+ *
  * @returns {Object} Alpine.js component
  */
 function lessonForm() {
@@ -58,7 +58,7 @@ function lessonForm() {
          */
         initializeDriveFiles() {
             const files = this.$el.querySelectorAll('#drive-files .file-icon');
-            
+
             // Hide .ts segment files
             files.forEach(file => {
                 if (file.dataset.id && file.dataset.id.endsWith('.ts')) {
@@ -139,40 +139,40 @@ function lessonForm() {
 
             // Create video card HTML
             const videoCard = `
-                <div class="card video-container mb-3">
+                <div class="video-container mb-3 aw-part-card">
                     <input type="hidden" name="videos" value="${safeId}">
                     <input type="hidden" name="videos_name" value="${safeName}">
-                    <div class="card-body p-3">
-                        <button type="button" class="btn-close position-absolute top-0 end-0 m-2" 
+                    <div class="aw-part-body">
+                        <button type="button" class="btn-close position-absolute top-0 end-0 m-2"
                                 @click="removeFile($event)" aria-label="${this.getTranslation('close')}"></button>
                         <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2 pe-5">
                             <span class="text-break">${safeName}</span>
-                            <span class="badge text-bg-secondary part-badge flex-shrink-0" hidden></span>
+                            <span class="aw-pill aw-pill--muted part-badge flex-shrink-0" hidden></span>
                         </p>
-                        <select name="files_type" class="form-select form-select-sm" @change="toggleDownloadInput($event)">
+                        <select name="files_type" class="aw-select" @change="toggleDownloadInput($event)">
                             <option value="video" ${fileType === 'video' ? 'selected' : ''}>${this.getTranslation('video')}</option>
                             <option value="audio" ${fileType === 'audio' ? 'selected' : ''}>${this.getTranslation('audioRecording')}</option>
                             <option value="book" ${fileType === 'book' ? 'selected' : ''}>${this.getTranslation('book')}</option>
                         </select>
                         <div class="download-key-field mt-2${fileType === 'audio' ? '' : ' d-none'}">
                             <label class="form-label small mb-1">${this.getTranslation('download')}</label>
-                            <input type="text" name="download_ids" class="form-control form-control-sm download-key-input"
+                            <input type="text" name="download_ids" class="aw-input download-key-input"
                                    value="" placeholder="Downloadable Files/name.mp3"
                                    aria-label="${this.getTranslation('download')}">
                         </div>
                         <div class="d-flex align-items-center gap-2 mt-2">
                             <label class="form-label small mb-0">${this.getTranslation('part')}</label>
-                            <input type="number" min="1" name="part_groups" class="form-control form-control-sm part-group-input"
+                            <input type="number" min="1" name="part_groups" class="aw-input part-group-input"
                                    style="max-width:6rem" value="" @input="reindexParts()"
                                    aria-label="${this.getTranslation('part')}">
                         </div>
                     </div>
-                    <div class="card-footer bg-light p-1 text-end">
-                        <button type="button" class="btn btn-sm btn-outline-secondary border-0" 
+                    <div class="aw-part-foot">
+                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
                                 @click="moveUp($event)" title="${this.getTranslation('moveUp')}">
                             <i class="fas fa-arrow-up"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary border-0" 
+                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
                                 @click="moveDown($event)" title="${this.getTranslation('moveDown')}">
                             <i class="fas fa-arrow-down"></i>
                         </button>
@@ -210,7 +210,7 @@ function lessonForm() {
             this.hasChanges = true;
             const container = event.currentTarget.closest('.video-container');
             const prev = container.previousElementSibling;
-            
+
             if (prev) {
                 container.parentNode.insertBefore(container, prev);
                 this.reindexParts();
@@ -224,7 +224,7 @@ function lessonForm() {
             this.hasChanges = true;
             const container = event.currentTarget.closest('.video-container');
             const next = container.nextElementSibling;
-            
+
             if (next) {
                 container.parentNode.insertBefore(next, container);
                 this.reindexParts();

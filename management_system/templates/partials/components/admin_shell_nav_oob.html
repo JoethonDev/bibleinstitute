@@ -1,0 +1,17 @@
+{% load aw_ui %}
+{% comment %}
+Persistent-shell navigation updates for HTMX page navigation.
+#display-page is swapped with the response's #page-region only, so the rail,
+contextual sidebar, mobile navigation and top-bar crumbs would otherwise
+keep the previous page's active state. Every admin page-navigation trigger
+declares `hx-select-oob` for these four regions; this partial supplies the
+matching elements (rendered from the same capability-filtered navigation
+model and the resolved route) in the same response. Local filter, table and
+drawer swaps do not target #display-page and therefore never rebuild
+navigation.
+{% endcomment %}
+{% aw_admin_workspace as aw %}
+{% include 'partials/components/admin_rail_nav.html' %}
+{% include 'partials/components/admin_sidebar_body.html' %}
+{% include 'partials/components/admin_mobile_nav.html' %}
+{% include 'partials/components/admin_topbar_crumbs.html' %}

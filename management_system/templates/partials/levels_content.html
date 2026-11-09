@@ -1,0 +1,204 @@
+{% load i18n %}
+{% load aw_ui %}
+{% aw_capabilities as caps %}
+{% translate "Academic" as page_eyebrow %}
+{% translate "Academic Levels" as page_title %}
+{% translate "Academic levels with their linked years, courses, offerings and enrollments." as page_description %}
+<div class="aw-dashboard-page" id="content">
+
+    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+
+    <div class="aw-card">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-flex aw-flex-wrap">
+                <span class="aw-table-count">{{ levels|length }} {% translate "Levels" %}</span>
+                {% if caps.manage_academic_setup %}
+                <button class="aw-btn aw-btn--primary aw-btn--sm aw-ms-auto" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span>{% translate "New Level" %}</span>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if levels %}
+    <div class="aw-grid aw-grid--3">
+        {% for lvl in levels %}
+        <section class="aw-card" aria-labelledby="level-name-{{ lvl.level }}">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                    <h3 id="level-name-{{ lvl.level }}">{{ lvl.name }}</h3>
+                </div>
+                <div class="aw-flex">
+                    <span class="aw-pill aw-pill--teal">{% translate "Level" %} {{ lvl.level }}</span>
+                    <div class="dropdown">
+                        <button class="aw-icon-btn" type="button" data-bs-toggle="dropdown" aria-label="{% translate 'Actions' %}">
+                            <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            {% if caps.manage_academic_setup %}
+                            <li>
+                                <a class="dropdown-item" href="#"
+                                   data-bs-toggle="modal" data-bs-target="#editLevelModal{{ lvl.level }}">
+                                    <i class="fas fa-edit me-2"></i>{% translate "Edit Name" %}
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'academic-setup' %}">
+                                    <i class="fas fa-cog me-2"></i>{% translate "Manage Years" %}
+                                </a>
+                            </li>
+                            {% endif %}
+                            <li>
+                                <a class="dropdown-item" href="{% url 'course-dashboard' %}?year={{ lvl.name }}">
+                                    <i class="fas fa-book-open me-2"></i>{% translate "View Courses" %}
+                                </a>
+                            </li>
+                            {% if caps.manage_academic_setup %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="#"
+                                   data-bs-toggle="modal" data-bs-target="#deleteLevelModal{{ lvl.level }}">
+                                    <i class="fas fa-trash me-2"></i>{% translate "Delete Level" %}
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-meta-grid">
+                    <div class="aw-meta-item">
+                        <span class="aw-label">{% translate "Years" %}</span>
+                        <span class="aw-value">{{ lvl.year_count }}</span>
+                    </div>
+                    <div class="aw-meta-item">
+                        <span class="aw-label">{% translate "Courses" %}</span>
+                        <span class="aw-value">{{ lvl.course_count }}</span>
+                    </div>
+                    <div class="aw-meta-item">
+                        <span class="aw-label">{% translate "Offerings" %}</span>
+                        <span class="aw-value">{{ lvl.offering_count }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="aw-card-foot">
+                <dl class="aw-kv mb-0">
+                    <dt>{% translate "Enrollments" %}</dt>
+                    <dd>{{ lvl.enrollment_count }}</dd>
+                </dl>
+            </div>
+        </section>
+
+        {% if caps.manage_academic_setup %}
+        {# --- Edit Name Modal --- #}
+        <div class="modal fade aw-modal" id="editLevelModal{{ lvl.level }}" tabindex="-1" aria-labelledby="editLevelModalLabel{{ lvl.level }}" aria-hidden="true" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="{% url 'level-edit' lvl.level %}" hx-post="{% url 'level-edit' lvl.level %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h6 class="modal-title" id="editLevelModalLabel{{ lvl.level }}">{% translate "Edit Level Name" %} - {{ lvl.name }}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">{% translate "Name (English)" %}</label>
+                                <input type="text" name="name_en" class="form-control" value="{{ lvl.name_en }}" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{% translate "Name (Arabic)" %}</label>
+                                <input type="text" name="name_ar" class="form-control" value="{{ lvl.name_ar }}" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                            </div>
+                            <p class="aw-small aw-muted mb-0">{% translate "Leave blank to use the default translated name." %}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                            <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Save" %}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {# --- Delete Confirmation Modal --- #}
+        <div class="modal fade aw-modal" id="deleteLevelModal{{ lvl.level }}" tabindex="-1" aria-labelledby="deleteLevelModalLabel{{ lvl.level }}" aria-hidden="true" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <form method="post" action="{% url 'level-delete' lvl.level %}" hx-post="{% url 'level-delete' lvl.level %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h6 class="modal-title" id="deleteLevelModalLabel{{ lvl.level }}">{% translate "Delete Level" %}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>{% translate "Are you sure you want to delete" %} <strong>{{ lvl.name }}</strong>?</p>
+                            <p class="aw-small text-danger mb-0">{% translate "This will remove all academic years and courses in this level." %}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                            <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete" %}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="aw-card">
+        <div class="aw-card-body">
+            {% translate "No academic levels found." as levels_empty_title %}
+            {% translate "Create an academic year to define your first level." as levels_empty_desc %}
+            {% include "partials/components/aw_empty.html" with icon="i-layers" title=levels_empty_title description=levels_empty_desc %}
+            {% if caps.manage_academic_setup %}
+            <div class="d-flex justify-content-center">
+                <button class="aw-btn aw-btn--primary aw-btn--sm" data-bs-toggle="modal" data-bs-target="#levelCreateModal">
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span>{% translate "Create Level" %}</span>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if caps.manage_academic_setup %}
+    {# --- Create Level Modal --- #}
+    <div class="modal fade aw-modal" id="levelCreateModal" tabindex="-1" aria-labelledby="levelCreateModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <form method="post" action="{% url 'level-create' %}" hx-post="{% url 'level-create' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="levelCreateModalLabel">{% translate "New Level" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Level Number" %}</label>
+                            <input type="number" name="level" min="1" class="form-control" required placeholder="{% translate 'e.g. 3' %}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Name (English)" %} <small class="aw-muted">{% translate "(optional)" %}</small></label>
+                            <input type="text" name="name_en" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{% translate "Name (Arabic)" %} <small class="aw-muted">{% translate "(optional)" %}</small></label>
+                            <input type="text" name="name_ar" class="form-control" placeholder="{% translate 'e.g. Third Academic Year' %}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Create" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

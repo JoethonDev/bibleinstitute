@@ -1,6 +1,6 @@
 {% load i18n %}
 <div id="telegram-message-list"
-     class="tg-chat-thread"
+     class="tg-chat-thread aw-card overflow-x-hidden"
      x-data="{
           autoRefresh: true,
           polling: false,
@@ -19,13 +19,16 @@
                if (document.hidden || this.polling) return;
                const el = this.$el.querySelector('#telegram-message-items');
                if (!el || !el.dataset.pollUrl) return;
-               // New messages only: never replace the rendered thread.
-               const url = el.dataset.pollUrl + '&after=' + (el.dataset.lastId || '0');
+               // New messages are appended; changed answer/digest state replaces
+               // the rendered items through the OOB response.
+               const url = el.dataset.pollUrl + '&after=' + (el.dataset.lastId || '0') + '&state=' + (el.dataset.state || '');
                if (!window.telegramChatBeginRequest?.(this.$el)) return;
                this.polling = true;
                const wasNearBottom = this.$el.scrollTop + this.$el.clientHeight >= this.$el.scrollHeight - 80;
                htmx.ajax('GET', url, { target: el, swap: 'beforeend' })
                    .then(() => {
+                       const stateEl = el.querySelector('li[data-state-value]');
+                       if (stateEl) el.dataset.state = stateEl.dataset.stateValue;
                        const items = el.querySelectorAll('li[data-msg-pk]');
                        if (items.length) el.dataset.lastId = items[items.length - 1].dataset.msgPk;
                        if (wasNearBottom) this.$el.scrollTop = this.$el.scrollHeight;
@@ -39,7 +42,7 @@
       }">
 
     <div class="tg-chat-autorefresh">
-        <label class="tg-chat-autorefresh-label">
+        <label class="tg-chat-autorefresh-label aw-small aw-muted">
             <input type="checkbox" x-model="autoRefresh">
             <span>{% translate "Auto refresh" %}</span>
         </label>
@@ -48,7 +51,8 @@
     <ol id="telegram-message-items"
         class="tg-chat-messages list-unstyled mb-0"
         data-poll-url="{{ panel_url }}?fragment=1"
-        data-last-id="{{ latest_message_pk|default:0 }}">
+        data-last-id="{{ latest_message_pk|default:0 }}"
+        data-state="{{ message_state }}">
         {% if messages_page_obj.has_previous %}
         <li class="tg-chat-scroll-sentinel tg-chat-scroll-sentinel--older" data-scroll-page data-direction="older"
             data-url="{{ detail_url }}?fragment=items&amp;page={{ messages_page_obj.previous_page_number }}"
@@ -60,7 +64,7 @@
     <form method="post"
           action="{{ reply_url }}"
           enctype="multipart/form-data"
-          class="tg-chat-reply-form tg-chat-composer"
+          class="tg-chat-reply-form tg-chat-composer aw-composer align-items-stretch"
           hx-post="{{ reply_url }}?fragment=panel"
           hx-target="#telegram-chat-panel"
           hx-swap="innerHTML"
@@ -68,8 +72,8 @@
           x-on:keydown.enter.exact.prevent="$event.target.form.requestSubmit()">
         {% csrf_token %}
         {% if reply_form.non_field_errors %}
-        <div class="ad-alert ad-alert--danger" role="alert">
-            <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
+        <div class="aw-alert aw-alert--danger" role="alert">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
             <span>{{ reply_form.non_field_errors }}</span>
         </div>
         {% endif %}
@@ -82,29 +86,65 @@
                 <div class="text-danger mt-1">{{ reply_form.message.errors }}</div>
                 {% endif %}
             </div>
-            <button type="submit" class="ad-btn ad-btn--teal tg-chat-send-btn">
+            <button type="submit" class="aw-btn aw-btn--primary tg-chat-send-btn">
                 <i class="fas fa-paper-plane" aria-hidden="true"></i>
                 <span class="visually-hidden">{% translate "Send Message" %}</span>
             </button>
         </div>
 
         <div class="tg-chat-composer-attach">
-            <label class="tg-chat-file-label" for="{{ reply_form.attachment.id_for_label }}">
+            <label class="tg-chat-file-label aw-btn aw-btn--ghost aw-btn--sm" for="{{ reply_form.attachment.id_for_label }}">
                 <i class="fas fa-paperclip" aria-hidden="true"></i>
                 {% translate "Attach a file" %}
             </label>
             {{ reply_form.attachment }}
-            <span id="telegram-support-attachment-help" class="tg-chat-file-hint">
-                {% translate "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB." %}
+            <span id="telegram-support-attachment-help" class="tg-chat-file-hint aw-small aw-muted">
+                {% translate "JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes." %}
             </span>
+        </div>
+
+        <div class="tg-chat-recorder aw-flex aw-flex-wrap align-items-center gap-2 mt-2"
+             x-data="supportVoiceRecorder"
+             data-unsupported="{% translate 'Voice recording is not available in this browser.' %}"
+             data-error="{% translate 'Microphone access was denied or unavailable.' %}"
+             data-error-empty="{% translate 'The recording was empty. Try again.' %}"
+             data-error-attach="{% translate 'The attachment field is unavailable.' %}">
+            <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-recorder-action="start" x-show="!recording" @click="start()">
+                <i class="fas fa-microphone" aria-hidden="true"></i>
+                <span>{% translate "Record voice" %}</span>
+            </button>
+            <template x-if="recording">
+                <div class="aw-flex aw-items-center gap-2">
+                    <span class="aw-pill aw-pill--red" aria-live="polite">
+                        <span x-text="seconds"></span>s
+                    </span>
+                    <button type="button" class="aw-btn aw-btn--danger aw-btn--sm" data-recorder-action="stop" @click="stop()">
+                        <i class="fas fa-stop" aria-hidden="true"></i>
+                        <span>{% translate "Stop" %}</span>
+                    </button>
+                </div>
+            </template>
+            <template x-if="blobUrl && !recording">
+                <div class="aw-flex aw-flex-wrap align-items-center gap-2">
+                    <audio controls preload="none" :src="blobUrl" class="tg-chat-audio"></audio>
+                    <button type="button" class="aw-btn aw-btn--primary aw-btn--sm" data-recorder-action="use" @click="attach()">
+                        <i class="fas fa-paperclip" aria-hidden="true"></i>
+                        <span>{% translate "Use recording" %}</span>
+                    </button>
+                    <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm" data-recorder-action="discard" @click="discard()">
+                        <span>{% translate "Discard" %}</span>
+                    </button>
+                </div>
+            </template>
+            <p class="aw-small text-danger w-100 mb-0" x-show="error" x-text="error" role="alert"></p>
         </div>
         {% if reply_form.attachment.errors %}
         <div class="text-danger mt-1">{{ reply_form.attachment.errors }}</div>
         {% endif %}
 
-        {{ reply_form.reply_to_telegram_message_id }}
-        {% if reply_form.reply_to_telegram_message_id.errors %}
-        <div class="text-danger mt-1">{{ reply_form.reply_to_telegram_message_id.errors }}</div>
+        {{ reply_form.reply_to_message_id }}
+        {% if reply_form.reply_to_message_id.errors %}
+        <div class="text-danger mt-1">{{ reply_form.reply_to_message_id.errors }}</div>
         {% endif %}
     </form>
 </div>

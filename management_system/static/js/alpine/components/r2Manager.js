@@ -139,7 +139,7 @@ function r2Manager() {
          * the refreshed list matches the current view; Django returns the
          * r2_browse partial for the file-list-container HX-Target. innerHTML is
          * used so the #file-list-container card is preserved (the partial's
-         * .ad-card-body becomes its content), matching the existing browse and
+         * .aw-card-body becomes its content), matching the existing browse and
          * admin_shell patterns.
          */
         refreshFileList() {
