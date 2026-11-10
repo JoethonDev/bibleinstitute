@@ -398,7 +398,7 @@ def get_student_attendance_context(student, check_date):
     meeting = AcademicYearLevelMeeting.objects.filter(
         academic_year_level_id=enrollment.academic_year_level_id,
         meeting_date=check_date,
-    ).select_related("course_offering").first()
+    ).select_related("course_offering__course").first()
     return enrollment.academic_year_level, meeting.course_offering if meeting else None
 
 

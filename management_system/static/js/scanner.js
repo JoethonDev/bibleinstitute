@@ -55,7 +55,11 @@
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
         var match = parsed.pathname.match(/^\/(?:(?:en|ar)\/)?scan\/([^/?#]+)\/?$/);
         if (!match || parsed.search || parsed.hash) return null;
-        return decodeURIComponent(match[1]);
+        try {
+            return decodeURIComponent(match[1]);
+        } catch (error) {
+            return null;
+        }
     }
 
     function beep(ok) {
@@ -174,7 +178,7 @@
         pill.textContent = actionLabel(payload.action);
         action.appendChild(pill);
         var source = document.createElement('td');
-        source.textContent = payload.source || '';
+        source.textContent = payload.source_label || payload.source || '';
         row.appendChild(time);
         row.appendChild(student);
         row.appendChild(action);
@@ -187,12 +191,12 @@
         if (wrap) wrap.hidden = false;
     }
 
-    function handleResult(payload, ok, displayTime) {
+    function handleResult(payload, ok) {
         if (ok) {
             var name = payload.student ? payload.student.name : '';
             var detail = actionLabel(payload.action) + (payload.course ? ' - ' + payload.course : '');
             feedback('success', name ? name + ' - ' + detail : detail,
-                     (payload.scanned_at || displayTime || '').slice(0, 5));
+                     (payload.scanned_at || '').slice(0, 5));
             beep(true);
             vibrate(true);
             prependRecent(payload);
@@ -215,16 +219,26 @@
         }
     }
 
-    function sendScan(token) {
+    function sendScan(token, options) {
+        var notify = !!(options && options.notify);
         if (sending) { pendingCode = token; return; }
         var now = Date.now();
-        if (recentCodes[token] && now - recentCodes[token] < CODE_CACHE_MS) return;
+        if (recentCodes[token] && now - recentCodes[token] < CODE_CACHE_MS) {
+            // The camera re-reads a code that is still in front of the lens; a
+            // deliberate lookup instead tells the operator it was just scanned.
+            if (notify) {
+                feedback('success', t('This student was scanned a moment ago.'), '');
+            }
+            return;
+        }
         var template = scanUrlTemplate();
         if (!template) return;
         sending = true;
+        // Replace the action first: a token that happens to contain the
+        // placeholder text can then never consume the action slot.
         var url = template
-            .replace('__token__', encodeURIComponent(token))
-            .replace('__action__', mode);
+            .replace('__action__', mode)
+            .replace('__token__', encodeURIComponent(token));
         var scannedMode = mode;
         fetch(url, {
             method: 'POST',
@@ -235,12 +249,25 @@
             },
             credentials: 'same-origin'
         }).then(function (response) {
-            return response.json().catch(function () { return {}; }).then(function (payload) {
-                return { ok: response.ok, payload: payload };
+            return response.json().catch(function () { return null; }).then(function (payload) {
+                if (response.status === 403) {
+                    // An expired session or a revoked capability redirects or
+                    // refuses here; never present that as a recorded scan.
+                    return {
+                        ok: false,
+                        payload: { error: t('Your session ended. Sign in again and reload the scanner.') },
+                    };
+                }
+                // A login redirect renders HTML, so only a real recorded answer
+                // counts as success.
+                return {
+                    ok: response.ok && !!payload && payload.status === 'recorded',
+                    payload: payload || {},
+                };
             });
         }).then(function (result) {
             recentCodes[token] = Date.now();
-            handleResult(result.payload || {}, result.ok, '');
+            handleResult(result.payload || {}, result.ok);
             if (scannedMode === 'exit') resetMode();
         }).catch(function () {
             feedback('error', t('The scan could not be saved. Check the connection and try again.'), '');
@@ -338,6 +365,17 @@
         var resultBox = document.getElementById('scan-result');
         if (errorBox) errorBox.hidden = true;
         if (resultBox) resultBox.textContent = '';
+        // One stream per page: a second request (auto-start plus a tap, or an
+        // autoplay failure) must not leave an orphan camera running.
+        if (local.stream) {
+            local.stream.getTracks().forEach(function (track) { track.stop(); });
+            local.stream = null;
+        }
+        if (active === local) {
+            active = null;
+            local.video.pause();
+            local.video.srcObject = null;
+        }
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('camera-unavailable');
@@ -356,7 +394,13 @@
             scan(local);
             return true;
         } catch (error) {
+            if (local.stream) {
+                local.stream.getTracks().forEach(function (track) { track.stop(); });
+                local.stream = null;
+            }
             active = null;
+            local.video.srcObject = null;
+            local.video.hidden = true;
             local.start.hidden = false;
             showCameraError(error && error.name === 'NotAllowedError'
                 ? t('Camera permission was denied. Allow camera access and try again.')
@@ -396,11 +440,25 @@
                     credentials: 'same-origin'
                 }).then(function (response) {
                     return response.json().catch(function () { return {}; }).then(function (payload) {
-                        return { ok: response.ok, payload: payload };
+                        return { ok: response.ok, status: response.status, payload: payload };
                     });
                 }).then(function (result) {
                     if (result.ok && result.payload.token) {
-                        sendScan(result.payload.token);
+                        sendScan(result.payload.token, { notify: true });
+                        return;
+                    }
+                    if (result.status === 403) {
+                        if (lookupError) {
+                            lookupError.textContent = t('Your session ended. Sign in again and reload the scanner.');
+                            lookupError.hidden = false;
+                        }
+                        return;
+                    }
+                    if (!result.payload || !result.payload.error) {
+                        if (lookupError) {
+                            lookupError.textContent = t('The lookup failed. Check the connection and try again.');
+                            lookupError.hidden = false;
+                        }
                         return;
                     }
                     var message = result.payload.error || t('Student not found.');

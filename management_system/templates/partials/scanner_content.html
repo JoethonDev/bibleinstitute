@@ -47,7 +47,7 @@ also renders the latest six rows).
                                data-scan-url="{% url 'record-attendance' token='__token__' action='__action__' %}"
                                class="scanner-video aw-w-100" hidden autoplay muted></video>
                     </div>
-                    <div id="scan-feedback" class="aw-scan-feedback" role="status" aria-live="assertive" hidden></div>
+                    <div id="scan-feedback" class="aw-scan-feedback" aria-live="assertive" aria-atomic="true" hidden></div>
                     <div class="aw-flex aw-flex-wrap aw-mt-3">
                         <button id="start-camera" class="aw-btn aw-btn--primary" type="button" hidden>
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-camera"></use></svg>

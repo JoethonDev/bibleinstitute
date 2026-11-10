@@ -694,6 +694,29 @@ Risk: iOS Safari can require a gesture before `getUserMedia`, which is why the
 fallback button remains; the five-second code cache is per page load and does
 not replace the server's duplicate rule.
 
+Review pass after the first push (same day) found and fixed four defects the
+browser test could not catch:
+
+- a failed `video.play()` or a second start request left an orphan camera
+  stream running (the camera indicator stayed on); every start now stops an
+  existing stream and a failure stops the tracks it just opened;
+- an HTML answer (login redirect for an expired session) was parsed as `{}`
+  and counted as a recorded scan; only a `status=recorded` JSON answer is
+  treated as success, and a 403 shows "Your session ended. Sign in again and
+  reload the scanner." without writing anything;
+- the live recent row printed the raw `scan` enum value instead of the display
+  label; the response now carries `source_label`;
+- a deliberate lookup inside the five-second cache window failed silently; it
+  now reports "This student was scanned a moment ago." while a camera re-read
+  of the same code stays quiet.
+
+Also hardened: a malformed percent-escaped token skips the rejection message
+(now caught), the action placeholder is replaced before the token so a crafted
+token cannot consume it, the lookup error path distinguishes a refused session
+from an unknown student, and `get_student_attendance_context` prefetches
+`course_offering__course` so naming the course in the banner adds no query per
+scan.
+
 ### Fixed: opening the drawer left a gap under the shell (10 November 2026)
 
 Reported as an empty band and a stray scrollbar when the drawer opens on the

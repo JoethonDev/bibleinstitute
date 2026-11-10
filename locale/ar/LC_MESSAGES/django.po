@@ -15576,3 +15576,9 @@ msgstr "تعذر الوصول إلى الكاميرا على هذا الجهاز
 
 msgid "The lookup failed. Check the connection and try again."
 msgstr "تعذر البحث. تحقق من الاتصال وحاول مرة أخرى."
+
+msgid "This student was scanned a moment ago."
+msgstr "تم مسح هذا الطالب قبل لحظات."
+
+msgid "Your session ended. Sign in again and reload the scanner."
+msgstr "انتهت جلستك. سجّل الدخول من جديد وأعد تحميل الماسح."
