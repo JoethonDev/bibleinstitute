@@ -1064,6 +1064,32 @@ fragment 200 with `<form>`, `enctype="multipart/form-data"` and a CSRF token;
 direct hit 302; `?new=1` 200 with the inline form. 188/188 templates compile;
 sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926; encoding clean.
 
+### Quiz durations: existing rows set to 0 (no limit) by data migration (10 November 2026)
+
+`duration_minutes = 0` means "no time limit": `quiz_attempts` sets
+`deadline = closing` when the value is falsy, the student payload sends 0 and
+every notification/admin label says "No limit". New quizzes already default to 0
+via `0110_alter_quiz_duration_minutes_default`; existing rows still carried their
+old per-quiz limits.
+
+`migrations/0114_quiz_duration_zero_data.py` closes that gap with one bounded
+UPDATE:
+
+```python
+Quiz.objects.exclude(duration_minutes=0).update(duration_minutes=0)
+```
+
+It depends on `0110_alter_quiz_duration_minutes_default` (the current leaf), so
+the graph keeps a single leaf and `makemigrations --check` still reports no
+changes. The reverse is `RunPython.noop` on purpose - the previous durations are
+not recorded anywhere, so restoring them would be a guess. The UPDATE only
+touches `duration_minutes`; attempts, snapshots, answers, grades and deadlines
+already stored per attempt are untouched.
+
+Verified by executing the migration's forward function against the disposable
+schema: quizzes at 60 and 45 became 0, an existing 0 stayed 0, and a second run
+changed nothing (`tmp/ui-audit/check_duration_migration.py`).
+
 ### Fixed: attendance 500, filter chrome, chat layout and drawer/agenda styling (10 November 2026)
 
 - **Attendance 500 (regression from the KPI strip).** `attendance_matrix_meetings`
