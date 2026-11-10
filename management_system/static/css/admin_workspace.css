@@ -671,6 +671,8 @@ body.aw-admin .aw-avatar {
     width: 30px;
     height: 30px;
     flex: 0 0 auto;
+    align-self: center;
+    overflow: hidden;
     border-radius: 50%;
     background: var(--aw-teal-soft);
     color: var(--aw-teal-3);
@@ -686,7 +688,10 @@ body.aw-admin .aw-avatar > img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 50%;
+    /* The container clips the shape and owns the radius; a radius on the image
+       itself turned any non-square slot into an ellipse. */
+    border-radius: 0;
+    display: block;
 }
 body.aw-admin .aw-spin { animation: aw-spin 1s linear infinite; }
 @keyframes aw-spin { to { transform: rotate(360deg); } }
@@ -2414,6 +2419,64 @@ body.aw-admin .aw-page--chat .aw-chat-panel { margin-bottom: 0; }
 body.aw-admin .aw-avatar--square { border-radius: 12px; }
 body.aw-admin .aw-avatar--square .aw-avatar-img { border-radius: 12px; object-fit: cover; }
 body.aw-admin .aw-chat-panel.is-empty { grid-template-columns: minmax(0, 1fr); }
+
+/* Full chat workspace: conversations rail, thread and student context side by
+   side. The page fills the workspace exactly and each column scrolls on its
+   own with no visible scrollbar, so the page itself never scrolls. */
+body.aw-admin .aw-page--chat {
+    /* Fallback: top bar 60 + workspace padding 24/32 + crumbs 32. */
+    height: calc(100dvh - 148px);
+    min-height: 460px;
+    padding-bottom: 0;
+    overflow: hidden;
+}
+/* A chat workspace has its own header, so the page crumbs are dropped and the
+   page can claim their 32px. */
+@supports selector(:has(*)) {
+    body.aw-admin #page-region:has(.aw-page--chat) .aw-page-crumbs { display: none; }
+    body.aw-admin .aw-page--chat { height: calc(100dvh - 116px); }
+}
+body.aw-admin .aw-page--chat .aw-chat-panel--full {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr) 320px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-chat-panel--full .aw-chat-list,
+body.aw-admin .aw-chat-panel--full .aw-chat-context,
+body.aw-admin .aw-chat-panel--full .aw-chat-thread {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+body.aw-admin .aw-chat-panel--full .aw-chat-list::-webkit-scrollbar,
+body.aw-admin .aw-chat-panel--full .aw-chat-context::-webkit-scrollbar,
+body.aw-admin .aw-chat-panel--full .aw-chat-thread::-webkit-scrollbar { width: 0; height: 0; }
+body.aw-admin .aw-chat-panel--full .aw-chat-list { border-inline-end: 1px solid var(--aw-line); }
+body.aw-admin .aw-chat-panel--full .aw-chat-context { border-inline-start: 1px solid var(--aw-line); }
+body.aw-admin .aw-chat-panel--full .aw-chat-main { overflow: hidden; }
+body.aw-admin .aw-chat-panel--full .aw-chat-head { flex: 0 0 auto; }
+body.aw-admin .aw-chat-panel--full .aw-chat-thread { flex: 1 1 auto; opacity: 1; }
+
+@media (max-width: 1280px) {
+    body.aw-admin .aw-page--chat .aw-chat-panel--full { grid-template-columns: minmax(0, 1fr) 300px; }
+    body.aw-admin .aw-page--chat .aw-chat-panel--full .aw-chat-list { display: none; }
+}
+@media (max-width: 900px) {
+    body.aw-admin .aw-page--chat { height: auto; overflow: visible; }
+    body.aw-admin .aw-page--chat .aw-chat-panel--full { grid-template-columns: minmax(0, 1fr); }
+    body.aw-admin .aw-page--chat .aw-chat-panel--full .aw-chat-context {
+        display: flex;
+        border-inline-start: 0;
+        border-top: 1px solid var(--aw-line);
+    }
+}
 body.aw-admin .aw-chat-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 body.aw-admin .aw-chat-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 

@@ -630,8 +630,15 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
                 "reply_to_message_id": reply_to_message_id,
             }
         )
+    list_context = _conversation_list_context(request)
     return {
         "conversation": conversation,
+        # The conversation rail lives beside the thread on the detail page, so
+        # the same bounded list context feeds it.
+        "page_obj": list_context["page_obj"],
+        "pagination_query": list_context["pagination_query"],
+        "unread_count": list_context["unread_count"],
+        "mark_all_read_url": list_context["mark_all_read_url"],
         "conversation_level": current_level_labels([conversation.user_id]).get(
             conversation.user_id,
             _("Level not assigned"),

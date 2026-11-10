@@ -2,6 +2,7 @@
 {% translate "Blocked" as blocked_label %}
 {% translate "Open" as open_label %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
+{% include 'partials/telegram_conversation_list.html' %}
 <div class="aw-chat-main">
     <div class="aw-chat-head">
         <span class="aw-avatar aw-avatar--lg aw-avatar--square" aria-hidden="true">
