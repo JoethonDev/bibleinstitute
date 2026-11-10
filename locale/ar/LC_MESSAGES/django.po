@@ -13415,6 +13415,15 @@ msgstr "لم تُسجل أي محاولات عبر قنوات خارجية بع�
 msgid "Notification history"
 msgstr "سجل الإشعارات"
 
+msgid "Notification history pages"
+msgstr "صفحات سجل الإشعارات"
+
+msgid "Matching notifications: %(count)s"
+msgstr "الإشعارات المطابقة: %(count)s"
+
+msgid "No notifications match these filters."
+msgstr "لا توجد إشعارات مطابقة لهذه التصفية."
+
 msgid "Notification redelivery"
 msgstr "إعادة إرسال الإشعارات"
 
@@ -13453,6 +13462,51 @@ msgstr "جارٍ تجهيز نسخ المستلمين."
 
 msgid "Recipient pages"
 msgstr "صفحات المستلمين"
+
+msgid "Search messages"
+msgstr "بحث في الرسائل"
+
+msgid "Delivery progress"
+msgstr "تقدم التسليم"
+
+msgid "View recipients"
+msgstr "عرض المستلمين"
+
+msgid "Loading more recipients..."
+msgstr "جارٍ تحميل المزيد من المستلمين..."
+
+msgid "Search recipients"
+msgstr "بحث في المستلمين"
+
+msgid "No recipients match this search."
+msgstr "لا يوجد مستلمون مطابقون لهذا البحث."
+
+msgid "Recipients: %(count)s"
+msgstr "المستلمون: %(count)s"
+
+msgid "View the recipients of %(title)s"
+msgstr "عرض مستلمي %(title)s"
+
+msgid "Each row is one message; open it to see every recipient and delivery outcome."
+msgstr "كل صف هو رسالة واحدة؛ افتحه لعرض جميع المستلمين ونتائج التسليم."
+
+msgid "Open this message to load its recipients."
+msgstr "افتح هذه الرسالة لتحميل مستلميها."
+
+msgid "This message has no saved recipients."
+msgstr "لا يوجد مستلمون محفوظون لهذه الرسالة."
+
+msgid "cancelled"
+msgstr "ملغاة"
+
+msgid "pending"
+msgstr "قيد الانتظار"
+
+msgid "redelivered"
+msgstr "أُعيد إرسالها"
+
+msgid "withdrawn"
+msgstr "مسحوبة"
 
 msgid "Redelivery queued. Final progress includes delivery receipts."
 msgstr "تمت إضافة إعادة الإرسال إلى قائمة الانتظار. يشمل التقدم النهائي إيصالات التسليم."

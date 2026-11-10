@@ -130,6 +130,45 @@
         });
     });
 
+    // ---- Drawer "load more" sentinels -------------------------------------
+    // A fragment that paginates inside a swap region appends its next page when
+    // a [data-aw-load-more] sentinel scrolls into view (notification history
+    // recipients inside the peek drawer). Requests are serialized per sentinel
+    // and the sentinel is replaced by the response, so the observer is rebuilt
+    // after every swap and after the drawer body is populated.
+    var loadMoreObserver = null;
+
+    function loadMoreSentinel(sentinel) {
+        if (!sentinel || !sentinel.dataset.url || sentinel.dataset.loading === '1') return;
+        if (!window.htmx) return;
+        sentinel.dataset.loading = '1';
+        sentinel.classList.add('is-loading');
+        htmx.ajax('GET', sentinel.dataset.url, { target: sentinel, swap: 'outerHTML' })
+            .then(scanLoadMoreSentinels)
+            .catch(function () {
+                if (!sentinel.isConnected) return;
+                sentinel.dataset.loading = '0';
+                sentinel.classList.remove('is-loading');
+            });
+    }
+
+    function scanLoadMoreSentinels() {
+        if (typeof IntersectionObserver !== 'function') return;
+        if (!loadMoreObserver) {
+            loadMoreObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) loadMoreSentinel(entry.target);
+                });
+            }, { rootMargin: '160px 0px' });
+        }
+        var sentinels = document.querySelectorAll('[data-aw-load-more][data-url]');
+        for (var i = 0; i < sentinels.length; i++) {
+            if (sentinels[i].dataset.observed === '1') continue;
+            sentinels[i].dataset.observed = '1';
+            loadMoreObserver.observe(sentinels[i]);
+        }
+    }
+
     // Scroll-triggered pagination for the R2/Drive browser. The server renders
     // a #drive-next-sentinel carrying the next-page URL; when it approaches the
     // viewport, the next page replaces #file-list-container (innerHTML) exactly
@@ -204,7 +243,9 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         scanDriveSentinels();
+        scanLoadMoreSentinels();
         document.addEventListener('htmx:after:swap', scanDriveSentinels);
+        document.addEventListener('htmx:after:swap', scanLoadMoreSentinels);
         document.addEventListener('htmx:after:swap', cleanupOrphanedModalBackdrop);
         document.addEventListener('input', function (event) {
             var search = event.target.closest && event.target.closest('[data-exceptional-student-search]');
@@ -378,6 +419,7 @@
             drawerBody.innerHTML = html;
             if (window.htmx && typeof window.htmx.process === 'function') window.htmx.process(drawerBody);
             if (window.Alpine && typeof window.Alpine.initTree === 'function') window.Alpine.initTree(drawerBody);
+            scanLoadMoreSentinels();
             var focusTarget = drawerBody.querySelector('[autofocus], button, a, input, select, textarea');
             if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
         }).catch(function () {
@@ -399,6 +441,7 @@
             drawerBody.innerHTML = options.html || '';
             if (window.htmx && typeof window.htmx.process === 'function') window.htmx.process(drawerBody);
             if (window.Alpine && typeof window.Alpine.initTree === 'function') window.Alpine.initTree(drawerBody);
+            scanLoadMoreSentinels();
             var focusTarget = drawerBody.querySelector('[autofocus], button, a, input, select, textarea');
             if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
         },
@@ -681,3 +724,4 @@
         }
     }
 }());
+

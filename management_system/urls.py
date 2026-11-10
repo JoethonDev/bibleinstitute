@@ -3,7 +3,7 @@ from django.urls import path
 from management_system import password_reset as password_reset_views
 from management_system.views import *
 from management_system.admin_operation_views import admin_operation_download, admin_operation_status
-from management_system.job_monitor_views import background_jobs, background_job_detail, background_job_status_batch, notification_redelivery
+from management_system.job_monitor_views import background_jobs, background_job_detail, background_job_status_batch, notification_group_recipients, notification_redelivery
 from management_system.forms import UserLoginForm
 from management_system.telegram_views import (
     telegram_account_unlink,
@@ -47,6 +47,11 @@ from management_system import portal_views as portal_extra_views
 urlpatterns = [
     path('dashboard/background-jobs/', background_jobs, name='background-jobs'),
     path('dashboard/notification-history/', background_jobs, {"notifications_only": True}, name='notification-history'),
+    path(
+        'dashboard/notification-history/group/<int:group_id>/recipients/',
+        notification_group_recipients,
+        name='notification-group-recipients',
+    ),
     path('dashboard/notification-history/<str:source>/<int:source_id>/redeliver/', notification_redelivery, name='notification-redelivery'),
     path('dashboard/notification-history/notification/<int:notification_id>/withdraw/', notification_withdraw, name='notification-withdraw'),
     path('dashboard/background-jobs/status/', background_job_status_batch, name='background-job-status-batch'),

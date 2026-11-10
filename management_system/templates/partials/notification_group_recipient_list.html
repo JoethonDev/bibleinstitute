@@ -1,0 +1,14 @@
+{% load i18n %}
+{% comment %}
+One page of recipients as a list. This is the search response: it replaces the
+whole list container inside the drawer, so it owns the empty state and the <ul>.
+{% endcomment %}
+{% if recipient_rows %}
+<ul class="aw-notif-recipient-rows">
+    {% include "partials/notification_group_recipient_items.html" %}
+</ul>
+{% elif search %}
+<p class="aw-small aw-muted">{% translate "No recipients match this search." %}</p>
+{% else %}
+<p class="aw-small aw-muted">{% translate "This message has no saved recipients." %}</p>
+{% endif %}

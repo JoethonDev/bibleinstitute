@@ -139,7 +139,7 @@ html[lang="ar"] body.aw-admin .aw-meta-item .aw-label,
 html[lang="ar"] body.aw-admin .aw-matrix thead th,
 html[lang="ar"] body.aw-admin .aw-storage-stat span,
 html[lang="ar"] body.aw-admin .aw-table tbody tr.aw-level-group td,
-html[lang="ar"] body.aw-admin .aw-msg .aw-msg-meta {
+html[lang="ar"] body.aw-admin .aw-msg .aw-msg-head {
     letter-spacing: 0;
     text-transform: none;
 }
@@ -198,7 +198,7 @@ html[lang="ar"] body.aw-admin .aw-top-user-text > span { font-size: 10.5px; }
 html[lang="ar"] body.aw-admin .aw-conv-main b { font-size: 12.5px; }
 html[lang="ar"] body.aw-admin .aw-conv-main p { font-size: 11.5px; }
 html[lang="ar"] body.aw-admin .aw-msg { font-size: 12.5px; line-height: 1.7; }
-html[lang="ar"] body.aw-admin .aw-msg .aw-msg-meta { font-size: 10px; }
+html[lang="ar"] body.aw-admin .aw-msg .aw-msg-head { font-size: 11px; }
 
 body.aw-admin.aw-drawer-open { overflow: hidden; }
 
@@ -780,6 +780,10 @@ body.aw-admin .aw-workspace {
     margin: 0 auto;
     padding: 24px 28px 32px;
     min-width: 0;
+    /* The page claims the rest of the main column instead of leaving a bare
+       band of canvas under itself on short pages; a page that sets its own
+       height (the chat workspace) keeps it. */
+    flex: 1 1 auto;
 }
 
 /* --------------------------------------------------------------------------
@@ -1704,6 +1708,15 @@ body.aw-admin .aw-drawer-head {
     border-bottom: 1px solid var(--aw-line);
 }
 body.aw-admin .aw-drawer-head h2 { font-family: var(--aw-font-display); font-size: 20px; font-weight: 600; }
+
+/* A long message title (notification history) wraps to two lines at most, so
+   the drawer head never eats the list it belongs to. */
+body.aw-admin #aw-drawer-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 body.aw-admin .aw-drawer-head p { margin-top: 2px; font-size: 11px; color: var(--aw-muted); }
 body.aw-admin .aw-drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
 body.aw-admin .aw-drawer-state { padding: 28px 8px; text-align: center; color: var(--aw-muted); font-size: 11.5px; }
@@ -2663,8 +2676,47 @@ body.aw-admin .aw-msg .aw-msg-attach a { color: inherit; text-decoration: underl
 body.aw-admin .aw-msg img.aw-msg-image,
 body.aw-admin .aw-msg video.aw-msg-video { display: block; max-width: 100%; border-radius: 7px; margin-top: 5px; }
 body.aw-admin .aw-msg audio { display: block; max-width: 100%; margin-top: 5px; }
-body.aw-admin .aw-msg .aw-msg-meta { display: flex; gap: 5px; margin-top: 3px; font-size: 8.5px; opacity: .65; }
-body.aw-admin .aw-msg--out .aw-msg-meta { justify-content: flex-end; }
+
+/* Bubble anatomy, top to bottom: identity with the delivery state, the text,
+   the timestamp, the flags an operator must act on, then the actions. */
+body.aw-admin .aw-msg-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    font-size: 10.5px;
+    line-height: 1.4;
+}
+body.aw-admin .aw-msg-author { font-weight: 700; }
+body.aw-admin .aw-msg-handle { margin-inline-start: 3px; font-weight: 500; opacity: .8; }
+body.aw-admin .aw-msg-sep { opacity: .55; }
+body.aw-admin .aw-msg-text { margin-top: 4px; }
+body.aw-admin .aw-msg-time {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 3px;
+    font-size: 9px;
+    opacity: .7;
+}
+body.aw-admin .aw-msg-flags {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+}
+body.aw-admin .aw-msg-flags:not(:has(> *)),
+body.aw-admin .aw-msg-actions:not(:has(> *)) { display: none; }
+body.aw-admin .aw-msg-note { font-size: 9.5px; opacity: .8; overflow-wrap: anywhere; }
+body.aw-admin .aw-msg-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+body.aw-admin .aw-msg-actions .aw-btn { min-height: 24px; padding: 2px 8px; font-size: 10.5px; }
 
 body.aw-admin .aw-composer {
     display: flex;
@@ -3649,4 +3701,88 @@ body.aw-admin .aw-alert--success {
     background: var(--aw-green-soft);
     border-color: #cbe5d9;
     color: var(--aw-green);
+}
+
+/* --------------------------------------------------------------------------
+   26. Notification history: one row per message, recipients in the peek drawer
+   -------------------------------------------------------------------------- */
+body.aw-admin .aw-notif-groups { margin: 0; padding: 0; list-style: none; }
+body.aw-admin .aw-notif-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--aw-row-line);
+}
+body.aw-admin .aw-notif-group:last-child { border-bottom: 0; }
+body.aw-admin .aw-notif-group:hover { background: var(--aw-teal-mist); }
+
+body.aw-admin .aw-notif-group-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+body.aw-admin .aw-notif-group-main .aw-cell-strong {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.45;
+}
+body.aw-admin .aw-notif-group-stats {
+    flex: 0 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10.5px;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-notif-group-status { flex: 0 0 auto; }
+body.aw-admin .aw-notif-group-progress { flex: 1 1 130px; min-width: 110px; max-width: 210px; }
+body.aw-admin .aw-notif-group-progress progress { display: block; width: 100%; height: 7px; }
+body.aw-admin .aw-notif-group-date { flex: 0 0 auto; font-size: 10.5px; color: var(--aw-muted); }
+body.aw-admin .aw-notif-group-open { flex: 0 0 auto; }
+body.aw-admin .aw-notif-group-open .aw-ico { width: 14px; height: 14px; }
+
+/* Drawer body: search box above a list that appends the next page when the
+   operator scrolls to its sentinel (admin_shell.js [data-aw-load-more]). */
+body.aw-admin .aw-notif-recipients-panel { display: flex; flex-direction: column; gap: 10px; }
+body.aw-admin .aw-notif-recipient-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+body.aw-admin .aw-notif-recipient-search .aw-field-label { margin: 0; white-space: nowrap; }
+body.aw-admin .aw-notif-recipient-search .aw-input { flex: 1 1 200px; max-width: none; min-height: 34px; }
+
+body.aw-admin .aw-notif-recipient-rows { margin: 0; padding: 0; list-style: none; }
+body.aw-admin .aw-notif-recipient-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px 10px;
+    flex-wrap: wrap;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--aw-row-line);
+}
+body.aw-admin .aw-notif-recipient-row:last-child { border-bottom: 0; }
+body.aw-admin .aw-notif-recipient-row .aw-cell-main { order: 0; flex: 1 1 170px; min-width: 0; }
+body.aw-admin .aw-notif-recipient-row > .aw-btn { order: 1; flex: 0 0 auto; }
+body.aw-admin .aw-notif-recipient-meta {
+    order: 2;
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+body.aw-admin .aw-load-more { display: flex; justify-content: center; padding: 12px 0 2px; }
+body.aw-admin .aw-load-more.is-loading { opacity: .55; }
+
+@media (max-width: 720px) {
+    body.aw-admin .aw-notif-group { padding: 9px 10px; gap: 7px; }
+    body.aw-admin .aw-notif-group-progress { max-width: none; flex-basis: 100%; }
+    body.aw-admin .aw-notif-group-main .aw-cell-strong { -webkit-line-clamp: 3; }
+    body.aw-admin .aw-notif-group-open { flex: 1 1 100%; justify-content: center; }
+    body.aw-admin .aw-notif-recipient-row .aw-cell-main { flex: 1 1 100%; }
+    body.aw-admin .aw-notif-recipient-row > .aw-btn { order: 1; }
 }

@@ -1,0 +1,68 @@
+{% load i18n %}
+{% comment %}
+Grouped notification history: one row per message.
+
+A broadcast creates one StudentNotification per recipient, so the flat table
+listed thousands of rows that share one message. Each row here is one message
+(the identity tuple original_audience() targets) with its recipient and channel
+totals. The recipients open in the shared peek drawer
+(partials/components/admin_drawer.html) and load there page by page as the
+operator scrolls, so a message with thousands of recipients never reaches the
+page in one response.
+{% endcomment %}
+{% if notification_groups_page is not None %}
+<div class="aw-card aw-table-card">
+    <div class="aw-table-tools">
+        <span class="aw-table-count">{% translate "Messages" %}: {{ notification_groups_page.paginator.count }}</span>
+        <span class="aw-small aw-muted">{% translate "Each row is one message; open it to see every recipient and delivery outcome." %}</span>
+    </div>
+
+    {% if notification_groups_page.object_list %}
+    <ul class="aw-notif-groups">
+        {% for group in notification_groups_page.object_list %}
+        <li class="aw-notif-group" data-notification-group="{{ group.group_id }}">
+            <div class="aw-notif-group-main">
+                <span class="aw-cell-strong">{{ group.title }}</span>
+                <span class="aw-cell-sub">{{ group.kind_label }}</span>
+            </div>
+            <div class="aw-notif-group-stats">
+                <span>{% translate "Recipients" %}: {{ group.recipients }}</span>
+                {% if group.cancelled %}<span class="aw-pill aw-pill--muted">{{ group.cancelled }} {% translate "cancelled" %}</span>{% endif %}
+                {% if group.withdrawn %}<span class="aw-pill aw-pill--muted">{{ group.withdrawn }} {% translate "withdrawn" %}</span>{% endif %}
+                {% if group.redelivered %}<span class="aw-pill aw-pill--teal">{{ group.redelivered }} {% translate "redelivered" %}</span>{% endif %}
+                {% if group.failed %}<span class="aw-pill aw-pill--red">{{ group.failed }} {% translate "failed" %}</span>{% endif %}
+                {% if group.pending %}<span class="aw-pill aw-pill--amber">{{ group.pending }} {% translate "pending" %}</span>{% endif %}
+            </div>
+            <div class="aw-notif-group-status">
+                {% include "partials/components/aw_status_pill.html" with status=group.status label=group.status_label %}
+            </div>
+            <div class="aw-notif-group-progress">
+                <progress max="100" value="{{ group.percent }}" aria-label="{% translate 'Delivery progress' %}" class="app-progress aw-w-100"></progress>
+                <span class="aw-cell-sub">{{ group.progress_label }}</span>
+            </div>
+            <div class="aw-notif-group-date aw-date">
+                <time datetime="{{ group.created_last|date:'c' }}">{{ group.created_last|date:"SHORT_DATETIME_FORMAT" }}</time>
+            </div>
+            <button type="button"
+                    class="aw-btn aw-btn--ghost aw-btn--sm aw-notif-group-open"
+                    data-aw-drawer="{{ group.recipients_url }}"
+                    data-aw-drawer-title="{{ group.title|truncatechars:90 }}"
+                    data-aw-drawer-subtitle="{% blocktranslate with count=group.recipients %}Recipients: {{ count }}{% endblocktranslate %}"
+                    aria-label="{% blocktranslate with title=group.title %}View the recipients of {{ title }}{% endblocktranslate %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+                <span>{% translate "View recipients" %}</span>
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="aw-cell-empty">
+        {% translate "No notifications match these filters." as empty_label %}
+        {% include "partials/components/aw_empty.html" with icon="i-bell" description=empty_label %}
+    </div>
+    {% endif %}
+
+    {% translate "Notification history pages" as job_pages_label %}
+    {% include "partials/pagination.html" with page_obj=notification_groups_page pagination_query=pagination_query aria_label=job_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
+</div>
+{% endif %}
