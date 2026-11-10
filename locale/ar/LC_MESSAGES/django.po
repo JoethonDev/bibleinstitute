@@ -13415,6 +13415,15 @@ msgstr "لم تُسجل أي محاولات عبر قنوات خارجية بع�
 msgid "Notification history"
 msgstr "سجل الإشعارات"
 
+msgid "Notification history pages"
+msgstr "صفحات سجل الإشعارات"
+
+msgid "Matching notifications: %(count)s"
+msgstr "الإشعارات المطابقة: %(count)s"
+
+msgid "No notifications match these filters."
+msgstr "لا توجد إشعارات مطابقة لهذه التصفية."
+
 msgid "Notification redelivery"
 msgstr "إعادة إرسال الإشعارات"
 
@@ -13453,6 +13462,51 @@ msgstr "جارٍ تجهيز نسخ المستلمين."
 
 msgid "Recipient pages"
 msgstr "صفحات المستلمين"
+
+msgid "Search messages"
+msgstr "بحث في الرسائل"
+
+msgid "Delivery progress"
+msgstr "تقدم التسليم"
+
+msgid "View recipients"
+msgstr "عرض المستلمين"
+
+msgid "Loading more recipients..."
+msgstr "جارٍ تحميل المزيد من المستلمين..."
+
+msgid "Search recipients"
+msgstr "بحث في المستلمين"
+
+msgid "No recipients match this search."
+msgstr "لا يوجد مستلمون مطابقون لهذا البحث."
+
+msgid "Recipients: %(count)s"
+msgstr "المستلمون: %(count)s"
+
+msgid "View the recipients of %(title)s"
+msgstr "عرض مستلمي %(title)s"
+
+msgid "Each row is one message; open it to see every recipient and delivery outcome."
+msgstr "كل صف هو رسالة واحدة؛ افتحه لعرض جميع المستلمين ونتائج التسليم."
+
+msgid "Open this message to load its recipients."
+msgstr "افتح هذه الرسالة لتحميل مستلميها."
+
+msgid "This message has no saved recipients."
+msgstr "لا يوجد مستلمون محفوظون لهذه الرسالة."
+
+msgid "cancelled"
+msgstr "ملغاة"
+
+msgid "pending"
+msgstr "قيد الانتظار"
+
+msgid "redelivered"
+msgstr "أُعيد إرسالها"
+
+msgid "withdrawn"
+msgstr "مسحوبة"
 
 msgid "Redelivery queued. Final progress includes delivery receipts."
 msgstr "تمت إضافة إعادة الإرسال إلى قائمة الانتظار. يشمل التقدم النهائي إيصالات التسليم."
@@ -14458,3 +14512,135 @@ msgstr "تحديد كل الصفوف المطابقة للتصفية"
 
 msgid "Search accounts"
 msgstr "البحث في الحسابات"
+
+msgid "Owner"
+msgstr "المالك"
+
+msgid "Finished"
+msgstr "انتهى"
+
+msgid "Last heartbeat"
+msgstr "آخر إشارة نشاط"
+
+msgid "Saved outputs"
+msgstr "المخرجات المحفوظة"
+
+msgid "Video manifest"
+msgstr "قائمة تشغيل الفيديو"
+
+msgid "Audio manifest"
+msgstr "قائمة تشغيل الصوت"
+
+msgid "Audio download"
+msgstr "تنزيل الصوت"
+
+msgid "Files saved"
+msgstr "الملفات المحفوظة"
+
+msgid "Stored object keys"
+msgstr "مفاتيح الكائنات المخزنة"
+
+msgid "Only the first 50 keys are listed."
+msgstr "تُعرض أول 50 مفتاحًا فقط."
+
+msgid "Lesson attachment"
+msgstr "ربط الدرس"
+
+msgid "Lesson status"
+msgstr "حالة الدرس"
+
+msgid "Source staging"
+msgstr "تجهيز المصدر"
+
+msgid "Source upload"
+msgstr "رفع المصدر"
+
+msgid "Source deleted"
+msgstr "حذف المصدر"
+
+msgid "Source expires"
+msgstr "انتهاء صلاحية المصدر"
+
+msgid "Errors"
+msgstr "الأخطاء"
+
+msgid "Error code"
+msgstr "رمز الخطأ"
+
+msgid "Failure history"
+msgstr "سجل الأعطال"
+
+msgid "Cleanup"
+msgstr "التنظيف"
+
+msgid "Cleanup attempts"
+msgstr "محاولات التنظيف"
+
+msgid "Requested"
+msgstr "وقت الطلب"
+
+msgid "Preserved files"
+msgstr "الملفات التي تم الاحتفاظ بها"
+
+msgid "Draft lesson removed"
+msgstr "تمت إزالة الدرس المسود"
+
+msgid "Stopped"
+msgstr "متوقف"
+
+msgid "%(phase)s - %(percent)s%%"
+msgstr "%(phase)s - %(percent)s%%"
+
+msgid "Worker"
+msgstr "عامل المعالجة"
+
+msgid "Job ID"
+msgstr "معرف المهمة"
+
+msgid "Source key"
+msgstr "مفتاح المصدر"
+
+msgid "ETag"
+msgstr "ETag"
+
+msgid "SHA-256"
+msgstr "SHA-256"
+
+msgid "Interrupted runs"
+msgstr "مرات الانقطاع"
+
+msgid "Upload deadline"
+msgstr "مهلة الرفع"
+
+msgid "Last dispatched"
+msgstr "آخر إرسال"
+
+msgid "Stop requested"
+msgstr "طُلب الإيقاف"
+
+msgid "Stop acknowledged"
+msgstr "تم تأكيد الإيقاف"
+
+msgid "Cleanup not before"
+msgstr "التنظيف ليس قبل"
+
+msgid "Cleanup started"
+msgstr "بدء التنظيف"
+
+msgid "Cleanup groups"
+msgstr "مجموعات التنظيف"
+
+msgid "Cleanup result"
+msgstr "نتيجة التنظيف"
+
+msgid "Only the first 200 keys are listed."
+msgstr "تُعرض أول 200 مفتاحًا فقط."
+
+msgid "Output name"
+msgstr "اسم المخرجات"
+
+msgid "Upload URL expires"
+msgstr "انتهاء رابط الرفع"
+
+msgid "Cleanup last dispatched"
+msgstr "آخر إرسال للتنظيف"

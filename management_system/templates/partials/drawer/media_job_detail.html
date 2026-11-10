@@ -4,54 +4,138 @@ Drawer body for one media job.
 
 Loaded through `data-aw-drawer` into `#aw-drawer-body`; the drawer component
 owns the title, subtitle and close affordance, so this fragment starts with the
-content. Read-only: the actions below reuse the same endpoints and data-*
-hooks as the row, handled by media_status.js.
+content. Every value below is read from the persisted MediaProcessingJob row:
+the serializer applies the live Redis progress overlay only for an active job
+of the current attempt, so a finished job, a retry or a crashed worker can
+never show a phase or percentage the database does not hold. Read-only: the
+actions reuse the row endpoints and the data-media-* hooks handled by
+media_status.js, and they are shown only when the same can_* gate allows them
+on the row.
 {% endcomment %}
 <div class="aw-stack aw-stack--lg">
     <div class="aw-flex aw-flex-wrap">
-        {% include "partials/components/aw_status_pill.html" with status=job.status label=job.status_label %}
+        <span class="aw-pill{% if job.status == 'succeeded' %} aw-pill--green{% elif job.status == 'failed' %} aw-pill--red{% elif job.status == 'processing' or job.status == 'uploading' or job.status == 'verifying' %} aw-pill--blue{% elif job.status == 'queued' %} aw-pill--amber{% else %} aw-pill--muted{% endif %}">{{ job.status_label }}</span>
         <span class="aw-small aw-muted">{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
     </div>
 
+    <div>
+        <div class="aw-progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100">
+            <span style="width: {{ job.percent }}%"></span>
+        </div>
+        <span class="aw-cell-sub">{{ job.progress_label }}</span>
+    </div>
+
     <dl class="aw-dl">
+        <div class="aw-kv"><dt>{% translate "Job ID" %}</dt><dd class="aw-break" dir="ltr">{{ job.public_id }}</dd></div>
         <div class="aw-kv"><dt>{% translate "File" %}</dt><dd>{{ job.original_filename }}</dd></div>
-        <div class="aw-kv"><dt>{% translate "Destination" %}</dt><dd>{% if job.lesson %}{{ job.lesson.name }}{% else %}{{ job.requested_folder }}{% endif %}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Output name" %}</dt><dd>{{ job.output_base_name }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Type" %}</dt><dd>{{ job.source_kind }}</dd></div>
         <div class="aw-kv"><dt>{% translate "Size" %}</dt><dd>{{ job.source_size|filesizeformat }}</dd></div>
-        <div class="aw-kv"><dt>{% translate "Source" %}</dt><dd>{{ job.source_kind }}</dd></div>
-        {% if job.part_id %}<div class="aw-kv"><dt>{% translate "Part" %}</dt><dd>{{ job.part_id }}</dd></div>{% endif %}
+        <div class="aw-kv"><dt>{% translate "Folder" %}</dt><dd class="aw-break" dir="ltr">{{ job.requested_folder|default:"/" }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Source key" %}</dt><dd class="aw-break" dir="ltr">{{ job.source_key }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "ETag" %}</dt><dd class="aw-break" dir="ltr">{{ job.source_etag|default:"-" }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "SHA-256" %}</dt><dd class="aw-break" dir="ltr">{{ job.source_sha256|default:"-" }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Destination" %}</dt><dd>{% if job.lesson %}{{ job.lesson.name }}{% else %}{{ job.requested_folder|default:"/" }}{% endif %}</dd></div>
+        {% if job.part_id %}<div class="aw-kv"><dt>{% translate "Part" %}</dt><dd dir="ltr">{{ job.part_id }}</dd></div>{% endif %}
         <div class="aw-kv"><dt>{% translate "Owner" %}</dt><dd>{{ job.created_by.username }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Worker" %}</dt><dd class="aw-break" dir="ltr">{{ job.worker_id|default:"-" }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Attempts" %}</dt><dd>{{ job.attempt_count }} / {{ max_attempts }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Interrupted runs" %}</dt><dd>{{ job.interrupted_count }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Created" %}</dt><dd>{{ job.created_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Upload deadline" %}</dt><dd>{{ job.upload_ack_deadline_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>
+        {% if job.started_at %}<div class="aw-kv"><dt>{% translate "Started" %}</dt><dd>{{ job.started_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+        {% if job.finished_at %}<div class="aw-kv"><dt>{% translate "Finished" %}</dt><dd>{{ job.finished_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+        {% if job.last_heartbeat_at %}<div class="aw-kv"><dt>{% translate "Last heartbeat" %}</dt><dd>{{ job.last_heartbeat_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+        {% if job.last_dispatched_at %}<div class="aw-kv"><dt>{% translate "Last dispatched" %}</dt><dd>{{ job.last_dispatched_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+        {% if job.stop_requested_at %}<div class="aw-kv"><dt>{% translate "Stop requested" %}</dt><dd>{{ job.stop_requested_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+        {% if job.cancel_acknowledged_at %}<div class="aw-kv"><dt>{% translate "Stop acknowledged" %}</dt><dd>{{ job.cancel_acknowledged_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
     </dl>
 
-    {% if job.progress_label %}
-    <div class="aw-progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100">
-        <span style="width: {{ job.percent }}%"></span>
+    <div>
+        <h3 class="aw-section-title">{% translate "Saved outputs" %}</h3>
+        <dl class="aw-dl">
+            <div class="aw-kv"><dt>{% translate "Video manifest" %}</dt><dd class="aw-break" dir="ltr">{{ job.manifest_key|default:"-" }}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Audio manifest" %}</dt><dd class="aw-break" dir="ltr">{{ job.audio_manifest_key|default:"-" }}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Audio download" %}</dt><dd class="aw-break" dir="ltr">{{ job.download_key|default:"-" }}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Files saved" %}</dt><dd>{{ job.output_keys|length }}</dd></div>
+        </dl>
+        {% if job.output_keys %}
+        <details class="aw-small">
+            <summary>{% translate "Stored object keys" %} ({{ job.output_keys|length }})</summary>
+            <ul class="aw-break" dir="ltr">
+                {% for key in job.output_keys|slice:":200" %}<li>{{ key }}</li>{% endfor %}
+            </ul>
+            {% if job.output_keys|length > 200 %}<p class="aw-small aw-muted">{% translate "Only the first 200 keys are listed." %}</p>{% endif %}
+        </details>
+        {% endif %}
     </div>
-    <span class="aw-cell-sub">{{ job.progress_label }}</span>
+
+    <div>
+        <h3 class="aw-section-title">{% translate "Lesson attachment" %}</h3>
+        <dl class="aw-dl">
+            <div class="aw-kv"><dt>{% translate "Status" %}</dt><dd>{{ job.get_attachment_status_display }}</dd></div>
+            {% if job.lesson %}
+            <div class="aw-kv"><dt>{% translate "Lesson status" %}</dt><dd>{{ job.lesson.get_status_display }}</dd></div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div>
+        <h3 class="aw-section-title">{% translate "Source staging" %}</h3>
+        <dl class="aw-dl">
+            <div class="aw-kv"><dt>{% translate "Source upload" %}</dt><dd>{% if job.source_acknowledged_at %}{{ job.source_acknowledged_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}-{% endif %}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Upload URL expires" %}</dt><dd>{% if job.source_upload_url_expires_at %}{{ job.source_upload_url_expires_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}-{% endif %}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Source deleted" %}</dt><dd>{% if job.staging_deleted_at %}{{ job.staging_deleted_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}-{% endif %}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Source expires" %}</dt><dd>{% if job.staging_expires_at %}{{ job.staging_expires_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}-{% endif %}</dd></div>
+        </dl>
+    </div>
+
+    {% if job.error_code or job.error_message or job.failure_history %}
+    <div>
+        <h3 class="aw-section-title">{% translate "Errors" %}</h3>
+        {% if job.error_code %}<dl class="aw-dl"><div class="aw-kv"><dt>{% translate "Error code" %}</dt><dd dir="ltr">{{ job.error_code }}</dd></div></dl>{% endif %}
+        {% if job.error_message %}<div class="aw-alert aw-alert--danger" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><span>{{ job.error_message }}</span></div>{% endif %}
+        {% if job.failure_history %}
+        <p class="aw-small aw-muted">{% translate "Failure history" %}</p>
+        <ul class="aw-small">
+            {% for entry in job.failure_history %}
+            <li><b dir="ltr">{{ entry.code }}</b> - {{ entry.phase }} - {{ entry.at }}{% if entry.message %}<br><span class="aw-muted">{{ entry.message }}</span>{% endif %}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
     {% endif %}
 
-    {% if job.error_message %}
-    <div class="aw-alert aw-alert--danger" role="alert">
-        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-        <span>{{ job.error_message }}</span>
-    </div>
-    {% endif %}
-    {% if job.cleanup_error_message %}
-    <div class="aw-alert aw-alert--warn" role="alert">
-        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-        <span>{{ job.cleanup_error_message }}</span>
+    {% if job.cleanup_status != 'not_requested' %}
+    <div>
+        <h3 class="aw-section-title">{% translate "Cleanup" %}</h3>
+        <dl class="aw-dl">
+            <div class="aw-kv"><dt>{% translate "Status" %}</dt><dd>{{ job.get_cleanup_status_display }}</dd></div>
+            <div class="aw-kv"><dt>{% translate "Cleanup attempts" %}</dt><dd>{{ job.cleanup_attempt_count }}</dd></div>
+            {% if job.cleanup_requested_at %}<div class="aw-kv"><dt>{% translate "Requested" %}</dt><dd>{{ job.cleanup_requested_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+            {% if job.cleanup_not_before %}<div class="aw-kv"><dt>{% translate "Cleanup not before" %}</dt><dd>{{ job.cleanup_not_before|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+            {% if job.cleanup_started_at %}<div class="aw-kv"><dt>{% translate "Cleanup started" %}</dt><dd>{{ job.cleanup_started_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+            {% if job.cleanup_last_dispatched_at %}<div class="aw-kv"><dt>{% translate "Cleanup last dispatched" %}</dt><dd>{{ job.cleanup_last_dispatched_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+            {% if job.cleanup_finished_at %}<div class="aw-kv"><dt>{% translate "Finished" %}</dt><dd>{{ job.cleanup_finished_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>{% endif %}
+            <div class="aw-kv"><dt>{% translate "Preserved files" %}</dt><dd>{{ job.cleanup_preserved_keys|length }}</dd></div>
+            {% if job.cleanup_group_ids %}<div class="aw-kv"><dt>{% translate "Cleanup groups" %}</dt><dd class="aw-break" dir="ltr">{{ job.cleanup_group_ids|join:", " }}</dd></div>{% endif %}
+            {% if job.lesson_deleted %}<div class="aw-kv"><dt>{% translate "Draft lesson removed" %}</dt><dd>{% translate "Yes" %}</dd></div>{% endif %}
+        </dl>
+        {% if job.cleanup_result %}
+        <details class="aw-small">
+            <summary>{% translate "Cleanup result" %}</summary>
+            <pre class="aw-break" dir="ltr">{{ job.cleanup_result|pprint }}</pre>
+        </details>
+        {% endif %}
+        {% if job.cleanup_error_message %}<div class="aw-alert aw-alert--warn" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><span>{{ job.cleanup_error_message }}</span></div>{% endif %}
     </div>
     {% endif %}
 
     <div class="aw-flex aw-flex-wrap">
-        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"
-                data-media-retry-url="{% url 'media-job-retry' job.public_id %}">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
-            {% translate "Retry" %}
-        </button>
-        <button type="button" class="aw-btn aw-btn--danger aw-btn--sm"
-                data-media-stop-url="{% url 'media-job-stop' job.public_id %}">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
-            {% translate "Stop" %}
-        </button>
+        {% if job.can_retry %}<button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-media-retry-url="{% url 'media-job-retry' job.public_id %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg> {% translate "Retry" %}</button>{% endif %}
+        {% if job.can_retry_attachment %}<button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-media-retry-kind="attachment" data-media-retry-url="{% url 'media-job-attachment-retry' job.public_id %}">{% translate "Retry lesson attachment" %}</button>{% endif %}
+        {% if job.can_publish %}<button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-media-retry-kind="publish" data-media-retry-url="{% url 'media-job-publish-retry' job.public_id %}">{% translate "Continue publishing" %}</button>{% endif %}
+        {% if job.can_stop %}<button type="button" class="aw-btn aw-btn--danger aw-btn--sm" data-media-stop-url="{% url 'media-job-stop' job.public_id %}" data-media-confirm-message="{% translate 'Stop processing this upload and any companion files?' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg> {% translate "Stop" %}</button>{% endif %}
+        {% if job.can_cleanup %}<button type="button" class="aw-btn aw-btn--danger aw-btn--sm" data-media-cleanup-url="{% url 'media-job-cleanup' job.public_id %}" data-media-confirm-message="{% translate "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed." %}">{% translate "Clean up" %}</button>{% endif %}
     </div>
 </div>

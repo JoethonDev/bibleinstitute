@@ -8,7 +8,176 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
-## Latest implementation unit (10 November 2026) - chat workspace and stale-asset root cause
+## Latest implementation unit (10 November 2026) - media worker CPU utilization
+
+The media worker was capped at 2 CPUs but used about one: `process_media_job`
+ran one job (prefetch 1) and `run_media_job` sequenced every FFmpeg stage, the
+encoder had no thread budget (FFmpeg auto-detected host cores, not the CFS
+quota), and `MEDIA_WORKER_CONCURRENCY` was defined but read by nothing.
+
+Changed:
+
+- `management_system/media_processing.py`: `run_media_job` starts the audio
+  deliverables (AAC intermediate, audio HLS, MP3) on one worker thread beside
+  the video HLS encode (real video sources only). The audio thread touches no
+  DB/Redis: it checks the job's shared stop events, while the main thread keeps
+  polling the job and reporting progress/heartbeats. Uploads stay in the main
+  thread and keep the existing order (video segments, audio segments, MP3).
+  Sibling failure/cancellation stops the other stage within about one progress
+  tick and the primary failure (or `MediaJobCancelled`) is re-raised; the
+  internal abort signal never reaches the job record. `media_encode_threads()`
+  derives the encoder `-threads` and `-filter_threads` budget from cgroup v2
+  `cpu.max` / cgroup v1 CFS quota (rounded up, capped at 16), with
+  `MEDIA_ENCODE_THREADS` as an override.
+- `compose.application.yml`: media-worker runs
+  `--concurrency=${MEDIA_WORKER_CONCURRENCY:-2}` with prefetch 1 and exports
+  `MEDIA_ENCODE_THREADS`; comments record the 2-CPU/2-job contract and the
+  memory/disk assumptions.
+- `learning_platform/settings.py`, `.env.example`: default
+  `MEDIA_WORKER_CONCURRENCY=2` and new `MEDIA_ENCODE_THREADS=0` (0 = derive from
+  the container quota). Compose owns the worker's actual concurrency; the
+  setting documents the default and is not read by application code.
+
+Invariants preserved: one atomic claim per job, `select_for_update` lifecycle
+transitions, private staging verification, exact output keys/cleanup, the
+`MediaProcessingPhase.UPLOAD_OUTPUT` transition, staging deletion and
+publication flow, and per-job temporary directories (the thread is joined
+before cleanup). No new dependency.
+
+Verification (10 November 2026): `python manage.py check` passed;
+`makemigrations --check --dry-run` reported no changes; changed files pass
+`ast.parse`; `audit_text_encoding` reports no violation in the changed files
+(it still fails on pre-existing `docs/pending/*` PRD lines, untouched here).
+A disposable harness (`tmp_media_smoke`, deleted after use) ran the real
+`run_media_job` with real FFmpeg audio stages and a libopenh264 stand-in for
+the unavailable local libx264: parallel success (audio overlapped the video
+window, 1.9 s wall), video-only and MP3-only branches, `-threads 2` in the
+generated command, thread-budget override, audio-failure and video-failure
+propagation (0.7 s), and operator cancellation. Local limits: the machine has
+12 cores and no cgroup quota (budget fell back to 12), so the 2-core server
+behavior and real x264 speed are not measured here.
+
+### Chain and exposure audit (10 November 2026)
+
+Media job exposure was showing less than the database holds: the detail drawer
+rendered an empty status pill and hid the progress bar because
+`_media_job_ui_state` never set `status_label`/`percent`/`progress_label`; a
+failed job displayed the phase it died in ("Encoding") instead of "Failed"; the
+live Redis hash could describe a previous attempt (or a crashed worker) and
+override DB phase/progress; and the drawer always offered Retry/Stop even when
+the row hid them.
+
+Fixed in `management_system/views.py` and
+`partials/drawer/media_job_detail.html`: the UI state now exposes the database
+status label, a bounded percentage and a phase/percent label; terminal jobs
+report Failed/Stopped/Complete; `_live_media_progress` applies Redis values only
+when the job is active and the hash attempt equals `attempt_count`; and the
+drawer shows the persisted row in detail (outputs/manifests/MP3/count with a
+bounded 50-key list, attachment and lesson status, staging timestamps, attempts
+and failure history, cleanup state) with the same can_* gates as the row.
+New drawer labels are in the Arabic catalogue and `django.mo` was recompiled.
+
+Chain audit on a disposable PostgreSQL 18 database (real ORM paths, no storage
+calls; audit script deleted after the run): concurrent `_attach_outputs` from
+two workers keeps all links and both media types (3 runs), a video part and an
+audio part sharing a curated `part_id` coexist without either type replacing
+the other, re-attaching the same outputs fails with `attachment_collision` and
+leaves the lesson unchanged, automation parts stay in p01/p02 order when p02
+finishes first, concurrent publication publishes the lesson exactly once
+(version 1) and the fan-out stays idempotent (one StudentNotification row).
+Known harmless artifact: two concurrent fan-outs can both log
+`student_count=1` because `bulk_create(ignore_conflicts=True)` hides conflicts
+from the pre-insert count; rows remain unique by `idempotency_key`.
+
+### Deploy continuity and durable job ownership (10 November 2026)
+
+A redeploy recreates the media worker, so an in-flight FFmpeg job previously
+waited for the 120-second heartbeat recovery before it was queued again, and a
+worker killed during an upload could leave exact R2 keys that made the retry
+fail as an `output_collision`.
+
+Changed:
+
+- Migration `0115_mediaprocessingjob_worker_id`: `MediaProcessingJob.worker_id`
+  records the claiming worker instance (`MEDIA_WORKER_ID`, the container
+  hostname by default). `claim_queued_job` writes it; `requeue_stalled_job`
+  clears it; the row and the admin drawer/API expose it.
+- `media_processing.release_worker_jobs()` locks and returns one stopping
+  worker's active jobs to `queued`, clears the claim/heartbeat and leaves
+  `last_dispatched_at = NULL` so the next recovery dispatches them. A job with
+  a pending operator stop is completed as cancelled instead of restarted.
+- `learning_platform/celery.py`: `worker_shutting_down` (SIGTERM sent by Docker
+  before the container exits) releases this worker's jobs and deletes their
+  live Redis hashes; `worker_ready` enqueues one bounded
+  `recover_pending_media_jobs` pass on the media queue, guarded by a 20-second
+  Redis `SET NX` key so the containers starting in one deploy do not each add a
+  pass. Queued-but-never-dispatched jobs are therefore picked up immediately
+  instead of waiting for the next beat tick.
+- `media_tasks.process_media_job`: before a fresh attempt re-encodes, it deletes
+  the job's own recorded `output_keys` (bounded exact-key helper). Leftovers
+  from a killed upload can no longer collide with the retry; a storage failure
+  only logs a warning and never blocks the attempt.
+- Compose media-worker: `stop_grace_period: 60s` so the released tasks can stop
+  FFmpeg and delete their partial outputs before Docker sends SIGKILL;
+  `MEDIA_WORKER_ID` is passed through (empty means container hostname).
+- Migration `0116_mediaprocessingjob_interrupted_count`: worker releases are
+  recorded separately from processing failures. `claim_queued_job`,
+  `record_job_failure`, the operator retry gate and the admin `can_retry` gate
+  compare effective attempts (`attempt_count - interrupted_count`), so any
+  number of deploys/crashes leaves the three real processing attempts intact.
+- Redis worker liveness: `media:worker:<worker_id>` (45-second TTL, refreshed by
+  a daemon thread every 15 seconds, deleted on graceful shutdown). Recovery
+  requeues an active job immediately when its owner's key is gone, guarded by
+  the requirement that the recovering worker's own key exists (so a Redis
+  restart cannot misread every key as dead); the 120-second heartbeat rule
+  remains the fallback.
+- `run_media_job` logs a bounded capacity snapshot per job (free disk and
+  `MemAvailable`) and warns below 4 GiB free disk, so the two-job headroom is
+  visible in `docker logs` instead of being assumed.
+- `deploy/blue_green_deploy.sh`: after the admin-worker check, the deploy now
+  verifies the recreated media worker is running and answering as a consumer of
+  the `media` queue.
+
+Hard kills without SIGTERM (OOM, host crash) are detected by the missing
+liveness key (within its 45-second TTL plus the 60-second beat tick); if Redis
+was also restarted, the heartbeat rule (120 seconds) still recovers the job.
+Interrupted runs never consume a processing attempt.
+
+The drawer now shows every persisted operational field: job id, source key,
+ETag, SHA-256, upload deadline, last dispatch, stop request/acknowledgement,
+interrupted runs, cleanup groups/result and the complete failure history, with
+up to 200 output keys listed. `docs/pending/lms_student_intelligence_architecture_prd.md`
+was normalized to ASCII punctuation so `audit_text_encoding` passes for the
+whole tree (746 files).
+
+Verification (disposable PostgreSQL 18, container removed afterwards): the
+migration applies, claim stores worker/attempt, a foreign worker cannot release
+the claim, shutdown release yields `queued` with no worker/dispatch/heartbeat,
+the next worker resumes at attempt 2, a stop-pending job is cancelled not
+requeued, beat recovery clears the worker, the retry deletes exactly its own
+recorded keys (and a storage failure does not block it), and the API/drawer
+expose the worker. The follow-up audit on a second disposable database covered
+four deploy interruptions without consuming an attempt, the attempt limit after
+three real failures, the Redis liveness mark/guard, immediate resumption of a
+dead worker's fresh-heartbeat job, the live worker's job being left alone, and
+the full drawer fields. `manage.py check`, `makemigrations --check --dry-run`
+("No changes detected"), `audit_text_encoding` (746 files) and compose YAML
+parsing pass.
+
+Encoder scaling was measured in a `debian:bookworm-slim` container capped at
+`--cpus=2` with the production profile (854x480, 120 s, `-preset fast`,
+CRF 23, 448k cap, HLS 6 s): `-threads 1` took 22.8 s and `-threads 2` took
+13.1 s, a 1.74x gain. The production server still needs its own measurement.
+
+Risks / next safe step: two concurrent jobs need disk headroom for two staged
+sources plus segments (the new per-job capacity log reports it) and 2 GiB
+memory headroom (the same log reports `MemAvailable`); deployments that never
+set the new env vars keep the compose defaults. Deploy, then measure one real
+lesson with `docker exec app-media-worker-1 ps -o pid,nlwp,pcpu,cmd -C ffmpeg`
+and `cat /sys/fs/cgroup/cpu.stat` before/after to confirm two encoder threads
+and low throttling; tune `MEDIA_ENCODE_THREADS`/concurrency from that evidence.
+
+## Implementation unit (10 November 2026) - chat workspace and stale-asset root cause
 
 ### Reported 1: empty band under the admin body on short pages
 
@@ -89,6 +258,125 @@ Reworked contract (one canonical structure):
   single truncated limits line whose full text stays in `title` and
   `aria-describedby`.
 - `TelegramSupportReplyForm.message` textarea `rows` 4 -> 2.
+- Message bubble anatomy (10 November follow-up): one bubble now reads
+  head -> text -> timestamp -> flags -> actions. `.aw-msg-head` carries the
+  author (`telegram_display_identity` for a student, "Admin (@handle)" for an
+  operator), a separator and the delivery/origin pills; `.aw-msg-text` is the
+  body; `.aw-msg-time` is its own muted line with `created_at` and `sent_at`;
+  `.aw-msg-flags` holds the awaiting/answered, digest-alert, Telegram-deletion,
+  delivery-error and removed-by states; `.aw-msg-actions` holds reply and the two
+  delete forms. The old `.aw-msg-meta` soup (sender, timestamp, both pills,
+  handle, sent time and every alert on one line) is gone. Empty flag/action rows
+  collapse via `:not(:has(> *))`, so a plain sent reply has no dead row.
+- Page band under `#display-page` (10 November follow-up): `.aw-workspace`
+  gained `flex: 1 1 auto`, so the page claims the rest of the `.aw-main` column
+  instead of ending above a bare canvas band. Measured on `background-jobs`:
+  workspace bottom == viewport bottom at 950x900, 1280x800 and 1919x959 (before:
+  862/900, 790/800, 681/959). No element overflows the page at those widths
+  (`wideElements` 0 at 950; at wider sizes only the rail tooltips, which are
+  invisible and clipped by `html { overflow-x: hidden }`); the wide table keeps
+  scrolling inside `.aw-table-wrap`. The canvas that remains below a short page
+  card is the page's own bottom padding plus the prototype's empty canvas - the
+  card is content-height by design and was not stretched.
+- Same check applied to `notification-history` (18 seeded notifications with
+  long Arabic titles, 950x900 / 1280x800 / 1919x959): no horizontal overflow
+  (0 elements wider than the page at 950; only the invisible rail tooltips
+  above), the long title wraps inside its `.aw-break` cell, and the page is
+  taller than the viewport so the fill question does not apply. The table is
+  capped at `max-height: 68vh` exactly like the prototype `.table-wrap`, so a
+  full page scrolls rows inside the table and scrolls the page for the pager;
+  the cap is already removed below 991.98px. Not changed: it is prototype
+  parity and shared by every admin table.
+- Real defect found there and fixed: `partials/background_jobs_content.html`
+  wrapped the whole table card in `{% if jobs_page %}`. A `Page` with zero
+  objects is falsy, so any filter that matched nothing rendered the head and the
+  filters and then nothing at all - no table, no empty state (reproduced with
+  `notification-history?q=no-such-notification-zzz`). The guard is now
+  `jobs_page is not None`, and the page renders its table card with the empty
+  row. The same template also gained notification-specific labels instead of
+  job wording: "No notifications match these filters." (with the bell icon),
+  "Matching notifications: %(count)s", caption "Notification history" and pager
+  aria "Notification history pages"; the jobs page keeps its own four labels.
+  Arabic entries were added and the catalogue recompiled (`msgfmt -c` clean).
+
+### Notification history grouped by message (10 November 2026)
+
+The page listed one row per recipient, so a broadcast to 11,219 students was
+11,219 rows. It now lists one row per **message**; opening a row lists that
+message's recipients.
+
+- Group key: `NOTIFICATION_GROUP_FIELDS` in `notification_history.py`
+  (notification_type, entity_id, offering_id, announcement_id, both effective
+  windows, title/body in both languages). `notification_message_identity()` is
+  the one helper for that tuple and `original_audience()` now uses it too, so
+  grouping and redelivery target the same set.
+- `notification_history_groups()` groups in SQL and returns one row per message:
+  `group_id=Min(pk)`, recipients, distinct inbox/push/Telegram totals by status,
+  created first/last, scheduled/cancelled/withdrawn/redelivery counts and a
+  `group_status` Case (`withdrawn`/`cancelled` when every recipient is,
+  `queued` when all are still scheduled, `running`, `failed`, `partial`,
+  `completed`). Filters: operation, group status (including
+  `delivery_failed`), title-or-kind search, since/until, announcement and
+  redelivery job.
+- New page partial `partials/notification_history_groups.html`: one flex row per
+  message (2-line title + kind, recipient count and outcome badges, status pill,
+  progress bar, created) and a "View recipients" button. The recipients open in
+  the **shared peek drawer** (`data-aw-drawer` on the button, message title as
+  the drawer title), not inline.
+- New fragment route `notification-group-recipients`
+  (`/dashboard/notification-history/group/<id>/recipients/`) answers three
+  shapes from one bounded page of 25 recipients: the drawer body
+  (`partials/notification_group_recipients.html`, search box + list container),
+  the search result (`?fragment=list`, `<ul>` + rows + sentinel) and the next
+  scroll page (`?fragment=more&page=N`, `<li>` rows + sentinel only, so it
+  appends inside the existing list). `?search=` narrows **within** that message
+  by name/username/email; non-HTMX hits redirect and unknown ids 404.
+- Scroll pagination lives in the shared shell: `admin_shell.js` observes
+  `[data-aw-load-more][data-url]` and swaps the sentinel (`outerHTML`) when it
+  scrolls into view, then rescans after every swap and after the drawer body is
+  populated. Requests are serialized per sentinel, so the drawer never fires a
+  second page while one is in flight. No pager is rendered inside the drawer.
+- Projections `readable_notification_group` and
+  `readable_notification_recipient` live in `job_monitor.py` beside
+  `readable_job`; each recipient row links to the existing per-recipient detail
+  page.
+- The jobs route is untouched: it still renders the flat table (and the
+  `is not None` empty-state fix above). The notification route no longer renders
+  that table.
+- Drawer head titles are clamped to two lines (`#aw-drawer-title`), so a long
+  message title never eats the list below it.
+- Fixed while verifying: `NormalizedContains` emitted `LIKE %s` without an
+  ESCAPE clause on non-PostgreSQL, so any search containing `_` (usernames,
+  storage keys) matched nothing locally while working on PostgreSQL, whose LIKE
+  defaults to backslash escaping. The non-PostgreSQL branch now emits
+  `ESCAPE '\\'`, so both backends agree.
+- Arabic: "Search messages", "Delivery progress", "Each row is one message...",
+  "View recipients", "View the recipients of %(title)s", "Recipients:
+  %(count)s", "Search recipients", "Loading more recipients...", "This message
+  has no saved recipients.", "No recipients match this search.", "cancelled",
+  "pending", "redelivered", "withdrawn" added and compiled.
+
+Verification: `tmp/ui-audit/verify_notification_groups.py` (3 seeded messages /
+49 recipient rows, 31 in the largest): 3 grouped rows and no flat rows, one
+drawer trigger per message, drawer body with 25 rows + search + a
+`fragment=more&page=2` sentinel, next page appending 6 rows with no second list
+and no trailing sentinel, list-shaped search responses (name, username, literal
+`%`), guards (302/404), filters (title, queued, delivery_failed, operation) and
+the untouched jobs page. `tmp/ui-audit/verify_notification_drawer.py` (Chromium):
+opens the drawer from the row, 25 rows, scrolling the drawer body appends to 31
+and clears the sentinel, search narrows to 1 without closing, clearing restores
+25, Escape closes, no console errors. Query budget: grouped page 8 statements,
+drawer body 6. `manage.py check` clean; `makemigrations --check` no changes;
+195 templates compile; `node --check` on `admin_shell.js`; admin sweep
+36/36 -> 200; scoped encoding audit clean. Screenshots:
+`tmp/ui-audit/notif-groups-1919.png`, `notif-drawer-1919.png`,
+`notif-drawer-scrolled-1512.png`, `notif-drawer-390.png`.
+
+Known cost: the group key includes the two body texts, so one page load
+aggregates the whole `StudentNotification` table (11,219 rows on production) and
+sorts the groups. That is a bounded admin read, but if the table grows by an
+order of magnitude the next step is a content-hash group column with an index
+(a migration), not a wider query.
 - Mobile: `.aw-page--chat` height is `calc(100dvh - var(--aw-chat-offset))`
   where the token is the top bar plus the active breakpoint's workspace padding
   (116 default, 134 at 991.98, 122 at 720). Below 1180px the student rail is
@@ -121,6 +409,10 @@ Verification (host Python 3.11 / Django 5.2, disposable SQLite
   active-row survival, linked-user fragment and the non-HTMX redirects.
 - `tmp/ui-audit/verify_chat_dom.py`: AR and EN, 0 duplicate ids, 0 unlabelled
   fields, 0 nameless buttons, no multi-line `{# #}` comment.
+- `tmp/ui-audit/verify_chat_layout.py` also asserts the bubble anatomy (head,
+  text, time order; a delivery pill and a `<time>` on every bubble; no
+  `.aw-msg-meta`), and `tmp/ui-audit/probe_jobs_overflow.py` reports the
+  page/viewport bottoms and any overflowing element.
 - `tmp/ui-audit/smoke_chat_posts.py`: reply, mark-read, claim and release each
   return exactly one panel root, no list and no full page.
 - `tmp/ui-audit/review_chat_queries.py`: query budget above.
@@ -158,9 +450,33 @@ It maps current Django/mobile owners and describes the student-facing scope:
 installability, Web Push, a page for explicitly downloaded audio/PDFs and
 WebAuthn passkey login. The document includes diagrams, proposed source
 changes, browser/server tools, candidate dependencies requiring explicit
-approval, proposed .env variables, self-test steps and open policy decisions.
+approval, proposed .env variables and self-test steps.
+
+Follow-up (10 November 2026): the user confirmed that the PWA/offline library
+remain student-only while passkeys cover all browser accounts. Offline media is
+encrypted at rest and unlocked by one local user-verification step; biometric
+or OS PIN/passcode is accepted. Keep access available through backgrounding and
+inactivity until explicit logout/account switch; disable offline media if
+secure encryption/unlock support is unavailable. Best-effort protection does
+not prevent screenshots or extraction after decryption. Clear downloads on
+logout/account switch and remove revoked media on the next online access check.
+Recheck server media authorization on every request; password login may access
+online media. Push covers all eligible student notifications with global opt-in,
+generic lock-screen text and authenticated related-page navigation. Use native
+PDF viewing where available and browser quota reporting. Production WebAuthn
+origin: https://bibleinstitute-eg.org; staging origin remains to be supplied.
+VAPID subject URI is optional. The user has not approved candidate dependency
+additions.
+
 No application code, dependency, .env, migration, deployment or database was
-changed. The related pending index is docs/pending/README.md.
+changed. The pending spec is git-ignored by the repository policy. The scoped
+encoding audit ran on docs/pending and found no violation in this spec; it
+exited nonzero for 60 existing typographic-character lines in
+lms_student_intelligence_architecture_prd.md. The file-specific audit argument
+is unsupported because --path requires a directory. Next safe step: review
+candidate libraries and browser/authenticator local encryption support before
+requesting package approval or implementing; obtain the staging origin.
+The related pending index is docs/pending/README.md.
 
 ## Previous documentation unit (8 November 2026) - student intelligence review
 

@@ -225,6 +225,61 @@ def monitored_jobs(*, selection: dict[str, list[str]] | None = None, **filters) 
     return first.union(*rest, all=True).order_by("-monitor_created", "monitor_family", "monitor_id") if rest else first.order_by("-monitor_created", "monitor_id")
 
 
+def readable_notification_group(row: dict) -> dict:
+    """Project one grouped message row for the notification history page."""
+    language = (get_language() or "ar")
+    english = language.startswith("en")
+    title = row["title_en"] if english and row["title_en"] else row["title_ar"]
+    body = row["body_en"] if english and row["body_en"] else row["body_ar"]
+    status = row["group_status"]
+    total, processed = row["group_total"], row["group_processed"]
+    return {
+        "group_id": row["group_id"],
+        "title": title,
+        "body": body,
+        "kind_label": str(dict(StudentNotification.NotificationType.choices).get(row["notification_type"], "")),
+        "recipients": row["recipients"],
+        "cancelled": row["cancelled_count"],
+        "withdrawn": row["withdrawn_count"],
+        "redelivered": row["redelivered_count"],
+        "status": status,
+        "status_label": str(dict(STATUSES).get(status, status)),
+        "processed": processed,
+        "total": total,
+        "failed": row["group_failed"],
+        "skipped": row["group_skipped"],
+        "pending": row["group_pending"],
+        "percent": min(100, round(processed * 100 / total)) if total else (100 if status == "completed" else 0),
+        "progress_label": (_("%(processed)s of %(total)s") % {"processed": processed, "total": total}
+                           if total else str(_("No progress reported"))),
+        "created_first": row["created_first"],
+        "created_last": row["created_last"],
+        "recipients_url": reverse("notification-group-recipients", args=[row["group_id"]]),
+    }
+
+
+def readable_notification_recipient(notification: StudentNotification) -> dict:
+    """Project one recipient row inside an expanded message."""
+    status = notification.history_status
+    total, processed = notification.history_total, notification.history_processed
+    return {
+        "id": notification.pk,
+        "user": notification.student,
+        "status": status,
+        "status_label": str(dict(STATUSES).get(status, status)),
+        "processed": processed,
+        "total": total,
+        "failed": notification.history_failed,
+        "skipped": notification.history_skipped,
+        "pending": notification.history_pending,
+        "percent": min(100, round(processed * 100 / total)) if total else (100 if status == "completed" else 0),
+        "progress_label": (_("%(processed)s of %(total)s") % {"processed": processed, "total": total}
+                           if total else str(_("No progress reported"))),
+        "created": notification.created_at,
+        "detail_url": reverse("background-job-detail", args=["notification", notification.pk]),
+    }
+
+
 def readable_job(row: dict) -> dict:
     job = {key.removeprefix("monitor_"): value for key, value in row.items()}
     family = job["family"]

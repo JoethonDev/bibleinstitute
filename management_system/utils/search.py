@@ -66,8 +66,10 @@ class NormalizedContains(Lookup):
         if connection.vendor != "postgresql":
             # PostgreSQL is authoritative and owns the indexed function. Keep
             # non-PostgreSQL tooling/tests executable without pretending that
-            # it has the same stored-value equivalence semantics.
-            return f"{lhs_sql} LIKE %s", [*lhs_params, pattern]
+            # it has the same stored-value equivalence semantics. The explicit
+            # ESCAPE clause mirrors PostgreSQL's default backslash escape, so a
+            # literal underscore (usernames, storage keys) matches on both.
+            return f"{lhs_sql} LIKE %s ESCAPE '\\'", [*lhs_params, pattern]
         return (
             f"lms_arabic_search_normalize({lhs_sql}) LIKE %s",
             [*lhs_params, pattern],

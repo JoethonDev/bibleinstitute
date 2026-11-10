@@ -345,6 +345,28 @@ done
 $ADMIN_READY || die "Admin worker did not respond as a consumer of the admin queue."
 info "Admin worker is running and consuming the admin queue."
 
+# The media worker holds the FFmpeg queue and the deploy recreates it, so a
+# stopped container would otherwise leave queued jobs with no consumer. Confirm
+# it restarted and still consumes the media queue; the worker's shutdown hook
+# has already returned its in-flight jobs to the queue before this check.
+MEDIA_CID="$(docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" ps --status running -q media-worker)"
+[[ -n "$MEDIA_CID" ]] || die "Media worker is not running."
+MEDIA_READY=false
+for attempt in $(seq 1 10); do
+    if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$APP_COMPOSE" exec -T media-worker python -c '
+from learning_platform.celery import app
+from celery.utils.nodenames import default_nodename
+queues = app.control.inspect(timeout=5, destination=[default_nodename(None)]).active_queues()
+raise SystemExit(0 if queues and any(q.get("name") == "media" for row in queues.values() for q in row) else 1)
+'; then
+        MEDIA_READY=true
+        break
+    fi
+    sleep 2
+done
+$MEDIA_READY || die "Media worker did not respond as a consumer of the media queue."
+info "Media worker is running and consuming the media queue."
+
 # ---------------------------------------------------------------------------
 # Step 5 - Atomic upstream switch
 # ---------------------------------------------------------------------------

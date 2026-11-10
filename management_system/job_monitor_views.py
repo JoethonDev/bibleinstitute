@@ -3,12 +3,13 @@
 import json
 import logging
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from django import forms
 from django.core.paginator import Paginator
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -17,17 +18,22 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET, require_POST
 
 from .admin_operations import ARTIFACT_TTL_HOURS, DOWNLOADABLE_EXPORT_KINDS, enqueue_admin_operation
-from .job_monitor import FAMILIES, PAGE_SIZE, STATUSES, monitored_jobs, operation_choices, readable_job, valid_job_id
+from .job_monitor import (
+    FAMILIES, PAGE_SIZE, STATUSES, monitored_jobs, operation_choices, readable_job,
+    readable_notification_group, readable_notification_recipient, valid_job_id,
+)
 from .models import AdminOperationJob, Announcement, PushDelivery, StudentNotification, TelegramBroadcast, TelegramNotificationDelivery
 from .notification_history import (
     notification_channel_history,
+    notification_history_groups,
     notification_materializing_ids,
+    notification_message_recipients,
     original_audience,
     original_notification,
 )
 from .notification_redelivery import enqueue_notification_redelivery
 from .utils.decorators import can_manage_academic_setup, capability_required
-from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
+from .utils.helpers import generate_breadcrumb, is_htmx, pagination_query_string, render_page
 from .utils.search import normalize_search_text
 
 
@@ -58,6 +64,7 @@ class JobFilters(forms.Form):
         if notifications_only:
             self.fields["family"].widget = forms.HiddenInput()
             self.fields["status"].choices.append(("delivery_failed", _("Has failed deliveries")))
+            self.fields["q"].label = _("Search messages")
 
     def clean(self):
         data = super().clean()
@@ -90,13 +97,79 @@ def background_jobs(request, notifications_only=False):
         params["family"] = "notification"
     form = JobFilters(params, notifications_only=notifications_only)
     page = None
+    groups_page = None
     if form.is_valid():
         data = dict(form.cleaned_data)
-        data["search"] = normalize_search_text(data.pop("q"))
-        page = Paginator(monitored_jobs(**data), PAGE_SIZE).get_page(request.GET.get("page", "1"))
-        page.object_list = [readable_job(row) for row in page.object_list]
-    return _response(request, {"filter_form": form, "jobs_page": page,
-                              "pagination_query": pagination_query_string(request), "notification_history": notifications_only})
+        search = normalize_search_text(data.pop("q"))
+        if notifications_only:
+            # One row per message. The page paginates messages, not the
+            # per-recipient rows a broadcast creates.
+            data.pop("family", None)
+            kinds = tuple(
+                value.split(":")[-1] for value, label in operation_choices()
+                if value.startswith("notification:")
+                and search and search in normalize_search_text(str(label))
+            )
+            groups_page = Paginator(
+                notification_history_groups(search=search, kinds=kinds, **data),
+                PAGE_SIZE,
+            ).get_page(request.GET.get("page", "1"))
+            groups_page.object_list = [readable_notification_group(row) for row in groups_page.object_list]
+        else:
+            data["search"] = search
+            page = Paginator(monitored_jobs(**data), PAGE_SIZE).get_page(request.GET.get("page", "1"))
+            page.object_list = [readable_job(row) for row in page.object_list]
+    return _response(request, {
+        "filter_form": form,
+        "jobs_page": page,
+        "notification_groups_page": groups_page,
+        "pagination_query": pagination_query_string(request),
+        "notification_history": notifications_only,
+    })
+
+
+@require_GET
+@capability_required(can_manage_academic_setup)
+def notification_group_recipients(request, group_id: int):
+    """Recipients of one message: the drawer body, a search result or a next page.
+
+    The drawer loads the body once; the search box swaps the list container
+    (``fragment=list``) and the scroll sentinel appends the next page
+    (``fragment=more``). Every shape is one PAGE_SIZE page of recipients.
+    """
+    if not is_htmx(request):
+        return redirect("notification-history")
+    fragment = request.GET.get("fragment")
+    search = normalize_search_text(request.GET.get("search", "").strip()[:120])
+    notification, recipients = notification_message_recipients(group_id, search=search)
+    if notification is None:
+        raise Http404
+    page = Paginator(recipients, PAGE_SIZE).get_page(request.GET.get("page", "1"))
+    recipients_url = reverse("notification-group-recipients", args=[group_id])
+    next_url = ""
+    if page.has_next():
+        query = {"fragment": "more", "page": page.next_page_number()}
+        if search:
+            query["search"] = search
+        next_url = f"{recipients_url}?{urlencode(query)}"
+    context = {
+        "group_id": group_id,
+        "recipient_rows": [readable_notification_recipient(row) for row in page.object_list],
+        "recipients_page": page,
+        "recipients_url": recipients_url,
+        "list_url": f"{recipients_url}?fragment=list",
+        "next_url": next_url,
+        "search": search,
+    }
+    if fragment == "more":
+        template = "partials/notification_group_recipient_items.html"
+    elif fragment == "list":
+        template = "partials/notification_group_recipient_list.html"
+    else:
+        template = "partials/notification_group_recipients.html"
+    response = render(request, template, context)
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @require_GET

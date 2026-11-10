@@ -1,0 +1,39 @@
+{% load i18n %}
+{% load aw_ui %}
+{% comment %}
+Recipient rows of one notification message plus the scroll sentinel.
+
+Only list items live here: the search response wraps them in its own list and
+the sentinel response appends them inside the existing list, so both pages are
+identical. The sentinel is a plain list item carrying the next page URL; the
+shared admin_shell.js observer loads it when it scrolls into view inside the
+drawer.
+{% endcomment %}
+{% for row in recipient_rows %}
+<li class="aw-notif-recipient-row">
+    <div class="aw-cell-main">
+        {% include "partials/components/aw_avatar.html" with name=row.user|aw_display_name tone="teal" %}
+        <div>
+            <b>{{ row.user|aw_display_name }}</b>
+            <span>@{{ row.user.username }}</span>
+        </div>
+    </div>
+    <div class="aw-notif-recipient-meta">
+        {% include "partials/components/aw_status_pill.html" with status=row.status label=row.status_label %}
+        <span class="aw-small aw-muted">{{ row.progress_label }}</span>
+        {% if row.failed %}<span class="aw-pill aw-pill--red">{{ row.failed }} {% translate "failed" %}</span>{% endif %}
+        {% if row.pending %}<span class="aw-pill aw-pill--amber">{{ row.pending }} {% translate "pending" %}</span>{% endif %}
+        <time class="aw-small aw-muted" datetime="{{ row.created|date:'c' }}">{{ row.created|date:"SHORT_DATETIME_FORMAT" }}</time>
+    </div>
+    <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{{ row.detail_url }}">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+        <span>{% translate "View details" %}</span>
+        <span class="visually-hidden">: {{ row.user|aw_display_name }}</span>
+    </a>
+</li>
+{% endfor %}
+{% if next_url %}
+<li class="aw-load-more" data-aw-load-more data-url="{{ next_url }}">
+    <span class="aw-small aw-muted">{% translate "Loading more recipients..." %}</span>
+</li>
+{% endif %}

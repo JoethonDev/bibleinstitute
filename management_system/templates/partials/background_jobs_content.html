@@ -64,7 +64,21 @@ pagination include arguments are unchanged.
 
     <p class="aw-field-error" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>
 
-    {% if jobs_page %}
+    {% comment %}
+    The notification history lists one row per message: a broadcast is one message
+    with thousands of recipient copies, so the grouped card owns that route and
+    the flat jobs table below stays for every other family.
+    {% endcomment %}
+    {% if notification_history %}
+    {% include 'partials/notification_history_groups.html' %}
+    {% else %}
+    {% comment %}
+    A page object with zero rows is falsy, so `{% if jobs_page %}` used to drop
+    the whole card for a filter that matches nothing - the operator saw the
+    filters and then a blank page with no result feedback. Test for None
+    instead: a matched-but-empty page renders the card with its empty row.
+    {% endcomment %}
+    {% if jobs_page is not None %}
     <div class="aw-card aw-table-card">
         <div class="aw-table-tools">
             <span class="aw-table-count">{% blocktranslate with count=jobs_page.paginator.count %}Matching jobs: {{ count }}{% endblocktranslate %}</span>
@@ -113,5 +127,6 @@ pagination include arguments are unchanged.
         {% translate "Background job pages" as job_pages_label %}
         {% include "partials/pagination.html" with page_obj=jobs_page pagination_query=pagination_query aria_label=job_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
     </div>
+    {% endif %}
     {% endif %}
 </div>

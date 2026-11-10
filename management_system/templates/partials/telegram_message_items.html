@@ -19,7 +19,25 @@
 {% for message in message_items %}
 {% ifchanged message.created_at|date:"Y-m-d" %}<li class="aw-msg-day">{{ message.created_at|date:"DATE_FORMAT" }}</li>{% endifchanged %}
 <li class="aw-msg{% if message.direction == 'inbound' %} aw-msg--in{% else %} aw-msg--out{% endif %}" data-msg-pk="{{ message.pk }}">
-    {% if message.text %}<div>{{ message.text|linebreaksbr }}</div>{% endif %}
+    {% comment %}
+    One bubble reads top to bottom: who wrote it with the delivery state, the
+    message itself, when it was written, the flags an operator must act on, then
+    the actions. Everything after the text is one block per concern so an Arabic
+    RTL bubble and an English LTR bubble keep the same rhythm.
+    {% endcomment %}
+    <div class="aw-msg-head">
+        <span class="aw-msg-author">
+            {% if message.direction == "inbound" %}
+            {% if message.sender_user %}{{ message.sender_user.telegram_display_identity }}{% else %}{% translate "Student" %}{% endif %}
+            {% else %}
+            {% translate "Admin" %}{% if message.sender_user %}<span class="aw-msg-handle">(@{{ message.sender_user.username }})</span>{% endif %}
+            {% endif %}
+        </span>
+        <span class="aw-msg-sep" aria-hidden="true">-</span>
+        {% include "partials/components/aw_status_pill.html" with status=message.delivery_status label=message.get_delivery_status_display %}
+        {% if message.origin %}{% include "partials/components/aw_status_pill.html" with status=message.origin label=message.get_origin_display %}{% endif %}
+    </div>
+    {% if message.text %}<div class="aw-msg-text">{{ message.text|linebreaksbr }}</div>{% endif %}
     {% with attachments=message.attachments.all %}
     {% for attachment in attachments %}
     {% url 'telegram-attachment' attachment_id=attachment.pk as attachment_url %}
@@ -72,19 +90,19 @@
     {% endif %}
     {% endfor %}
     {% endwith %}
+    <div class="aw-msg-time">
+        <time datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+        {% if message.sent_at %}<span>{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</span>{% endif %}
+    </div>
     {% if message.delivery_status == "unknown" %}
     <div class="aw-alert aw-alert--warn" role="status">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
         <span>{{ delivery_unknown_label }}</span>
     </div>
     {% endif %}
-    <div class="aw-msg-meta aw-flex-wrap">
-        <span>{% if message.direction == "inbound" %}{% if message.sender_user %}{{ message.sender_user.telegram_display_identity }}{% else %}{% translate "Student" %}{% endif %}{% else %}{% translate "Admin" %}{% endif %} - {{ message.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-        {% include "partials/components/aw_status_pill.html" with status=message.delivery_status label=message.get_delivery_status_display %}
-        {% if message.origin %}{% include "partials/components/aw_status_pill.html" with status=message.origin label=message.get_origin_display %}{% endif %}
-        {% if message.direction == "outbound" and message.sender_user %}<span>@{{ message.sender_user.username }}</span>{% endif %}
-        {% if message.sent_at %}<time datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
-        {% if message.delivery_error %}<span title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
+    <div class="aw-msg-flags">
+        {% if message.delivery_error %}<span class="aw-msg-note" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
+        {% if message.delivery_error %}<span class="aw-msg-note" title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
         {% if message.digest_alert %}
         {% with alert=message.digest_alert %}
         {% if alert.resolved_at %}
@@ -113,10 +131,10 @@
         {% elif message.telegram_deletion_status == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=deletion_expired_label %}
         {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=deletion_failed_label %}{% endif %}
         {% endif %}
-        {% if message.telegram_deleted_by %}<span>{% translate "Removed by" %} @{{ message.telegram_deleted_by.username }}</span>{% endif %}
-        {% if message.telegram_deletion_error %}<span>{{ message.telegram_deletion_error }}</span>{% endif %}
+        {% if message.telegram_deleted_by %}<span class="aw-msg-note">{% translate "Removed by" %} @{{ message.telegram_deleted_by.username }}</span>{% endif %}
+        {% if message.telegram_deletion_error %}<span class="aw-msg-note">{{ message.telegram_deletion_error }}</span>{% endif %}
     </div>
-    <div class="aw-flex aw-flex-wrap">
+    <div class="aw-msg-actions">
         {% if message.direction == "inbound" %}
         <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-select="#telegram-chat-panel" hx-swap="outerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
         {% endif %}

@@ -1,0 +1,36 @@
+{% load i18n %}
+{% comment %}
+Recipients of one notification message, as the shared peek drawer body.
+
+The drawer opens with the first page already rendered; the search box swaps the
+list container, and the sentinel inside the list appends the next page when it
+scrolls into view. Everything is bounded per page, so a 11k-recipient message is
+still one request of PAGE_SIZE rows at a time.
+{% endcomment %}
+<div id="notification-group-{{ group_id }}" class="aw-notif-recipients-panel">
+    <form method="get"
+          action="{{ recipients_url }}"
+          class="aw-notif-recipient-search"
+          hx-get="{{ list_url }}"
+          hx-target="#notification-group-{{ group_id }}-list"
+          hx-swap="innerHTML"
+          hx-push-url="false"
+          role="search">
+        <label class="aw-field-label" for="notification-group-search-{{ group_id }}">{% translate "Search recipients" %}</label>
+        <input id="notification-group-search-{{ group_id }}"
+               class="aw-input"
+               type="search"
+               name="search"
+               value="{{ search }}"
+               placeholder="{% translate 'Name, username or email' %}"
+               hx-get="{{ list_url }}"
+               hx-include="closest form"
+               hx-trigger="input changed delay:250ms, search"
+               hx-target="#notification-group-{{ group_id }}-list"
+               hx-swap="innerHTML"
+               hx-push-url="false">
+    </form>
+    <div id="notification-group-{{ group_id }}-list" class="aw-notif-recipients-list">
+        {% include "partials/notification_group_recipient_list.html" %}
+    </div>
+</div>

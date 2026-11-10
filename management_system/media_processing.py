@@ -76,6 +76,8 @@ SOURCE_EXTENSIONS = {
 MAX_FAILURE_HISTORY = 20
 MAX_ERROR_MESSAGE_LENGTH = 4000
 MAX_STDERR_LENGTH = 8000
+MAX_ENCODE_THREADS = 16
+MIN_FREE_DISK_BYTES = 4 * 1024**3
 MAX_MEDIA_ATTEMPTS = 3
 MAX_AUTOMATION_UPLOAD_FILES = 2
 ATTEMPT_LIMIT_ERROR = "attempt_limit_exceeded"
@@ -194,6 +196,45 @@ def media_limits() -> dict[str, Any]:
         "mp3_bitrate": bitrate_setting("MEDIA_MP3_BITRATE", "128k"),
         "max_segment_bytes": max(0, int(getattr(settings, "MEDIA_MAX_SEGMENT_BYTES", 2048000))),
     }
+
+
+def _cgroup_cpu_allowance() -> float | None:
+    """Return the container CPU allowance from cgroup v2/v1, if one is set."""
+    with suppress(OSError, ValueError):
+        with open("/sys/fs/cgroup/cpu.max", "r", encoding="ascii") as handle:
+            fields = handle.read().split()
+        if len(fields) == 2 and fields[0] != "max":
+            quota, period = int(fields[0]), int(fields[1])
+            if quota > 0 and period > 0:
+                return quota / period
+    with suppress(OSError, ValueError, ZeroDivisionError):
+        with open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "r", encoding="ascii") as handle:
+            quota = int(handle.read().strip())
+        with open("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "r", encoding="ascii") as handle:
+            period = int(handle.read().strip())
+        if quota > 0 and period > 0:
+            return quota / period
+    return None
+
+
+def media_encode_threads() -> int:
+    """Return the encoder thread budget for one media job.
+
+    Compose ``cpus`` is a CFS quota, so FFmpeg inside the container still sees
+    every host CPU and would spawn an encoder thread and a filter thread per
+    host core. Those threads are then throttled every period and stall together.
+    The budget is the container CPU allowance (rounded up) so one encode can use
+    the whole allowance without oversubscribing it; ``MEDIA_ENCODE_THREADS``
+    overrides it.
+    """
+    override = int(getattr(settings, "MEDIA_ENCODE_THREADS", 0) or 0)
+    if override > 0:
+        return min(override, MAX_ENCODE_THREADS)
+    allowance = _cgroup_cpu_allowance()
+    if allowance is None:
+        allowance = float(os.cpu_count() or 1)
+    threads = int(allowance) + (1 if allowance % 1 else 0)
+    return max(1, min(threads, MAX_ENCODE_THREADS))
 
 
 def _scaled_bitrate(value: str, factor: float) -> str:
@@ -359,6 +400,11 @@ def transition_job(
     return job
 
 
+def media_worker_id() -> str:
+    """Return this worker instance identity (container hostname by default)."""
+    return str(getattr(settings, "MEDIA_WORKER_ID", "") or "")[:128]
+
+
 @transaction.atomic
 def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
     """Atomically claim one queued job for a media worker attempt."""
@@ -370,7 +416,7 @@ def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
         or job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED
     ):
         return None
-    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS:
         _mark_attempt_limit_locked(job)
         return None
     timestamp = timezone.now()
@@ -378,9 +424,13 @@ def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
     job.phase = MediaProcessingPhase.DOWNLOAD
     job.progress = 0
     job.attempt_count += 1
+    job.worker_id = media_worker_id()
     job.started_at = timestamp
     job.last_heartbeat_at = timestamp
-    job.save(update_fields=["status", "phase", "progress", "attempt_count", "started_at", "last_heartbeat_at"])
+    job.save(update_fields=[
+        "status", "phase", "progress", "attempt_count", "worker_id",
+        "started_at", "last_heartbeat_at",
+    ])
     return job
 
 
@@ -398,7 +448,7 @@ def record_job_failure(
     job = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
     if expected_attempt_count is not None and job.attempt_count != expected_attempt_count:
         return job
-    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS:
         error_code = ATTEMPT_LIMIT_ERROR
         error_message = ATTEMPT_LIMIT_MESSAGE
     message = str(error_message or _("Media processing failed."))[:MAX_ERROR_MESSAGE_LENGTH]
@@ -472,7 +522,7 @@ def queue_verified_job(
         MediaProcessingStatus.SUCCEEDED,
     }:
         return job, False
-    if job.status == MediaProcessingStatus.FAILED and job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if job.status == MediaProcessingStatus.FAILED and job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS:
         raise ValidationError(ATTEMPT_LIMIT_MESSAGE)
     if job.status == MediaProcessingStatus.FAILED and not job.source_acknowledged_at:
         raise ValidationError(_("This media job has no acknowledged source to retry."))
@@ -540,7 +590,10 @@ def requeue_stalled_job(
             "error_code", "error_message",
         ])
         return job
-    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if (
+        job.status == MediaProcessingStatus.QUEUED
+        and job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS
+    ):
         _mark_attempt_limit_locked(job)
         return job
     job.status = MediaProcessingStatus.QUEUED
@@ -548,8 +601,68 @@ def requeue_stalled_job(
     job.progress = 0
     job.last_dispatched_at = dispatched_at or timezone.now()
     job.last_heartbeat_at = None
-    job.save(update_fields=["status", "phase", "progress", "last_dispatched_at", "last_heartbeat_at"])
+    job.worker_id = ""
+    job.interrupted_count = min(job.attempt_count, (job.interrupted_count or 0) + 1)
+    job.save(update_fields=[
+        "status", "phase", "progress", "last_dispatched_at",
+        "last_heartbeat_at", "worker_id", "interrupted_count",
+    ])
     return job
+
+
+def release_worker_jobs(worker_id: Any = None, *, limit: int = 100) -> list[Any]:
+    """Return one stopping worker's in-flight jobs to the durable queue.
+
+    Called from the worker shutdown signal (SIGTERM) so a redeploy does not
+    leave jobs holding a dead worker's claim. Every row is locked and rechecked,
+    so a job that finished, failed or was stopped in the meantime is untouched.
+    A released job keeps its attempt number (the interrupted attempt stays on
+    record) but loses the worker claim and heartbeat; it is left with
+    ``last_dispatched_at = None`` so the next worker's startup recovery, or the
+    beat recovery within one minute, dispatches it again. No task is enqueued
+    here: the shutting-down pool must not claim its own released jobs.
+    """
+    owner = str(worker_id if worker_id is not None else media_worker_id())[:128]
+    if not owner:
+        return []
+    job_ids = list(
+        MediaProcessingJob.objects.filter(
+            worker_id=owner,
+            status__in=ACTIVE_WORKER_STATUSES,
+        ).order_by("pk").values_list("pk", flat=True)[:limit]
+    )
+    released: list[Any] = []
+    now = timezone.now()
+    for job_id in job_ids:
+        with transaction.atomic():
+            job = MediaProcessingJob.objects.select_for_update().filter(pk=job_id).first()
+            if job is None or job.worker_id != owner or job.status not in ACTIVE_WORKER_STATUSES:
+                continue
+            if job.stop_requested_at is not None:
+                job.status = MediaProcessingStatus.CANCELLED
+                job.phase = MediaProcessingPhase.CANCELLED
+                job.finished_at = now
+                job.cancel_acknowledged_at = now
+                job.error_code = "cancelled_by_operator"
+                job.error_message = str(_("Stopped by an administrator."))
+                job.save(update_fields=[
+                    "status", "phase", "finished_at", "cancel_acknowledged_at",
+                    "error_code", "error_message",
+                ])
+                continue
+            job.status = MediaProcessingStatus.QUEUED
+            job.phase = MediaProcessingPhase.QUEUED
+            job.progress = 0
+            job.last_dispatched_at = None
+            job.last_heartbeat_at = None
+            job.worker_id = ""
+            job.interrupted_count = min(job.attempt_count, (job.interrupted_count or 0) + 1)
+            job.save(update_fields=[
+                "status", "phase", "progress", "last_dispatched_at",
+                "last_heartbeat_at", "worker_id", "interrupted_count",
+            ])
+            released.append(job.public_id)
+    return released
 
 
 def assert_media_job_lease(job_id: int, attempt_count: int) -> None:
@@ -901,7 +1014,7 @@ def is_retryable_failed_job(job: MediaProcessingJob) -> bool:
     return bool(
         job.status == MediaProcessingStatus.FAILED
         and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
-        and job.attempt_count < MAX_MEDIA_ATTEMPTS
+        and job.attempt_count - job.interrupted_count < MAX_MEDIA_ATTEMPTS
         and job.source_acknowledged_at
         and not job.staging_deleted_at
         and is_retryable_media_failure(job.error_code)
@@ -914,6 +1027,17 @@ class MediaProcessingError(Exception):
     def __init__(self, message: str, code: str = "processing_failed"):
         super().__init__(message)
         self.code = code
+
+
+class _ParallelStageAborted(MediaProcessingError):
+    """Internal signal that the sibling media stage stopped this one.
+
+    It never reaches the job record: ``run_media_job`` replaces it with the
+    failure (or cancellation) that stopped the sibling stage.
+    """
+
+    def __init__(self):
+        super().__init__("The sibling media stage stopped.", "parallel_stage_aborted")
 
 
 def mark_publication_failed(job_id: Any) -> None:
@@ -1305,13 +1429,17 @@ def _run_hls(
         playlist,
     ]
     if stream == "v:0":
+        threads = media_encode_threads()
         command = [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input_path,
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+            "-filter_threads", str(threads),
+            "-i", input_path,
             "-map", "0:v:0", "-map", "0:a:0?",
             "-c:v", "libx264", "-crf", str(limits["video_crf"]), "-preset", limits["video_preset"],
             "-maxrate", _scaled_bitrate(limits["video_maxrate"], rate_scale),
             "-bufsize", _scaled_bitrate(limits["video_bufsize"], rate_scale),
             "-profile:v", "high", "-pix_fmt", "yuv420p",
+            "-threads", str(threads),
         ]
         if limits["video_max_width"]:
             command += ["-vf", video_scale_filter(limits["video_max_width"])]
@@ -1622,6 +1750,22 @@ def finish_attachment_retry(public_id: Any, *, error: Exception | None = None) -
     return job
 
 
+def _capacity_snapshot(work_root: str) -> dict[str, int | None]:
+    """Return the free disk and memory available to this worker instance."""
+    try:
+        free_disk = shutil.disk_usage(work_root).free
+    except OSError:
+        free_disk = None
+    free_memory = None
+    with suppress(OSError, ValueError):
+        with open("/proc/meminfo", "r", encoding="ascii") as handle:
+            for line in handle:
+                if line.startswith("MemAvailable:"):
+                    free_memory = int(line.split()[1]) * 1024
+                    break
+    return {"free_disk_bytes": free_disk, "free_memory_bytes": free_memory}
+
+
 def run_media_job(
     job: MediaProcessingJob,
     *,
@@ -1637,6 +1781,24 @@ def run_media_job(
     folder = validate_requested_folder(job.requested_folder)
     work_root = getattr(settings, "MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
     os.makedirs(work_root, exist_ok=True)
+    capacity = _capacity_snapshot(work_root)
+    logger.info(
+        "media worker capacity",
+        extra={
+            "event": "media_worker_capacity",
+            "public_id": str(job.public_id),
+            **capacity,
+        },
+    )
+    if capacity["free_disk_bytes"] is not None and capacity["free_disk_bytes"] < MIN_FREE_DISK_BYTES:
+        logger.warning(
+            "media work volume is below the concurrency headroom",
+            extra={
+                "event": "media_worker_low_disk",
+                "public_id": str(job.public_id),
+                "free_disk_bytes": capacity["free_disk_bytes"],
+            },
+        )
     try:
         with TemporaryDirectory(prefix=f"media-{job.public_id}-", dir=work_root) as work_dir:
             source_path = os.path.join(work_dir, "source")
@@ -1678,61 +1840,137 @@ def run_media_job(
             else:
                 video_output_dir = os.path.join(work_dir, "video-hls")
                 audio_output_dir = os.path.join(work_dir, "audio-hls")
-                manifest_path, video_names = _encode_hls_with_size_cap(
-                    source_path, video_output_dir, job.output_base_name, "v:0",
-                    probe.duration, progress_callback, probe=probe,
-                    cancellation_check=cancellation_check,
-                ) if probe.has_video else (None, [])
-                if manifest_path:
-                    if heartbeat_callback:
-                        heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
-                    manifest_key, _ = _upload_hls_outputs(
-                        manifest_path, video_names, video_output_dir, folder,
-                        job.output_base_name, "Video Segments", created_keys,
-                        (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
-                        cancellation_check=cancellation_check,
-                        output_key_callback=output_key_callback,
-                    )
-                else:
-                    manifest_key = ""
+                manifest_key = ""
                 audio_manifest_key = ""
                 download_key = ""
+                parallel_stages = probe.has_video and probe.has_audio
+                audio_outputs: dict[str, Any] = {}
+                audio_errors: list[BaseException] = []
+                video_stopped = threading.Event()
+                audio_stopped = threading.Event()
+                stage_seconds: dict[str, float] = {}
+
+                def audio_cancellation_check() -> None:
+                    if video_stopped.is_set():
+                        raise _ParallelStageAborted()
+                    if not parallel_stages and cancellation_check:
+                        cancellation_check()
+
+                def encode_audio_outputs() -> None:
+                    started = time.monotonic()
+                    stage_progress = None if parallel_stages else progress_callback
+                    try:
+                        audio_path = _prepare_audio(
+                            source_path,
+                            probe,
+                            work_dir,
+                            probe.duration,
+                            stage_progress,
+                            audio_cancellation_check,
+                        )
+                        audio_playlist, audio_names = _encode_hls_with_size_cap(
+                            audio_path, audio_output_dir, f"{job.output_base_name}_audio",
+                            "a:0", probe.duration, stage_progress, probe=probe,
+                            cancellation_check=audio_cancellation_check,
+                        )
+                        mp3_path = _make_mp3(
+                            audio_path,
+                            source_path,
+                            job.source_kind,
+                            work_dir,
+                            probe.duration,
+                            stage_progress,
+                            audio_cancellation_check,
+                        )
+                        audio_outputs.update(
+                            playlist=audio_playlist,
+                            names=audio_names,
+                            mp3=mp3_path,
+                        )
+                    except BaseException as exc:
+                        audio_errors.append(exc)
+                        audio_stopped.set()
+                    finally:
+                        stage_seconds["audio"] = time.monotonic() - started
+
+                audio_thread = None
+                if parallel_stages:
+                    # The audio deliverables read only the staged source and
+                    # write their own work directory, so they are independent
+                    # of the video encode and run beside it on the idle core.
+                    audio_thread = threading.Thread(
+                        target=encode_audio_outputs,
+                        name=f"media-audio-{job.public_id}",
+                        daemon=True,
+                    )
+                    audio_thread.start()
+                elif probe.has_audio:
+                    encode_audio_outputs()
+
+                video_error: BaseException | None = None
+                try:
+                    if probe.has_video:
+                        def video_cancellation_check() -> None:
+                            if audio_stopped.is_set():
+                                raise _ParallelStageAborted()
+                            if cancellation_check:
+                                cancellation_check()
+
+                        video_started = time.monotonic()
+                        manifest_path, video_names = _encode_hls_with_size_cap(
+                            source_path, video_output_dir, job.output_base_name, "v:0",
+                            probe.duration, progress_callback, probe=probe,
+                            cancellation_check=video_cancellation_check,
+                        )
+                        stage_seconds["video"] = time.monotonic() - video_started
+                        if manifest_path:
+                            if heartbeat_callback:
+                                heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
+                            manifest_key, _ = _upload_hls_outputs(
+                                manifest_path, video_names, video_output_dir, folder,
+                                job.output_base_name, "Video Segments", created_keys,
+                                (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
+                                cancellation_check=video_cancellation_check,
+                                output_key_callback=output_key_callback,
+                            )
+                except BaseException as exc:
+                    video_error = exc
+                    video_stopped.set()
+                finally:
+                    if audio_thread is not None:
+                        audio_thread.join()
+                if parallel_stages:
+                    logger.info(
+                        "media stages completed",
+                        extra={
+                            "event": "media_stages_completed",
+                            "public_id": str(job.public_id),
+                            "video_ms": round(stage_seconds.get("video", 0.0) * 1000),
+                            "audio_ms": round(stage_seconds.get("audio", 0.0) * 1000),
+                            "encode_threads": media_encode_threads(),
+                        },
+                    )
+                failures = [error for error in (*audio_errors, video_error) if error is not None]
+                primary_failure = next(
+                    (error for error in failures if not isinstance(error, _ParallelStageAborted)),
+                    failures[0] if failures else None,
+                )
+                if primary_failure is not None:
+                    raise primary_failure
                 if probe.has_audio:
-                    audio_path = _prepare_audio(
-                        source_path,
-                        probe,
-                        work_dir,
-                        probe.duration,
-                        progress_callback,
-                        cancellation_check,
-                    )
-                    audio_playlist, audio_names = _encode_hls_with_size_cap(
-                        audio_path, audio_output_dir, f"{job.output_base_name}_audio",
-                        "a:0", probe.duration, progress_callback, probe=probe,
-                        cancellation_check=cancellation_check,
-                    )
                     if heartbeat_callback:
                         heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, 70)
                     audio_manifest_key, _ = _upload_hls_outputs(
-                        audio_playlist, audio_names, audio_output_dir, folder,
+                        audio_outputs["playlist"], audio_outputs["names"], audio_output_dir, folder,
                         f"{job.output_base_name}_audio", "Audio Segments", created_keys,
                         (lambda value: heartbeat_callback(MediaProcessingPhase.UPLOAD_OUTPUT, value)) if heartbeat_callback else None,
                         cancellation_check=cancellation_check,
                         output_key_callback=output_key_callback,
                     )
-                    mp3_path = _make_mp3(
-                        audio_path,
-                        source_path,
-                        job.source_kind,
-                        work_dir,
-                        probe.duration,
-                        progress_callback,
-                        cancellation_check,
-                    )
                     download_key = _destination_key(folder, "Downloadable Files", f"{job.output_base_name}.mp3")
                     upload_output_file(
                         download_key,
-                        mp3_path,
+                        audio_outputs["mp3"],
                         content_type="audio/mpeg",
                         cancellation_check=cancellation_check,
                         output_key_callback=output_key_callback,
@@ -1794,6 +2032,9 @@ __all__ = [
     "job_is_visible_to",
     "mark_publication_failed",
     "media_limits",
+    "media_encode_threads",
+    "media_worker_id",
+    "release_worker_jobs",
     "publish_attached_lesson",
     "publish_automation_lesson",
     "queue_verified_job",
