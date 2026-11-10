@@ -1,0 +1,83 @@
+{% load i18n %}
+{% comment %}
+Telegram support chat workspace: the conversations column plus the chat panel.
+
+The conversations column is a sibling of the panel here, and this partial is
+the single definition of that layout for both the inbox page and one
+conversation page. The panel is one root element (#telegram-chat-panel), so
+every panel request replaces it whole with hx-swap="outerHTML" and the empty
+state, the thread and the student rail can never be mixed in one DOM.
+
+chat_push_url is "true" on the inbox page (filter changes are page state) and
+"false" on one conversation page (the address bar keeps pointing at that
+conversation while the list is filtered).
+{% endcomment %}
+<div class="aw-chat-layout">
+    <aside class="aw-chat-col aw-chat-col--list" aria-label="{% translate 'Conversations' %}">
+        <div class="aw-chat-list-head">
+            <form method="get"
+                  action="{{ conversation_list_url }}"
+                  hx-get="{{ conversation_list_url }}"
+                  hx-target="#telegram-conversation-list"
+                  hx-select="#telegram-conversation-list"
+                  hx-swap="outerHTML"
+                  hx-push-url="{{ chat_push_url|default:'false' }}">
+                <input type="hidden" name="status" value="{{ status }}">
+                <div class="aw-field">
+                    <label class="aw-field-label" for="telegram-conv-search">{% translate "Search conversations" %}</label>
+                    <input id="telegram-conv-search"
+                           class="aw-input"
+                           type="search"
+                           name="search"
+                           value="{{ search }}"
+                           placeholder="{% translate 'Name or message...' %}"
+                           hx-get="{{ conversation_list_url }}"
+                           hx-include="closest form"
+                           hx-trigger="input changed delay:250ms, search"
+                           hx-target="#telegram-conversation-list"
+                           hx-select="#telegram-conversation-list"
+                           hx-swap="outerHTML"
+                           hx-push-url="{{ chat_push_url|default:'false' }}">
+                </div>
+            </form>
+            <div class="aw-chip-row" role="group" aria-label="{% translate 'Filter conversations' %}">
+                <a class="aw-chip{% if not status %} aw-chip--teal{% endif %}"
+                   href="{{ conversation_list_url }}{% if search %}?search={{ search|urlencode }}{% endif %}"
+                   hx-get="{{ conversation_list_url }}{% if search %}?search={{ search|urlencode }}{% endif %}"
+                   hx-target="#telegram-conversation-list"
+                   hx-select="#telegram-conversation-list"
+                   hx-swap="outerHTML"
+                   hx-push-url="{{ chat_push_url|default:'false' }}">{% translate "All" %}</a>
+                <a class="aw-chip{% if status == 'pending' %} aw-chip--teal{% endif %}"
+                   href="{{ conversation_list_url }}?status=pending{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
+                   hx-get="{{ conversation_list_url }}?status=pending{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
+                   hx-target="#telegram-conversation-list"
+                   hx-select="#telegram-conversation-list"
+                   hx-swap="outerHTML"
+                   hx-push-url="{{ chat_push_url|default:'false' }}">{% translate "Unread" %}{% if unread_count %} {{ unread_count }}{% endif %}</a>
+                <a class="aw-chip{% if status == 'processed' %} aw-chip--teal{% endif %}"
+                   href="{{ conversation_list_url }}?status=processed{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
+                   hx-get="{{ conversation_list_url }}?status=processed{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
+                   hx-target="#telegram-conversation-list"
+                   hx-select="#telegram-conversation-list"
+                   hx-swap="outerHTML"
+                   hx-push-url="{{ chat_push_url|default:'false' }}">{% translate "Processed" %}</a>
+            </div>
+        </div>
+        {% include 'partials/telegram_conversation_list.html' %}
+    </aside>
+
+    {% if conversation %}
+    {% include 'partials/telegram_chat_panel.html' %}
+    {% else %}
+    <section id="telegram-chat-panel"
+             class="aw-chat-panel is-empty"
+             aria-label="{% translate 'Telegram Support Chat' %}">
+        <div class="aw-chat-empty">
+            {% translate "Select a conversation" as empty_title %}
+            {% translate "Choose a conversation from the list to view messages and reply." as empty_description %}
+            {% include "partials/components/aw_empty.html" with icon="i-message" title=empty_title description=empty_description %}
+        </div>
+    </section>
+    {% endif %}
+</div>

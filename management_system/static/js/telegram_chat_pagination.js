@@ -32,7 +32,18 @@
         return document.querySelectorAll('#telegram-conversation-list, #telegram-message-list');
     }
 
+    // A panel/message swap detaches the previous scroll root; its observer and
+    // map entry would otherwise leak for the life of the page.
+    function pruneDetachedObservers() {
+        observers.forEach((observer, root) => {
+            if (root.isConnected) return;
+            observer.disconnect();
+            observers.delete(root);
+        });
+    }
+
     function bindScrollLoading(singleRoot = null) {
+        pruneDetachedObservers();
         rootsToBind(singleRoot).forEach((root) => {
             const previous = observers.get(root);
             if (previous) previous.disconnect();

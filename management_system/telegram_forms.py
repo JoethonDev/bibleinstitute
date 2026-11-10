@@ -71,7 +71,9 @@ class TelegramSupportReplyForm(forms.Form):
         },
         widget=forms.Textarea(
             attrs={
-                "rows": 4,
+                # The composer shares the chat height with the thread, so it
+                # starts compact and the CSS caps its growth.
+                "rows": 2,
                 "maxlength": 4000,
                 "aria-label": _("Reply message"),
                 "class": "aw-textarea",

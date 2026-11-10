@@ -2,9 +2,30 @@
 {% translate "Blocked" as blocked_label %}
 {% translate "Open" as open_label %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-{% include 'partials/telegram_conversation_list.html' %}
+{% comment %}
+The panel root. Every panel request returns this element and the trigger swaps
+it with hx-swap="outerHTML", so the open/empty state class always matches the
+content. The student rail lives inside it, which makes the open panel a second
+column beside the thread and keeps the conversations column a page sibling.
+{% endcomment %}
+<section id="telegram-chat-panel"
+         class="aw-chat-panel is-open"
+         data-conversation-id="{{ conversation.pk }}"
+         aria-label="{% translate 'Telegram Support Chat' %}">
 <div class="aw-chat-main">
     <div class="aw-chat-head">
+        <a class="aw-icon-btn aw-chat-back"
+           href="{{ conversation_list_url }}"
+           hx-get="{{ conversation_list_url }}"
+           hx-target="#display-page"
+           hx-select="#page-region"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-select-oob="#aw-rail-nav,#aw-sidebar-body,#aw-mobile-nav,#aw-topbar-crumbs"
+           aria-label="{% translate 'Back to conversations' %}"
+           title="{% translate 'Back to conversations' %}">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-chevron-{% if request.LANGUAGE_CODE == 'ar' %}right{% else %}left{% endif %}"></use></svg>
+        </a>
         <span class="aw-avatar aw-avatar--lg aw-avatar--square" aria-hidden="true">
             {% if conversation.user.profile_image_key %}
             <img class="aw-avatar-img"
@@ -28,12 +49,12 @@
             </a>
 
             {% if conversation.status == "open" %}
-            <form method="post" action="{{ claim_url }}" hx-post="{{ claim_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="aw-inline-form">
+            <form method="post" action="{{ claim_url }}" hx-post="{{ claim_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-select="#telegram-chat-panel" hx-swap="outerHTML" class="aw-inline-form">
                 {% csrf_token %}
                 <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Claim conversation" %}</button>
             </form>
             {% elif conversation.status == "claimed" and conversation.claimed_by_id == request.user.pk %}
-            <form method="post" action="{{ release_url }}" hx-post="{{ release_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-swap="innerHTML" class="aw-inline-form">
+            <form method="post" action="{{ release_url }}" hx-post="{{ release_url }}?fragment=panel" hx-target="#telegram-chat-panel" hx-select="#telegram-chat-panel" hx-swap="outerHTML" class="aw-inline-form">
                 {% csrf_token %}
                 <button type="submit" class="aw-btn aw-btn--outline aw-btn--sm">{% translate "Release conversation" %}</button>
             </form>
@@ -44,7 +65,8 @@
                   action="{{ mark_read_url }}"
                   hx-post="{{ mark_read_url }}?fragment=panel"
                   hx-target="#telegram-chat-panel"
-                  hx-swap="innerHTML"
+                  hx-select="#telegram-chat-panel"
+                  hx-swap="outerHTML"
                   class="aw-inline-form">
                 {% csrf_token %}
                 <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
@@ -141,4 +163,5 @@
     <hr class="aw-divider">
     <p class="aw-small aw-muted">{% translate 'Access to this conversation is admin-only. Replies are sent as "Admin".' %}</p>
 </aside>
+</section>
 {% endwith %}

@@ -5,11 +5,14 @@
 {% for conversation in page_obj %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
 <li class="aw-conv-row" data-chat-user-id="{{ conversation.user_id }}">
-    <a class="aw-conv-item"
+    <a class="aw-conv-item{% if active_conversation_id and conversation.pk == active_conversation_id %} is-active{% endif %}"
        href="{% url 'telegram-conversation-detail' conversation.pk %}"
        hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel"
        hx-target="#telegram-chat-panel"
-       hx-swap="innerHTML"
+       hx-select="#telegram-chat-panel"
+       hx-swap="outerHTML"
+       hx-push-url="{% url 'telegram-conversation-detail' conversation.pk %}"
+       {% if active_conversation_id and conversation.pk == active_conversation_id %}aria-current="true"{% endif %}
        aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
         <span class="aw-avatar" aria-hidden="true">
             {% if conversation.user.profile_image_key %}

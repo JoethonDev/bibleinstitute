@@ -209,6 +209,25 @@ i18n/jsi18n are separate. Consult actual route modules for exact names/payloads.
   owner (including overlays); `app_admin.css` keeps the legacy `ad-*` layer for
   pages not yet converted. Shared `aw_*` partials provide avatar, status pill,
   page head, filter bar, empty state and the icon sprite.
+- Static cache-busting: every page emits `?v={{ static_asset_version }}` and
+  nginx marks any non-empty `v` immutable for 7 days, so
+  `settings.STATIC_ASSET_VERSION` must change when an asset changes (it derives
+  from the newest owned css/js modification time unless a release pipeline sets
+  the env var). Never pin it to a constant.
+- Telegram chat workspace:
+  `partials/telegram_chat_layout.html` owns the conversations column plus the
+  chat panel for **both** the inbox and one-conversation pages;
+  `partials/telegram_chat_panel.html` owns the panel root
+  (`#telegram-chat-panel`, `is-open`/`is-empty`) and is swapped whole
+  (`hx-select` + `hx-swap="outerHTML"`). The list column is a page sibling of
+  the panel, never inside it. `admin_workspace.css` section 20 owns the
+  three-column/scroll contract and `admin_shell.js` re-initialises Alpine on the
+  swapped panel. Its width queries are declared after the base chat rules
+  (they set `display`); below 1180px the student rail is hidden and below 900px
+  the workspace is one pane at a time with the phone-only `.aw-chat-back`
+  control. Viewport-height pages size themselves with `--aw-chat-offset`
+  (top bar + workspace padding), re-declared at the 991.98 and 720 breakpoints
+  together with the workspace padding.
 - Static CSS: app.css, app_admin.css, app_student.css, psalmodia.css,
   public_site.css and reference design styles. Repeated layers are intentional
   unless an exact stale override is proved; no mass cascade consolidation.

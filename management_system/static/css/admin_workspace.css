@@ -72,6 +72,10 @@ body.aw-admin {
     --aw-rail-w: 68px;
     --aw-sidebar-w: 250px;
     --aw-topbar-h: 60px;
+    /* Top bar plus the workspace vertical padding; viewport-height pages
+       subtract it. The navigation/phone breakpoints below re-declare it with
+       their own workspace padding. */
+    --aw-chat-offset: 116px;
     --aw-font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Noto Sans", sans-serif;
     --aw-font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Sakkal Majalla", serif;
     --aw-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
@@ -1874,6 +1878,9 @@ body.aw-admin .aw-mobile-nav { display: flex; flex-direction: column; gap: 2px; 
     body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar { display: none; }
     body.aw-admin .aw-topbar .aw-mobile-toggle { display: inline-grid; }
     body.aw-admin .aw-workspace { padding: 18px 16px 56px; }
+    /* Keep the viewport-height pages (chat) in step with the workspace
+       padding: top bar 60 + 18 top + 56 bottom. */
+    body.aw-admin { --aw-chat-offset: 134px; }
     body.aw-admin .aw-page-head { align-items: flex-start; flex-direction: column; gap: 12px; }
     body.aw-admin .aw-page-actions { width: 100%; }
     body.aw-admin .aw-topbar { padding-inline: 14px; }
@@ -1887,6 +1894,8 @@ body.aw-admin .aw-mobile-nav { display: flex; flex-direction: column; gap: 2px; 
 
 @media (max-width: 720px) {
     body.aw-admin .aw-workspace { padding: 14px 12px 48px; }
+    /* top bar 60 + 14 top + 48 bottom. */
+    body.aw-admin { --aw-chat-offset: 122px; }
     body.aw-admin .aw-page-title { font-size: 24px; }
     body.aw-admin .aw-page-desc { font-size: 11.5px; }
     body.aw-admin .aw-crumbs { display: none; }
@@ -2390,94 +2399,87 @@ body.aw-admin .aw-cal-legend span { display: inline-flex; align-items: center; g
 
 
 
-/* One joined surface: conversation list column, thread column and the student
-   context rail. The rail lives inside #telegram-chat-panel so the existing
-   panel fragment keeps owning it when a conversation is selected. */
+/* One joined surface: the conversations column on the start side and the chat
+   panel on the end side. The panel is either the empty state (two columns on
+   screen) or the thread plus the student context rail (three columns on
+   screen). The conversations column is a sibling of the panel on both the list
+   page and the conversation page, so a panel swap can never duplicate it. */
 body.aw-admin .aw-chat-layout {
     display: grid;
-    grid-template-columns: 290px minmax(0, 1fr);
+    grid-template-columns: 300px minmax(0, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
     border: 1px solid var(--aw-line);
     border-radius: var(--aw-radius);
     background: var(--aw-paper);
     overflow: hidden;
-    min-height: 620px;
 }
-body.aw-admin .aw-chat-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-body.aw-admin .aw-chat-col + .aw-chat-col { border-inline-start: 1px solid var(--aw-line); }
-body.aw-admin .aw-chat-panel {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+body.aw-admin .aw-chat-col {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
-    /* Bound the panel to the viewport so the thread scrolls inside the chat
-       instead of stretching the page. */
-    height: calc(100dvh - 176px);
     overflow: hidden;
 }
-body.aw-admin .aw-page--chat { padding-bottom: 0; min-height: 0; }
-body.aw-admin .aw-page--chat .aw-chat-panel { margin-bottom: 0; }
-body.aw-admin .aw-avatar--square { border-radius: 12px; }
-body.aw-admin .aw-avatar--square .aw-avatar-img { border-radius: 12px; object-fit: cover; }
+body.aw-admin .aw-chat-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-inline-start: 1px solid var(--aw-line);
+}
 body.aw-admin .aw-chat-panel.is-empty { grid-template-columns: minmax(0, 1fr); }
 
-/* Full chat workspace: conversations rail, thread and student context side by
-   side. The page fills the workspace exactly and each column scrolls on its
-   own with no visible scrollbar, so the page itself never scrolls. */
+/* The chat page owns the viewport height so the conversation list, the thread
+   and the student rail each scroll inside their own column and the document
+   never scrolls behind the composer. --aw-chat-offset is the top bar plus the
+   workspace vertical padding at the active breakpoint. */
 body.aw-admin .aw-page--chat {
-    /* Fallback: top bar 60 + workspace padding 24/32 + crumbs 32. */
-    height: calc(100dvh - 148px);
-    min-height: 460px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: calc(100dvh - var(--aw-chat-offset));
+    min-height: 520px;
     padding-bottom: 0;
     overflow: hidden;
 }
-/* A chat workspace has its own header, so the page crumbs are dropped and the
-   page can claim their 32px. */
-@supports selector(:has(*)) {
-    body.aw-admin #page-region:has(.aw-page--chat) .aw-page-crumbs { display: none; }
-    body.aw-admin .aw-page--chat { height: calc(100dvh - 116px); }
-}
-body.aw-admin .aw-page--chat .aw-chat-panel--full {
-    display: grid;
-    grid-template-columns: 300px minmax(0, 1fr) 320px;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    border: 1px solid var(--aw-line);
-    border-radius: var(--aw-radius);
-    background: var(--aw-paper);
-}
-body.aw-admin .aw-chat-panel--full .aw-chat-list,
-body.aw-admin .aw-chat-panel--full .aw-chat-context,
-body.aw-admin .aw-chat-panel--full .aw-chat-thread {
+/* The chat carries its own header, so the page crumbs are dropped. */
+body.aw-admin #page-region:has(.aw-page--chat) .aw-page-crumbs { display: none; }
+
+/* Every chat column owns its overflow and hides the scrollbar chrome. */
+body.aw-admin .aw-chat-list,
+body.aw-admin .aw-chat-thread,
+body.aw-admin .aw-chat-context {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
-body.aw-admin .aw-chat-panel--full .aw-chat-list::-webkit-scrollbar,
-body.aw-admin .aw-chat-panel--full .aw-chat-context::-webkit-scrollbar,
-body.aw-admin .aw-chat-panel--full .aw-chat-thread::-webkit-scrollbar { width: 0; height: 0; }
-body.aw-admin .aw-chat-panel--full .aw-chat-list { border-inline-end: 1px solid var(--aw-line); }
-body.aw-admin .aw-chat-panel--full .aw-chat-context { border-inline-start: 1px solid var(--aw-line); }
-body.aw-admin .aw-chat-panel--full .aw-chat-main { overflow: hidden; }
-body.aw-admin .aw-chat-panel--full .aw-chat-head { flex: 0 0 auto; }
-body.aw-admin .aw-chat-panel--full .aw-chat-thread { flex: 1 1 auto; opacity: 1; }
+body.aw-admin .aw-chat-list::-webkit-scrollbar,
+body.aw-admin .aw-chat-thread::-webkit-scrollbar,
+body.aw-admin .aw-chat-context::-webkit-scrollbar { width: 0; height: 0; }
 
-@media (max-width: 1280px) {
-    body.aw-admin .aw-page--chat .aw-chat-panel--full { grid-template-columns: minmax(0, 1fr) 300px; }
-    body.aw-admin .aw-page--chat .aw-chat-panel--full .aw-chat-list { display: none; }
+body.aw-admin .aw-avatar--square { border-radius: 12px; }
+body.aw-admin .aw-avatar--square .aw-avatar-img { border-radius: 12px; object-fit: cover; }
+
+/* Phone-only affordance: on wider screens the conversations column is always
+   visible next to the thread, so there is nothing to go back to. Declared
+   before the width queries below so their `inline-grid` wins. */
+body.aw-admin .aw-chat-back { display: none; }
+
+/* Below 1180px a 320px rail would leave the thread unusably narrow; below
+   900px the workspace shows one pane at a time. The width queries live at the
+   end of this section so they always win over the base chat rules above. */
+body.aw-admin .aw-chat-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
-@media (max-width: 900px) {
-    body.aw-admin .aw-page--chat { height: auto; overflow: visible; }
-    body.aw-admin .aw-page--chat .aw-chat-panel--full { grid-template-columns: minmax(0, 1fr); }
-    body.aw-admin .aw-page--chat .aw-chat-panel--full .aw-chat-context {
-        display: flex;
-        border-inline-start: 0;
-        border-top: 1px solid var(--aw-line);
-    }
-}
-body.aw-admin .aw-chat-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 body.aw-admin .aw-chat-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 
 body.aw-admin .aw-chat-list-head {
@@ -2488,7 +2490,7 @@ body.aw-admin .aw-chat-list-head {
     border-bottom: 1px solid var(--aw-line);
     background: var(--aw-paper-2);
 }
-body.aw-admin .aw-chat-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+body.aw-admin .aw-chat-list { flex: 1 1 auto; min-height: 0; }
 body.aw-admin .aw-chat-list ul { margin: 0; padding: 0; list-style: none; }
 
 body.aw-admin .aw-conv-item {
@@ -2513,17 +2515,36 @@ body.aw-admin .aw-conv-main p {
 }
 body.aw-admin .aw-conv-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
 
+/* Phone-only affordance: on wider screens the conversations column is always
+   visible next to the thread, so there is nothing to go back to. */
 body.aw-admin .aw-chat-head {
     display: flex;
     align-items: center;
     gap: 9px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
     padding: 9px 13px;
     border-bottom: 1px solid var(--aw-line);
     background: var(--aw-paper-2);
 }
-body.aw-admin .aw-chat-head .aw-chat-title { min-width: 0; flex: 1; }
+body.aw-admin .aw-chat-head .aw-chat-title { min-width: 150px; flex: 1 1 150px; }
 body.aw-admin .aw-chat-head b { display: block; font-size: 12px; }
 body.aw-admin .aw-chat-head .aw-chat-title > span { display: block; font-size: 10px; color: var(--aw-muted); }
+body.aw-admin .aw-chat-head .aw-chat-title b,
+body.aw-admin .aw-chat-head .aw-chat-title > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* The head actions stay on the identity row while they fit and wrap below it
+   instead of squeezing the name into a column of single letters. */
+body.aw-admin .aw-chat-head .aw-row-actions {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-inline-start: auto;
+}
+body.aw-admin .aw-chat-head .aw-btn { white-space: nowrap; }
 
 body.aw-admin .aw-msg { max-width: 78%; padding: 7px 10px; border-radius: 10px; font-size: 11.5px; line-height: 1.5; }
 body.aw-admin .aw-msg--in { align-self: flex-start; background: var(--aw-paper); border: 1px solid var(--aw-line); border-start-start-radius: 3px; }
@@ -2539,7 +2560,6 @@ body.aw-admin .aw-chat-thread {
     gap: 9px;
     background: linear-gradient(180deg, var(--aw-paper), var(--aw-paper-2));
 }
-body.aw-admin .aw-chat-context { overflow-y: auto; min-height: 0; }
 body.aw-admin .aw-msg-image,
 body.aw-admin .aw-msg-video {
     display: block;
@@ -2649,15 +2669,24 @@ body.aw-admin .aw-msg--out .aw-msg-meta { justify-content: flex-end; }
 body.aw-admin .aw-composer {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    padding: 9px 11px;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 8px 10px;
     border-top: 1px solid var(--aw-line);
     background: var(--aw-paper);
 }
 body.aw-admin .aw-composer-row { display: flex; align-items: flex-end; gap: 7px; }
 body.aw-admin .aw-composer-field { flex: 1 1 auto; min-width: 0; }
-body.aw-admin .aw-composer .aw-textarea { min-height: 38px; max-height: 90px; }
+body.aw-admin .aw-composer .aw-textarea { min-height: 42px; max-height: 96px; }
 body.aw-admin .aw-composer-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* The limits hint is one truncated line; its full text stays in the title and
+   in aria-describedby rather than eating a third of the thread height. */
+body.aw-admin .aw-composer-actions > .aw-small {
+    flex: 1 1 160px;
+    min-width: 0;
+    font-size: 9.5px;
+    line-height: 1.4;
+}
 body.aw-admin .aw-file-input { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; border: 0; opacity: 0; overflow: hidden; }
 
 
@@ -2699,25 +2728,53 @@ body.aw-admin .aw-linked-main { min-width: 0; flex: 1; }
 body.aw-admin .aw-linked-main b { display: block; font-size: 11.5px; }
 body.aw-admin .aw-linked-main span { display: block; font-size: 10px; color: var(--aw-muted); }
 
-@media (max-width: 768px) {
-    body.aw-admin .aw-chat-panel { grid-template-columns: minmax(0, 1fr); height: auto; overflow: visible; }
-    body.aw-admin .aw-chat-context { border-inline-start: 0; border-top: 1px solid var(--aw-line); }
+/* Width queries last: they must win over every base chat rule above, including
+   the ones that set `display` on the rail and the chat head.
+   Below 1180px a 320px rail would leave the thread unusably narrow. Below
+   900px the workspace shows one pane at a time: the inbox fills the screen with
+   the conversations column, an open conversation fills it with the thread (the
+   back control in the chat head returns to the inbox). The page keeps the
+   viewport height on phones as well, so the composer stays visible and each
+   pane scrolls inside itself instead of scrolling the document. */
+@media (max-width: 1180px) {
+    body.aw-admin .aw-chat-layout { grid-template-columns: 260px minmax(0, 1fr); }
+    body.aw-admin .aw-chat-panel,
+    body.aw-admin .aw-chat-panel.is-empty { grid-template-columns: minmax(0, 1fr); }
+    body.aw-admin .aw-chat-context { display: none; }
 }
-@media (max-width: 920px) {
-    body.aw-admin .aw-chat-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
-    body.aw-admin .aw-chat-layout > .aw-chat-col--list { max-height: 260px; border-bottom: 1px solid var(--aw-line); border-inline-start: 0; }
-    body.aw-admin .aw-chat-main { min-height: 420px; }
+@media (max-width: 900px) {
+    body.aw-admin .aw-page--chat { min-height: 0; overflow: hidden; }
+    body.aw-admin .aw-chat-layout { grid-template-columns: minmax(0, 1fr); }
+    body.aw-admin .aw-chat-panel { border-inline-start: 0; }
+    /* No conversation open: the conversations column owns the screen. */
+    body.aw-admin .aw-chat-panel.is-empty { display: none; }
+    body.aw-admin .aw-chat-col--list { max-height: none; }
+    /* A conversation is open: the thread owns the screen. The page head (list
+       actions) is not needed there and gives its height to the thread. */
+    body.aw-admin .aw-chat-layout:has(.aw-chat-panel.is-open) .aw-chat-col--list { display: none; }
+    body.aw-admin .aw-page--chat:has(.aw-chat-panel.is-open) .aw-page-head { display: none; }
+    body.aw-admin .aw-chat-back { display: inline-grid; }
+    body.aw-admin .aw-chat-main { min-height: 0; }
+    body.aw-admin .aw-chat-head { gap: 7px; padding: 8px 10px; }
+    body.aw-admin .aw-chat-thread { padding: 10px; }
 }
-
-
 
 @media (max-width: 720px) {
 
 
 
 
-
     body.aw-admin .aw-msg { max-width: 88%; }
+    body.aw-admin .aw-chat-list-head { padding: 8px 9px; }
+    /* The title already says what this page is; the description would take a
+       third of a phone screen away from the conversations. */
+    body.aw-admin .aw-page--chat .aw-page-desc { display: none; }
+    /* 16px inputs stop iOS Safari from zooming the workspace when the search
+       field or the composer gets focus. */
+    body.aw-admin .aw-page--chat .aw-input,
+    body.aw-admin .aw-page--chat .aw-textarea { font-size: 16px; }
+    body.aw-admin .aw-composer { padding: 7px 8px; }
+    body.aw-admin .aw-conv-item { padding: 9px 10px; }
 }
 
 /* --------------------------------------------------------------------------

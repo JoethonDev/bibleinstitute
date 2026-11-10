@@ -62,6 +62,23 @@
             var ctx = event.detail && event.detail.ctx;
             var target = (ctx && ctx.target) || event.target;
             if (!target || !(target instanceof Element)) return;
+
+            // The chat panel replaces its own root (hx-swap="outerHTML"), so
+            // the pre-swap node is detached. Re-initialise the new root and
+            // pin the thread to the newest message, exactly like a page load.
+            if (target.id === 'telegram-chat-panel') {
+                var panel = document.getElementById('telegram-chat-panel');
+                if (!panel) return;
+                if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                    try {
+                        window.Alpine.initTree(panel);
+                    } catch (error) { /* Alpine owns its scope. */ }
+                }
+                var thread = panel.querySelector('#telegram-message-list');
+                if (thread) thread.scrollTop = thread.scrollHeight;
+                return;
+            }
+
             // Page-level swaps are any region that carries the workspace body:
             // sidebar/rail navigations target #display-page, while table, form
             // and pagination links target #content. Both replace the persistent
