@@ -89,13 +89,13 @@
                     } catch (error) { /* A missed region keeps its markup. */ }
                 }
             }
-            // The main column is the scroll container now, so the browser's
-            // navigation scroll reset no longer applies: a page swap must put the
-            // new page back at the top. In-place updates (pagination, filters,
-            // which target #content) keep their position.
+            // A page swap starts at the top of the page. The document owns the
+            // scroll; mainColumn is cleared too in case a future layout scrolls
+            // that column instead.
             if (target.id === 'display-page' || target.id === 'page-region') {
                 var mainColumn = document.querySelector('.aw-main');
                 if (mainColumn) mainColumn.scrollTop = 0;
+                window.scrollTo(0, 0);
             }
             var region = target.id === 'page-region'
                 ? target
