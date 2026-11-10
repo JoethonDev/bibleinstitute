@@ -2734,6 +2734,9 @@ class MediaProcessingJob(models.Model):
     # prove which jobs the previous container owned instead of guessing from
     # heartbeat age alone.
     worker_id = models.CharField(max_length=128, blank=True, default="")
+    # Worker releases (redeploy, crash recovery) recorded for this job. They
+    # are not processing failures, so they do not consume MAX_MEDIA_ATTEMPTS.
+    interrupted_count = models.PositiveSmallIntegerField(default=0)
     status = models.CharField(
         max_length=24,
         choices=MediaProcessingStatus.choices,

@@ -120,14 +120,35 @@ Changed:
 - Compose media-worker: `stop_grace_period: 60s` so the released tasks can stop
   FFmpeg and delete their partial outputs before Docker sends SIGKILL;
   `MEDIA_WORKER_ID` is passed through (empty means container hostname).
+- Migration `0116_mediaprocessingjob_interrupted_count`: worker releases are
+  recorded separately from processing failures. `claim_queued_job`,
+  `record_job_failure`, the operator retry gate and the admin `can_retry` gate
+  compare effective attempts (`attempt_count - interrupted_count`), so any
+  number of deploys/crashes leaves the three real processing attempts intact.
+- Redis worker liveness: `media:worker:<worker_id>` (45-second TTL, refreshed by
+  a daemon thread every 15 seconds, deleted on graceful shutdown). Recovery
+  requeues an active job immediately when its owner's key is gone, guarded by
+  the requirement that the recovering worker's own key exists (so a Redis
+  restart cannot misread every key as dead); the 120-second heartbeat rule
+  remains the fallback.
+- `run_media_job` logs a bounded capacity snapshot per job (free disk and
+  `MemAvailable`) and warns below 4 GiB free disk, so the two-job headroom is
+  visible in `docker logs` instead of being assumed.
 - `deploy/blue_green_deploy.sh`: after the admin-worker check, the deploy now
   verifies the recreated media worker is running and answering as a consumer of
   the `media` queue.
 
-Hard kills without SIGTERM (OOM, host crash) still fall back to the existing
-beat pass: active jobs with a heartbeat older than 120 seconds are requeued
-within one 60-second tick. The interrupted attempt keeps its number, so it still
-counts toward `MAX_MEDIA_ATTEMPTS`; two interrupted deploys leave one attempt.
+Hard kills without SIGTERM (OOM, host crash) are detected by the missing
+liveness key (within its 45-second TTL plus the 60-second beat tick); if Redis
+was also restarted, the heartbeat rule (120 seconds) still recovers the job.
+Interrupted runs never consume a processing attempt.
+
+The drawer now shows every persisted operational field: job id, source key,
+ETag, SHA-256, upload deadline, last dispatch, stop request/acknowledgement,
+interrupted runs, cleanup groups/result and the complete failure history, with
+up to 200 output keys listed. `docs/pending/lms_student_intelligence_architecture_prd.md`
+was normalized to ASCII punctuation so `audit_text_encoding` passes for the
+whole tree (746 files).
 
 Verification (disposable PostgreSQL 18, container removed afterwards): the
 migration applies, claim stores worker/attempt, a foreign worker cannot release
@@ -135,17 +156,26 @@ the claim, shutdown release yields `queued` with no worker/dispatch/heartbeat,
 the next worker resumes at attempt 2, a stop-pending job is cancelled not
 requeued, beat recovery clears the worker, the retry deletes exactly its own
 recorded keys (and a storage failure does not block it), and the API/drawer
-expose the worker. `manage.py check`, `makemigrations --check --dry-run`
-("No changes detected"), compose YAML parsing and `bash -n` for the deploy
-script pass.
+expose the worker. The follow-up audit on a second disposable database covered
+four deploy interruptions without consuming an attempt, the attempt limit after
+three real failures, the Redis liveness mark/guard, immediate resumption of a
+dead worker's fresh-heartbeat job, the live worker's job being left alone, and
+the full drawer fields. `manage.py check`, `makemigrations --check --dry-run`
+("No changes detected"), `audit_text_encoding` (746 files) and compose YAML
+parsing pass.
+
+Encoder scaling was measured in a `debian:bookworm-slim` container capped at
+`--cpus=2` with the production profile (854x480, 120 s, `-preset fast`,
+CRF 23, 448k cap, HLS 6 s): `-threads 1` took 22.8 s and `-threads 2` took
+13.1 s, a 1.74x gain. The production server still needs its own measurement.
 
 Risks / next safe step: two concurrent jobs need disk headroom for two staged
-sources plus segments (volume size unverified) and 2 GiB memory headroom
-(two bounded job footprints); deployments that never set the new env vars keep
-the compose defaults. Deploy, then measure one real lesson with
-`docker exec app-media-worker-1 ps -o pid,nlwp,pcpu,cmd -C ffmpeg` and
-`cat /sys/fs/cgroup/cpu.stat` before/after to confirm two encoder threads and
-low throttling; tune `MEDIA_ENCODE_THREADS`/concurrency from that evidence.
+sources plus segments (the new per-job capacity log reports it) and 2 GiB
+memory headroom (the same log reports `MemAvailable`); deployments that never
+set the new env vars keep the compose defaults. Deploy, then measure one real
+lesson with `docker exec app-media-worker-1 ps -o pid,nlwp,pcpu,cmd -C ffmpeg`
+and `cat /sys/fs/cgroup/cpu.stat` before/after to confirm two encoder threads
+and low throttling; tune `MEDIA_ENCODE_THREADS`/concurrency from that evidence.
 
 ## Implementation unit (10 November 2026) - chat workspace and stale-asset root cause
 

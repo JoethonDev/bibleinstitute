@@ -77,6 +77,7 @@ MAX_FAILURE_HISTORY = 20
 MAX_ERROR_MESSAGE_LENGTH = 4000
 MAX_STDERR_LENGTH = 8000
 MAX_ENCODE_THREADS = 16
+MIN_FREE_DISK_BYTES = 4 * 1024**3
 MAX_MEDIA_ATTEMPTS = 3
 MAX_AUTOMATION_UPLOAD_FILES = 2
 ATTEMPT_LIMIT_ERROR = "attempt_limit_exceeded"
@@ -415,7 +416,7 @@ def claim_queued_job(public_id: Any) -> MediaProcessingJob | None:
         or job.cleanup_status != MediaCleanupStatus.NOT_REQUESTED
     ):
         return None
-    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS:
         _mark_attempt_limit_locked(job)
         return None
     timestamp = timezone.now()
@@ -447,7 +448,7 @@ def record_job_failure(
     job = MediaProcessingJob.objects.select_for_update().get(pk=job_id)
     if expected_attempt_count is not None and job.attempt_count != expected_attempt_count:
         return job
-    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS:
         error_code = ATTEMPT_LIMIT_ERROR
         error_message = ATTEMPT_LIMIT_MESSAGE
     message = str(error_message or _("Media processing failed."))[:MAX_ERROR_MESSAGE_LENGTH]
@@ -521,7 +522,7 @@ def queue_verified_job(
         MediaProcessingStatus.SUCCEEDED,
     }:
         return job, False
-    if job.status == MediaProcessingStatus.FAILED and job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if job.status == MediaProcessingStatus.FAILED and job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS:
         raise ValidationError(ATTEMPT_LIMIT_MESSAGE)
     if job.status == MediaProcessingStatus.FAILED and not job.source_acknowledged_at:
         raise ValidationError(_("This media job has no acknowledged source to retry."))
@@ -589,7 +590,10 @@ def requeue_stalled_job(
             "error_code", "error_message",
         ])
         return job
-    if job.attempt_count >= MAX_MEDIA_ATTEMPTS:
+    if (
+        job.status == MediaProcessingStatus.QUEUED
+        and job.attempt_count - job.interrupted_count >= MAX_MEDIA_ATTEMPTS
+    ):
         _mark_attempt_limit_locked(job)
         return job
     job.status = MediaProcessingStatus.QUEUED
@@ -598,9 +602,10 @@ def requeue_stalled_job(
     job.last_dispatched_at = dispatched_at or timezone.now()
     job.last_heartbeat_at = None
     job.worker_id = ""
+    job.interrupted_count = min(job.attempt_count, (job.interrupted_count or 0) + 1)
     job.save(update_fields=[
         "status", "phase", "progress", "last_dispatched_at",
-        "last_heartbeat_at", "worker_id",
+        "last_heartbeat_at", "worker_id", "interrupted_count",
     ])
     return job
 
@@ -651,9 +656,10 @@ def release_worker_jobs(worker_id: Any = None, *, limit: int = 100) -> list[Any]
             job.last_dispatched_at = None
             job.last_heartbeat_at = None
             job.worker_id = ""
+            job.interrupted_count = min(job.attempt_count, (job.interrupted_count or 0) + 1)
             job.save(update_fields=[
                 "status", "phase", "progress", "last_dispatched_at",
-                "last_heartbeat_at", "worker_id",
+                "last_heartbeat_at", "worker_id", "interrupted_count",
             ])
             released.append(job.public_id)
     return released
@@ -1008,7 +1014,7 @@ def is_retryable_failed_job(job: MediaProcessingJob) -> bool:
     return bool(
         job.status == MediaProcessingStatus.FAILED
         and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
-        and job.attempt_count < MAX_MEDIA_ATTEMPTS
+        and job.attempt_count - job.interrupted_count < MAX_MEDIA_ATTEMPTS
         and job.source_acknowledged_at
         and not job.staging_deleted_at
         and is_retryable_media_failure(job.error_code)
@@ -1744,6 +1750,22 @@ def finish_attachment_retry(public_id: Any, *, error: Exception | None = None) -
     return job
 
 
+def _capacity_snapshot(work_root: str) -> dict[str, int | None]:
+    """Return the free disk and memory available to this worker instance."""
+    try:
+        free_disk = shutil.disk_usage(work_root).free
+    except OSError:
+        free_disk = None
+    free_memory = None
+    with suppress(OSError, ValueError):
+        with open("/proc/meminfo", "r", encoding="ascii") as handle:
+            for line in handle:
+                if line.startswith("MemAvailable:"):
+                    free_memory = int(line.split()[1]) * 1024
+                    break
+    return {"free_disk_bytes": free_disk, "free_memory_bytes": free_memory}
+
+
 def run_media_job(
     job: MediaProcessingJob,
     *,
@@ -1759,6 +1781,24 @@ def run_media_job(
     folder = validate_requested_folder(job.requested_folder)
     work_root = getattr(settings, "MEDIA_WORK_DIR", "/var/lib/lms-media-processing")
     os.makedirs(work_root, exist_ok=True)
+    capacity = _capacity_snapshot(work_root)
+    logger.info(
+        "media worker capacity",
+        extra={
+            "event": "media_worker_capacity",
+            "public_id": str(job.public_id),
+            **capacity,
+        },
+    )
+    if capacity["free_disk_bytes"] is not None and capacity["free_disk_bytes"] < MIN_FREE_DISK_BYTES:
+        logger.warning(
+            "media work volume is below the concurrency headroom",
+            extra={
+                "event": "media_worker_low_disk",
+                "public_id": str(job.public_id),
+                "free_disk_bytes": capacity["free_disk_bytes"],
+            },
+        )
     try:
         with TemporaryDirectory(prefix=f"media-{job.public_id}-", dir=work_root) as work_dir:
             source_path = os.path.join(work_dir, "source")

@@ -2737,7 +2737,7 @@ def _media_job_ui_state(job, *, phase=None, now=None):
         job.status == MediaProcessingStatus.FAILED
         and job.source_acknowledged_at
         and job.cleanup_status == MediaCleanupStatus.NOT_REQUESTED
-        and job.attempt_count < MAX_MEDIA_ATTEMPTS
+        and job.attempt_count - job.interrupted_count < MAX_MEDIA_ATTEMPTS
         and not job.staging_deleted_at
     )
     can_retry_attachment = bool(
@@ -2908,6 +2908,7 @@ def _serialize_media_job(job, live=None):
         "phase": live.get("phase", job.phase),
         "progress": int(live.get("progress", job.progress)),
         "attempt_count": job.attempt_count,
+        "interrupted_count": job.interrupted_count,
         "worker_id": job.worker_id,
         "lesson_id": job.lesson_id,
         "part_id": job.part_id,

@@ -14593,3 +14593,54 @@ msgstr "%(phase)s - %(percent)s%%"
 
 msgid "Worker"
 msgstr "عامل المعالجة"
+
+msgid "Job ID"
+msgstr "معرف المهمة"
+
+msgid "Source key"
+msgstr "مفتاح المصدر"
+
+msgid "ETag"
+msgstr "ETag"
+
+msgid "SHA-256"
+msgstr "SHA-256"
+
+msgid "Interrupted runs"
+msgstr "مرات الانقطاع"
+
+msgid "Upload deadline"
+msgstr "مهلة الرفع"
+
+msgid "Last dispatched"
+msgstr "آخر إرسال"
+
+msgid "Stop requested"
+msgstr "طُلب الإيقاف"
+
+msgid "Stop acknowledged"
+msgstr "تم تأكيد الإيقاف"
+
+msgid "Cleanup not before"
+msgstr "التنظيف ليس قبل"
+
+msgid "Cleanup started"
+msgstr "بدء التنظيف"
+
+msgid "Cleanup groups"
+msgstr "مجموعات التنظيف"
+
+msgid "Cleanup result"
+msgstr "نتيجة التنظيف"
+
+msgid "Only the first 200 keys are listed."
+msgstr "تُعرض أول 200 مفتاحًا فقط."
+
+msgid "Output name"
+msgstr "اسم المخرجات"
+
+msgid "Upload URL expires"
+msgstr "انتهاء رابط الرفع"
+
+msgid "Cleanup last dispatched"
+msgstr "آخر إرسال للتنظيف"

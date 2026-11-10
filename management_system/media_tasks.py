@@ -32,7 +32,9 @@ from .media_processing import (
     claim_queued_job,
     cleanup_job_workdirs,
     finish_attachment_retry,
+    is_retryable_media_failure,
     is_automation_job,
+    media_worker_id,
     publish_automation_lesson,
     PUBLICATION_PENDING_ERROR,
     PUBLICATION_PENDING_MESSAGE,
@@ -97,6 +99,65 @@ def clear_media_progress(public_ids) -> None:
             extra={"event": "media_progress_clear_failed"},
             exc_info=True,
         )
+
+
+MEDIA_WORKER_KEY_PREFIX = "media:worker:"
+MEDIA_WORKER_KEY_TTL_SECONDS = 45
+
+
+def mark_media_worker_alive(worker_id: str | None = None) -> None:
+    """Mark this worker instance as alive so recovery can tell it apart."""
+    owner = str(worker_id or media_worker_id() or "")
+    client = _redis_client()
+    if not owner or client is None:
+        return
+    try:
+        client.set(
+            f"{MEDIA_WORKER_KEY_PREFIX}{owner}",
+            timezone.now().isoformat(),
+            ex=MEDIA_WORKER_KEY_TTL_SECONDS,
+        )
+    except Exception:
+        logger.warning(
+            "media worker liveness mark failed",
+            extra={"event": "media_worker_liveness_failed", "worker_id": owner},
+            exc_info=True,
+        )
+
+
+def forget_media_worker(worker_id: str | None = None) -> None:
+    """Remove this worker's liveness mark when it shuts down on purpose."""
+    owner = str(worker_id or media_worker_id() or "")
+    client = _redis_client()
+    if not owner or client is None:
+        return
+    try:
+        client.delete(f"{MEDIA_WORKER_KEY_PREFIX}{owner}")
+    except Exception:
+        logger.warning(
+            "media worker liveness clear failed",
+            extra={"event": "media_worker_liveness_clear_failed", "worker_id": owner},
+            exc_info=True,
+        )
+
+
+def media_worker_liveness(worker_id: str) -> bool | None:
+    """Return whether another worker is alive, or None when Redis cannot say.
+
+    ``None`` also covers the case where this recovery process has no liveness
+    mark of its own (Redis restarted, first seconds after boot), because then an
+    absent key does not prove the other worker is gone.
+    """
+    owner = str(worker_id or "")
+    client = _redis_client()
+    if not owner or client is None:
+        return None
+    try:
+        if not client.exists(f"{MEDIA_WORKER_KEY_PREFIX}{media_worker_id()}"):
+            return None
+        return bool(client.exists(f"{MEDIA_WORKER_KEY_PREFIX}{owner}"))
+    except Exception:
+        return None
 
 
 def _discard_stale_outputs(job: MediaProcessingJob) -> None:
@@ -1051,9 +1112,16 @@ def recover_pending_media_jobs(limit: int = 100):
                 continue
             stale_before = now - grace
         elif job.status in ACTIVE_WORKER_STATUSES:
-            if job.last_heartbeat_at and now - job.last_heartbeat_at < heartbeat_grace:
+            owner_alive = media_worker_liveness(job.worker_id)
+            if owner_alive is False and job.worker_id != media_worker_id():
+                # The claiming worker's liveness mark expired without a
+                # graceful release: it is gone, so do not wait for the
+                # heartbeat grace before resuming the job.
+                stale_before = None
+            elif job.last_heartbeat_at and now - job.last_heartbeat_at < heartbeat_grace:
                 continue
-            stale_before = now - heartbeat_grace
+            else:
+                stale_before = now - heartbeat_grace
         else:
             continue
         stalled = requeue_stalled_job(

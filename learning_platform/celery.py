@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 
 from celery import Celery
 from celery.signals import worker_ready, worker_shutting_down
@@ -13,13 +14,45 @@ app.autodiscover_tasks()
 logger = logging.getLogger(__name__)
 
 MEDIA_STARTUP_RECOVERY_KEY = "media:startup-recovery"
+LIVENESS_REFRESH_SECONDS = 15
+
+_liveness_stop = threading.Event()
+_liveness_thread: threading.Thread | None = None
 
 
 @worker_ready.connect
 def recover_quiz_jobs_on_start(**kwargs):
     app.send_task("management_system.tasks.recover_quiz_operations")
     app.send_task("management_system.tasks.reconcile_closed_quiz_snapshots")
+    start_worker_liveness()
     _recover_media_jobs_on_start()
+
+
+def start_worker_liveness() -> None:
+    """Publish this worker's liveness mark and keep refreshing it."""
+    global _liveness_thread
+    from management_system.media_tasks import mark_media_worker_alive
+
+    mark_media_worker_alive()
+    if _liveness_thread is not None and _liveness_thread.is_alive():
+        return
+    _liveness_stop.clear()
+
+    def refresh() -> None:
+        while not _liveness_stop.wait(LIVENESS_REFRESH_SECONDS):
+            mark_media_worker_alive()
+
+    _liveness_thread = threading.Thread(
+        target=refresh,
+        name="media-worker-liveness",
+        daemon=True,
+    )
+    _liveness_thread.start()
+
+
+def stop_worker_liveness() -> None:
+    """Stop refreshing this worker's liveness mark."""
+    _liveness_stop.set()
 
 
 def _recover_media_jobs_on_start() -> None:
@@ -64,9 +97,11 @@ def release_media_jobs_on_shutdown(**kwargs):
     """
     try:
         from management_system.media_processing import media_worker_id, release_worker_jobs
-        from management_system.media_tasks import clear_media_progress
+        from management_system.media_tasks import clear_media_progress, forget_media_worker
 
+        stop_worker_liveness()
         released = release_worker_jobs(media_worker_id())
+        forget_media_worker(media_worker_id())
         if not released:
             return
         clear_media_progress(released)
