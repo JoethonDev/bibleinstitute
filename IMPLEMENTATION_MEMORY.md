@@ -1064,6 +1064,33 @@ fragment 200 with `<form>`, `enctype="multipart/form-data"` and a CSRF token;
 direct hit 302; `?new=1` 200 with the inline form. 188/188 templates compile;
 sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926; encoding clean.
 
+### Fixed: multi-line `{# ... #}` comments leaked into the admin shell (10 November 2026)
+
+Reported: raw comment text appeared at the top of every admin page and the shell
+layout broke - content pushed to one side with an empty column.
+
+Cause: Django's `{# ... #}` comment closes on the **same line**. A THREE-LINE
+`{# ... #}` block added to `partials/components/admin_sidebar.html` (the
+"no aria-hidden binding" note) was therefore not a comment at all: the text
+rendered inside `.aw-shell`, and that stray text node became an anonymous grid
+item in a three-column grid, pushing `.aw-main` out of its column.
+
+Fix and prevention:
+
+- Converted every multi-line hash comment to `{% comment %}...{% endcomment %}`:
+  `admin_sidebar.html`, `promotion_evaluation_content.html`,
+  `signup_settings_content.html` and two blocks in `user_detail_content.html`.
+- Added `tmp/ui-audit/audit_hash_comments.py`, which fails on any `{#` without a
+  matching `#}` on the same line (currently 0 findings).
+- Extended `tmp/ui-audit/audit_markup.py` to treat a literal `{#` in rendered
+  output as a template leak; it did not catch this class before.
+- Added `tmp/ui-audit/check_shell_clean.py`, which asserts `.aw-shell` has
+  exactly its three element children (rail, sidebar, main), no stray text nodes
+  and no leaked template syntax. Clean on all eight sampled pages.
+
+This is the second occurrence of this class in the project; the single-line rule
+is now enforced by an audit rather than by memory.
+
 ### Telegram chat: duplicate bubbles and wrong-side student text fixed (10 November 2026)
 
 Reported: a student's message appeared on the admin side, and an admin reply

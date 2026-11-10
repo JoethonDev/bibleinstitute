@@ -103,8 +103,10 @@ panels through data-aw-tabs / data-aw-tab / data-aw-tabpanel.
             {% endif %}
             <span class="aw-step-line" aria-hidden="true"></span>
             {% if preview_rows is not None %}
-            {# Preview is done once rows exist, or once saved results exist. When the
-               results panel is not rendered yet (unsaved preview) it stays active. #}
+            {% comment %}
+            Preview is done once rows exist, or once saved results exist. When the
+            results panel is not rendered yet (unsaved preview) it stays active.
+            {% endcomment %}
             <button type="button"
                     class="aw-step{% if results_page_obj.object_list or preview_rows and results_page_obj is not None %} is-done{% else %} is-active{% endif %}"
                     id="promotion-step-preview"
