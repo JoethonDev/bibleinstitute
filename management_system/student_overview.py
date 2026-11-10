@@ -125,7 +125,10 @@ def build_student_overview(student_id: int) -> dict | None:
         "attendance_counts": attendance_counts,
         "notifications": notifications,
         "conversations": conversations,
-        "messages": messages,
+        # Not "messages": that key shadows the Django messages framework, so the
+        # shared toast stack rendered every Telegram message object as a toast
+        # ("Telegram message 2898").
+        "telegram_messages": messages,
         "devices": devices,
         "sessions": sessions,
         "payments": payments,
