@@ -564,6 +564,15 @@ body.aw-admin .aw-grid--3 > :only-child { grid-column: 1 / -1; }
     body.aw-admin .aw-workspace { padding-bottom: 32px; }
 }
 
+/* Printing must show the whole page, not just the visible scroll port. */
+@media print {
+    body.aw-admin .aw-shell { height: auto; overflow: visible; display: block; }
+    body.aw-admin .aw-main { overflow: visible; }
+    body.aw-admin .aw-rail,
+    body.aw-admin .aw-sidebar,
+    body.aw-admin .aw-topbar { display: none; }
+}
+
 /* Base rhythm for card bodies that do not already stack their children. The
    :not(.aw-stack) guard keeps it from doubling the gap on stacked bodies. */
 body.aw-admin .aw-card-body:not(.aw-stack):not(.aw-card-body--flush) > * + *:not(.aw-kv) { margin-top: 10px; }
