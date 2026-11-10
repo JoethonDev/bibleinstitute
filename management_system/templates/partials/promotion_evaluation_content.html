@@ -237,7 +237,7 @@ panels through data-aw-tabs / data-aw-tab / data-aw-tabpanel.
                             <h3 id="promotion-formula-title">{% translate "Formula Settings" %}</h3>
                         </div>
                     </div>
-                    <div class="aw-card-body">
+                    <div class="aw-card-body aw-stack">
                         {% if formula_form.non_field_errors %}
                         <div class="aw-alert aw-alert--danger" role="alert">
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
@@ -332,7 +332,7 @@ panels through data-aw-tabs / data-aw-tab / data-aw-tabpanel.
                             </button>
                         </div>
                     </div>
-                    <div class="aw-card-body aw-card-body--tight">
+                    <div class="aw-card-body aw-card-body--tight aw-stack">
                         {{ rule_formset.management_form }}
 
                         {% if rule_formset.non_form_errors %}
@@ -439,7 +439,7 @@ panels through data-aw-tabs / data-aw-tab / data-aw-tabpanel.
                         <h3 id="promotion-preview-title">{% translate "Evaluation Preview" %}</h3>
                     </div>
                 </div>
-                <div class="aw-card-body aw-card-body--tight">
+                <div class="aw-card-body aw-card-body--tight aw-stack">
                     {% translate "This preview shows calculated scores based on the saved formula. No results have been saved. Students with unresolved manual grading are excluded from their computed scores." as preview_help_text %}
                     <div class="aw-small aw-muted">{{ preview_help_text }}</div>
 
@@ -781,7 +781,7 @@ panels through data-aw-tabs / data-aw-tab / data-aw-tabpanel.
                                         <i class="fas fa-check-circle" aria-hidden="true"></i>{% translate "Overridden" %}
                                     </span>
                                     {% else %}
-                                    <form method="post" action="{% url 'evaluation-result-override' result.pk %}" hx-post="{% url 'evaluation-result-override' result.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form aw-flex-wrap" data-confirm-message="{% translate 'Are you sure?' %}">
+                                    <form method="post" action="{% url 'evaluation-result-override' result.pk %}" hx-post="{% url 'evaluation-result-override' result.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-flex aw-flex-wrap aw-m-0" data-confirm-message="{% translate 'Are you sure?' %}">
                                         {% csrf_token %}
                                         <input type="hidden" name="scope" value="{{ selected_scope.pk }}">
                                         <select name="final_status" class="aw-select" required aria-label="{% translate "Override status" %}">

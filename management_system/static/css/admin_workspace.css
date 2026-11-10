@@ -549,6 +549,43 @@ body.aw-admin .aw-main {
     flex-direction: column;
 }
 
+/* A lone child in a multi-column grid must not sit in a half-empty row. */
+body.aw-admin .aw-grid--2 > :only-child,
+body.aw-admin .aw-grid--2-even > :only-child,
+body.aw-admin .aw-grid--3 > :only-child { grid-column: 1 / -1; }
+
+/* Desktop app shell: the shell owns the viewport and the main column scrolls
+   inside it. Without this the workspace's bottom padding pushed the document
+   past 100dvh on tall pages, so the page scrolled to reveal empty space, and
+   short pages left a dead band under the content. */
+@media (min-width: 993px) {
+    body.aw-admin .aw-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+    body.aw-admin .aw-main { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+    body.aw-admin .aw-workspace { padding-bottom: 32px; }
+}
+
+/* Base rhythm for card bodies that do not already stack their children. The
+   :not(.aw-stack) guard keeps it from doubling the gap on stacked bodies. */
+body.aw-admin .aw-card-body:not(.aw-stack):not(.aw-card-body--flush) > * + *:not(.aw-kv) { margin-top: 10px; }
+body.aw-admin .aw-card-body--tight:not(.aw-stack) > * + *:not(.aw-kv) { margin-top: 8px; }
+
+/* A lead paragraph or alert before a form grid inside a form section. */
+body.aw-admin .aw-form-section > p + .aw-form-grid,
+body.aw-admin .aw-form-section > .aw-alert + .aw-form-grid { margin-top: 12px; }
+
+/* Dialog and drawer bodies that are not explicit stacks. */
+body.aw-admin .aw-modal .modal-body:not(.aw-stack) > * + * { margin-top: 10px; }
+body.aw-admin #aw-drawer-body > * + * { margin-top: 12px; }
+
+/* Alerts that sit inside a table card. */
+body.aw-admin .aw-table-card > .aw-alert { margin: 10px 12px; }
+
+/* Footer inside a card body bleeds to the card edge instead of floating. */
+body.aw-admin .aw-card-body:not(.aw-card-body--flush):not(.aw-card-body--tight) > form > .aw-form-actions:last-child {
+    margin: 14px -15px -15px;
+    border-radius: 0 0 calc(var(--aw-radius) - 1px) calc(var(--aw-radius) - 1px);
+}
+
 body.aw-admin .aw-topbar {
     position: sticky;
     top: 0;
@@ -735,7 +772,9 @@ body.aw-admin .aw-menu-sep { height: 1px; margin: 4px; background: var(--aw-line
 /* ---- Workspace canvas ---- */
 body.aw-admin .aw-workspace {
     width: 100%;
-    max-width: 1680px;
+    /* The top bar spans the whole main column; capping the workspace narrower
+       produced cream gutters on wide screens that read as broken layout. */
+    max-width: none;
     margin: 0 auto;
     padding: 24px 28px 64px;
     min-width: 0;
@@ -1291,6 +1330,11 @@ body.aw-admin .aw-table-tools {
 }
 body.aw-admin .aw-table-tools .aw-search-wrap { flex: 1 1 220px; max-width: 320px; }
 body.aw-admin .aw-table-tools .aw-select { width: auto; min-width: 120px; }
+/* Inline filter fields: the label is visually hidden so the row stays compact. */
+body.aw-admin .aw-table-tools .aw-field--inline { margin: 0; flex: 0 0 auto; }
+body.aw-admin .aw-table-tools .aw-field--inline .aw-input { width: auto; min-width: 150px; }
+body.aw-admin .aw-table-tools .aw-field--inline .aw-input[type="search"] { min-width: 220px; }
+body.aw-admin .aw-table-tools .aw-field--inline .aw-input[type="date"] { min-width: 150px; }
 body.aw-admin .aw-table-tools .aw-spacer { flex: 1; }
 body.aw-admin .aw-table-count { font-size: 10.5px; color: var(--aw-muted); white-space: nowrap; }
 
@@ -2910,7 +2954,7 @@ body.aw-admin .aw-table tbody tr.aw-level-group td {
 body.aw-admin .aw-row-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     justify-content: flex-end;
     flex-wrap: wrap;
 }

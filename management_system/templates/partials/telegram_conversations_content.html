@@ -121,10 +121,11 @@ URL/fragment/query hook below are unchanged.
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body aw-stack">
                     <p class="aw-small aw-muted">{% translate "Find a linked student to open or start their conversation." %}</p>
 
                     <form method="get" action="{{ conversation_list_url }}"
+                          class="aw-stack"
                           hx-get="{{ conversation_list_url }}"
                           hx-target="#telegram-linked-user-list"
                           hx-select="#telegram-linked-user-list"
