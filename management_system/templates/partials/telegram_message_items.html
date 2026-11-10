@@ -1,5 +1,4 @@
 {% load i18n %}
-{% translate "Answered" as answered_label %}
 {% translate "Alert removed from Telegram" as alert_removed_label %}
 {% translate "Alert updated in Telegram" as alert_edited_label %}
 {% translate "Alert remains in Telegram because the 48-hour deletion window expired" as alert_expired_label %}
@@ -76,21 +75,19 @@
         {% if message.direction == "outbound" and message.sender_user %}<span>@{{ message.sender_user.username }}</span>{% endif %}
         {% if message.sent_at %}<time datetime="{{ message.sent_at|date:'c' }}">{% translate "Sent" %} {{ message.sent_at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
         {% if message.delivery_error %}<span title="{{ message.delivery_error }}">{{ message.delivery_error }}</span>{% endif %}
-        {% if message.content_type == "digest" %}
-        {% if message.resolved_at %}
-        {% if message.resolved_by %}
-        {% blocktranslate with admin=message.resolved_by.username asvar answered_by_label %}Answered by @{{ admin }}{% endblocktranslate %}
-        {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=answered_by_label %}
-        {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="green" label=answered_label %}{% endif %}
-        {% if message.resolution == "deleted" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_removed_label %}
-        {% elif message.resolution == "edited" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_edited_label %}
-        {% elif message.resolution == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_expired_label %}
-        {% elif message.resolution == "unavailable" %}{% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=alert_unavailable_label %}
-        {% elif message.resolution == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=alert_failed_label %}{% endif %}
-        {% else %}{% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=awaiting_reply_label %}
+        {% if message.digest_alert %}
+        {% with alert=message.digest_alert %}
+        {% if alert.resolved_at %}
+        {% if alert.resolution == "deleted" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_removed_label %}
+        {% elif alert.resolution == "edited" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_edited_label %}
+        {% elif alert.resolution == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_expired_label %}
+        {% elif alert.resolution == "unavailable" %}{% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=alert_unavailable_label %}
+        {% elif alert.resolution == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=alert_failed_label %}{% endif %}
+        {% elif alert.delivery_status == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=alert_failed_label %}
         {% endif %}
+        {% endwith %}
         {% endif %}
-        {% if message.direction == "inbound" and message.content_type != "digest" %}
+        {% if message.direction == "inbound" %}
         {% if message.answered_at and message.answered_by %}
         {% blocktranslate with admin=message.answered_by.username asvar inbound_answered_label %}Answered by @{{ admin }}{% endblocktranslate %}
         {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=inbound_answered_label %}
@@ -107,13 +104,26 @@
         {% if message.telegram_deletion_error %}<span>{{ message.telegram_deletion_error }}</span>{% endif %}
     </div>
     <div class="aw-flex aw-flex-wrap">
-        {% if message.direction == "inbound" and message.content_type != "digest" %}
+        {% if message.direction == "inbound" %}
         <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
-        {% elif message.content_type == "digest" and message.source_message_id %}
-        <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.source_message_id }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
+        {% endif %}
+        {% if message.digest_alert and message.digest_alert.delivery_status == "sent" and message.digest_alert.telegram_deletion_status != "deleted" and message.digest_alert.telegram_deletion_status != "expired" %}
+        <form method="post"
+              action="{% url 'telegram-conversation-message-delete' conversation.pk message.digest_alert.pk %}"
+              hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.digest_alert.pk %}?fragment=panel"
+              hx-target="#telegram-chat-panel"
+              hx-swap="innerHTML"
+              class="aw-inline-form"
+              data-confirm-message="{% translate 'Delete this alert from Telegram? The conversation history will remain.' %}">
+            {% csrf_token %}
+            <button type="submit" class="aw-btn aw-btn--ghost aw-btn--sm">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                {% translate "Delete alert from Telegram" %}
+            </button>
+        </form>
         {% endif %}
         {% if message.direction == "outbound" and message.delivery_status == "sent" and message.telegram_deletion_status != "deleted" and message.telegram_deletion_status != "expired" %}
-        {% if message.sender_user_id == request.user.pk or message.content_type == "digest" and message.telegram_chat_id == own_admin_chat_id %}
+        {% if message.sender_user_id == request.user.pk %}
         <form method="post"
               action="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}"
               hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}?fragment=panel"

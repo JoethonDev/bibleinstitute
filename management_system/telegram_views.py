@@ -536,21 +536,37 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     ).values_list("telegram_chat_id", flat=True).first()
     messages_queryset = TelegramMessage.objects.filter(
         conversation_id=conversation.pk,
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
     ).select_related(
         "sender_user", "telegram_deleted_by", "resolved_by",
         "resolution_reply", "resolution_reply__sender_user",
         "answered_by", "answer_reply",
     ).prefetch_related("attachments").order_by("created_at", "pk")
-    if own_admin_chat_id is None:
-        messages_queryset = messages_queryset.exclude(content_type=TelegramMessage.ContentType.DIGEST)
-    else:
-        messages_queryset = messages_queryset.filter(
-            ~Q(content_type=TelegramMessage.ContentType.DIGEST)
-            | Q(
-                content_type=TelegramMessage.ContentType.DIGEST,
-                telegram_chat_id=own_admin_chat_id,
-            )
-        )
+
+    # A digest row is the alert delivered to an admin's Telegram, not a chat
+    # message: it is outbound while carrying the student's text, and after a
+    # reply its text also contains the answer. Rendering it put the student's
+    # message on the admin side and repeated the reply, so the timeline shows
+    # only real messages and each inbound row carries its alert state instead.
+    def annotate_digest_alerts(messages):
+        inbound_ids = [
+            message.pk for message in messages
+            if message.direction == TelegramMessage.Direction.INBOUND
+        ]
+        if not inbound_ids:
+            return
+        digests = TelegramMessage.objects.filter(
+            source_message_id__in=inbound_ids,
+            content_type=TelegramMessage.ContentType.DIGEST,
+        ).order_by("pk")
+        if own_admin_chat_id is not None:
+            digests = digests.filter(telegram_chat_id=own_admin_chat_id)
+        latest = {}
+        for digest in digests:
+            latest[digest.source_message_id] = digest
+        for message in messages:
+            message.digest_alert = latest.get(message.pk)
     after_raw = request.GET.get("after")
     message_items = None
     messages_page_obj = None
@@ -596,6 +612,10 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         page_number = requested_page or paginator.num_pages or 1
         messages_page_obj = paginator.get_page(page_number)
         latest_message_pk = messages_queryset.values_list("pk", flat=True).last()
+    if message_items is not None:
+        annotate_digest_alerts(message_items)
+    elif messages_page_obj is not None:
+        annotate_digest_alerts(list(messages_page_obj.object_list))
     reply_to_message_id = _valid_reply_target(
         conversation.pk,
         request.GET.get("reply_to"),
@@ -612,7 +632,6 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
             conversation.user_id,
             _("Level not assigned"),
         ),
-        "own_admin_chat_id": own_admin_chat_id,
         "messages_page_obj": messages_page_obj,
         "message_items": message_items,
         "latest_message_pk": latest_message_pk,
