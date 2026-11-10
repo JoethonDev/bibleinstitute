@@ -1,6 +1,6 @@
 {% load i18n %}
 <div id="telegram-conversation-list"
-     class="tg-chat-list"
+     class="aw-chat-list"
      data-loaded-pages="1"
      data-poll-url="{{ conversation_list_url }}?fragment=items{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
      x-data="{
@@ -20,7 +20,7 @@
              if (!el.dataset.pollUrl) return;
              // Once older pages are appended, a page-1 poll would drop them.
              if (Number(el.dataset.loadedPages || '1') > 1) return;
-             const list = el.querySelector('.tg-chat-conv-list');
+             const list = el.querySelector('.aw-chat-list-ul');
              if (!list) return;
              if (!window.telegramChatBeginRequest?.(el)) return;
              this.polling = true;
@@ -36,14 +36,7 @@
          }
      }">
 
-    <div class="tg-chat-autorefresh">
-        <label class="tg-chat-autorefresh-label aw-small aw-muted">
-            <input type="checkbox" x-model="autoRefresh">
-            <span>{% translate "Auto refresh" %}</span>
-        </label>
-    </div>
-
-    <ul class="tg-chat-conv-list list-unstyled mb-0">
+    <ul class="aw-chat-list-ul">
         {% include 'partials/telegram_conversation_items.html' %}
     </ul>
 </div>

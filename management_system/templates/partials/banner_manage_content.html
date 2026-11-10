@@ -1,20 +1,39 @@
 {% load i18n %}
 {% comment %}
-Banners workspace. The server-paginated rows keep the publish form, every
-toggle/delete POST action, the csrf tokens, the hx-* contract, the confirm
-messages and the #banner-loading indicator. Presentation only: ad-* markup is
-replaced by the admin workspace primitives, so no id, action, method or hook
-changes.
-The view projects only the paginator count and the current page; it has no
-visibility counts, so the KPI grid shows those two real values only.
-StudentBanner has no image or preview field, so no preview is rendered.
+Banners workspace. The publish form, every toggle/delete POST action, the csrf
+tokens, the hx-* contract, the confirm messages and the #banner-loading
+indicator are preserved. Presentation only: Bootstrap controls are replaced by
+the workspace primitives.
+
+Each published banner renders as a card (title, message, visible switch,
+created date, action pair, delete). The switch posts the existing toggle
+endpoint on change, so the visible state is one control bound to one endpoint.
+StudentBanner has no schedule window and this app has no banner edit route, so
+no schedule row and no Edit action are rendered; both are reported instead of
+invented. The publish form fields are rendered by BannerForm, whose widgets
+still set Bootstrap classes in the view module (outside this file's scope).
 {% endcomment %}
 {% translate "Site & Apps" as page_eyebrow %}
 {% translate "Banners" as page_title %}
-{% translate "Yes" as banner_yes_label %}
-{% translate "No" as banner_no_label %}
+{% translate "Short, dismissible messages that appear above student pages." as page_description %}
 <div id="content" class="aw-dashboard-page">
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title %}
+    <div class="aw-page-head aw-flex-wrap">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <button type="button" class="aw-btn aw-btn--primary aw-btn--sm"
+                    data-aw-drawer="{% url 'banner-manage' %}?fragment=form"
+                    data-aw-drawer-title="{% translate 'New banner' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                <span>{% translate "New banner" %}</span>
+            </button>
+            <noscript>
+                <a class="aw-btn aw-btn--ghost aw-btn--sm" href="?new=1">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
+                    <span>{% translate "New banner" %}</span>
+                </a>
+            </noscript>
+        </div>
+    </div>
 
     <div class="aw-kpi-grid">
         <div class="aw-kpi">
@@ -37,110 +56,70 @@ StudentBanner has no image or preview field, so no preview is rendered.
         </div>
     </div>
 
+    {% if show_form %}
     <section class="aw-card">
         <div class="aw-card-head">
             <div class="aw-card-title">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-plus"></use></svg>
                 <h3>{% translate "New banner" %}</h3>
             </div>
-            <span id="banner-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+            <span id="banner-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
         </div>
-        <form method="post" action="{% url 'banner-manage' %}" hx-post="{% url 'banner-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
-            {% csrf_token %}
-            <div class="aw-form-section">
-                <div class="aw-form-grid">
-                    <div class="aw-field aw-span-2">
-                        <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
-                        {{ form.title }}
-                        {% if form.title.errors %}<div class="aw-field-error">{{ form.title.errors }}</div>{% endif %}
-                    </div>
-                    <div class="aw-field aw-span-2">
-                        <label for="{{ form.body.id_for_label }}">{{ form.body.label }}</label>
-                        {{ form.body }}
-                        {% if form.body.errors %}<div class="aw-field-error">{{ form.body.errors }}</div>{% endif %}
-                    </div>
-                    <div class="aw-field">
-                        <label for="{{ form.action_label.id_for_label }}">{{ form.action_label.label }}</label>
-                        {{ form.action_label }}
-                        {% if form.action_label.errors %}<div class="aw-field-error">{{ form.action_label.errors }}</div>{% endif %}
-                    </div>
-                    <div class="aw-field">
-                        <label for="{{ form.action_url.id_for_label }}">{{ form.action_url.label }}</label>
-                        {{ form.action_url }}
-                        {% if form.action_url.errors %}<div class="aw-field-error">{{ form.action_url.errors }}</div>{% endif %}
-                    </div>
-                </div>
-                {% if form.non_field_errors %}
-                <div class="aw-alert aw-alert--danger mt-3" role="alert">
-                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-                    <div>{{ form.non_field_errors }}</div>
-                </div>
-                {% endif %}
-                <div class="aw-form-actions">
-                    <button type="submit" class="aw-btn aw-btn--primary">
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-                        <span>{% translate "Publish" %}</span>
-                    </button>
-                </div>
-            </div>
-        </form>
-    </section>
+        {% include "partials/banner_form_fields.html" %}
 
-    <div class="aw-table-card aw-table-wrap">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
-                <h3>{% translate "Banners" %}</h3>
-            </div>
-            <span class="aw-pill aw-pill--teal aw-pill--plain">{{ page_obj.paginator.count }}</span>
-        </div>
-        {% if page_obj.object_list %}
-        <div class="aw-table-wrap">
-            <table class="aw-table">
-                <caption class="visually-hidden">{% translate "Student banner messages" %}</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">{% translate "Title" %}</th>
-                        <th scope="col">{% translate "Message" %}</th>
-                        <th scope="col">{% translate "Visible" %}</th>
-                        <th scope="col">{% translate "Actions" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for banner in page_obj.object_list %}
-                    <tr>
-                        <td class="aw-cell-strong">{{ banner.title }}</td>
-                        <td>{{ banner.body|truncatechars:80 }}</td>
-                        <td>
-                            {% if banner.is_active %}
-                            {% include "partials/components/aw_status_pill.html" with status="active" label=banner_yes_label %}
-                            {% else %}
-                            {% include "partials/components/aw_status_pill.html" with status="inactive" label=banner_no_label %}
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="aw-flex aw-flex-wrap">
-                                <form method="post" action="{% url 'banner-toggle' banner.pk %}" hx-post="{% url 'banner-toggle' banner.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
-                                    {% csrf_token %}
-                                    <button type="submit" class="aw-btn aw-btn--ghost aw-btn--sm">{% if banner.is_active %}{% translate "Hide" %}{% else %}{% translate "Show" %}{% endif %}</button>
-                                </form>
-                                <form method="post" action="{% url 'banner-delete' banner.pk %}" hx-post="{% url 'banner-delete' banner.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this banner?' %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete" %}</button>
-                                </form>
+    </section>
+    {% endif %}
+
+    {% if page_obj.object_list %}
+    <div class="aw-stack aw-stack--lg">
+        {% for banner in page_obj.object_list %}
+        <article class="aw-card">
+            <div class="aw-card-body">
+                <div class="aw-flex-between aw-flex-wrap">
+                    <div class="aw-flex">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+                        <div>
+                            <b>{{ banner.title }}</b>
+                            <div class="aw-small aw-muted">{{ banner.body }}</div>
+                            {% if banner.action_label %}
+                            <div class="aw-small aw-muted aw-mt-2">
+                                <span class="aw-pill aw-pill--plain">{{ banner.action_label }}</span>
+                                <span class="aw-truncate">{{ banner.action_url }}</span>
                             </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label %}
-        {% else %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <form method="post" action="{% url 'banner-toggle' banner.pk %}" hx-post="{% url 'banner-toggle' banner.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                        {% csrf_token %}
+                        <label class="aw-switch">
+                            <input type="checkbox" id="banner-visible-{{ banner.pk }}"{% if banner.is_active %} checked{% endif %} hx-post="{% url 'banner-toggle' banner.pk %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true">
+                            <span class="aw-switch-track" aria-hidden="true"></span>
+                            <span>{% translate "Visible" %}</span>
+                        </label>
+                        <noscript><button type="submit" class="aw-btn aw-btn--ghost aw-btn--sm">{% if banner.is_active %}{% translate "Hide" %}{% else %}{% translate "Show" %}{% endif %}</button></noscript>
+                    </form>
+                </div>
+                <hr class="aw-divider aw-mt-3">
+                <div class="aw-flex-between aw-flex-wrap">
+                    <span class="aw-small aw-muted">{{ banner.created_at|date:"DATE_FORMAT" }}</span>
+                    <div class="aw-row-actions">
+                        <form method="post" action="{% url 'banner-delete' banner.pk %}" hx-post="{% url 'banner-delete' banner.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Delete this banner?' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete" %}</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query aria_label=pagination_aria_label %}
+    {% else %}
+    <div class="aw-card">
         <div class="aw-card-body">
             {% translate "No banners yet." as banners_empty_desc %}
             {% include "partials/components/aw_empty.html" with icon="i-bell" description=banners_empty_desc %}
         </div>
-        {% endif %}
     </div>
+    {% endif %}
 </div>

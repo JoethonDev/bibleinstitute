@@ -1,11 +1,18 @@
 {% load i18n %}
 {% comment %}
-Broadcast detail and delivery monitor. Presentation only: the monitor root keeps
-x-data, data-job-detail, data-job-status-url and data-unavailable-label; the
-summary card keeps data-job-record, data-primary-job, data-family, data-id,
-data-active, data-next-poll-at and every data-job-field; the progress element,
-the data-job-poll-error hook, the redelivery and recipient-delete POST forms, the
+Broadcast detail and delivery monitor.
+
+Presentation only. The monitor root keeps x-data, data-job-detail,
+data-job-status-url and data-unavailable-label; the summary card keeps
+data-job-record, data-primary-job, data-family, data-id, data-active,
+data-next-poll-at and every data-job-field; the progress element, the
+data-job-poll-error hook, the redelivery and recipient-delete POST forms, the
 status/readiness conditions and the pagination include arguments are unchanged.
+
+The context strip reports audience, status and the sent/confirmed/created time
+that the broadcast model already carries. The view supplies no webhook-update
+or delivery-health aggregate, so none is rendered. Recipient rows keep the
+server-projected delivery counters and deletion form.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page"{% if monitor_job %} x-data="backgroundJobsMonitor" data-job-detail="true" data-job-status-url="{{ job_status_url }}" data-unavailable-label="{% translate 'Unavailable' %}"{% endif %}>
     {% translate "Engagement" as page_eyebrow %}
@@ -32,7 +39,30 @@ status/readiness conditions and the pagination include arguments are unchanged.
         </div>
     </div>
 
-    {% if monitor_job %}<p class="text-danger small" data-job-poll-error hidden role="status">{% translate "Progress updates are temporarily unavailable. Retrying..." %}</p>{% endif %}
+    {% if monitor_job %}<div class="aw-alert aw-alert--danger" data-job-poll-error hidden role="status"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{% translate "Progress updates are temporarily unavailable. Retrying..." %}</div></div>{% endif %}
+
+    <div class="aw-context-strip">
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            {% translate "Audience" %} <b>{{ target_label }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+            {% translate "Status" %} <b>{{ broadcast.get_status_display }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+            {% if broadcast.completed_at %}
+            {% translate "Sent" %} <b>{{ broadcast.completed_at|date:"Y-m-d H:i" }}</b>
+            {% elif broadcast.confirmed_at %}
+            {% translate "Confirmed" %} <b>{{ broadcast.confirmed_at|date:"Y-m-d H:i" }}</b>
+            {% else %}
+            {% translate "Created" %} <b>{{ broadcast.created_at|date:"Y-m-d H:i" }}</b>
+            {% endif %}
+        </span>
+    </div>
 
     <section class="aw-card"{% if monitor_job %} data-job-record data-primary-job="true" data-family="telegram" data-id="{{ monitor_job.id }}" data-active="{{ monitor_job.active|yesno:'true,false' }}" data-next-poll-at="{{ monitor_job.next_poll|date:'c' }}"{% endif %}>
         <div class="aw-card-head">
@@ -42,7 +72,7 @@ status/readiness conditions and the pagination include arguments are unchanged.
             </div>
         </div>
         <div class="aw-card-body">
-            <dl class="mb-0">
+            <dl class="aw-dl">
                 <div class="aw-kv">
                     <dt>{% translate "Status" %}</dt>
                     <dd{% if monitor_job %} data-job-field="status_label" aria-live="polite"{% endif %}>{% if monitor_job %}{{ monitor_job.status_label }}{% else %}{{ broadcast.get_status_display }}{% endif %}</dd>
@@ -60,7 +90,7 @@ status/readiness conditions and the pagination include arguments are unchanged.
                     <dd class="aw-num">{{ broadcast.recipient_count }}</dd>
                 </div>
                 <div class="aw-kv">
-                    <dt>{% translate "Sent" %}</dt>
+                    <dt>{% translate "Delivered" %}</dt>
                     <dd class="aw-num"{% if monitor_job %} data-job-field="succeeded"{% endif %}>{{ broadcast.sent_count }}</dd>
                 </div>
                 <div class="aw-kv">
@@ -73,11 +103,15 @@ status/readiness conditions and the pagination include arguments are unchanged.
                     <dd class="aw-num" data-job-field="skipped">{{ broadcast.skipped_count }}</dd>
                 </div>
                 {% endif %}
+                <div class="aw-kv">
+                    <dt>{% translate "Created" %}</dt>
+                    <dd>{{ broadcast.created_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+                </div>
             </dl>
             {% if monitor_job %}
-            <div class="mt-3">
-                <progress max="100" value="{{ monitor_job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress w-100"></progress>
-                <p class="aw-small aw-muted mb-0 mt-1" data-job-field="progress_label">{{ monitor_job.progress_label }}</p>
+            <div class="aw-stack aw-mt-3">
+                <progress max="100" value="{{ monitor_job.percent }}" aria-label="{% translate 'Processing progress' %}" class="app-progress"></progress>
+                <p class="aw-small aw-muted" data-job-field="progress_label">{{ monitor_job.progress_label }}</p>
             </div>
             {% endif %}
         </div>
@@ -175,10 +209,19 @@ status/readiness conditions and the pagination include arguments are unchanged.
                 <tbody>
                 {% for recipient in recipient_page_obj %}
                     <tr>
-                        <td class="aw-cell-strong">{{ recipient.user_display_name|default:recipient.user_username }}</td>
+                        <td>
+                            <div class="aw-cell-main">
+                                <div>
+                                    <b>{{ recipient.user_display_name|default:recipient.user_username|default:"-" }}</b>
+                                    {% if recipient.user_username and recipient.user_display_name != recipient.user_username %}
+                                    <span class="aw-cell-sub">{{ recipient.user_username }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
                         <td>
                             {% if recipient.status == "sending" %}
-                            {% include "partials/components/aw_status_pill.html" with status=recipient.status tone="blue" label=recipient.get_status_display %}
+                            {% include "partials/components/aw_status_pill.html" with status="processing" label=recipient.get_status_display %}
                             {% else %}
                             {% include "partials/components/aw_status_pill.html" with status=recipient.status label=recipient.get_status_display %}
                             {% endif %}
@@ -192,10 +235,12 @@ status/readiness conditions and the pagination include arguments are unchanged.
                         <td>{{ recipient.last_error|default:"-" }}</td>
                         <td>
                             {% if recipient.telegram_messages_remaining and recipient.status != 'queued' and recipient.status != 'sending' %}
-                            <form method="post" action="{% url 'telegram-broadcast-recipient-delete' broadcast.pk recipient.pk %}" class="aw-inline-form" data-confirm-message="{% translate 'Delete every recorded broadcast message for this recipient?' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete from Telegram" %}</button>
-                            </form>
+                            <div class="aw-row-actions">
+                                <form method="post" action="{% url 'telegram-broadcast-recipient-delete' broadcast.pk recipient.pk %}" class="aw-inline-form" data-confirm-message="{% translate 'Delete every recorded broadcast message for this recipient?' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">{% translate "Delete from Telegram" %}</button>
+                                </form>
+                            </div>
                             {% else %}-{% endif %}
                         </td>
                     </tr>

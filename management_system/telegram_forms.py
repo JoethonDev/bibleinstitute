@@ -74,7 +74,7 @@ class TelegramSupportReplyForm(forms.Form):
                 "rows": 4,
                 "maxlength": 4000,
                 "aria-label": _("Reply message"),
-                "class": "form-control tg-chat-reply-input",
+                "class": "aw-textarea",
             }
         ),
     )
@@ -87,7 +87,7 @@ class TelegramSupportReplyForm(forms.Form):
         },
         widget=forms.ClearableFileInput(
             attrs={
-                "class": "form-control form-control-sm tg-chat-file-input",
+                "class": "aw-file-input",
                 "accept": SUPPORT_ATTACHMENT_ACCEPT,
                 "aria-describedby": "telegram-support-attachment-help",
             }
@@ -161,7 +161,7 @@ class TelegramBroadcastForm(forms.Form):
                 "rows": 8,
                 "maxlength": 4000,
                 "aria-label": _("Broadcast message"),
-                "class": "form-control tg-broadcast-textarea",
+                "class": "aw-textarea tg-broadcast-textarea",
             }
         ),
     )
@@ -171,7 +171,7 @@ class TelegramBroadcastForm(forms.Form):
         widget=forms.Select(
             attrs={
                 "aria-describedby": "telegram-broadcast-level-help",
-                "class": "form-select tg-broadcast-select",
+                "class": "aw-select tg-broadcast-select",
             }
         ),
     )

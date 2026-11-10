@@ -467,10 +467,13 @@ def format_quiz(quiz, user, opening=None, closing=None) -> str:
         lines.append(_('Opens: %(date)s') % {"date": format_human_datetime(opening_value, user)})
         lines.append(_('Closes: %(date)s') % {"date": format_human_datetime(closing_value, user)})
         lines.append(_('Time zone: %(name)s') % {"name": timezone_name(user)})
-        lines.append(_('Time allowed after starting: %(minutes)s minutes.') % {
-            "minutes": quiz.duration_minutes,
-        })
-        lines.append(_('Your attempt ends at its time limit or at closing time, whichever comes first.'))
+        if quiz.duration_minutes:
+            lines.append(_('Time allowed after starting: %(minutes)s minutes.') % {
+                "minutes": quiz.duration_minutes,
+            })
+            lines.append(_('Your attempt ends at its time limit or at closing time, whichever comes first.'))
+        else:
+            lines.append(_('No time limit: your attempt ends at closing time.'))
 
     link = website_url("quiz-details", [offering.pk, quiz.pk])
     if link:

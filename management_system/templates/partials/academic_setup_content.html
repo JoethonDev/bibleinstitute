@@ -4,6 +4,13 @@ Academic setup workspace: academic years, the selected year's level links with
 their meeting weekdays, and the selected scope's course offerings. Every id,
 POST form, csrf token, hx attribute and permission stays exactly as it was;
 level CRUD remains on /dashboard/levels/ and is not duplicated here.
+
+The three section cards are real tab panels: the delegated admin_shell tab
+controller reads data-aw-tabs / data-aw-tab / data-aw-tabpanel, so a tab click
+toggles is-active, aria-selected, tabindex and the panel hidden state without
+any inline script or server round trip. The active tab is derived from the
+existing query selection (scope, then academic year, then all years) so an
+HTMX navigation into a scope keeps landing on the panel it asked for.
 {% endcomment %}
 {% translate "Academic" as page_eyebrow %}
 {% translate "Academic Setup" as page_title %}
@@ -60,247 +67,350 @@ level CRUD remains on /dashboard/levels/ and is not duplicated here.
         {% endif %}
     </div>
 
-    {# In-page anchor strip, no JS and no new backend. #}
-    <nav class="aw-tabs" aria-label="{% translate 'Sections' %}">
-        <a class="aw-tab" href="#academic-years">{% translate "Academic Years" %}</a>
-        {% if selected_year %}<a class="aw-tab" href="#year-levels">{% translate "Year Levels" %}</a>{% endif %}
-        {% if selected_scope %}<a class="aw-tab" href="#course-offerings">{% translate "Course Offerings" %}</a>{% endif %}
-    </nav>
-
-    {# --- Academic Years Section --- #}
-    <div class="aw-table-card" id="academic-years">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
-                <h3>{% translate "Academic Years" %}</h3>
-            </div>
-            <div class="aw-flex position-relative">
-                <span id="setup-loading" class="htmx-indicator" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
-                <button class="aw-btn aw-btn--primary aw-btn--sm" data-bs-toggle="modal" data-bs-target="#yearModal">
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span>{% translate "New Academic Year" %}</span>
-                </button>
-            </div>
-        </div>
-        <form method="get" class="aw-table-tools" action="{% url 'academic-setup' %}"
-              role="search"
-              hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#setup-loading">
-            {% if selected_scope_id %}<input type="hidden" name="scope" value="{{ selected_scope_id }}">{% elif selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
-            <div class="aw-search-wrap">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
-                <input type="search" id="year-search" name="q" class="aw-input aw-input--search" placeholder="{% translate "Search years..." %}" value="{{ search }}" hx-preserve
-                       hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
-            </div>
-            <label for="year-filter" class="visually-hidden">{% translate "Filter by status" %}</label>
-            <select name="active" id="year-filter" class="aw-select"
-                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
-                <option value="all" {% if active_filter == "all" %}selected{% endif %}>{% translate "All" %}</option>
-                <option value="active" {% if active_filter == "active" %}selected{% endif %}>{% translate "Active" %}</option>
-                <option value="inactive" {% if active_filter == "inactive" %}selected{% endif %}>{% translate "Inactive" %}</option>
-            </select>
-            <span class="aw-table-count">{{ year_page_obj.paginator.count }} {% translate "Academic Years" %}</span>
-        </form>
-        <div class="aw-table-wrap">
-            <table class="aw-table">
-                <thead>
-                    <tr>
-                        <th>{% translate "Name" %}</th>
-                        <th>{% translate "Levels" %}</th>
-                        <th>{% translate "Start" %}</th>
-                        <th>{% translate "End" %}</th>
-                        <th>{% translate "Status" %}</th>
-                        <th>{% translate "Actions" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for y in year_page_obj.object_list %}
-                    <tr{% if selected_year == y.pk %} class="is-selected"{% endif %}>
-                        <td class="aw-cell-strong">{{ y.name }}</td>
-                        <td>{{ y.level_display }}</td>
-                        <td class="aw-date">{{ y.starts_on }}</td>
-                        <td class="aw-date">{{ y.ends_on }}</td>
-                        <td>
-                            {% if y.is_active %}
-                            {% include "partials/components/aw_status_pill.html" with status="active" label=active_state %}
-                            {% else %}
-                            {% include "partials/components/aw_status_pill.html" with status="inactive" label=historical_state %}
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="aw-row-actions">
-                            {% if not y.is_active %}
-                            <form method="post" action="{% url 'academic-year-activate' y.id %}" hx-post="{% url 'academic-year-activate' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Activate this academic year?' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="aw-icon-btn" title="{% translate "Activate" %}"><i class="fas fa-check" aria-hidden="true"></i></button>
-                            </form>
-                            {% endif %}
-                            <a href="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" class="aw-icon-btn" title="{% translate "View levels and offerings" %}"
-                               hx-get="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
-                                <i class="fas fa-layer-group" aria-hidden="true"></i>
-                            </a>
-                            <button class="aw-icon-btn" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}" title="{% translate "Edit" %}">
-                                <i class="fas fa-edit" aria-hidden="true"></i>
-                            </button>
-                            <form method="post" action="{% url 'academic-year-delete' y.id %}" hx-post="{% url 'academic-year-delete' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this year?' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="aw-icon-btn text-danger" title="{% translate "Delete" %}"><i class="fas fa-trash" aria-hidden="true"></i></button>
-                            </form>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="aw-cell-empty">
-                            {% translate "No academic years yet." as years_empty_desc %}
-                            {% include "partials/components/aw_empty.html" with icon="i-calendar" description=years_empty_desc %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        {# --- Year pagination --- #}
-        {% translate "Year pagination" as year_pagination_aria %}
-        {% include "partials/pagination.html" with page_obj=year_page_obj pagination_query=year_pagination_query aria_label=year_pagination_aria hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#setup-loading" %}
-    </div>
-
-    {# --- Year-Level Links Section --- #}
-    {% if year_level_links %}
-    <div class="aw-card" id="year-levels">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
-                <h3>{% translate "Year Levels" %} - {{ year_level_links.0.academic_year.name }}</h3>
-            </div>
-        </div>
-        {% for ayl in year_level_links %}
-        <div class="aw-form-section">
-            <div class="aw-form-section-head">
-                <div>
-                    <h3>{{ ayl.level.display_name }}</h3>
-                    {% if selected_scope_id == ayl.pk %}<p>{% translate "Current" %}</p>{% endif %}
+    {# Year snapshot cards. Only values already projected on each year are shown. #}
+    {% if year_page_obj.object_list %}
+    <div class="aw-grid aw-grid--2-even">
+        {% for y in year_page_obj.object_list %}
+        <section class="aw-card" aria-labelledby="year-summary-{{ y.id }}">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+                    <h3 id="year-summary-{{ y.id }}">{{ y.name }}</h3>
                 </div>
-                <div class="aw-flex">
-                    <a href="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" class="aw-btn aw-btn--ghost aw-btn--sm"
-                       hx-get="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
-                        <i class="fas fa-book" aria-hidden="true"></i>
-                        <span>{% translate "Offerings" %}</span>
-                    </a>
-                    <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" hx-post="{% url 'academic-year-level-delete' ayl.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this level from the academic year?' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="aw-icon-btn text-danger" title="{% translate "Delete" %}"><i class="fas fa-trash" aria-hidden="true"></i></button>
-                    </form>
-                </div>
+                {% if y.is_active %}
+                {% include "partials/components/aw_status_pill.html" with status="active" label=active_state %}
+                {% else %}
+                {% include "partials/components/aw_status_pill.html" with status="inactive" label=historical_state %}
+                {% endif %}
             </div>
-            {# --- Weekday checkboxes --- #}
-            <form method="post" action="{% url 'academic-year-level-weekdays' ayl.pk %}" hx-post="{% url 'academic-year-level-weekdays' ayl.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
-                {% csrf_token %}
-                <div class="aw-field">
-                    <label class="aw-field-label">{% translate "Meeting Weekdays" %}</label>
-                    <div class="d-flex flex-wrap gap-3">
-                        {% for day_val, day_name in meeting_weekday_choices %}
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="meeting_weekdays" value="{{ day_val }}" id="wd-{{ ayl.pk }}-{{ day_val }}"{% if day_val in ayl.meeting_weekdays %} checked{% endif %}>
-                            <label class="form-check-label small" for="wd-{{ ayl.pk }}-{{ day_val }}">{{ day_name }}</label>
-                        </div>
-                        {% endfor %}
+            <div class="aw-card-body">
+                <dl class="aw-stack">
+                    <div class="aw-kv">
+                        <dt>{% translate "Start" %}</dt>
+                        <dd>{{ y.starts_on }}</dd>
                     </div>
-                </div>
-                <div class="mt-2">
-                    <button type="submit" class="aw-btn aw-btn--outline aw-btn--sm">{% translate "Save Weekdays" %}</button>
-                </div>
-            </form>
-        </div>
+                    <div class="aw-kv">
+                        <dt>{% translate "End" %}</dt>
+                        <dd>{{ y.ends_on }}</dd>
+                    </div>
+                    <div class="aw-kv">
+                        <dt>{% translate "Levels" %}</dt>
+                        <dd>{% if y.level_display %}{{ y.level_display }}{% else %}<span class="aw-muted">-</span>{% endif %}</dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
         {% endfor %}
     </div>
     {% endif %}
 
-    {# --- Course Offerings Section --- #}
-    {% if selected_scope %}
-    <div class="aw-table-card" id="course-offerings">
-        <div class="aw-card-head">
-            <div class="aw-card-title">
+    <div data-aw-tabs>
+        {# Real tabs: the delegated controller owns is-active / aria-selected / hidden. #}
+        <nav class="aw-tabs" role="tablist" aria-label="{% translate 'Sections' %}">
+            <button type="button"
+                    class="aw-tab{% if not selected_scope and not year_level_links %} is-active{% endif %}"
+                    id="academic-years-tab"
+                    data-aw-tab="years"
+                    role="tab"
+                    aria-selected="{% if not selected_scope and not year_level_links %}true{% else %}false{% endif %}"
+                    aria-controls="academic-years-panel"
+                    tabindex="{% if not selected_scope and not year_level_links %}0{% else %}-1{% endif %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+                <span>{% translate "Academic Years" %}</span>
+                <span class="aw-count">{{ year_page_obj.paginator.count }}</span>
+            </button>
+            {% if year_level_links %}
+            <button type="button"
+                    class="aw-tab{% if not selected_scope %} is-active{% endif %}"
+                    id="year-levels-tab"
+                    data-aw-tab="levels"
+                    role="tab"
+                    aria-selected="{% if not selected_scope %}true{% else %}false{% endif %}"
+                    aria-controls="year-levels-panel"
+                    tabindex="{% if not selected_scope %}0{% else %}-1{% endif %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                <span>{% translate "Year Levels" %}</span>
+                <span class="aw-count">{{ year_level_links|length }}</span>
+            </button>
+            {% endif %}
+            {% if selected_scope %}
+            <button type="button"
+                    class="aw-tab is-active"
+                    id="course-offerings-tab"
+                    data-aw-tab="offerings"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="course-offerings-panel"
+                    tabindex="0">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
-                <h3>{% translate "Course Offerings" %} - {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h3>
+                <span>{% translate "Course Offerings" %}</span>
+                <span class="aw-count">{{ offering_page_obj.paginator.count }}</span>
+            </button>
+            {% endif %}
+        </nav>
+
+        {# --- Academic Years Section --- #}
+        <div class="aw-tabpanel"
+             id="academic-years-panel"
+             data-aw-tabpanel="years"
+             role="tabpanel"
+             aria-labelledby="academic-years-tab"{% if selected_scope or year_level_links %} hidden{% endif %}>
+            <div class="aw-table-card" id="academic-years">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+                        <h3>{% translate "Academic Years" %}</h3>
+                    </div>
+                    <div class="aw-flex position-relative">
+                        <span id="setup-loading" class="htmx-indicator" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+                        <button class="aw-btn aw-btn--primary aw-btn--sm" data-bs-toggle="modal" data-bs-target="#yearModal">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span>{% translate "New Academic Year" %}</span>
+                        </button>
+                    </div>
+                </div>
+                <form method="get" class="aw-table-tools" action="{% url 'academic-setup' %}"
+                      role="search"
+                      hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#setup-loading">
+                    {% if selected_scope_id %}<input type="hidden" name="scope" value="{{ selected_scope_id }}">{% elif selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
+                    <div class="aw-search-wrap">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <label for="year-search" class="visually-hidden">{% translate "Search years" %}</label>
+                        <input type="search" id="year-search" name="q" class="aw-input aw-input--search" placeholder="{% translate "Search years..." %}" value="{{ search }}" hx-preserve
+                               hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
+                    </div>
+                    <label for="year-filter" class="visually-hidden">{% translate "Filter by status" %}</label>
+                    <select name="active" id="year-filter" class="aw-select"
+                            hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                        <option value="all" {% if active_filter == "all" %}selected{% endif %}>{% translate "All" %}</option>
+                        <option value="active" {% if active_filter == "active" %}selected{% endif %}>{% translate "Active" %}</option>
+                        <option value="inactive" {% if active_filter == "inactive" %}selected{% endif %}>{% translate "Inactive" %}</option>
+                    </select>
+                    <span class="aw-table-count">{{ year_page_obj.paginator.count }} {% translate "Academic Years" %}</span>
+                </form>
+                <div class="aw-table-wrap">
+                    <table class="aw-table">
+                        <thead>
+                            <tr>
+                                <th>{% translate "Name" %}</th>
+                                <th>{% translate "Levels" %}</th>
+                                <th>{% translate "Start" %}</th>
+                                <th>{% translate "End" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th>{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for y in year_page_obj.object_list %}
+                            <tr{% if selected_year == y.pk %} class="is-selected"{% endif %}>
+                                <td class="aw-cell-strong">{{ y.name }}</td>
+                                <td>{{ y.level_display }}</td>
+                                <td class="aw-date">{{ y.starts_on }}</td>
+                                <td class="aw-date">{{ y.ends_on }}</td>
+                                <td>
+                                    {% if y.is_active %}
+                                    {% include "partials/components/aw_status_pill.html" with status="active" label=active_state %}
+                                    {% else %}
+                                    {% include "partials/components/aw_status_pill.html" with status="inactive" label=historical_state %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="aw-row-actions">
+                                    {% if not y.is_active %}
+                                    <form method="post" action="{% url 'academic-year-activate' y.id %}" hx-post="{% url 'academic-year-activate' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Activate this academic year?' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="aw-icon-btn" title="{% translate "Activate" %}"><i class="fas fa-check" aria-hidden="true"></i></button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" class="aw-icon-btn" title="{% translate "View levels and offerings" %}"
+                                       hx-get="?{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}&{% endif %}academic_year={{ y.pk }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                                        <i class="fas fa-layer-group" aria-hidden="true"></i>
+                                    </a>
+                                    <button class="aw-icon-btn" data-bs-toggle="modal" data-bs-target="#yearModal{{ y.id }}" title="{% translate "Edit" %}">
+                                        <i class="fas fa-edit" aria-hidden="true"></i>
+                                    </button>
+                                    <form method="post" action="{% url 'academic-year-delete' y.id %}" hx-post="{% url 'academic-year-delete' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this year?' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="aw-icon-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                                    </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="aw-cell-empty">
+                                    {% translate "No academic years yet." as years_empty_desc %}
+                                    {% include "partials/components/aw_empty.html" with icon="i-calendar" description=years_empty_desc %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {# --- Year pagination --- #}
+                {% translate "Year pagination" as year_pagination_aria %}
+                {% include "partials/pagination.html" with page_obj=year_page_obj pagination_query=year_pagination_query aria_label=year_pagination_aria hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#setup-loading" %}
             </div>
-            <div class="aw-flex">
-                <button type="button" class="aw-btn aw-btn--primary aw-btn--sm" data-bs-toggle="modal" data-bs-target="#offeringModal">
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span>{% translate "New Offering" %}</span>
-                </button>
-                <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-bs-toggle="modal" data-bs-target="#copyModal">
-                    <i class="fas fa-copy" aria-hidden="true"></i>
-                    <span>{% translate "Copy Offerings" %}</span>
-                </button>
-            </div>
-        </div>
-        <form method="get" action="{% url 'academic-setup' %}" class="aw-table-tools" role="search"
-              hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#setup-loading">
-            <input type="hidden" name="scope" value="{{ selected_scope_id }}">
-            <div class="aw-search-wrap">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                <label for="offering-search" class="visually-hidden">{% translate "Search offerings" %}</label>
-                <input type="search" id="offering-search" name="offering_q" class="aw-input aw-input--search" placeholder="{% translate "Search offerings..." %}" value="{{ offering_search }}" hx-preserve
-                       hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
-            </div>
-            <label for="offering-status" class="visually-hidden">{% translate "Status" %}</label>
-            <select name="offering_status" id="offering-status" class="aw-select"
-                    hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
-                <option value="all" {% if offering_status == "all" %}selected{% endif %}>{% translate "All" %}</option>
-                <option value="draft" {% if offering_status == "draft" %}selected{% endif %}>{% translate "Draft" %}</option>
-                <option value="published" {% if offering_status == "published" %}selected{% endif %}>{% translate "Published" %}</option>
-                <option value="archived" {% if offering_status == "archived" %}selected{% endif %}>{% translate "Archived" %}</option>
-            </select>
-            <span class="aw-table-count">{{ offering_page_obj.paginator.count }} {% translate "Offerings" %}</span>
-        </form>
-        <div class="aw-table-wrap">
-            <table class="aw-table">
-                <thead>
-                    <tr>
-                        <th>{% translate "Course" %}</th>
-                        <th>{% translate "Instructor" %}</th>
-                        <th>{% translate "Status" %}</th>
-                        <th>{% translate "Actions" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for o in offering_page_obj.object_list %}
-                    <tr>
-                        <td class="aw-cell-strong">{{ o.course.name }}</td>
-                        <td>{% if o.instructor %}{{ o.instructor }}{% else %}<span class="aw-muted">-</span>{% endif %}</td>
-                        <td>{% include "partials/components/aw_status_pill.html" with status=o.status label=o.get_status_display %}</td>
-                        <td>
-                            <div class="aw-row-actions">
-                            <button type="button" class="aw-icon-btn" data-bs-toggle="modal" data-bs-target="#offeringEditModal" data-offering-action="{% url 'course-offering-edit' o.id %}" data-offering-course="{{ o.course_id }}" data-offering-instructor="{{ o.instructor|default:''|escapejs }}" data-offering-status="{{ o.status }}" data-offering-name="{{ o.course.name|escapejs }}" title="{% translate "Edit" %}">
-                                <i class="fas fa-edit" aria-hidden="true"></i>
-                            </button>
-                            <form method="post" action="{% url 'course-offering-delete' o.id %}" hx-post="{% url 'course-offering-delete' o.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this offering?' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="aw-icon-btn text-danger" title="{% translate "Delete" %}"><i class="fas fa-trash" aria-hidden="true"></i></button>
-                            </form>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="aw-cell-empty">
-                            {% translate "No offerings for this scope." as offerings_empty_desc %}
-                            {% include "partials/components/aw_empty.html" with icon="i-book" description=offerings_empty_desc %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
         </div>
 
-        {# --- Offering pagination --- #}
-        {% translate "Offering pagination" as offering_pagination_aria %}
-        {% include "partials/pagination.html" with page_obj=offering_page_obj pagination_query=offering_pagination_query page_param="offering_page" aria_label=offering_pagination_aria hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#setup-loading" %}
+        {# --- Year-Level Links Section --- #}
+        {% if year_level_links %}
+        <div class="aw-tabpanel"
+             id="year-levels-panel"
+             data-aw-tabpanel="levels"
+             role="tabpanel"
+             aria-labelledby="year-levels-tab"{% if selected_scope %} hidden{% endif %}>
+            <div class="aw-card" id="year-levels">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+                        <h3>{% translate "Year Levels" %} - {{ year_level_links.0.academic_year.name }}</h3>
+                    </div>
+                </div>
+                {% for ayl in year_level_links %}
+                <div class="aw-form-section">
+                    <div class="aw-form-section-head">
+                        <div>
+                            <h3>{{ ayl.level.display_name }}</h3>
+                            {% if selected_scope_id == ayl.pk %}<p>{% translate "Current" %}</p>{% endif %}
+                            {% if ayl.meeting_weekdays %}
+                            <div class="aw-chip-row">
+                                {% for day_val, day_name in meeting_weekday_choices %}
+                                {% if day_val in ayl.meeting_weekdays %}<span class="aw-chip aw-chip--teal">{{ day_name }}</span>{% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="aw-flex">
+                            <a href="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" class="aw-btn aw-btn--ghost aw-btn--sm"
+                               hx-get="?scope={{ ayl.pk }}&{% if search %}q={{ search }}&{% endif %}{% if active_filter != "all" %}active={{ active_filter }}{% endif %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                                <i class="fas fa-book" aria-hidden="true"></i>
+                                <span>{% translate "Offerings" %}</span>
+                            </a>
+                            <form method="post" action="{% url 'academic-year-level-delete' ayl.pk %}" hx-post="{% url 'academic-year-level-delete' ayl.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this level from the academic year?' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="aw-icon-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                            </form>
+                        </div>
+                    </div>
+                    {# --- Weekday checkboxes --- #}
+                    <form method="post" action="{% url 'academic-year-level-weekdays' ayl.pk %}" hx-post="{% url 'academic-year-level-weekdays' ayl.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                        {% csrf_token %}
+                        <div class="aw-field">
+                            <span class="aw-field-label">{% translate "Meeting Weekdays" %}</span>
+                            <div class="aw-flex aw-flex-wrap">
+                                {% for day_val, day_name in meeting_weekday_choices %}
+                                <label class="aw-check" for="wd-{{ ayl.pk }}-{{ day_val }}">
+                                    <input type="checkbox" name="meeting_weekdays" value="{{ day_val }}" id="wd-{{ ayl.pk }}-{{ day_val }}"{% if day_val in ayl.meeting_weekdays %} checked{% endif %}>
+                                    <span>{{ day_name }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="aw-form-actions">
+                            <button type="submit" class="aw-btn aw-btn--outline aw-btn--sm">{% translate "Save Weekdays" %}</button>
+                        </div>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# --- Course Offerings Section --- #}
+        {% if selected_scope %}
+        <div class="aw-tabpanel"
+             id="course-offerings-panel"
+             data-aw-tabpanel="offerings"
+             role="tabpanel"
+             aria-labelledby="course-offerings-tab">
+            <div class="aw-table-card" id="course-offerings">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
+                        <h3>{% translate "Course Offerings" %} - {{ selected_scope.level.display_name }} / {{ selected_scope.academic_year.name }}</h3>
+                    </div>
+                    <div class="aw-flex">
+                        <button type="button" class="aw-btn aw-btn--primary aw-btn--sm" data-bs-toggle="modal" data-bs-target="#offeringModal">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span>{% translate "New Offering" %}</span>
+                        </button>
+                        <button type="button" class="aw-btn aw-btn--outline aw-btn--sm" data-bs-toggle="modal" data-bs-target="#copyModal">
+                            <i class="fas fa-copy" aria-hidden="true"></i>
+                            <span>{% translate "Copy Offerings" %}</span>
+                        </button>
+                    </div>
+                </div>
+                <form method="get" action="{% url 'academic-setup' %}" class="aw-table-tools" role="search"
+                      hx-get="{% url 'academic-setup' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#setup-loading">
+                    <input type="hidden" name="scope" value="{{ selected_scope_id }}">
+                    <div class="aw-search-wrap">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <label for="offering-search" class="visually-hidden">{% translate "Search offerings" %}</label>
+                        <input type="search" id="offering-search" name="offering_q" class="aw-input aw-input--search" placeholder="{% translate "Search offerings..." %}" value="{{ offering_search }}" hx-preserve
+                               hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, search" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#setup-loading">
+                    </div>
+                    <label for="offering-status" class="visually-hidden">{% translate "Status" %}</label>
+                    <select name="offering_status" id="offering-status" class="aw-select"
+                            hx-get="{% url 'academic-setup' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#setup-loading">
+                        <option value="all" {% if offering_status == "all" %}selected{% endif %}>{% translate "All" %}</option>
+                        <option value="draft" {% if offering_status == "draft" %}selected{% endif %}>{% translate "Draft" %}</option>
+                        <option value="published" {% if offering_status == "published" %}selected{% endif %}>{% translate "Published" %}</option>
+                        <option value="archived" {% if offering_status == "archived" %}selected{% endif %}>{% translate "Archived" %}</option>
+                    </select>
+                    <span class="aw-table-count">{{ offering_page_obj.paginator.count }} {% translate "Offerings" %}</span>
+                </form>
+                <div class="aw-table-wrap">
+                    <table class="aw-table">
+                        <thead>
+                            <tr>
+                                <th>{% translate "Course" %}</th>
+                                <th>{% translate "Instructor" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th>{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in offering_page_obj.object_list %}
+                            <tr>
+                                <td class="aw-cell-strong">{{ o.course.name }}</td>
+                                <td>{% if o.instructor %}{{ o.instructor }}{% else %}<span class="aw-muted">-</span>{% endif %}</td>
+                                <td>{% include "partials/components/aw_status_pill.html" with status=o.status label=o.get_status_display %}</td>
+                                <td>
+                                    <div class="aw-row-actions">
+                                    <button type="button" class="aw-icon-btn" data-bs-toggle="modal" data-bs-target="#offeringEditModal" data-offering-action="{% url 'course-offering-edit' o.id %}" data-offering-course="{{ o.course_id }}" data-offering-instructor="{{ o.instructor|default:''|escapejs }}" data-offering-status="{{ o.status }}" data-offering-name="{{ o.course.name|escapejs }}" title="{% translate "Edit" %}">
+                                        <i class="fas fa-edit" aria-hidden="true"></i>
+                                    </button>
+                                    <form method="post" action="{% url 'course-offering-delete' o.id %}" hx-post="{% url 'course-offering-delete' o.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this offering?' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="aw-icon-btn is-danger" title="{% translate "Delete" %}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                                    </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="aw-cell-empty">
+                                    {% translate "No offerings for this scope." as offerings_empty_desc %}
+                                    {% include "partials/components/aw_empty.html" with icon="i-book" description=offerings_empty_desc %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {# --- Offering pagination --- #}
+                {% translate "Offering pagination" as offering_pagination_aria %}
+                {% include "partials/pagination.html" with page_obj=offering_page_obj pagination_query=offering_pagination_query page_param="offering_page" aria_label=offering_pagination_aria hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" hx_indicator="#setup-loading" %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     {# --- Create Offering Modal --- #}
+    {% if selected_scope %}
     <div class="modal fade aw-modal" id="offeringModal" tabindex="-1" aria-labelledby="offeringModalLabel" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -309,26 +419,28 @@ level CRUD remains on /dashboard/levels/ and is not duplicated here.
                     <input type="hidden" name="academic_year_level" value="{{ selected_scope_id }}">
                     <div class="modal-header"><h5 class="modal-title" id="offeringModalLabel">{% translate "New Course Offering" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label" for="create-offering-course">{% translate "Course" %}</label>
-                            <select name="course" id="create-offering-course" class="form-select" required>
-                                <option value="">{% translate "Select course..." %}</option>
-                                {% for c in scope_courses %}
-                                <option value="{{ c.id }}">{{ c.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="create-offering-instructor">{% translate "Instructor" %}</label>
-                            <input type="text" name="instructor" id="create-offering-instructor" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="create-offering-status">{% translate "Status" %}</label>
-                            <select name="status" id="create-offering-status" class="form-select">
-                                <option value="draft">{% translate "Draft" %}</option>
-                                <option value="published">{% translate "Published" %}</option>
-                                <option value="archived">{% translate "Archived" %}</option>
-                            </select>
+                        <div class="aw-stack">
+                            <div class="aw-field">
+                                <label class="aw-field-label" for="create-offering-course">{% translate "Course" %}</label>
+                                <select name="course" id="create-offering-course" class="aw-select" required>
+                                    <option value="">{% translate "Select course..." %}</option>
+                                    {% for c in scope_courses %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="aw-field">
+                                <label class="aw-field-label" for="create-offering-instructor">{% translate "Instructor" %}</label>
+                                <input type="text" name="instructor" id="create-offering-instructor" class="aw-input">
+                            </div>
+                            <div class="aw-field">
+                                <label class="aw-field-label" for="create-offering-status">{% translate "Status" %}</label>
+                                <select name="status" id="create-offering-status" class="aw-select">
+                                    <option value="draft">{% translate "Draft" %}</option>
+                                    <option value="published">{% translate "Published" %}</option>
+                                    <option value="archived">{% translate "Archived" %}</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -348,25 +460,27 @@ level CRUD remains on /dashboard/levels/ and is not duplicated here.
                     {% csrf_token %}
                     <div class="modal-header"><h5 class="modal-title" id="offeringEditModalLabel">{% translate "Edit Offering" %}<span id="offeringEditName"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-offering-course">{% translate "Course" %}</label>
-                            <select name="course" id="edit-offering-course" class="form-select" required>
-                                {% for c in scope_courses %}
-                                <option value="{{ c.id }}">{{ c.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-offering-instructor">{% translate "Instructor" %}</label>
-                            <input type="text" name="instructor" id="edit-offering-instructor" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="edit-offering-status">{% translate "Status" %}</label>
-                            <select name="status" id="edit-offering-status" class="form-select">
-                                <option value="draft">{% translate "Draft" %}</option>
-                                <option value="published">{% translate "Published" %}</option>
-                                <option value="archived">{% translate "Archived" %}</option>
-                            </select>
+                        <div class="aw-stack">
+                            <div class="aw-field">
+                                <label class="aw-field-label" for="edit-offering-course">{% translate "Course" %}</label>
+                                <select name="course" id="edit-offering-course" class="aw-select" required>
+                                    {% for c in scope_courses %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="aw-field">
+                                <label class="aw-field-label" for="edit-offering-instructor">{% translate "Instructor" %}</label>
+                                <input type="text" name="instructor" id="edit-offering-instructor" class="aw-input">
+                            </div>
+                            <div class="aw-field">
+                                <label class="aw-field-label" for="edit-offering-status">{% translate "Status" %}</label>
+                                <select name="status" id="edit-offering-status" class="aw-select">
+                                    <option value="draft">{% translate "Draft" %}</option>
+                                    <option value="published">{% translate "Published" %}</option>
+                                    <option value="archived">{% translate "Archived" %}</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -389,11 +503,11 @@ level CRUD remains on /dashboard/levels/ and is not duplicated here.
                     <div class="modal-header"><h5 class="modal-title" id="yearModalLabel{{ y.id }}">{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         {% for field in y.edit_form %}
-                        <div class="mb-3">
-                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {{ field }}
-                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                            {% if field.errors %}<div class="aw-field-error">{{ field.errors }}</div>{% endif %}
+                            {% if field.help_text %}<span class="aw-field-hint">{{ field.help_text }}</span>{% endif %}
+                            {% if field.errors %}<span class="aw-field-error">{{ field.errors }}</span>{% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -416,11 +530,11 @@ level CRUD remains on /dashboard/levels/ and is not duplicated here.
                     <div class="modal-header"><h5 class="modal-title" id="yearModalLabel">{% translate "New Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
                         {% for field in year_form %}
-                        <div class="mb-3">
-                            <label class="form-label" for="id_{{ field.name }}">{{ field.label }}</label>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="id_{{ field.name }}">{{ field.label }}</label>
                             {{ field }}
-                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                            {% if field.errors %}<div class="aw-field-error">{{ field.errors }}</div>{% endif %}
+                            {% if field.help_text %}<span class="aw-field-hint">{{ field.help_text }}</span>{% endif %}
+                            {% if field.errors %}<span class="aw-field-error">{{ field.errors }}</span>{% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -441,31 +555,31 @@ level CRUD remains on /dashboard/levels/ and is not duplicated here.
                     {% csrf_token %}
                     <div class="modal-header"><h5 class="modal-title" id="copyModalLabel">{% translate "Copy Course Offerings" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label" for="id_target_year_level">{% translate "Target Academic Scope" %}</label>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="id_target_year_level">{% translate "Target Academic Scope" %}</label>
                             {{ copy_form.target_year_level }}
-                            <div class="form-text">{% translate "Select the active scope into which offerings will be copied." %}</div>
+                            <span class="aw-field-hint">{% translate "Select the active scope into which offerings will be copied." %}</span>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="id_source_year_level">{% translate "Source Academic Scope" %}</label>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="id_source_year_level">{% translate "Source Academic Scope" %}</label>
                             {{ copy_form.source_year_level }}
-                            <div class="form-text">{% translate "Select the scope that contains the source offerings to copy from." %}</div>
+                            <span class="aw-field-hint">{% translate "Select the scope that contains the source offerings to copy from." %}</span>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="id_offerings">{% translate "Offerings to Copy" %}</label>
+                        <div class="aw-field">
+                            <label class="aw-field-label" for="id_offerings">{% translate "Offerings to Copy" %}</label>
                             {{ copy_form.offerings }}
-                            <div class="form-text">{% translate "Select the offerings to copy from the source scope." %}</div>
+                            <span class="aw-field-hint">{% translate "Select the offerings to copy from the source scope." %}</span>
                         </div>
-                        <div class="mb-3">
-                            <div class="form-check">
+                        <div class="aw-field">
+                            <label class="aw-check" for="id_copy_lessons">
                                 {{ copy_form.copy_lessons }}
-                                <label class="form-check-label" for="id_copy_lessons">{% translate "Copy Lessons" %}</label>
-                            </div>
-                            <div class="form-check">
+                                <span>{% translate "Copy Lessons" %}</span>
+                            </label>
+                            <label class="aw-check" for="id_copy_quizzes">
                                 {{ copy_form.copy_quizzes }}
-                                <label class="form-check-label" for="id_copy_quizzes">{% translate "Copy Quizzes" %}</label>
-                            </div>
-                            <div class="form-text">{% translate "Copied content is created as draft." %}</div>
+                                <span>{% translate "Copy Quizzes" %}</span>
+                            </label>
+                            <span class="aw-field-hint">{% translate "Copied content is created as draft." %}</span>
                         </div>
                         {% if copy_form.non_field_errors %}
                         <div class="aw-alert aw-alert--danger" role="alert">

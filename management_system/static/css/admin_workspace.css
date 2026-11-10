@@ -78,6 +78,14 @@ body.aw-admin {
     --aw-motion: .18s cubic-bezier(.22, .61, .36, 1);
 }
 
+/* The document itself owns the canvas so a short page still paints the admin
+   background to the bottom of the viewport, and nothing can push a horizontal
+   scrollbar onto the window (wide tables scroll inside .aw-table-wrap). */
+html.aw-html {
+    background: #f5f0e6;
+    overflow-x: hidden;
+    min-height: 100%;
+}
 body.aw-admin {
     margin: 0;
     min-height: 100vh;
@@ -91,6 +99,102 @@ body.aw-admin {
     -webkit-font-smoothing: antialiased;
     overflow-x: clip;
 }
+
+/* --------------------------------------------------------------------------
+   1b. Language typography
+
+   Arabic is the primary admin reading language (LANGUAGE_CODE = 'ar'), but the
+   prototype was drawn in English, so its 13.5px scale, positive tracking on
+   small caps labels and negative tracking on titles are Latin decisions. They
+   separate Arabic joins at label sizes and collide at title sizes.
+
+   This layer leaves the Latin scale exactly as ported and applies the approved
+   Arabic reading stack (the same decision already used by the student
+   redesign): Tahoma/Segoe UI, a larger base, a taller line box and neutral
+   tracking. Selectors are scoped with html[lang="ar"] so no English page and
+   no student/public surface is affected.
+   -------------------------------------------------------------------------- */
+html[lang="ar"] body.aw-admin {
+    --aw-font-ui: Tahoma, "Segoe UI", Arial, sans-serif;
+    --aw-font-display: Tahoma, "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+/* Tracking and uppercase are Latin devices; both are wrong for Arabic. */
+html[lang="ar"] body.aw-admin .aw-eyebrow,
+html[lang="ar"] body.aw-admin .aw-side-label,
+html[lang="ar"] body.aw-admin .aw-sidebar-head-text p,
+html[lang="ar"] body.aw-admin .aw-sidebar-head-text h2,
+html[lang="ar"] body.aw-admin .aw-field > label,
+html[lang="ar"] body.aw-admin .aw-field-label,
+html[lang="ar"] body.aw-admin .aw-shell .form-label,
+html[lang="ar"] body.aw-admin .aw-kpi-label,
+html[lang="ar"] body.aw-admin .aw-table thead th,
+html[lang="ar"] body.aw-admin .aw-meta-item .aw-label,
+html[lang="ar"] body.aw-admin .aw-matrix thead th,
+html[lang="ar"] body.aw-admin .aw-storage-stat span,
+html[lang="ar"] body.aw-admin .aw-table tbody tr.aw-level-group td,
+html[lang="ar"] body.aw-admin .aw-msg .aw-msg-meta {
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Titles: no negative tracking, taller line box for Arabic ascenders. */
+html[lang="ar"] body.aw-admin .aw-page-title {
+    font-size: clamp(26px, 2.6vw, 34px);
+    letter-spacing: 0;
+    line-height: 1.35;
+}
+html[lang="ar"] body.aw-admin .aw-sidebar-head-text h2 { font-size: 14.5px; letter-spacing: 0; }
+html[lang="ar"] body.aw-admin .aw-drawer-head h2 { letter-spacing: 0; line-height: 1.35; }
+html[lang="ar"] body.aw-admin .aw-kpi-value { font-size: 30px; letter-spacing: 0; }
+
+/* Small labels one step up: 9.5-10px is below the Arabic legibility floor. */
+html[lang="ar"] body.aw-admin .aw-eyebrow,
+html[lang="ar"] body.aw-admin .aw-side-label,
+html[lang="ar"] body.aw-admin .aw-kpi-label,
+html[lang="ar"] body.aw-admin .aw-table thead th,
+html[lang="ar"] body.aw-admin .aw-matrix thead th { font-size: 11px; }
+html[lang="ar"] body.aw-admin .aw-sidebar-head-text p { font-size: 11px; }
+html[lang="ar"] body.aw-admin .aw-field > label,
+html[lang="ar"] body.aw-admin .aw-field-label,
+html[lang="ar"] body.aw-admin .aw-shell .form-label { font-size: 11.5px; }
+
+/* Reading text one step up from the Latin scale. */
+html[lang="ar"] body.aw-admin .aw-page-desc { font-size: 13.5px; line-height: 1.7; }
+html[lang="ar"] body.aw-admin .aw-table { font-size: 12.5px; }
+html[lang="ar"] body.aw-admin .aw-card-head h3 { font-size: 13.5px; }
+html[lang="ar"] body.aw-admin .aw-card-head p { font-size: 11.5px; }
+html[lang="ar"] body.aw-admin .aw-crumbs { font-size: 12px; }
+html[lang="ar"] body.aw-admin .aw-page-info,
+html[lang="ar"] body.aw-admin .aw-table-count { font-size: 11.5px; }
+html[lang="ar"] body.aw-admin .aw-pill { font-size: 11px; }
+html[lang="ar"] body.aw-admin .aw-empty h4 { font-size: 14px; }
+html[lang="ar"] body.aw-admin .aw-empty p { font-size: 12px; }
+
+/* Controls: bigger targets and a taller field box for Arabic input text. */
+html[lang="ar"] body.aw-admin .aw-btn { font-size: 13px; }
+html[lang="ar"] body.aw-admin .aw-btn--sm { font-size: 12px; }
+html[lang="ar"] body.aw-admin .aw-btn--lg { font-size: 13.5px; }
+html[lang="ar"] body.aw-admin .aw-input,
+html[lang="ar"] body.aw-admin .aw-select,
+html[lang="ar"] body.aw-admin .aw-textarea,
+html[lang="ar"] body.aw-admin .aw-shell .form-control,
+html[lang="ar"] body.aw-admin .aw-shell .form-select {
+    min-height: 40px;
+    font-size: 13.5px;
+}
+html[lang="ar"] body.aw-admin .aw-tab { font-size: 13px; }
+html[lang="ar"] body.aw-admin .aw-side-link { min-height: 40px; font-size: 13.5px; }
+html[lang="ar"] body.aw-admin .aw-top-user b { font-size: 12.5px; }
+html[lang="ar"] body.aw-admin .aw-top-user-text > span { font-size: 10.5px; }
+
+/* Chat surfaces (shared with the Telegram rebuild in phase 2). */
+html[lang="ar"] body.aw-admin .aw-conv-main b { font-size: 12.5px; }
+html[lang="ar"] body.aw-admin .aw-conv-main p { font-size: 11.5px; }
+html[lang="ar"] body.aw-admin .aw-msg { font-size: 12.5px; line-height: 1.7; }
+html[lang="ar"] body.aw-admin .aw-msg .aw-msg-meta { font-size: 10px; }
 
 body.aw-admin.aw-drawer-open { overflow: hidden; }
 
@@ -136,6 +240,36 @@ body.aw-admin .aw-flex-wrap { flex-wrap: wrap; }
 body.aw-admin .aw-stack { display: flex; flex-direction: column; gap: 8px; }
 body.aw-admin .aw-stack--lg { gap: 16px; }
 body.aw-admin .aw-ms-auto { margin-inline-start: auto; }
+/* Zero-margin utility, declared before the directional ones so a combined
+   `aw-m-0 aw-mt-2` still gets its top spacing. */
+body.aw-admin .aw-m-0 { margin: 0; }
+body.aw-admin .aw-alert--stack { flex-direction: column; align-items: stretch; }
+/* The workspace uses the `hidden` attribute for script-toggled regions. Several
+   aw-* classes set `display`, which outranks the UA [hidden] rule, so make the
+   attribute authoritative. */
+body.aw-admin [hidden] { display: none !important; }
+body.aw-admin .aw-section-title { margin: 0 0 8px; font-family: var(--aw-font-display); font-size: 13px; font-weight: 650; color: var(--aw-ink); }
+body.aw-admin .aw-mt-2 { margin-top: 8px; }
+body.aw-admin .aw-mt-1 { margin-top: 4px; }
+body.aw-admin .aw-mb-2 { margin-bottom: 8px; }
+body.aw-admin .aw-mb-3 { margin-bottom: 12px; }
+body.aw-admin .aw-me-2 { margin-inline-end: 8px; }
+body.aw-admin .aw-ms-1 { margin-inline-start: 4px; }
+body.aw-admin .aw-ps-3 { padding-inline-start: 12px; }
+body.aw-admin .aw-text-danger { color: var(--aw-red); }
+body.aw-admin .aw-strong { font-weight: 650; }
+body.aw-admin .aw-break { overflow-wrap: anywhere; }
+body.aw-admin .aw-ta-c { text-align: center; }
+body.aw-admin .aw-ta-e { text-align: end; }
+body.aw-admin .aw-text-warning { color: var(--aw-amber); }
+body.aw-admin .aw-self-start { align-self: flex-start; }
+body.aw-admin .aw-self-center { align-self: center; }
+body.aw-admin .aw-flex--between { justify-content: space-between; }
+body.aw-admin .aw-p-1 { padding: 4px; }
+body.aw-admin .aw-mt-3 { margin-top: 12px; }
+body.aw-admin .aw-doc-image { display: block; max-width: 100%; margin-top: 8px; border: 1px solid var(--aw-line); border-radius: 8px; }
+body.aw-admin .aw-doc-frame { position: relative; aspect-ratio: 4 / 3; margin-top: 8px; }
+body.aw-admin .aw-doc-frame iframe { width: 100%; height: 100%; border: 0; border-radius: 8px; background: var(--aw-paper-3); }
 body.aw-admin .aw-w-100 { width: 100%; }
 
 
@@ -151,11 +285,18 @@ body.aw-admin .aw-shell {
     min-width: 0;
 }
 
+/* Collapsed sidebar keeps a narrow, still-usable column. Hiding the aside
+   outright moved .aw-main into the empty second grid cell and squeezed the
+   whole workspace into a sliver, so the shell now reserves a slim column and
+   hides only the sidebar content. */
 body.aw-admin .aw-shell.is-sidebar-collapsed {
-    grid-template-columns: var(--aw-rail-w) 0 minmax(0, 1fr);
+    grid-template-columns: var(--aw-rail-w) var(--aw-sidebar-collapsed-w, 56px) minmax(0, 1fr);
 }
-
-body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar { display: none; }
+body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar { width: var(--aw-sidebar-collapsed-w, 56px); }
+body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar-head { justify-content: center; }
+body.aw-admin .aw-shell.is-sidebar-collapsed .aw-sidebar-head-text,
+body.aw-admin .aw-shell.is-sidebar-collapsed .aw-side-label,
+body.aw-admin .aw-shell.is-sidebar-collapsed .aw-side-nav { display: none; }
 
 /* ---- Domain rail ---- */
 body.aw-admin .aw-rail {
@@ -494,6 +635,7 @@ body.aw-admin .aw-icon-btn {
     transition: background var(--aw-motion), color var(--aw-motion), border-color var(--aw-motion);
 }
 body.aw-admin .aw-icon-btn:hover { background: var(--aw-paper-3); color: var(--aw-ink); border-color: var(--aw-line); }
+body.aw-admin .aw-icon-btn.is-danger:hover { background: var(--aw-red-soft); color: var(--aw-red); border-color: #e8c5c2; }
 body.aw-admin .aw-icon-btn .aw-ico { width: 18px; height: 18px; }
 
 body.aw-admin .aw-avatar {
@@ -513,6 +655,14 @@ body.aw-admin .aw-avatar {
 }
 body.aw-admin .aw-avatar--lg { width: 46px; height: 46px; font-size: 14px; }
 body.aw-admin .aw-avatar--xl { width: 64px; height: 64px; font-size: 19px; }
+body.aw-admin .aw-avatar > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+body.aw-admin .aw-spin { animation: aw-spin 1s linear infinite; }
+@keyframes aw-spin { to { transform: rotate(360deg); } }
 body.aw-admin .aw-avatar--gold { background: var(--aw-gold-soft); color: var(--aw-gold-2); border-color: #e7d3ae; }
 body.aw-admin .aw-avatar--green { background: var(--aw-green-soft); color: var(--aw-green); border-color: #cbe5d9; }
 body.aw-admin .aw-avatar--red { background: var(--aw-red-soft); color: var(--aw-red); border-color: #ecc9c6; }
@@ -745,8 +895,27 @@ body.aw-admin .aw-field-label {
     letter-spacing: .08em;
     text-transform: uppercase;
     color: var(--aw-muted);
+    margin-bottom: 0;
 }
 body.aw-admin .aw-field .aw-req { color: var(--aw-red); }
+
+/* Checkbox and radio rows: the control sits beside its label, so the field
+   stops being a stacked label block. */
+body.aw-admin .aw-field--check { gap: 2px; }
+body.aw-admin .aw-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--aw-ink);
+    cursor: pointer;
+}
+body.aw-admin .aw-check input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--aw-teal); }
+/* AwFormMixin assigns aw-check-input to every CheckboxInput widget, including
+   standalone booleans that are not wrapped in .aw-check, so the class needs
+   its own geometry instead of relying on the wrapper. */
+body.aw-admin .aw-check-input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--aw-teal); }
+body.aw-admin .aw-check-list { display: flex; flex-direction: column; gap: 7px; }
 body.aw-admin .aw-input,
 body.aw-admin .aw-select,
 body.aw-admin .aw-textarea {
@@ -911,6 +1080,52 @@ body.aw-admin .aw-kpi-value {
 }
 body.aw-admin .aw-kpi-value small { font-family: var(--aw-font-ui); font-size: 12px; color: var(--aw-muted); font-weight: 500; }
 body.aw-admin .aw-kpi-meta { display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 10.5px; color: var(--aw-muted); }
+body.aw-admin .aw-kpi-link { display: block; color: inherit; }
+body.aw-admin .aw-kpi-link:hover { border-color: var(--aw-line-2); box-shadow: var(--aw-shadow-sm); }
+
+/* ---- Command palette (quick jump) ---- */
+body.aw-admin .aw-cmd-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 320px;
+    overflow: auto;
+    border-radius: .75rem;
+}
+body.aw-admin .aw-cmd-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    color: var(--aw-ink);
+}
+body.aw-admin .aw-cmd-item:hover { background: var(--aw-paper-2); }
+body.aw-admin .aw-cmd-item.is-active { background: var(--aw-teal-soft); }
+body.aw-admin .aw-cmd-section {
+    padding: 4px 9px;
+    font-size: 9px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--aw-muted);
+}
+body.aw-admin .aw-cmd-empty { padding: 8px 9px; font-size: 11px; color: var(--aw-muted); }
+body.aw-admin .aw-cmd-empty.is-error { color: var(--aw-red); }
+body.aw-admin .aw-cmd-hit {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: inherit;
+    text-decoration: none;
+}
+body.aw-admin .aw-cmd-hit:hover { color: inherit; }
+body.aw-admin .aw-cmd-hit-top { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+body.aw-admin .aw-cmd-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+body.aw-admin .aw-cmd-sub { font-size: 10.5px; color: var(--aw-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.aw-admin .aw-cmd-star { border: 0; background: none; padding: 2px 4px; color: var(--aw-muted); cursor: pointer; }
+body.aw-admin .aw-cmd-star.is-pinned { color: var(--aw-gold-2); }
 
 
 
@@ -949,6 +1164,9 @@ body.aw-admin .aw-attn-icon {
     color: var(--aw-amber);
 }
 body.aw-admin .aw-attn-icon--red { background: var(--aw-red-soft); color: var(--aw-red); }
+body.aw-admin .aw-attn-icon--teal { background: var(--aw-teal-soft); color: var(--aw-teal-2); }
+body.aw-admin .aw-attn-icon--blue { background: var(--aw-blue-soft); color: var(--aw-blue); }
+body.aw-admin .aw-attn-icon--gold { background: var(--aw-gold-soft); color: var(--aw-gold-2); }
 
 
 
@@ -1172,6 +1390,8 @@ body.aw-admin .aw-table-foot {
     border-top: 1px solid var(--aw-line);
     background: var(--aw-paper-2);
 }
+/* Standalone footer outside a table card (attendance, grade matrix). */
+body.aw-admin .aw-table-foot--spaced { margin-top: 12px; border: 1px solid var(--aw-line); border-radius: var(--aw-radius); }
 
 body.aw-admin .aw-pager { display: flex; align-items: center; gap: 3px; }
 body.aw-admin .aw-pager a,
@@ -1202,8 +1422,11 @@ body.aw-admin .aw-bulkbar {
     background: var(--aw-ink);
     color: #fff;
     border-top: 1px solid var(--aw-ink-2);
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
 }
-body.aw-admin .aw-bulkbar .aw-count { font-size: 11.5px; font-weight: 700; }
+body.aw-admin .aw-bulkbar .aw-count { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; }
 body.aw-admin .aw-bulkbar .aw-count b { color: var(--aw-gold); }
 body.aw-admin .aw-bulkbar .aw-btn {
     background: rgba(255, 255, 255, .08);
@@ -1212,15 +1435,6 @@ body.aw-admin .aw-bulkbar .aw-btn {
 }
 body.aw-admin .aw-bulkbar .aw-btn:hover { background: rgba(255, 255, 255, .16); }
 body.aw-admin .aw-bulkbar .aw-btn--danger { background: rgba(178, 69, 63, .28); border-color: rgba(255, 255, 255, .12); }
-body.aw-admin .aw-bulkbar .aw-clear {
-    color: rgba(255, 255, 255, .7);
-    font-size: 11px;
-    text-decoration: underline;
-    background: none;
-    border: 0;
-    cursor: pointer;
-}
-
 /* --------------------------------------------------------------------------
    9. Pills, chips, tags
    -------------------------------------------------------------------------- */
@@ -1269,6 +1483,50 @@ body.aw-admin .aw-chip--teal { background: var(--aw-teal-soft); border-color: #c
 body.aw-admin .aw-chip--gold { background: var(--aw-gold-soft); border-color: #e8d4ad; color: var(--aw-gold-2); }
 
 body.aw-admin .aw-chip-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+
+/* Toggle bound to a checkbox input: the input stays focusable and labelled. */
+body.aw-admin .aw-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--aw-ink);
+    cursor: pointer;
+}
+body.aw-admin .aw-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+body.aw-admin .aw-switch-track {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    border-radius: 99px;
+    background: var(--aw-line-2);
+    transition: background var(--aw-motion);
+}
+body.aw-admin .aw-switch-track::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    inset-inline-start: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--aw-paper);
+    box-shadow: var(--aw-shadow-sm);
+    transition: transform var(--aw-motion);
+}
+body.aw-admin .aw-switch input:checked + .aw-switch-track { background: var(--aw-teal); }
+body.aw-admin .aw-switch input:checked + .aw-switch-track::after { transform: translateX(16px); }
+[dir="rtl"] body.aw-admin .aw-switch input:checked + .aw-switch-track::after { transform: translateX(-16px); }
+body.aw-admin .aw-switch input:focus-visible + .aw-switch-track { outline: 2px solid var(--aw-gold); outline-offset: 2px; }
+
+/* Identity band: person summary at the top of a detail surface. */
+body.aw-admin .aw-identity { display: flex; align-items: center; gap: 14px; padding: 16px; }
+body.aw-admin .aw-identity-main { min-width: 0; flex: 1; }
+body.aw-admin .aw-identity-main h2 { font-size: 20px; font-weight: 650; line-height: 1.25; }
+body.aw-admin .aw-identity-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 11px; color: var(--aw-muted); }
+body.aw-admin .aw-identity-chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 
 
 
@@ -1625,7 +1883,6 @@ body.aw-admin .aw-mobile-nav { display: flex; flex-direction: column; gap: 2px; 
     body.aw-admin .aw-context-strip { gap: 8px; font-size: 10.5px; }
     body.aw-admin .aw-ctx-sep { display: none; }
     body.aw-admin .aw-drawer { width: 100vw; }
-    body.aw-admin .aw-bulkbar { position: sticky; bottom: 0; z-index: 5; }
     body.aw-admin .aw-empty { padding: 28px 14px; }
 }
 
@@ -1721,6 +1978,9 @@ body.aw-admin .aw-score {
 
 
 body.aw-admin .aw-score--none { color: #b5bcbe; }
+body.aw-admin .aw-score--good { background: var(--aw-green-soft); color: var(--aw-green); }
+body.aw-admin .aw-score--mid { background: var(--aw-amber-soft); color: var(--aw-amber); }
+body.aw-admin .aw-score--bad { background: var(--aw-red-soft); color: var(--aw-red); }
 
 body.aw-admin .aw-attend-cell { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; }
 body.aw-admin .aw-attend-cell .aw-ico { width: 12px; height: 12px; }
@@ -2008,6 +2268,44 @@ body.aw-admin .aw-step.is-done { color: var(--aw-green); }
 body.aw-admin .aw-step.is-done .aw-step-num { background: var(--aw-green-soft); border-color: #cbe5d9; color: var(--aw-green); }
 body.aw-admin .aw-step-line { flex: 1; min-width: 18px; height: 1px; background: var(--aw-line); }
 
+/* Real tab panels: the selected panel is the only one in flow. */
+body.aw-admin .aw-tabpanel[hidden] { display: none; }
+body.aw-admin .aw-tabpanel { min-width: 0; }
+
+/* Compact table used inside a peek drawer (attendance day detail). */
+body.aw-admin .aw-drawer-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+body.aw-admin .aw-drawer-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+    color: var(--aw-muted);
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    text-align: start;
+}
+body.aw-admin .aw-drawer-table td { padding: 5px 6px; border-bottom: 1px solid var(--aw-row-line); text-align: start; }
+body.aw-admin .aw-drawer-scroll { max-height: 58vh; overflow: auto; }
+
+/* Secondary line inside a table header (meeting course name under the date). */
+body.aw-admin .aw-th-sub {
+    display: block;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--aw-muted);
+}
+/* Definition list without the reboot's bottom margin. */
+body.aw-admin .aw-dl { margin: 0; }
+
+/* Second header row of a two-row sticky table head (plain tables and matrix). */
+body.aw-admin .aw-table thead th.aw-th-subhead,
+body.aw-admin .aw-matrix thead th.aw-th-subhead { top: 26px; }
+
 @media (max-width: 720px) {
     body.aw-admin .aw-stepper { padding: 10px; }
     body.aw-admin .aw-step { padding-inline: 8px; }
@@ -2050,12 +2348,47 @@ body.aw-admin .aw-cal-legend span { display: inline-flex; align-items: center; g
 
 
 
+/* One joined surface: conversation list column, thread column and the student
+   context rail. The rail lives inside #telegram-chat-panel so the existing
+   panel fragment keeps owning it when a conversation is selected. */
+body.aw-admin .aw-chat-layout {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr);
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    background: var(--aw-paper);
+    overflow: hidden;
+    min-height: 620px;
+}
+body.aw-admin .aw-chat-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+body.aw-admin .aw-chat-col + .aw-chat-col { border-inline-start: 1px solid var(--aw-line); }
+body.aw-admin .aw-chat-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 285px;
+    min-width: 0;
+    min-height: 0;
+}
+body.aw-admin .aw-chat-panel.is-empty { grid-template-columns: minmax(0, 1fr); }
+body.aw-admin .aw-chat-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+body.aw-admin .aw-chat-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
+body.aw-admin .aw-chat-list-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+}
+body.aw-admin .aw-chat-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+body.aw-admin .aw-chat-list ul { margin: 0; padding: 0; list-style: none; }
+
 body.aw-admin .aw-conv-item {
     display: flex;
     gap: 9px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--aw-row-line);
-    cursor: pointer;
+    color: inherit;
 }
 body.aw-admin .aw-conv-item:hover { background: var(--aw-paper-2); }
 body.aw-admin .aw-conv-item.is-active { background: var(--aw-teal-soft); }
@@ -2087,14 +2420,95 @@ body.aw-admin .aw-chat-head .aw-chat-title > span { display: block; font-size: 1
 body.aw-admin .aw-msg { max-width: 78%; padding: 7px 10px; border-radius: 10px; font-size: 11.5px; line-height: 1.5; }
 body.aw-admin .aw-msg--in { align-self: flex-start; background: var(--aw-paper); border: 1px solid var(--aw-line); border-start-start-radius: 3px; }
 body.aw-admin .aw-msg--out { align-self: flex-end; background: var(--aw-teal); color: #fff; border-end-end-radius: 3px; }
+body.aw-admin .aw-chat-thread {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    background: linear-gradient(180deg, var(--aw-paper), var(--aw-paper-2));
+}
+body.aw-admin .aw-msg-day {
+    align-self: center;
+    padding: 2px 9px;
+    border-radius: 99px;
+    background: var(--aw-paper-3);
+    color: var(--aw-muted);
+    font-size: 9.5px;
+    font-weight: 650;
+}
+body.aw-admin .aw-msg .aw-msg-attach { display: block; margin-top: 5px; font-size: 10.5px; }
+body.aw-admin .aw-msg .aw-msg-attach a { color: inherit; text-decoration: underline; }
+body.aw-admin .aw-msg img.aw-msg-image,
+body.aw-admin .aw-msg video.aw-msg-video { display: block; max-width: 100%; border-radius: 7px; margin-top: 5px; }
+body.aw-admin .aw-msg audio { display: block; max-width: 100%; margin-top: 5px; }
 body.aw-admin .aw-msg .aw-msg-meta { display: flex; gap: 5px; margin-top: 3px; font-size: 8.5px; opacity: .65; }
 body.aw-admin .aw-msg--out .aw-msg-meta { justify-content: flex-end; }
 
-body.aw-admin .aw-composer { display: flex; align-items: flex-end; gap: 7px; padding: 9px 11px; border-top: 1px solid var(--aw-line); background: var(--aw-paper); }
+body.aw-admin .aw-composer {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 9px 11px;
+    border-top: 1px solid var(--aw-line);
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-composer-row { display: flex; align-items: flex-end; gap: 7px; }
+body.aw-admin .aw-composer-field { flex: 1 1 auto; min-width: 0; }
 body.aw-admin .aw-composer .aw-textarea { min-height: 38px; max-height: 90px; }
+body.aw-admin .aw-composer-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+body.aw-admin .aw-file-input { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; border: 0; opacity: 0; overflow: hidden; }
 
 
+body.aw-admin .aw-chat-context {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: var(--aw-paper-2);
+    border-inline-start: 1px solid var(--aw-line);
+    overflow-y: auto;
+    min-height: 0;
+}
+body.aw-admin .aw-chat-context h4 { font-size: 11px; font-weight: 800; color: var(--aw-ink); }
+body.aw-admin .aw-chat-context dl { margin: 0; }
 body.aw-admin .aw-chat-context .aw-kv { font-size: 10.5px; }
+body.aw-admin .aw-divider { height: 1px; background: var(--aw-line); border: 0; margin: 2px 0; }
+body.aw-admin .aw-quick-links { display: flex; flex-direction: column; gap: 6px; }
+body.aw-admin .aw-quick-links .aw-btn { justify-content: flex-start; width: 100%; }
+
+body.aw-admin .aw-chat-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    padding: 28px 18px;
+    min-height: 320px;
+}
+
+body.aw-admin .aw-linked-list { margin: 0; padding: 0; list-style: none; }
+body.aw-admin .aw-linked-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--aw-row-line);
+}
+body.aw-admin .aw-linked-main { min-width: 0; flex: 1; }
+body.aw-admin .aw-linked-main b { display: block; font-size: 11.5px; }
+body.aw-admin .aw-linked-main span { display: block; font-size: 10px; color: var(--aw-muted); }
+
+@media (max-width: 1180px) {
+    body.aw-admin .aw-chat-panel { grid-template-columns: minmax(0, 1fr); }
+    body.aw-admin .aw-chat-context { display: none; }
+}
+@media (max-width: 920px) {
+    body.aw-admin .aw-chat-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+    body.aw-admin .aw-chat-layout > .aw-chat-col--list { max-height: 260px; border-bottom: 1px solid var(--aw-line); border-inline-start: 0; }
+    body.aw-admin .aw-chat-main { min-height: 420px; }
+}
 
 
 
@@ -2113,6 +2527,67 @@ body.aw-admin .aw-chat-context .aw-kv { font-size: 10.5px; }
 
 
 body.aw-admin .aw-dropzone .aw-ico { width: 25px; height: 25px; color: var(--aw-gold-2); }
+body.aw-admin .aw-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 22px 16px;
+    border: 1px dashed var(--aw-line-2);
+    border-radius: 10px;
+    background: var(--aw-paper-2);
+    color: var(--aw-muted);
+    text-align: center;
+    font-size: 11.5px;
+}
+body.aw-admin .aw-dropzone b { color: var(--aw-ink); font-size: 12px; font-weight: 650; }
+body.aw-admin .aw-dropzone:hover,
+body.aw-admin .aw-dropzone.is-dragover { border-color: var(--aw-gold); background: var(--aw-gold-soft); color: var(--aw-gold-2); }
+
+body.aw-admin .aw-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border: 1px solid var(--aw-line);
+    border-radius: 5px;
+    background: var(--aw-paper-3);
+    color: var(--aw-muted);
+    font-size: 9.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+body.aw-admin .aw-q-card {
+    border: 1px solid var(--aw-line);
+    border-radius: 9px;
+    background: var(--aw-paper);
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+body.aw-admin .aw-q-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    background: var(--aw-paper-2);
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-q-num {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--aw-teal-soft);
+    color: var(--aw-teal-2);
+    font-size: 10.5px;
+    font-weight: 800;
+}
+body.aw-admin .aw-q-head .aw-select { width: auto; min-width: 130px; min-height: 28px; font-size: 10.5px; padding-block: 3px; }
+body.aw-admin .aw-q-head .aw-input--points { width: 72px; min-height: 28px; font-size: 11px; padding-block: 3px; }
+body.aw-admin .aw-q-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 
 
 
@@ -2365,6 +2840,8 @@ body.aw-admin .aw-tabs { margin-bottom: 14px; }
 
 /* Scanner video fills the focused camera frame. */
 body.aw-admin .aw-scan-frame .scanner-video {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -2404,6 +2881,35 @@ body.aw-admin .aw-calmg-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: .35rem;
+}
+
+/* Joined month surface: one bordered table-like block, as in the prototype. */
+body.aw-admin .aw-cal-joined {
+    border: 1px solid var(--aw-line);
+    border-radius: var(--aw-radius);
+    overflow: hidden;
+    background: var(--aw-paper);
+}
+body.aw-admin .aw-cal-joined .aw-calmg-grid { gap: 0; }
+body.aw-admin .aw-cal-joined .aw-calmg-wd {
+    padding: 6px 0;
+    background: var(--aw-paper-2);
+    border-bottom: 1px solid var(--aw-line);
+}
+body.aw-admin .aw-cal-joined .aw-calmg-cell {
+    min-height: 112px;
+    border: 0;
+    border-inline-end: 1px solid var(--aw-line);
+    border-bottom: 1px solid var(--aw-line);
+    border-radius: 0;
+    transform: none;
+    box-shadow: none;
+}
+body.aw-admin .aw-cal-joined .aw-calmg-cell:hover {
+    background: var(--aw-teal-mist);
+    border-color: var(--aw-line);
+    transform: none;
+    box-shadow: none;
 }
 
 body.aw-admin .aw-calmg-wd {
@@ -2505,7 +3011,7 @@ body.aw-admin .aw-calendar-holiday small {
     min-width: 0;
 }
 
-body.aw-admin .aw-calendar-holiday .ps-inline-form {
+body.aw-admin .aw-calendar-holiday .aw-inline-form {
     flex-shrink: 0;
     display: inline-flex;
     align-items: flex-start;
@@ -2584,7 +3090,7 @@ body.aw-admin .aw-calmg-cell .aw-calendar-meeting-course {
     min-width: 0;
 }
 
-body.aw-admin .aw-calmg-cell .aw-calendar-meeting .ps-inline-form {
+body.aw-admin .aw-calmg-cell .aw-calendar-meeting .aw-inline-form {
     margin-inline-start: 0;
     flex-shrink: 0;
     display: inline-flex;
@@ -2751,12 +3257,14 @@ body.aw-admin .cal-day-modal .aw-calendar-meeting-text {
     body.aw-admin .aw-calmg-cell .aw-calendar-meeting-text,
     body.aw-admin .aw-calendar-holiday small { flex: 1 1 100%; }
 
-    body.aw-admin .aw-calmg-cell .aw-calendar-meeting .ps-inline-form,
-    body.aw-admin .aw-calendar-holiday .ps-inline-form { margin-inline-start: auto; }
+    body.aw-admin .aw-calmg-cell .aw-calendar-meeting .aw-inline-form,
+    body.aw-admin .aw-calendar-holiday .aw-inline-form { margin-inline-start: auto; }
 }
 
 @media (max-width: 575.98px) {
     body.aw-admin .aw-calmg-cell { min-height: 3rem; padding: .3rem .2rem; font-size: .72rem; border-radius: .5rem; }
+    /* Phone cells keep their compact height inside the joined surface too. */
+    body.aw-admin .aw-cal-joined .aw-calmg-cell { min-height: 3.4rem; }
     body.aw-admin .aw-calmg-grid { gap: .15rem; }
 
     /* Phone cells show only the day number and status dots; the full day
@@ -2885,15 +3393,4 @@ body.aw-admin .aw-alert--success {
     background: var(--aw-green-soft);
     border-color: #cbe5d9;
     color: var(--aw-green);
-}
-
-/* Support composer: the label drives the file picker, so hide the raw input. */
-body.aw-admin .tg-chat-file-input {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    padding: 0;
-    border: 0;
-    opacity: 0;
-    overflow: hidden;
 }

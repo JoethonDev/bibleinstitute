@@ -1,6 +1,21 @@
 {% extends 'admin_panel.html' %}
 {% load i18n %}
 
+{% comment %}
+This page template renders the grades-matrix page for the
+`grades-matrix-dashboard` route: management_system/views.py calls
+render_page(request, "yearly_transcript_dashboard.html",
+"partials/grade_matrix_content.html", ...), so the direct GET and the HTMX
+fragment must both render the same partial. A transcript-oriented body here
+would diverge from the fragment response.
+
+The context is per student and per course (matrix_rows carry each course's quiz
+cells, weekly and final totals), but it has no per-student term record, no
+course-by-course transcript totals and no transcript export route, and the view
+is the grades matrix route, not a transcripts route. A real Transcripts page
+needs its own view, URL and context; it is reported as remaining work instead of
+being faked here. The h1 and the document label therefore stay "Grades matrix".
+{% endcomment %}
 {% block body %}
   {% include "partials/grade_matrix_content.html" %}
 {% endblock %}

@@ -4,25 +4,7 @@
 {% load i18n %}
 
 {% block body %}
-<div id="{{ id }}" class="sd-page{% if extended_view == 'admin_panel.html' %} aw-dashboard-page{% endif %}">
-{% if extended_view == 'admin_panel.html' %}
-<link rel="stylesheet" href="{% static 'css/app_student.css' %}?v={{ static_asset_version }}">
-<div class="aw-page-head">
-    <div class="aw-page-head-main">
-        <div class="aw-eyebrow">{% translate "Curriculum" %}</div>
-        <h1 class="aw-page-title">{% translate "Quiz Details" %}</h1>
-        <p class="aw-page-desc">{{ quiz_name }} - {% translate "Student" %}: {{ username }}</p>
-    </div>
-</div>
-{% if total_grade is not None %}
-<div class="aw-context-strip">
-    <span class="aw-ctx-item">
-        <svg class="aw-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>
-        <b>{% translate "Final Grade" %}:</b> {{ total_grade }}
-    </span>
-</div>
-{% endif %}
-{% endif %}
+<div id="{{ id }}" class="sd-page">
 <div class="container py-4">
     <!-- Back Navigation -->
     <div class="row justify-content-center">

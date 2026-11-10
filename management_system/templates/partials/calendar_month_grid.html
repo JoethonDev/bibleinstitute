@@ -5,7 +5,10 @@
 {# and cell_variant ("admin" renders interactive cells, "student" renders read-only cells). #}
 {# Cell state-class contract: is-out / is-holiday / is-meeting / has-meeting / is-today. #}
 {# has-meeting = a course meeting is scheduled on that day; is-meeting = configured meeting weekday. #}
+{# The admin variant adds the `aw-cal-joined` surface wrapper so the weekday row and #}
+{# every day cell render as one bordered calendar. The student variant keeps its own markup. #}
 {% if cell_variant == "admin" %}
+<div class="aw-cal-joined aw-mt-3">
 <div class="aw-calmg-grid" role="grid">
 {% else %}
 <div class="sd-cal-grid" role="grid">
@@ -23,3 +26,6 @@
     {% endfor %}
   {% endfor %}
 </div>
+{% if cell_variant == "admin" %}
+</div>
+{% endif %}

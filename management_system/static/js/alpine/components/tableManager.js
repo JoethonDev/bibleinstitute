@@ -29,6 +29,7 @@ function tableManager() {
         recalculationStatus: '',
         recalculationStatusUrl: '',
         recalculationTimer: null,
+        statusTimer: null,
         jobStartedHandler: null,
         discoveryTimer: null,
 
@@ -64,6 +65,7 @@ function tableManager() {
 
         destroy() {
             clearTimeout(this.recalculationTimer);
+            clearTimeout(this.statusTimer);
             clearTimeout(this.discoveryTimer);
             if (this.jobStartedHandler) window.removeEventListener("quiz-operation-started", this.jobStartedHandler);
             if (this.wakeHandler) {
@@ -183,6 +185,9 @@ function tableManager() {
                     this.recalculationBusy = false;
                     this.recalculationStatusUrl = '';
                     try { sessionStorage.removeItem(this.recalculationKey()); } catch (error) { /* Optional. */ }
+                    // A finished job is history, not an alert: clear the strip
+                    // shortly after the operator has had a chance to read it.
+                    this.clearStatusLater();
                     this.discoveryDelay = 5000;
                     this.scheduleDiscovery(0);
                 } else {
@@ -192,6 +197,20 @@ function tableManager() {
                 this.recalculationStatus = error.message;
                 this.recalculationBusy = false;
             }
+        },
+
+        dismissRecalculationStatus() {
+            clearTimeout(this.statusTimer);
+            this.statusTimer = null;
+            this.recalculationStatus = '';
+        },
+
+        clearStatusLater() {
+            clearTimeout(this.statusTimer);
+            this.statusTimer = setTimeout(() => {
+                this.recalculationStatus = '';
+                this.statusTimer = null;
+            }, 12000);
         },
 
         rowCheckboxes() {

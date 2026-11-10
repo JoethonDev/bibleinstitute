@@ -33,8 +33,7 @@
   function flipStar(btn, pinned) {
     // Optimistic in-place update: no list rebuild, no fetch, no modal flash.
     btn.textContent = pinned ? "*" : "*";
-    btn.classList.toggle("text-warning", pinned);
-    btn.classList.toggle("text-muted", !pinned);
+    btn.classList.toggle("is-pinned", pinned);
     var label = pinned ? t("Unpin") : t("Pin");
     btn.setAttribute("aria-label", label);
     btn.title = label;
@@ -67,8 +66,7 @@
     // One muted helper line: visible on empty field, hidden while writing.
     var hint = document.getElementById("command-palette-hint");
     if (!hint || !input) return;
-    if (input.value.trim().length >= 2) hint.classList.add("d-none");
-    else hint.classList.remove("d-none");
+    hint.hidden = input.value.trim().length >= 2;
   }
   function open() {
     if (!ensure()) return;
@@ -86,14 +84,14 @@
   }
   function headerEl(text) {
     var h = document.createElement("div");
-    h.className = "list-group-item list-group-item-secondary py-1 small fw-bold";
+    h.className = "aw-cmd-section";
     h.textContent = text;
     return h;
   }
   function starBtn(r, pinned) {
     var b = document.createElement("button");
     b.type = "button";
-    b.className = "btn btn-sm btn-link p-0 flex-shrink-0 cmd-star " + (pinned ? "text-warning" : "text-muted");
+    b.className = "aw-cmd-star cmd-star" + (pinned ? " is-pinned" : "");
     b.textContent = pinned ? "*" : "*";
     var label = pinned ? t("Unpin") : t("Pin");
     b.setAttribute("aria-label", label);
@@ -103,23 +101,23 @@
   }
   function rowEl(r, i, pinned) {
     var wrap = document.createElement("div");
-    wrap.className = "list-group-item d-flex align-items-center gap-2" + (i === active ? " active" : "");
+    wrap.className = "aw-cmd-item" + (i === active ? " is-active" : "");
     wrap.setAttribute("role", "option");
     if (i === active) wrap.setAttribute("aria-selected", "true");
     var a = document.createElement("a");
     a.href = r.url;
-    a.className = "flex-grow-1 text-reset text-decoration-none";
+    a.className = "aw-cmd-hit";
     var b = document.createElement("div");
-    b.className = "d-flex justify-content-between align-items-center gap-2";
+    b.className = "aw-cmd-hit-top";
     var s1 = document.createElement("span");
-    s1.className = "d-flex align-items-center gap-2";
+    s1.className = "aw-cmd-title";
     var pill = document.createElement("span");
     pill.className = "cmd-type";
     pill.textContent = r.type;
     s1.appendChild(pill);
     s1.appendChild(document.createTextNode(r.label));
     var s2 = document.createElement("small");
-    s2.className = "text-muted text-truncate";
+    s2.className = "aw-cmd-sub";
     s2.textContent = r.sub || "";
     b.appendChild(s1); b.appendChild(s2);
     a.appendChild(b);
@@ -146,7 +144,7 @@
     });
     if (!items.length) {
       var d = document.createElement("div");
-      d.className = "list-group-item text-muted";
+      d.className = "aw-cmd-empty";
       d.textContent = t("No results found.");
       box.appendChild(d);
     }
@@ -167,7 +165,7 @@
     if (!loadPins().length && !recents.length) {
       box.innerHTML = "";
       var d = document.createElement("div");
-      d.className = "list-group-item text-muted";
+      d.className = "aw-cmd-empty";
       d.textContent = t("Type to search. Prefix with u, o, l, q, m, t to scope.");
       box.appendChild(d);
     }
@@ -203,7 +201,7 @@
     if (!box) return;
     box.innerHTML = "";
     var d = document.createElement("div");
-    d.className = "list-group-item text-muted";
+    d.className = "aw-cmd-empty";
     d.textContent = t("Searching...");
     box.appendChild(d);
   }
@@ -227,7 +225,7 @@
         if (!box) return;
         box.innerHTML = "";
         var e = document.createElement("div");
-        e.className = "list-group-item text-danger";
+        e.className = "aw-cmd-empty is-error";
         e.textContent = t("Search failed. Try again.");
         box.appendChild(e);
       });
@@ -289,8 +287,8 @@
     if (!box || !items.length) return;
     var rows = box.querySelectorAll('[role="option"]');
     for (var i = 0; i < rows.length; i++) {
-      if (i === active) { rows[i].classList.add("active"); rows[i].setAttribute("aria-selected", "true"); }
-      else { rows[i].classList.remove("active"); rows[i].removeAttribute("aria-selected"); }
+      if (i === active) { rows[i].classList.add("is-active"); rows[i].setAttribute("aria-selected", "true"); }
+      else { rows[i].classList.remove("is-active"); rows[i].removeAttribute("aria-selected"); }
     }
     var row = rows[active];
     if (row && row.scrollIntoView) {

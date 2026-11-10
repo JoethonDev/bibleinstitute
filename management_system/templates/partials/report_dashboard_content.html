@@ -1,11 +1,19 @@
 {% load i18n %}
 {% comment %}
 Combined report workspace.
-Presentation only: the filter form, CSV link, XLSX POST form, report rows,
-pagination query and every HTMX hook are preserved from the legacy page.
+Presentation only: the filter parameter names, CSV link, XLSX POST form,
+report rows, pagination query and every HTMX hook are preserved from the
+legacy page.
 The page head is inlined because aw_page_head.html renders a server-built
 link list only; this view supplies no page_actions and the XLSX export is a
 CSRF-protected POST form.
+Aggregates: the view supplies only the filtered population count (row_count)
+and the paginator, so the KPI grid shows those two real values. The prototype's
+average grade, attendance percentage, at-risk count, unevaluable count, grade
+distribution buckets and at-risk list have no context value and are therefore
+not rendered (reported, not invented).
+The context strip uses the selected scope and the academic year window the view
+already exposes through selected_year.academic_year.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
   {% translate "Reports" as page_eyebrow %}
@@ -14,13 +22,13 @@ CSRF-protected POST form.
   <div class="aw-page-head aw-flex-wrap">
     {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
     <div class="aw-page-actions">
-      <span id="report-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+      <span id="report-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
       {% if selected_year %}
         <a href="{% url 'export-report-csv' %}?academic_year={{ selected_year.id }}{% if selected_student %}&student={{ selected_student }}{% endif %}{% if selected_study_mode %}&study_mode={{ selected_study_mode }}{% endif %}{% if selected_course_offering %}&course_offering={{ selected_course_offering }}{% endif %}" class="aw-btn aw-btn--ghost aw-btn--sm">
           <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
           <span>{% translate "Export CSV" %}</span>
         </a>
-        <form method="post" action="{% url 'export-report-xlsx' %}" class="mb-0">
+        <form method="post" action="{% url 'export-report-xlsx' %}">
           {% csrf_token %}
           <input type="hidden" name="academic_year" value="{{ selected_year.id }}">
           {% if selected_student %}<input type="hidden" name="student" value="{{ selected_student }}">{% endif %}
@@ -39,86 +47,108 @@ CSRF-protected POST form.
     {% include "partials/admin_operation_status.html" with operation_job=report_export_job status_url=report_export_status_url status=report_export_job.status total=report_export_job.total processed=report_export_job.processed succeeded=report_export_job.succeeded failed=report_export_job.failed skipped=report_export_job.skipped artifact_ready=report_export_job.artifact_key artifact_url=report_export_download_url %}
   {% endif %}
 
+  {% if selected_year %}
+  <div class="aw-context-strip">
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+      <b>{{ selected_year.academic_year.name }}</b>
+    </span>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-layers"></use></svg>
+      {{ selected_year.level.display_name }}
+    </span>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+      <b>{{ row_count }}</b>
+      {% translate "Students" %}
+    </span>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+      <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+      {{ selected_year.academic_year.starts_on|date:"DATE_FORMAT" }} - {{ selected_year.academic_year.ends_on|date:"DATE_FORMAT" }}
+    </span>
+  </div>
+  {% endif %}
+
   <div class="aw-card aw-dashboard-filters">
     <div class="aw-card-body aw-card-body--tight">
-      <form method="get" class="row g-3 align-items-end" hx-get="{% url 'report-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#report-loading">
-        <div class="col-12 col-md-2">
-          <div class="aw-field">
-            <label for="level-select">{% translate "Level" %}</label>
-            <select name="level" class="aw-select" id="level-select"
-              hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
-              <option value="">{% translate "All levels" %}</option>
-              {% for lvl in levels %}
-                <option value="{{ lvl.ordering }}" {% if selected_level|add:0 == lvl.ordering %}selected{% endif %}>{% translate "Level" %} {{ lvl.ordering }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="col-12 col-md-3">
-          <div class="aw-field">
-            <label for="academic-year-select">{% translate "Academic Year" %}</label>
-            <select name="academic_year" class="aw-select" id="academic-year-select"
-              hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
-              <option value="">{% translate "Select year" %}</option>
-              {% for ay in academic_years %}
-                  <option value="{{ ay.id }}" data-level="{{ ay.level.ordering }}"
-                  {% if selected_year and ay.id == selected_year.id %}selected{% endif %}
-                  {% if selected_level and ay.level.ordering != selected_level|add:0 %}class="d-none"{% endif %}>
-                  {{ ay.academic_year.name }} - {{ ay.level.display_name }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="col-12 col-md-2">
-          <div class="aw-field">
-            <label for="student-search">{% translate "Student" %}</label>
-            <input type="text" name="student" id="student-search" class="aw-input"
+      <div class="aw-filter-bar">
+        <form method="get" class="aw-table-tools" hx-get="{% url 'report-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#report-loading">
+          <label class="visually-hidden" for="student-search">{% translate "Student" %}</label>
+          <div class="aw-search-wrap">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input type="text" name="student" id="student-search" class="aw-input aw-input--search"
               value="{{ selected_student }}" placeholder="{% translate 'Search by name or username' %}"
               hx-preserve hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="input changed delay:200ms, keyup[key=='Enter']" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest form:replace" hx-indicator="#report-loading">
           </div>
-        </div>
-        <div class="col-12 col-md-2">
-          <div class="aw-field">
-            <label for="study-mode-select">{% translate "Study Mode" %}</label>
-            <select name="study_mode" class="aw-select" id="study-mode-select"
-              hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
-              <option value="">{% translate "All modes" %}</option>
-              <option value="online" {% if selected_study_mode == 'online' %}selected{% endif %}>{% translate "Online" %}</option>
-              <option value="offline" {% if selected_study_mode == 'offline' %}selected{% endif %}>{% translate "Offline" %}</option>
-            </select>
-          </div>
-        </div>
-        <div class="col-12 col-md-2">
-          <div class="aw-field">
-            <label for="course-select">{% translate "Course" %}</label>
-            <select name="course_offering" class="aw-select" id="course-select"
-              hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
-              <option value="">{% translate "All courses" %}</option>
-              {% for co in course_offerings %}
-                <option value="{{ co.id }}" {% if selected_course_offering|add:0 == co.id %}selected{% endif %}>{{ co.course.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="col-12 col-md-1 d-grid">
-          <button type="submit" class="aw-btn aw-btn--primary">{% translate "Filter" %}</button>
-        </div>
-      </form>
+          <label class="visually-hidden" for="level-select">{% translate "Level" %}</label>
+          <select name="level" class="aw-select" id="level-select"
+            hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+            <option value="">{% translate "All levels" %}</option>
+            {% for lvl in levels %}
+              <option value="{{ lvl.ordering }}" {% if selected_level|add:0 == lvl.ordering %}selected{% endif %}>{% translate "Level" %} {{ lvl.ordering }}</option>
+            {% endfor %}
+          </select>
+          <label class="visually-hidden" for="academic-year-select">{% translate "Academic Year" %}</label>
+          <select name="academic_year" class="aw-select" id="academic-year-select"
+            hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+            <option value="">{% translate "Select year" %}</option>
+            {% for ay in academic_years %}
+                <option value="{{ ay.id }}" data-level="{{ ay.level.ordering }}"
+                {% if selected_year and ay.id == selected_year.id %}selected{% endif %}
+                {% if selected_level and ay.level.ordering != selected_level|add:0 %}hidden{% endif %}>
+                {{ ay.academic_year.name }} - {{ ay.level.display_name }}
+              </option>
+            {% endfor %}
+          </select>
+          <label class="visually-hidden" for="study-mode-select">{% translate "Study Mode" %}</label>
+          <select name="study_mode" class="aw-select" id="study-mode-select"
+            hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+            <option value="">{% translate "All modes" %}</option>
+            <option value="online" {% if selected_study_mode == 'online' %}selected{% endif %}>{% translate "Online" %}</option>
+            <option value="offline" {% if selected_study_mode == 'offline' %}selected{% endif %}>{% translate "Offline" %}</option>
+          </select>
+          <label class="visually-hidden" for="course-select">{% translate "Course" %}</label>
+          <select name="course_offering" class="aw-select" id="course-select"
+            hx-get="{% url 'report-dashboard' %}" hx-include="closest form" hx-trigger="change" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#report-loading">
+            <option value="">{% translate "All courses" %}</option>
+            {% for co in course_offerings %}
+              <option value="{{ co.id }}" {% if selected_course_offering|add:0 == co.id %}selected{% endif %}>{{ co.course.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
+            <span>{% translate "Filter" %}</span>
+          </button>
+          <a href="{% url 'report-dashboard' %}" hx-get="{% url 'report-dashboard' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest form:replace" data-clear-search="student-search" class="aw-btn aw-btn--ghost aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+            <span>{% translate "Clear" %}</span>
+          </a>
+        </form>
+      </div>
     </div>
   </div>
 
   {% if selected_year %}
-    <div class="row mb-3">
-      <div class="col-12 col-sm-6 col-lg-3">
-        <div class="aw-kpi aw-kpi--blue">
-          <div class="aw-kpi-top">
-            <span class="aw-kpi-label">{% translate "Students" %}</span>
-            <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
-          </div>
-          <div class="aw-kpi-value">{{ row_count }}</div>
+    <div class="aw-kpi-grid">
+      <div class="aw-kpi aw-kpi--blue">
+        <div class="aw-kpi-top">
+          <span class="aw-kpi-label">{% translate "Students" %}</span>
+          <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
         </div>
+        <div class="aw-kpi-value">{{ row_count }}</div>
       </div>
+      {% if page_obj %}
+      <div class="aw-kpi aw-kpi--gold">
+        <div class="aw-kpi-top">
+          <span class="aw-kpi-label">{% translate "Page" %}</span>
+          <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg></span>
+        </div>
+        <div class="aw-kpi-value">{{ page_obj.number }} <small>/ {{ page_obj.paginator.num_pages }}</small></div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="aw-card aw-table-card">
@@ -126,7 +156,7 @@ CSRF-protected POST form.
         <table class="aw-table">
           <thead>
             <tr>
-              <th scope="col" class="aw-sticky-col">{% translate "Student" %}</th>
+              <th scope="col">{% translate "Student" %}</th>
               <th scope="col">{% translate "Mode" %}</th>
               <th scope="col">{% translate "Grade" %}</th>
               <th scope="col">{% translate "Grade %" %}</th>
@@ -143,7 +173,17 @@ CSRF-protected POST form.
           <tbody>
             {% for row in rows %}
               <tr>
-                <td class="aw-sticky-col">{{ row.first_name }} {{ row.last_name }}<br><small class="aw-cell-sub">{{ row.username }}</small></td>
+                <td>
+                  <div class="aw-cell-main">
+                    {% with row_name=row.first_name|add:" "|add:row.last_name %}
+                    {% include "partials/components/aw_avatar.html" with name=row_name %}
+                    {% endwith %}
+                    <div>
+                      <b>{{ row.first_name }} {{ row.last_name }}</b>
+                      <span>{{ row.username }}</span>
+                    </div>
+                  </div>
+                </td>
                 <td>{{ row.study_mode }}</td>
                 <td class="aw-num"><span class="aw-score">{{ row.grade_earned }}/{{ row.grade_available }}</span></td>
                 <td class="aw-num"><span class="aw-score">{{ row.grade_percent }}%</span></td>

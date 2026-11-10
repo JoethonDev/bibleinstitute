@@ -5,9 +5,16 @@ Application analytics workspace.
 Presentation only: the GET/hx filter contract, multi-select city dropdown,
 CSV export query, KPI values, every Chart.js canvas id, the
 #content[data-chartjs-url] host, the application-analytics-data JSON payload and
-the series table are unchanged. The page head is inlined because aw_page_head
-takes a server-built action list and this view supplies none; the existing CSV
-link is the only page action.
+the series table are unchanged.
+Every filter control still posts a parameter build_analytics_dataset() reads
+(scope, from, to, group, status, study_mode, city); the city search box is a
+client-side filter of the option list, not a query parameter.
+The chart cards carry the workspace head/body shell. application_analytics.js
+labels a dataset from the nearest <h6> inside the canvas card body, so each body
+keeps a visually hidden <h6> with the same translated title as its card head;
+removing it would blank the legend labels. The page head is inlined because
+aw_page_head takes a server-built action list and this view supplies none; the
+existing CSV link is the only page action.
 {% endcomment %}
 {% translate "Reports" as page_eyebrow %}
 {% translate "Application Analytics" as page_title %}
@@ -18,7 +25,7 @@ link is the only page action.
   <div class="aw-page-head aw-flex-wrap">
     {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
     <div class="aw-page-actions">
-      <span id="application-analytics-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
+      <span id="application-analytics-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
       <a href="{% url 'export-application-analytics-csv' %}{% if export_query %}?{{ export_query }}{% endif %}" class="aw-btn aw-btn--ghost aw-btn--sm">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
         <span>{% translate "Export CSV" %}</span>
@@ -27,126 +34,116 @@ link is the only page action.
   </div>
 
   <div class="aw-card aw-dashboard-filters analytics-filter-card">
-    <div class="aw-card-body">
-      <form method="get" action="{% url 'application-analytics' %}" class="row g-3 align-items-end"
+    <div class="aw-card-body aw-card-body--tight">
+      <form method="get" action="{% url 'application-analytics' %}" class="aw-form-grid"
             hx-get="{% url 'application-analytics' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML"
             hx-push-url="true" hx-sync="this:abort" hx-indicator="#application-analytics-loading">
 
-        <div class="col-12 col-md-4">
-          <div class="aw-field">
-            <label for="analytics-scope-select">{% translate "Academic scope" %}</label>
-            <select name="scope" class="aw-select" id="analytics-scope-select"
-                    hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                    hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                    hx-indicator="#application-analytics-loading">
-              {% for option in scope_options %}
-                <option value="{{ option.value }}" {% if option.value == selected_scope %}selected{% endif %}>{{ option.label }}</option>
-              {% endfor %}
-            </select>
-          </div>
+        <div class="aw-field aw-span-2">
+          <label for="analytics-scope-select">{% translate "Academic scope" %}</label>
+          <select name="scope" class="aw-select" id="analytics-scope-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for option in scope_options %}
+              <option value="{{ option.value }}" {% if option.value == selected_scope %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-6 col-md-2">
-          <div class="aw-field">
-            <label for="analytics-date-from">{% translate "From" %}</label>
-            <input type="date" name="from" id="analytics-date-from" class="aw-input" value="{{ date_from }}"
-                   hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                   hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                   hx-indicator="#application-analytics-loading">
-          </div>
+        <div class="aw-field">
+          <label for="analytics-date-from">{% translate "From" %}</label>
+          <input type="date" name="from" id="analytics-date-from" class="aw-input" value="{{ date_from }}"
+                 hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                 hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                 hx-indicator="#application-analytics-loading">
         </div>
 
-        <div class="col-6 col-md-2">
-          <div class="aw-field">
-            <label for="analytics-date-to">{% translate "To" %}</label>
-            <input type="date" name="to" id="analytics-date-to" class="aw-input" value="{{ date_to }}"
-                   hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                   hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                   hx-indicator="#application-analytics-loading">
-          </div>
+        <div class="aw-field">
+          <label for="analytics-date-to">{% translate "To" %}</label>
+          <input type="date" name="to" id="analytics-date-to" class="aw-input" value="{{ date_to }}"
+                 hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                 hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                 hx-indicator="#application-analytics-loading">
         </div>
 
-        <div class="col-6 col-md-2">
-          <div class="aw-field">
-            <label for="analytics-group-select">{% translate "Group by" %}</label>
-            <select name="group" class="aw-select" id="analytics-group-select"
-                    hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                    hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                    hx-indicator="#application-analytics-loading">
-              {% for value, label in group_options %}
-                <option value="{{ value }}" {% if value == group %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
+        <div class="aw-field">
+          <label for="analytics-group-select">{% translate "Group by" %}</label>
+          <select name="group" class="aw-select" id="analytics-group-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for value, label in group_options %}
+              <option value="{{ value }}" {% if value == group %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-6 col-md-2">
-          <div class="aw-field">
-            <label for="analytics-status-select">{% translate "Status" %}</label>
-            <select name="status" class="aw-select" id="analytics-status-select"
-                    hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                    hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                    hx-indicator="#application-analytics-loading">
-              {% for value, label in status_options %}
-                <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
+        <div class="aw-field">
+          <label for="analytics-status-select">{% translate "Status" %}</label>
+          <select name="status" class="aw-select" id="analytics-status-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for value, label in status_options %}
+              <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-6 col-md-2">
-          <div class="aw-field">
-            <label for="analytics-study-mode-select">{% translate "Study mode" %}</label>
-            <select name="study_mode" class="aw-select" id="analytics-study-mode-select"
-                    hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                    hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                    hx-indicator="#application-analytics-loading">
-              {% for value, label in study_mode_options %}
-                <option value="{{ value }}" {% if value == selected_study_mode %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
+        <div class="aw-field">
+          <label for="analytics-study-mode-select">{% translate "Study mode" %}</label>
+          <select name="study_mode" class="aw-select" id="analytics-study-mode-select"
+                  hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                  hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                  hx-indicator="#application-analytics-loading">
+            {% for value, label in study_mode_options %}
+              <option value="{{ value }}" {% if value == selected_study_mode %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-12 col-md-4">
-          <div class="aw-field">
-            <label id="analytics-city-label">{% translate "Cities" %}</label>
-            <div class="dropdown">
-              <button class="aw-btn aw-btn--ghost dropdown-toggle w-100 analytics-city-toggle" type="button"
-                      id="analytics-city-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside"
-                      aria-expanded="false">
-                {% if selected_cities %}{% translate "Cities" %}: {{ selected_cities|length }}{% else %}{% translate "All cities" %}{% endif %}
-              </button>
-              <div class="dropdown-menu w-100 analytics-city-menu" aria-labelledby="analytics-city-toggle">
-                <input type="search" id="analytics-city-search" class="aw-input mb-2"
-                       placeholder="{% translate 'Search cities' %}" aria-label="{% translate 'Search cities' %}"
-                       autocomplete="off">
-                <div class="analytics-city-options">
-                  {% for city in city_options %}
-                    <label class="form-check analytics-city-option" data-city="{{ city }}">
-                      <input class="form-check-input" type="checkbox" name="city" value="{{ city }}"
-                             {% if city in selected_cities %}checked{% endif %}
-                             hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
-                             hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
-                             hx-indicator="#application-analytics-loading">
-                      <span class="form-check-label">{{ city }}</span>
-                    </label>
-                  {% empty %}
-                    <div class="form-text">{% translate "No matching cities" %}</div>
-                  {% endfor %}
-                </div>
-                <div class="form-text analytics-city-empty" id="analytics-city-empty" hidden>{% translate "No matching cities" %}</div>
+        <div class="aw-field aw-span-2">
+          <label id="analytics-city-label">{% translate "Cities" %}</label>
+          <div class="dropdown">
+            <button class="aw-btn aw-btn--ghost dropdown-toggle aw-w-100 analytics-city-toggle" type="button"
+                    id="analytics-city-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                    aria-expanded="false">
+              {% if selected_cities %}{% translate "Cities" %}: {{ selected_cities|length }}{% else %}{% translate "All cities" %}{% endif %}
+            </button>
+            <div class="dropdown-menu aw-w-100 analytics-city-menu" aria-labelledby="analytics-city-toggle">
+              <input type="search" id="analytics-city-search" class="aw-input aw-mt-2"
+                     placeholder="{% translate 'Search cities' %}" aria-label="{% translate 'Search cities' %}"
+                     autocomplete="off">
+              <div class="analytics-city-options">
+                {% for city in city_options %}
+                  <label class="aw-check analytics-city-option" data-city="{{ city }}">
+                    <input type="checkbox" name="city" value="{{ city }}"
+                           {% if city in selected_cities %}checked{% endif %}
+                           hx-get="{% url 'application-analytics' %}" hx-include="closest form" hx-trigger="change"
+                           hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"
+                           hx-indicator="#application-analytics-loading">
+                    <span>{{ city }}</span>
+                  </label>
+                {% empty %}
+                  <div class="aw-small aw-muted">{% translate "No matching cities" %}</div>
+                {% endfor %}
               </div>
+              <div class="aw-small aw-muted analytics-city-empty" id="analytics-city-empty" hidden>{% translate "No matching cities" %}</div>
             </div>
           </div>
         </div>
 
-        <div class="col-12 col-md-8 aw-flex">
-          <button type="submit" class="aw-btn aw-btn--primary">{% translate "Filter" %}</button>
-          <a href="{% url 'application-analytics' %}" class="aw-btn aw-btn--ghost"
+        <div class="aw-flex aw-span-2">
+          <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-filter"></use></svg>
+            <span>{% translate "Filter" %}</span>
+          </button>
+          <a href="{% url 'application-analytics' %}" class="aw-btn aw-btn--ghost aw-btn--sm"
              hx-get="{% url 'application-analytics' %}" hx-target="#content" hx-select="#content"
              hx-swap="outerHTML" hx-push-url="true">
-            {% translate "Clear filters" %}
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+            <span>{% translate "Clear filters" %}</span>
           </a>
         </div>
       </form>
@@ -205,55 +202,92 @@ link is the only page action.
     </div>
   </div>
 
+  {# The hidden h6 in every body is the dataset label application_analytics.js reads; see the header comment. #}
   <div class="analytics-charts-grid">
-    <div class="aw-card analytics-chart-card--wide">
-      <div class="aw-card-body">
-        <h6 class="mb-3">{% translate "Submissions over time" %}</h6>
+    <section class="aw-card analytics-chart-card--wide">
+      <div class="aw-card-head">
+        <div class="aw-card-title">
+          <svg class="aw-ico" aria-hidden="true"><use href="#i-chart-line"></use></svg>
+          <h3>{% translate "Submissions over time" %}</h3>
+        </div>
+      </div>
+      <div class="aw-card-body aw-card-body--tight">
+        <h6 class="visually-hidden">{% translate "Submissions over time" %}</h6>
         <div class="analytics-chart-canvas">
           <canvas id="analytics-series-chart" role="img" aria-label="{% translate 'Submissions over time' %}"></canvas>
         </div>
       </div>
-    </div>
-    <div class="aw-card analytics-chart-card--wide">
-      <div class="aw-card-body">
-        <h6 class="mb-3">{% translate "Cumulative submissions" %}</h6>
+    </section>
+    <section class="aw-card analytics-chart-card--wide">
+      <div class="aw-card-head">
+        <div class="aw-card-title">
+          <svg class="aw-ico" aria-hidden="true"><use href="#i-chart-line"></use></svg>
+          <h3>{% translate "Cumulative submissions" %}</h3>
+        </div>
+      </div>
+      <div class="aw-card-body aw-card-body--tight">
+        <h6 class="visually-hidden">{% translate "Cumulative submissions" %}</h6>
         <div class="analytics-chart-canvas">
           <canvas id="analytics-cumulative-chart" role="img" aria-label="{% translate 'Cumulative submissions' %}"></canvas>
         </div>
       </div>
-    </div>
-    <div class="aw-card">
-      <div class="aw-card-body">
-        <h6 class="mb-3">{% translate "Application status" %}</h6>
+    </section>
+    <section class="aw-card">
+      <div class="aw-card-head">
+        <div class="aw-card-title">
+          <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
+          <h3>{% translate "Application status" %}</h3>
+        </div>
+      </div>
+      <div class="aw-card-body aw-card-body--tight">
+        <h6 class="visually-hidden">{% translate "Application status" %}</h6>
         <div class="analytics-chart-canvas">
           <canvas id="analytics-status-chart" role="img" aria-label="{% translate 'Application status' %}"></canvas>
         </div>
       </div>
-    </div>
-    <div class="aw-card">
-      <div class="aw-card-body">
-        <h6 class="mb-3">{% translate "Study mode" %}</h6>
+    </section>
+    <section class="aw-card">
+      <div class="aw-card-head">
+        <div class="aw-card-title">
+          <svg class="aw-ico" aria-hidden="true"><use href="#i-chart"></use></svg>
+          <h3>{% translate "Study mode" %}</h3>
+        </div>
+      </div>
+      <div class="aw-card-body aw-card-body--tight">
+        <h6 class="visually-hidden">{% translate "Study mode" %}</h6>
         <div class="analytics-chart-canvas">
           <canvas id="analytics-mode-chart" role="img" aria-label="{% translate 'Study mode' %}"></canvas>
         </div>
       </div>
-    </div>
-    <div class="aw-card analytics-chart-card--wide">
-      <div class="aw-card-body">
-        <h6 class="mb-3">{% translate "Applications by city" %}</h6>
+    </section>
+    <section class="aw-card analytics-chart-card--wide">
+      <div class="aw-card-head">
+        <div class="aw-card-title">
+          <svg class="aw-ico" aria-hidden="true"><use href="#i-globe"></use></svg>
+          <h3>{% translate "Applications by city" %}</h3>
+        </div>
+      </div>
+      <div class="aw-card-body aw-card-body--tight">
+        <h6 class="visually-hidden">{% translate "Applications by city" %}</h6>
         <div class="analytics-chart-canvas">
           <canvas id="analytics-city-chart" role="img" aria-label="{% translate 'Applications by city' %}"></canvas>
         </div>
       </div>
-    </div>
-    <div class="aw-card">
-      <div class="aw-card-body">
-        <h6 class="mb-3">{% translate "Applications by weekday" %}</h6>
+    </section>
+    <section class="aw-card">
+      <div class="aw-card-head">
+        <div class="aw-card-title">
+          <svg class="aw-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>
+          <h3>{% translate "Applications by weekday" %}</h3>
+        </div>
+      </div>
+      <div class="aw-card-body aw-card-body--tight">
+        <h6 class="visually-hidden">{% translate "Applications by weekday" %}</h6>
         <div class="analytics-chart-canvas">
           <canvas id="analytics-weekday-chart" role="img" aria-label="{% translate 'Applications by weekday' %}"></canvas>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 
   <div class="aw-card aw-table-card">
@@ -272,10 +306,10 @@ link is the only page action.
           {% for row in series_rows %}
             <tr>
               <td>{{ row.label }}</td>
-              <td>{{ row.online }}</td>
-              <td>{{ row.offline }}</td>
-              <td>{{ row.total }}</td>
-              <td>{{ row.cumulative }}</td>
+              <td class="aw-num">{{ row.online }}</td>
+              <td class="aw-num">{{ row.offline }}</td>
+              <td class="aw-num">{{ row.total }}</td>
+              <td class="aw-num">{{ row.cumulative }}</td>
             </tr>
           {% empty %}
             <tr>

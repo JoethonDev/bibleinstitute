@@ -43,7 +43,7 @@ UPCOMING_DAYS = 14
 MAX_UPCOMING_ITEMS = 8
 
 
-def _queue(key, label, *, count, url, items, empty_label, icon):
+def _queue(key, label, *, count, url, items, empty_label, icon, tone="red", action_label=None):
     return {
         "key": key,
         "label": label,
@@ -52,6 +52,8 @@ def _queue(key, label, *, count, url, items, empty_label, icon):
         "items": items,
         "empty_label": empty_label,
         "icon": icon,
+        "tone": tone,
+        "action_label": action_label,
     }
 
 
@@ -60,9 +62,12 @@ def _pending_applications_queue(actor):
     count = queryset.count()
     items = []
     if count:
+        # The queue only needs identity and date columns. `role` is not read
+        # here, and combining select_related("role") with only() that omits it
+        # makes Django raise "Field User.role cannot be both deferred and
+        # traversed using select_related", so the join is not requested.
         rows = (
-            queryset.select_related("role")
-            .order_by("-date_joined", "-pk")
+            queryset.order_by("-date_joined", "-pk")
             .only("id", "first_name", "last_name", "username", "date_joined", "city")
             [:MAX_QUEUE_ITEMS]
         )
@@ -83,6 +88,8 @@ def _pending_applications_queue(actor):
         items=items,
         empty_label=_("No pending applications."),
         icon="i-file",
+        tone="amber",
+        action_label=_("Review queue"),
     )
 
 
@@ -112,6 +119,8 @@ def _failed_media_queue(actor, *, can_see_all: bool):
         items=items,
         empty_label=_("No failed media jobs."),
         icon="i-upload",
+        tone="red",
+        action_label=_("Open pipeline"),
     )
 
 
@@ -143,6 +152,8 @@ def _ungraded_queue():
         items=items,
         empty_label=_("No answers are waiting for grading."),
         icon="i-check-square",
+        tone="blue",
+        action_label=_("Open Content QA"),
     )
 
 
@@ -170,6 +181,8 @@ def _unread_support_queue():
         items=items,
         empty_label=_("No unread support conversations."),
         icon="i-message",
+        tone="teal",
+        action_label=_("Open inbox"),
     )
 
 

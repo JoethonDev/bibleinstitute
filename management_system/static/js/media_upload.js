@@ -194,24 +194,23 @@
             li.appendChild(document.createTextNode(': ' + result.errors.join(', ')));
             validationErrorList.appendChild(li);
         });
-        validationErrors.classList.toggle('d-none', invalidFiles.length === 0);
+        validationErrors.hidden = invalidFiles.length === 0;
     }
 
     function renderSelectedFiles(validFiles) {
         fileListItems.innerHTML = '';
         validFiles.forEach(function (result) {
-            var li = el('li', 'list-group-item d-flex justify-content-between align-items-center');
-            var info = el('div');
-            var strong = el('strong', null, result.file.name);
-            var small = el('small', 'text-muted', typeLabel(result.kind) + ' - ' + formatFileSize(result.file.size));
-            info.appendChild(strong);
-            info.appendChild(el('br'));
-            info.appendChild(small);
-            li.appendChild(info);
-            li.appendChild(el('span', 'badge bg-success', T.valid));
+            var li = el('li', 'aw-file-row');
+            var identity = el('div', 'aw-cell-main');
+            var text = el('span', 'aw-cell-main-text');
+            text.appendChild(el('b', null, result.file.name));
+            text.appendChild(el('span', null, typeLabel(result.kind) + ' - ' + formatFileSize(result.file.size)));
+            identity.appendChild(text);
+            li.appendChild(identity);
+            li.appendChild(el('span', 'aw-pill aw-pill--green', T.valid));
             fileListItems.appendChild(li);
         });
-        fileList.classList.toggle('d-none', validFiles.length === 0);
+        fileList.hidden = validFiles.length === 0;
     }
 
     function cardIdFor(jobId, filename) {
@@ -223,42 +222,45 @@
     }
 
     function createJobCard(job) {
-        var card = el('div', 'aw-card mb-2 media-job-card');
+        var card = el('div', 'aw-card aw-mt-2 media-job-card');
         card.id = cardIdFor(job.id, job.filename);
 
         var body = el('div', 'aw-card-body');
 
-        var head = el('div', 'd-flex justify-content-between align-items-start gap-2 flex-wrap');
-        var info = el('div', 'media-job-info');
-        var name = el('div', 'fw-semibold media-job-name', job.filename || '');
-        var meta = el('div', 'small text-muted media-job-meta', formatFileSize(job.source_size || 0));
-        info.appendChild(name);
-        info.appendChild(meta);
-         var retryBtn = el('button', 'aw-btn aw-btn--ghost aw-btn--sm media-job-retry d-none', T.retry);
-         var attachmentRetryBtn = el('button', 'aw-btn aw-btn--ghost aw-btn--sm media-job-attachment-retry d-none', T.retryAttachment);
-         retryBtn.type = 'button';
-         attachmentRetryBtn.type = 'button';
-         head.appendChild(info);
-         var actions = el('div', 'aw-row-actions');
-         actions.appendChild(retryBtn);
-         actions.appendChild(attachmentRetryBtn);
-         head.appendChild(actions);
+        var head = el('div', 'aw-flex aw-flex-wrap');
+        var info = el('div', 'aw-cell-main');
+        var text = el('span', 'aw-cell-main-text');
+        text.appendChild(el('b', null, job.filename || ''));
+        text.appendChild(el('span', null, formatFileSize(job.source_size || 0)));
+        info.appendChild(text);
+        var retryBtn = el('button', 'aw-btn aw-btn--ghost aw-btn--sm media-job-retry', T.retry);
+        var attachmentRetryBtn = el('button', 'aw-btn aw-btn--ghost aw-btn--sm media-job-attachment-retry', T.retryAttachment);
+        retryBtn.type = 'button';
+        attachmentRetryBtn.type = 'button';
+        retryBtn.hidden = true;
+        attachmentRetryBtn.hidden = true;
+        head.appendChild(info);
+        var actions = el('div', 'aw-row-actions');
+        actions.appendChild(retryBtn);
+        actions.appendChild(attachmentRetryBtn);
+        head.appendChild(actions);
 
-        var progressWrap = el('div', 'progress mt-2 media-job-progress');
-        var bar = el('div', 'progress-bar media-job-bar');
-        bar.setAttribute('role', 'progressbar');
-        bar.setAttribute('aria-valuemin', '0');
-        bar.setAttribute('aria-valuemax', '100');
-        bar.setAttribute('aria-valuenow', '0');
+        var progressWrap = el('div', 'aw-progress media-job-progress aw-mt-2');
+        progressWrap.setAttribute('role', 'progressbar');
+        progressWrap.setAttribute('aria-valuemin', '0');
+        progressWrap.setAttribute('aria-valuemax', '100');
+        progressWrap.setAttribute('aria-valuenow', '0');
+        var bar = el('span', 'media-job-bar');
         bar.style.width = '0%';
         progressWrap.appendChild(bar);
 
-        var statusEl = el('div', 'small media-job-status mt-1', T.waitingForUpload);
+        var statusEl = el('div', 'aw-small media-job-status aw-mt-2', T.waitingForUpload);
         statusEl.setAttribute('role', 'status');
         statusEl.setAttribute('aria-live', 'polite');
 
-        var errorEl = el('div', 'small text-danger media-job-error mt-1 d-none');
+        var errorEl = el('div', 'aw-field-error media-job-error aw-mt-2');
         errorEl.setAttribute('role', 'alert');
+        errorEl.hidden = true;
 
         body.appendChild(head);
         body.appendChild(progressWrap);
@@ -271,6 +273,7 @@
             jobId: job.id || null,
             filename: job.filename || '',
             card: card,
+            progressWrap: progressWrap,
             bar: bar,
             statusEl: statusEl,
             errorEl: errorEl,
@@ -284,26 +287,26 @@
 
     function setCardProgress(state, percent) {
         var value = Math.max(0, Math.min(100, Math.round(percent || 0)));
-        state.bar.setAttribute('aria-valuenow', String(value));
+        if (state.progressWrap) state.progressWrap.setAttribute('aria-valuenow', String(value));
         state.bar.style.width = value + '%';
     }
 
     function setCardStatus(state, text) {
         state.statusEl.textContent = text || '';
-        state.statusEl.classList.remove('d-none');
+        state.statusEl.hidden = false;
     }
 
     function setCardError(state, text) {
         state.errorEl.textContent = text || '';
-        state.errorEl.classList.toggle('d-none', !text);
+        state.errorEl.hidden = !text;
     }
 
      function showRetry(state, show) {
-         state.retryBtn.classList.toggle('d-none', !show);
+         state.retryBtn.hidden = !show;
      }
 
      function showAttachmentRetry(state, show) {
-         state.attachmentRetryBtn.classList.toggle('d-none', !show);
+         state.attachmentRetryBtn.hidden = !show;
      }
 
     function stopPolling(state) {

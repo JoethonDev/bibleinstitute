@@ -1,0 +1,105 @@
+{% load i18n %}
+{% comment %}
+Admin quiz-submission detail.
+
+Separate from the student exam template (display_quiz.html) on purpose: the
+student exam keeps its own markup and stylesheet, and this page renders the
+submitted answers with the admin grading form inside the workspace shell.
+The POST contract is unchanged: the form posts to the same URL and
+questions_rendering.html emits the same `questions[...]` field names that
+`unpack_quiz_form` parses.
+{% endcomment %}
+<div id="content" class="aw-dashboard-page">
+
+    {% translate "Curriculum" as page_eyebrow %}
+    {% translate "Quiz submission" as page_title %}
+    {% blocktranslate with quiz=quiz_name student=username asvar page_description %}{{ quiz }} - {{ student }}{% endblocktranslate %}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+        <div class="aw-page-actions">
+            <a class="aw-btn aw-btn--outline"
+               href="{{ back_url }}"
+               hx-get="{{ back_url }}"
+               hx-target="#display-page"
+               hx-select="#page-region"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
+                <span>{% translate "Back to submissions" %}</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="aw-context-strip">
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            <span>{% translate "Student" %}</span>
+            <b>{{ username }}</b>
+        </span>
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
+            <span>{% translate "Quiz" %}</span>
+            <b>{{ quiz_name }}</b>
+        </span>
+        {% if total_grade is not None %}
+        <span class="aw-ctx-sep" aria-hidden="true"></span>
+        <span class="aw-ctx-item">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>
+            <span>{% translate "Final grade" %}</span>
+            <b>{{ total_grade }}</b>
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="aw-grid aw-grid--main-rail">
+        <section class="aw-card" aria-labelledby="submission-answers-heading">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
+                    <h3 id="submission-answers-heading">{% translate "Answers" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <form method="post" action="" id="quiz-form">
+                    {% csrf_token %}
+                    {% include 'questions_rendering.html' %}
+                    {% if can_correct_grade %}
+                    <div class="aw-form-actions">
+                        <button type="submit" class="aw-btn aw-btn--primary">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "Submit Correction" %}</span>
+                        </button>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </section>
+
+        <aside class="aw-editor-rail">
+            <section class="aw-card">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                        <h3>{% translate "Submission" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <div class="aw-kv"><dt>{% translate "Student" %}</dt><dd>{{ username }}</dd></div>
+                    <div class="aw-kv"><dt>{% translate "Quiz" %}</dt><dd>{{ quiz_name }}</dd></div>
+                    <div class="aw-kv"><dt>{% translate "Questions" %}</dt><dd>{{ questions|length }}</dd></div>
+                    {% if total_grade is not None %}
+                    <div class="aw-kv"><dt>{% translate "Final grade" %}</dt><dd>{{ total_grade }}</dd></div>
+                    {% endif %}
+                </div>
+            </section>
+            {% if can_correct_grade %}
+            <section class="aw-card">
+                <div class="aw-card-body">
+                    <p class="aw-small aw-muted">{% translate "Manual corrections are saved against this quiz and preserve the student's submitted answers." %}</p>
+                </div>
+            </section>
+            {% endif %}
+        </aside>
+    </div>
+</div>

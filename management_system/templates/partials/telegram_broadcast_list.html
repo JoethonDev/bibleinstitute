@@ -1,10 +1,17 @@
 {% load i18n %}
 {% comment %}
-Telegram broadcast list fragment. Presentation only: the View/Review links, the
-draft delete POST (action, method, csrf, hx-* contract, confirm message, icon
-accessibility labels), the server-projected status/recipient/created values and
-the paginator query are unchanged. The list root id and the fragment response
-contract are preserved.
+Telegram broadcast list fragment.
+
+Presentation only. The View/Review links, the draft delete POST (action,
+method, csrf, hx-* contract, confirm message, icon accessibility labels), the
+server-projected status/recipient/created values and the paginator query are
+unchanged. The list root id and the fragment response contract are preserved.
+
+The broadcast model has no title field, so the identity column uses the message
+excerpt the row already carries. Delivered and failed use the model's
+sent_count/failed_count, which the view's broadcast queryset loads. The view
+supplies no status aggregates and no filter parameters, so no KPI strip, status
+tabs or filter bar is rendered here.
 {% endcomment %}
 <div id="telegram-broadcast-list">
     <div class="aw-card aw-table-card">
@@ -14,22 +21,61 @@ contract are preserved.
                 <caption class="visually-hidden">{% translate "Telegram broadcasts" %}</caption>
                 <thead>
                     <tr>
-                        <th scope="col"><span class="visually-hidden">{% translate "Actions" %}</span></th>
-                        <th scope="col">{% translate "Status" %}</th>
+                        <th scope="col">{% translate "Broadcast" %}</th>
                         <th scope="col">{% translate "Target" %}</th>
                         <th scope="col">{% translate "Recipients" %}</th>
+                        <th scope="col">{% translate "Delivered" %}</th>
+                        <th scope="col">{% translate "Failed" %}</th>
+                        <th scope="col">{% translate "Status" %}</th>
                         <th scope="col">{% translate "Created" %}</th>
+                        <th scope="col"><span class="visually-hidden">{% translate "Actions" %}</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for broadcast in page_obj %}
                     <tr>
                         <td>
+                            <div class="aw-cell-main">
+                                <div>
+                                    <b>{{ broadcast.message|truncatechars:64 }}</b>
+                                    <span class="aw-cell-sub">{{ broadcast.academic_year.name }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if broadcast.level %}
+                            {{ broadcast.level.display_name }}
+                            {% else %}
+                            {% translate "All levels" %}
+                            {% endif %}
+                        </td>
+                        <td class="aw-num">{{ broadcast.recipient_count }}</td>
+                        <td class="aw-num">{{ broadcast.sent_count }}</td>
+                        <td class="aw-num">{{ broadcast.failed_count }}</td>
+                        <td>
+                            {% if broadcast.status == "sending" %}
+                            {% include "partials/components/aw_status_pill.html" with status="processing" label=broadcast.get_status_display %}
+                            {% elif broadcast.status == "draft" %}
+                            {% include "partials/components/aw_status_pill.html" with status="inactive" label=broadcast.get_status_display %}
+                            {% else %}
+                            {% include "partials/components/aw_status_pill.html" with status=broadcast.status label=broadcast.get_status_display %}
+                            {% endif %}
+                        </td>
+                        <td class="aw-date">
+                            <time datetime="{{ broadcast.created_at|date:'c' }}">{{ broadcast.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+                            {% if broadcast.created_by %}
+                            <span class="aw-cell-sub">{{ broadcast.created_by.get_full_name|default:broadcast.created_by.username }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             <div class="aw-row-actions">
-                                <a href="{% url 'telegram-broadcast-detail' broadcast_id=broadcast.pk %}" class="aw-btn aw-btn--ghost aw-btn--sm">
+                                <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
+                                        data-aw-drawer="{% url 'telegram-broadcasts' %}?fragment=broadcast&amp;id={{ broadcast.pk }}"
+                                        data-aw-drawer-title="{% translate 'Broadcast' %}"
+                                        data-aw-drawer-subtitle="{{ broadcast.get_status_display }}">
                                     <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
                                     <span>{% translate "View" %}</span>
-                                </a>
+                                </button>
                                 {% if broadcast.status == 'draft' %}
                                 <a href="{% url 'telegram-broadcast-confirm-page' broadcast_id=broadcast.pk %}" class="aw-btn aw-btn--ghost aw-btn--sm">
                                     <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
@@ -44,30 +90,6 @@ contract are preserved.
                                 </form>
                                 {% endif %}
                             </div>
-                        </td>
-                        <td>
-                            {% if broadcast.status == "sending" %}
-                            {% include "partials/components/aw_status_pill.html" with status=broadcast.status tone="blue" label=broadcast.get_status_display %}
-                            {% elif broadcast.status == "draft" %}
-                            {% include "partials/components/aw_status_pill.html" with status=broadcast.status tone="muted" label=broadcast.get_status_display %}
-                            {% else %}
-                            {% include "partials/components/aw_status_pill.html" with status=broadcast.status label=broadcast.get_status_display %}
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="aw-cell-strong">{{ broadcast.academic_year.name }}</span>
-                            {% if broadcast.level %}
-                            <span class="aw-cell-sub">{{ broadcast.level.display_name }}</span>
-                            {% else %}
-                            <span class="aw-cell-sub">{% translate "All levels" %}</span>
-                            {% endif %}
-                        </td>
-                        <td class="aw-num">{{ broadcast.recipient_count }}</td>
-                        <td class="aw-date">
-                            <time datetime="{{ broadcast.created_at|date:'c' }}">{{ broadcast.created_at|date:"SHORT_DATETIME_FORMAT" }}</time>
-                            {% if broadcast.created_by %}
-                            <span class="aw-cell-sub">{{ broadcast.created_by.get_full_name|default:broadcast.created_by.username }}</span>
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

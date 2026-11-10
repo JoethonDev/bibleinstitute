@@ -36,14 +36,14 @@ logger = logging.getLogger(__name__)
 
 class JobFilters(forms.Form):
     q = forms.CharField(label=_("Search jobs"), max_length=100, required=False,
-                        widget=forms.TextInput(attrs={"type": "search", "class": "form-control"}))
+                        widget=forms.TextInput(attrs={"type": "search", "class": "aw-input"}))
     family = forms.ChoiceField(label=_("Job category"), required=False)
     operation = forms.ChoiceField(label=_("Operation"), required=False)
     status = forms.ChoiceField(label=_("Status"), required=False)
     since = forms.DateField(label=_("Created from"), required=False,
-                           widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}))
+                           widget=forms.DateInput(attrs={"type": "date", "class": "aw-input"}))
     until = forms.DateField(label=_("Created through"), required=False,
-                           widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}))
+                           widget=forms.DateInput(attrs={"type": "date", "class": "aw-input"}))
     notification_announcement = forms.IntegerField(required=False, min_value=1, max_value=9_223_372_036_854_775_807, widget=forms.HiddenInput)
     redelivery_job = forms.UUIDField(required=False, widget=forms.HiddenInput)
 
@@ -54,7 +54,7 @@ class JobFilters(forms.Form):
         operations = [(value, label) for value, label in operation_choices() if value.startswith("notification:") == notifications_only]
         for field, choices in (("family", families), ("operation", operations), ("status", STATUSES)):
             self.fields[field].choices = [("", _("All")), *choices]
-            self.fields[field].widget.attrs["class"] = "form-select"
+            self.fields[field].widget.attrs["class"] = "aw-select"
         if notifications_only:
             self.fields["family"].widget = forms.HiddenInput()
             self.fields["status"].choices.append(("delivery_failed", _("Has failed deliveries")))
@@ -164,7 +164,7 @@ def _job_detail_response(request, family, job_id, redelivery_form=None):
 class RedeliveryForm(forms.Form):
     audience = forms.ChoiceField(label=_("Audience"), choices=[
         ("group", _("Original recipients of this saved content")), ("recipient", _("This recipient only")),
-    ], widget=forms.Select(attrs={"class": "form-select"}))
+    ], widget=forms.Select(attrs={"class": "aw-select"}))
     mode = forms.ChoiceField(choices=[("failed", _("Retry failed deliveries")), ("all", _("Resend all"))])
 
 

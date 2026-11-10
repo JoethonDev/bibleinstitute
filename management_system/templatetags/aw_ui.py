@@ -101,10 +101,24 @@ def aw_initials(value) -> str:
     return initials_from_name(display)
 
 
+#: Pill tone names that `.aw-pill--<tone>` styles. An explicit tone passes
+#: through aw_status_tone unchanged instead of being remapped to muted.
+_AW_TONE_NAMES = frozenset(
+    {"teal", "gold", "green", "red", "amber", "blue", "violet", "muted"}
+)
+
+
 @register.filter
 def aw_status_tone(value) -> str:
-    """Return the presentational tone for a raw status value."""
+    """Return the presentational tone for a raw status value.
+
+    Callers that already know the tone (``tone="red"`` for a failure) must not
+    be remapped through the status dictionary, which previously forced every
+    explicit tone to muted.
+    """
     key = str(value or "").strip().lower().replace("_", " ")
+    if key in _AW_TONE_NAMES:
+        return key
     return STATUS_TONES.get(key, "muted")
 
 

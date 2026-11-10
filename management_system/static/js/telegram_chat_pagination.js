@@ -20,7 +20,7 @@
     function removeDuplicateConversationRows(root) {
         if (!isConversationRoot(root)) return;
         const seenUsers = new Set();
-        root.querySelectorAll('.tg-chat-row[data-chat-user-id]').forEach((row) => {
+        root.querySelectorAll('[data-chat-user-id]').forEach((row) => {
             const userId = row.dataset.chatUserId;
             if (seenUsers.has(userId)) row.remove();
             else seenUsers.add(userId);

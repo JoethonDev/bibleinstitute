@@ -2,6 +2,11 @@
 {% load aw_ui %}
 {% translate "Attendance" as page_eyebrow %}
 {% translate "Correct Attendance Record" as page_title %}
+{% comment %}
+Attendance record correction. Presentation only: the POST target, the
+`attendance_date` and `action` field names, the CSRF token, the swap contract
+and every value rendered from `record` are unchanged.
+{% endcomment %}
 <div id="content" class="aw-dashboard-page">
     {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=record.student|aw_display_name %}
 
@@ -19,22 +24,22 @@
                     <div class="aw-form-section">
                         <div class="aw-form-grid">
                             <div class="aw-field">
-                                <label for="attendance_date" class="form-label">{% translate "New Date" %}</label>
-                                <input type="date" name="attendance_date" id="attendance_date" class="form-control" value="{{ record.attendance_date|date:'Y-m-d' }}">
+                                <label for="attendance_date">{% translate "New Date" %}</label>
+                                <input type="date" name="attendance_date" id="attendance_date" class="aw-input" value="{{ record.attendance_date|date:'Y-m-d' }}">
                             </div>
                             <div class="aw-field">
-                                <label for="action" class="form-label">{% translate "New Action" %}</label>
-                                <select name="action" id="action" class="form-select">
+                                <label for="action">{% translate "New Action" %}</label>
+                                <select name="action" id="action" class="aw-select">
                                     <option value="">{% translate "- Keep current -" %}</option>
                                     <option value="entrance">{% translate "Entrance" %}</option>
                                     <option value="exit">{% translate "Exit" %}</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="aw-form-actions">
-                            <button type="submit" class="aw-btn aw-btn--primary">{% translate "Save Correction" %}</button>
-                            <a href="{% url 'attendance-management' %}" class="aw-btn aw-btn--ghost">{% translate "Cancel" %}</a>
-                        </div>
+                    </div>
+                    <div class="aw-form-actions">
+                        <button type="submit" class="aw-btn aw-btn--primary">{% translate "Save Correction" %}</button>
+                        <a href="{% url 'attendance-management' %}" class="aw-btn aw-btn--ghost">{% translate "Cancel" %}</a>
                     </div>
                 </form>
             </div>

@@ -1,5 +1,4 @@
 {% load i18n %}
-{% load crispy_forms_tags %}
 <div id="content" class="aw-dashboard-page">
     {% translate "People" as page_eyebrow %}
     {% translate "Signup Settings" as page_title %}
@@ -17,16 +16,69 @@
     </div>
     {% endif %}
 
-    <div class="aw-card">
-        <div class="aw-card-body">
-            <form method="post" action="{% url 'signup-settings' %}" hx-post="{% url 'signup-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
-                {% csrf_token %}
-                {{ form|crispy }}
-                <div class="mt-3 d-flex align-items-center gap-2">
-                    <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Save changes" %}</button>
-                    <span id="signup-settings-loading" class="htmx-indicator ms-2" aria-hidden="true"><i class="fas fa-circle-notch fa-spin"></i></span>
-                </div>
-            </form>
+    <form method="post" action="{% url 'signup-settings' %}" hx-post="{% url 'signup-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+        {% csrf_token %}
+
+        {# The view supplies no public-page preview data, so there is no rail; the
+           card column spans the editor grid instead of reserving an empty one. #}
+        <div class="aw-stack aw-stack--lg">
+                <section class="aw-card">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-user-plus"></use></svg>
+                            <h3>{% translate "Signup state" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <div class="aw-form-grid">
+                            <div class="aw-field aw-span-2">
+                                <label class="aw-switch">{{ form.is_open }}<span class="aw-switch-track" aria-hidden="true"></span><span>{% translate "Signup is open" %}</span></label>
+                                {% if form.is_open.help_text %}<span class="aw-field-hint">{{ form.is_open.help_text }}</span>{% endif %}
+                                {% for error in form.is_open.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                            </div>
+                            {% include "partials/components/aw_field.html" with field=form.intake_scope %}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="aw-card">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                            <h3>{% translate "Public form copy" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <div class="aw-form-grid">
+                            {% include "partials/components/aw_field.html" with field=form.title_ar %}
+                            {% include "partials/components/aw_field.html" with field=form.title_en %}
+                            {% include "partials/components/aw_field.html" with field=form.subtitle_ar %}
+                            {% include "partials/components/aw_field.html" with field=form.subtitle_en %}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="aw-card">
+                    <div class="aw-card-head">
+                        <div class="aw-card-title">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
+                            <h3>{% translate "Closed page" %}</h3>
+                        </div>
+                    </div>
+                    <div class="aw-card-body">
+                        <div class="aw-form-grid">
+                            {% include "partials/components/aw_field.html" with field=form.closed_title_ar %}
+                            {% include "partials/components/aw_field.html" with field=form.closed_title_en %}
+                            {% include "partials/components/aw_field.html" with field=form.closed_message_ar %}
+                            {% include "partials/components/aw_field.html" with field=form.closed_message_en %}
+                        </div>
+                    </div>
+                </section>
         </div>
-    </div>
+
+        <div class="aw-form-actions">
+            <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Save changes" %}</button>
+            <span id="signup-settings-loading" class="htmx-indicator" aria-hidden="true"><svg class="aw-ico aw-spin"><use href="#i-refresh"></use></svg></span>
+        </div>
+    </form>
 </div>

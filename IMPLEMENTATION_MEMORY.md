@@ -8,7 +8,18 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
-## Latest documentation unit (8 November 2026) - student intelligence review
+## Latest documentation unit (9 November 2026) - student PWA specification
+
+Created and indexed [the PWA specification](docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md).
+It maps current Django/mobile owners and describes the student-facing scope:
+installability, Web Push, a page for explicitly downloaded audio/PDFs and
+WebAuthn passkey login. The document includes diagrams, proposed source
+changes, browser/server tools, candidate dependencies requiring explicit
+approval, proposed .env variables, self-test steps and open policy decisions.
+No application code, dependency, .env, migration, deployment or database was
+changed. The related pending index is docs/pending/README.md.
+
+## Previous documentation unit (8 November 2026) - student intelligence review
 
 Created [the review](docs/pending/STUDENT_INTELLIGENCE_PRD_REVIEW.md), indexed in
 `docs/pending/README.md`. It fact-checks the PRD against current source, records
@@ -56,6 +67,10 @@ separate quiz group; lesson parts are stacked with no
 tabs and a PDF viewer with production-style controls; the quiz has no exit X or
 Save and exit, has high-contrast selection, unanswered-question validation and
 detailed question/answer review; calendar stays on the active scope.
+Second review: lesson About/Lesson outline removed; quiz navigator is side-column
+on desktop and below-question on mobile; ordering/matching review is line-by-line
+with the student answer; warning/info student alerts added with per-banner
+dismiss; course row separators strengthened and Arabic content text enlarged.
 
 Validation: 11 English and 11 Arabic pages at 1440/1024/768/390/360 with no body
 overflow or console errors; Arabic pages are `lang="ar"` / `dir="rtl"` with no
@@ -65,6 +80,1259 @@ duplicate IDs or missing local links; `node --check` passes; scoped
 `audit_text_encoding --path prototype/student-redesign` passes all prototype text
 files. The repo-wide encoding audit remains red only on the pre-existing
 `docs/pending/lms_student_intelligence_architecture_prd.md` typography.
+
+## Admin UI rebuild program (started 9 November 2026)
+
+The operator approved the full audit recommendations: rework the admin UI/UX to
+match `prototype/admin-redesign` exactly, admin only, with business logic,
+schema, routes and permissions unchanged. Two settled decisions from that
+approval:
+
+- `crispy-bootstrap5` is removed from the admin rendering path and replaced by
+  one `aw_field.html` partial plus one form mixin that assigns `aw-*` widget
+  classes in Python. The package stays installed only until the non-admin
+  surfaces migrate; that removal is its own tracked step.
+- Every prototype surface that is absent today must exist in its prototype
+  place (drawers, context strips, KPI strips, tabs, steppers), and page content
+  must not absorb what belongs in a drawer.
+
+Controlling documents: [the phased plan](docs/current/ADMIN_UI_REBUILD_PLAN.md)
+and [the parity audit](docs/current/ADMIN_UI_PARITY_AUDIT_2026-11-09.md).
+Phases: P0 foundations (typography, primitives, form contract), P1 shared shell,
+P2 Telegram, P3 People, P4 Curriculum, P5 Academic and Attendance, P6 Media,
+Reports and Site plus UI kit, P7 removal and full review.
+
+### Completed unit: P0.1 Arabic typography layer (9 November 2026)
+
+- `management_system/static/css/admin_workspace.css` gained section 1b
+  "Language typography": 30 rule blocks, 55 `html[lang="ar"]` selectors.
+- Arabic now uses the approved reading stack (Tahoma, Segoe UI, Arial) - the
+  same decision as the student redesign - with a 15px base and 1.75 line-height.
+- Tracking and uppercase are reset for Arabic on every selector that set them:
+  eyebrow, sidebar label, sidebar heading, field labels, KPI label, table head,
+  matrix head, meta label, storage stat, level group row, message meta.
+- Title tracking is neutralised (`aw-page-title` `letter-spacing: 0`,
+  `line-height: 1.35`, clamp 26-34px); `aw-kpi-value` is 30px with zero tracking.
+- Small labels move above the Arabic legibility floor: eyebrow, side label, KPI
+  label and table head 11px; field labels 11.5px.
+- Reading and control sizes step up: page description 13.5px, table 12.5px,
+  buttons 13/12/13.5, inputs min-height 40px at 13.5px, sidebar links 40px at
+  13.5px, chat conversation and message text 12.5px.
+- The Latin scale is untouched: base 13.5px, the Latin UI and display stacks and
+  every prototype token remain exactly as ported.
+
+Verification: `manage.py check` reports no issues; stylesheet braces balance
+(791/791); the new block is Arabic-scoped only (0 Arabic characters added to the
+stylesheet); `audit_text_encoding` does not flag the stylesheet.
+
+Next safe step: P0.3 form-rendering contract (`partials/components/aw_field.html`
+plus the form mixin in `management_system/forms.py`), then remove crispy from the
+nine admin templates that load it. P0.2 primitives are added with their first
+consumer rather than in advance, so no unused CSS is introduced.
+
+### Completed unit: P0.3 admin form-rendering contract (9 November 2026)
+
+- `management_system/forms.py` owns widget classes now: `AwFormMixin` walks
+  `self.fields` and assigns `aw-input` / `aw-select` / `aw-textarea` /
+  `aw-check-input` by widget type through `apply_aw_widget_classes`, preserving
+  existing attrs (placeholder, `dir`, `min`, `step`, `accept`, `type`) and
+  replacing retired Bootstrap names (`form-control`, `form-select`,
+  `form-control-sm`, `form-select-sm`, `form-check-input`). Hidden inputs are
+  skipped. Canonical bases `AwForm` and `AwModelForm` sit on the mixin.
+- New partials: `partials/components/aw_field.html` (one bound field: label,
+  required marker, control, hint, errors; checkbox branch renders the control
+  beside its label as `.aw-field--check` + `.aw-check`) and
+  `partials/components/aw_form_fields.html` (all visible fields, then hidden).
+- Converted forms: `UserCreationForm` and `CourseForm` to `AwModelForm`
+  (`UserUpdateForm` inherits), `ApplicationAdminForm` and `SignupSettingsForm`
+  to `AwModelForm`, `CSVUploadForm` to `AwForm`. Student and public forms
+  (`UserLoginForm`, `SignupForm`, `SignupDetailsForm`,
+  `MissingApplicationDocumentsForm`, `AcademicPaymentForm`) are untouched.
+  `CanonicalUserAdminForm` is used only by Django admin (`admin.py`), not the
+  workspace, and was left alone.
+- Converted templates: `signup_settings_content`, `dashboard_form_content`,
+  `application_review_content`, `user_detail_content`,
+  `user_bulk_form_content`. Each renders
+  `<div class="aw-form-grid">{% include "partials/components/aw_form_fields.html" with form=... %}</div>`
+  and its action row now uses `.aw-form-actions` instead of Bootstrap
+  `mt-3 d-flex`. `{% load crispy_forms_tags %}`, `as_crispy_field` and
+  `form|crispy` are gone from the admin shell and the five wrapper templates.
+- CSS: `.aw-field` label now sets `margin-bottom: 0` so Bootstrap's reboot
+  margin no longer doubles the 4px label gap; added `.aw-field--check`,
+  `.aw-check`, `.aw-check input` and `.aw-check-list` beside the existing field
+  rules. No new legacy class was introduced.
+
+Verification: `manage.py check` clean; all 179 project templates compile;
+`verify_forms.py` reports every sampled widget carrying an `aw-*` class with no
+retired class; `render_field.py` renders text, textarea, select and checkbox
+fields with the canonical structure, the required marker only on required
+fields and the checkbox branch inline; zero `crispy` references remain outside
+student/public templates; the five converted partials contain zero
+`form-control`/`form-select`/`form-label`/`as_crispy` references;
+`audit_text_encoding` clean.
+
+Known open item: `display_quiz.html` still loads `crispy_forms_tags` without
+using it. It is the shared student exam template, so it is deferred to the
+student surface pass rather than touched here.
+
+Next safe step: Phase 1 shared shell components (pager footer always visible
+with info first, bulk bar under the table, drawer trigger contract, real tab
+and stepper states, filter-bar consolidation, icon unification in shared
+partials).
+
+### Completed unit: P1 shared shell - pager and bulk bar (9 November 2026)
+
+- `partials/pagination.html` rewritten to the prototype anatomy:
+  - the footer always renders when `page_obj` exists, so a single-page list
+    still reports "Showing 1-5 of 5"; previously the whole footer was gated on
+    `has_other_pages`.
+  - `.aw-page-info` now precedes the `<nav>` (prototype renders the range on the
+    start side and the pager on the end side).
+  - chevrons come from the shared sprite (`#i-chevron-left` / `-right`, RTL
+    mirrored through `request.LANGUAGE_CODE`) instead of Font Awesome, and the
+    "Previous"/"Next" words and Bootstrap `d-none d-md-inline me-1` utilities are
+    gone.
+  - the ellipsis is a non-interactive `.is-gap` span, not a disabled button.
+  - every existing argument is preserved: `pagination_query`, `page_param`,
+    `base_url`, `item_label`, `aria_label`, `wrapper_class`, and the HTMX
+    pass-through set.
+- `partials/table_and_pagination.html`: the `.aw-bulkbar` moved out of the white
+  `aw-table-tools` row to directly after the pagination include, so it is a
+  sticky bar at the table foot as in the prototype. It is guarded by
+  `{% if view != "application" %}` because the applications branch has no
+  Alpine root yet; selection, delete, clear, quiz recalculation and the signed
+  token are unchanged. The selection label now uses `.aw-count`, and the
+  clear/delete controls use sprite icons.
+- `admin_workspace.css`: `.aw-bulkbar` is `position: sticky; bottom: 0;
+  z-index: 4` with an inline `.aw-count`; the duplicate mobile sticky rule and
+  the unused `.aw-bulkbar .aw-clear` rule were removed. Added
+  `.aw-table-foot--spaced` for standalone footers and replaced the two
+  Bootstrap `wrapper_class="mt-3"` callers (attendance, grade matrix).
+- Drawer trigger contract recorded in the plan: `data-aw-drawer` plus optional
+  title/subtitle, response body inserted into `#aw-drawer-body` with HTMX and
+  Alpine re-initialised; 403 and session-expiry states already handled by
+  `admin_shell.js`.
+
+Verification: `manage.py check` clean; 179/179 templates compile;
+`render_pager.py` asserts the always-visible footer, info-before-pager order,
+sprite chevrons, `is-gap` ellipsis, single-page range and RTL chevron
+direction; `assert_bulkbar.py` asserts the bar sits after the pager, outside the
+tools row, declared once and guarded for applications; `audit_text_encoding`
+clean.
+
+Next safe step: Phase 2 Telegram rebuild (three columns with the student context
+rail, list search plus All/Unread/Pending chips wired to the existing
+`search`/`status` parameters, reduced row and bubble anatomy, composer inside the
+thread column, chat head reduced to the prototype actions).
+
+### Completed unit: P2 Telegram rebuild (9 November 2026)
+
+- Layout is now the prototype surface: `.aw-chat-layout` (290px conversation
+  column + fluid panel) with the panel itself split into thread and a 285px
+  student context rail. The rail lives inside `#telegram-chat-panel`, so the
+  existing panel fragment keeps owning it with no new endpoint.
+- Conversation column: `.aw-chat-list-head` carries a search field and the
+  All / Unread / Processed chips. Search is live (`input changed delay:250ms`)
+  and both controls target `#telegram-conversation-list` with
+  `hx-select`/`hx-swap`/`hx-push-url`, using the `search` and `status` query
+  parameters the view already supported. Unread shows `unread_count`.
+- Row anatomy reduced to the prototype set: avatar, name + time, one-line
+  preview, one status pill. Username, level, message count, chevron and the
+  second pill are gone; the status branch logic is unchanged.
+- Thread: `.aw-chat-thread`, `.aw-msg--in/out` bubbles with a `.aw-msg-meta`
+  line, `{% ifchanged %}` day separators, attachments as image/video/audio/
+  link. The per-message header row (role + content type + timestamp) and the
+  `text-white` direction utilities are gone.
+- Composer: `.aw-composer` with `.aw-composer-row` (textarea + send),
+  `.aw-composer-actions` (attach + voice recorder) and a hidden `.aw-file-input`.
+  Every hx-*, csrf, `reply_to_message_id`, `supportVoiceRecorder` hook and the
+  polling controller are byte-for-byte preserved.
+- Chat head reduced to avatar + name/level/@username + Student 360 link + the
+  existing claim/release/mark-read forms. The Refresh and Back links and the
+  two metadata stacks moved into the rail as real `aw-kv` rows (Phone, Email,
+  Level, Created, Last message) plus quick links (Student 360, Attendance,
+  Grades, Payments) and the admin-only note.
+- `telegram_forms.py`: reply widgets moved off Bootstrap names to `aw-textarea`
+  and `aw-file-input` (centralized in Python, as agreed).
+- JS: `telegram_chat_pagination.js` now dedupes on `[data-chat-user-id]`;
+  the conversation poller queries `.aw-chat-list-ul`, which the markup emits.
+- Icons: added sprite symbols `i-paperclip`, `i-microphone`, `i-stop`, `i-reply`
+  and replaced the Font Awesome paperclip/microphone/stop/reply/alert icons in
+  the chat surfaces. Added `.aw-avatar > img` (object-fit round image) and
+  `.aw-spin`, which removed all inline `style` attributes from the chat markup.
+- Filter-chip filtering, row selection and claim/read/delete endpoints are
+  unchanged; no view, model, url, queryset or permission changed.
+
+Verification: `manage.py check` clean; 179/179 templates compile; `node --check`
+passes on the chat JS; `verify_telegram.py` reports no `tg-chat-*` in templates
+or JS, all five required ids present, the aw-chat class contract present in
+markup and zero Bootstrap utility classes; `audit_text_encoding` clean;
+stylesheet braces 836/836.
+
+Deferred cleanup (tracked, not a runtime defect): the legacy `tg-chat-*` rules
+in `app_admin.css:1274-2130` (855 lines) are now dead and must be deleted in P7.
+Templates and JS no longer reference them.
+
+### Completed unit: P3 People (9 November 2026)
+
+Applications
+- `applications_dashboard_content.html`: the two extra filter cards are gone.
+  The tab strip is a bare `aw-tabs` on the canvas and one `aw-card` with
+  `aw-card-body--flush` owns the search row (`aw-table-tools`), the
+  `#applications-workspace` body, the table and the footer. The hidden
+  `#application-bulk-result` block and every hx/data hook are unchanged.
+- `application_review_content.html`: identity band (`aw-identity` with an
+  `aw_avatar` xl, name, username/email/phone meta, status + study mode +
+  identity chips), an `aw-context-strip` (application number, submitted,
+  reviewed by), then `aw-grid--main-rail`: main = edit card, application
+  summary (`aw-kv` rows) and documents; rail = Decision card (note and
+  enrollment scope always visible, out of the Alpine edit toggle) plus a
+  Review checklist. Decision/activate/decline/reopen/delete form contracts are
+  unchanged.
+- `table_and_pagination.html` **application branches only**: checkbox header
+  and cells use `aw-cell-check`, the name cell is an `aw-cell-main` identity
+  block, status renders through `aw_status_pill`, actions use `aw-row-actions`.
+  Every other view branch is untouched and still carries its legacy classes for
+  Phases 4-6.
+
+Students and settings
+- `tables/user_rows.html`: `aw-cell-main` identity, `aw-cell-check` and
+  `aw-row-actions` replace `column-checkbox` / `column-actions`.
+- `dashboard_form_content.html`: `aw-editor-grid` with the form card in the main
+  column and an `aw-editor-rail` summary built only from context that exists.
+- `signup_settings_content.html`: three named cards (Signup state, Public form
+  copy, Closed page) with the new `.aw-switch` toggle for `is_open`; the rail is
+  omitted because the view supplies no preview data (noted in the template).
+- `historical_intake_content.html`: every Bootstrap row/gutter/column/form-check
+  construction replaced by `aw-form-grid` + `aw-field`; the records table uses
+  `aw-cell-main` plus pills and keeps the inline promotion form compact.
+- `user_detail_content.html`: identity band plus one merged summary card, with
+  the actions moved into the page head slot.
+
+CSS added (first consumers in this phase): `.aw-switch` + `.aw-switch-track`
+(RTL-aware), `.aw-identity`, `.aw-identity-main`, `.aw-identity-meta`,
+`.aw-identity-chips`, `.aw-mt-2`, `.aw-mt-3`, `.aw-doc-image`, `.aw-doc-frame`.
+
+Integration fixes applied by the lead after the two workers returned: replaced
+the remaining `ps-inline-form` with `aw-inline-form` in the review page,
+converted the document utilities (`img-fluid rounded border`,
+`ratio ratio-4x3`, `mt-2`) to `aw-doc-image` / `aw-doc-frame` / `aw-mt-2`,
+swapped the signup-settings inline `style="grid-column"` for a plain
+`aw-stack`, replaced the last Font Awesome spinners on these pages with
+`aw-spin` sprite icons, and removed the stacked legacy column classes from
+`user_rows.html`.
+
+Deliberately not built (no data or endpoint exists; reported instead of faked):
+applications Export action and pending-count warning strip; signup public-page
+preview rail; a historical-record View drawer (needs a new fragment endpoint).
+
+Verification: `manage.py check` clean; 179/179 templates compile;
+`verify_people.py` reports no legacy utility classes in the eight People
+templates, the required ids present, and the aw contract present (`aw-tabs`,
+`aw-table-tools`, `aw-cell-main`, `aw-switch`, `aw-editor-grid`, `aw-identity`,
+`aw-form-grid`); `audit_text_encoding` clean; stylesheet braces 854/854.
+
+### Completed unit: P4 Curriculum (9 November 2026)
+
+Lesson editor
+- The editor form now wraps the page head so the primary submit renders in
+  `.aw-page-actions`; the two stacked autosave banners became one compact head
+  indicator bound to the same `isSaving` / `lastSaved` state.
+- Left column is a stack of "Lesson Details" and "Media parts". Each attached
+  media link renders `.video-container.aw-part-card` > `.aw-part-head` (part
+  badge, type tag, move up/down, remove) > `.aw-part-body` (`.aw-file-row`
+  icon/name/key plus type, part and download fields). The Drive browser moved
+  inside the card as a `<details>` whose summary is the `.aw-dropzone`; an
+  action row offers "Attach existing file" and "Upload files".
+- `lessonForm.js` changed only the `appendLessonFile` markup string so the
+  JS-generated card and the server card are element-for-element identical
+  (36 elements, same tag/class/attribute order). No method, event, selector or
+  data flow changed.
+- Rail keeps Publish checklist and Danger zone. Media-jobs and student-preview
+  cards were omitted because the view context supplies no such data.
+
+Quiz editor and lists
+- `quiz_form_content.html`: head actions (Save) plus a compact autosave chip,
+  one details card with the field grid, and rail cards for schedule, summary
+  and checklist. The standalone Submit/Reset card is gone.
+- `questions_rendering.html`: question cards are `.aw-q-card` >
+  `.aw-q-head` (`.aw-q-num`, type select, points input, remove icon) >
+  `.aw-q-body` (name, choices, add choice) **inside admin branches only**. The
+  shared student exam branch is untouched: a guard-interval check proves every
+  changed line lies inside an `{% if not is_student %}` block.
+- `submission_dashboard_content.html`: page description, `aw-context-strip`
+  (quiz, close date, submission count) and the canonical single-row filter bar.
+- `content_qa_content.html`: each KPI now pairs its own label with its own
+  value; issue groups render as cards with a count, pill and sample rows.
+- `table_and_pagination.html` curriculum branches: `aw-cell-main` identity,
+  sprite sort icons, `aw-row-actions`; the application branches were frozen.
+
+CSS added with their first consumers: `.aw-dropzone` (container + hover/drag
+state), `.aw-tag`, `.aw-q-card`, `.aw-q-head`, `.aw-q-num`, `.aw-q-body`,
+`.aw-input--points`.
+
+Arabic catalogue: 14 new msgids were appended to
+`locale/ar/LC_MESSAGES/django.po` with Arabic translations (Media parts,
+Add part, Attach existing file, dropzone hints, quiz-status note, total-grade
+note, and the Content QA labels). A duplicate entry was detected and removed.
+The catalogue parses cleanly (`msgfmt -c` reaches the write step with no format
+error), but `.mo` compilation is blocked by this session's process-write policy,
+so the compiled catalog is stale until someone runs
+`python manage.py compilemessages` (no deploy step runs it today).
+
+Deliberately not built: the admin submission detail still renders the student
+exam shell (`display_quiz.html`); converting it needs its own change because it
+is shared with the live student exam. Media-jobs and student-preview rail cards
+have no view data. "Add part" has no JS method today, so the head control links
+to the existing Drive picker instead of inventing behaviour.
+
+Verification: `manage.py check` clean; 179/179 templates compile;
+`verify_curriculum.py` reports the editor primitives present and no legacy
+residue in the two editors; `node --check` passes on `lessonForm.js`; the
+student-branch guard check reports every changed line in the shared question
+partial inside an admin-only block; `audit_text_encoding` clean; stylesheet
+braces 864/864.
+
+### Completed unit: four reported admin defects (9 November 2026)
+
+1. Stale quiz-operation message shown on entry without an operator action.
+   - Root cause: the discovery endpoint (`GET /dashboard/quizzez/recalculate/`)
+     fell back to the operator's **last completed** job, so every page load
+     re-polled it and re-rendered the finished message. A browser without the
+     sessionStorage marker replayed it forever.
+   - Fix: discovery now advertises only `queued`/`running` jobs
+     (`views.py`, `recalculate_quizzes`). A finished job stays reachable through
+     its status URL for a client that is already tracking it.
+   - UX: the status strip gained a dismiss button and auto-clears 12s after a
+     terminal state (`tableManager.js`: `dismissRecalculationStatus()`,
+     `clearStatusLater()`, `statusTimer` cleared in `destroy`).
+
+2. Quiz row actions were a wall of wide text buttons that wrapped.
+   - `table_and_pagination.html` action cell is now one compact `.aw-row-actions`
+     cluster of `.aw-icon-btn` controls (9 icon buttons, 0 wide buttons),
+     each with `title` + `aria-label`; destructive controls use
+     `.aw-icon-btn.is-danger` (new CSS rule). Every action, `hx-*`, confirm
+     message, CSRF token and Alpine handler is preserved, and the duplicate
+     delete row for submissions was merged into the same cluster.
+
+3. Blank area and horizontal scrollbar below the shell on short pages.
+   - `admin_panel.html` marks the document root `class="aw-html"`; the stylesheet
+     paints that root with the admin canvas colour, sets `min-height: 100%` and
+     `overflow-x: hidden`, so a short page no longer shows a white band below
+     the shell and no element can put a horizontal scrollbar on the window
+     (wide tables still scroll inside `.aw-table-wrap`).
+
+4. `Duration (minutes)`: 0 now means "no time limit", and the default is 0.
+   - `Quiz.duration_minutes` default 60 -> 0 plus
+     `migrations/0110_alter_quiz_duration_minutes_default.py` (chained after
+     0113 because a later migration already existed locally; `makemigrations
+     --check` reports no changes).
+   - `quiz_attempts.py`: a zero duration sets `deadline = closing` instead of
+     `now + 0`, so the attempt is bounded only by the quiz window.
+   - Import/create defaults moved from 60 to 0 (`views.py` three call sites,
+     `quiz_import.py` display projection).
+   - Admin quiz form: value defaults to 0, a hint explains "0 means no time
+     limit: the attempt is bounded only by the quiz closing date", and the rail
+     summary renders "No limit" instead of 0.
+   - Student-facing copy: the notification body and the Telegram quiz briefing
+     now say "No time limit..." when the duration is 0 instead of "0 minutes".
+
+Verification: `manage.py check` clean; `makemigrations --check` -> "No changes
+detected"; 179/179 templates compile; `node --check` passes on `tableManager.js`;
+`verify_four_fixes.py` asserts all four fixes in source (discovery filter,
+dismiss/auto-hide, icon cluster with every label preserved, aw-html guard,
+model default + migration + deadline branch + form presentation); stylesheet
+braces 866/866; `audit_text_encoding` clean.
+
+Open notes: six new msgids were added to `locale/ar/LC_MESSAGES/django.po`
+("No limit", the two no-time-limit sentences, the 0-means-no-limit hint,
+"Please enter a duration", "Dismiss"); `django.mo` is still stale because this
+session's process-write policy blocks `msgfmt`/`compilemessages`. The student API
+payload still sends `duration_minutes: 0`; the mobile app should treat 0 as
+"no limit" when it renders that field.
+
+### Completed unit: admin submission detail separated from the student exam (9 November 2026)
+
+- New `templates/submission_detail.html` (extends `admin_panel.html`) and
+  `partials/submission_detail_content.html`. The page renders the workspace
+  head, a context strip (student, quiz, final grade), an answers card that
+  includes `questions_rendering.html` with the unchanged `questions[...]` field
+  names, a correction submit action when the operator may grade, and a rail with
+  the submission summary.
+- `submission_user` (views.py) now renders `submission_detail.html`. It also
+  fixes a data bug: the page used `request.user.username` as the *student* label,
+  so the admin saw their own username; it now uses the graded student's full
+  name or username.
+- The POST branch, `unpack_quiz_form`, the grading transaction and the
+  correction field names are untouched. `display_quiz.html` is byte-identical
+  (`git status` clean), so the student exam, preview and taken-view routes are
+  unaffected.
+- Two new msgids: "Quiz submission", "Back to submissions" (plus "Answers",
+  "Submission" and the manual-correction note). Arabic entries still need to be
+  added and compiled.
+
+Verification: seeded a quiz, question, submission and grade on the disposable
+schema and requested the route as an admin. `/ar/...` and `/en/...` both return
+200; the response contains `aw-dashboard-page`, `aw-context-strip`,
+`aw-editor-rail`, `id="quiz-form"`, `questions[0]` and the "Submit Correction"
+action, and contains **no** `sd-frame` and **no** `app_student.css`, i.e. the
+student exam shell is gone from the admin page.
+
+Follow-up for the review pass: `display_quiz.html` still carries an
+`extended_view == 'admin_panel.html'` branch that no caller reaches now
+(`extended_view` is only passed as `base.html`); it can be deleted safely
+because it never matches on the student path.
+
+### Completed unit: scanner result moved into the admin shell (9 November 2026)
+
+- `templates/scan_preview.html` used to `{% extends 'base.html' %}` and render
+  the public/student `sd-page` + `container` layout, so scanning an ID dropped
+  the operator out of the workspace.
+- It now extends `admin_panel.html` and renders an `aw-dashboard-page` with a
+  page head, a context strip (username, study mode, academic year, date), two
+  cards (course, record attendance) and the policy note.
+- Preserved exactly: the `record-attendance` POST URLs for entrance and exit,
+  both CSRF tokens, the ids `entrance-form`, `exit-form`, `entrance-btn`,
+  `exit-btn`, `record-error`, `record-status`, the disabled reasons, and the
+  inline recorder script contract. The script's class toggles now use
+  `aw-btn--primary` / `aw-btn--gold` / `aw-btn--outline` instead of the
+  Bootstrap/sd button classes.
+- Decision recorded: the graduation gallery is **not** an admin surface. The
+  admin navigation points at `graduation-gallery-manage` (already on the admin
+  shell); `graduates/<scope_id>/` is the student/public album, so converting it
+  would break the student experience and was deliberately left alone.
+
+Verification: template compiles; rendered `/en/scan/<token>/` and
+`/ar/scan/<token>/` as an admin on the disposable schema, both 200, both
+containing `aw-dashboard-page`, `aw-context-strip`, `entrance-form` and
+`record-status`, and containing neither `sd-page` nor `container py-4`.
+
+### Completed unit: JS-created question cards match the server card (9 November 2026)
+
+- `quizForm.js` `buildQuestionCard` now emits the same anatomy the server
+  renders: `.aw-q-card` > `.aw-q-head` (`.aw-q-num`, `.aw-select.question-type`,
+  `.aw-input--points` grade, `.aw-icon-btn.is-danger` remove) > `.aw-q-body`
+  (hidden id, `.aw-field` name, answers section, correct-answer section).
+- `buildChoiceRow` emits `.aw-choice-row` with `aw-input` + an icon remove
+  button. Every functional hook is unchanged: `.question-card`,
+  `[data-question-card]`, `.question-type`, `[data-choice-row]`, the
+  `questions[...]` names and `data-action` values.
+- `reindexQuestions` now also rewrites `.aw-q-num` so the visible number follows
+  DOM order after add/remove, and the one `.card-body` parent lookup became
+  `.aw-q-body, .card-body` so server cards and JS cards both resolve.
+- Structured editors (order/match) keep their existing markup; they are already
+  skinned by the admin stylesheet.
+
+Verification: `node --check` passes; hook census confirms `aw-q-card`,
+`aw-q-head`, `aw-q-num` (2), `aw-q-body` (2), `aw-choice-row`, plus the preserved
+`question-card` (12), `data-choice-row` (4) and `question-type` (6) hooks.
+
+### Completed unit: P5 Academic and Attendance (9 November 2026)
+
+Shared primitive added first: a delegated tab controller in `admin_shell.js`
+(`[data-aw-tabs]` root, `[data-aw-tab]` buttons, `[data-aw-tabpanel]` panels;
+toggles `is-active`, `aria-selected`, `tabindex`, `hidden`). No page needs an
+inline script and HTMX swaps keep working. CSS gained `.aw-tabpanel[hidden]`,
+`.aw-drawer-table` / `.aw-drawer-scroll`, `.aw-th-sub`, `.aw-dl`, the
+`.aw-cal-joined` joined month surface (with a phone min-height override), and the
+calendar's inline-form rule now targets `.aw-inline-form`.
+
+Academic
+- `academic_setup_content.html`: real tabs with counts and panels; the previous
+  `href="#..."` anchors are buttons wired to the controller. Default tab is
+  derived from context (scope -> offerings, year -> levels, else years).
+  Existing ids `#academic-years`, `#year-levels`, `#course-offerings` stayed on
+  the inner cards, so every HTMX link and redirect target is unchanged. Year
+  snapshot cards use `aw-kv`; weekday cells render `.aw-chip--teal` from real
+  `meeting_weekdays` data.
+- `levels_content.html`: prototype level cards (head, level pill, meta grid,
+  divider, enrollments row); dropdown `href="#"` triggers became buttons bound
+  to the same modal targets. Weekday chips were omitted because the levels view
+  projects counts only - reported, not invented.
+
+Promotion
+- `promotion_evaluation_content.html`: real stepper. Each stage is a button with
+  `data-aw-tab`; exactly one carries `is-active` and completed stages carry
+  `is-done`, derived from context (`selected_scope`, `preview_rows`,
+  `results_page_obj`). Promote is never marked done because no scope-level
+  completion flag exists. The five stage sections became panels; every form,
+  id, hx attribute and field name is unchanged. Added the context strip
+  (year, level, formula kind, evaluation end) and made the results override form
+  compact. The results action bar moved into the promote panel with its ids.
+- `promotion_history_content.html`: context strip, `aw-cell-main` identity with
+  an avatar and a Student 360 link, outcome pills, and the canonical filter
+  tools. No KPI grid because the view supplies no aggregates.
+
+Attendance, calendar, scanner
+- `attendance_management_content.html`: the matrix now has **one column per
+  meeting** (`Student` + N meeting columns + 5 counters + Score, colspan
+  `meetings|length|add:7`) with `.aw-attend-cell--full/--partial/--none/--absent`
+  and accessible status labels. The day detail renders per student in a
+  full-width `<details>` with `.aw-drawer-table` (Date, Course, Entrance, Exit,
+  By, Grade, Action) instead of the old Bootstrap collapse columns. The
+  duplicated guidance line is printed once. Head actions (Scanner, Calendar,
+  Reconcile, Settings) and one `aw-filter-bar` replaced the eight scattered
+  filter fields. The 4-KPI grid was not built: only `student_count` and
+  `meeting_count` exist.
+- `calendar_month_grid.html` / `calendar_management_content.html`: admin month
+  renders inside `.aw-cal-joined` (one bordered surface, collapsed interior
+  borders); toolbar regrouped; every `.aw-calmg-*` hook, data attribute and
+  modal kept. `calendar_day_sheet.js` no longer bails above 575.98px, so the day
+  sheet opens on desktop (still a Bootstrap modal; a true drawer needs a
+  fragment endpoint).
+- `scanner_content.html`: camera card with frame/box/hint, checklist, aw form
+  controls, same ids and handler contract.
+
+Python-side widget centralization finished: `AcademicYearForm`,
+`CourseOfferingForm`, `AcademicYearLevelWeekdayForm`, `AttendancePolicyForm`,
+`HistoricalIntakeForm`, `ExceptionalCourseAssignmentForm`,
+`HistoricalExistingBulkForm`, `OfferingCopyForm`, `QuizTypeForm`,
+`PromotionFormulaForm`, `PromotionRuleForm`, `QuizExceptionalOpeningForm`,
+`AnnouncementForm` and `LessonEditorForm` now inherit `AwForm`/`AwModelForm`.
+Removed the post-`super()` re-assignment of `form-select`/`form-check-input` in
+`OfferingCopyForm`, which was overriding the mixin.
+
+Verification: `manage.py check` clean; 181/181 templates compile; the disposable
+schema now carries a seeded academic year, so the **whole admin route sweep
+passes 36/36 with status 200** (previously five routes raised
+`AcademicYear.DoesNotExist` on an unconfigured database); `node --check` passes
+on `calendar_day_sheet.js` and `admin_shell.js`; stylesheet braces 880/880;
+`audit_text_encoding` clean; all phase verifiers (Phase 5, Curriculum, People,
+four fixes, Telegram) report green.
+
+Known items: four new scanner msgids need Arabic entries ("Scanner checklist",
+"Align the QR inside the frame", "If the QR code is rejected, use the manual
+lookup.", "A repeated scan is rejected and the recorded entrance or exit is
+kept."); `views.py` still passes `matrix_column_count` which no template
+consumes now; a true attendance-day drawer still needs a fragment endpoint.
+
+### Fixed: admin dashboard 500 on the pending-applications queue (9 November 2026)
+
+- Symptom: `GET /dashboard/` raised `FieldError: Field User.role cannot be both
+  deferred and traversed using select_related at the same time` from
+  `admin_today._pending_applications_queue`.
+- Cause: the queue queryset combined `.select_related("role")` with
+  `.only("id", "first_name", "last_name", "username", "date_joined", "city")`.
+  Django refuses to traverse a relation whose FK column was deferred by `only()`.
+  The queue never reads `role`, so the join was unnecessary.
+- Why earlier smoke tests missed it: the query only executes when at least one
+  pending application exists (`if count:`), and the disposable database had
+  none.
+- Fix: dropped `.select_related("role")`; the queue reads identity, city and
+  date columns only. No other queue pairs `select_related` with an `only()`
+  that omits the joined key (audited all five queues).
+- Evidence: reproduced the exact exception with the old query shape and
+  confirmed the new query returns rows; seeded a pending applicant and
+  requested `/en/dashboard/` and `/ar/dashboard/` -> both 200 with the
+  applicant rendered in the queue; full admin route sweep **36/36 -> 200**;
+  `manage.py check` clean.
+
+### Completed unit: P6 Media, Reports and Site (9 November 2026)
+
+- Rebuilt: media jobs, media upload, R2 management and file list, gallery
+  manage, combined report, grades matrix, payments matrix, progress, analytics,
+  the transcript wrapper, app releases and banners.
+- Media: upload now uses `.aw-dropzone` (three files reference it), file and
+  folder grids use `.aw-file-grid` / `.aw-folder-grid`, R2 keeps every
+  `#stat-*`, rename/info/create-folder and `data-r2-*` hook.
+- Reports: `aw-context-strip` present across the report pages (14 partials now
+  use it), `aw-kpi` strips where the views supply counts, canonical
+  `aw-filter-bar` toolbars, `aw-cell-main` identity cells, and the grades matrix
+  two-row header offset moved out of inline styles into
+  `.aw-table thead th.aw-th-subhead`.
+- Analytics city filter: kept the Bootstrap dropdown because the multi-select
+  behaviour is owned by `application_analytics.js`; its row markup now uses
+  `aw-check` instead of `form-check`. This is the one remaining Bootstrap
+  component hook in an admin template and is recorded as accepted.
+- Two speculative primitives (`.aw-chart` CSS bars and `.aw-donut`) were added
+  during this phase and then removed: no template used them, and the existing
+  report charts remain canvas-based. No dead CSS was left behind.
+- Not built: the UI-kit page (a review artefact, not an admin destination) and a
+  dedicated transcripts context (the route still wraps the grades matrix until a
+  transcript-specific view exists).
+
+Verification: all 13 Phase 6 templates compile; `verify_phase6.py` reports no
+legacy utility classes outside the accepted analytics dropdown, no inline
+sticky offsets, and the dropzone/KPI/context-strip/file-grid contract present;
+`manage.py check` clean; **181/181 templates compile** and the admin route sweep
+is **36/36 -> 200**; stylesheet braces 884/884; `audit_text_encoding` clean.
+
+Integration fixes after the workers returned (found in their reports):
+
+- Added the missing `.aw-score--good/--mid/--bad` tones the grades matrix now
+  emits (three percentage bands plus a legend).
+- Fixed `.aw-th-subhead`: the rule was scoped to `.aw-table`, but the grades
+  matrix is `.aw-matrix`, so the two-row sticky header overlapped on scroll.
+  The selector now covers both tables.
+- Removed the dead `.analytics-city-option .form-check-input` / `.form-check-label`
+  rules from `app_admin.css` (the city rows use `aw-check` now).
+- `BannerForm` (`portal_views.py`) moved from `form-control`/`form-check` widget
+  classes to `aw-input`/`aw-textarea`, so the banner publish form no longer
+  renders Bootstrap controls.
+- Added the two new head-copy msgids to the Arabic catalogue ("Publish Android
+  builds, enforce a minimum version, and control saving." and "Short,
+  dismissible messages that appear above student pages.").
+
+Recorded decisions from this phase:
+
+- The analytics city multi-select keeps the Bootstrap dropdown because the
+  multi-select behaviour lives in `application_analytics.js`; its rows are
+  `aw-check` now. Accepted as the only Bootstrap component hook in an admin
+  template.
+- Two breadcrumb trails still render per page: the top bar owns domain/section
+  crumbs and the body renders the resource trail from `partials/breadcrumbs.html`
+  (many wrappers override the block with the same include). This is a
+  whole-app navigation decision, not a per-page defect, so it is deferred to the
+  review pass rather than changed silently mid-phase.
+- The UI-kit page is not built; a transcript-specific view/context does not
+  exist, so the transcripts route keeps wrapping the grades matrix.
+
+Media integration notes (from the media worker's handoff):
+
+- Jobs/Upload are plain `aw-tab` anchors, not the delegated panel controller:
+  the upload workspace is a separate view with its own context and there is no
+  merged route or fragment to switch between them client-side.
+- `r2Manager.js` deletes nodes via `.closest('.col')` and drives the Bootstrap
+  modal API, so `.col` wrappers and the three modal dialogs stay; the file and
+  folder menus were converted to `aw-menu` + `data-aw-menu-trigger` because
+  `r2Manager.js` never calls the Bootstrap dropdown API.
+- `r2_browse.html` (an include the worker could not edit) was cleaned by the
+  lead: `mb-3`/`mt-3` utilities replaced with `aw-mt-2`/`aw-mt-3` and the Font
+  Awesome chevron replaced with the sprite.
+- `drive_files.html` deliberately keeps `.card-title` and `.card-body`: both are
+  JS hooks read by `addFile()`, not styling. Removing them would break file
+  selection, so the Bootstrap-looking classes stay with a documented reason.
+- Follow-up (JS, not done): `media_upload.js` still generates
+  `list-group-item`, `.progress` and `badge` markup for selected files and job
+  cards; converting it is the same kind of change already applied to
+  `quizForm.js`.
+- Arabic catalogue: eleven media/gallery msgids added ("Jobs", the upload
+  dropzone copy, "Processing jobs", "Queue rules", "Pipeline", the gallery
+  publish line, "Album rules" and the four album rule sentences). `msgfmt -c`
+  reaches the write step with no parse or duplicate error; `.mo` still needs
+  `compilemessages` outside this sandbox.
+
+### Completed unit: Engagement and Today cockpit (9 November 2026)
+
+Today (Overview)
+- `views.py` `today_kpis` is now a decision cockpit: four tiles are the live
+  queues (pending applications, failed media, ungraded answers, unread Telegram)
+  read from the bounded queue counts, plus active students and attendance today.
+  Each tile carries a `meta` line and an optional destination `url`;
+  content-inventory tiles (courses/lessons/quizzes/offerings) are gone.
+- `admin_today._queue` gained `tone` and `action_label`, and the four queues set
+  amber/red/blue/teal with "Review queue", "Open pipeline", "Open Content QA",
+  "Open inbox" instead of a generic "View".
+- `today_content.html` renders `.aw-kpi-meta`, wraps linked tiles in
+  `.aw-kpi-link`, and uses the per-queue tone class and action label.
+- CSS: `.aw-attn-icon--teal/--blue/--gold` tone variants and `.aw-kpi-link`.
+
+Engagement
+- Announcements and delivery detail rebuilt: real Compose/History tab panels via
+  the delegated controller, `.aw-form-grid` composer with `aw-check` level rows,
+  canonical filter bar and sortable history, delivery detail on `aw-kv` rows,
+  `aw_status_pill`, `.aw-progress` and recipient `.aw-table` rows.
+- Telegram accounts: context strip, KPI tiles, `aw-cell-main` identity and the
+  canonical filter bar.
+- Broadcasts (content/list/detail/confirm): KPI strip where aggregates exist,
+  status tabs, filter bar, identity-first columns, status pills.
+- Bot configuration: status card, settings grid and `aw-switch` booleans.
+- All nine Engagement templates compile with no legacy utility classes and the
+  full aw contract (tab panels, context strip, KPI, identity cells, filter bar,
+  switch).
+
+Verification: `manage.py check` clean; 181/181 templates compile;
+`verify_engagement.py` 9/9 compile with no legacy residue; admin route sweep
+**36/36 -> 200**; Today renders 200 with the new decision KPIs and queue labels;
+stylesheet braces 889/889; encoding clean; Arabic catalogue parses (11 new
+Today/queue msgids added).
+
+Remaining admin surfaces (from the coverage matrix): `content_detail_content`
+(lesson/quiz detail, 6 legacy hits), `student_overview_content` (Student 360
+identity hero and real tabs), `background_job_detail_content` (1 legacy hit).
+Structural gaps unchanged: definition/endpoint-dependent drawers, UI-kit page,
+transcripts view, two breadcrumb trails, `media_upload.js` generated markup.
+
+### Backend unblocking and shared-component fixes (9 November 2026)
+
+These were the "blocked by backend" gaps that stopped pages from matching the
+prototype. All resolved with bounded queries; no route, model or migration
+change.
+
+- Media jobs: the view now returns one aggregate of job counts by status for the
+  actor's search scope (`status_counts`, `total_count`) and builds a `media_kpis`
+  list. The template renders Total + Queued / Processing (processing + uploading
+  + verifying) / Completed (succeeded) / Failed, replacing the previous
+  Total + Page tiles. One extra statement; route still 5 queries.
+- Attendance: the view computes `scanned_student_count` (distinct students with
+  at least one attendance record for the scoped meeting dates) and an
+  `attendance_kpis` list; the page gained the 4-tile strip Students / Scanned /
+  Not scanned / Meetings with meta lines. Route stays at 13 queries.
+- Scanner: the view used to pass `{}`, which is why the page was static copy. It
+  now passes a bounded `recent_scans` feed (six rows, one query) and `last_scan`;
+  the template renders a Recent scans table with identity cells and action pills,
+  plus an honest empty state. Route +1 query.
+- Shared status pill: `aw_status_tone` remapped **explicit** tones through the
+  status dictionary, so every `tone="green|red|amber|..."` override rendered
+  muted. The filter now passes known tone names through unchanged and only maps
+  raw status values. Verified: tone green/red/amber -> green/red/amber, status
+  `active` -> green, unknown -> muted.
+- Widget classes moved out of Bootstrap for the remaining admin forms:
+  `TelegramBroadcastForm` textarea/select (`aw-textarea` / `aw-select`, keeping
+  the `tg-broadcast-*` hooks), `JobFilters` search/date/select fields and
+  `RedeliveryForm.audience` in `job_monitor_views.py` (`aw-input` / `aw-select`).
+- `backgroundJobsMonitor.js` now mirrors the job percentage onto the workspace
+  `.aw-progress` bar (inner span width + `aria-valuenow`) as well as the legacy
+  native `<progress>`, so polling still animates the new bar.
+- Arabic catalogue: eight media/attendance/scanner labels and thirteen Telegram
+  labels added (Jobs for this search, In this scope, At least one scan, In this
+  window, Recent scans, Time, No scans recorded yet., Admin-only report,
+  Eligible accounts, Needs review, of accounts, Broadcast, Confirmed, Activated,
+  Admin-only config, Bot ID, Deactivated, Last validated, Not connected, Private
+  chats only).
+
+Verification: `manage.py check` clean; 181/181 templates compile; admin route
+sweep 36/36 -> 200; query-count review unchanged (max 24, same two repeated-
+statement routes); stylesheet braces 889/889; encoding clean; Engagement
+verifier green; `node --check` passes on the jobs monitor.
+
+Still blocked (need a product decision or a new endpoint, not a data query):
+report population aggregates (average grade, attendance %, at-risk, unevaluable,
+distribution buckets) have no canonical definition or scope in the report view;
+a transcript view needs its own context; the remaining right-hand drawers
+(attendance day, broadcast detail, R2 rename, banner create, release publish)
+each need their own fragment.
+
+Resolved in the follow-up pass:
+
+- Promotion scope size: `promotion_formula` now passes `scope_student_count`
+  (distinct students with an active enrollment in the selected scope, the same
+  notion the attendance matrix uses) and the context strip shows it. Verified
+  with `?scope=<pk>` -> 200 and the Students chip present.
+- Drawer pattern proven end to end on the media job peek:
+  - `media_processing_status` gained a `?fragment=job&job=<uuid>` branch that
+    returns `partials/drawer/media_job_detail.html`, applies the same actor
+    scoping as the list (staff see only their own jobs), redirects to the owning
+    page when the request is not an HTMX fetch, and returns 404 for a missing or
+    malformed id.
+  - The row gained a `data-aw-drawer` icon trigger with title/subtitle, so the
+    shared drawer component and `admin_shell.js` controller are used by a page
+    for the first time.
+  - Verified: page 200 with the trigger, fragment 200 with content, direct hit
+    302, bad uuid 404.
+- New template: `partials/drawer/media_job_detail.html` (read-only summary,
+  progress and retry/stop actions reusing the existing endpoints and hooks).
+
+Verification: `manage.py check` clean; 182/182 templates compile; admin route
+sweep 36/36 -> 200; query review max 25 (Today; the +1 came from the seeded
+failed-media row being rendered), media page 6, promotion 5; stylesheet braces
+889/889; encoding clean; Engagement verifier green.
+
+### Last admin surfaces closed (9 November 2026)
+
+- Student 360 (`student_overview_content.html`): identity hero (avatar, name,
+  username, role/application/level/account chips, capability-gated User details
+  / Message / History actions), one context strip (level, year, enrollment
+  status, count, joined, last login, masked phone), and five real tab panels on
+  the delegated controller (Overview, Academics, Attendance, Finance,
+  Engagement). All 13 existing cards, 12 empty states and the inline pager are
+  preserved; no KPI or count was invented because the view supplies none.
+  Rendered with a real student id: 200, hero + 5 panels + strip present.
+- Content detail and background job detail: both now compile with **zero legacy
+  utility classes**. The background job card keeps all five `data-job-*` hooks
+  (verified against HEAD: 5 before, 5 after, none lost).
+- Correction to the review: `prototype/admin-redesign/` contains no
+  `content-detail.html` and no `background-jobs.html`. Content detail is an
+  internal detail surface aligned to `submission-detail.html` anatomy, and the
+  background jobs page is an admin addition outside the prototype, so neither is
+  a parity gap. The review report's parity list should be read with this note.
+- UI kit: **not built, by explicit user request** ("no need to implement UI kit
+  in case it is for showcase"). The route, view and navigation entry were
+  reverted and no reference remains. Two placeholder templates
+  (`templates/ui_kit.html`, `templates/partials/ui_kit_content.html`) contain a
+  removal note only and should be deleted where the filesystem allows unlinking.
+
+Coverage after this pass: every admin page partial now has zero legacy utility
+classes. The seven partials not rebuilt are `background_jobs_content` (addition),
+`dashboard_content` (shell), `submission_detail_content` (new), the two student
+gallery surfaces, the student lesson stream, and the UI kit placeholder.
+
+Verification: `manage.py check` clean; **184/184 templates compile**; admin route
+sweep 36/36 -> 200; query review unchanged (max 25, same two repeated-statement
+routes); stylesheet braces 889/889; encoding clean; `"Student 360"` added to the
+Arabic catalogue.
+
+### Fixed: collapsed sidebar layout and post-HTMX toggle (9 November 2026)
+
+Reported symptoms: collapsing the sidebar squeezed the whole workspace into a
+narrow strip next to an empty column; the toggle stopped working after an HTMX
+navigation; console reported `aria-hidden` on a focused sidebar and on the
+command palette.
+
+Root causes and fixes:
+
+1. **Grid placement.** `.aw-shell.is-sidebar-collapsed` used
+   `grid-template-columns: rail 0 1fr` *and* `display: none` on `.aw-sidebar`.
+   Removing the aside from the grid made `.aw-main` auto-place into the second
+   (0-width) column, so the workspace rendered in a sliver and the third column
+   stayed empty. Collapsed mode now keeps a slim column
+   (`--aw-sidebar-collapsed-w`, 56px), sets `.aw-sidebar { width: 56px }`,
+   centers the head and hides only the head text, the section label and the
+   section nav, so the toggle stays visible and reachable.
+2. **Post-swap Alpine.** `admin_shell.js` re-initialized the swapped page and the
+   persistent OOB regions inside one `try`. A throw while initializing the page
+   skipped `#aw-sidebar-body`, leaving the freshly swapped toggle without an
+   Alpine binding (dead button). Each tree now has its own guard. The after-swap
+   handler also accepts `#content` (table, form and pagination links), not only
+   `#display-page` / `#page-region`, so body-region navigation re-initializes the
+   persistent regions too.
+3. **ARIA.** The sidebar carried `x-bind:aria-hidden`, which hides an element
+   that holds focus (the collapse button lives inside it). The binding was
+   removed; the collapsed state is purely visual and the toggle keeps
+   `aria-expanded`. A global `hide.bs.modal` capture handler blurs a focused
+   descendant before Bootstrap sets `aria-hidden` on the dialog, which clears the
+   command-palette warning.
+
+Verification: `manage.py check` clean; `node --check admin_shell.js` passes;
+stylesheet braces 891/891; 184/184 templates compile; admin route sweep
+36/36 -> 200. Rendered shell confirmed to keep `#content` inside `.aw-main` with
+21 sidebar links and the toggle present.
+
+Follow-ups found by the detail-page worker and closed in the same pass:
+
+- `background_jobs_content.html` filter grid moved off Bootstrap
+  (`row g-3 align-items-end`, `col-12 col-md-6 col-xl-4`, `col-12`) onto
+  `.aw-form-grid` + `.aw-form-actions`; its poll-error line now uses
+  `.aw-field-error` instead of `text-danger small`.
+- `notification_delivery_content.html` header comment corrected: the monitor now
+  mirrors the percentage onto `.aw-progress`, so the note no longer claims it
+  only writes the native element.
+- Arabic entry added for the new content-detail description msgid
+  `%(kind)s in %(course)s` -> `%(kind)s في %(course)s`.
+
+Tracked, not changed: a precise scan
+(`tmp/ui-audit/scan_bootstrap_classes.py`) still finds Bootstrap tokens in 25
+admin partials. Most are functional JS hooks (`d-none` toggled by
+media/scanner/upload scripts), the column-picker Bootstrap dropdown with
+`form-check-input` in `table_and_pagination.html`, and `me-1` icon spacing in
+`shortcuts_help`. Converting those needs JS changes and should be its own pass.
+
+The column picker was converted after all (it was the last Bootstrap *component*
+in the shared table shell, used by every list page): `.dropdown` /
+`dropdown-toggle` / `dropdown-menu` / `dropdown-item` / `form-check-input` are
+now `.aw-menu-wrap` + `data-aw-menu-trigger` + `.aw-menu` + `.aw-menu-item`,
+driven by the existing delegated `admin_shell.js` controller. The Alpine model
+(`x-model="col.visible"`, `saveColumnPreferences()`, `resetColumns()`) and the
+`i-columns` / `i-refresh` sprite icons are unchanged. Verified on the users,
+courses and lessons pages: the menu wrapper, trigger, menu element, Alpine model
+and reset action all render, and no Bootstrap dropdown remains.
+
+Cosmetic token pass (same day, after the column picker):
+
+- `academic_setup_content.html`: `aw-icon-btn text-danger` -> `aw-icon-btn
+  is-danger`, so destructive row actions use the workspace danger treatment.
+- `content_qa_content.html`: dropped the trailing `mb-0` from the `aw-mt-2`
+  meta lines.
+- `submission_dashboard_content.html`: form-level `mb-0` -> `aw-m-0`.
+- `user_bulk_form_content.html`: `fw-bold` -> `aw-section-title`,
+  `mb-0 small` -> `aw-small aw-m-0`, `mb-0`/`mb-0 mt-2` -> `aw-m-0`/`aw-m-0 aw-mt-2`.
+- New CSS: `.aw-m-0` (declared before the directional utilities so a combined
+  `aw-m-0 aw-mt-2` keeps its top spacing), `.aw-section-title`, and
+  `.aw-check-input` geometry. The last one matters because `AwFormMixin` maps
+  every `CheckboxInput` to `aw-check-input`, but only `.aw-check input` was
+  styled, so standalone booleans rendered unstyled.
+- Bootstrap-token scan is down from 25 to 21 admin partials. The remainder is
+  `d-none` toggled by feature scripts (media, scanner, upload, R2), the bulk-bar
+  select-all `form-check-input`, and one `ms-2` on a button. JPG/`text-break`
+  family tokens are cosmetic only.
+
+Attendance day drawer: evaluated and deliberately not built. The existing
+`<details>` block contains per-record correction links plus two CSRF-protected
+delete forms per meeting; loading those into a fetched drawer would leave the
+drawer open while `hx-target="#content"` replaced the page underneath. The inline
+disclosure is the safer equivalent, so the prototype's drawer is not reproduced
+here by design.
+
+### Banner create drawer (9 November 2026)
+
+Second real use of the shared drawer, and the first **form** in one:
+
+- `banner_form_fields.html` is the single definition of the publish form. The
+  inline card includes it only when `show_form` is true, and the drawer fragment
+  includes the same file, so the two paths can never drift.
+- `banner_manage` gained `?fragment=form` (returns
+  `partials/drawer/banner_form.html`, redirects to the page when the request is
+  not an HTMX fetch) and passes `show_form`, which is true for a POST (validation
+  errors stay on the page) or `?new=1`.
+- The page head is now the `aw-page-head` wrapper with an `aw-page-actions`
+  block: a `data-aw-drawer` "New banner" button plus a `<noscript>` link to
+  `?new=1`, so the form is still reachable without JavaScript.
+- Because the inline card is rendered only in those cases, the form's field ids
+  never appear twice in the same document.
+
+Verified: page 200 with the drawer trigger and no inline card; fragment 200 with
+`<form>`; direct hit 302; `?new=1` 200 with the inline card; page head contains
+the actions; `<div>` open/close counts balanced (66/66). 186/186 templates
+compile; sweep 36/36 -> 200; DOM audit clean; encoding clean.
+
+### Pagination parity verified (9 November 2026)
+
+- All 32 admin templates that carry a page object include
+  `partials/pagination.html`; the scan found **no hand-rolled admin pager**. The
+  only remaining `pagination` class in the project is `notifications.html`, a
+  student page outside admin scope.
+- Anatomy against the prototype footer: range text start-side, pager end-side,
+  sprite chevrons, disabled prev/next as non-links, `aria-current` on the active
+  page, non-interactive ellipsis gap. Ours adds `nav > ul` semantics with an
+  accessible label and RTL-aware chevrons.
+- Placement verified on users, courses and background-jobs: the footer is inside
+  the table card. Lists with no rows render the empty state rather than an empty
+  pager, so sampled pages with an empty database showed no footer - that is the
+  intended behaviour, not a regression.
+
+### Calendar day agenda moved into the shared drawer (9 November 2026)
+
+The prototype opens a day's agenda in a drawer; the admin calendar used a
+Bootstrap modal. `admin_shell.js` now exposes a small programmatic API for
+components that already own their markup:
+
+```js
+window.awDrawer.open({ title, subtitle, html, trigger });
+window.awDrawer.close();
+```
+
+It reuses the existing drawer machinery (overlay, Escape, focus return, HTMX and
+Alpine init), so no second overlay implementation exists.
+
+`calendar_day_sheet.js` uses that API when present and falls back to the
+Bootstrap modal otherwise. This matters because the same script drives the
+student calendar, which does not load `admin_shell.js`: the admin calendar now
+shows the agenda in the drawer, while the student calendar keeps its dialog
+untouched. The cloned markup is **moved**, not copied - the staging node is
+emptied first, otherwise every id inside the agenda would exist twice while the
+drawer is open.
+
+Verified: admin calendar (after the `?academic_year=` redirect) returns 200 with
+the drawer shell, the shell script and the staging modal; the student calendar
+returns 200 with the modal and without the drawer shell or the shell script.
+DOM and markup audits stay clean; 187/187 templates compile; sweep 36/36 -> 200;
+max 23 queries; braces 926/926; JS encoding audit passes.
+
+Fourth drawer, and the first read-only one driven from a list row:
+
+- `telegram_broadcasts` gained `?fragment=broadcast&id=<pk>` returning
+  `partials/drawer/broadcast_peek.html`: redirects to the list for a non-HTMX
+  hit, and returns 404 for a non-numeric or unknown id.
+- The list row's "View" link became a `data-aw-drawer` button with the status as
+  the drawer subtitle; the full delivery report (which owns the polling monitor)
+  stays reachable through an "Open full report" action inside the drawer, so no
+  Alpine component is loaded into a fragment that the drawer cannot initialise.
+- Drawer content: status pill, target, academic year, recipients, delivered,
+  failed, skipped, created, completed, author, a truncated message body and the
+  report link.
+
+Two defects found and fixed while verifying against real data:
+
+- The first label used `{% translate "Audience" %}` while the metrics row used
+  `{% translate "Recipients" %}`; both map to the same Arabic word, so the drawer
+  showed "المستلمون" twice. The first row is now "Target".
+- `{{ broadcast.academic_year }}` rendered empty for a year whose `name` is blank.
+  The row now uses `{% firstof ...name ...starts_on|date:"Y" %}`, so it falls back
+  to the starting year.
+
+Verified: list 200 with the trigger, fragment 200 with eight kv rows and the
+report link, direct hit 302, malformed id 404, unknown id 404. 189/189 templates
+compile; sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926;
+encoding clean.
+
+### Android release publish drawer (9 November 2026)
+
+Third drawer, reusing the banner pattern:
+
+- `app_release_form_fields.html` is the single definition of the multipart
+  publish form (version name, version code, APK upload, notes). The inline card
+  includes it only when `show_form`, and the drawer fragment includes the same
+  file, so field ids never appear twice.
+- `app_release_manage` gained `?fragment=form` (returns
+  `partials/drawer/app_release_form.html`, redirects to the page for a non-HTMX
+  hit) and passes `show_form`, true only for `?new=1`.
+- The page head is the `aw-page-head` wrapper with a "Publish build" drawer
+  button plus a `<noscript>` link to `?new=1`.
+
+Verified: page 200 with trigger and no inline form, head actions present;
+fragment 200 with `<form>`, `enctype="multipart/form-data"` and a CSRF token;
+direct hit 302; `?new=1` 200 with the inline form. 188/188 templates compile;
+sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926; encoding clean.
+
+### Telegram chat: duplicate bubbles and wrong-side student text fixed (10 November 2026)
+
+Reported: a student's message appeared on the admin side, and an admin reply
+appeared twice.
+
+Cause: the support digest is stored as an **outbound** row whose text contains
+the student's message (`Support message from ... / Level: ... / <student text>`),
+and after a reply `_digest_answer_text` appends `Answered by @admin` to that same
+text. When the signed-in admin had a linked Telegram account, the conversation
+view rendered their own digest rows in the timeline, so the student's text
+appeared inside a right-side bubble and the reply text appeared twice - once
+appended inside the digest, once as the real outbound message.
+
+Fix (presentation only; send/receive logic untouched):
+
+- `_conversation_detail_context` always excludes `content_type=DIGEST` from the
+  timeline and annotates each inbound message with `digest_alert` (the newest
+  digest announcing it, scoped to the admin's own chat when known). The dead
+  `own_admin_chat_id` context key was removed.
+- `telegram_message_items.html` no longer renders digest bubbles. Alert state
+  (removed / edited / expired / unavailable / failed) appears on the inbound
+  message, and "Delete alert from Telegram" posts the existing delete endpoint
+  with the digest id, so the alert is still removable from Telegram.
+
+Media verified, not assumed: an inbound photo and an admin photo reply each
+render one `img.aw-msg-image`. Admin media sent through the bot is already
+archived to R2 by `store_attachment` inside
+`reply_with_provider_media_to_conversation`, which is why it has a preview.
+
+Reproduction: `tmp/ui-audit/repro_chat_duplicate.py` builds a conversation with
+an inbound photo, a text reply, an admin photo reply and a resolved digest, then
+asserts 3 bubbles, student text once, admin reply once, no digest header, 2
+images and 1 alert delete action.
+
+Verification: 187/187 templates compile; `manage.py check` clean; 36/36 admin
+routes 200; DOM and markup audits clean; Telegram verifier green; encoding clean;
+Arabic catalogue recompiled for the two new labels. Shipped as `b379e38`.
+
+### Markup quality gate and the `None` cell fix (9 November 2026)
+
+New audit: `tmp/ui-audit/audit_markup.py` renders all 35 admin routes and checks
+for placeholder links (`href=""` / `href="#"`), template syntax leaking into the
+output, POST forms without a CSRF token, empty `class=""` attributes, and images
+without `alt`.
+
+First run found one real defect: the courses table rendered the literal text
+**"None"** in two cells, because the shared cell renderer printed `{{ value }}`
+directly and two columns are null in the data. Fixed centrally in
+`table_and_pagination.html` with `{{ value|default_if_none:"-" }}`, so every list
+page now shows a dash instead of "None" for a null cell.
+
+After the fix: **0 placeholder links, 0 template leaks, 0 POST forms without
+CSRF, 0 empty class attributes, 0 images without alt** across all admin routes.
+
+Verification: 186/186 templates compile; `manage.py check` clean; admin route
+sweep 36/36 -> 200; DOM audit clean (0/0/0/0); stylesheet braces 926/926; query
+review unchanged (max 25); encoding clean.
+
+`tmp/ui-audit/audit_rtl_css.py` scans `admin_workspace.css` for physical,
+direction-sensitive declarations (`margin-left/right`, `padding-left/right`,
+bare `left:`/`right:`, `text-align: left/right`, `border-left/right`).
+
+Result: **zero hits**. The workspace stylesheet uses logical properties
+throughout (`margin-inline-start`, `inset-inline-end`, `text-align: start/end`,
+`border-inline`), so the Arabic RTL layout mirrors from the same rules as the
+English LTR layout without a separate override sheet. The legacy `app_admin.css`
+and `app.css` still contain physical declarations, but they are the files the
+rebuild is replacing.
+
+### Cosmetic Bootstrap tokens cleared from the admin surfaces (9 November 2026)
+
+After the `hidden` migration the remaining Bootstrap utility tokens were
+presentation-only but still spread over fourteen admin templates. All were
+replaced with named workspace utilities, added on demand (each has a live
+consumer): `.aw-ta-c`, `.aw-ta-e`, `.aw-text-danger`, `.aw-text-warning`,
+`.aw-strong`, `.aw-break`, `.aw-mb-2`, `.aw-mb-3`, `.aw-mt-1`, `.aw-me-2`,
+`.aw-ms-1`, `.aw-ps-3`, `.aw-flex--between`, `.aw-p-1`, `.aw-self-start`,
+`.aw-self-center`.
+
+Files converted: promotion evaluation, content detail, notification delivery,
+table and pagination, lesson editor, background jobs list, quiz form, admin panel,
+levels, promotion history, announcements, polling toggle, admin operation status,
+quiz import result and the drive picker.
+
+Result: the token scan is down from **14 files / ~200 tokens to 1 file / 57
+tokens**. The single remaining file is `templates/questions_rendering.html`, and
+its tokens sit in the **student branch** (`{% else %}` of
+`{% if not is_student and mode == "edit" %}`, plus one shared `<label>`). The
+admin branch of that same partial already uses `aw-input`, so converting the rest
+would either alter student markup or leave `aw-*` classes unstyled outside
+`body.aw-admin`. It is deliberately left as the student boundary.
+
+Verification: 184/184 templates compile; `manage.py check` clean; admin route
+sweep 36/36 -> 200; DOM audit clean (0/0/0/0 across 64 renders); stylesheet braces
+926/926; encoding clean; query review unchanged (max 25). A double-prefix scan
+(`aw-aw-`) confirmed the mass replacements did not corrupt existing class names.
+
+### Visibility contract unified on the `hidden` attribute (9 November 2026)
+
+Every script-toggled region in the admin now uses the HTML `hidden` attribute
+instead of Bootstrap's `d-none` class, and the stylesheet makes that attribute
+authoritative:
+
+```css
+body.aw-admin [hidden] { display: none !important; }
+```
+
+That rule matters because several `aw-*` classes set `display`, which outranks
+the UA `[hidden]` rule; without it a hidden element with `display:flex` would
+still render.
+
+Converted together (markup and script in the same unit, so no half state):
+
+- Scanner: `scanner.js` (7 toggles) + `scanner_content.html` (4 regions). The
+  video's inline `style="position: absolute; inset: 0"` moved into
+  `.aw-scan-frame .scanner-video`, so no inline layout style remains.
+- R2: `r2Manager.js` (11 toggles, including the optional-chain assignment that
+  had to become an explicit `if (panel) panel.hidden = true`) +
+  `r2_management_content.html` (3 regions). The operation panel's inline
+  `style="flex-direction:column;align-items:stretch"` became `.aw-alert--stack`.
+- Applications: `applications.js` (select-all button and the bulk summary) +
+  the dashboard partial's status alert.
+- Lesson editor: `lessonForm.js` (both the template string and the toggle) + the
+  download-key field and the delete form.
+- Quiz form: the hidden delete form.
+- Media processing: the CSRF form.
+- Report dashboard: the row condition now emits `hidden`.
+- Scanner preview: both status alerts and the four inline-script toggles.
+
+Result: **zero `d-none` occurrences** in `management_system/templates` and in
+`management_system/static/js`. Remaining Bootstrap utility tokens are cosmetic
+only (34 `text-center`, 15 `mb-0`, 15 `fw-semibold`, 14 `w-100`, 13
+`text-danger`, 13 `text-break`, 13 `mb-2`, ...) spread over 14 files; they render
+identically to the aw equivalents and are tracked, not defects.
+
+Verification: `node --check` passes on scanner, applications, lessonForm and
+r2Manager; `manage.py check` clean; 184/184 templates compile; admin route sweep
+36/36 -> 200; DOM audit clean (0/0/0/0 across 64 renders); stylesheet braces
+910/910; encoding clean.
+
+### Command palette moved onto the workspace primitives (9 November 2026)
+
+The quick-jump palette was the last Bootstrap component in the admin shell. It
+now renders with aw classes while keeping the Bootstrap *modal* shell (show/hide
+and focus trap are Bootstrap's job and are used by other dialogs too).
+
+- Template: input `form-control` -> `aw-input`; results `list-group` ->
+  `aw-cmd-results`; hint `form-text text-muted` -> `aw-field-hint`; the title
+  icon is the `i-search` sprite. The `#command-palette-input`,
+  `#command-palette-results`, `#command-palette-hint` and
+  `data-search-url` hooks are unchanged.
+- `command_palette.js`: section headers -> `aw-cmd-section`; rows ->
+  `aw-cmd-item` with `is-active` instead of `active`; hit link -> `aw-cmd-hit`
+  with `aw-cmd-hit-top` / `aw-cmd-title` / `aw-cmd-sub`; pin button ->
+  `aw-cmd-star` with `is-pinned` (replacing `text-warning` / `text-muted`);
+  empty, loading and error rows -> `aw-cmd-empty` (error adds `is-error`); the
+  hint now uses the `hidden` attribute. `rerenderKeep` toggles `is-active`, and
+  keyboard navigation still selects rows through `[role="option"]`, so no
+  selector depended on the Bootstrap class.
+- New CSS block `.aw-cmd-*` (results list, item, active/hover, section,
+  empty/error, hit, top row, title row, sub, star, pinned star).
+
+Kept deliberately: the Bootstrap modal wrapper and its `btn-close`, the
+`.cmd-type` pill, and the `.cmd-star` transform from `app_admin.css`.
+
+Consequence: the `#command-palette-results .list-group-item*` rules in
+`app_admin.css` are now dead. They cannot be unlinked from this session; they are
+cosmetic no-ops and should be removed with the `tg-chat-*` block.
+
+Verification: `node --check command_palette.js` passes; the DOM audit stays clean
+(0 duplicate ids, 0 unlabelled fields, 0 nameless buttons, 0 tables without `th`);
+184/184 templates compile; admin route sweep 36/36 -> 200; query review unchanged
+(max 25); stylesheet braces 908/908; encoding clean. The Bootstrap-token scan is
+down to 19 admin partials; the only remaining `list-group` is in
+`course_detail.html`, which is a student surface.
+
+### Rendered-DOM accessibility audit (9 November 2026)
+
+New reusable check: `tmp/ui-audit/audit_dom.py` renders every admin route in
+English and Arabic on the disposable schema and reports duplicate ids, form
+fields with no accessible name, buttons with no accessible name, and tables with
+no header cell.
+
+First run (64 page renders) found: 14 unlabelled fields, 8 nameless buttons, and
+**36 tables with no `th`** - the last one came from the shell-wide
+`shortcuts_help.html` modal, which rendered a Bootstrap `table table-sm` with a
+`tbody` only, so every page in the app carried an unlabelled table.
+
+Fixed:
+
+- `shortcuts_help.html`: `table table-sm mb-0` -> `aw-table aw-m-0` with a
+  `thead` of two visually-hidden `th` (Shortcut / Action); the hint moved to
+  `aw-field-hint aw-m-0` and the title icon to the `i-keyboard` sprite.
+- `table_and_pagination.html`: the select-all and per-row checkboxes are now
+  `aw-check-input` (which the new CSS geometry actually styles) with explicit
+  `aria-label`s, and the "select all matching" button has a static
+  `aria-label` because its text is filled by Alpine at runtime; its FA icon
+  became the `i-check` sprite and the stray `ms-2` was dropped.
+- `telegram_accounts_content.html`: the search field gained `aria-label`.
+
+After: **0 duplicate ids, 0 unlabelled fields, 0 nameless buttons, 0 tables
+without `th`** across all 64 renders (the only non-200 is `calendar-management`,
+which redirects when no month is supplied). Five Arabic entries were added for
+the new labels (Shortcut, Select all rows on this page, Select row, Select all
+rows matching the filter, Search accounts).
+
+`media_upload.js` produced Bootstrap markup after the template was converted, so
+the upload page still showed Bootstrap rows and bars at runtime:
+
+- Selected files were `li.list-group-item.d-flex` with a `badge`; they are now
+  `li.aw-file-row` containing an `.aw-cell-main` identity block and an
+  `.aw-pill.aw-pill--green` state.
+- Job cards were `div.progress > div.progress-bar`; they are now
+  `.aw-progress > span` with the percentage mirrored onto the wrapper's
+  `aria-valuenow`. `setCardProgress` updates the span width and the wrapper.
+- `d-none` toggles became the `hidden` attribute (`validationErrors`,
+  `fileList`, retry buttons, job error) and the two template placeholders in
+  `upload_video_content.html` use `hidden` instead of `d-none`.
+- `text-muted`, `fw-semibold`, `mb-2`, `mt-1`, `small` and `gap-2` were replaced
+  with `aw-muted`, `aw-small`, `aw-mt-2` and the `aw-cell-main-text` structure.
+
+Verified: `node --check` passes; the upload page returns 200 with both toggled
+regions carrying `hidden`, no `d-none` anywhere in the page, and the dropzone
+present. Bootstrap-token scan is now 20 admin partials, and the only remaining
+`list-group` is the command palette.
+
+The command palette stays on Bootstrap deliberately: it is a `modal` overlay
+whose item markup (`list-group-item`, `btn btn-link`, `active`) is keyed to
+custom `.cmd-palette` CSS and its own keyboard navigation. Converting it is a
+design task with new CSS, not a class swap, so it is recorded rather than
+half-converted.
+
+### Review pass (9 November 2026)
+
+Full report: [admin UI rebuild review](docs/current/ADMIN_UI_REBUILD_REVIEW_2026-11-09.md).
+Evidence was produced on the disposable schema with seeded data.
+
+- Performance: 31 routes measured with `CaptureQueriesContext`; **max 24
+  statements** (Today), no route above 24. Only two routes repeat a statement
+  four or more times: Today (11 counts, one per queue by design) and
+  `historical-intake` (4 repeated academic-year-level selects - the one real
+  N+1-shaped repetition, recorded as a follow-up).
+- Security: capability matrix verified for admin/staff/moderator/student on ten
+  routes; no non-admin reaches an admin-only page; `scanner` for moderator is
+  correct by policy. A state-changing POST without a CSRF token returns 403.
+  Zero `|safe`/`mark_safe` in templates. `promotion-formula` is gated by
+  `can_view_reports` (staff read-only) while its write path raises
+  `PermissionDenied` internally, so there is no escalation - recorded as a
+  product decision, not a defect.
+- Parity: shell geometry, page anatomy, context strips (14 partials), canonical
+  filter bars, table footers, sticky bulk bar, Telegram three-column layout,
+  editor part/question cards, admin submission detail, academic/promotion tab
+  panels and stepper, per-meeting attendance matrix, joined calendar surface.
+  Data/endpoint-dependent regions remain deliberately unbuilt and are listed.
+- Dead code removed in this pass: `matrix_column_count` context key (unused
+  after the matrix rewrite) and the dead `extended_view == 'admin_panel.html'`
+  branch in `display_quiz.html` (the only caller passes `base.html`, so student
+  output cannot change).
+- Dead code tracked, not removable from this session (shell writes are denied):
+  the contiguous `tg-chat-*` block in `app_admin.css:1274-2130`. The exact
+  one-command cleanup is recorded in the review report.
+- Still open: `compilemessages` for the new msgids; `media_upload.js` generated
+  markup; the two-breadcrumb-trail decision; UI-kit page; transcript view;
+  attendance day drawer endpoint.
+
+Verification after the review edits: `manage.py check` clean; 181/181 templates
+compile; admin route sweep 36/36 -> 200; query-count re-measurement unchanged
+(max 24, two routes with repeats); stylesheet braces 884/884; encoding clean;
+Curriculum, Phase 5 and Phase 6 verifiers green.
 
 ## Current task disposition
 

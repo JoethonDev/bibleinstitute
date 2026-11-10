@@ -137,45 +137,66 @@ function lessonForm() {
             const safeId = this.escapeHtml(id);
             const safeName = this.escapeHtml(name);
 
-            // Create video card HTML
+            // Create video card HTML. This card must stay structurally identical
+            // to the server-rendered card in partials/lesson_editor_content.html
+            // (.video-container > .aw-part-card with .aw-part-head / .aw-part-body,
+            // one .aw-file-row per file, then the type, part and download fields).
             const videoCard = `
-                <div class="video-container mb-3 aw-part-card">
+                <div class="video-container aw-part-card">
                     <input type="hidden" name="videos" value="${safeId}">
                     <input type="hidden" name="videos_name" value="${safeName}">
-                    <div class="aw-part-body">
-                        <button type="button" class="btn-close position-absolute top-0 end-0 m-2"
-                                @click="removeFile($event)" aria-label="${this.getTranslation('close')}"></button>
-                        <p class="fw-bold mb-2 text-primary d-flex justify-content-between align-items-start gap-2 pe-5">
-                            <span class="text-break">${safeName}</span>
-                            <span class="aw-pill aw-pill--muted part-badge flex-shrink-0" hidden></span>
-                        </p>
-                        <select name="files_type" class="aw-select" @change="toggleDownloadInput($event)">
-                            <option value="video" ${fileType === 'video' ? 'selected' : ''}>${this.getTranslation('video')}</option>
-                            <option value="audio" ${fileType === 'audio' ? 'selected' : ''}>${this.getTranslation('audioRecording')}</option>
-                            <option value="book" ${fileType === 'book' ? 'selected' : ''}>${this.getTranslation('book')}</option>
-                        </select>
-                        <div class="download-key-field mt-2${fileType === 'audio' ? '' : ' d-none'}">
-                            <label class="form-label small mb-1">${this.getTranslation('download')}</label>
-                            <input type="text" name="download_ids" class="aw-input download-key-input"
-                                   value="" placeholder="Downloadable Files/name.mp3"
-                                   aria-label="${this.getTranslation('download')}">
-                        </div>
-                        <div class="d-flex align-items-center gap-2 mt-2">
-                            <label class="form-label small mb-0">${this.getTranslation('part')}</label>
-                            <input type="number" min="1" name="part_groups" class="aw-input part-group-input"
-                                   style="max-width:6rem" value="" @input="reindexParts()"
-                                   aria-label="${this.getTranslation('part')}">
+                    <div class="aw-part-head">
+                        <span class="aw-pill aw-pill--muted part-badge" hidden></span>
+                        <span class="aw-tag">${fileType === 'video' ? this.getTranslation('video') : (fileType === 'audio' ? this.getTranslation('audioRecording') : this.getTranslation('book'))}</span>
+                        <div class="aw-row-actions aw-ms-auto">
+                            <button type="button" class="aw-icon-btn"
+                                    @click="moveUp($event)" title="${this.getTranslation('moveUp')}"
+                                    aria-label="${this.getTranslation('moveUp')}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+                            </button>
+                            <button type="button" class="aw-icon-btn"
+                                    @click="moveDown($event)" title="${this.getTranslation('moveDown')}"
+                                    aria-label="${this.getTranslation('moveDown')}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-down"></use></svg>
+                            </button>
+                            <button type="button" class="aw-icon-btn"
+                                    @click="removeFile($event)" title="${this.getTranslation('close')}"
+                                    aria-label="${this.getTranslation('close')}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                            </button>
                         </div>
                     </div>
-                    <div class="aw-part-foot">
-                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
-                                @click="moveUp($event)" title="${this.getTranslation('moveUp')}">
-                            <i class="fas fa-arrow-up"></i>
-                        </button>
-                        <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
-                                @click="moveDown($event)" title="${this.getTranslation('moveDown')}">
-                            <i class="fas fa-arrow-down"></i>
-                        </button>
+                    <div class="aw-part-body">
+                        <div class="aw-file-row">
+                            <span class="aw-file-ic">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#${fileType === 'audio' ? 'i-audio' : (fileType === 'book' ? 'i-file' : 'i-video')}"></use></svg>
+                            </span>
+                            <span class="aw-file-main">
+                                <b class="text-break">${safeName}</b>
+                                <span class="aw-truncate" title="${safeId}">${safeId}</span>
+                            </span>
+                        </div>
+                        <div class="aw-form-grid">
+                            <div class="aw-field aw-span-2">
+                                <select name="files_type" class="aw-select" @change="toggleDownloadInput($event)">
+                                    <option value="video" ${fileType === 'video' ? 'selected' : ''}>${this.getTranslation('video')}</option>
+                                    <option value="audio" ${fileType === 'audio' ? 'selected' : ''}>${this.getTranslation('audioRecording')}</option>
+                                    <option value="book" ${fileType === 'book' ? 'selected' : ''}>${this.getTranslation('book')}</option>
+                                </select>
+                            </div>
+                            <div class="aw-field">
+                                <span class="aw-field-label">${this.getTranslation('part')}</span>
+                                <input type="number" min="1" name="part_groups" class="aw-input part-group-input"
+                                       value="" @input="reindexParts()"
+                                       aria-label="${this.getTranslation('part')}">
+                            </div>
+                            <div class="aw-field download-key-field"${fileType === 'audio' ? '' : ' hidden'}>
+                                <span class="aw-field-label">${this.getTranslation('download')}</span>
+                                <input type="text" name="download_ids" class="aw-input download-key-input"
+                                       value="" placeholder="Downloadable Files/name.mp3"
+                                       aria-label="${this.getTranslation('download')}">
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -319,7 +340,7 @@ function lessonForm() {
             const field = card.querySelector('.download-key-field');
             if (!field) return;
             const isAudio = event.currentTarget.value === 'audio';
-            field.classList.toggle('d-none', !isAudio);
+            field.hidden = !isAudio;
             if (!isAudio) {
                 const input = field.querySelector('.download-key-input');
                 if (input) input.value = '';

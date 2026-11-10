@@ -1,73 +1,44 @@
 {% load i18n %}
 {% translate "Unread" as unread_label %}
-{% translate "Read" as read_label %}
 {% translate "Blocked" as blocked_label %}
 {% translate "Open" as open_label %}
 {% for conversation in page_obj %}
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
-<li class="tg-chat-row" data-chat-user-id="{{ conversation.user_id }}">
-    <a class="tg-chat-row-link aw-conv-item"
+<li class="aw-conv-row" data-chat-user-id="{{ conversation.user_id }}">
+    <a class="aw-conv-item"
        href="{% url 'telegram-conversation-detail' conversation.pk %}"
        hx-get="{% url 'telegram-conversation-detail' conversation.pk %}?fragment=panel"
        hx-target="#telegram-chat-panel"
        hx-swap="innerHTML"
        aria-label="{% blocktranslate with student=student_name %}Open conversation with {{ student }}{% endblocktranslate %}">
-        <span class="tg-chat-avatar aw-avatar d-flex" aria-hidden="true">
+        <span class="aw-avatar" aria-hidden="true">
             {% if conversation.user.profile_image_key %}
-            <img class="tg-chat-avatar-img"
+            <img class="aw-avatar-img"
                  src="{% url 'application-document' conversation.user.pk 'profile' %}"
                  alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
             {% else %}
-            <span class="tg-chat-avatar-fallback">{{ student_name|first|default:"?"|upper }}</span>
+            <span>{{ student_name|first|default:"?"|upper }}</span>
             {% endif %}
         </span>
-        <span class="tg-chat-row-main aw-conv-main">
-            <span class="tg-chat-row-head">
-                <span class="tg-chat-user-name">{{ student_name }}</span>
-                <span class="tg-chat-row-username">{{ conversation.user.username }}</span>
-                <span class="tg-chat-row-level aw-small aw-muted">{{ conversation.current_level_label }}</span>
-                <span class="tg-chat-row-time">
-                    {% if conversation.latest_user_message_at %}
-                    <time datetime="{{ conversation.latest_user_message_at|date:'c' }}">{{ conversation.latest_user_message_at|date:"SHORT_DATETIME_FORMAT" }}</time>
-                    {% endif %}
-                </span>
-            </span>
-            <span class="tg-chat-row-sub aw-conv-meta flex-wrap">
-                <span class="tg-chat-row-preview aw-small">
-                    {% if conversation.latest_user_message_text %}
-                    {{ conversation.latest_user_message_text|truncatechars:64 }}
-                    {% elif conversation.latest_user_message_content_type %}
-                    <i class="fas fa-paperclip me-1" aria-hidden="true"></i>{% translate "Media message" %}
-                    {% else %}
-                    {% translate "No messages yet" %}
-                    {% endif %}
-                </span>
-                <span class="tg-chat-row-status">
-                    {% if conversation.is_unread %}
-                    {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=unread_label %}
-                    {% else %}
-                    {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=read_label %}
-                    {% endif %}
-                    {% if conversation.status == "claimed" and conversation.claimed_by %}
-                    {% blocktranslate with admin=conversation.claimed_by.username asvar assigned_label %}Assigned to @{{ admin }}{% endblocktranslate %}
-                    {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=assigned_label %}
-                    {% elif conversation.status == "handled" and conversation.handled_by %}
-                    {% blocktranslate with admin=conversation.handled_by.username asvar resolved_label %}Resolved by @{{ admin }}{% endblocktranslate %}
-                    {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=resolved_label %}
-                    {% elif conversation.status == "blocked" %}
-                    {% include "partials/components/aw_status_pill.html" with status="" tone="red" label=blocked_label %}
-                    {% else %}
-                    {% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=open_label %}
-                    {% endif %}
-                </span>
-                {% if conversation.message_count %}
-                <span class="tg-chat-row-count" title="{% blocktranslate count counter=conversation.message_count %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktranslate %}">
-                    <i class="far fa-comment-dots" aria-hidden="true"></i>{{ conversation.message_count }}
-                </span>
+        <span class="aw-conv-main">
+            <b>{{ student_name }}{% if conversation.latest_user_message_at %}<span><time datetime="{{ conversation.latest_user_message_at|date:'c' }}">{{ conversation.latest_user_message_at|date:"SHORT_DATETIME_FORMAT" }}</time></span>{% endif %}</b>
+            <p>{% if conversation.latest_user_message_text %}{{ conversation.latest_user_message_text|truncatechars:64 }}{% elif conversation.latest_user_message_content_type %}{% translate "Media message" %}{% else %}{% translate "No messages yet" %}{% endif %}</p>
+            <span class="aw-conv-meta">
+                {% if conversation.is_unread %}
+                {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=unread_label %}
+                {% elif conversation.status == "claimed" and conversation.claimed_by %}
+                {% blocktranslate with admin=conversation.claimed_by.username asvar assigned_label %}Assigned to @{{ admin }}{% endblocktranslate %}
+                {% include "partials/components/aw_status_pill.html" with status="" tone="amber" label=assigned_label %}
+                {% elif conversation.status == "handled" and conversation.handled_by %}
+                {% blocktranslate with admin=conversation.handled_by.username asvar resolved_label %}Resolved by @{{ admin }}{% endblocktranslate %}
+                {% include "partials/components/aw_status_pill.html" with status="" tone="green" label=resolved_label %}
+                {% elif conversation.status == "blocked" %}
+                {% include "partials/components/aw_status_pill.html" with status="" tone="red" label=blocked_label %}
+                {% else %}
+                {% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=open_label %}
                 {% endif %}
             </span>
         </span>
-        <span class="tg-chat-row-chevron" aria-hidden="true"><i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}"></i></span>
     </a>
 </li>
 {% endwith %}
@@ -79,7 +50,7 @@
 </li>
 {% endfor %}
 {% if page_obj.has_next %}
-<li class="tg-chat-scroll-sentinel" data-scroll-page data-direction="next"
+<li data-scroll-page data-direction="next"
     data-url="{{ conversation_list_url }}?fragment=items&amp;page={{ page_obj.next_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
     aria-hidden="true"></li>
 {% endif %}

@@ -1,126 +1,371 @@
 {% load i18n %}
-<section class="aw-card aw-card-body mt-3" aria-labelledby="notification-content-heading">
-    <h2 id="notification-content-heading" class="h5">{% translate "Saved notification content" %}</h2>
-    {% if notification_type_label %}<p class="aw-small aw-muted">{% translate "Notification type" %}: {{ notification_type_label }}</p>{% endif %}
-    {% if notification_recipient %}<p>{% translate "Recipient" %}: <strong>{{ notification_recipient }}</strong></p>{% endif %}
-    <div class="aw-grid aw-grid--2-even">
-        <div dir="rtl" lang="ar">
-            <h3 class="h6">{% translate "Arabic content" %}</h3>
-            <strong class="text-break">{{ notification_content.title_ar }}</strong>
-            <div class="text-break">{{ notification_content.body_ar|linebreaksbr }}</div>
-        </div>
-        <div dir="ltr" lang="en">
-            <h3 class="h6">{% translate "English content" %}</h3>
-            <strong class="text-break">{{ notification_content.title_en }}</strong>
-            <div class="text-break">{{ notification_content.body_en|linebreaksbr }}</div>
-        </div>
-    </div>
-    {% if notification_content.action_label %}
-    <div class="mt-3">
-        <strong>{% translate "Action button" %}:</strong> {{ notification_content.action_label }}
-        {% if notification_content.action_url %}<div class="aw-small text-break" dir="ltr">{{ notification_content.action_url }}</div>{% endif %}
-    </div>
+{% comment %}
+Delivery detail for one saved notification, announcement or Telegram broadcast.
+
+Included by partials/background_job_detail_content.html, which owns the page
+root (#content), the page head and the job summary card, so this fragment starts
+with the notification context strip and then renders the saved content, the
+retry/resend form, the withdraw action and the delivery tables.
+
+Presentation only. Preserved exactly: every section id used by aria-labelledby,
+every form method/action and CSRF token, the withdraw hx chain and both
+confirm messages, the redelivery hx chain and hidden audience input, the
+announcement retry form, the history link, the per-copy detail links, every
+data-job-record / data-job-field hook read by backgroundJobsMonitor, and every
+pagination include with its page_param query arguments.
+
+Not built because the fragment receives no such data: the page head (owned by the
+including template; a second <h1> would be wrong), a sent timestamp for the
+announcement/Telegram snapshot dicts (only StudentNotification rows carry
+created_at, so "Sent" is omitted instead of inventing a value), and per-channel
+success/failure counters. The recipient progress bars use .aw-progress, and
+backgroundJobsMonitor mirrors the polled percentage onto the aw bar (inner span
+width plus aria-valuenow) as well as the native progress element.
+{% endcomment %}
+{% get_current_language as aw_language %}
+<div class="aw-context-strip">
+    <span class="aw-ctx-item">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+        <b>{% if aw_language|slice:":2" == "en" %}{{ notification_content.title_en|truncatechars:80 }}{% else %}{{ notification_content.title_ar|truncatechars:80 }}{% endif %}</b>
+    </span>
+    {% if notification_type_label %}
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">{{ notification_type_label }}</span>
     {% endif %}
     {% if notification_recipient %}
-    <p class="aw-small aw-muted mt-3">{% if not inbox_visible %}{% translate "Transport retry only; no duplicate inbox notification was created." %}{% elif inbox_read_at %}{% translate "Read in the inbox" %}: {{ inbox_read_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}{% translate "Unread in the inbox" %}{% endif %}</p>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+        @{{ notification_recipient }}
+    </span>
+    {% endif %}
+    {% if notification_content.created_at %}
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+        {% translate "Sent" %} {{ notification_content.created_at|date:"SHORT_DATETIME_FORMAT" }}
+    </span>
+    {% endif %}
+    {% if audience_count %}
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+        <b>{{ audience_count }}</b> {% translate "Recipients" %}
+    </span>
+    {% endif %}
     {% if notification_content.withdrawn_at %}
-    <p class="aw-small aw-muted">{% translate "Withdrawn" %}: {{ notification_content.withdrawn_at|date:"SHORT_DATETIME_FORMAT" }}{% if notification_content.withdrawn_by %} - @{{ notification_content.withdrawn_by.username }}{% endif %}</p>
+    <span class="aw-ctx-sep" aria-hidden="true"></span>
+    <span class="aw-ctx-item">
+        {% translate "Withdrawn" as withdrawn_state_label %}
+        {% include "partials/components/aw_status_pill.html" with status="withdrawn" label=withdrawn_state_label %}
+    </span>
     {% endif %}
-    {% if not notification_content.withdrawn_at or notification_deletion_retryable %}
-    <form method="post"
-          action="{% url 'notification-withdraw' notification_content.pk %}"
-          hx-post="{% url 'notification-withdraw' notification_content.pk %}"
-          hx-target="#content" hx-select="#content" hx-swap="outerHTML"
-          hx-select-oob="#toast-stack" hx-push-url="true" hx-sync="this:drop"
-          data-confirm-message="{% if notification_content.withdrawn_at %}{% translate 'Retry removing Telegram copies that previously failed?' %}{% else %}{% translate 'Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?' %}{% endif %}">
-        {% csrf_token %}
-        <button type="submit" class="aw-btn aw-btn--danger mt-2">
-            <i class="fas fa-trash me-2" aria-hidden="true"></i>{% if notification_content.withdrawn_at %}{% translate "Retry Telegram deletion" %}{% else %}{% translate "Withdraw recipient notification" %}{% endif %}
-        </button>
-        {% if not notification_content.withdrawn_at %}
-        <p class="aw-small aw-muted mt-2">{% translate "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs." %}</p>
-        {% else %}
-        <p class="aw-small aw-muted mt-2">{% translate "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram." %}</p>
+</div>
+
+<section class="aw-card" aria-labelledby="notification-content-heading">
+    <div class="aw-card-head">
+        <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+            <h3 id="notification-content-heading">{% translate "Saved notification content" %}</h3>
+        </div>
+    </div>
+    <div class="aw-card-body">
+        <dl class="aw-stack">
+            {% if notification_type_label %}
+            <div class="aw-kv">
+                <dt>{% translate "Notification type" %}</dt>
+                <dd>{{ notification_type_label }}</dd>
+            </div>
+            {% endif %}
+            {% if notification_recipient %}
+            <div class="aw-kv">
+                <dt>{% translate "Recipient" %}</dt>
+                <dd>{{ notification_recipient }}</dd>
+            </div>
+            {% endif %}
+            {% if notification_content.created_at %}
+            <div class="aw-kv">
+                <dt>{% translate "Sent" %}</dt>
+                <dd>{{ notification_content.created_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+            </div>
+            {% endif %}
+            {% if notification_content.withdrawn_at %}
+            <div class="aw-kv">
+                <dt>{% translate "Withdrawn" %}</dt>
+                <dd>{{ notification_content.withdrawn_at|date:"SHORT_DATETIME_FORMAT" }}{% if notification_content.withdrawn_by %} - @{{ notification_content.withdrawn_by.username }}{% endif %}</dd>
+            </div>
+            {% endif %}
+            {% if notification_content.action_label %}
+            <div class="aw-kv">
+                <dt>{% translate "Action button" %}</dt>
+                <dd>{{ notification_content.action_label }}{% if notification_content.action_url %}<div class="aw-small aw-muted aw-break" dir="ltr">{{ notification_content.action_url }}</div>{% endif %}</dd>
+            </div>
+            {% endif %}
+        </dl>
+
+        {% if notification_recipient %}
+        <p class="aw-small aw-muted aw-mt-2">{% if not inbox_visible %}{% translate "Transport retry only; no duplicate inbox notification was created." %}{% elif inbox_read_at %}{% translate "Read in the inbox" %}: {{ inbox_read_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}{% translate "Unread in the inbox" %}{% endif %}</p>
         {% endif %}
-    </form>
-    {% endif %}
-    {% endif %}
-    <p class="aw-small aw-muted mt-3">{% translate "Push success means a confirmed provider receipt, not that the student opened the message. Pending receipts keep polling; terminal failures can be retried." %}</p>
-    {% if broadcast_attachments %}
-    <h3 class="h6">{% translate "Attachments" %}</h3>
-    <ul>{% for attachment in broadcast_attachments %}<li class="text-break">{{ attachment.original_name }} ({{ attachment.size_bytes|filesizeformat }})</li>{% endfor %}</ul>
-    {% endif %}
-    {% if history_url %}<a class="aw-btn aw-btn--ghost align-self-start mt-2" href="{{ history_url }}" hx-get="{{ history_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">{% translate "View delivery history" %}</a>{% endif %}
+
+        <div class="aw-grid aw-grid--2-even aw-mt-3">
+            <div dir="rtl" lang="ar">
+                <h4 class="aw-field-label">{% translate "Arabic content" %}</h4>
+                <b>{{ notification_content.title_ar }}</b>
+                <div>{{ notification_content.body_ar|linebreaksbr }}</div>
+            </div>
+            <div dir="ltr" lang="en">
+                <h4 class="aw-field-label">{% translate "English content" %}</h4>
+                <b>{{ notification_content.title_en }}</b>
+                <div>{{ notification_content.body_en|linebreaksbr }}</div>
+            </div>
+        </div>
+
+        <p class="aw-small aw-muted aw-mt-3">{% translate "Push success means a confirmed provider receipt, not that the student opened the message. Pending receipts keep polling; terminal failures can be retried." %}</p>
+
+        {% if broadcast_attachments %}
+        <h4 class="aw-field-label aw-mt-3">{% translate "Attachments" %}</h4>
+        <ul class="aw-stack aw-mt-2">
+            {% for attachment in broadcast_attachments %}<li class="aw-small aw-break">{{ attachment.original_name }} ({{ attachment.size_bytes|filesizeformat }})</li>{% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if notification_recipient %}
+        <hr class="aw-divider aw-mt-3">
+        {% if not notification_content.withdrawn_at or notification_deletion_retryable %}
+        <form method="post"
+              action="{% url 'notification-withdraw' notification_content.pk %}"
+              hx-post="{% url 'notification-withdraw' notification_content.pk %}"
+              hx-target="#content" hx-select="#content" hx-swap="outerHTML"
+              hx-select-oob="#toast-stack" hx-push-url="true" hx-sync="this:drop"
+              data-confirm-message="{% if notification_content.withdrawn_at %}{% translate 'Retry removing Telegram copies that previously failed?' %}{% else %}{% translate 'Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?' %}{% endif %}">
+            {% csrf_token %}
+            <button type="submit" class="aw-btn aw-btn--danger aw-mt-2">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                <span>{% if notification_content.withdrawn_at %}{% translate "Retry Telegram deletion" %}{% else %}{% translate "Withdraw recipient notification" %}{% endif %}</span>
+            </button>
+            {% if not notification_content.withdrawn_at %}
+            <p class="aw-small aw-muted aw-mt-2">{% translate "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs." %}</p>
+            {% else %}
+            <p class="aw-small aw-muted aw-mt-2">{% translate "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram." %}</p>
+            {% endif %}
+        </form>
+        {% endif %}
+        {% endif %}
+
+        {% if history_url %}
+        <a class="aw-btn aw-btn--ghost aw-mt-2" href="{{ history_url }}" hx-get="{{ history_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+            <span>{% translate "View delivery history" %}</span>
+        </a>
+        {% endif %}
+    </div>
 </section>
 
 {% if redelivery_form and redelivery_url %}
-<section class="aw-card aw-card-body mt-3" aria-labelledby="notification-redelivery-heading">
-    <h2 id="notification-redelivery-heading" class="h5">{% translate "Retry or resend" %}</h2>
-    <p>{% blocktranslate with count=audience_count %}Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again.{% endblocktranslate %}</p>
-    <p class="aw-small aw-muted">{% translate "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history." %}</p>
-    {% if redelivery_materializing %}<p class="text-warning" role="status">{% translate "Initial delivery records are still being prepared. Resend all will be available when they finish." %}</p>{% endif %}
-    <form method="post" action="{{ redelivery_url }}" hx-post="{{ redelivery_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:drop" data-confirm-message="{% translate 'Queue another delivery using this saved content?' %}">
-        {% csrf_token %}
-        {% if redelivery_form.non_field_errors %}<div class="text-danger" role="alert">{{ redelivery_form.non_field_errors }}</div>{% endif %}
-        {% if redelivery_form.mode.errors %}<div class="text-danger" role="alert">{{ redelivery_form.mode.errors }}</div>{% endif %}
-        {% if is_broadcast %}<input type="hidden" name="audience" value="group">{% else %}
-        <label for="{{ redelivery_form.audience.id_for_label }}" class="form-label">{{ redelivery_form.audience.label }}</label>
-        {{ redelivery_form.audience }}
-        {% if redelivery_form.audience.errors %}<div class="text-danger" role="alert">{{ redelivery_form.audience.errors }}</div>{% endif %}
-        {% endif %}
-        <div class="aw-flex aw-flex-wrap mt-3">
-            <button type="submit" name="mode" value="failed" class="aw-btn aw-btn--primary">{% translate "Retry failed deliveries" %}</button>
-            {% if not redelivery_materializing %}<button type="submit" name="mode" value="all" class="aw-btn aw-btn--danger">{% translate "Resend all" %}</button>{% endif %}
+<section class="aw-card" aria-labelledby="notification-redelivery-heading">
+    <div class="aw-card-head">
+        <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+            <h3 id="notification-redelivery-heading">{% translate "Retry or resend" %}</h3>
         </div>
-    </form>
+    </div>
+    <div class="aw-card-body">
+        <p>{% blocktranslate with count=audience_count %}Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again.{% endblocktranslate %}</p>
+        <p class="aw-small aw-muted">{% translate "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history." %}</p>
+        {% if redelivery_materializing %}<div class="aw-alert aw-alert--warn" role="status">{% translate "Initial delivery records are still being prepared. Resend all will be available when they finish." %}</div>{% endif %}
+        <form method="post" action="{{ redelivery_url }}" hx-post="{{ redelivery_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:drop" data-confirm-message="{% translate 'Queue another delivery using this saved content?' %}">
+            {% csrf_token %}
+            {% if redelivery_form.non_field_errors %}<div class="aw-field-error" role="alert">{% for error in redelivery_form.non_field_errors %}{{ error }}{% endfor %}</div>{% endif %}
+            {% if redelivery_form.mode.errors %}<div class="aw-field-error" role="alert">{% for error in redelivery_form.mode.errors %}{{ error }}{% endfor %}</div>{% endif %}
+            {% if is_broadcast %}<input type="hidden" name="audience" value="group">{% else %}
+            <div class="aw-field aw-mt-3">
+                <label class="aw-field-label" for="{{ redelivery_form.audience.id_for_label }}">{{ redelivery_form.audience.label }}</label>
+                {{ redelivery_form.audience }}
+                {% for error in redelivery_form.audience.errors %}<span class="aw-field-error" role="alert">{{ error }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            <div class="aw-flex aw-flex-wrap aw-mt-3">
+                <button type="submit" name="mode" value="failed" class="aw-btn aw-btn--primary">{% translate "Retry failed deliveries" %}</button>
+                {% if not redelivery_materializing %}<button type="submit" name="mode" value="all" class="aw-btn aw-btn--danger">{% translate "Resend all" %}</button>{% endif %}
+            </div>
+        </form>
+    </div>
 </section>
 {% endif %}
 
 {% if announcement_retry_id %}
-<form method="post" action="{% url 'announcement-retry' announcement_retry_id %}" class="mt-3">{% csrf_token %}<button type="submit" class="aw-btn aw-btn--primary">{% translate "Retry notification generation" %}</button></form>
+<form method="post" action="{% url 'announcement-retry' announcement_retry_id %}">
+    {% csrf_token %}
+    <button type="submit" class="aw-btn aw-btn--primary">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+        <span>{% translate "Retry notification generation" %}</span>
+    </button>
+</form>
 {% endif %}
 
 {% if notification_delivery_page %}
-<section class="aw-card aw-card-body mt-3" aria-labelledby="notification-channels-heading">
-    <h2 id="notification-channels-heading" class="h5">{% translate "Channel delivery attempts" %}</h2>
-    {% for delivery in notification_delivery_page.object_list %}
-    <div class="border-bottom py-3">
-        <strong>{{ delivery.row_target }}</strong> - {{ delivery.status_label }}
-        <span class="aw-small aw-muted">{% translate "Attempts" %}: {{ delivery.row_attempts }}</span>
-        {% if delivery.row_error %}<p class="text-danger text-break">{{ delivery.row_error }}</p>{% endif %}
-        {% if delivery.deletion_status_label %}<p class="aw-small aw-muted">{% translate "Telegram removal" %}: {{ delivery.deletion_status_label }}</p>{% endif %}
-        {% if delivery.row_deletion_error %}<p class="text-danger text-break">{{ delivery.row_deletion_error }}</p>{% endif %}
-        {% if delivery.row_channel == 'telegram' %}
-            {% if delivery.row_content %}<details><summary>{% translate "Exact Telegram message text" %}</summary><div class="text-break">{{ delivery.row_content|linebreaksbr }}</div></details>
-            {% else %}<p class="aw-small aw-muted">{% translate "Exact text was not recorded for older Telegram attempts. The saved notification content is shown above." %}</p>{% endif %}
-        {% endif %}
+<section class="aw-card aw-table-card" aria-labelledby="notification-channels-heading">
+    <div class="aw-card-head">
+        <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+            <h3 id="notification-channels-heading">{% translate "Channel delivery attempts" %}</h3>
+        </div>
     </div>
-    {% empty %}<p class="aw-muted">{% translate "No external channel attempts recorded yet." %}</p>{% endfor %}
+    <div class="aw-table-wrap">
+        <table class="aw-table">
+            <caption class="visually-hidden">{% translate "Channel delivery attempts" %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{% translate "Target" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Attempts" %}</th>
+                    <th scope="col">{% translate "Created" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for delivery in notification_delivery_page.object_list %}
+                <tr>
+                    <td>
+                        <div class="aw-cell-main">
+                            <div>
+                                <b>{{ delivery.row_target }}</b>
+                                {% if delivery.row_error %}<span class="aw-cell-sub aw-text-danger aw-break">{{ delivery.row_error }}</span>{% endif %}
+                                {% if delivery.row_deletion_error %}<span class="aw-cell-sub aw-text-danger aw-break">{{ delivery.row_deletion_error }}</span>{% endif %}
+                                {% if delivery.row_channel == 'telegram' %}
+                                {% if delivery.row_content %}
+                                <details>
+                                    <summary class="aw-small">{% translate "Exact Telegram message text" %}</summary>
+                                    <div class="aw-small aw-break" dir="auto">{{ delivery.row_content|linebreaksbr }}</div>
+                                </details>
+                                {% else %}
+                                <span class="aw-cell-sub">{% translate "Exact text was not recorded for older Telegram attempts. The saved notification content is shown above." %}</span>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% include "partials/components/aw_status_pill.html" with status=delivery.row_status label=delivery.status_label %}
+                        {% if delivery.deletion_status_label %}<span class="aw-cell-sub">{% translate "Telegram removal" %}: {{ delivery.deletion_status_label }}</span>{% endif %}
+                    </td>
+                    <td class="aw-num">{{ delivery.row_attempts }}</td>
+                    <td class="aw-date">{{ delivery.row_created|date:"SHORT_DATETIME_FORMAT" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="aw-cell-empty">
+                        {% translate "No external channel attempts recorded yet." as no_channel_attempts %}
+                        {% include "partials/components/aw_empty.html" with icon="i-send" description=no_channel_attempts %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% translate "Delivery attempt pages" as delivery_pages_label %}
     {% include "partials/pagination.html" with page_obj=notification_delivery_page pagination_query=delivery_pagination_query page_param="delivery_page" aria_label=delivery_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
 </section>
 {% endif %}
 
 {% if notification_attempt_page %}
-<section class="aw-card aw-card-body mt-3" aria-labelledby="notification-copy-heading">
-    <h2 id="notification-copy-heading" class="h5">{% translate "This redelivery's recipients" %}</h2>
-    {% for copy in notification_attempt_page.object_list %}
-    <div class="border-bottom py-3" data-job-record data-family="notification" data-id="{{ copy.id }}" data-active="{{ copy.active|yesno:'true,false' }}">
-        <a href="{{ copy.detail_url }}" hx-get="{{ copy.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" class="text-break">{{ copy.target }}</a>
-        <span class="d-block" data-job-field="status_label">{{ copy.status_label }}</span>
-        <progress max="100" value="{{ copy.percent }}" class="app-progress w-100" aria-label="{% translate 'Processing progress' %}"></progress>
-        <span data-job-field="progress_label">{{ copy.progress_label }}</span>
+<section class="aw-card aw-table-card" aria-labelledby="notification-copy-heading">
+    <div class="aw-card-head">
+        <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            <h3 id="notification-copy-heading">{% translate "This redelivery's recipients" %}</h3>
+        </div>
     </div>
-    {% empty %}<p>{% translate "Recipient copies are being prepared." %}</p>{% endfor %}
+    <div class="aw-table-wrap">
+        <table class="aw-table">
+            <caption class="visually-hidden">{% translate "This redelivery's recipients" %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{% translate "Recipient" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                    <th scope="col">{% translate "Progress" %}</th>
+                    <th scope="col" class="aw-ta-e"><span class="visually-hidden">{% translate "Actions" %}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for copy in notification_attempt_page.object_list %}
+                <tr data-job-record data-family="notification" data-id="{{ copy.id }}" data-active="{{ copy.active|yesno:'true,false' }}">
+                    <td>
+                        <div class="aw-cell-main">
+                            <div>
+                                <a href="{{ copy.detail_url }}" hx-get="{{ copy.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true"><b>{{ copy.target }}</b></a>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="aw-pill aw-pill--muted" data-job-field="status_label">{{ copy.status_label }}</span></td>
+                    <td>
+                        <div class="aw-progress" role="progressbar" aria-label="{% translate 'Processing progress' %}" aria-valuenow="{{ copy.percent }}" aria-valuemin="0" aria-valuemax="100">
+                            <span style="width: {{ copy.percent }}%"></span>
+                        </div>
+                        <span class="aw-cell-sub" data-job-field="progress_label">{{ copy.progress_label }}</span>
+                    </td>
+                    <td>
+                        <div class="aw-row-actions">
+                            <a class="aw-icon-btn" href="{{ copy.detail_url }}" hx-get="{{ copy.detail_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" title="{% translate 'Details' %}" aria-label="{% translate 'Details' %}">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="aw-cell-empty">{% translate "Recipient copies are being prepared." %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% translate "Recipient pages" as recipient_pages_label %}
     {% include "partials/pagination.html" with page_obj=notification_attempt_page pagination_query=recipient_pagination_query page_param="recipient_page" aria_label=recipient_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
 </section>
 {% endif %}
 
 {% if recipient_page %}
-<section class="aw-card aw-card-body mt-3" aria-labelledby="broadcast-recipients-heading">
-    <h2 id="broadcast-recipients-heading" class="h5">{% translate "Telegram recipients" %}</h2>
-    {% for recipient in recipient_page.object_list %}<div class="border-bottom py-2 text-break"><strong>{{ recipient.user_display_name|default:recipient.user_username }}</strong> - {{ recipient.get_status_display }}{% if recipient.last_error %}<p class="text-danger">{{ recipient.last_error }}</p>{% endif %}</div>{% endfor %}
+<section class="aw-card aw-table-card" aria-labelledby="broadcast-recipients-heading">
+    <div class="aw-card-head">
+        <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+            <h3 id="broadcast-recipients-heading">{% translate "Telegram recipients" %}</h3>
+        </div>
+    </div>
+    <div class="aw-table-wrap">
+        <table class="aw-table">
+            <caption class="visually-hidden">{% translate "Telegram recipients" %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{% translate "Recipient" %}</th>
+                    <th scope="col">{% translate "Status" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recipient in recipient_page.object_list %}
+                <tr>
+                    <td>
+                        <div class="aw-cell-main">
+                            {% include "partials/components/aw_avatar.html" with name=recipient.user_display_name|default:recipient.user_username tone="teal" %}
+                            <div>
+                                <b>{{ recipient.user_display_name|default:recipient.user_username }}</b>
+                                {% if recipient.user_username %}<span class="aw-cell-sub">@{{ recipient.user_username }}</span>{% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% include "partials/components/aw_status_pill.html" with status=recipient.status label=recipient.get_status_display %}
+                        {% if recipient.last_error %}<span class="aw-cell-sub aw-text-danger aw-break">{{ recipient.last_error }}</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2" class="aw-cell-empty">{% translate "No Results" %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% translate "Recipient pages" as recipient_pages_label %}
     {% include "partials/pagination.html" with page_obj=recipient_page pagination_query=recipient_pagination_query page_param="recipient_page" aria_label=recipient_pages_label hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" %}
 </section>

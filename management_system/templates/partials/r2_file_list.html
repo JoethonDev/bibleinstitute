@@ -4,154 +4,147 @@ R2 folder/file collection. Presentation only: each card keeps its
 data-folder-id/data-file-key hook, the .col wrapper the r2Manager delete
 handlers remove, the folder hx-get/hx-target/hx-push-url navigation and every
 Alpine selection/action directive. Folders render in the shared folder grid;
-files in the shared file grid. The provider lists folders before files, so the
-two grids preserve the original order.
+files in the shared file grid. Menus use the delegated aw-menu controller in
+admin_shell.js, so every action keeps its original data/Alpine hook.
 {% endcomment %}
 {% if drive %}
-    {% if drive.0.type == 'folder' %}
-    <div class="aw-folder-grid mb-3">
-        {% for item in drive %}
-        {% if item.type == 'folder' %}
-        <div class="col">
-            <div class="aw-folder-card position-relative pe-5" data-folder-id="{{ item.id }}"
-                 x-data="{ showActions: false }">
-                <div class="position-absolute top-0 end-0 p-1"
-                     @mouseenter="showActions = true"
-                     @mouseleave="showActions = false">
-                    <div class="dropdown">
-                        <button class="aw-btn aw-btn--ghost aw-btn--icon"
-                                type="button"
-                                data-bs-toggle="dropdown"
-                                aria-label="{% translate 'File actions' %}">
-                            <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a class="dropdown-item" href="#" @click.prevent="showRenameModal('{{ item.id|escapejs }}', '{{ item.name|escapejs }}', true)">
-                                    <i class="fas fa-edit me-2"></i>{% translate "Rename" %}
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="#" @click.prevent="deleteFolder('{{ item.id|escapejs }}')">
-                                    <i class="fas fa-trash me-2"></i>{% translate "Delete Folder" %}
-                                </a>
-                            </li>
-                        </ul>
+    <div class="aw-stack">
+        {% if drive.0.type == 'folder' %}
+        <div class="aw-folder-grid">
+            {% for item in drive %}
+            {% if item.type == 'folder' %}
+            <div class="col">
+                <div class="aw-folder-card" data-folder-id="{{ item.id }}" x-data="{ showActions: false }">
+                    <div class="aw-flex is-clickable"
+                         style="flex:1;min-width:0"
+                         role="button" tabindex="0"
+                         aria-label="{% blocktranslate with name=item.name %}Open folder {{ name }}{% endblocktranslate %}"
+                         @keydown.enter.prevent="$el.click()" @keydown.space.prevent="$el.click()"
+                         hx-get="{% url 'r2-management-dashboard' %}?folder={{ item.id|urlencode }}"
+                         hx-target="#file-list-container"
+                         hx-push-url="true">
+                        <svg class="aw-ico aw-ico--lg" aria-hidden="true"><use href="#i-folder"></use></svg>
+                        <b title="{{ item.name }}">{{ item.name }}</b>
                     </div>
-                </div>
-
-                <div class="aw-flex is-clickable"
-                     role="button" tabindex="0"
-                     aria-label="{% blocktranslate with name=item.name %}Open folder {{ name }}{% endblocktranslate %}"
-                     @keydown.enter.prevent="$el.click()" @keydown.space.prevent="$el.click()"
-                     hx-get="{% url 'r2-management-dashboard' %}?folder={{ item.id|urlencode }}"
-                     hx-target="#file-list-container"
-                     hx-push-url="true">
-                    <svg class="aw-ico aw-ico--lg" aria-hidden="true"><use href="#i-folder"></use></svg>
-                    <b title="{{ item.name }}">{{ item.name }}</b>
+                    <div class="aw-menu-wrap"
+                         @mouseenter="showActions = true"
+                         @mouseleave="showActions = false">
+                        <button type="button" class="aw-icon-btn"
+                                data-aw-menu-trigger aria-haspopup="true" aria-expanded="false"
+                                aria-label="{% translate 'File actions' %}">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-more"></use></svg>
+                        </button>
+                        <div class="aw-menu" hidden>
+                            <button type="button" class="aw-menu-item"
+                                    @click="showRenameModal('{{ item.id|escapejs }}', '{{ item.name|escapejs }}', true)">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                                {% translate "Rename" %}
+                            </button>
+                            <button type="button" class="aw-menu-item aw-menu-item--danger"
+                                    @click="deleteFolder('{{ item.id|escapejs }}')">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                {% translate "Delete Folder" %}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
+            {% endif %}
+            {% endfor %}
         </div>
         {% endif %}
-        {% endfor %}
-    </div>
-    {% endif %}
 
-    <div class="aw-file-grid">
-        {% for item in drive %}
-        {% if item.type == 'file' %}
-        <div class="col">
-            <div class="aw-file-card" data-file-key="{{ item.id }}"
-                 x-data="{ showActions: false }">
-                <div class="position-absolute top-0 start-0 p-1">
-                    <input type="checkbox"
-                           class="form-check-input"
-                           @click="toggleFileSelection('{{ item.id|escapejs }}')"
-                           :checked="selectedFiles.includes('{{ item.id|escapejs }}')">
-                </div>
+        <div class="aw-file-grid">
+            {% for item in drive %}
+            {% if item.type == 'file' %}
+            <div class="col">
+                <div class="aw-file-card" data-file-key="{{ item.id }}" x-data="{ showActions: false }">
+                    <label class="aw-check">
+                        <input type="checkbox"
+                               aria-label="{% translate 'Select file' %}"
+                               @click="toggleFileSelection('{{ item.id|escapejs }}')"
+                               :checked="selectedFiles.includes('{{ item.id|escapejs }}')">
+                    </label>
 
-                <div class="aw-file-menu"
-                     @mouseenter="showActions = true"
-                     @mouseleave="showActions = false">
-                    <div class="dropdown">
-                        <button class="aw-btn aw-btn--ghost aw-btn--icon"
-                                type="button"
-                                data-bs-toggle="dropdown"
+                    <div class="aw-file-menu aw-menu-wrap"
+                         @mouseenter="showActions = true"
+                         @mouseleave="showActions = false">
+                        <button type="button" class="aw-icon-btn"
+                                data-aw-menu-trigger aria-haspopup="true" aria-expanded="false"
                                 aria-label="{% translate 'File actions' %}">
-                            <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-more"></use></svg>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a class="dropdown-item" href="#" @click.prevent="downloadFile('{{ item.id|escapejs }}')">
-                                    <i class="fas fa-download me-2"></i>{% translate "Download" %}
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="#" @click.prevent="showRenameModal('{{ item.id|escapejs }}', '{{ item.name|escapejs }}')">
-                                    <i class="fas fa-edit me-2"></i>{% translate "Rename" %}
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="#" @click.prevent="getFileMetadata('{{ item.id|escapejs }}')">
-                                    <i class="fas fa-info-circle me-2"></i>{% translate "Info" %}
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="#"
-                                   @click.prevent="deleteFile('{{ item.id|escapejs }}', '{{ item.name|escapejs }}', '{{ item.name|slice:'-5:'|escapejs }}')">
-                                    <i class="fas fa-trash me-2"></i>{% translate "Delete" %}
-                                </a>
-                            </li>
-                        </ul>
+                        <div class="aw-menu" hidden>
+                            <button type="button" class="aw-menu-item"
+                                    @click="downloadFile('{{ item.id|escapejs }}')">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
+                                {% translate "Download" %}
+                            </button>
+                            <button type="button" class="aw-menu-item"
+                                    @click="showRenameModal('{{ item.id|escapejs }}', '{{ item.name|escapejs }}')">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                                {% translate "Rename" %}
+                            </button>
+                            <button type="button" class="aw-menu-item"
+                                    @click="getFileMetadata('{{ item.id|escapejs }}')">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                                {% translate "Info" %}
+                            </button>
+                            <div class="aw-menu-sep"></div>
+                            <button type="button" class="aw-menu-item aw-menu-item--danger"
+                                    @click="deleteFile('{{ item.id|escapejs }}', '{{ item.name|escapejs }}', '{{ item.name|slice:'-5:'|escapejs }}')">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                {% translate "Delete" %}
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="aw-file-icon mx-auto">
+                    <div class="aw-file-icon">
+                        {% if item.kind == 'video' %}
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
+                        {% elif item.kind == 'audio' %}
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-audio"></use></svg>
+                        {% elif item.kind == 'image' %}
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-image"></use></svg>
+                        {% else %}
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                        {% endif %}
+                    </div>
+
+                    <b title="{{ item.name }}">
+                        {% if item.kind != 'other' %}{{ item.stem }}{% else %}{{ item.name }}{% endif %}
+                    </b>
                     {% if item.kind == 'video' %}
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
+                    <small class="aw-pill aw-pill--red">{% translate "Video" %}</small>
                     {% elif item.kind == 'audio' %}
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-audio"></use></svg>
+                    <small class="aw-pill aw-pill--green">{% translate "Audio" %}</small>
                     {% elif item.kind == 'image' %}
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-image"></use></svg>
-                    {% else %}
-                        <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                    <small class="aw-pill aw-pill--blue">{% translate "Image" %}</small>
+                    {% elif item.kind == 'document' %}
+                    <small class="aw-pill aw-pill--amber">{% translate "Document" %}</small>
+                    {% endif %}
+                    {% if item.rel_path != item.name %}
+                    <span dir="auto" title="{{ item.rel_path }}">{{ item.rel_path }}</span>
+                    {% endif %}
+
+                    {% if item.size %}
+                    <span dir="ltr">
+                        {% if item.size < 1024 %}
+                            {{ item.size }} B
+                        {% elif item.size < 1048576 %}
+                         {{ item.size|floatformat:2|add:"0"|slice:":-2" }} KB
+                        {% elif item.size < 1073741824 %}
+                            {% widthratio item.size 1048576 1 %} MB
+                        {% else %}
+                            {% widthratio item.size 1073741824 1 %} GB
+                        {% endif %}
+                    </span>
                     {% endif %}
                 </div>
-
-                <b title="{{ item.name }}">
-                    {% if item.kind != 'other' %}{{ item.stem }}{% else %}{{ item.name }}{% endif %}
-                </b>
-                {% if item.kind == 'video' %}
-                <small class="aw-pill aw-pill--red mt-1">{% translate "Video" %}</small>
-                {% elif item.kind == 'audio' %}
-                <small class="aw-pill aw-pill--green mt-1">{% translate "Audio" %}</small>
-                {% elif item.kind == 'image' %}
-                <small class="aw-pill aw-pill--blue mt-1">{% translate "Image" %}</small>
-                {% elif item.kind == 'document' %}
-                <small class="aw-pill aw-pill--amber mt-1">{% translate "Document" %}</small>
-                {% endif %}
-                {% if item.rel_path != item.name %}
-                <span dir="auto" title="{{ item.rel_path }}">{{ item.rel_path }}</span>
-                {% endif %}
-
-                {% if item.size %}
-                <span dir="ltr">
-                    {% if item.size < 1024 %}
-                        {{ item.size }} B
-                    {% elif item.size < 1048576 %}
-                     {{ item.size|floatformat:2|add:"0"|slice:":-2" }} KB
-                    {% elif item.size < 1073741824 %}
-                        {% widthratio item.size 1048576 1 %} MB
-                    {% else %}
-                        {% widthratio item.size 1073741824 1 %} GB
-                    {% endif %}
-                </span>
-                {% endif %}
             </div>
+            {% endif %}
+            {% endfor %}
         </div>
-        {% endif %}
-        {% endfor %}
     </div>
 {% else %}
     {% translate "This folder is empty." as empty_description %}

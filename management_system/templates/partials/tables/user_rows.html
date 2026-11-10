@@ -1,29 +1,34 @@
-﻿{% load i18n aw_ui %}
+{% load i18n aw_ui %}
 {% comment %}
 Students table row template. One row per serialized user from
 User.serialize_pagination(); column indexes match the Students
 table_columns contract in views.user_dashboard.
+
+The projection carries identity (display_name, username), the application
+decision, study mode, role and the joined/last-login timestamps. It carries no
+level, enrollment type or avatar image, so no such column is rendered here.
 {% endcomment %}
 {% for values in page_obj %}
 <tr data-id="{{ values.id }}">
-    <td class="column-checkbox aw-cell-check">
+    <td class="aw-cell-check">
         <input type="checkbox"
-               class="form-check-input row-checkbox"
+               class="row-checkbox"
                :value="'{{ values.id }}'"
                x-model="selected"
-               @change="updateSelectAll()">
+               @change="updateSelectAll()"
+               aria-label="{% blocktranslate with name=values.display_name %}Select {{ name }}{% endblocktranslate %}">
     </td>
     <td class="aw-cell-identity" x-show="columns[0].visible">
         <div class="aw-cell-main">
             {% include "partials/components/aw_avatar.html" with name=values.display_name tone="teal" %}
-            <div class="aw-cell-main-text">
+            <div>
                 <b><a href="{{ values.url }}"
                       hx-get="{{ values.url }}"
                       hx-target="#display-page"
                       hx-select="#page-region"
                       hx-swap="innerHTML"
                       hx-push-url="true">{{ values.display_name }}</a></b>
-                <span>{{ values.username }}</span>
+                <span class="aw-cell-sub">{{ values.username }}</span>
             </div>
         </div>
     </td>
@@ -39,7 +44,7 @@ table_columns contract in views.user_dashboard.
     <td x-show="columns[5].visible" class="aw-date">
         {% if values.last_login %}{{ values.last_login|date:"Y-m-d H:i" }}{% else %}<span class="aw-muted">-</span>{% endif %}
     </td>
-    <td class="column-actions">
+    <td class="aw-row-actions">
         <div class="aw-row-actions">
             <a class="aw-icon-btn" href="{{ values.url }}"
                hx-get="{{ values.url }}"
@@ -50,14 +55,15 @@ table_columns contract in views.user_dashboard.
                aria-label="{% translate 'View' %}" title="{% translate 'View' %}">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
             </a>
-            <a class="aw-icon-btn" href="{% url 'student-overview' values.id %}"
+            <a class="aw-btn aw-btn--sm" href="{% url 'student-overview' values.id %}"
                hx-get="{% url 'student-overview' values.id %}"
                hx-target="#display-page"
                hx-select="#page-region"
                hx-swap="innerHTML"
                hx-push-url="true"
-               aria-label="{% translate 'Overview' %}" title="{% translate 'Overview' %}">
-                <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+               aria-label="{% translate 'Overview' %}">
+                <span>360</span>
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
             </a>
             <a class="aw-icon-btn" href="{{ values.url }}update/"
                hx-get="{{ values.url }}update/"

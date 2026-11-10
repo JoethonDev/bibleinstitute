@@ -3,15 +3,15 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content cmd-palette">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-search me-1"></i>{% translate "Quick jump" %}</h5>
+        <h5 class="modal-title"><svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>{% translate "Quick jump" %}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
       </div>
       <div class="modal-body">
-        <input id="command-palette-input" type="search" class="form-control" autocomplete="off"
+        <input id="command-palette-input" type="search" class="aw-input" autocomplete="off"
                placeholder="{% translate 'Search' %}" aria-label="{% translate 'Search' %}"
                data-search-url="{% url 'command-palette-search' %}">
-        <div id="command-palette-results" class="list-group mt-2" role="listbox" aria-label="{% translate 'Search' %}"></div>
-        <div id="command-palette-hint" class="form-text text-muted mt-2">{% translate "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope." %}</div>
+        <div id="command-palette-results" class="aw-cmd-results aw-mt-2" role="listbox" aria-label="{% translate 'Search' %}"></div>
+        <div id="command-palette-hint" class="aw-field-hint aw-mt-2">{% translate "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope." %}</div>
       </div>
     </div>
   </div>

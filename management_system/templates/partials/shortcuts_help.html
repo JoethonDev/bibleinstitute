@@ -3,12 +3,18 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-keyboard me-1"></i>{% translate "Keyboard shortcuts" %}</h5>
+        <h5 class="modal-title"><svg class="aw-ico" aria-hidden="true"><use href="#i-keyboard"></use></svg>{% translate "Keyboard shortcuts" %}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
       </div>
       <div class="modal-body">
-        <p class="form-text mt-0">{% translate "Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they work with Arabic layouts too." %}</p>
-        <table class="table table-sm mb-0">
+        <p class="aw-field-hint aw-m-0">{% translate "Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they work with Arabic layouts too." %}</p>
+        <table class="aw-table aw-m-0">
+          <thead>
+            <tr>
+              <th scope="col" class="visually-hidden">{% translate "Shortcut" %}</th>
+              <th scope="col" class="visually-hidden">{% translate "Action" %}</th>
+            </tr>
+          </thead>
           <tbody>
             <tr><td><kbd>Ctrl/Cmd + K</kbd></td><td>{% translate "Quick jump" %}</td></tr>
             <tr><td><kbd>/</kbd></td><td>{% translate "Focus search" %}</td></tr>

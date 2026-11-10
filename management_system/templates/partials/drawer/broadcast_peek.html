@@ -1,0 +1,44 @@
+{% load i18n %}
+{% comment %}
+Drawer body: one broadcast peek. Read-only summary plus a link to the full
+report, which owns the delivery monitor. The drawer component supplies the title
+and close affordance.
+{% endcomment %}
+<div class="aw-stack aw-stack--lg">
+    <div class="aw-flex aw-flex-wrap">
+        {% include "partials/components/aw_status_pill.html" with status=broadcast.status label=broadcast.get_status_display %}
+        <span class="aw-small aw-muted">{{ broadcast.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+    </div>
+
+    <dl class="aw-dl">
+        <div class="aw-kv"><dt>{% translate "Target" %}</dt><dd>{{ target_label }}</dd></div>
+        {% if broadcast.academic_year %}
+        <div class="aw-kv"><dt>{% translate "Academic year" %}</dt><dd>{% firstof broadcast.academic_year.name broadcast.academic_year.starts_on|date:"Y" %}</dd></div>
+        {% endif %}
+        <div class="aw-kv"><dt>{% translate "Recipients" %}</dt><dd>{{ broadcast.recipient_count }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Delivered" %}</dt><dd>{{ broadcast.sent_count }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Failed" %}</dt><dd>{{ broadcast.failed_count }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Skipped" %}</dt><dd>{{ broadcast.skipped_count }}</dd></div>
+        <div class="aw-kv"><dt>{% translate "Created" %}</dt><dd>{{ broadcast.created_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>
+        {% if broadcast.completed_at %}
+        <div class="aw-kv"><dt>{% translate "Completed" %}</dt><dd>{{ broadcast.completed_at|date:"SHORT_DATETIME_FORMAT" }}</dd></div>
+        {% endif %}
+        <div class="aw-kv"><dt>{% translate "Author" %}</dt><dd>{{ broadcast.created_by.username }}</dd></div>
+    </dl>
+
+    {% if broadcast.message %}
+    <div class="aw-card">
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-small aw-muted">{% translate "Message" %}</div>
+            <p class="aw-m-0">{{ broadcast.message|truncatechars:280 }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="aw-flex aw-flex-wrap">
+        <a href="{{ detail_url }}" class="aw-btn aw-btn--primary aw-btn--sm">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+            {% translate "Open full report" %}
+        </a>
+    </div>
+</div>

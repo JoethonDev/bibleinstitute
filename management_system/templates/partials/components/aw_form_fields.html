@@ -1,0 +1,7 @@
+{% comment %}
+Renders every visible field of a bound form through the canonical field partial,
+then the hidden fields. Callers own the surrounding .aw-form-grid or
+.aw-form-section so sections can compose their own layout.
+{% endcomment %}
+{% for field in form.visible_fields %}{% include "partials/components/aw_field.html" with field=field %}{% endfor %}
+{% for field in form.hidden_fields %}{{ field }}{% endfor %}

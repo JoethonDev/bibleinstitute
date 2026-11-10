@@ -536,21 +536,41 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     ).values_list("telegram_chat_id", flat=True).first()
     messages_queryset = TelegramMessage.objects.filter(
         conversation_id=conversation.pk,
+    ).exclude(
+        content_type=TelegramMessage.ContentType.DIGEST,
     ).select_related(
         "sender_user", "telegram_deleted_by", "resolved_by",
         "resolution_reply", "resolution_reply__sender_user",
         "answered_by", "answer_reply",
     ).prefetch_related("attachments").order_by("created_at", "pk")
-    if own_admin_chat_id is None:
-        messages_queryset = messages_queryset.exclude(content_type=TelegramMessage.ContentType.DIGEST)
-    else:
-        messages_queryset = messages_queryset.filter(
-            ~Q(content_type=TelegramMessage.ContentType.DIGEST)
-            | Q(
-                content_type=TelegramMessage.ContentType.DIGEST,
-                telegram_chat_id=own_admin_chat_id,
-            )
-        )
+
+    # A digest row is the alert delivered to an admin's Telegram, not a chat
+    # message: it is outbound while carrying the student's text, and after a
+    # reply its text also contains the answer. Rendering it put the student's
+    # message on the admin side and repeated the reply, so the timeline shows
+    # only real messages and each inbound row carries its alert state instead.
+    def annotate_digest_alerts(messages):
+        # Alerts belong to one admin account. Without a linked chat the viewer
+        # has no alert of their own to act on, and the delete endpoint would
+        # reject the action, so no alert state is attached at all.
+        if own_admin_chat_id is None:
+            return
+        inbound_ids = [
+            message.pk for message in messages
+            if message.direction == TelegramMessage.Direction.INBOUND
+        ]
+        if not inbound_ids:
+            return
+        digests = TelegramMessage.objects.filter(
+            source_message_id__in=inbound_ids,
+            content_type=TelegramMessage.ContentType.DIGEST,
+            telegram_chat_id=own_admin_chat_id,
+        ).order_by("pk")
+        latest = {}
+        for digest in digests:
+            latest[digest.source_message_id] = digest
+        for message in messages:
+            message.digest_alert = latest.get(message.pk)
     after_raw = request.GET.get("after")
     message_items = None
     messages_page_obj = None
@@ -596,6 +616,10 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         page_number = requested_page or paginator.num_pages or 1
         messages_page_obj = paginator.get_page(page_number)
         latest_message_pk = messages_queryset.values_list("pk", flat=True).last()
+    if message_items is not None:
+        annotate_digest_alerts(message_items)
+    elif messages_page_obj is not None:
+        annotate_digest_alerts(list(messages_page_obj.object_list))
     reply_to_message_id = _valid_reply_target(
         conversation.pk,
         request.GET.get("reply_to"),
@@ -612,7 +636,6 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
             conversation.user_id,
             _("Level not assigned"),
         ),
-        "own_admin_chat_id": own_admin_chat_id,
         "messages_page_obj": messages_page_obj,
         "message_items": message_items,
         "latest_message_pk": latest_message_pk,
@@ -1015,6 +1038,30 @@ def telegram_broadcasts(request):
     }
     if request.GET.get("fragment") == "1":
         return render(request, "partials/telegram_broadcast_list.html", context)
+
+    # Drawer fragment: one broadcast peek for the shared drawer. A direct browser
+    # hit returns to the list instead of rendering a bare fragment.
+    if request.GET.get("fragment") == "broadcast":
+        if request.headers.get("HX-Request") != "true":
+            return redirect("telegram-broadcasts")
+        raw_id = request.GET.get("id", "")
+        if not raw_id.isdigit():
+            return HttpResponse(status=404)
+        broadcast = (
+            TelegramBroadcast.objects.select_related("academic_year", "level", "created_by")
+            .filter(pk=int(raw_id))
+            .first()
+        )
+        if broadcast is None:
+            return HttpResponse(status=404)
+        return render(request, "partials/drawer/broadcast_peek.html", {
+            "broadcast": broadcast,
+            "detail_url": reverse("telegram-broadcast-detail", args=[broadcast.pk]),
+            "target_label": (
+                broadcast.level.display_name if broadcast.level else _("All active students")
+            ),
+        })
+
     return render_page(request, "telegram_broadcasts.html", "partials/telegram_broadcasts_content.html", context)
 
 

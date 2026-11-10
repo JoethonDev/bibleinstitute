@@ -1,14 +1,23 @@
 {% load i18n %}
 {% comment %}
-Announcement workspace (composer + delivery history).
-Presentation only: the composer keeps its field ids and names, the signed
-recipient-count POST hook, the compose POST contract (hx-target #display-page,
-#page-region select, toast OOB, pushed URL, confirm message), the retry POST per
-failed announcement, the delivery status rows, the paginator query and the
-shared pagination include. No metric is added: the only count shown is the
-server paginator count. The page head is rendered with the canonical component
-because the view supplies no page_actions; every action lives inside its own
-form so it keeps its method, action, csrf token and confirm message.
+Announcement workspace (composer + delivery history) on the approved admin
+prototype: shared page head, a real Compose/History tab set driven by the
+delegated [data-aw-tabs] controller in admin_shell.js, and one card per panel.
+
+Presentation only. Preserved exactly: the composer field ids/names, the signed
+recipient-count POST hook (id, hx-post, hx-trigger, hx-include, aria-live), the
+compose POST contract (action, method, csrf token, hx-target #display-page,
+hx-select #page-region, toast OOB, pushed URL, confirm message), the per-row
+retry POST for failed announcements, the delivery status rows, the history
+pagination query and the shared pagination include arguments.
+
+Deliberately not built because the view supplies no data or route for them (not
+faked): the prototype audience select (the form exposes level checkboxes, no
+audience choice field), the delivery-channels card (no channel counts or
+states), the Preview submit (no preview route), the estimated-reach/live-preview
+rail, and server search/status filtering on the history list (the view reads
+only "page"; no sort links exist either). The count in the History tab and the
+filter bar is the real paginator count.
 {% endcomment %}
 {% translate "Engagement" as page_eyebrow %}
 {% translate "Notifications" as page_title %}
@@ -16,151 +25,216 @@ form so it keeps its method, action, csrf token and confirm message.
 <div id="content" class="aw-dashboard-page">
   {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
 
-  <section class="aw-card" aria-label="{% translate 'Compose notification' %}">
-    <div class="aw-card-head">
-      <div class="aw-card-title">
+  <div data-aw-tabs>
+    {# Real tabs: the delegated controller owns is-active / aria-selected / hidden. #}
+    <nav class="aw-tabs" role="tablist" aria-label="{% translate 'Sections' %}">
+      <button type="button"
+              class="aw-tab{% if page_obj.number == 1 %} is-active{% endif %}"
+              id="announcement-compose-tab"
+              data-aw-tab="compose"
+              role="tab"
+              aria-selected="{% if page_obj.number == 1 %}true{% else %}false{% endif %}"
+              aria-controls="announcement-compose-panel"
+              tabindex="{% if page_obj.number == 1 %}0{% else %}-1{% endif %}">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
-        <h3>{% translate "Compose notification" %}</h3>
-      </div>
-    </div>
-    <form method="post" action="{% url 'notifications-management' %}" id="notification-compose-form" hx-post="{% url 'notifications-management' %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Send this notification to the resolved recipients?' %}">
-      {% csrf_token %}
-      <div class="aw-form-section">
-        {% if announcement_form.non_field_errors %}
-        <div class="aw-alert aw-alert--danger mb-3" role="alert">
-          <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-          <div>
-            {% for error in announcement_form.non_field_errors %}
-            <p class="mb-0">{{ error }}</p>
-            {% endfor %}
+        <span>{% translate "Compose notification" %}</span>
+      </button>
+      <button type="button"
+              class="aw-tab{% if page_obj.number > 1 %} is-active{% endif %}"
+              id="announcement-history-tab"
+              data-aw-tab="history"
+              role="tab"
+              aria-selected="{% if page_obj.number > 1 %}true{% else %}false{% endif %}"
+              aria-controls="announcement-history-panel"
+              tabindex="{% if page_obj.number > 1 %}0{% else %}-1{% endif %}">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+        <span>{% translate "History" %}</span>
+        <span class="aw-count">{{ page_obj.paginator.count }}</span>
+      </button>
+    </nav>
+
+    <div class="aw-tabpanel"
+         id="announcement-compose-panel"
+         data-aw-tabpanel="compose"
+         role="tabpanel"
+         aria-labelledby="announcement-compose-tab"{% if page_obj.number > 1 %} hidden{% endif %}>
+      <section class="aw-card" aria-label="{% translate 'Compose notification' %}">
+        <div class="aw-card-head">
+          <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+            <h3>{% translate "Compose notification" %}</h3>
           </div>
+        </div>
+        <form method="post" action="{% url 'notifications-management' %}" id="notification-compose-form" hx-post="{% url 'notifications-management' %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Send this notification to the resolved recipients?' %}">
+          {% csrf_token %}
+          <div class="aw-form-section">
+            <div class="aw-stack">
+              {% if announcement_form.non_field_errors %}
+              <div class="aw-alert aw-alert--danger" role="alert">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                <div>
+                  {% for error in announcement_form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+              {% endif %}
+
+              <div class="aw-form-grid">
+                <div class="aw-field aw-span-2">
+                  <label class="aw-field-label" for="{{ announcement_form.title.id_for_label }}">{{ announcement_form.title.label }}<span class="aw-req" aria-hidden="true">*</span></label>
+                  {{ announcement_form.title }}
+                  {% if announcement_form.title.help_text %}<span class="aw-field-hint">{{ announcement_form.title.help_text }}</span>{% endif %}
+                  {% for error in announcement_form.title.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                <div class="aw-field aw-span-2">
+                  <label class="aw-field-label" for="{{ announcement_form.body.id_for_label }}">{{ announcement_form.body.label }}<span class="aw-req" aria-hidden="true">*</span></label>
+                  {{ announcement_form.body }}
+                  {% if announcement_form.body.help_text %}<span class="aw-field-hint">{{ announcement_form.body.help_text }}</span>{% endif %}
+                  {% for error in announcement_form.body.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                <div class="aw-field">
+                  <label class="aw-field-label" for="{{ announcement_form.action_label.id_for_label }}">{{ announcement_form.action_label.label }}</label>
+                  {{ announcement_form.action_label }}
+                  {% if announcement_form.action_label.help_text %}<span class="aw-field-hint">{{ announcement_form.action_label.help_text }}</span>{% endif %}
+                  {% for error in announcement_form.action_label.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                <div class="aw-field">
+                  <label class="aw-field-label" for="{{ announcement_form.action_url.id_for_label }}">{{ announcement_form.action_url.label }}</label>
+                  {{ announcement_form.action_url }}
+                  {% if announcement_form.action_url.help_text %}<span class="aw-field-hint">{{ announcement_form.action_url.help_text }}</span>{% endif %}
+                  {% for error in announcement_form.action_url.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                <div class="aw-field aw-span-2">
+                  <span class="aw-field-label" id="announcement-levels-label">{{ announcement_form.levels.label }}</span>
+                  <div class="aw-check-list" role="group" aria-labelledby="announcement-levels-label">
+                    {% for checkbox in announcement_form.levels %}
+                    <label class="aw-check" for="{{ checkbox.id_for_label }}">
+                      {{ checkbox.tag }}
+                      <span>{{ checkbox.choice_label }}</span>
+                    </label>
+                    {% endfor %}
+                  </div>
+                  {% if announcement_form.levels.help_text %}<span class="aw-field-hint">{{ announcement_form.levels.help_text }}</span>{% endif %}
+                  {% for error in announcement_form.levels.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="aw-flex aw-flex-wrap aw-mt-2">
+              <span class="aw-small aw-muted">{% translate "Recipients:" %}</span>
+              <span id="notification-recipient-count" class="aw-pill aw-pill--teal"
+                    hx-post="{{ recipient_count_url }}"
+                    hx-trigger="load, change from:#notification-compose-form"
+                    hx-include="closest form"
+                    aria-live="polite">...</span>
+            </div>
+          </div>
+          <div class="aw-form-actions">
+            <button type="submit" class="aw-btn aw-btn--primary">
+              <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+              <span>{% translate "Send notification" %}</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="aw-tabpanel"
+         id="announcement-history-panel"
+         data-aw-tabpanel="history"
+         role="tabpanel"
+         aria-labelledby="announcement-history-tab"{% if page_obj.number == 1 %} hidden{% endif %}>
+      <section class="aw-card aw-table-card">
+        <div class="aw-card-head">
+          <div class="aw-card-title">
+            <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+            <h3>{% translate "Sent notifications" %}</h3>
+          </div>
+        </div>
+        <div class="aw-card-body aw-card-body--tight">
+          <div class="aw-filter-bar">
+            <div class="aw-table-tools">
+              <span class="aw-table-count">{% blocktranslate with count=page_obj.paginator.count %}{{ count }} Notifications{% endblocktranslate %}</span>
+            </div>
+          </div>
+        </div>
+        {% if page_obj.object_list %}
+        <div class="aw-table-wrap">
+          <table class="aw-table">
+            <caption class="visually-hidden">{% translate "Sent notifications" %}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{% translate "Date" %}</th>
+                <th scope="col">{% translate "Title" %}</th>
+                <th scope="col">{% translate "Target" %}</th>
+                <th scope="col">{% translate "Author" %}</th>
+                <th scope="col">{% translate "Recipients" %}</th>
+                <th scope="col">{% translate "Status" %}</th>
+                <th scope="col" class="aw-ta-e"><span class="visually-hidden">{% translate "Actions" %}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for announcement in page_obj %}
+              <tr>
+                <td class="aw-date">{{ announcement.created_at }}<span class="aw-cell-sub">{{ announcement.academic_year.name }}</span></td>
+                <td>
+                  <b>{{ announcement.title|truncatechars:60 }}</b>
+                  <span class="aw-cell-sub"><span class="visually-hidden">{% translate "Body" %}: </span>{{ announcement.body|truncatechars:100 }}</span>
+                </td>
+                <td>
+                  {% with announcement_levels=announcement.levels.all %}
+                  {% if announcement_levels %}{% for level in announcement_levels %}{{ level }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}{% translate "All active students" %}{% endif %}
+                  {% endwith %}
+                </td>
+                <td>{% if announcement.created_by %}{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}{% else %}-{% endif %}</td>
+                <td class="aw-num">{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}-{% endif %}</td>
+                <td>
+                  {% if announcement.status == 'sending' %}
+                  {% include "partials/components/aw_status_pill.html" with status=announcement.status tone="blue" label=announcement.get_status_display %}
+                  {% else %}
+                  {% include "partials/components/aw_status_pill.html" with status=announcement.status label=announcement.get_status_display %}
+                  {% endif %}
+                  {% if announcement.status == 'failed' %}
+                  <span class="aw-cell-sub aw-text-danger">{{ announcement.last_error }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="aw-row-actions">
+                    <a class="aw-icon-btn"
+                       href="{% url 'background-job-detail' 'announcement' announcement.pk %}"
+                       hx-get="{% url 'background-job-detail' 'announcement' announcement.pk %}"
+                       hx-target="#display-page"
+                       hx-select="#page-region"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       title="{% translate 'Preview' %}"
+                       aria-label="{% translate 'Preview' %}">
+                      <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
+                    </a>
+                    {% if announcement.status == 'failed' %}
+                    <form method="post" action="{% url 'announcement-retry' announcement.pk %}" hx-post="{% url 'announcement-retry' announcement.pk %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Retry this notification?' %}" class="aw-inline-form">
+                      {% csrf_token %}
+                      <button type="submit" class="aw-icon-btn" title="{% translate 'Retry' %}" aria-label="{% translate 'Retry' %}">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                      </button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="aw-card-body">
+          {% translate "No notifications have been sent yet." as notifications_empty_desc %}
+          {% include "partials/components/aw_empty.html" with icon="i-bell" description=notifications_empty_desc %}
         </div>
         {% endif %}
-
-        <div class="aw-form-grid">
-          <div class="aw-field aw-span-2">
-            <label for="{{ announcement_form.title.id_for_label }}">{{ announcement_form.title.label }}</label>
-            {{ announcement_form.title }}
-            {% if announcement_form.title.errors %}<div class="aw-field-error">{{ announcement_form.title.errors }}</div>{% endif %}
-          </div>
-          <div class="aw-field aw-span-2">
-            <label for="{{ announcement_form.body.id_for_label }}">{{ announcement_form.body.label }}</label>
-            {{ announcement_form.body }}
-            {% if announcement_form.body.errors %}<div class="aw-field-error">{{ announcement_form.body.errors }}</div>{% endif %}
-          </div>
-          <div class="aw-field">
-            <label for="{{ announcement_form.action_label.id_for_label }}">{{ announcement_form.action_label.label }}</label>
-            {{ announcement_form.action_label }}
-            {% if announcement_form.action_label.errors %}<div class="aw-field-error">{{ announcement_form.action_label.errors }}</div>{% endif %}
-          </div>
-          <div class="aw-field">
-            <label for="{{ announcement_form.action_url.id_for_label }}">{{ announcement_form.action_url.label }}</label>
-            {{ announcement_form.action_url }}
-            {% if announcement_form.action_url.help_text %}<span class="aw-field-hint">{{ announcement_form.action_url.help_text }}</span>{% endif %}
-            {% if announcement_form.action_url.errors %}<div class="aw-field-error">{{ announcement_form.action_url.errors }}</div>{% endif %}
-          </div>
-        </div>
-
-        <fieldset class="mt-3">
-          <legend class="aw-field-label">{{ announcement_form.levels.label }}</legend>
-          <div class="aw-flex aw-flex-wrap">
-            {% for checkbox in announcement_form.levels %}
-            <div class="form-check">
-              {{ checkbox.tag }}
-              <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
-            </div>
-            {% endfor %}
-          </div>
-          <span class="aw-field-hint d-block mt-1">{{ announcement_form.levels.help_text }}</span>
-          {% if announcement_form.levels.errors %}<div class="aw-field-error mt-1">{{ announcement_form.levels.errors }}</div>{% endif %}
-        </fieldset>
-
-        <p class="aw-flex aw-flex-wrap mt-3 mb-0">
-          <span>{% translate "Recipients:" %}</span>
-          <span id="notification-recipient-count" class="aw-pill aw-pill--teal"
-                hx-post="{{ recipient_count_url }}"
-                hx-trigger="load, change from:#notification-compose-form"
-                hx-include="closest form"
-                aria-live="polite">...</span>
-        </p>
-      </div>
-      <div class="aw-form-actions">
-        <button type="submit" class="aw-btn aw-btn--primary">
-          <svg class="aw-ico" aria-hidden="true"><use href="#i-send"></use></svg>
-          <span>{% translate "Send notification" %}</span>
-        </button>
-      </div>
-    </form>
-  </section>
-
-  <section class="aw-card aw-table-card">
-    <div class="aw-card-head">
-      <div class="aw-card-title">
-        <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
-        <h3>{% translate "Sent notifications" %}</h3>
-      </div>
-      <span class="aw-pill aw-pill--muted">{% blocktranslate with count=page_obj.paginator.count %}{{ count }} Notifications{% endblocktranslate %}</span>
+        {% translate "Notifications pagination" as aria_label %}
+        {% translate "notifications" as item_label %}
+        {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" aria_label=aria_label item_label=item_label %}
+      </section>
     </div>
-    {% if page_obj.object_list %}
-    <div class="aw-table-wrap">
-      <table class="aw-table">
-        <caption class="visually-hidden">{% translate "Sent notifications" %}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{% translate "Date" %}</th>
-            <th scope="col">{% translate "Status" %}</th>
-            <th scope="col">{% translate "Author" %}</th>
-            <th scope="col">{% translate "Target" %}</th>
-            <th scope="col">{% translate "Recipients" %}</th>
-            <th scope="col">{% translate "Title" %}</th>
-            <th scope="col">{% translate "Body" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for announcement in page_obj %}
-          <tr>
-            <td class="aw-date">{{ announcement.created_at }}<span class="aw-cell-sub">{{ announcement.academic_year.name }}</span></td>
-            <td>
-              {% if announcement.status == 'sending' %}
-              {% include "partials/components/aw_status_pill.html" with status=announcement.status tone="blue" label=announcement.get_status_display %}
-              {% else %}
-              {% include "partials/components/aw_status_pill.html" with status=announcement.status label=announcement.get_status_display %}
-              {% endif %}
-              {% if announcement.status == 'failed' %}
-              <form method="post" action="{% url 'announcement-retry' announcement.pk %}" hx-post="{% url 'announcement-retry' announcement.pk %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Retry this notification?' %}" class="aw-inline-form mt-1">
-                {% csrf_token %}
-                <button type="submit" class="aw-btn aw-btn--ghost aw-btn--sm">
-                  <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
-                  <span>{% translate "Retry" %}</span>
-                </button>
-              </form>
-              <span class="aw-cell-sub text-danger">{{ announcement.last_error }}</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if announcement.created_by %}{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}{% else %}-{% endif %}
-            </td>
-            <td>
-              {% with announcement_levels=announcement.levels.all %}
-              {% if announcement_levels %}{% for level in announcement_levels %}{{ level }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}{% translate "All active students" %}{% endif %}
-              {% endwith %}
-            </td>
-            <td class="aw-num">{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}-{% endif %}</td>
-            <td>{{ announcement.title|truncatechars:60 }}</td>
-            <td>{{ announcement.body|truncatechars:100 }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="aw-card-body">
-      {% translate "No notifications have been sent yet." as notifications_empty_desc %}
-      {% include "partials/components/aw_empty.html" with icon="i-bell" description=notifications_empty_desc %}
-    </div>
-    {% endif %}
-    {% translate "Notifications pagination" as aria_label %}
-    {% translate "notifications" as item_label %}
-    {% include "partials/pagination.html" with page_obj=page_obj pagination_query=pagination_query hx_target="#content" hx_select="#content" hx_swap="outerHTML" hx_push_url="true" aria_label=aria_label item_label=item_label %}
-  </section>
+  </div>
 </div>

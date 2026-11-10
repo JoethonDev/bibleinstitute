@@ -1,4 +1,3 @@
-{% load crispy_forms_tags %}
 {% load i18n %}
 {% load aw_ui %}
 {% translate "People" as page_eyebrow %}
@@ -10,7 +9,53 @@
 {% translate "No application documents uploaded." as documents_empty %}
 <div id="content" class="aw-dashboard-page" x-data="{ editing: {% if edit_form.is_bound and edit_form.errors %}true{% else %}false{% endif %} }">
 
-    {% include "partials/components/aw_page_head.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=profile_user|aw_display_name %}
+    {# Page head with the server-built action slot: the existing student overview
+       link and the Alpine edit toggle, replacing the ad-hoc flex row. #}
+    <div class="aw-page-head">
+        {% include "partials/components/aw_page_head_main.html" %}
+        <div class="aw-page-actions">
+            <a class="aw-btn aw-btn--outline" href="{% url 'student-overview' profile_user.pk %}"
+               hx-get="{% url 'student-overview' profile_user.pk %}"
+               hx-target="#display-page" hx-swap="innerHTML" hx-push-url="true" hx-select="#page-region">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                <span>{% translate "Overview" %}</span>
+            </a>
+            {% if can_edit_user %}
+            <button type="button"
+                    class="aw-btn aw-btn--primary"
+                    x-show="!editing"
+                    @click="editing = true"
+                    aria-controls="user-edit-form"
+                    :aria-expanded="editing.toString()">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                <span>{% translate "Edit" %}</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Identity band: the same facts the prototype puts above the tabs. #}
+    <section class="aw-card">
+        <div class="aw-identity">
+            {% include "partials/components/aw_avatar.html" with name=profile_user size="xl" tone="teal" %}
+            <div class="aw-identity-main">
+                <h2>{{ profile_user|aw_display_name }}</h2>
+                <div class="aw-identity-meta">
+                    <span dir="ltr">@{{ profile_user.username }}</span>
+                    {% if profile_user.email %}<span aria-hidden="true">&middot;</span><span dir="ltr">{{ profile_user.email }}</span>{% endif %}
+                    {% if profile_user.phone %}<span aria-hidden="true">&middot;</span><span dir="ltr">{{ profile_user.phone }}</span>{% endif %}
+                </div>
+                <div class="aw-identity-chips">
+                    {% if profile_user.role %}
+                    {% include "partials/components/aw_status_pill.html" with status=profile_user.role.role label=profile_user.role.get_role_display tone="teal" %}
+                    {% endif %}
+                    {% if active_enrollment and can_view_application_data %}
+                    <span class="aw-chip aw-chip--teal">{{ active_enrollment.academic_year_level.level.display_name }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
 
     {# At-a-glance state; the application decision keeps the panel's capability gate. #}
     <div class="aw-context-strip">
@@ -39,27 +84,6 @@
         {% endif %}
     </div>
 
-    {# Page actions: the existing student overview link and the edit toggle. #}
-    <div class="aw-flex aw-flex-wrap">
-        <a class="aw-btn aw-btn--primary aw-ms-auto" href="{% url 'student-overview' profile_user.pk %}"
-           hx-get="{% url 'student-overview' profile_user.pk %}"
-           hx-target="#display-page" hx-swap="innerHTML" hx-push-url="true" hx-select="#page-region">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
-            <span>{% translate "Overview" %}</span>
-        </a>
-        {% if can_edit_user %}
-        <button type="button"
-                class="aw-btn aw-btn--outline"
-                x-show="!editing"
-                @click="editing = true"
-                aria-controls="user-edit-form"
-                :aria-expanded="editing.toString()">
-            <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
-            <span>{% translate "Edit" %}</span>
-        </button>
-        {% endif %}
-    </div>
-
     {% if can_edit_user %}
     <section id="user-edit-form" class="aw-card" x-show="editing" x-cloak>
         <div class="aw-card-head">
@@ -72,7 +96,7 @@
             <form method="post" enctype="multipart/form-data" action="{% url 'user-profile' profile_user.pk %}" hx-post="{% url 'user-profile' profile_user.pk %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                 {% csrf_token %}
                 <div class="aw-form-section">
-                    {{ edit_form|crispy }}
+                    <div class="aw-form-grid">{% include "partials/components/aw_form_fields.html" with form=edit_form %}</div>
                     <div class="aw-form-actions">
                         <button type="submit" class="aw-btn aw-btn--primary">
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
@@ -89,168 +113,136 @@
     {% endif %}
 
     <div x-show="!editing" x-cloak>
-        <div class="aw-grid aw-grid--2-even">
-            <div class="aw-stack aw-stack--lg">
-                <section class="aw-card">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
-                            <h3>{% translate "Account information" %}</h3>
+        <div class="aw-stack aw-stack--lg">
+            {# One summary card: the five bordered information cards merged into a
+               single key/value grid, grouped by the card titles they replace. #}
+            <section class="aw-card">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
+                        <h3>{% translate "Profile summary" %}</h3>
+                    </div>
+                </div>
+                <div class="aw-card-body">
+                    <dl class="aw-form-grid">
+                        <div class="aw-form-section-head aw-span-2">
+                            <div><h3>{% translate "Account information" %}</h3></div>
                         </div>
-                    </div>
-                    <div class="aw-card-body">
-                        <dl class="mb-0">
-                            <div class="aw-kv"><dt>{% translate "Username" %}</dt><dd>{{ profile_user.username }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "First name" %}</dt><dd>{{ profile_user.first_name|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Last name" %}</dt><dd>{{ profile_user.last_name|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Email" %}</dt><dd>{{ profile_user.email|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Role" %}</dt><dd>{{ profile_user.role.get_role_display|default:"-" }}</dd></div>
-                            <div class="aw-kv">
-                                <dt>{% translate "Active" %}</dt>
-                                <dd>{% if profile_user.is_active %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd>
-                            </div>
-                            <div class="aw-kv"><dt>{% translate "Joined date" %}</dt><dd>{{ profile_user.joined_date|date:"Y-m-d"|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Last login" %}</dt><dd>{{ profile_user.last_login|date:"Y-m-d H:i"|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Time zone" %}</dt><dd dir="ltr">{{ profile_user.time_zone|default:"-" }}</dd></div>
-                        </dl>
-                    </div>
-                </section>
+                        <div class="aw-kv"><dt>{% translate "Username" %}</dt><dd>{{ profile_user.username }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "First name" %}</dt><dd>{{ profile_user.first_name|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Last name" %}</dt><dd>{{ profile_user.last_name|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Email" %}</dt><dd>{{ profile_user.email|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Role" %}</dt><dd>{{ profile_user.role.get_role_display|default:"-" }}</dd></div>
+                        <div class="aw-kv">
+                            <dt>{% translate "Active" %}</dt>
+                            <dd>{% if profile_user.is_active %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd>
+                        </div>
+                        <div class="aw-kv"><dt>{% translate "Joined date" %}</dt><dd>{{ profile_user.joined_date|date:"Y-m-d"|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Last login" %}</dt><dd>{{ profile_user.last_login|date:"Y-m-d H:i"|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Time zone" %}</dt><dd dir="ltr">{{ profile_user.time_zone|default:"-" }}</dd></div>
 
-                {% if can_view_application_data %}
-                <section class="aw-card">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check-square"></use></svg>
-                            <h3>{% translate "Application information" %}</h3>
+                        {% if can_view_application_data %}
+                        <div class="aw-form-section-head aw-span-2">
+                            <div><h3>{% translate "Application information" %}</h3></div>
                         </div>
-                    </div>
-                    <div class="aw-card-body">
-                        <dl class="mb-0">
-                            <div class="aw-kv">
-                                <dt>{% translate "Application status" %}</dt>
-                                <dd>{% include "partials/components/aw_status_pill.html" with status=profile_user.application_status label=profile_user.get_application_status_display %}</dd>
-                            </div>
-                            <div class="aw-kv"><dt>{% translate "Identity type" %}</dt><dd>{{ profile_user.get_identity_type_display|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "National ID / passport number" %}</dt><dd dir="ltr">{{ profile_user.identity_number|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Decision notes" %}</dt><dd>{{ profile_user.decision_notes|default:"-"|linebreaksbr }}</dd></div>
-                            <div class="aw-kv">
-                                <dt>{% translate "Decided by" %}</dt>
-                                <dd>{% if profile_user.decided_by %}{{ profile_user.decided_by.get_full_name|default:profile_user.decided_by.username }}{% else %}-{% endif %}</dd>
-                            </div>
-                            <div class="aw-kv"><dt>{% translate "Decided at" %}</dt><dd>{{ profile_user.decided_at|date:"Y-m-d H:i"|default:"-" }}</dd></div>
-                            <div class="aw-kv">
-                                <dt>{% translate "Active enrollment" %}</dt>
-                                <dd>{% if active_enrollment %}{{ active_enrollment.academic_year_level.academic_year.name }} - {{ active_enrollment.academic_year_level.level.display_name }}{% else %}{% translate "None" %}{% endif %}</dd>
-                            </div>
-                        </dl>
-                    </div>
-                </section>
-                {% endif %}
-            </div>
-
-            <div class="aw-stack aw-stack--lg">
-                <section class="aw-card">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
-                            <h3>{% translate "Personal information" %}</h3>
+                        <div class="aw-kv">
+                            <dt>{% translate "Application status" %}</dt>
+                            <dd>{% include "partials/components/aw_status_pill.html" with status=profile_user.application_status label=profile_user.get_application_status_display %}</dd>
                         </div>
-                    </div>
-                    <div class="aw-card-body">
-                        <dl class="mb-0">
-                            <div class="aw-kv"><dt>{% translate "Phone" %}</dt><dd dir="ltr">{{ profile_user.phone|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Country" %}</dt><dd>{{ profile_user.country|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "City" %}</dt><dd>{{ profile_user.city|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Educational qualification / occupation" %}</dt><dd>{{ profile_user.education_or_job|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Study mode" %}</dt><dd>{{ profile_user.get_study_mode_display|default:"-" }}</dd></div>
-                        </dl>
-                    </div>
-                </section>
-
-                <section class="aw-card">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
-                            <h3>{% translate "Church information" %}</h3>
+                        <div class="aw-kv"><dt>{% translate "Identity type" %}</dt><dd>{{ profile_user.get_identity_type_display|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "National ID / passport number" %}</dt><dd dir="ltr">{{ profile_user.identity_number|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Decision notes" %}</dt><dd>{{ profile_user.decision_notes|default:"-"|linebreaksbr }}</dd></div>
+                        <div class="aw-kv">
+                            <dt>{% translate "Decided by" %}</dt>
+                            <dd>{% if profile_user.decided_by %}{{ profile_user.decided_by.get_full_name|default:profile_user.decided_by.username }}{% else %}-{% endif %}</dd>
                         </div>
-                    </div>
-                    <div class="aw-card-body">
-                        <dl class="mb-0">
-                            <div class="aw-kv"><dt>{% translate "Confessor name" %}</dt><dd>{{ profile_user.priest_name|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Confessor phone" %}</dt><dd dir="ltr">{{ profile_user.priest_phone|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Church" %}</dt><dd>{{ profile_user.church|default:"-" }}</dd></div>
-                            <div class="aw-kv"><dt>{% translate "Service (if any)" %}</dt><dd>{{ profile_user.service|default:"-" }}</dd></div>
-                        </dl>
-                    </div>
-                </section>
-
-                <section class="aw-card">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-message"></use></svg>
-                            <h3>{% translate "Telegram Account" %}</h3>
+                        <div class="aw-kv"><dt>{% translate "Decided at" %}</dt><dd>{{ profile_user.decided_at|date:"Y-m-d H:i"|default:"-" }}</dd></div>
+                        <div class="aw-kv">
+                            <dt>{% translate "Active enrollment" %}</dt>
+                            <dd>{% if active_enrollment %}{{ active_enrollment.academic_year_level.academic_year.name }} - {{ active_enrollment.academic_year_level.level.display_name }}{% else %}{% translate "None" %}{% endif %}</dd>
                         </div>
-                    </div>
-                    <div class="aw-card-body">
-                        {% if telegram_account %}
-                        <div class="aw-flex-between aw-flex-wrap">
-                            {% include "partials/components/aw_status_pill.html" with status="linked" label=telegram_linked %}
-                            {% if telegram_can_unlink %}
-                            <form method="post"
-                                  action="{{ telegram_unlink_url }}"
-                                  hx-post="{{ telegram_unlink_url }}"
-                                  hx-target="#content"
-                                  hx-select="#content"
-                                  hx-swap="outerHTML"
-                                  hx-select-oob="#toast-stack"
-                                  hx-push-url="true"
-                                  class="ps-inline-form"
-                                  data-confirm-message="{% translate 'Unlink this Telegram account?' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-log-out"></use></svg>
-                                    {% translate "Unlink Telegram" %}
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                        {% else %}
-                        {% include "partials/components/aw_status_pill.html" with status="not linked" label=telegram_not_linked %}
                         {% endif %}
-                    </div>
-                </section>
 
-                {% if can_view_application_data %}
-                <section class="aw-card">
-                    <div class="aw-card-head">
-                        <div class="aw-card-title">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
-                            <h3>{% translate "Application documents" %}</h3>
+                        <div class="aw-form-section-head aw-span-2">
+                            <div><h3>{% translate "Personal information" %}</h3></div>
                         </div>
-                    </div>
-                    <div class="aw-card-body">
-                        {% if application_documents %}
-                        <div class="aw-stack">
-                            {% for document in application_documents %}
-                            <div class="aw-file-row">
-                                <span class="aw-file-ic">
-                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
-                                </span>
-                                <div class="aw-file-main"><b>{{ document.label }}</b></div>
-                                <div class="aw-file-actions">
-                                    <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{{ document.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
-                                    <a class="aw-btn aw-btn--outline aw-btn--sm" href="{{ document.download_url }}">{% translate "Download" %}</a>
+                        <div class="aw-kv"><dt>{% translate "Phone" %}</dt><dd dir="ltr">{{ profile_user.phone|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Country" %}</dt><dd>{{ profile_user.country|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "City" %}</dt><dd>{{ profile_user.city|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Educational qualification / occupation" %}</dt><dd>{{ profile_user.education_or_job|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Study mode" %}</dt><dd>{{ profile_user.get_study_mode_display|default:"-" }}</dd></div>
+
+                        <div class="aw-form-section-head aw-span-2">
+                            <div><h3>{% translate "Church information" %}</h3></div>
+                        </div>
+                        <div class="aw-kv"><dt>{% translate "Confessor name" %}</dt><dd>{{ profile_user.priest_name|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Confessor phone" %}</dt><dd dir="ltr">{{ profile_user.priest_phone|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Church" %}</dt><dd>{{ profile_user.church|default:"-" }}</dd></div>
+                        <div class="aw-kv"><dt>{% translate "Service (if any)" %}</dt><dd>{{ profile_user.service|default:"-" }}</dd></div>
+
+                        <div class="aw-kv">
+                            <dt>{% translate "Telegram Account" %}</dt>
+                            <dd>
+                                {% if telegram_account %}
+                                <div class="aw-flex aw-flex-wrap">
+                                    {% include "partials/components/aw_status_pill.html" with status="linked" label=telegram_linked %}
+                                    {% if telegram_can_unlink %}
+                                    <form method="post"
+                                          action="{{ telegram_unlink_url }}"
+                                          hx-post="{{ telegram_unlink_url }}"
+                                          hx-target="#content"
+                                          hx-select="#content"
+                                          hx-swap="outerHTML"
+                                          hx-select-oob="#toast-stack"
+                                          hx-push-url="true"
+                                          data-confirm-message="{% translate 'Unlink this Telegram account?' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="aw-btn aw-btn--danger aw-btn--sm">
+                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-log-out"></use></svg>
+                                            {% translate "Unlink Telegram" %}
+                                        </button>
+                                    </form>
+                                    {% endif %}
                                 </div>
-                            </div>
-                            {% endfor %}
+                                {% else %}
+                                {% include "partials/components/aw_status_pill.html" with status="not linked" label=telegram_not_linked %}
+                                {% endif %}
+                            </dd>
                         </div>
-                        {% else %}
-                        {% include "partials/components/aw_empty.html" with icon="i-file" description=documents_empty %}
-                        {% endif %}
+                    </dl>
+                </div>
+            </section>
+
+            {% if can_view_application_data %}
+            <section class="aw-card">
+                <div class="aw-card-head">
+                    <div class="aw-card-title">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                        <h3>{% translate "Application documents" %}</h3>
                     </div>
-                </section>
-                {% endif %}
-            </div>
+                </div>
+                <div class="aw-card-body">
+                    {% if application_documents %}
+                    <div class="aw-stack">
+                        {% for document in application_documents %}
+                        <div class="aw-file-row">
+                            <span class="aw-file-ic">
+                                <svg class="aw-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+                            </span>
+                            <div class="aw-file-main"><b>{{ document.label }}</b></div>
+                            <div class="aw-file-actions">
+                                <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{{ document.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
+                                <a class="aw-btn aw-btn--outline aw-btn--sm" href="{{ document.download_url }}">{% translate "Download" %}</a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {% include "partials/components/aw_empty.html" with icon="i-file" description=documents_empty %}
+                    {% endif %}
+                </div>
+            </section>
+            {% endif %}
         </div>
     </div>
 </div>

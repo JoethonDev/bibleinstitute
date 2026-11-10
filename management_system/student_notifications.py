@@ -160,14 +160,21 @@ def _quiz_snapshot_body(quiz: Quiz, user: User, opening: datetime, closing: date
         _("Opens: %(date)s") % {"date": format_human_datetime(opening, user)},
         _("Closes: %(date)s") % {"date": format_human_datetime(closing, user)},
         _("Time zone: %(name)s") % {"name": timezone_name(user)},
-        _("Allowed time: up to %(minutes)s minutes after starting.") % {
-            "minutes": quiz.duration_minutes,
-        },
-        _("Your attempt ends at closing if that comes first."),
+    ]
+    # 0 minutes means no time limit: the attempt runs until the quiz closes.
+    if quiz.duration_minutes:
+        lines.append(
+            _("Allowed time: up to %(minutes)s minutes after starting.")
+            % {"minutes": quiz.duration_minutes}
+        )
+        lines.append(_("Your attempt ends at closing if that comes first."))
+    else:
+        lines.append(_("No time limit: your attempt ends when the quiz closes."))
+    lines.extend([
         _("Open the exam to view instructions and start."),
         _("Type: %(type)s") % {"type": quiz_type_name or _("Unassigned")},
         _("Total grade: %(grade)s") % {"grade": quiz.total_grade},
-    ]
+    ])
     return "\n".join(lines)
 
 

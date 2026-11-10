@@ -1,13 +1,13 @@
 {% extends 'admin_panel.html' %}
-{% load crispy_forms_tags %}
 {% load i18n %}
 
 {% comment %}
 Bulk user import workspace. Presentation only: the CSV POST keeps its exact
-action, multipart encoding, hx-* contract, csrf token, crispy field
-(id_csv_file, label, help text and validation messages), the operation-status
-include arguments and the row-error projection. The view supplies no page
-head context, so the head is inlined with existing catalog msgids.
+action, multipart encoding, hx-* contract, csrf token, the canonical aw-field
+rendering (id_csv_file, label, help text and validation messages), the
+operation-status include arguments and the row-error projection. The view
+supplies no page head context, so the head is inlined with existing catalog
+msgids.
 {% endcomment %}
 
 {% block body %}

@@ -181,7 +181,7 @@ def parse_quiz_import(payload: str, *, mode: str = "create") -> QuizImportResult
         "status_label": quiz_display.get("status_label", ""),
         "opening_display": quiz_display.get("opening_display", ""),
         "closing_display": quiz_display.get("closing_display", ""),
-        "duration_minutes": quiz_display.get("duration_minutes", 60),
+        "duration_minutes": quiz_display.get("duration_minutes", 0),
         "total_grade": result.total_grade,
         "questions_count": len(result.questions),
     }

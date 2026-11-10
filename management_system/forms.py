@@ -35,6 +35,83 @@ def _joined_date_field(*, required: bool = True, initial=None) -> forms.DateFiel
     )
 
 
+# Canonical control classes for the admin workspace. Widgets never carry these
+# in templates: one mixin assigns them from the widget type so the admin field
+# partial can render every field the same way.
+_AW_CONTROL_CLASSES = {
+    "select": "aw-select",
+    "textarea": "aw-textarea",
+    "checkbox": "aw-check-input",
+    "file": "aw-input",
+    "default": "aw-input",
+}
+
+# Legacy Bootstrap control names that must not survive in admin markup.
+_AW_RETIRED_CLASSES = frozenset(
+    {
+        "form-control",
+        "form-select",
+        "form-check-input",
+        "form-control-sm",
+        "form-select-sm",
+    }
+)
+
+
+def _aw_widget_kind(widget: forms.Widget) -> str:
+    if isinstance(widget, (forms.CheckboxInput, forms.CheckboxSelectMultiple)):
+        return "checkbox"
+    if isinstance(widget, (forms.RadioSelect,)):
+        return "checkbox"
+    if isinstance(widget, forms.Select):
+        return "select"
+    if isinstance(widget, forms.Textarea):
+        return "textarea"
+    if isinstance(widget, forms.FileInput):
+        return "file"
+    return "default"
+
+
+def apply_aw_widget_classes(fields: dict) -> None:
+    """Assign the admin control class to every rendered widget.
+
+    Existing attributes are preserved (placeholders, ``dir``, ``inputmode``,
+    ``min``, ``step``, ``accept``). Retired Bootstrap control classes are
+    replaced rather than kept, so the admin shell stops depending on the
+    Bootstrap skin rules.
+    """
+
+    for field in fields.values():
+        widget = field.widget
+        if isinstance(widget, forms.HiddenInput):
+            continue
+        classes = [
+            token
+            for token in str(widget.attrs.get("class", "")).split()
+            if token and token not in _AW_RETIRED_CLASSES
+        ]
+        control = _AW_CONTROL_CLASSES[_aw_widget_kind(widget)]
+        if control not in classes:
+            classes.append(control)
+        widget.attrs["class"] = " ".join(classes)
+
+
+class AwFormMixin:
+    """Admin form base: one place assigns the workspace control classes."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_aw_widget_classes(self.fields)
+
+
+class AwForm(AwFormMixin, forms.Form):
+    """Form rendered by the admin workspace field partial."""
+
+
+class AwModelForm(AwFormMixin, forms.ModelForm):
+    """Model form rendered by the admin workspace field partial."""
+
+
 def _set_password_if_provided(user: User, password: str | None) -> None:
     if password:
         user.set_password(password)
@@ -93,7 +170,7 @@ class UserLoginForm(AuthenticationForm):
         }
     ), strip=False)
     
-class UserCreationForm(forms.ModelForm):
+class UserCreationForm(AwModelForm):
     def __init__(self, *args, **kwargs):
         super(UserCreationForm, self).__init__(*args, **kwargs)
         self.fields['username'].label = _("Username") # Localized
@@ -351,7 +428,7 @@ class UserUpdateForm(UserCreationForm):
                 raise forms.ValidationError(exc.message if hasattr(exc, "message") else str(exc))
         return identity_number
 
-class LessonEditorForm(forms.Form):
+class LessonEditorForm(AwForm):
     lesson_name = forms.CharField(max_length=255, label=_("Lesson Name"))
     description = forms.CharField(required=False, label=_("Lesson Description"))
     course_offering = forms.ModelChoiceField(queryset=CourseOffering.objects.none(), label=_("Course Offering"))
@@ -380,7 +457,7 @@ class LessonEditorForm(forms.Form):
             raise forms.ValidationError(_("Enter a valid date and time."))
 
 
-class CourseForm(forms.ModelForm):
+class CourseForm(AwModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['name'].label = _("Course Name")
@@ -395,7 +472,7 @@ class CourseForm(forms.ModelForm):
         model = Course
         fields = "__all__"
 
-class AcademicYearForm(forms.ModelForm):
+class AcademicYearForm(AwModelForm):
     def __init__(self, *args, **kwargs):
         level_choices = kwargs.pop("level_choices", None)
         super().__init__(*args, **kwargs)
@@ -444,7 +521,7 @@ class AcademicYearForm(forms.ModelForm):
         return cleaned
 
 
-class CourseOfferingForm(forms.ModelForm):
+class CourseOfferingForm(AwModelForm):
     class Meta:
         model = CourseOffering
         fields = ["course", "academic_year_level", "instructor", "status"]
@@ -472,7 +549,7 @@ class CourseOfferingForm(forms.ModelForm):
                 self.fields["course"].queryset = Course.objects.filter(level=self.instance.academic_year_level.level)
 
 
-class AcademicYearLevelWeekdayForm(forms.ModelForm):
+class AcademicYearLevelWeekdayForm(AwModelForm):
     meeting_weekdays = forms.MultipleChoiceField(
         choices=[
             (0, _("Monday")),
@@ -500,7 +577,7 @@ class AcademicYearLevelWeekdayForm(forms.ModelForm):
         return sorted({int(day) for day in self.cleaned_data["meeting_weekdays"]})
 
 
-class AttendancePolicyForm(forms.ModelForm):
+class AttendancePolicyForm(AwModelForm):
     class Meta:
         model = AttendancePolicy
         fields = ["entrance_deadline", "exit_time", "buffer_minutes"]
@@ -528,7 +605,7 @@ class AttendancePolicyForm(forms.ModelForm):
         return minutes
 
 
-class HistoricalIntakeForm(forms.Form):
+class HistoricalIntakeForm(AwForm):
     source_year_level = forms.ModelChoiceField(
         queryset=AcademicYearLevel.objects.none(),
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -586,7 +663,7 @@ class HistoricalIntakeForm(forms.Form):
         return cleaned
 
 
-class ExceptionalCourseAssignmentForm(forms.Form):
+class ExceptionalCourseAssignmentForm(AwForm):
     student_identifier = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Username or numeric student ID")}),
         label=_("Student"),
@@ -616,7 +693,7 @@ class ExceptionalCourseAssignmentForm(forms.Form):
         return student
 
 
-class HistoricalExistingBulkForm(forms.Form):
+class HistoricalExistingBulkForm(AwForm):
     """Find-mode bulk intake for existing students (1-50 per run)."""
 
     students = forms.ModelMultipleChoiceField(
@@ -692,7 +769,7 @@ class HistoricalExistingBulkForm(forms.Form):
         return cleaned
 
 
-class OfferingCopyForm(forms.Form):
+class OfferingCopyForm(AwForm):
     source_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none(), label=_("Source academic scope"))
     target_year_level = forms.ModelChoiceField(queryset=AcademicYearLevel.objects.none(), label=_("Target academic scope"))
     offerings = GroupedByLevelModelMultipleChoiceField(
@@ -709,10 +786,6 @@ class OfferingCopyForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["source_year_level"].label = _("Source Academic Scope")
         self.fields["target_year_level"].label = _("Target Academic Scope")
-        self.fields["source_year_level"].widget.attrs.update({"class": "form-select"})
-        self.fields["target_year_level"].widget.attrs.update({"class": "form-select"})
-        self.fields["copy_lessons"].widget.attrs.update({"class": "form-check-input"})
-        self.fields["copy_quizzes"].widget.attrs.update({"class": "form-check-input"})
         source_scopes = AcademicYearLevel.objects.filter(
             academic_year__is_active=False,
         ).select_related("academic_year", "level").order_by(
@@ -753,7 +826,7 @@ class OfferingCopyForm(forms.Form):
         return cleaned
 
 
-class QuizTypeForm(forms.ModelForm):
+class QuizTypeForm(AwModelForm):
     class Meta:
         model = QuizType
         fields = ["code", "name_en", "name_ar"]
@@ -769,7 +842,7 @@ class QuizTypeForm(forms.ModelForm):
         }
 
 
-class PromotionFormulaForm(forms.Form):
+class PromotionFormulaForm(AwForm):
     academic_year_level = forms.ModelChoiceField(
         queryset=AcademicYearLevel.objects.filter(academic_year__is_active=True).select_related("academic_year", "level").order_by(
             "academic_year__ordering", "level__ordering"
@@ -837,7 +910,7 @@ class PromotionFormulaForm(forms.Form):
         return cleaned
 
 
-class PromotionRuleForm(forms.Form):
+class PromotionRuleForm(AwForm):
     metric = forms.ChoiceField(
         choices=PromotionRule.Metric.choices,
         label=_("Metric"),
@@ -873,11 +946,11 @@ class PromotionRuleForm(forms.Form):
             self.add_error("quiz_type", _("Attendance rules cannot select a quiz type."))
         return cleaned
 
-class CSVUploadForm(forms.Form):
+class CSVUploadForm(AwForm):
     csv_file = forms.FileField(label=_("CSV File"), help_text=_("Upload a .csv file with user data."))
 
 
-class QuizExceptionalOpeningForm(forms.Form):
+class QuizExceptionalOpeningForm(AwForm):
     students = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
         label=_("Students"),
@@ -928,7 +1001,7 @@ class QuizExceptionalOpeningForm(forms.Form):
         return cleaned
 
 
-class ApplicationAdminForm(forms.ModelForm):
+class ApplicationAdminForm(AwModelForm):
     username = CanonicalUsernameField(
         widget=forms.TextInput(attrs={"placeholder": _("Username")})
     )
@@ -1456,7 +1529,7 @@ class SignupDetailsForm(forms.ModelForm):
         return user
 
 
-class AnnouncementForm(forms.Form):
+class AnnouncementForm(AwForm):
     """Validate one admin announcement draft without persistence work.
 
     This is a trust-boundary validator only. Admin authorization, active-year
@@ -1566,7 +1639,7 @@ class AnnouncementForm(forms.Form):
         return cleaned_data
 
 
-class SignupSettingsForm(forms.ModelForm):
+class SignupSettingsForm(AwModelForm):
     """Admin control over the public signup form: open/close, titles, intake scope."""
 
     intake_scope = forms.ModelChoiceField(
