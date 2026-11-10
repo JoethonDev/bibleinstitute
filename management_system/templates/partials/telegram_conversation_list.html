@@ -1,8 +1,14 @@
 {% load i18n %}
+{% comment %}
+Conversations column. The root is the scroll container, the server owns the
+page (25 rows), and the sentinel below loads the next page when it becomes
+visible. The poll URL carries the open conversation id so its active row survives
+a refresh of the first page.
+{% endcomment %}
 <div id="telegram-conversation-list"
      class="aw-chat-list"
      data-loaded-pages="1"
-     data-poll-url="{{ conversation_list_url }}?fragment=items{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"
+     data-poll-url="{{ conversation_list_url }}?fragment=items{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}{% if active_conversation_id %}&amp;active={{ active_conversation_id }}{% endif %}"
      x-data="{
          autoRefresh: true,
          polling: false,

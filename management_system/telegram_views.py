@@ -418,6 +418,15 @@ def _conversation_search_queryset(search: str):
     return queryset
 
 
+def _active_conversation_id(request) -> int | None:
+    """Return the conversation id the request marks as open, when valid."""
+    try:
+        active_id = int(request.GET.get("active", ""))
+    except (TypeError, ValueError):
+        return None
+    return active_id if active_id > 0 else None
+
+
 def _conversation_list_context(request):
     search = normalize_search_text(request.GET.get("search", "").strip()[:120])
     status = request.GET.get("status", "").strip()
@@ -455,13 +464,16 @@ def _conversation_list_context(request):
         )
     return {
         "page_obj": page_obj,
-        "pagination_query": pagination_query_string(request, exclude=("page", "start_page")),
+        "pagination_query": pagination_query_string(request, exclude=("page", "start_page", "active")),
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
             (_("Telegram Support Chat"), None),
         ]),
         "search": search,
         "status": status,
+        # The row of the conversation that is open in the panel; it survives a
+        # list refresh, which keeps the highlight stable while polling.
+        "active_conversation_id": _active_conversation_id(request),
         "conversation_list_url": reverse("telegram-conversations"),
         "mark_all_read_url": reverse("telegram-conversations-mark-all-read"),
         "unread_count": count_unread_conversations(),
@@ -508,6 +520,11 @@ def telegram_conversations(request):
             request.GET.get("start_page", 1)
         ),
     })
+    # The start-conversation search is a modal list, not a page navigation:
+    # answering it with the whole inbox page made every keystroke render the
+    # shell only for hx-select to throw it away.
+    if fragment == "linked-users":
+        return render(request, "partials/telegram_linked_user_list.html", context)
     return render_page(request, "telegram_conversations.html", "partials/telegram_conversations_content.html", context)
 
 
@@ -529,7 +546,13 @@ def _valid_reply_target(conversation_id: int, value: str | None) -> int | None:
     return message_id
 
 
-def _conversation_detail_context(request, conversation, reply_form=None, panel_notice=None):
+def _conversation_detail_context(
+    request,
+    conversation,
+    reply_form=None,
+    panel_notice=None,
+    include_conversation_list=False,
+):
     own_admin_chat_id = TelegramAccount.objects.filter(
         user_id=request.user.pk,
         is_active=True,
@@ -630,15 +653,17 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
                 "reply_to_message_id": reply_to_message_id,
             }
         )
-    list_context = _conversation_list_context(request)
+    list_context = None
+    if include_conversation_list:
+        # The conversations column is page state and no fragment touches it, so
+        # a panel/poll/items response never builds that list query.
+        list_context = _conversation_list_context(request)
     return {
+        **(list_context or {}),
+        # The conversations column lives beside the panel on this page too, so
+        # the same bounded list context feeds it and the open row is marked.
+        "active_conversation_id": conversation.pk,
         "conversation": conversation,
-        # The conversation rail lives beside the thread on the detail page, so
-        # the same bounded list context feeds it.
-        "page_obj": list_context["page_obj"],
-        "pagination_query": list_context["pagination_query"],
-        "unread_count": list_context["unread_count"],
-        "mark_all_read_url": list_context["mark_all_read_url"],
         "conversation_level": current_level_labels([conversation.user_id]).get(
             conversation.user_id,
             _("Level not assigned"),
@@ -677,7 +702,13 @@ def telegram_conversation_detail(request, conversation_id):
     if not fragment and request.GET.get("page"):
         return redirect("telegram-conversation-detail", conversation_id=conversation_id)
     conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
-    context = _conversation_detail_context(request, conversation)
+    # Only the page render owns the conversations column; the panel, the older
+    # page and the poll are single-region fragments.
+    context = _conversation_detail_context(
+        request,
+        conversation,
+        include_conversation_list=not fragment,
+    )
     if fragment == "panel":
         return render(request, "partials/telegram_chat_panel.html", context)
     if fragment == "items":
@@ -698,7 +729,12 @@ def telegram_conversation_reply(request, conversation_id):
     form = TelegramSupportReplyForm(request.POST, request.FILES)
     panel_request = request.GET.get("fragment") == "panel"
     if not form.is_valid():
-        context = _conversation_detail_context(request, conversation, form)
+        context = _conversation_detail_context(
+            request,
+            conversation,
+            form,
+            include_conversation_list=not panel_request,
+        )
         if panel_request:
             return render(request, "partials/telegram_chat_panel.html", context, status=200)
         return render_page(

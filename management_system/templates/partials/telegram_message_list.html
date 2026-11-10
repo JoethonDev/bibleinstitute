@@ -62,7 +62,8 @@
           enctype="multipart/form-data"
           hx-post="{{ reply_url }}?fragment=panel"
           hx-target="#telegram-chat-panel"
-          hx-swap="innerHTML"
+          hx-select="#telegram-chat-panel"
+          hx-swap="outerHTML"
           hx-config='{"timeout": 900000}'
           x-on:keydown.enter.exact.prevent="$event.target.form.requestSubmit()">
         {% csrf_token %}
@@ -91,7 +92,9 @@
                 {% translate "Attach a file" %}
             </label>
             {{ reply_form.attachment }}
-            <span id="telegram-support-attachment-help" class="aw-small aw-muted">
+            <span id="telegram-support-attachment-help"
+                  class="aw-small aw-muted aw-truncate"
+                  title="{% translate 'JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes.' %}">
                 {% translate "JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes." %}
             </span>
             {% if reply_form.attachment.errors %}

@@ -1,12 +1,11 @@
 {% load i18n %}
 {% comment %}
-Standalone conversation page. The chat panel partial owns the detail head,
-status blocks, thread, composer and every /?fragment=panel target; this wrapper
-only provides the page root and the HTMX target the partial swaps into.
+One Telegram conversation page.
+
+The conversations column, the panel root and every /?fragment= target are owned
+by the shared layout/panel partials, so a hard refresh renders exactly the DOM
+an HTMX panel swap produces and the list is never duplicated inside the panel.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page aw-page--chat">
-
-    <div id="telegram-chat-panel" class="aw-chat-panel aw-chat-panel--full">
-        {% include 'partials/telegram_chat_panel.html' %}
-    </div>
+    {% include 'partials/telegram_chat_layout.html' %}
 </div>

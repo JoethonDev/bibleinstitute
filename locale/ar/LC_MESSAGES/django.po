@@ -10744,6 +10744,9 @@ msgstr "رسائل جماعية"
 msgid "conversations"
 msgstr "محادثات"
 
+msgid "Conversations"
+msgstr "المحادثات"
+
 msgid "linked users"
 msgstr "مستخدمين مرتبطين"
 
@@ -13648,6 +13651,18 @@ msgstr "تم حذف الرسالة من Telegram. عادت المحادثة إل
 
 msgid "Only a sent Telegram reply can be deleted."
 msgstr "يمكن حذف رد أُرسل بالفعل إلى Telegram فقط."
+
+msgid "Quick links"
+msgstr "روابط سريعة"
+
+msgid "Back to conversations"
+msgstr "العودة إلى المحادثات"
+
+msgid "Search conversations"
+msgstr "بحث المحادثات"
+
+msgid "Student context"
+msgstr "بيانات الطالب"
 
 msgid "Only administrators can withdraw notifications."
 msgstr "يمكن للمسؤولين فقط سحب الإشعارات."

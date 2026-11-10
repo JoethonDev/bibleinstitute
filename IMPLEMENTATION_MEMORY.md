@@ -8,6 +8,149 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Latest implementation unit (10 November 2026) - chat workspace and stale-asset root cause
+
+### Reported 1: empty band under the admin body on short pages
+
+Not reproducible on the current tree. Measured in Chromium on the disposable
+schema at 1919x1031 and 1366x768 for `background-jobs` and
+`attendance-management`: `.aw-shell` and `.aw-rail` bottoms equal the viewport
+bottom in every case, and the deployed
+`https://bibleinstitute-eg.org/static/css/admin_workspace.css` is byte-identical
+to the working tree (it already carries `.aw-shell { min-height: 100vh }`). The
+operator screenshots therefore show an older stylesheet, not a layout defect.
+
+Root cause of "a fix that never reaches the browser": nginx serves `/static/`
+with `Cache-Control: public, immutable` for any non-empty `?v=` value
+(`map $arg_v` in `nginx/default.conf`) while `STATIC_ASSET_VERSION` was the
+constant `dev` from `.env`. An immutable response is never revalidated, so every
+client kept the pre-fix CSS and JS for the 7-day `expires` window.
+
+Fix: `learning_platform/settings.py` now derives `STATIC_ASSET_VERSION` from the
+newest modification time plus file count of the owned `css`/`js` trees
+(`management_system/static`, `static`) when the env var is unset or `dev`; an
+explicit non-`dev` value still wins for release pipelines. The token changes on
+the next deploy that ships a changed asset and stays stable otherwise. No
+template, static path or nginx rule changed.
+
+### Reported 2: Telegram chat broken under HTMX/Alpine and on refresh
+
+Proven root causes:
+
+- `partials/telegram_chat_panel.html` included
+  `partials/telegram_conversation_list.html` while every trigger swapped the
+  panel with `hx-swap="innerHTML"`. Opening a conversation injected a **second**
+  conversation list (duplicate id) inside the panel, so the panel grid received
+  three children (list, thread, context) in a two-column track.
+- The conversation page used a separate `aw-chat-panel--full` grid with a third
+  copy of the list, so HTMX and a hard refresh produced different DOM.
+- No `hx-push-url` on a row: the address bar stayed on the inbox, so refresh
+  lost the open conversation.
+- The start-conversation modal search fetched the whole inbox page on every
+  keystroke and used `hx-select` to throw it away.
+- The post-swap handler only re-initialised Alpine for `#display-page`,
+  `#page-region` and `#content`, never for the swapped chat panel.
+
+Reworked contract (one canonical structure):
+
+- New `partials/telegram_chat_layout.html`: conversations column plus the
+  panel. Both the inbox and the conversation page include it; the column is a
+  page sibling of the panel on both routes, so a panel swap cannot duplicate it.
+  `chat_push_url` is `true` on the inbox (filters are page state) and `false`
+  on a conversation page (the URL keeps the conversation).
+- `partials/telegram_chat_panel.html` owns its root
+  `<section id="telegram-chat-panel" class="aw-chat-panel is-open">`; the empty
+  state is the same root with `is-empty`. Every panel trigger (row link, claim,
+  release, mark-read, reply composer, message reply/delete) now uses
+  `hx-target="#telegram-chat-panel"` + `hx-select="#telegram-chat-panel"` +
+  `hx-swap="outerHTML"`, so the open/empty class always matches its content and
+  a full-page response can never be poured into the panel.
+- Conversation rows push the clean detail URL (`hx-push-url`), so refresh and
+  Back render the same workspace; Back restores the empty inbox.
+- `telegram_conversations` gained `?fragment=linked-users` returning only
+  `partials/telegram_linked_user_list.html`; the modal search and its clear
+  action use it.
+- `active` conversation id: the list marks the open row (`is-active` +
+  `aria-current`) and carries `active` in its poll URL, so a poll keeps the
+  highlight. `active` is excluded from `pagination_query`.
+- `_conversation_detail_context` gained `include_conversation_list` (default
+  false); only the page render builds the list context. Panel 12 queries (was
+  17), items 12 (was 17), poll 10 (was 15).
+- `admin_shell.js` re-initialises Alpine on the swapped panel and pins the
+  thread to the newest message; `telegram_chat_pagination.js` disconnects
+  observers whose scroll root was detached by a swap.
+- CSS section 20 rewritten: `.aw-chat-layout` is grid `300px | 1fr` with
+  `flex: 1 1 auto` inside a viewport-height `.aw-page--chat`; the panel is
+  `1fr | 320px` when open and one column when empty (2 columns on screen when
+  empty, 3 when a conversation is open). `.aw-chat-list`, `.aw-chat-thread` and
+  `.aw-chat-context` each own `overflow-y: auto` with hidden scrollbars and
+  `overscroll-behavior: contain`. Chat head no longer squeezes the name
+  (wrapping actions, truncated identity); composer uses a 2-row textarea and a
+  single truncated limits line whose full text stays in `title` and
+  `aria-describedby`.
+- `TelegramSupportReplyForm.message` textarea `rows` 4 -> 2.
+- Mobile: `.aw-page--chat` height is `calc(100dvh - var(--aw-chat-offset))`
+  where the token is the top bar plus the active breakpoint's workspace padding
+  (116 default, 134 at 991.98, 122 at 720). Below 1180px the student rail is
+  hidden; below 900px the workspace shows **one pane at a time** - the inbox
+  fills the screen with the conversations column and an open conversation fills
+  it with the thread. The empty panel is hidden, the page head yields its height
+  while a conversation is open, and a phone-only back control in the chat head
+  (`.aw-chat-back`, chevron mirrored for RTL, canonical `#display-page` +
+  `#page-region` navigation) returns to the inbox. The page head description is
+  hidden at 720 and chat inputs use 16px there so iOS does not zoom on focus.
+  The width queries are declared after every base chat rule, because rules that
+  set `display` (rail, empty panel, head) otherwise win on source order.
+
+Arabic: added "Conversations", "Quick links", "Search conversations",
+"Student context" and "Back to conversations"; the chat template labels now
+resolve in Arabic (`tmp/ui-audit/check_chat_msgids.py` reports 0 missing).
+`django.mo` was compiled with `manage.py compilemessages -l ar` after
+`msgfmt -c` passed, which also clears the previously stale catalog.
+
+Verification (host Python 3.11 / Django 5.2, disposable SQLite
+`chat_repro.sqlite3`, Chromium 157):
+
+- `manage.py check` clean; `makemigrations --check --dry-run` -> no changes;
+  193/193 templates compile; scoped `audit_text_encoding` clean
+  (`management_system` 485, `locale` 2, `learning_platform` 6 files). The
+  repo-wide audit remains red only on the pre-existing
+  `docs/pending/lms_student_intelligence_architecture_prd.md`.
+- `tmp/ui-audit/verify_chat_layout.py`: 60 assertions over the inbox, the
+  conversation page, panel/items/poll fragments, list pagination (25/page),
+  active-row survival, linked-user fragment and the non-HTMX redirects.
+- `tmp/ui-audit/verify_chat_dom.py`: AR and EN, 0 duplicate ids, 0 unlabelled
+  fields, 0 nameless buttons, no multi-line `{# #}` comment.
+- `tmp/ui-audit/smoke_chat_posts.py`: reply, mark-read, claim and release each
+  return exactly one panel root, no list and no full page.
+- `tmp/ui-audit/review_chat_queries.py`: query budget above.
+- `tmp/ui-audit/verify_chat_browser.py` (Chromium, real dev server): shell and
+  rail reach the viewport bottom at 1919x1031 and 1366x768; inbox is two
+  columns with an internally scrolling list and no document scroll; opening the
+  45-message conversation yields three non-overlapping columns in one row,
+  thread scrolls and opens at the newest message, URL follows the conversation;
+  the message poller actually fires after the panel swap and never injects a
+  full page; Back restores the empty inbox; hard refresh renders the same three
+  columns; search narrows and restores the list; 1919/1280/1024 widths keep the
+  list and thread side by side, and at 390x844 and 768x1024 the inbox fills the
+  screen with the conversations pane, tapping a row swaps to the thread (page
+  head hidden, back control visible, composer inside the viewport), the thread
+  scrolls to the newest message, the document does not scroll, and the back
+  control restores the conversations pane. No horizontal overflow at any width.
+- Admin route sweep 36/36 -> 200.
+
+Database: none. No model, migration, schema, data, permission, route or
+dependency change. The disposable `chat_repro.sqlite3` (gitignored) is local
+verification data seeded by `tmp/ui-audit/seed_chat.py`; re-running the chat
+scripts needs that seed.
+
+Known limits: real Telegram send/receive, media and attachments were not
+exercised (no bot token; that path is unchanged). The conversation list stops
+polling after loading page 2+ (pre-existing bounded behaviour). Filtering the
+list on a conversation page intentionally does not push a URL, so the active
+row highlight is not restored by that later list swap (the panel head still
+identifies the student).
+
 ## Latest documentation unit (9 November 2026) - student PWA specification
 
 Created and indexed [the PWA specification](docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md).

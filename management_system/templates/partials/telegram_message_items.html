@@ -118,14 +118,15 @@
     </div>
     <div class="aw-flex aw-flex-wrap">
         {% if message.direction == "inbound" %}
-        <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-swap="innerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
+        <a class="aw-btn aw-btn--sm" href="{{ detail_url }}" hx-get="{{ panel_url }}?fragment=panel&amp;reply_to={{ message.pk }}" hx-target="#telegram-chat-panel" hx-select="#telegram-chat-panel" hx-swap="outerHTML" aria-label="{% translate 'Reply to this message' %}"><svg class="aw-ico" aria-hidden="true"><use href="#i-reply"></use></svg>{% translate "Reply" %}</a>
         {% endif %}
         {% if message.digest_alert and message.digest_alert.delivery_status == "sent" and message.digest_alert.telegram_deletion_status != "deleted" and message.digest_alert.telegram_deletion_status != "expired" %}
         <form method="post"
               action="{% url 'telegram-conversation-message-delete' conversation.pk message.digest_alert.pk %}"
               hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.digest_alert.pk %}?fragment=panel"
               hx-target="#telegram-chat-panel"
-              hx-swap="innerHTML"
+              hx-select="#telegram-chat-panel"
+              hx-swap="outerHTML"
               class="aw-inline-form"
               data-confirm-message="{% translate 'Delete this alert from Telegram? The conversation history will remain.' %}">
             {% csrf_token %}
@@ -141,7 +142,8 @@
               action="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}"
               hx-post="{% url 'telegram-conversation-message-delete' conversation.pk message.pk %}?fragment=panel"
               hx-target="#telegram-chat-panel"
-              hx-swap="innerHTML"
+              hx-select="#telegram-chat-panel"
+              hx-swap="outerHTML"
               class="aw-inline-form"
               data-confirm-message="{% translate 'Delete this message from Telegram? The local conversation history will remain.' %}">
             {% csrf_token %}

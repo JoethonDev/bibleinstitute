@@ -34,7 +34,51 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', '').lower() in ('true', '1', 'yes')
-STATIC_ASSET_VERSION = os.getenv('STATIC_ASSET_VERSION', 'dev')
+
+
+_STATIC_ASSET_DIRS = (
+    BASE_DIR / 'management_system' / 'static' / 'css',
+    BASE_DIR / 'management_system' / 'static' / 'js',
+    BASE_DIR / 'static' / 'css',
+    BASE_DIR / 'static' / 'js',
+)
+_STATIC_ASSET_SUFFIXES = frozenset({'.css', '.js'})
+
+
+def _static_asset_version() -> str:
+    """Cache-busting token for the project's own static assets.
+
+    Nginx serves /static/ with `Cache-Control: public, immutable` whenever the
+    URL carries a non-empty v parameter (see nginx/default.conf), so the token
+    must change exactly when an asset changes; a constant token pins the old
+    stylesheet and script in every browser. STATIC_ASSET_VERSION still wins for
+    release pipelines that stamp their own value. Otherwise the newest
+    modification time of the owned asset trees is the token, which changes on
+    the next deploy that ships a changed file and stays stable when nothing
+    changed. Vendored libraries and collected copies are not part of the token.
+    """
+    configured = os.getenv('STATIC_ASSET_VERSION', '').strip()
+    if configured and configured != 'dev':
+        return configured
+    newest = 0
+    file_count = 0
+    for directory in _STATIC_ASSET_DIRS:
+        if not directory.is_dir():
+            continue
+        for asset in directory.rglob('*'):
+            if asset.suffix not in _STATIC_ASSET_SUFFIXES:
+                continue
+            try:
+                newest = max(newest, asset.stat().st_mtime_ns)
+            except OSError:
+                continue
+            file_count += 1
+    if not file_count:
+        return 'dev'
+    return f'{newest:x}-{file_count}'
+
+
+STATIC_ASSET_VERSION = _static_asset_version()
 
 # Nginx terminates TLS and forwards the original protocol. Secure cookie
 # defaults turn on automatically for production while remaining convenient for

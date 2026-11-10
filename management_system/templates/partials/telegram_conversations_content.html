@@ -1,13 +1,17 @@
 {% load i18n %}
 {% comment %}
 Telegram support inbox.
-Presentation only. The page head main block is shared; both actions stay inline
-because they are state-changing controls (a POST form and a modal trigger)
-rather than links. The mark-all-read POST contract, the start conversation
-modal trigger, the conversation poller, the linked-user search and every
-URL/fragment/query hook below are unchanged.
+
+Presentation only. The chat workspace (conversations column, empty panel and
+their scroll contracts) is the shared telegram_chat_layout partial, which the
+one-conversation page renders too, so both routes keep the same structure. The
+page head main block is shared; both actions stay inline because they are
+state-changing controls (a POST form and a modal trigger) rather than links.
+The mark-all-read POST contract, the start conversation modal trigger, the
+conversation poller, the linked-user search and every URL/fragment/query hook
+below are unchanged.
 {% endcomment %}
-<div id="content" class="aw-dashboard-page">
+<div id="content" class="aw-dashboard-page aw-page--chat">
 
     {% translate "Engagement" as page_eyebrow %}
     {% translate "Telegram Chat" as page_title %}
@@ -42,71 +46,7 @@ URL/fragment/query hook below are unchanged.
         </div>
     </div>
 
-    <div class="aw-chat-layout">
-        <aside class="aw-chat-col aw-chat-col--list" aria-label="{% translate 'Telegram Support Chat' %}">
-            <div class="aw-chat-list-head">
-                <form method="get"
-                      action="{{ conversation_list_url }}"
-                      hx-get="{{ conversation_list_url }}"
-                      hx-target="#telegram-conversation-list"
-                      hx-select="#telegram-conversation-list"
-                      hx-swap="outerHTML"
-                      hx-push-url="true">
-                    <input type="hidden" name="status" value="{{ status }}">
-                    <div class="aw-field">
-                        <label class="aw-field-label" for="telegram-conv-search">{% translate "Search conversations" %}</label>
-                        <input id="telegram-conv-search"
-                               class="aw-input"
-                               type="search"
-                               name="search"
-                               value="{{ search }}"
-                               placeholder="{% translate 'Name or message...' %}"
-                               hx-get="{{ conversation_list_url }}"
-                               hx-include="closest form"
-                               hx-trigger="input changed delay:250ms, search"
-                               hx-target="#telegram-conversation-list"
-                               hx-select="#telegram-conversation-list"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                    </div>
-                </form>
-                <div class="aw-chip-row" role="group" aria-label="{% translate 'Filter conversations' %}">
-                    <a class="aw-chip{% if not status %} aw-chip--teal{% endif %}"
-                       href="{{ conversation_list_url }}{% if search %}?search={{ search|urlencode }}{% endif %}"
-                       hx-get="{{ conversation_list_url }}{% if search %}?search={{ search|urlencode }}{% endif %}"
-                       hx-target="#telegram-conversation-list"
-                       hx-select="#telegram-conversation-list"
-                       hx-swap="outerHTML"
-                       hx-push-url="true">{% translate "All" %}</a>
-                    <a class="aw-chip{% if status == 'pending' %} aw-chip--teal{% endif %}"
-                       href="{{ conversation_list_url }}?status=pending{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
-                       hx-get="{{ conversation_list_url }}?status=pending{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
-                       hx-target="#telegram-conversation-list"
-                       hx-select="#telegram-conversation-list"
-                       hx-swap="outerHTML"
-                       hx-push-url="true">{% translate "Unread" %}{% if unread_count %} {{ unread_count }}{% endif %}</a>
-                    <a class="aw-chip{% if status == 'processed' %} aw-chip--teal{% endif %}"
-                       href="{{ conversation_list_url }}?status=processed{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
-                       hx-get="{{ conversation_list_url }}?status=processed{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
-                       hx-target="#telegram-conversation-list"
-                       hx-select="#telegram-conversation-list"
-                       hx-swap="outerHTML"
-                       hx-push-url="true">{% translate "Processed" %}</a>
-                </div>
-            </div>
-            {% include 'partials/telegram_conversation_list.html' %}
-        </aside>
-
-        <section id="telegram-chat-panel"
-                 class="aw-chat-panel is-empty"
-                 aria-label="{% translate 'Telegram Support Chat' %}">
-            <div class="aw-chat-empty">
-                {% translate "Select a conversation" as empty_title %}
-                {% translate "Choose a conversation from the list to view messages and reply." as empty_description %}
-                {% include "partials/components/aw_empty.html" with icon="i-message" title=empty_title description=empty_description %}
-            </div>
-        </section>
-    </div>
+    {% include 'partials/telegram_chat_layout.html' with chat_push_url='true' %}
 
     <div class="modal fade"
          id="telegramStartConversationModal"
@@ -126,9 +66,8 @@ URL/fragment/query hook below are unchanged.
 
                     <form method="get" action="{{ conversation_list_url }}"
                           class="aw-stack"
-                          hx-get="{{ conversation_list_url }}"
+                          hx-get="{{ conversation_list_url }}?fragment=linked-users"
                           hx-target="#telegram-linked-user-list"
-                          hx-select="#telegram-linked-user-list"
                           hx-swap="outerHTML"
                           hx-push-url="false"
                           hx-sync="this:replace">
@@ -143,11 +82,10 @@ URL/fragment/query hook below are unchanged.
                                    value="{{ start_search }}"
                                    placeholder="{% translate 'Search by name or username' %}"
                                    autocomplete="off"
-                                   hx-get="{{ conversation_list_url }}"
+                                   hx-get="{{ conversation_list_url }}?fragment=linked-users"
                                    hx-include="closest form"
                                    hx-trigger="input changed delay:200ms, search"
                                    hx-target="#telegram-linked-user-list"
-                                   hx-select="#telegram-linked-user-list"
                                    hx-swap="outerHTML"
                                    hx-push-url="false"
                                    hx-indicator="#telegram-start-loading"
@@ -162,9 +100,8 @@ URL/fragment/query hook below are unchanged.
                             {% if start_search %}
                             <a class="aw-btn aw-btn--ghost aw-btn--sm"
                                href="{{ conversation_list_url }}"
-                               hx-get="{{ conversation_list_url }}"
+                               hx-get="{{ conversation_list_url }}?fragment=linked-users"
                                hx-target="#telegram-linked-user-list"
-                               hx-select="#telegram-linked-user-list"
                                hx-swap="outerHTML"
                                hx-push-url="false">
                                 <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
