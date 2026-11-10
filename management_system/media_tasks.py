@@ -78,6 +78,49 @@ def _redis_client():
         return None
 
 
+def clear_media_progress(public_ids) -> None:
+    """Delete the live progress hashes of jobs that returned to the queue."""
+    keys = [f"media:job:{public_id}" for public_id in public_ids]
+    if not keys:
+        return
+    client = _redis_client()
+    if client is None:
+        return
+    try:
+        pipeline = client.pipeline(transaction=False)
+        for key in keys:
+            pipeline.delete(key)
+        pipeline.execute()
+    except Exception:
+        logger.warning(
+            "stale media progress clear failed",
+            extra={"event": "media_progress_clear_failed"},
+            exc_info=True,
+        )
+
+
+def _discard_stale_outputs(job: MediaProcessingJob) -> None:
+    """Delete outputs a previous attempt recorded before re-encoding them.
+
+    A worker killed during an upload can leave exact keys behind. The retry
+    writes those same keys, and the storage no-overwrite guard would reject
+    them as a collision, so the job's own recorded keys are removed first. A
+    failure here is logged and does not block the attempt: the upload guard
+    still protects every other job's objects.
+    """
+    try:
+        delete_existing_objects_exact(list(job.output_keys or []))
+    except Exception:
+        logger.warning(
+            "stale media outputs could not be removed",
+            extra={
+                "event": "media_stale_outputs_cleanup_failed",
+                "public_id": str(job.public_id),
+            },
+            exc_info=True,
+        )
+
+
 class MediaProgressReporter:
     """Write live progress and throttled durable heartbeats."""
 
@@ -214,6 +257,8 @@ def process_media_job(self, public_id: str):
     if job is None:
         return {"status": "ignored", "public_id": str(public_id)}
     cleanup_job_workdirs(job.public_id)
+    if job.output_keys:
+        _discard_stale_outputs(job)
     reporter = MediaProgressReporter(job)
     created = None
     started = time.monotonic()

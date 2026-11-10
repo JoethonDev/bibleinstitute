@@ -104,14 +104,21 @@ services:
 
   # -- Media processing worker (dedicated FFmpeg queue) -----------
   # Runs native ffmpeg/ffprobe only for `media`-queue jobs (server-side FFmpeg
-  # migration, proposal sections 15-16). One job at a time: concurrency 1 and
-  # prefetch 1. Private named volume mounted at MEDIA_WORK_DIR only; it does
-  # not attach the shared lms_static_data volume. The environment block below
-  # repeats x-app-base because a service-level `environment` key replaces the
-  # anchored mapping in Compose YAML merge semantics; values are identical to
-  # the anchor plus the MEDIA_* settings. The worker now always re-encodes the
-  # HLS video (CRF quality target), so it is CPU-bound and needs a real CPU
-  # allowance; the quota only applies while FFmpeg runs.
+  # migration, proposal sections 15-16). Two jobs at a time with prefetch 1 so
+  # both cores of the 2-CPU allowance stay busy: while one job uploads its
+  # segments or waits on storage, the other encodes. Each video encode is
+  # capped to the container CPU allowance (MEDIA_ENCODE_THREADS=0 derives it
+  # from the cgroup quota, so a 2-CPU worker gets 2 threads instead of one
+  # thread per host core), and one video job runs its audio deliverables beside
+  # the video encode. The private named volume is mounted at MEDIA_WORK_DIR
+  # only; it does not attach the shared lms_static_data volume. The environment
+  # block below repeats x-app-base because a service-level `environment` key
+  # replaces the anchored mapping in Compose YAML merge semantics; values are
+  # identical to the anchor plus the MEDIA_* settings. The worker now always
+  # re-encodes the HLS video (CRF quality target), so it is CPU-bound and needs
+  # a real CPU allowance; the quota only applies while FFmpeg runs. Two
+  # concurrent jobs need disk headroom for two staged sources plus their
+  # segments; 2 GiB memory stays above two bounded job footprints.
   media-worker:
     <<: *app-base
     build:
@@ -125,7 +132,7 @@ services:
       - worker
       - --loglevel=INFO
       - --queues=media
-      - --concurrency=1
+      - --concurrency=${MEDIA_WORKER_CONCURRENCY:-2}
       - --prefetch-multiplier=1
     environment:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
@@ -151,12 +158,19 @@ services:
       MEDIA_SOURCE_RETENTION_HOURS: ${MEDIA_SOURCE_RETENTION_HOURS:-24}
       MEDIA_FAILED_SOURCE_RETENTION_HOURS: ${MEDIA_FAILED_SOURCE_RETENTION_HOURS:-72}
       MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS: ${MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS:-90}
-      MEDIA_WORKER_CONCURRENCY: ${MEDIA_WORKER_CONCURRENCY:-1}
+      MEDIA_WORKER_CONCURRENCY: ${MEDIA_WORKER_CONCURRENCY:-2}
+      MEDIA_ENCODE_THREADS: ${MEDIA_ENCODE_THREADS:-0}
+      MEDIA_WORKER_ID: ${MEDIA_WORKER_ID:-}
       MEDIA_VIDEO_CRF: ${MEDIA_VIDEO_CRF:-23}
       MEDIA_VIDEO_PRESET: ${MEDIA_VIDEO_PRESET:-fast}
       MEDIA_AUDIO_BITRATE: ${MEDIA_AUDIO_BITRATE:-128k}
     volumes:
       - media_processing_data:${MEDIA_WORK_DIR:-/var/lib/lms-media-processing}
+    # On redeploy Docker sends SIGTERM; the Celery shutdown hook returns this
+    # container's in-flight jobs to the queue and the aborted tasks delete their
+    # partial R2 outputs. The longer stop window lets that cleanup finish
+    # instead of leaving objects that the retry would report as a collision.
+    stop_grace_period: 60s
     cpus: 2.0
     mem_limit: 2G
 

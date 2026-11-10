@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import ipaddress as _ipaddress
 import os
+import socket
 from celery.schedules import crontab
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
@@ -400,7 +401,20 @@ MEDIA_SEGMENT_SECONDS = int(os.getenv("MEDIA_SEGMENT_SECONDS", "6"))
 MEDIA_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_SOURCE_RETENTION_HOURS", "24"))
 MEDIA_FAILED_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_FAILED_SOURCE_RETENTION_HOURS", "72"))
 MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS = int(os.getenv("MEDIA_SUCCESSFUL_JOB_RETENTION_DAYS", "90"))
-MEDIA_WORKER_CONCURRENCY = int(os.getenv("MEDIA_WORKER_CONCURRENCY", "1"))
+# Number of media jobs the dedicated worker processes at once (prefetch stays 1).
+# Two jobs on a two-CPU worker keep both cores busy while one job uploads or
+# waits on storage; each job is memory-bounded, so this stays small.
+MEDIA_WORKER_CONCURRENCY = int(os.getenv("MEDIA_WORKER_CONCURRENCY", "2"))
+# Encoder threads per FFmpeg job. 0 derives the budget from the container CPU
+# allowance (cgroup v2 cpu.max / cgroup v1 CFS quota), so a 2-CPU worker gets 2
+# threads instead of one thread per host core, which the quota would throttle.
+MEDIA_ENCODE_THREADS = int(os.getenv("MEDIA_ENCODE_THREADS", "0"))
+# Identity of this worker instance, recorded on the media job row and in the
+# live Redis progress hash. Docker gives every container a unique hostname, so
+# the shutdown hook releases exactly the jobs this instance owned instead of
+# guessing from heartbeat age; a deployment may override it with a stable name,
+# but the default keeps redeploys distinguishable.
+MEDIA_WORKER_ID = (os.getenv("MEDIA_WORKER_ID") or socket.gethostname())[:128]
 # Encoding profile for the always-compressed HLS outputs. Video is re-encoded
 # with H.264 High profile at this CRF (lower = higher quality and larger files;
 # 23 is the x264 default and visually close to the source), using this x264

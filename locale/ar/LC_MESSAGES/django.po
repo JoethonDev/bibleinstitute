@@ -14512,3 +14512,84 @@ msgstr "تحديد كل الصفوف المطابقة للتصفية"
 
 msgid "Search accounts"
 msgstr "البحث في الحسابات"
+
+msgid "Owner"
+msgstr "المالك"
+
+msgid "Finished"
+msgstr "انتهى"
+
+msgid "Last heartbeat"
+msgstr "آخر إشارة نشاط"
+
+msgid "Saved outputs"
+msgstr "المخرجات المحفوظة"
+
+msgid "Video manifest"
+msgstr "قائمة تشغيل الفيديو"
+
+msgid "Audio manifest"
+msgstr "قائمة تشغيل الصوت"
+
+msgid "Audio download"
+msgstr "تنزيل الصوت"
+
+msgid "Files saved"
+msgstr "الملفات المحفوظة"
+
+msgid "Stored object keys"
+msgstr "مفاتيح الكائنات المخزنة"
+
+msgid "Only the first 50 keys are listed."
+msgstr "تُعرض أول 50 مفتاحًا فقط."
+
+msgid "Lesson attachment"
+msgstr "ربط الدرس"
+
+msgid "Lesson status"
+msgstr "حالة الدرس"
+
+msgid "Source staging"
+msgstr "تجهيز المصدر"
+
+msgid "Source upload"
+msgstr "رفع المصدر"
+
+msgid "Source deleted"
+msgstr "حذف المصدر"
+
+msgid "Source expires"
+msgstr "انتهاء صلاحية المصدر"
+
+msgid "Errors"
+msgstr "الأخطاء"
+
+msgid "Error code"
+msgstr "رمز الخطأ"
+
+msgid "Failure history"
+msgstr "سجل الأعطال"
+
+msgid "Cleanup"
+msgstr "التنظيف"
+
+msgid "Cleanup attempts"
+msgstr "محاولات التنظيف"
+
+msgid "Requested"
+msgstr "وقت الطلب"
+
+msgid "Preserved files"
+msgstr "الملفات التي تم الاحتفاظ بها"
+
+msgid "Draft lesson removed"
+msgstr "تمت إزالة الدرس المسود"
+
+msgid "Stopped"
+msgstr "متوقف"
+
+msgid "%(phase)s - %(percent)s%%"
+msgstr "%(phase)s - %(percent)s%%"
+
+msgid "Worker"
+msgstr "عامل المعالجة"

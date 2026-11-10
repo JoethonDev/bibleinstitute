@@ -2729,6 +2729,11 @@ class MediaProcessingJob(models.Model):
         related_name="media_processing_jobs",
     )
     part_id = models.CharField(max_length=100, blank=True, default="")
+    # Worker instance that claimed the current attempt (container hostname by
+    # default). Cleared when the job goes back to the queue, so a redeploy can
+    # prove which jobs the previous container owned instead of guessing from
+    # heartbeat age alone.
+    worker_id = models.CharField(max_length=128, blank=True, default="")
     status = models.CharField(
         max_length=24,
         choices=MediaProcessingStatus.choices,

@@ -57,6 +57,88 @@ propagation (0.7 s), and operator cancellation. Local limits: the machine has
 12 cores and no cgroup quota (budget fell back to 12), so the 2-core server
 behavior and real x264 speed are not measured here.
 
+### Chain and exposure audit (10 November 2026)
+
+Media job exposure was showing less than the database holds: the detail drawer
+rendered an empty status pill and hid the progress bar because
+`_media_job_ui_state` never set `status_label`/`percent`/`progress_label`; a
+failed job displayed the phase it died in ("Encoding") instead of "Failed"; the
+live Redis hash could describe a previous attempt (or a crashed worker) and
+override DB phase/progress; and the drawer always offered Retry/Stop even when
+the row hid them.
+
+Fixed in `management_system/views.py` and
+`partials/drawer/media_job_detail.html`: the UI state now exposes the database
+status label, a bounded percentage and a phase/percent label; terminal jobs
+report Failed/Stopped/Complete; `_live_media_progress` applies Redis values only
+when the job is active and the hash attempt equals `attempt_count`; and the
+drawer shows the persisted row in detail (outputs/manifests/MP3/count with a
+bounded 50-key list, attachment and lesson status, staging timestamps, attempts
+and failure history, cleanup state) with the same can_* gates as the row.
+New drawer labels are in the Arabic catalogue and `django.mo` was recompiled.
+
+Chain audit on a disposable PostgreSQL 18 database (real ORM paths, no storage
+calls; audit script deleted after the run): concurrent `_attach_outputs` from
+two workers keeps all links and both media types (3 runs), a video part and an
+audio part sharing a curated `part_id` coexist without either type replacing
+the other, re-attaching the same outputs fails with `attachment_collision` and
+leaves the lesson unchanged, automation parts stay in p01/p02 order when p02
+finishes first, concurrent publication publishes the lesson exactly once
+(version 1) and the fan-out stays idempotent (one StudentNotification row).
+Known harmless artifact: two concurrent fan-outs can both log
+`student_count=1` because `bulk_create(ignore_conflicts=True)` hides conflicts
+from the pre-insert count; rows remain unique by `idempotency_key`.
+
+### Deploy continuity and durable job ownership (10 November 2026)
+
+A redeploy recreates the media worker, so an in-flight FFmpeg job previously
+waited for the 120-second heartbeat recovery before it was queued again, and a
+worker killed during an upload could leave exact R2 keys that made the retry
+fail as an `output_collision`.
+
+Changed:
+
+- Migration `0115_mediaprocessingjob_worker_id`: `MediaProcessingJob.worker_id`
+  records the claiming worker instance (`MEDIA_WORKER_ID`, the container
+  hostname by default). `claim_queued_job` writes it; `requeue_stalled_job`
+  clears it; the row and the admin drawer/API expose it.
+- `media_processing.release_worker_jobs()` locks and returns one stopping
+  worker's active jobs to `queued`, clears the claim/heartbeat and leaves
+  `last_dispatched_at = NULL` so the next recovery dispatches them. A job with
+  a pending operator stop is completed as cancelled instead of restarted.
+- `learning_platform/celery.py`: `worker_shutting_down` (SIGTERM sent by Docker
+  before the container exits) releases this worker's jobs and deletes their
+  live Redis hashes; `worker_ready` enqueues one bounded
+  `recover_pending_media_jobs` pass on the media queue, guarded by a 20-second
+  Redis `SET NX` key so the containers starting in one deploy do not each add a
+  pass. Queued-but-never-dispatched jobs are therefore picked up immediately
+  instead of waiting for the next beat tick.
+- `media_tasks.process_media_job`: before a fresh attempt re-encodes, it deletes
+  the job's own recorded `output_keys` (bounded exact-key helper). Leftovers
+  from a killed upload can no longer collide with the retry; a storage failure
+  only logs a warning and never blocks the attempt.
+- Compose media-worker: `stop_grace_period: 60s` so the released tasks can stop
+  FFmpeg and delete their partial outputs before Docker sends SIGKILL;
+  `MEDIA_WORKER_ID` is passed through (empty means container hostname).
+- `deploy/blue_green_deploy.sh`: after the admin-worker check, the deploy now
+  verifies the recreated media worker is running and answering as a consumer of
+  the `media` queue.
+
+Hard kills without SIGTERM (OOM, host crash) still fall back to the existing
+beat pass: active jobs with a heartbeat older than 120 seconds are requeued
+within one 60-second tick. The interrupted attempt keeps its number, so it still
+counts toward `MAX_MEDIA_ATTEMPTS`; two interrupted deploys leave one attempt.
+
+Verification (disposable PostgreSQL 18, container removed afterwards): the
+migration applies, claim stores worker/attempt, a foreign worker cannot release
+the claim, shutdown release yields `queued` with no worker/dispatch/heartbeat,
+the next worker resumes at attempt 2, a stop-pending job is cancelled not
+requeued, beat recovery clears the worker, the retry deletes exactly its own
+recorded keys (and a storage failure does not block it), and the API/drawer
+expose the worker. `manage.py check`, `makemigrations --check --dry-run`
+("No changes detected"), compose YAML parsing and `bash -n` for the deploy
+script pass.
+
 Risks / next safe step: two concurrent jobs need disk headroom for two staged
 sources plus segments (volume size unverified) and 2 GiB memory headroom
 (two bounded job footprints); deployments that never set the new env vars keep

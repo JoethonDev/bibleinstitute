@@ -2804,6 +2804,12 @@ def _media_job_ui_state(job, *, phase=None, now=None):
         current_phase_label = _("Lesson publication failed")
     elif job.attachment_status == MediaAttachmentStatus.FAILED:
         current_phase_label = _("Lesson attachment failed")
+    elif job.status == MediaProcessingStatus.FAILED:
+        current_phase_label = _("Failed")
+    elif job.status == MediaProcessingStatus.CANCELLED:
+        current_phase_label = _("Stopped")
+    elif job.status == MediaProcessingStatus.SUCCEEDED:
+        current_phase_label = _("Complete")
     else:
         current_phase_label = dict(MediaProcessingPhase.choices).get(phase, phase)
 
@@ -2845,6 +2851,15 @@ def _media_job_ui_state(job, *, phase=None, now=None):
         if lesson_status == PublicationStatus.PUBLISHED and not publication_pending and job.error_code != PUBLICATION_FAILED_ERROR:
             completed_steps.append(str(_("Lesson published")))
 
+    percent = max(0, min(100, int(job.progress or 0)))
+    if job.status in ACTIVE_WORKER_STATUSES or job.status == MediaProcessingStatus.QUEUED:
+        progress_label = _("%(phase)s - %(percent)s%%") % {
+            "phase": current_phase_label,
+            "percent": percent,
+        }
+    else:
+        progress_label = current_phase_label
+
     return {
         "can_stop": can_stop,
         "can_cleanup": can_cleanup,
@@ -2854,6 +2869,9 @@ def _media_job_ui_state(job, *, phase=None, now=None):
         "stop_pending": stop_pending,
         "publication_pending": publication_pending,
         "cleanup_waiting_for_upload_url": cleanup_waiting,
+        "status_label": str(job.get_status_display()),
+        "percent": percent,
+        "progress_label": str(progress_label),
         "current_phase_label": str(current_phase_label),
         "next_step_label": str(next_step_label),
         "completed_steps": completed_steps,
@@ -2863,18 +2881,34 @@ def _media_job_ui_state(job, *, phase=None, now=None):
     }
 
 
+def _live_media_progress(job, live):
+    """Return live worker progress only when it matches the current attempt.
+
+    The Redis hash is a worker cache: it can outlive a crashed worker or still
+    describe a previous attempt after a retry. Every terminal state and every
+    other attempt is reported from the database row, so the UI never shows a
+    phase or percentage that contradicts the persisted job.
+    """
+    if not live or job.status not in ACTIVE_WORKER_STATUSES:
+        return {}
+    if str(live.get("attempt") or "") != str(job.attempt_count):
+        return {}
+    return live
+
+
 def _serialize_media_job(job, live=None):
-    live = live or {}
+    live = _live_media_progress(job, live)
     ui_state = _media_job_ui_state(job, phase=live.get("phase", job.phase))
     return {
         "id": str(job.public_id),
         "filename": job.original_filename,
         "requested_folder": job.requested_folder,
         "source_kind": job.source_kind,
-        "status": live.get("status", job.status),
+        "status": job.status,
         "phase": live.get("phase", job.phase),
         "progress": int(live.get("progress", job.progress)),
         "attempt_count": job.attempt_count,
+        "worker_id": job.worker_id,
         "lesson_id": job.lesson_id,
         "part_id": job.part_id,
         "attachment_status": job.attachment_status,
@@ -3276,7 +3310,11 @@ def media_processing_status(request):
         for key, value in _media_job_ui_state(job, now=timezone.now()).items():
             setattr(job, key, value)
         job.cleanup_error_message = _media_cleanup_error(job)
-        return render(request, "partials/drawer/media_job_detail.html", {"job": job})
+        return render(
+            request,
+            "partials/drawer/media_job_detail.html",
+            {"job": job, "max_attempts": MAX_MEDIA_ATTEMPTS},
+        )
 
     if search:
         queryset = queryset.filter(
