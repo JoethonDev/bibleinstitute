@@ -35,12 +35,22 @@
             </a>
         </span>
         {% elif attachment.media_type == "photo" %}
-        <a href="{{ attachment_url }}" target="_blank" rel="noopener">
+        <button type="button" class="aw-msg-image-btn"
+                data-aw-lightbox="{{ attachment_url }}"
+                data-aw-lightbox-kind="image"
+                aria-label="{% translate 'Open full screen' %}" title="{% translate 'Open full screen' %}">
             <img class="aw-msg-image" src="{{ attachment_url }}" alt="{{ attachment.original_name }}" loading="lazy" decoding="async">
-        </a>
+        </button>
         {% elif attachment.media_type == "video" %}
         <video class="aw-msg-video" controls preload="none" src="{{ attachment_url }}"></video>
         <span class="aw-msg-attach">
+            <button type="button" class="aw-btn aw-btn--ghost aw-btn--sm"
+                    data-aw-lightbox="{{ attachment_url }}"
+                    data-aw-lightbox-kind="video"
+                    aria-label="{% translate 'Open full screen' %}">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-external"></use></svg>
+                {% translate "Open full screen" %}
+            </button>
             <a href="{{ attachment_url }}?download=1">
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-download"></use></svg>
                 {% translate "Download" %} {{ attachment.original_name }}

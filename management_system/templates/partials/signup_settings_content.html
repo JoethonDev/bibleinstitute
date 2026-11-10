@@ -19,8 +19,10 @@
     <form method="post" action="{% url 'signup-settings' %}" hx-post="{% url 'signup-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
         {% csrf_token %}
 
-        {# The view supplies no public-page preview data, so there is no rail; the
-           card column spans the editor grid instead of reserving an empty one. #}
+        {% comment %}
+        The view supplies no public-page preview data, so there is no rail; the
+        card column spans the editor grid instead of reserving an empty one.
+        {% endcomment %}
         <div class="aw-stack aw-stack--lg">
                 <section class="aw-card">
                     <div class="aw-card-head">

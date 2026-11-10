@@ -7862,7 +7862,8 @@ def attendance_management(request):
     )
 
     # KPI strip: two bounded aggregates over the filtered scope, not the page.
-    meeting_dates = [meeting.date for meeting in meetings]
+    # `attendance_matrix_meetings` returns column dicts, so read the key.
+    meeting_dates = [meeting["date"] for meeting in meetings]
     scanned_student_count = 0
     if meeting_dates:
         scanned_student_count = (

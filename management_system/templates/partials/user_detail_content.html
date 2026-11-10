@@ -9,8 +9,10 @@
 {% translate "No application documents uploaded." as documents_empty %}
 <div id="content" class="aw-dashboard-page" x-data="{ editing: {% if edit_form.is_bound and edit_form.errors %}true{% else %}false{% endif %} }">
 
-    {# Page head with the server-built action slot: the existing student overview
-       link and the Alpine edit toggle, replacing the ad-hoc flex row. #}
+    {% comment %}
+    Page head with the server-built action slot: the existing student overview
+    link and the Alpine edit toggle, replacing the ad-hoc flex row.
+    {% endcomment %}
     <div class="aw-page-head">
         {% include "partials/components/aw_page_head_main.html" %}
         <div class="aw-page-actions">
@@ -114,8 +116,10 @@
 
     <div x-show="!editing" x-cloak>
         <div class="aw-stack aw-stack--lg">
-            {# One summary card: the five bordered information cards merged into a
-               single key/value grid, grouped by the card titles they replace. #}
+            {% comment %}
+            One summary card: the five bordered information cards merged into a
+            single key/value grid, grouped by the card titles they replace.
+            {% endcomment %}
             <section class="aw-card">
                 <div class="aw-card-head">
                     <div class="aw-card-title">

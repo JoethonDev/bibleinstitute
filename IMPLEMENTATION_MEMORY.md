@@ -1064,6 +1064,95 @@ fragment 200 with `<form>`, `enctype="multipart/form-data"` and a CSRF token;
 direct hit 302; `?new=1` 200 with the inline form. 188/188 templates compile;
 sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926; encoding clean.
 
+### Quiz durations: existing rows set to 0 (no limit) by data migration (10 November 2026)
+
+`duration_minutes = 0` means "no time limit": `quiz_attempts` sets
+`deadline = closing` when the value is falsy, the student payload sends 0 and
+every notification/admin label says "No limit". New quizzes already default to 0
+via `0110_alter_quiz_duration_minutes_default`; existing rows still carried their
+old per-quiz limits.
+
+`migrations/0114_quiz_duration_zero_data.py` closes that gap with one bounded
+UPDATE:
+
+```python
+Quiz.objects.exclude(duration_minutes=0).update(duration_minutes=0)
+```
+
+It depends on `0110_alter_quiz_duration_minutes_default` (the current leaf), so
+the graph keeps a single leaf and `makemigrations --check` still reports no
+changes. The reverse is `RunPython.noop` on purpose - the previous durations are
+not recorded anywhere, so restoring them would be a guess. The UPDATE only
+touches `duration_minutes`; attempts, snapshots, answers, grades and deadlines
+already stored per attempt are untouched.
+
+Verified by executing the migration's forward function against the disposable
+schema: quizzes at 60 and 45 became 0, an existing 0 stayed 0, and a second run
+changed nothing (`tmp/ui-audit/check_duration_migration.py`).
+
+### Fixed: attendance 500, filter chrome, chat layout and drawer/agenda styling (10 November 2026)
+
+- **Attendance 500 (regression from the KPI strip).** `attendance_matrix_meetings`
+  returns column **dicts**, but the new KPI code read `meeting.date`. With a
+  real scope selected the view crashed with
+  `AttributeError: 'dict' object has no attribute 'date'`. Now reads
+  `meeting["date"]`; verified with `?academic_year=1&level=1` -> 200.
+- **Saved filter presets removed.** `static/js/filter_presets.js` injected a
+  localStorage preset select plus Save/Delete into every `.aw-filter-bar`; it
+  was deleted, its script tag removed from `admin_panel.html`, and
+  `.aw-filter-bar` gained `gap: 10px` so stacked filter rows no longer touch.
+  No template or view references it.
+- **Telegram chat layout.** `.aw-chat-panel` is now height-bounded
+  (`calc(100dvh - 208px)`, max `calc(100dvh - 150px)`, `overflow: hidden`), the
+  thread scrolls internally (`overscroll-behavior: contain`) and the student
+  context stays a 300px side rail down to 1024px instead of being hidden below
+  1180px; below 1024 it stacks with a top border. `.aw-chat-context` scrolls on
+  its own.
+- **Chat media.** Images and video are capped at `max-height: 260px`; images are
+  wrapped in a button and both media types open the new full-screen lightbox
+  (`window.awDrawer`-independent, delegated in `admin_shell.js`, Escape/backdrop
+  close, `aw-lightbox` styles). The photo no longer opens a new tab. One new
+  msgid: "Open full screen".
+- **Calendar day agenda in the drawer.** The month-cell styles are compact by
+  design, so `#aw-drawer-body` now gets a readable variant (row layout, borders,
+  uppercase level label, holiday chip, add-action row) instead of inheriting the
+  10px cell typography.
+- **Modal opening no longer shifts the shell.** Bootstrap pads the body when a
+  dialog opens; `body.aw-admin.modal-open { padding-right: 0 !important }` plus
+  `scrollbar-gutter: stable` keeps the grid in place.
+
+Verification: `manage.py check` clean; 187/187 templates compile; 36/36 admin
+routes 200; attendance with a scope 200; DOM and markup audits clean; stylesheet
+braces 948/948; template encoding audit clean; `node --check` on the shell script;
+max 25 queries.
+
+### Fixed: multi-line `{# ... #}` comments leaked into the admin shell (10 November 2026)
+
+Reported: raw comment text appeared at the top of every admin page and the shell
+layout broke - content pushed to one side with an empty column.
+
+Cause: Django's `{# ... #}` comment closes on the **same line**. A THREE-LINE
+`{# ... #}` block added to `partials/components/admin_sidebar.html` (the
+"no aria-hidden binding" note) was therefore not a comment at all: the text
+rendered inside `.aw-shell`, and that stray text node became an anonymous grid
+item in a three-column grid, pushing `.aw-main` out of its column.
+
+Fix and prevention:
+
+- Converted every multi-line hash comment to `{% comment %}...{% endcomment %}`:
+  `admin_sidebar.html`, `promotion_evaluation_content.html`,
+  `signup_settings_content.html` and two blocks in `user_detail_content.html`.
+- Added `tmp/ui-audit/audit_hash_comments.py`, which fails on any `{#` without a
+  matching `#}` on the same line (currently 0 findings).
+- Extended `tmp/ui-audit/audit_markup.py` to treat a literal `{#` in rendered
+  output as a template leak; it did not catch this class before.
+- Added `tmp/ui-audit/check_shell_clean.py`, which asserts `.aw-shell` has
+  exactly its three element children (rail, sidebar, main), no stray text nodes
+  and no leaked template syntax. Clean on all eight sampled pages.
+
+This is the second occurrence of this class in the project; the single-line rule
+is now enforced by an audit rather than by memory.
+
 ### Telegram chat: duplicate bubbles and wrong-side student text fixed (10 November 2026)
 
 Reported: a student's message appeared on the admin side, and an admin reply
