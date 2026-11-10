@@ -52,6 +52,19 @@ page in one response.
                 <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
                 <span>{% translate "View recipients" %}</span>
             </button>
+            {% if group.status != "withdrawn" %}
+            <form method="post"
+                  action="{% url 'notification-group-withdraw' group.group_id %}"
+                  class="aw-inline-form"
+                  data-confirm-message="{% translate 'Withdraw this notification for every recipient? It leaves their inbox, pending push and Telegram sends are cancelled, and bot copies are removed where the 48-hour window allows.' %}">
+                {% csrf_token %}
+                <button type="submit" class="aw-btn aw-btn--ghost aw-btn--sm aw-text-danger"
+                        aria-label="{% blocktranslate with title=group.title %}Withdraw {{ title }} for every recipient{% endblocktranslate %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                    <span>{% translate "Withdraw" %}</span>
+                </button>
+            </form>
+            {% endif %}
         </li>
         {% endfor %}
     </ul>

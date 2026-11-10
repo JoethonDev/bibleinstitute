@@ -377,6 +377,118 @@ aggregates the whole `StudentNotification` table (11,219 rows on production) and
 sorts the groups. That is a bounded admin read, but if the table grows by an
 order of magnitude the next step is a content-hash group column with an index
 (a migration), not a wider query.
+
+### Notification withdrawal ("unsend") from the history (10 November 2026)
+
+Withdrawal already existed as a per-recipient admin action, but its only button
+lived on a recipient's delivery detail page, so it was invisible from the
+notification history. The history now exposes it.
+
+- Per message: each grouped row carries a **Withdraw** action
+  (`notification-group-withdraw`, POST) that hides once every recipient is
+  withdrawn. It counts the pending recipients, creates the durable
+  `AdminOperationJob` kind `NOTIFICATION_WITHDRAWAL`
+  (new migration `0117_alter_adminoperationjob_kind.py`), enqueues it on the
+  admin queue, and redirects to that job's status page so progress is visible.
+  Repeating it while a job runs returns the same job (conflict key
+  `notification_withdrawal:<message id>`); with nothing left it returns to the
+  history with an informational message.
+- Per recipient: `execute_notification_withdrawal` in
+  `notification_withdrawal.py` walks the message's not-yet-withdrawn rows by
+  primary-key batch (100) and calls the existing canonical
+  `withdraw_student_notification` for each, so inbox hiding, queued
+  push/Telegram cancellation and 48-hour bot deletion keep exactly one rule. It
+  commits progress and the cursor through `assert_admin_operation_progress`,
+  resumes from `job.cursor`, and finishes COMPLETED, PARTIAL or FAILED with the
+  withdrawn/skipped/failed and Telegram deleted/expired/failed counters.
+- Keep per-recipient withdrawal available from the recipient detail page; it is
+  the same service, so a single student can still be withdrawn without a job.
+- Provider reality (unchanged): the inbox row disappears, pending sends are
+  cancelled, Telegram copies are removed only inside the 48-hour window, and a
+  delivered mobile push is dismissed by the app on its next sync.
+- Arabic labels added and compiled: "Withdraw", "Notification withdrawal", the
+  confirmation, "Withdrawing this notification for %(count)s recipient(s)...",
+  "Every recipient of this notification is already withdrawn.", "You are no
+  longer allowed to withdraw notifications.", "Invalid notification message."
+
+Verification: `tmp/ui-audit/verify_notification_withdrawal.py` (disposable
+schema) - the row exposes the action, the POST creates the job with the
+recipient total and hands it to the admin queue, `run_admin_operation` finishes
+it COMPLETED with 31/31 (and 8/8 on the queued message in an earlier run), every
+recipient row gains `withdrawn_at`/`withdrawn_by`, queued push and Telegram rows
+become `skipped`, the group reports its withdrawn count and drops the action,
+a repeat does not queue a second job, and a student gets 403. No broker exists
+in the disposable environment, so the verifier stubs `enqueue_admin_operation`
+and runs the real task function; the view path is the same one every other
+admin operation uses. `manage.py check` clean, `makemigrations --check` no
+changes, 197 templates compile, chat/notification/drawer/overflow suites green,
+admin sweep 36/36 -> 200, scoped encoding audit clean.
+
+### Fixed: opening the drawer left a gap under the shell (10 November 2026)
+
+Reported as an empty band and a stray scrollbar when the drawer opens on the
+attendance and notification-history pages.
+
+Root cause: the drawer locked the page with `body.aw-drawer-open
+{ overflow: hidden }`, which removes the scrollport the sticky rail and sidebar
+pin to. The page kept its scroll offset, so both columns were laid out at that
+offset (measured: rail top -206, bottom 724 in a 930px viewport) and the shell
+stopped 206px above the bottom - the visible band. `scrollbar-gutter: stable`
+then also reserved the 17px gutter while the scrollbar was gone, shrinking the
+shell to 1909px under a 1926px overlay (a seam at the inline end).
+
+Fix: the page is locked by pinning it to the top instead of hiding the overflow
+in place. `admin_shell.js` remembers `scrollY`, adds `html.aw-scroll-locked`,
+scrolls to 0 while the drawer covers the page, and restores the offset on close;
+the CSS locks `overflow` on the html/body pair and releases the gutter while
+locked (`scrollbar-gutter: auto`), so the shell keeps the full window width and
+the rail/sidebar keep spanning the viewport. No template or query changed.
+
+Evidence (`tmp/ui-audit/verify_all_drawers.py`, Chromium, page scrolled to
+180-240px before opening, at 1919x987 and 1440x900): every drawer entry point -
+attendance row, notification recipients, app-release form, banner form, media
+job, Telegram broadcast and the calendar day agenda - opens with `scrollY` 0,
+rail and sidebar spanning the full viewport, `documentElement.scrollWidth ==
+innerWidth` (no horizontal overflow), drawer content `scrollWidth <=
+clientWidth`, and no descendant painting outside the drawer; Escape restores the
+operator's scroll position and the rail still spans the viewport.
+`tmp/ui-audit/verify_drawer_overflow.py` covers the two reported pages with the
+same assertions plus a horizontal-overflow check after close. `manage.py check`
+clean, `makemigrations --check` no changes, `node --check admin_shell.js`, all
+other suites green, admin sweep 36/36 -> 200, scoped encoding audit clean.
+
+### Fixed: table rows leaked the clipped table height into the page scroll (10 November 2026)
+
+Reported as "adding rows to `tbody` adds empty space instead of scrolling
+inside the table" on background jobs and attendance (any list table).
+
+Root cause: `app.css` defines `.visually-hidden { position: absolute; ... }`,
+and the shared table markup renders one hidden label per row
+(`<span class="visually-hidden">: <row label></span>`) plus a hidden `<caption>`.
+Nothing inside `.aw-table-wrap` was a positioned ancestor, so those boxes took
+the viewport as their containing block: an absolutely positioned box is **not
+clipped by an ancestor that is not in its containing-block chain**, so their
+document-positioned 1x1 boxes extended the page scroll height by the hidden part
+of every row. The wrap itself scrolled correctly all along - the page simply
+grew underneath it, which is why the "space" scaled with the row count and the
+page could scroll far past the card.
+
+Fix: `body.aw-admin .aw-table-wrap` and `body.aw-admin .aw-matrix-wrap` are now
+`position: relative`, so the scroll region is the containing block for its
+absolute descendants and clips them like everything else. No markup, JS or
+query changed.
+
+Evidence (`tmp/ui-audit/verify_table_overflow.py`, background jobs with 25 rows):
+`documentElement.scrollHeight` went 1754 -> **1133** at 1919x1034 (content
+height), 1815 -> **1103** at 1440x900 and 2530 -> **1208** at 1150x1034; the
+wrap still scrolls internally (scrollHeight 1429 vs clientHeight 703 at 1919),
+scrolling it to the end reveals the last row, and `window.scrollY` stays 0.
+Forcing `position: static` on the wrap in the console re-creates 1815 and
+restoring the rule returns 1103, which pins the cause to that rule. The users
+page (1059/1027) and the attendance/grade matrix wrapper (styled
+`position: relative`) are covered too. `manage.py check` clean,
+`makemigrations --check` no changes, 197 templates compile, admin sweep
+36/36 -> 200, scoped encoding audit clean.
 - Mobile: `.aw-page--chat` height is `calc(100dvh - var(--aw-chat-offset))`
   where the token is the top bar plus the active breakpoint's workspace padding
   (116 default, 134 at 991.98, 122 at 720). Below 1180px the student rail is

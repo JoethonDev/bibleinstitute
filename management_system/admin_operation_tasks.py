@@ -25,6 +25,7 @@ from .models import AdminOperationJob
 
 from .notification_redelivery import refresh_notification_redeliveries as refresh
 from .notification_redelivery import execute_notification_redelivery
+from .notification_withdrawal import execute_notification_withdrawal
 from .academic_evaluation import execute_formula_recalculation
 from .academic_enrollment import execute_bulk_promotion
 from .historical_intake import execute_historical_intake
@@ -61,6 +62,9 @@ def execute_admin_operation(job: AdminOperationJob, token: uuid.UUID) -> dict:
     if job.kind == AdminOperationJob.Kind.NOTIFICATION_REDELIVERY:
 
         return execute_notification_redelivery(job, token)
+    if job.kind == AdminOperationJob.Kind.NOTIFICATION_WITHDRAWAL:
+
+        return execute_notification_withdrawal(job, token)
     if job.kind == AdminOperationJob.Kind.FORMULA_RECALCULATION:
 
         return execute_formula_recalculation(job, token)

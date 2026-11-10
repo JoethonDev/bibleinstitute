@@ -355,6 +355,25 @@
         return !!(drawer && !drawer.hasAttribute('hidden'));
     }
 
+    // Locking the page with body-level `overflow: hidden` removes the
+    // scrollport, so the sticky rail/sidebar stop pinning and stay at the old
+    // page offset - they ended above the viewport and left a bare canvas band
+    // under the shell. Snap the covered page to the top while the drawer is
+    // open and restore the operator's scroll position on close.
+    var drawerLockedScroll = 0;
+
+    function lockPageForDrawer() {
+        drawerLockedScroll = window.scrollY || window.pageYOffset || 0;
+        document.documentElement.classList.add('aw-scroll-locked');
+        if (drawerLockedScroll) window.scrollTo(0, 0);
+    }
+
+    function unlockPageForDrawer() {
+        document.documentElement.classList.remove('aw-scroll-locked');
+        if (drawerLockedScroll) window.scrollTo(0, drawerLockedScroll);
+        drawerLockedScroll = 0;
+    }
+
     function closeDrawer() {
         if (!drawerIsOpen()) return;
         // Fence any in-flight fragment: a late response must not reopen or
@@ -365,12 +384,14 @@
         if (drawerOverlay) drawerOverlay.setAttribute('hidden', '');
         if (drawerBody) drawerBody.innerHTML = '';
         document.body.classList.remove('aw-drawer-open');
+        unlockPageForDrawer();
         if (drawerReturnFocus && typeof drawerReturnFocus.focus === 'function') drawerReturnFocus.focus();
         drawerReturnFocus = null;
     }
 
     function showDrawer() {
         if (!drawer) return;
+        lockPageForDrawer();
         drawer.removeAttribute('hidden');
         drawer.setAttribute('aria-hidden', 'false');
         if (drawerOverlay) drawerOverlay.removeAttribute('hidden');

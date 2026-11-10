@@ -31,6 +31,7 @@ from management_system.telegram_views import (
 )
 from management_system.notification_views import (
     announcement_retry,
+    notification_group_withdraw,
     notification_withdraw,
     notifications_management,
     notifications_recipient_count,
@@ -54,6 +55,11 @@ urlpatterns = [
     ),
     path('dashboard/notification-history/<str:source>/<int:source_id>/redeliver/', notification_redelivery, name='notification-redelivery'),
     path('dashboard/notification-history/notification/<int:notification_id>/withdraw/', notification_withdraw, name='notification-withdraw'),
+    path(
+        'dashboard/notification-history/group/<int:group_id>/withdraw/',
+        notification_group_withdraw,
+        name='notification-group-withdraw',
+    ),
     path('dashboard/background-jobs/status/', background_job_status_batch, name='background-job-status-batch'),
     path('dashboard/background-jobs/<str:family>/<str:job_id>/', background_job_detail, name='background-job-detail'),
     path("offerings/<int:offering_id>/quizzes/<int:quiz_id>/snapshot/", quiz_snapshot, name="quiz-snapshot"),

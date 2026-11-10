@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
 from django.http import HttpResponse, Http404, JsonResponse
@@ -23,8 +24,10 @@ from .announcements import (
     retry_announcement,
     send_announcement,
 )
+from .admin_operations import create_admin_operation, enqueue_admin_operation
 from .forms import AnnouncementForm
-from .models import Announcement, StudentNotification
+from .models import AdminOperationJob, Announcement, StudentNotification
+from .notification_history import notification_message_recipients
 from .notification_withdrawal import (
     NotificationWithdrawalError,
     withdraw_student_notification,
@@ -442,6 +445,43 @@ def notification_withdraw(request, notification_id):
             % {"count": result.push_pending_recall},
         )
     return redirect("background-job-detail", family="notification", job_id=notification_id)
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def notification_group_withdraw(request, group_id: int):
+    """Queue one message withdrawn for every pending recipient.
+
+    A broadcast is thousands of recipient rows and each withdrawal may call the
+    Telegram API, so this is the durable `NOTIFICATION_WITHDRAWAL` job over the
+    canonical per-recipient operation. The page then follows the job status.
+    """
+    notification, recipients = notification_message_recipients(group_id)
+    if notification is None:
+        raise Http404
+    pending = recipients.filter(withdrawn_at__isnull=True).count()
+    if not pending:
+        messages.info(request, _("Every recipient of this notification is already withdrawn."))
+        return redirect("notification-history")
+    try:
+        job = create_admin_operation(
+            actor=request.user,
+            kind=AdminOperationJob.Kind.NOTIFICATION_WITHDRAWAL,
+            input={"message_id": notification.pk},
+            conflict_key=f"notification_withdrawal:{notification.pk}",
+            language=_web_language(request),
+            total=pending,
+        )
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0] if exc.messages else str(exc))
+        return redirect("notification-history")
+    enqueue_admin_operation(str(job.pk))
+    messages.success(
+        request,
+        _("Withdrawing this notification for %(count)s recipient(s). Track it below.")
+        % {"count": pending},
+    )
+    return redirect("background-job-detail", family="management", job_id=job.pk)
 
 
 @capability_required(can_manage_academic_setup)
