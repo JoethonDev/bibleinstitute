@@ -14668,3 +14668,42 @@ msgstr "انتهاء رابط الرفع"
 
 msgid "Cleanup last dispatched"
 msgstr "آخر إرسال للتنظيف"
+
+msgid "Scan mode"
+msgstr "وضع المسح"
+
+msgid "Next scan records entrance"
+msgstr "المسحة القادمة تسجل دخول"
+
+msgid "Next scan records exit"
+msgstr "المسحة القادمة تسجل خروج"
+
+msgid "Entrance mode"
+msgstr "وضع الدخول"
+
+msgid "Exit mode"
+msgstr "وضع الخروج"
+
+msgid "The camera opens automatically; a scan saves entrance immediately and keeps the camera running."
+msgstr "تُفتح الكاميرا تلقائيًا؛ وتحفظ المسحة الدخول فورًا مع بقاء الكاميرا تعمل."
+
+msgid "Press the exit toggle to record exit for the next scan only; it returns to entrance automatically."
+msgstr "اضغط زر الخروج لتسجيل الخروج في المسحة القادمة فقط؛ ثم يعود تلقائيًا إلى الدخول."
+
+msgid "A repeated scan is rejected and the recorded entrance or exit is kept. The same code is ignored for five seconds."
+msgstr "تُرفض المسحة المتكررة ويُحتفظ بالدخول أو الخروج المسجل. يُتجاهل نفس الكود لمدة خمس ثوانٍ."
+
+msgid "If the QR code is rejected, use the manual lookup; it records with the current scan mode."
+msgstr "إذا رُفض رمز QR استخدم البحث اليدوي؛ ويسجل حسب وضع المسح الحالي."
+
+msgid "The scan was rejected."
+msgstr "تم رفض المسحة."
+
+msgid "The scan could not be saved. Check the connection and try again."
+msgstr "تعذر حفظ المسحة. تحقق من الاتصال وحاول مرة أخرى."
+
+msgid "Camera access is unavailable on this device. Tap the button to try again."
+msgstr "تعذر الوصول إلى الكاميرا على هذا الجهاز. اضغط الزر للمحاولة مرة أخرى."
+
+msgid "The lookup failed. Check the connection and try again."
+msgstr "تعذر البحث. تحقق من الاتصال وحاول مرة أخرى."

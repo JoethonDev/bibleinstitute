@@ -28,11 +28,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("i18n/", include("django.conf.urls.i18n")),
     path(
-        "jsi18n/",
-        JavaScriptCatalog.as_view(domain="django", packages=["management_system"]),
-        name="javascript-catalog",
-    ),
-    path(
         "api/mobile/v1/",
         include(("management_system.mobile_urls", "mobile-v1"), namespace="mobile-v1"),
     ),
@@ -43,6 +38,14 @@ urlpatterns = [
 
 urlpatterns += i18n_patterns(
     path('', include('management_system.urls')),
+    # Language-specific JavaScript catalogue: the unprefixed /jsi18n/ resolved
+    # its language from the session cookie, so an English page served Arabic
+    # gettext strings. The prefixed route follows the page language.
+    path(
+        "jsi18n/",
+        JavaScriptCatalog.as_view(domain="django", packages=["management_system"]),
+        name="javascript-catalog",
+    ),
     # prefix_default_language=False
 )
 

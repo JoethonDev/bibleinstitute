@@ -5,8 +5,9 @@ Attendance scanner page content. The camera panel keeps its exact element ids
 (#scanner-video, #start-camera, #stop-camera, #camera-error, #scan-result) and
 the `hidden` show/hide contract used by scanner.js; the page is a focused camera
 workspace inside the admin shell on desktop and off-canvas navigation on phone.
-The scan feedback region is the live region scanner.js writes to; no last-scan
-or recent-scan record is rendered because the view passes no such context.
+#scan-feedback is the live region scanner.js writes over the running camera,
+and #recent-scans-body receives each new scan without a page load (the server
+also renders the latest six rows).
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
     {% translate "Attendance" as page_eyebrow %}
@@ -26,15 +27,29 @@ or recent-scan record is rendered because the view passes no such context.
                     </div>
                 </div>
                 <div class="aw-card-body">
+                    <div class="aw-context-strip aw-scan-mode-strip">
+                        <span class="aw-ctx-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-camera"></use></svg>
+                            <span>{% translate "Scan mode" %}</span>
+                            <span id="scan-mode" class="aw-pill aw-pill--muted">{% translate "Next scan records entrance" %}</span>
+                        </span>
+                        <button id="scan-mode-toggle" type="button" class="aw-btn aw-btn--outline aw-btn--sm aw-scan-mode-toggle"
+                                aria-pressed="false">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-log-out"></use></svg>
+                            <span>{% translate "Entrance mode" %}</span>
+                        </button>
+                    </div>
                     <div class="aw-scan-frame">
                         <div class="aw-scan-box" aria-hidden="true"></div>
                         <div class="aw-scan-hint">{% translate "Align the QR inside the frame" %}</div>
                         <video id="scanner-video" playsinline
                                data-jsqr-url="{% static 'vendor/jsqr/jsQR.js' %}?v={{ static_asset_version }}"
+                               data-scan-url="{% url 'record-attendance' token='__token__' action='__action__' %}"
                                class="scanner-video aw-w-100" hidden autoplay muted></video>
                     </div>
+                    <div id="scan-feedback" class="aw-scan-feedback" role="status" aria-live="assertive" hidden></div>
                     <div class="aw-flex aw-flex-wrap aw-mt-3">
-                        <button id="start-camera" class="aw-btn aw-btn--primary" type="button">
+                        <button id="start-camera" class="aw-btn aw-btn--primary" type="button" hidden>
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-camera"></use></svg>
                             {% translate "Open Camera" %}
                         </button>
@@ -82,8 +97,7 @@ or recent-scan record is rendered because the view passes no such context.
                     </div>
                 </div>
                 <div class="aw-card-body aw-card-body--flush">
-                    {% if recent_scans %}
-                    <div class="aw-table-wrap">
+                    <div class="aw-table-wrap" id="recent-scans-table"{% if not recent_scans %} hidden{% endif %}>
                         <table class="aw-table">
                             <thead>
                                 <tr>
@@ -93,7 +107,7 @@ or recent-scan record is rendered because the view passes no such context.
                                     <th scope="col">{% translate "Source" %}</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="recent-scans-body">
                                 {% for scan in recent_scans %}
                                 <tr>
                                     <td>{{ scan.scanned_at|date:"H:i" }}</td>
@@ -118,9 +132,7 @@ or recent-scan record is rendered because the view passes no such context.
                             </tbody>
                         </table>
                     </div>
-                    {% else %}
-                    <div class="aw-empty">{% translate "No scans recorded yet." %}</div>
-                    {% endif %}
+                    <div class="aw-empty" id="recent-scans-empty"{% if recent_scans %} hidden{% endif %}>{% translate "No scans recorded yet." %}</div>
                 </div>
             </section>
 
@@ -135,11 +147,19 @@ or recent-scan record is rendered because the view passes no such context.
                     <div class="aw-checklist">
                         <div class="aw-check-item">
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-                            <span>{% translate "If the QR code is rejected, use the manual lookup." %}</span>
+                            <span>{% translate "The camera opens automatically; a scan saves entrance immediately and keeps the camera running." %}</span>
                         </div>
                         <div class="aw-check-item">
                             <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
-                            <span>{% translate "A repeated scan is rejected and the recorded entrance or exit is kept." %}</span>
+                            <span>{% translate "Press the exit toggle to record exit for the next scan only; it returns to entrance automatically." %}</span>
+                        </div>
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "A repeated scan is rejected and the recorded entrance or exit is kept. The same code is ignored for five seconds." %}</span>
+                        </div>
+                        <div class="aw-check-item">
+                            <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                            <span>{% translate "If the QR code is rejected, use the manual lookup; it records with the current scan mode." %}</span>
                         </div>
                     </div>
                 </div>

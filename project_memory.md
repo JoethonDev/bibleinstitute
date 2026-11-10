@@ -187,7 +187,7 @@ approved or efficient. Prefer the owners above; inspect callers before reuse.
 | Mobile API | learning_platform/urls.py -> mobile_urls.py -> mobile_api.py; notification withdrawal is in mobile_notifications.py | mobile_auth.py, mobile_http.py, mobile_otp.py/tasks, mobile_versioning.py, mobile_downloads.py, localization helper. Notification withdrawal lookups accept only bounded, authenticated IDs owned by the current mobile account. |
 | Protected playback/progress | views.py start_viewing_session/lesson_manifest/progress_heartbeat; mobile_api.py media/progress endpoints; worker.js | media_delivery.py owns media link/session/token/manifest/audio/book resolution; progress_activity.apply_progress_heartbeat owns merged progress/events; web and mobile keep their own transport auth/HTTP formatting. |
 | Media management/automation | views.py media_job_*; automation_urls.py/automation_api.py | media_processing/storage/tasks and MediaProcessingJob; client reference manual. `_media_job_ui_state`/`_serialize_media_job` expose the persisted row (status, phase, percent, outputs, attachment, staging, cleanup) and apply the Redis progress hash only for the current attempt of an active job; the drawer renders that same state with the row's can_* action gates. |
-| Attendance | views.py scanner/scan_preview/record_attendance/correction | capability, token, meeting scope, utils.attendance, policy and schedule. |
+| Attendance | views.py scanner/scan_preview/record_attendance/correction | capability, token, meeting scope, utils.attendance, policy and schedule. The scanner page posts `/scan/<token>/<action>/` with fetch while the camera keeps running: entrance is the default mode, an exit toggle arms exit for one scan then resets, and the JSON answer carries the resolved student and course for the in-page banner. A decoded code is cached client-side for five seconds; the server still owns duplicate rejection. |
 | Reporting/exports | views.py export_* / report dashboard | utils.reports, report_export.py, xlsx_export.py and matrix modules; whole-scope evaluation and report workbook exports run on the J01 ledger with owner/admin private-artifact downloads, while CSV stays a bounded streaming response. |
 | Announcements/Telegram/push | notification_views.py, telegram_views.py; gallery_views.py for gallery | student_notifications.py and announcement fan-out; notification_history.py for saved per-recipient content/outcomes; notification_redelivery.py for admin retry/resend ledger work; telegram/broadcasts.py and channel-specific provider tasks. Recheck source/recipient eligibility at enqueue and delayed provider boundaries. |
 | App releases/banners | portal_views.py | MobileAppRelease/UpdatePolicy/DownloadPolicy/StudentBanner, portal templates, API version/download response contracts. |
@@ -195,7 +195,10 @@ approved or efficient. Prefer the owners above; inspect callers before reuse.
 Root routes in [learning_platform/urls.py](learning_platform/urls.py): localized
 web routes include management_system.urls; /admin/ is Django admin;
 /api/mobile/v1/ is mobile; /api/automation/ is automation; Telegram webhook and
-i18n/jsi18n are separate. Consult actual route modules for exact names/payloads.
+i18n are separate. The JavaScript catalogue (`/jsi18n/`) sits inside the
+localized patterns so `{% url 'javascript-catalog' %}` yields `/ar/jsi18n/` or
+`/en/jsi18n/` and browser `gettext()` follows the page language. Consult actual
+route modules for exact names/payloads.
 
 ## 6. Frontend locations and contracts
 

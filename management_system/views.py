@@ -7739,6 +7739,13 @@ def student_lookup(request):
     if request.method != "POST":
         return JsonResponse({"error": _("Method not allowed")}, status=405)
 
+    # The scanner posts this form with fetch so it can record immediately and
+    # keep the camera open; a plain form post keeps the redirect fallback.
+    wants_json = (
+        request.headers.get("X-Requested-With") == "fetch"
+        or "application/json" in request.headers.get("Accept", "")
+    )
+
     query = request.POST.get("query", "").strip()
     if not query:
         return JsonResponse({"error": _("Query is required.")}, status=400)
@@ -7756,13 +7763,20 @@ def student_lookup(request):
         except User.DoesNotExist:
             pass
 
-    if not user:
+    if not user or (user.role and user.role.role != "student"):
+        if wants_json:
+            return JsonResponse({"error": _("Student not found.")}, status=404)
         messages.error(request, _("Student not found."))
         return redirect("scanner")
 
-    if user.role and user.role.role != "student":
-        messages.error(request, _("Student not found."))
-        return redirect("scanner")
+    if wants_json:
+        return JsonResponse({
+            "token": user.qr_token or str(user.pk),
+            "student": {
+                "name": user.get_full_name() or user.username,
+                "username": user.username,
+            },
+        })
 
     return redirect("scan-preview", token=user.qr_token or user.id)
 
@@ -7802,8 +7816,19 @@ def record_attendance(request, token, action):
         user = User.objects.get(Q(qr_token=token) | Q(pk=token))
     except (ValueError, TypeError):
         user = get_object_or_404(User, qr_token=token)
+    # The scanner keeps the camera running and prints the response in place, so
+    # every answer names the student it resolved instead of only an action code.
+    student_info = {
+        "name": user.get_full_name() or user.username,
+        "username": user.username,
+    }
     today = timezone.localdate()
     scan_availability = attendance_scan_availability(user, today, include_recorded_actions=False)
+    course_name = (
+        scan_availability.course_offering.course.name
+        if scan_availability.course_offering is not None
+        else None
+    )
     reason = scan_availability.reason_for(action)
     if reason:
         already_recorded = action in scan_availability.recorded_actions
@@ -7811,6 +7836,9 @@ def record_attendance(request, token, action):
             {
                 "error": reason,
                 "code": "already_recorded" if already_recorded else "attendance_unavailable",
+                "action": action,
+                "student": student_info,
+                "course": course_name,
             },
             status=409 if already_recorded else 400,
         )
@@ -7824,7 +7852,13 @@ def record_attendance(request, token, action):
         )
     if not created:
         return JsonResponse(
-            {"error": scan_availability.duplicate_reason(action), "code": "already_recorded"},
+            {
+                "error": scan_availability.duplicate_reason(action),
+                "code": "already_recorded",
+                "action": action,
+                "student": student_info,
+                "course": course_name,
+            },
             status=409,
         )
     return JsonResponse({
@@ -7832,6 +7866,8 @@ def record_attendance(request, token, action):
         "action": action,
         "source": rec.source,
         "scanned_at": timezone.localtime(rec.scanned_at).strftime("%H:%M:%S"),
+        "student": student_info,
+        "course": course_name,
     })
 
 @capability_required(can_view_reports)

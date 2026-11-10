@@ -424,6 +424,110 @@ admin operation uses. `manage.py check` clean, `makemigrations --check` no
 changes, 197 templates compile, chat/notification/drawer/overflow suites green,
 admin sweep 36/36 -> 200, scoped encoding audit clean.
 
+### Scanner records immediately and phones keep their labels (10 November 2026)
+
+Two units: the admin scanner no longer asks for a mode per scan, and phone
+layouts no longer drop control labels.
+
+**Phone labels (option A1).** `admin_workspace.css` used to hide every
+`.aw-page-actions .aw-btn span` at `max-width: 720px`, leaving icon-only
+buttons whose icons are `aria-hidden`, so the controls had no visible and no
+accessible name (measured: 3 unnamed page actions on attendance and students,
+2 on background jobs, 1 on notification history; labels returned at 721px).
+The rule now keeps the label in a compact form (10.5px, tighter padding, icon
+14px, wrap allowed); the same treatment keeps the promotion stepper step names
+(previously `display: none` under 720px), and the quiz table-tools
+`.column-controls` wraps instead of clipping the second action. The topbar
+`Create`/notifications/background-jobs buttons already carried `aria-label`, so
+the intentional topbar compaction (breadcrumb, user name, search placeholder,
+Ctrl-K hint) is unchanged. Audit: `tmp/ui-audit/audit_admin_mobile.py` walks all
+admin routes at 390px and 720px; unnamed visible controls are now 0 on every
+page audited, and the phone screenshots keep every action readable.
+
+**Scanner (immediate save, exit as a one-shot toggle).** The camera opens on
+load (the previous "Open Camera" button only appears when the browser blocks
+auto-start, e.g. a permission or gesture rule). A decoded `/scan/<token>/`
+code is posted with fetch to the existing `record_attendance` endpoint
+(`POST /scan/<token>/entrance|exit/`) instead of navigating to
+`scan_preview`; the response prints in `#scan-feedback` over the running
+camera (name, action, course, time; error tone for 400/409), a short WebAudio
+tone and vibration fire, and the recent-scans table gets the new row prepended
+(bounded to 6). `#scan-mode-toggle` arms exit for exactly one scan, shows the
+armed state in the chip/toggle/frame, and returns to entrance after the attempt
+whether it succeeded or was rejected. The same decoded code is skipped for five
+seconds client-side (`CODE_CACHE_MS`), a single request is kept in flight with a
+one-slot pending queue, and the detection downscale is 720px. `scan_preview`
+stays unchanged for direct links; the manual lookup form now posts with fetch,
+gets `{token, student}` from a JSON branch in `student_lookup`, and records
+immediately with the current mode. `record_attendance` answers now include
+`student {name, username}` and `course`, including on 400/409 payloads, so the
+banner can name the student for rejections.
+
+**JavaScript catalogue language.** `/jsi18n/` sat outside `i18n_patterns`, so
+its language came from the session cookie: an English page received the Arabic
+catalogue and every `gettext()` string drawn by JS (scanner feedback included)
+rendered Arabic. The route now lives inside the localized patterns;
+`{% url 'javascript-catalog' %}` yields `/en/jsi18n/` or `/ar/jsi18n/` and the
+catalogue matches the page language (verified: "Entrance" -> "Entrance" in en,
+-> Arabic in ar).
+
+Files: `views.py` (record_attendance payload, student_lookup JSON branch),
+`static/js/scanner.js` (rewritten), `templates/partials/scanner_content.html`,
+`static/css/admin_workspace.css` (A1 labels, stepper labels, tool wrapping,
+scanner feedback/mode styles), `learning_platform/urls.py` (catalogue route),
+`locale/ar/LC_MESSAGES/django.po` + compiled `.mo` (13 new entries).
+
+Verification: `tmp/ui-audit/verify_scanner_flow.py` drives a fake Chromium
+camera with a stubbed `jsQR` queue at 1440x900 and 390x844: camera starts with
+no button press, one entrance POST per code, the same code is not posted again
+inside five seconds, exit arms and posts `exit` then resets to entrance, the
+duplicate entrance returns the error banner and keeps one row, the manual
+lookup records and stays on the scanner, recent rows prepend and stay bounded,
+and page actions/stepper keep their labels on phones. Also green: `manage.py
+check`, `makemigrations --check` (no changes), chat/notification/drawer/
+overflow/withdrawal suites, admin sweep 35 routes -> 200, `node --check` on both
+admin scripts, scoped encoding audit (536 files). Screenshots:
+`tmp/ui-audit/scanner-immediate-1440.png`, `phone-quiz-labels.png`,
+`phone-scanner-ar.png`.
+
+Risk: iOS Safari can require a gesture before `getUserMedia`, which is why the
+fallback button remains; the five-second code cache is per page load and does
+not replace the server's duplicate rule.
+
+### Fixed: opening the drawer left a gap under the shell (10 November 2026)
+
+Reported as an empty band and a stray scrollbar when the drawer opens on the
+attendance and notification-history pages.
+
+Root cause: the drawer locked the page with `body.aw-drawer-open
+{ overflow: hidden }`, which removes the scrollport the sticky rail and sidebar
+pin to. The page kept its scroll offset, so both columns were laid out at that
+offset (measured: rail top -206, bottom 724 in a 930px viewport) and the shell
+stopped 206px above the bottom - the visible band. `scrollbar-gutter: stable`
+then also reserved the 17px gutter while the scrollbar was gone, shrinking the
+shell to 1909px under a 1926px overlay (a seam at the inline end).
+
+Fix: the page is locked by pinning it to the top instead of hiding the overflow
+in place. `admin_shell.js` remembers `scrollY`, adds `html.aw-scroll-locked`,
+scrolls to 0 while the drawer covers the page, and restores the offset on close;
+the CSS locks `overflow` on the html/body pair and releases the gutter while
+locked (`scrollbar-gutter: auto`), so the shell keeps the full window width and
+the rail/sidebar keep spanning the viewport. No template or query changed.
+
+Evidence (`tmp/ui-audit/verify_all_drawers.py`, Chromium, page scrolled to
+180-240px before opening, at 1919x987 and 1440x900): every drawer entry point -
+attendance row, notification recipients, app-release form, banner form, media
+job, Telegram broadcast and the calendar day agenda - opens with `scrollY` 0,
+rail and sidebar spanning the full viewport, `documentElement.scrollWidth ==
+innerWidth` (no horizontal overflow), drawer content `scrollWidth <=
+clientWidth`, and no descendant painting outside the drawer; Escape restores the
+operator's scroll position and the rail still spans the viewport.
+`tmp/ui-audit/verify_drawer_overflow.py` covers the two reported pages with the
+same assertions plus a horizontal-overflow check after close. `manage.py check`
+clean, `makemigrations --check` no changes, `node --check admin_shell.js`, all
+other suites green, admin sweep 36/36 -> 200, scoped encoding audit clean.
+
+
 ### Fixed: opening the drawer left a gap under the shell (10 November 2026)
 
 Reported as an empty band and a stray scrollbar when the drawer opens on the

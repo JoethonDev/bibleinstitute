@@ -1954,8 +1954,20 @@ body.aw-admin .aw-mobile-nav { display: flex; flex-direction: column; gap: 2px; 
     body.aw-admin .aw-table-tools { padding: 8px; }
     body.aw-admin .aw-table-tools .aw-search-wrap { max-width: none; flex-basis: 100%; }
     body.aw-admin .aw-table-tools .aw-select { flex: 1; min-width: 0; }
-    body.aw-admin .aw-page-actions .aw-btn span { display: none; }
-    body.aw-admin .aw-page-actions .aw-btn .aw-ico { margin: 0; }
+    body.aw-admin .aw-table-tools .column-controls { flex-wrap: wrap; min-width: 0; }
+    body.aw-admin .aw-table-tools .column-controls .aw-btn { flex: 0 1 auto; min-width: 0; }
+    body.aw-admin .aw-table-tools .column-controls .aw-btn span { white-space: normal; }
+    /* Phones keep every page action readable: the label shrinks instead of
+       disappearing, so a page never shows bare icons without a name. */
+    body.aw-admin .aw-page-actions { flex-wrap: wrap; gap: 6px; }
+    body.aw-admin .aw-page-actions .aw-btn {
+        font-size: 10.5px;
+        line-height: 1.2;
+        padding: 6px 9px;
+        gap: 5px;
+    }
+    body.aw-admin .aw-page-actions .aw-btn span { display: inline; white-space: normal; text-align: start; }
+    body.aw-admin .aw-page-actions .aw-btn .aw-ico { flex: 0 0 14px; width: 14px; height: 14px; margin: 0; }
     body.aw-admin .aw-quick-grid { grid-template-columns: 1fr; }
     body.aw-admin .aw-context-strip { gap: 8px; font-size: 10.5px; }
     body.aw-admin .aw-ctx-sep { display: none; }
@@ -2384,9 +2396,10 @@ body.aw-admin .aw-table thead th.aw-th-subhead,
 body.aw-admin .aw-matrix thead th.aw-th-subhead { top: 26px; }
 
 @media (max-width: 720px) {
-    body.aw-admin .aw-stepper { padding: 10px; }
-    body.aw-admin .aw-step { padding-inline: 8px; }
-    body.aw-admin .aw-step span:not(.aw-step-num) { display: none; }
+    body.aw-admin .aw-stepper { padding: 10px; flex-wrap: wrap; gap: 4px; }
+    body.aw-admin .aw-step { padding-inline: 8px; font-size: 10.5px; gap: 4px; }
+    /* Keep the step name: a bare number does not tell the operator the step. */
+    body.aw-admin .aw-step span:not(.aw-step-num) { display: inline; white-space: normal; }
 }
 
 /* --------------------------------------------------------------------------
@@ -3084,6 +3097,46 @@ body.aw-admin .aw-scan-frame .aw-scan-hint {
     color: rgba(255, 255, 255, .75);
     font-size: 10px;
 }
+
+/* Scan feedback stays over the running camera: entrance in teal, exit in gold,
+   rejected scans in red, then it clears itself. */
+body.aw-admin .aw-scan-feedback {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--aw-line);
+    background: var(--aw-paper-2);
+    font-size: 12px;
+    animation: aw-feedback-in .16s ease-out;
+}
+body.aw-admin .aw-scan-feedback b { font-size: 13px; }
+body.aw-admin .aw-scan-feedback span { color: var(--aw-muted); }
+body.aw-admin .aw-scan-feedback.is-success { border-color: #b7e0d0; background: #eaf6f0; color: #145c45; }
+body.aw-admin .aw-scan-feedback.is-success span { color: #2f6b57; }
+body.aw-admin .aw-scan-feedback.is-error { border-color: #f0c2c2; background: #fbeceb; color: #8a1f1f; }
+body.aw-admin .aw-scan-feedback.is-error span { color: #8a1f1f; }
+@keyframes aw-feedback-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: none; }
+}
+
+body.aw-admin .aw-scan-mode-strip {
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+body.aw-admin .aw-scan-mode-strip .aw-pill { font-size: 10.5px; }
+body.aw-admin .aw-scan-mode-toggle.is-exit {
+    border-color: var(--aw-gold);
+    background: var(--aw-gold-soft, #fbf3dd);
+    color: #7a5a12;
+}
+body.aw-admin .aw-scan-frame.is-exit {
+    box-shadow: inset 0 0 0 2px var(--aw-gold);
+}
+
 
 
 
