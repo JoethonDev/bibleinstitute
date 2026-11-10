@@ -13487,6 +13487,30 @@ msgstr "المستلمون: %(count)s"
 msgid "View the recipients of %(title)s"
 msgstr "عرض مستلمي %(title)s"
 
+msgid "Withdraw"
+msgstr "سحب"
+
+msgid "Notification withdrawal"
+msgstr "سحب الإشعارات"
+
+msgid "Withdraw this notification for every recipient? It leaves their inbox, pending push and Telegram sends are cancelled, and bot copies are removed where the 48-hour window allows."
+msgstr "هل تريد سحب هذا الإشعار من جميع المستلمين؟ سيُزال من صندوقهم، وتُلغى إرسالات Push وتيليجرام المعلّقة، وتُحذف نسخ البوت حيث تسمح نافذة الـ 48 ساعة."
+
+msgid "Withdraw %(title)s for every recipient"
+msgstr "سحب %(title)s من جميع المستلمين"
+
+msgid "Withdrawing this notification for %(count)s recipient(s). Track it below."
+msgstr "جارٍ سحب هذا الإشعار من %(count)s مستلمًا. تابع الحالة أدناه."
+
+msgid "Every recipient of this notification is already withdrawn."
+msgstr "تم سحب هذا الإشعار بالفعل من جميع المستلمين."
+
+msgid "You are no longer allowed to withdraw notifications."
+msgstr "لم يعد مسموحًا لك بسحب الإشعارات."
+
+msgid "Invalid notification message."
+msgstr "رسالة الإشعار غير صحيحة."
+
 msgid "Each row is one message; open it to see every recipient and delivery outcome."
 msgstr "كل صف هو رسالة واحدة؛ افتحه لعرض جميع المستلمين ونتائج التسليم."
 

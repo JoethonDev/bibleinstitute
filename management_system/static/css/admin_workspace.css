@@ -200,6 +200,13 @@ html[lang="ar"] body.aw-admin .aw-conv-main p { font-size: 11.5px; }
 html[lang="ar"] body.aw-admin .aw-msg { font-size: 12.5px; line-height: 1.7; }
 html[lang="ar"] body.aw-admin .aw-msg .aw-msg-head { font-size: 11px; }
 
+/* The drawer locks the page without removing the sticky shell from its
+   scrollport: admin_shell.js snaps the page to the top (html.aw-scroll-locked
+   hides the root overflow) and restores the offset on close. The gutter is
+   released while locked so the shell still spans the full window width. */
+html.aw-scroll-locked,
+html.aw-scroll-locked body { overflow: hidden; }
+html.aw-scroll-locked body.aw-admin { scrollbar-gutter: auto; }
 body.aw-admin.aw-drawer-open { overflow: hidden; }
 
 body.aw-admin h1,
@@ -1361,6 +1368,12 @@ body.aw-admin .aw-table-wrap {
     overflow: auto;
     max-height: 68vh;
     -webkit-overflow-scrolling: touch;
+    /* A scroll region must also be a containing block: the shared
+       .visually-hidden helper is position:absolute, so without this its 1x1
+       boxes are placed against the viewport at each row's document position and
+       the clipped table height leaks into the page scroll height (empty space
+       under the page that grows with every row). */
+    position: relative;
 }
 body.aw-admin .aw-table-wrap::-webkit-scrollbar { height: 8px; width: 8px; }
 body.aw-admin .aw-table-wrap::-webkit-scrollbar-thumb { background: var(--aw-line-2); border-radius: 99px; }
@@ -1995,7 +2008,7 @@ body.aw-admin .aw-mobile-nav { display: flex; flex-direction: column; gap: 2px; 
 /* --------------------------------------------------------------------------
    16. Matrices, scores and attendance cells
    -------------------------------------------------------------------------- */
-body.aw-admin .aw-matrix-wrap { overflow: auto; max-height: 70vh; }
+body.aw-admin .aw-matrix-wrap { overflow: auto; max-height: 70vh; position: relative; }
 body.aw-admin .aw-matrix { width: 100%; font-size: 11px; border-collapse: collapse; }
 body.aw-admin .aw-matrix th,
 body.aw-admin .aw-matrix td {
@@ -3786,3 +3799,4 @@ body.aw-admin .aw-load-more.is-loading { opacity: .55; }
     body.aw-admin .aw-notif-recipient-row .aw-cell-main { flex: 1 1 100%; }
     body.aw-admin .aw-notif-recipient-row > .aw-btn { order: 1; }
 }
+

@@ -3342,6 +3342,7 @@ class AdminOperationJob(models.Model):
         STORAGE_DELETE = "storage_delete", _("Storage delete")
         STORAGE_USAGE_REFRESH = "storage_usage_refresh", _("Storage usage refresh")
         NOTIFICATION_REDELIVERY = "notification_redelivery", _("Notification redelivery")
+        NOTIFICATION_WITHDRAWAL = "notification_withdrawal", _("Notification withdrawal")
 
     class Status(models.TextChoices):
         QUEUED = "queued", _("Queued")
