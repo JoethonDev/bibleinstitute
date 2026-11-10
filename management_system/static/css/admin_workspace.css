@@ -2364,15 +2364,18 @@ body.aw-admin .aw-chat-col { display: flex; flex-direction: column; min-width: 0
 body.aw-admin .aw-chat-col + .aw-chat-col { border-inline-start: 1px solid var(--aw-line); }
 body.aw-admin .aw-chat-panel {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
     min-width: 0;
     min-height: 0;
     /* Bound the panel to the viewport so the thread scrolls inside the chat
        instead of stretching the page. */
-    height: calc(100dvh - 208px);
-    max-height: calc(100dvh - 150px);
+    height: calc(100dvh - 176px);
     overflow: hidden;
 }
+body.aw-admin .aw-page--chat { padding-bottom: 0; min-height: 0; }
+body.aw-admin .aw-page--chat .aw-chat-panel { margin-bottom: 0; }
+body.aw-admin .aw-avatar--square { border-radius: 12px; }
+body.aw-admin .aw-avatar--square .aw-avatar-img { border-radius: 12px; object-fit: cover; }
 body.aw-admin .aw-chat-panel.is-empty { grid-template-columns: minmax(0, 1fr); }
 body.aw-admin .aw-chat-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 body.aw-admin .aw-chat-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -2501,11 +2504,15 @@ body.aw-admin .aw-msg-expand { align-self: flex-start; }
     flex-direction: row;
     align-items: center;
     gap: 8px;
-    margin-top: 0;
+    margin-top: 8px;
     padding: 8px 10px;
     border: 1px solid var(--aw-line);
     border-radius: 8px;
 }
+/* The drawer title already carries the date, so the repeated day number and the
+   phone-only dots are noise inside it. */
+#aw-drawer-body .aw-calendar-day-number,
+#aw-drawer-body .cal-day-dots { display: none; }
 #aw-drawer-body .aw-calendar-meeting-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #aw-drawer-body .aw-calendar-meeting-level { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--aw-muted); }
 #aw-drawer-body .aw-calendar-meeting-course { font-size: 12.5px; color: var(--aw-ink); }
@@ -2592,8 +2599,8 @@ body.aw-admin .aw-linked-main { min-width: 0; flex: 1; }
 body.aw-admin .aw-linked-main b { display: block; font-size: 11.5px; }
 body.aw-admin .aw-linked-main span { display: block; font-size: 10px; color: var(--aw-muted); }
 
-@media (max-width: 1024px) {
-    body.aw-admin .aw-chat-panel { grid-template-columns: minmax(0, 1fr); height: auto; max-height: none; overflow: visible; }
+@media (max-width: 768px) {
+    body.aw-admin .aw-chat-panel { grid-template-columns: minmax(0, 1fr); height: auto; overflow: visible; }
     body.aw-admin .aw-chat-context { border-inline-start: 0; border-top: 1px solid var(--aw-line); }
 }
 @media (max-width: 920px) {

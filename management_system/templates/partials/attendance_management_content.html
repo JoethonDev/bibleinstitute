@@ -204,7 +204,9 @@ need a fragment endpoint that does not exist yet, so none is invented.
                             </tr></thead>
                             <tbody>
                                 {% for row in matrix_rows %}
-                                <tr>
+                                <tr data-attendance-row
+                                    data-attendance-title="{{ row.student|aw_display_name }}"
+                                    data-attendance-subtitle="{{ row.cells|length }} {% translate 'Meetings' %}">
                                     <th scope="row" class="aw-sticky-col">
                                         <div class="aw-flex">
                                             {% include "partials/components/aw_avatar.html" with name=row.student tone="teal" %}
@@ -244,99 +246,77 @@ need a fragment endpoint that does not exist yet, so none is invented.
                                     <td>{{ row.partial_days }}</td>
                                     <td>{{ row.incomplete_days }}</td>
                                     <td>{{ row.absent_days }}</td>
-                                    <td><span class="aw-score">{{ row.score }}</span></td>
-                                </tr>
-                                <tr class="attendance-matrix-detail-row">
-                                    <td colspan="{{ meetings|length|add:7 }}">
-                                        <details id="attendance-meetings-{{ row.student.pk }}">
-                                            <summary class="aw-btn aw-btn--ghost aw-btn--sm">
-                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
-                                                <span>{% translate "Details" %}</span>
-                                                <span class="aw-small aw-muted">{{ row.cells|length }} {% translate "Meetings" %}</span>
-                                            </summary>
-                                            <div class="aw-drawer-scroll">
-                                                <table class="aw-drawer-table">
-                                                    <thead><tr>
-                                                        <th scope="col">{% translate "Date" %}</th>
-                                                        <th scope="col">{% translate "Course" %}</th>
-                                                        <th scope="col">{% translate "Entrance" %}</th>
-                                                        <th scope="col">{% translate "Exit" %}</th>
-                                                        <th scope="col">{% translate "By" %}</th>
-                                                        <th scope="col">{% translate "Grade" %}</th>
-                                                        <th scope="col">{% translate "Action" %}</th>
-                                                    </tr></thead>
-                                                    <tbody>
-                                                        {% for cell in row.cells %}
-                                                        <tr>
-                                                            <td>
-                                                                <b>{{ cell.meeting.date|date:"DATE_FORMAT" }}</b>
-                                                                {% if cell.entrance or cell.exit %}
-                                                                <span class="aw-pill aw-pill--green">{% translate "Scan recorded" %}</span>
-                                                                {% else %}
-                                                                <span class="aw-pill aw-pill--muted">{% translate "No scan recorded" %}</span>
-                                                                {% endif %}
-                                                            </td>
-                                                            <td>{{ cell.meeting.course_name }}</td>
-                                                            <td>
-                                                                {% if cell.entrance %}{{ cell.entrance.scanned_at|date:"H:i:s" }}<br><span class="aw-muted">{{ cell.entrance_source_label }}</span>{% else %}-{% endif %}
-                                                            </td>
-                                                            <td>
-                                                                {% if cell.exit %}{{ cell.exit.scanned_at|date:"H:i:s" }}<br><span class="aw-muted">{{ cell.exit_source_label }}</span>{% else %}-{% endif %}
-                                                            </td>
-                                                            <td>
-                                                                {% if cell.entrance %}{% translate "Entrance" %}: {{ cell.entrance_by_label }}{% endif %}{% if cell.entrance and cell.exit %}<br>{% endif %}{% if cell.exit %}{% translate "Exit" %}: {{ cell.exit_by_label }}{% endif %}{% if not cell.entrance and not cell.exit %}-{% endif %}
-                                                            </td>
-                                                            <td>
-                                                                {% if cell.status == "on_time" %}
-                                                                <span class="aw-attend-cell aw-attend-cell--full" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg></span>
-                                                                {% elif cell.status == "incomplete" %}
-                                                                <span class="aw-attend-cell aw-attend-cell--none" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
-                                                                {% elif cell.status == "absent" %}
-                                                                <span class="aw-attend-cell aw-attend-cell--absent" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg></span>
-                                                                {% else %}
-                                                                <span class="aw-attend-cell aw-attend-cell--partial" aria-hidden="true"><svg class="aw-ico" aria-hidden="true"><use href="#i-clock"></use></svg></span>
-                                                                {% endif %}
-                                                                <strong>{{ cell.grade }}</strong> - {{ cell.status_label }}
-                                                            </td>
-                                                            <td>
-                                                                <div class="aw-row-actions">
-                                                                    {% if cell.entrance %}
-                                                                    <span class="aw-muted">{% translate "Entrance" %}</span>
-                                                                    <a href="{% url 'attendance-correction' cell.entrance.pk %}" class="aw-icon-btn" title="{% translate 'Correct entrance' %}">
-                                                                        <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
-                                                                        <span class="visually-hidden">{% translate "Correct entrance" %}</span>
-                                                                    </a>
-                                                                    <form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
-                                                                        {% csrf_token %}
-                                                                        <button type="submit" class="aw-btn aw-btn--danger aw-btn--icon" title="{% translate 'Delete' %}">
-                                                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
-                                                                            <span class="visually-hidden">{% translate "Delete" %}</span>
-                                                                        </button>
-                                                                    </form>
-                                                                    {% endif %}
-                                                                    {% if cell.exit %}
-                                                                    <span class="aw-muted">{% translate "Exit" %}</span>
-                                                                    <a href="{% url 'attendance-correction' cell.exit.pk %}" class="aw-icon-btn" title="{% translate 'Correct exit' %}">
-                                                                        <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
-                                                                        <span class="visually-hidden">{% translate "Correct exit" %}</span>
-                                                                    </a>
-                                                                    <form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
-                                                                        {% csrf_token %}
-                                                                        <button type="submit" class="aw-btn aw-btn--danger aw-btn--icon" title="{% translate 'Delete' %}">
-                                                                            <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
-                                                                            <span class="visually-hidden">{% translate "Delete" %}</span>
-                                                                        </button>
-                                                                    </form>
-                                                                    {% endif %}
-                                                                    {% if not cell.entrance and not cell.exit %}<span class="aw-muted">-</span>{% endif %}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </details>
+                                    <td>
+                                        <span class="aw-score">{{ row.score }}</span>
+                                        {% comment %}
+                                        Row detail opens in the shared drawer: the
+                                        markup lives in an inert template so there
+                                        is one copy and no inline expansion.
+                                        {% endcomment %}
+                                        <template data-attendance-detail>
+                                            <ol class="aw-stack aw-stack--lg">
+                                                {% for cell in row.cells %}
+                                                <li class="aw-card">
+                                                    <div class="aw-card-body aw-card-body--tight">
+                                                        <div class="aw-flex aw-flex--between aw-flex-wrap">
+                                                            <b>{{ cell.meeting.date|date:"DATE_FORMAT" }}</b>
+                                                            {% if cell.entrance or cell.exit %}
+                                                            <span class="aw-pill aw-pill--green">{% translate "Scan recorded" %}</span>
+                                                            {% else %}
+                                                            <span class="aw-pill aw-pill--muted">{% translate "No scan recorded" %}</span>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="aw-small aw-muted">{{ cell.meeting.course_name }}</div>
+                                                        <dl class="aw-dl aw-mt-2">
+                                                            <div class="aw-kv">
+                                                                <dt>{% translate "Entrance" %}</dt>
+                                                                <dd>{% if cell.entrance %}{{ cell.entrance.scanned_at|date:"H:i:s" }} - {{ cell.entrance_source_label }}{% else %}-{% endif %}</dd>
+                                                            </div>
+                                                            <div class="aw-kv">
+                                                                <dt>{% translate "Exit" %}</dt>
+                                                                <dd>{% if cell.exit %}{{ cell.exit.scanned_at|date:"H:i:s" }} - {{ cell.exit_source_label }}{% else %}-{% endif %}</dd>
+                                                            </div>
+                                                            <div class="aw-kv">
+                                                                <dt>{% translate "By" %}</dt>
+                                                                <dd>{% if cell.entrance %}{% translate "Entrance" %}: {{ cell.entrance_by_label }}{% endif %}{% if cell.entrance and cell.exit %}, {% endif %}{% if cell.exit %}{% translate "Exit" %}: {{ cell.exit_by_label }}{% endif %}{% if not cell.entrance and not cell.exit %}-{% endif %}</dd>
+                                                            </div>
+                                                            <div class="aw-kv">
+                                                                <dt>{% translate "Grade" %}</dt>
+                                                                <dd><strong>{{ cell.grade }}</strong> - {{ cell.status_label }}</dd>
+                                                            </div>
+                                                        </dl>
+                                                        <div class="aw-row-actions">
+                                                            {% if cell.entrance %}
+                                                            <a href="{% url 'attendance-correction' cell.entrance.pk %}" class="aw-btn aw-btn--ghost aw-btn--sm">
+                                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                                                                {% translate "Correct entrance" %}
+                                                            </a>
+                                                            <form method="post" action="{% url 'attendance-delete' cell.entrance.pk %}" hx-post="{% url 'attendance-delete' cell.entrance.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="aw-icon-btn is-danger" title="{% translate 'Delete' %}" aria-label="{% translate 'Delete entrance' %}">
+                                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                                                </button>
+                                                            </form>
+                                                            {% endif %}
+                                                            {% if cell.exit %}
+                                                            <a href="{% url 'attendance-correction' cell.exit.pk %}" class="aw-btn aw-btn--ghost aw-btn--sm">
+                                                                <svg class="aw-ico" aria-hidden="true"><use href="#i-edit"></use></svg>
+                                                                {% translate "Correct exit" %}
+                                                            </a>
+                                                            <form method="post" action="{% url 'attendance-delete' cell.exit.pk %}" hx-post="{% url 'attendance-delete' cell.exit.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-inline-form" data-confirm-message="{% translate 'Delete this record?' %}">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="aw-icon-btn is-danger" title="{% translate 'Delete' %}" aria-label="{% translate 'Delete exit' %}">
+                                                                    <svg class="aw-ico" aria-hidden="true"><use href="#i-trash"></use></svg>
+                                                                </button>
+                                                            </form>
+                                                            {% endif %}
+                                                            {% if not cell.entrance and not cell.exit %}<span class="aw-muted">-</span>{% endif %}
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                                {% endfor %}
+                                            </ol>
+                                        </template>
                                     </td>
                                 </tr>
                                 {% empty %}

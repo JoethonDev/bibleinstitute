@@ -463,6 +463,22 @@
                 expand.getAttribute('data-aw-lightbox'),
                 expand.getAttribute('data-aw-lightbox-kind') || 'image'
             );
+            return;
+        }
+        // Attendance matrix: clicking a row opens that student's meeting history
+        // in the drawer instead of expanding a second table row inline.
+        var row = event.target.closest('tr[data-attendance-row]');
+        if (row && window.awDrawer) {
+            if (event.target.closest('a, button, input, select, textarea, form, label')) return;
+            var template = row.querySelector('template[data-attendance-detail]');
+            if (!template) return;
+            event.preventDefault();
+            window.awDrawer.open({
+                title: row.getAttribute('data-attendance-title') || '',
+                subtitle: row.getAttribute('data-attendance-subtitle') || '',
+                html: template.innerHTML,
+                trigger: row
+            });
         }
     });
 
