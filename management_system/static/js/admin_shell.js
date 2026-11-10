@@ -89,6 +89,14 @@
                     } catch (error) { /* A missed region keeps its markup. */ }
                 }
             }
+            // The main column is the scroll container now, so the browser's
+            // navigation scroll reset no longer applies: a page swap must put the
+            // new page back at the top. In-place updates (pagination, filters,
+            // which target #content) keep their position.
+            if (target.id === 'display-page' || target.id === 'page-region') {
+                var mainColumn = document.querySelector('.aw-main');
+                if (mainColumn) mainColumn.scrollTop = 0;
+            }
             var region = target.id === 'page-region'
                 ? target
                 : (target.querySelector('#page-region') || document.getElementById('page-region'));
@@ -463,6 +471,22 @@
                 expand.getAttribute('data-aw-lightbox'),
                 expand.getAttribute('data-aw-lightbox-kind') || 'image'
             );
+            return;
+        }
+        // Attendance matrix: clicking a row opens that student's meeting history
+        // in the drawer instead of expanding a second table row inline.
+        var row = event.target.closest('tr[data-attendance-row]');
+        if (row && window.awDrawer) {
+            if (event.target.closest('a, button, input, select, textarea, form, label')) return;
+            var template = row.querySelector('template[data-attendance-detail]');
+            if (!template) return;
+            event.preventDefault();
+            window.awDrawer.open({
+                title: row.getAttribute('data-attendance-title') || '',
+                subtitle: row.getAttribute('data-attendance-subtitle') || '',
+                html: template.innerHTML,
+                trigger: row
+            });
         }
     });
 

@@ -501,7 +501,7 @@ HTMX navigation into a scope keeps landing on the panel it asked for.
                 <form method="post" action="{% url 'academic-year-edit' y.id %}" hx-post="{% url 'academic-year-edit' y.id %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
                     <div class="modal-header"><h5 class="modal-title" id="yearModalLabel{{ y.id }}">{% translate "Edit Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
-                    <div class="modal-body">
+                    <div class="modal-body aw-stack">
                         {% for field in y.edit_form %}
                         <div class="aw-field">
                             <label class="aw-field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -528,7 +528,7 @@ HTMX navigation into a scope keeps landing on the panel it asked for.
                 <form method="post" action="{% url 'academic-year-create' %}" hx-post="{% url 'academic-year-create' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
                     <div class="modal-header"><h5 class="modal-title" id="yearModalLabel">{% translate "New Academic Year" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
-                    <div class="modal-body">
+                    <div class="modal-body aw-stack">
                         {% for field in year_form %}
                         <div class="aw-field">
                             <label class="aw-field-label" for="id_{{ field.name }}">{{ field.label }}</label>
@@ -554,7 +554,7 @@ HTMX navigation into a scope keeps landing on the panel it asked for.
                 <form method="post" action="{% url 'copy-course-offerings' %}" hx-post="{% url 'copy-course-offerings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
                     {% csrf_token %}
                     <div class="modal-header"><h5 class="modal-title" id="copyModalLabel">{% translate "Copy Course Offerings" %}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button></div>
-                    <div class="modal-body">
+                    <div class="modal-body aw-stack">
                         <div class="aw-field">
                             <label class="aw-field-label" for="id_target_year_level">{% translate "Target Academic Scope" %}</label>
                             {{ copy_form.target_year_level }}

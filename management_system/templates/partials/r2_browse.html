@@ -37,7 +37,7 @@ segment is the requested folder path and intermediate ancestors are not links.
 </div>
 {% endif %}
 
-<div id="drive-files">
+<div id="drive-files"{% if not is_root %} class="aw-mt-3"{% endif %}>
     {% include 'partials/r2_file_list.html' %}
 </div>
 {% if next_page_url %}

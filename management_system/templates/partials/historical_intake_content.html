@@ -79,8 +79,8 @@
                 {% csrf_token %}<input type="hidden" name="action" value="existing_preview">
                 <div class="aw-form-section">
                     <p class="aw-small aw-muted">{% translate "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled." %}</p>
-                    {% if existing_form.non_field_errors %}<div class="aw-alert aw-alert--danger" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ existing_form.non_field_errors }}</div></div>{% endif %}
-                    <div class="aw-form-grid">
+                    {% if existing_form.non_field_errors %}<div class="aw-alert aw-alert--danger aw-mt-2" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ existing_form.non_field_errors }}</div></div>{% endif %}
+                    <div class="aw-form-grid aw-mt-3">
                         <div class="aw-span-2">{% include "partials/components/aw_field.html" with field=existing_form.student_search %}</div>
                         <div class="aw-span-2" id="existing-student-picker" role="group" aria-labelledby="existing-students-label">
                             <span id="existing-students-label" class="aw-field-label">{% translate "Existing students" %} ({{ selected_users|length }}/50)</span>
@@ -167,8 +167,8 @@
                 {% if intake_job %}
                 {% include "partials/admin_operation_status.html" with operation_job=intake_job status_url=intake_status_url status=intake_job.status total=intake_job.total processed=intake_job.processed %}
                 {% endif %}
-                <details><summary class="aw-small">{% translate "Expected columns" %}</summary><p class="aw-small">{% for column in intake_columns %}<code>{{ column }}</code> {% endfor %}</p></details>
-                <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+                <details class="aw-mt-2"><summary class="aw-small">{% translate "Expected columns" %}</summary><p class="aw-small">{% for column in intake_columns %}<code>{{ column }}</code> {% endfor %}</p></details>
+                <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-mt-3">
                     {% csrf_token %}
                     <div class="aw-field">
                         <label for="intake-file" class="aw-field-label">{% translate "Intake CSV or XLSX" %}</label>
@@ -183,8 +183,8 @@
                     </div>
                 </form>
                 {% if preview %}
-                <p class="aw-small aw-muted">{% translate "Applying queues one row at a time; a failing row is reported without stopping the remaining rows." %}</p>
-                <div class="aw-table-wrap"><table class="aw-table"><thead><tr><th>{% translate "Row" %}</th><th>{% translate "Source student" %}</th><th>{% translate "Account" %}</th><th>{% translate "Result" %}</th><th>{% translate "Message" %}</th></tr></thead><tbody>{% for item in preview %}<tr><td>{{ item.row }}</td><td>{{ item.source_name }}</td><td>{{ item.account }}</td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}</tbody></table></div>
+                <p class="aw-small aw-muted aw-mt-3">{% translate "Applying queues one row at a time; a failing row is reported without stopping the remaining rows." %}</p>
+                <div class="aw-table-wrap aw-mt-2"><table class="aw-table"><thead><tr><th>{% translate "Row" %}</th><th>{% translate "Source student" %}</th><th>{% translate "Account" %}</th><th>{% translate "Result" %}</th><th>{% translate "Message" %}</th></tr></thead><tbody>{% for item in preview %}<tr><td>{{ item.row }}</td><td>{{ item.source_name }}</td><td>{{ item.account }}</td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}</tbody></table></div>
                 {% endif %}
             </div>
         </div>
@@ -202,8 +202,8 @@
                 {% csrf_token %}<input type="hidden" name="action" value="assign_exceptional">
                 <div class="aw-form-section">
                     <p class="aw-small aw-muted">{% translate "Select a student and only the active-year course offerings they must complete. This creates targeted access, not full-year access." %}</p>
-                    {% if exceptional_form.non_field_errors %}<div class="aw-alert aw-alert--danger" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ exceptional_form.non_field_errors }}</div></div>{% endif %}
-                    <div class="aw-form-grid">
+                    {% if exceptional_form.non_field_errors %}<div class="aw-alert aw-alert--danger aw-mt-2" role="alert"><svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg><div>{{ exceptional_form.non_field_errors }}</div></div>{% endif %}
+                    <div class="aw-form-grid aw-mt-3">
                         {% include "partials/components/aw_field.html" with field=exceptional_form.student_identifier %}
                         <div class="aw-field aw-span-2">
                             <span class="aw-field-label">{{ exceptional_form.course_offerings.label }}</span>

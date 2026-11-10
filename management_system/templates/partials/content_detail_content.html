@@ -196,7 +196,7 @@
                         <h3 id="aw-content-exception">{% translate "Exceptional quiz opening" %}</h3>
                     </div>
                 </div>
-                <div class="aw-card-body">
+                <div class="aw-card-body aw-stack">
                     <p class="aw-small aw-muted">{% translate "Select enrolled students and a local opening window. This does not change the normal quiz window." %}</p>
                     <p class="aw-small aw-muted">{% blocktranslate with timezone=application_timezone %}All schedule times use {{ timezone }}.{% endblocktranslate %}</p>
                     <form method="post" action="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}" hx-post="{% url 'quiz-exceptional-opening' quiz_id=content.pk %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Are you sure?' %}">

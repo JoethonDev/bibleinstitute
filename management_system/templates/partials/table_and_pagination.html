@@ -63,7 +63,7 @@
     </div>
 
     <!-- Select-all-matching hint (non-application branch) -->
-    <div class="aw-alert aw-alert--info" x-show="showSelectAllHint()" x-cloak role="status">
+    <div class="aw-alert aw-alert--info aw-mt-2 aw-mb-2" x-show="showSelectAllHint()" x-cloak role="status">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
         <span>{% translate "All rows on this page are selected." %}</span>
         <button type="button" class="aw-btn aw-btn--primary aw-btn--sm"
@@ -76,7 +76,7 @@
 
     <!-- Responsive Table -->
     {% if view == 'quiz' and caps.manage_academic_setup %}
-    <div class="aw-alert aw-alert--info" x-show="!!recalculationStatus" x-cloak role="status" aria-live="polite">
+    <div class="aw-alert aw-alert--info aw-mt-2 aw-mb-2" x-show="!!recalculationStatus" x-cloak role="status" aria-live="polite">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>
         <span x-text="recalculationStatus"></span>
         <button type="button" class="aw-btn aw-btn--outline aw-btn--sm"

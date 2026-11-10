@@ -133,6 +133,7 @@ width plus aria-valuenow) as well as the native progress element.
         <hr class="aw-divider aw-mt-3">
         {% if not notification_content.withdrawn_at or notification_deletion_retryable %}
         <form method="post"
+              class="aw-mt-3"
               action="{% url 'notification-withdraw' notification_content.pk %}"
               hx-post="{% url 'notification-withdraw' notification_content.pk %}"
               hx-target="#content" hx-select="#content" hx-swap="outerHTML"
@@ -169,7 +170,7 @@ width plus aria-valuenow) as well as the native progress element.
             <h3 id="notification-redelivery-heading">{% translate "Retry or resend" %}</h3>
         </div>
     </div>
-    <div class="aw-card-body">
+    <div class="aw-card-body aw-stack">
         <p>{% blocktranslate with count=audience_count %}Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again.{% endblocktranslate %}</p>
         <p class="aw-small aw-muted">{% translate "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history." %}</p>
         {% if redelivery_materializing %}<div class="aw-alert aw-alert--warn" role="status">{% translate "Initial delivery records are still being prepared. Resend all will be available when they finish." %}</div>{% endif %}

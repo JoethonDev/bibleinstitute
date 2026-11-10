@@ -4,7 +4,7 @@
 {% with student_name=conversation.user.get_full_name|default:conversation.user.username %}
 <div class="aw-chat-main">
     <div class="aw-chat-head">
-        <span class="aw-avatar aw-avatar--lg" aria-hidden="true">
+        <span class="aw-avatar aw-avatar--lg aw-avatar--square" aria-hidden="true">
             {% if conversation.user.profile_image_key %}
             <img class="aw-avatar-img"
                  src="{% url 'application-document' conversation.user.pk 'profile' %}"
@@ -67,7 +67,7 @@
 
 <aside class="aw-chat-context" aria-label="{% translate 'Telegram Support Chat' %}">
     <div class="aw-flex">
-        <span class="aw-avatar aw-avatar--lg" aria-hidden="true">
+        <span class="aw-avatar aw-avatar--lg aw-avatar--square" aria-hidden="true">
             {% if conversation.user.profile_image_key %}
             <img class="aw-avatar-img"
                  src="{% url 'application-document' conversation.user.pk 'profile' %}"

@@ -76,7 +76,7 @@ rendered here instead of inventing them.
                     </div>
                 </div>
             </div>
-            <div class="aw-card-body">
+            <div class="aw-card-body aw-stack">
                 <div class="aw-meta-grid">
                     <div class="aw-meta-item">
                         <span class="aw-label">{% translate "Years" %}</span>
@@ -144,7 +144,7 @@ rendered here instead of inventing them.
                             <h6 class="modal-title" id="deleteLevelModalLabel{{ lvl.level }}">{% translate "Delete Level" %}</h6>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                         </div>
-                        <div class="modal-body">
+                        <div class="modal-body aw-stack">
                             <p>{% translate "Are you sure you want to delete" %} <strong>{{ lvl.name }}</strong>?</p>
                             <p class="aw-small aw-text-danger">{% translate "This will remove all academic years and courses in this level." %}</p>
                         </div>

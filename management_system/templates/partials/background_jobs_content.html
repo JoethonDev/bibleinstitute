@@ -37,28 +37,26 @@ pagination include arguments are unchanged.
     <div class="aw-card aw-dashboard-filters">
         <div class="aw-card-body aw-card-body--tight">
             <div class="aw-filter-bar">
-                <form method="get" class="aw-form-grid" role="search"
+                <form method="get" class="aw-table-tools" role="search"
                       hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace">
                     {{ filter_form.non_field_errors }}
                     {% for field in filter_form %}
                     {% if field.is_hidden %}{{ field }}{% if field.errors %}<div class="aw-field-error">{{ field.errors }}</div>{% endif %}{% else %}
-                    <div class="aw-field">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="aw-field aw-field--inline">
+                        <label class="visually-hidden" for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
                         {% if field.errors %}<div class="aw-field-error" role="alert">{{ field.errors }}</div>{% endif %}
                     </div>
                     {% endif %}
                     {% endfor %}
-                    <div class="aw-form-actions">
-                        <button type="submit" class="aw-btn aw-btn--primary">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
-                            <span>{% translate "Search and filter" %}</span>
-                        </button>
-                        <a class="aw-btn aw-btn--ghost" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
-                            <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
-                            <span>{% translate "Clear" %}</span>
-                        </a>
-                    </div>
+                    <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <span>{% translate "Search and filter" %}</span>
+                    </button>
+                    <a class="aw-btn aw-btn--ghost aw-btn--sm" href="{{ list_url }}" hx-get="{{ list_url }}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                        <span>{% translate "Clear" %}</span>
+                    </a>
                 </form>
             </div>
         </div>

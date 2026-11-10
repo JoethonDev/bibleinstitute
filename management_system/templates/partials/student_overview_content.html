@@ -229,7 +229,7 @@ audit-logged there.
                     <div class="aw-card-body">
                         <p class="aw-small aw-muted">{% translate "What the student sees. Actions are disabled in preview." %}</p>
                         {% if readonly_offerings %}
-                        <div class="aw-timeline" data-pager-body>
+                        <div class="aw-timeline aw-mt-2" data-pager-body>
                             {% for o in readonly_offerings %}
                             <div class="aw-tl-item" data-pager-row>
                                 <b>{{ o.course.name }} - {{ o.academic_year_level.level.display_name }}</b>
