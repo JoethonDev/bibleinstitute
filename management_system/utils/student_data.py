@@ -21,6 +21,7 @@ from ..models import (
     AcademicHoliday,
     AcademicYearLevelMeeting,
     AttendanceRecord,
+    CourseOffering,
     Enrollment,
     Grade,
     LectureProgress,
@@ -44,6 +45,7 @@ from ..quiz_attempts import reconcile_snapshots
 
 
 PAGE_SIZE = 20
+PROGRESS_LESSON_BATCH_SIZE = 100
 
 
 def page_metadata(page_obj: Page, page_size: int = PAGE_SIZE) -> dict[str, int | bool]:
@@ -442,16 +444,22 @@ def student_quiz_data(
     }
 
 
-def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
-    if not _can_read_offering(user, offering_id):
-        return None
-    quizzes = list(Quiz.objects.filter(
+def _student_course_quiz_rows(
+    user: User,
+    offering_id: int,
+    *,
+    limit: int | None = None,
+) -> list[dict]:
+    quiz_queryset = Quiz.objects.filter(
         course_offering_id=offering_id,
         status=PublicationStatus.PUBLISHED,
     ).select_related(
         "course_offering__academic_year_level__academic_year",
         "course_offering__academic_year_level__level",
-    ).order_by("opening_date", "pk"))
+    ).order_by("opening_date", "pk")
+    if limit is not None:
+        quiz_queryset = quiz_queryset[:max(0, limit)]
+    quizzes = list(quiz_queryset)
     grades = {
         row.quiz_id: row
         for row in Grade.objects.filter(user=user, quiz_id__in=[quiz.pk for quiz in quizzes])
@@ -487,8 +495,25 @@ def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
             snapshots.get(quiz.pk),
             current,
         )
-        result.append({"id": quiz.pk, "status": mode})
+        result.append({"quiz": quiz, "id": quiz.pk, "status": mode, "grade": grade})
     return result
+
+
+def student_course_quiz_data(
+    user: User,
+    offering: CourseOffering,
+    *,
+    limit: int | None = None,
+) -> list[dict]:
+    """Return quiz state for a course offering authorized by the caller."""
+    return _student_course_quiz_rows(user, offering.pk, limit=limit)
+
+
+def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
+    if not _can_read_offering(user, offering_id):
+        return None
+    rows = _student_course_quiz_rows(user, offering_id)
+    return [{"id": row["id"], "status": row["status"]} for row in rows]
 
 
 def student_profile_data(user: User) -> dict:
@@ -670,6 +695,9 @@ def student_course_progress_data(
     offerings: list,
     *,
     include_unpublished: bool = False,
+    lesson_detail_ids: set[int] | None = None,
+    include_attendance_metrics: bool = True,
+    include_quiz_metrics: bool = True,
 ) -> dict[int, dict]:
     """Build progress for caller-authorized offerings for HTML and mobile."""
     offering_ids = [offering.pk for offering in offerings]
@@ -701,36 +729,89 @@ def student_course_progress_data(
             lessons = lesson_queryset.only(
                 "id", "course_offering_id", "links", "created_date"
             ).order_by("course_offering_id", "created_date", "pk")
-            media_parts = {}
-            for lesson in lessons.iterator(chunk_size=500):
-                for link in _parse_links(lesson):
-                    if not isinstance(link, dict) or link.get("file_type") not in {"video", "audio"}:
-                        continue
-                    part_id = link.get("part_id")
-                    if part_id:
-                        media_parts[(lesson.pk, part_id)] = lesson.course_offering_id
-            if media_parts:
+            detail_ids = lesson_detail_ids or set()
+            lesson_progress = {}
+            lesson_batch = []
+
+            def consume_lesson_batch(batch: list[Lesson]) -> None:
+                batch_ids = {lesson.pk for lesson in batch}
+                media_parts = {}
+                for lesson in batch:
+                    for link in _parse_links(lesson):
+                        if (
+                            not isinstance(link, dict)
+                            or link.get("file_type") not in {"video", "audio"}
+                        ):
+                            continue
+                        part_id = link.get("part_id")
+                        if not part_id:
+                            continue
+                        part_key = (lesson.pk, part_id)
+                        if part_key in media_parts:
+                            continue
+                        media_parts[part_key] = lesson.course_offering_id
+                        progress_by_offering[lesson.course_offering_id]["watchable_parts"] += 1
+                        if lesson.pk in detail_ids:
+                            lesson_metric = lesson_progress.setdefault(
+                                lesson.course_offering_id, {}
+                            ).setdefault(
+                                lesson.pk,
+                                {
+                                    "watched_parts": 0,
+                                    "watchable_parts": 0,
+                                    "watch_percent": 0,
+                                },
+                            )
+                            lesson_metric["watchable_parts"] += 1
+
+                if not media_parts:
+                    return
                 progress_rows = LectureProgress.objects.filter(
                     student=user,
-                    lesson_id__in={lesson_id for lesson_id, _part_id in media_parts},
-                ).values("lesson_id", "part_id", "merged_ranges", "unique_seconds", "percent")
-                progress_by_part = {
-                    (row["lesson_id"], row["part_id"]): row
-                    for row in progress_rows
-                }
-                for part_key, offering_id in media_parts.items():
-                    metric = progress_by_offering[offering_id]
-                    metric["watchable_parts"] += 1
-                    progress = progress_by_part.get(part_key)
-                    if progress is None:
+                    lesson_id__in=batch_ids,
+                ).values(
+                    "lesson_id", "part_id", "merged_ranges", "unique_seconds", "percent"
+                ).iterator(chunk_size=500)
+                for progress in progress_rows:
+                    lesson_id = progress["lesson_id"]
+                    part_key = (lesson_id, progress["part_id"])
+                    offering_id = media_parts.get(part_key)
+                    if offering_id is None:
                         continue
+                    metric = progress_by_offering[offering_id]
                     percent = max(0, min(int(progress["percent"] or 0), 100))
-                    ranges = progress["merged_ranges"] if isinstance(progress["merged_ranges"], list) else []
+                    ranges = (
+                        progress["merged_ranges"]
+                        if isinstance(progress["merged_ranges"], list)
+                        else []
+                    )
                     seconds = progress["unique_seconds"] or unique_seconds(ranges)
                     metric["watch_time_seconds"] += max(0, seconds)
                     metric["watch_percent"] += percent
                     if percent >= 80:
                         metric["watched_parts"] += 1
+                    if lesson_id in detail_ids:
+                        lesson_metric = lesson_progress[offering_id][lesson_id]
+                        lesson_metric["watch_percent"] += percent
+                        if percent >= 80:
+                            lesson_metric["watched_parts"] += 1
+
+            for lesson in lessons.iterator(chunk_size=PROGRESS_LESSON_BATCH_SIZE):
+                lesson_batch.append(lesson)
+                if len(lesson_batch) == PROGRESS_LESSON_BATCH_SIZE:
+                    consume_lesson_batch(lesson_batch)
+                    lesson_batch.clear()
+            if lesson_batch:
+                consume_lesson_batch(lesson_batch)
+
+            for offering_id, lessons_by_id in lesson_progress.items():
+                progress_by_offering[offering_id]["lesson_progress"] = lessons_by_id
+                for lesson_metric in lessons_by_id.values():
+                    if lesson_metric["watchable_parts"]:
+                        lesson_metric["watch_percent"] = round(
+                            lesson_metric["watch_percent"]
+                            / lesson_metric["watchable_parts"]
+                        )
         for metric in progress_by_offering.values():
             seconds = metric.pop("watch_time_seconds", 0)
             metric["watch_time_minutes"] = int(round(seconds / 60))
@@ -739,13 +820,14 @@ def student_course_progress_data(
                     metric["watch_percent"] / metric["watchable_parts"]
                 )
 
-        meeting_counts = AcademicYearLevelMeeting.objects.filter(
-            course_offering_id__in=offering_ids
-        ).values("course_offering_id").annotate(total=Count("pk"))
-        for row in meeting_counts:
-            progress_by_offering[row["course_offering_id"]]["attendance_total"] = row["total"]
+        if include_attendance_metrics:
+            meeting_counts = AcademicYearLevelMeeting.objects.filter(
+                course_offering_id__in=offering_ids
+            ).values("course_offering_id").annotate(total=Count("pk"))
+            for row in meeting_counts:
+                progress_by_offering[row["course_offering_id"]]["attendance_total"] = row["total"]
 
-        if user.study_mode != "online":
+        if include_attendance_metrics and user.study_mode != "online":
             starts_on = min(
                 offering.academic_year_level.academic_year.starts_on
                 for offering in offerings
@@ -772,36 +854,37 @@ def student_course_progress_data(
                     fully_scanned_attendance_day(pair)
                 )
 
-        quiz_queryset = Quiz.objects.filter(course_offering_id__in=offering_ids)
-        if not include_unpublished:
-            quiz_queryset = quiz_queryset.filter(status=PublicationStatus.PUBLISHED)
-        for row in quiz_queryset.values(
-            "course_offering_id", "quiz_type__code"
-        ).annotate(total=Count("pk")):
-            quiz_type = row["quiz_type__code"]
-            if quiz_type in {"weekly", "final"}:
-                progress_by_offering[row["course_offering_id"]][f"{quiz_type}_total"] = row["total"]
+        if include_quiz_metrics:
+            quiz_queryset = Quiz.objects.filter(course_offering_id__in=offering_ids)
+            if not include_unpublished:
+                quiz_queryset = quiz_queryset.filter(status=PublicationStatus.PUBLISHED)
+            for row in quiz_queryset.values(
+                "course_offering_id", "quiz_type__code"
+            ).annotate(total=Count("pk")):
+                quiz_type = row["quiz_type__code"]
+                if quiz_type in {"weekly", "final"}:
+                    progress_by_offering[row["course_offering_id"]][f"{quiz_type}_total"] = row["total"]
 
-        grades = Grade.objects.filter(
-            user=user,
-            quiz__course_offering_id__in=offering_ids,
-            quiz__quiz_type__code__in=("weekly", "final"),
-        )
-        if not include_unpublished:
-            grades = grades.filter(quiz__status=PublicationStatus.PUBLISHED)
-        grades = grades.select_related("quiz__quiz_type").order_by("quiz__opening_date", "quiz_id")
-        for grade in grades:
-            quiz_type = grade.quiz.quiz_type
-            if not quiz_type or quiz_type.code not in {"weekly", "final"}:
-                continue
-            metric = progress_by_offering[grade.quiz.course_offering_id]
-            bucket = "weekly" if quiz_type.code == "weekly" else "final"
-            metric[f"{bucket}_taken"] += 1
-            metric[f"{bucket}_grades"].append({
-                "name": grade.quiz.name,
-                "score": grade.total_grade,
-                "total": grade.quiz.total_grade,
-            })
+            grades = Grade.objects.filter(
+                user=user,
+                quiz__course_offering_id__in=offering_ids,
+                quiz__quiz_type__code__in=("weekly", "final"),
+            )
+            if not include_unpublished:
+                grades = grades.filter(quiz__status=PublicationStatus.PUBLISHED)
+            grades = grades.select_related("quiz__quiz_type").order_by("quiz__opening_date", "quiz_id")
+            for grade in grades:
+                quiz_type = grade.quiz.quiz_type
+                if not quiz_type or quiz_type.code not in {"weekly", "final"}:
+                    continue
+                metric = progress_by_offering[grade.quiz.course_offering_id]
+                bucket = "weekly" if quiz_type.code == "weekly" else "final"
+                metric[f"{bucket}_taken"] += 1
+                metric[f"{bucket}_grades"].append({
+                    "name": grade.quiz.name,
+                    "score": grade.total_grade,
+                    "total": grade.quiz.total_grade,
+                })
 
     return progress_by_offering
 
@@ -911,8 +994,40 @@ def localized_notification_text(notification: StudentNotification, language: str
     return notification.title_en, notification.body_en
 
 
-def student_notification_data(user: User, page: int) -> tuple[Page, int]:
-    queryset = student_notifications_queryset(user).order_by("-created_at", "-pk")
+_STUDENT_NOTIFICATION_FILTERS = {
+    "lessons": StudentNotification.NotificationType.LESSON_PUBLISHED,
+    "quizzes": StudentNotification.NotificationType.QUIZ_OPENING,
+    "announcements": StudentNotification.NotificationType.ANNOUNCEMENT,
+}
+
+
+def filtered_student_notifications_queryset(
+    user: User,
+    *,
+    kind: str | None = None,
+    unread: bool = False,
+) -> QuerySet:
+    queryset = student_notifications_queryset(user)
+    notification_type = _STUDENT_NOTIFICATION_FILTERS.get(kind)
+    if notification_type:
+        queryset = queryset.filter(notification_type=notification_type)
+    if unread:
+        queryset = queryset.filter(read_at__isnull=True)
+    return queryset
+
+
+def student_notification_data(
+    user: User,
+    page: int,
+    *,
+    kind: str | None = None,
+    unread: bool = False,
+) -> tuple[Page, int]:
+    queryset = filtered_student_notifications_queryset(
+        user,
+        kind=kind,
+        unread=unread,
+    ).order_by("-created_at", "-pk")
     page_obj = Paginator(queryset, PAGE_SIZE).get_page(page)
     return page_obj, unread_notification_count(user)
 
@@ -921,9 +1036,16 @@ def student_notification_cursor_page(
     user: User,
     before_created_at: datetime,
     before_id: int,
+    *,
+    kind: str | None = None,
+    unread: bool = False,
 ) -> tuple[list[StudentNotification], bool]:
     """Return the next stable history page after a notification cursor."""
-    queryset = student_notifications_queryset(user).filter(
+    queryset = filtered_student_notifications_queryset(
+        user,
+        kind=kind,
+        unread=unread,
+    ).filter(
         Q(created_at__lt=before_created_at)
         | Q(created_at=before_created_at, pk__lt=before_id)
     ).select_related("lesson", "quiz").order_by("-created_at", "-pk")

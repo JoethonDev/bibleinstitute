@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
@@ -49,6 +49,17 @@ class PublicationStatus(models.TextChoices):
     DRAFT = "draft", _("Draft")
     PUBLISHED = "published", _("Published")
     ARCHIVED = "archived", _("Archived")
+
+
+class StudentMode(models.TextChoices):
+    LEGACY = "legacy", _("Legacy student view")
+    NEW = "new", _("New student view")
+
+
+class StudentExperienceOverride(models.TextChoices):
+    INHERIT = "inherit", _("Use global student view")
+    LEGACY = "legacy", _("Legacy student view")
+    NEW = "new", _("New student view")
 
 
 class MediaProcessingStatus(models.TextChoices):
@@ -176,6 +187,12 @@ class User(AbstractUser):
     STUDY_MODES = [("online", _("Online")), ("offline", _("Offline"))]
     study_mode = models.CharField(max_length=10, choices=STUDY_MODES, null=True, blank=True)
     study_mode_override = models.BooleanField(default=False)
+    student_experience_override = models.CharField(
+        max_length=10,
+        choices=StudentExperienceOverride.choices,
+        default=StudentExperienceOverride.INHERIT,
+        editable=False,
+    )
 
     IDENTITY_TYPES = [("national_id", _("National ID")), ("passport", _("Passport"))]
     identity_type = models.CharField(max_length=20, choices=IDENTITY_TYPES, null=True, blank=True)
@@ -2375,6 +2392,43 @@ class SignupSettings(models.Model):
     @classmethod
     def load(cls) -> "SignupSettings":
         return cls.objects.get_or_create(singleton="default")[0]
+
+
+class StudentExperienceSettings(models.Model):
+    """Global default for the authenticated student experience rollout."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    mode = models.CharField(
+        max_length=10,
+        choices=StudentMode.choices,
+        default=StudentMode.LEGACY,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="student_experience_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Student Experience Settings")
+        verbose_name_plural = _("Student Experience Settings")
+
+    def __str__(self):
+        return str(_("Student Experience Settings"))
+
+    @classmethod
+    def load(cls) -> "StudentExperienceSettings | None":
+        return cls.objects.filter(singleton="default").first()
+
+    def save(self, *args, **kwargs):
+        result = super().save(*args, **kwargs)
+        from .student_experience.mode import invalidate_student_experience_mode_cache
+
+        transaction.on_commit(invalidate_student_experience_mode_cache)
+        return result
 
 
 class AttendanceRecord(models.Model):

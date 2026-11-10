@@ -1,0 +1,22 @@
+{% load i18n %}
+<div class="sn-notif-panel-inner">
+  <div class="sn-notif-panel-head"><b>{% translate "Notifications" %}</b>{% if unread_count %}<span class="sn-notif-count">{{ unread_count }}</span>{% endif %}</div>
+  {% if notification_items %}
+  <div class="sn-notif-panel-list">
+    {% for item in notification_items %}
+    <article class="sn-notif-panel-item{% if not item.is_read %} is-unread{% endif %}" data-notification-id="{{ item.id }}">
+      {% if item.target_url %}
+      <form method="post" action="{{ item.open_url }}" data-notification-open>{% csrf_token %}<input type="hidden" name="target_url" value="{{ item.target_url }}"><button type="submit" class="sn-notif-panel-title">{{ item.title }}</button></form>
+      {% else %}<b class="sn-notif-panel-title">{{ item.title }}</b>{% endif %}
+      <p>{{ item.body|truncatechars:100|urlize }}</p>
+      <time>{{ item.created_at|date:"D, j M - H:i" }}</time>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<p class="sn-muted">{% translate "No notifications yet." %}</p>{% endif %}
+  <div class="sn-notif-panel-foot">
+    {% if unread_count %}<form method="post" action="{% url 'student-notification-read-all' %}" data-notification-read-all>{% csrf_token %}<button type="submit" class="sn-text-link">{% translate "Mark all as read" %}</button></form>{% endif %}
+    <a class="sn-text-link" href="{% url 'student-notifications' %}">{% translate "View all notifications" %}</a>
+  </div>
+</div>
+<span id="notification-badge" class="sn-notif-badge" hx-swap-oob="true"{% if not unread_count %} hidden{% endif %}>{{ unread_count }}</span>

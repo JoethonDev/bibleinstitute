@@ -1,0 +1,112 @@
+{% extends "student_next/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your student record" %} - {% translate "Bible Institute" %}{% endblock %}
+{% block body %}
+<div id="profile-content" class="sn-page sn-profile-page" data-profile-tabs>
+  {% include "student_next/partials/alerts.html" %}
+  <header class="sn-page-head">
+    <div class="sn-page-head-main"><div class="sn-eyebrow">{% translate "My profile" %}</div><h1 class="sn-page-title">{% translate "Your student record" %}</h1><p class="sn-page-desc">{% translate "Your personal details, documents, and academic payments." %}</p></div>
+  </header>
+  <section class="sn-profile-hero">
+    <div class="sn-profile-identity">
+      <span class="sn-avatar sn-avatar--large">{{ initials }}</span>
+      <div><span class="sn-eyebrow">{% translate "Student record" %}</span><h2>{{ object.get_full_name|default:object.username }}</h2><p>{{ object.role.get_role_display }}</p></div>
+    </div>
+    {% if show_profile_qr %}
+    <div class="sn-profile-qr">
+      <div><b>{% translate "Attendance QR" %}</b><p>{% translate "Show this code when your attendance is scanned." %}</p><a class="sn-text-link" href="{% url 'download-qr' %}?download=1" download>{% translate "Download QR code" %}</a></div>
+      <a href="{% url 'download-qr' %}?download=1" download aria-label="{% translate 'Download QR Code' %}"><img src="{% url 'download-qr' %}" alt="{% translate 'QR code for profile access' %}" loading="lazy" decoding="async"></a>
+    </div>
+    {% endif %}
+  </section>
+
+  <div class="sn-profile-tabs" role="tablist" aria-label="{% translate 'Student record sections' %}">
+    <button type="button" role="tab" class="is-active" aria-selected="true" aria-controls="profile-personal" data-profile-tab="personal">{% translate "Personal" %}</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="profile-documents" data-profile-tab="documents">{% translate "Documents" %}</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="profile-payments" data-profile-tab="payments">{% translate "Payments" %}</button>
+  </div>
+
+  <div class="sn-layout-main-aside">
+    <div class="sn-stack">
+      <section class="sn-card sn-profile-card" id="profile-personal" role="tabpanel" data-profile-panel="personal">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Personal details" %}</h2><p>{% translate "Keep your contact details up to date." %}</p></div></div>
+        <div class="sn-card-body">
+          {% if profile_editable %}
+          <form method="post" action="{% url 'view-profile' %}" hx-post="{% url 'view-profile' %}" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-push-url="true">
+            {% csrf_token %}
+            {% for field in signup_details_form %}{% include "student_next/partials/field.html" with field=field %}{% endfor %}
+            <div class="sn-form-actions"><button type="submit" class="sn-btn sn-btn--primary"><svg class="sn-ico" aria-hidden="true"><use href="#i-check"></use></svg>{% translate "Save profile" %}</button></div>
+          </form>
+          {% else %}
+            {% for field in signup_details_form %}{% include "student_next/partials/field.html" with field=field %}{% endfor %}
+          {% endif %}
+        </div>
+      </section>
+      <section class="sn-card sn-profile-card" id="profile-documents" role="tabpanel" data-profile-panel="documents" hidden>
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Documents" %}</h2><p>{% translate "View your submitted application documents." %}</p></div></div>
+        <div class="sn-card-body">
+          {% if application_documents %}
+          <ul class="sn-doc-list">
+            {% for doc in application_documents %}
+            <li class="sn-doc-row"><span class="sn-doc-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-file"></use></svg></span><div><b>{{ doc.label }}</b><span>{% translate "On file" %}</span></div><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ doc.url }}"{% if doc.is_image %} target="_blank" rel="noopener noreferrer"{% endif %}>{% translate "View" %}</a><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ doc.download_url }}" download>{% translate "Download" %}</a></li>
+            {% endfor %}
+          </ul>
+          {% else %}<p class="sn-muted">{% translate "No application documents have been uploaded." %}</p>{% endif %}
+          {% if can_upload_missing_documents and missing_documents_form.fields %}
+          <div class="sn-form-block">
+            <h3>{% translate "Missing documents" %}</h3><p>{% translate "Upload any signup document that is still missing. Existing documents stay protected." %}</p>
+            <form method="post" action="{% url 'profile-missing-documents' %}" hx-post="{% url 'profile-missing-documents' %}" hx-encoding="multipart/form-data" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-push-url="true" enctype="multipart/form-data">
+              {% csrf_token %}
+              {% for field in missing_documents_form %}{% include "student_next/partials/field.html" with field=field %}{% endfor %}
+              <div class="sn-form-actions"><button type="submit" class="sn-btn sn-btn--primary"><svg class="sn-ico" aria-hidden="true"><use href="#i-upload"></use></svg>{% translate "Upload documents" %}</button></div>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+      <section class="sn-card sn-profile-card" id="profile-payments" role="tabpanel" data-profile-panel="payments" hidden>
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Academic payments" %}</h2><p>{% translate "Receipts are recorded for each academic scope." %}</p></div></div>
+        <div class="sn-card-body">
+          {% if academic_payments %}
+          <ul class="sn-doc-list">
+            {% for payment in academic_payments %}
+            <li class="sn-doc-row"><span class="sn-doc-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-receipt"></use></svg></span><div><b>{{ payment.academic_year_level.level.display_name }} - {{ payment.academic_year_level.academic_year.name }}</b><span>{{ payment.uploaded_at|date:"d/m/Y" }}</span></div><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'academic-payment-document' payment.pk %}" target="_blank" rel="noopener noreferrer">{% translate "View receipt" %}</a></li>
+            {% endfor %}
+          </ul>
+          {% else %}<p class="sn-muted">{% translate "No academic payment receipts are on file." %}</p>{% endif %}
+          {% if profile_editable and academic_payment_scopes %}
+          <div class="sn-form-block">
+            <h3>{% translate "Upload academic payment" %}</h3><p>{% translate "A new academic year needs its own payment receipt before promotion can be recorded." %}</p>
+            <form method="post" action="{% url 'profile-academic-payment' %}" hx-post="{% url 'profile-academic-payment' %}" hx-encoding="multipart/form-data" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-push-url="true" enctype="multipart/form-data">
+              {% csrf_token %}
+              {% for field in academic_payment_form %}{% include "student_next/partials/field.html" with field=field %}{% endfor %}
+              <div class="sn-form-actions"><button type="submit" class="sn-btn sn-btn--primary"><svg class="sn-ico" aria-hidden="true"><use href="#i-upload"></use></svg>{% translate "Upload receipt" %}</button></div>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+    <aside class="sn-aside">
+      <section class="sn-card sn-aside-card">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Profile health" %}</h2></div></div>
+        <div class="sn-card-body">
+          {% if has_profile_gaps %}<p class="sn-health-status sn-health-status--warning">{% translate "A few details still need your attention." %}</p><ul class="sn-check-list">{% for item in missing_profile_items|slice:":6" %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="sn-health-status sn-health-status--success">{% translate "Your required profile details are complete." %}</p>{% endif %}
+        </div>
+      </section>
+      {% if next_actions.resume or next_actions.next_quizzes %}
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next actions" %}</h2></div></div><div class="sn-card-body">
+        {% if next_actions.resume %}<a class="sn-more-item" href="{% url 'lesson-details' next_actions.resume.offering_id next_actions.resume.lesson_id %}"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg></span><div><b>{% translate "Continue studying" %}</b><small>{{ next_actions.resume.lesson_name }}</small></div></a>{% endif %}
+        {% for quiz in next_actions.next_quizzes|slice:":3" %}<a class="sn-more-item" href="{% url 'quiz-details' quiz.offering_id quiz.id %}"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span><div><b>{{ quiz.name }}</b><small>{{ quiz.course_name }}</small></div></a>{% endfor %}
+      </div></section>
+      {% endif %}
+      {% if telegram_account or telegram_link_url %}
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Telegram" %}</h2></div></div><div class="sn-card-body">
+        {% if telegram_account %}<p>{% translate "Your Telegram account is linked." %}</p>{% if telegram_can_unlink %}<form method="post" action="{% url 'telegram-unlink' %}" hx-post="{% url 'telegram-unlink' %}" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-push-url="true" data-confirm-message="{% translate 'Are you sure?' %}">{% csrf_token %}<button type="submit" class="sn-btn sn-btn--ghost sn-btn--sm">{% translate "Unlink Telegram" %}</button></form>{% endif %}
+        {% else %}<p>{% translate "Connect Telegram to receive lesson and quiz notifications." %}</p><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ telegram_link_url }}" target="_blank" rel="noopener noreferrer">{% translate "Connect Telegram" %}</a>{% endif %}
+      </div></section>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "student_next/base.html" %}
+{% load static i18n %}
+{% block title %}{{ quiz.name }} - {{ offering.course.name }}{% endblock %}
+{% block extra_scripts %}
+{% if mode == "exam" %}{% include "partials/quiz_runtime.html" %}<script defer src="{% static 'js/student_next/quiz.js' %}?v={{ static_asset_version }}"></script>{% endif %}
+{% endblock %}
+{% block body %}
+{% include "student_next/partials/alerts.html" %}
+<nav class="sn-breadcrumb" aria-label="{% translate 'Breadcrumb' %}">
+  <a href="{% url 'courses' %}">{% translate "My learning" %}</a><span class="sn-crumb-sep">/</span>
+  <a href="{% url 'course-details' offering.pk %}">{{ offering.course.name }}</a><span class="sn-crumb-sep">/</span>
+  <span aria-current="page">{{ quiz.name }}</span>
+</nav>
+
+{% if mode == "exam" %}
+  <form action="" method="post" id="quiz-form"
+        data-deadline="{{ attempt_deadline|default_if_none:'' }}"
+        data-server-now="{{ server_now_ms|default:0 }}"
+        data-snapshot-url="{{ snapshot_url }}"
+        data-saving-text="{% translate 'Saving answers...' %}"
+        data-saved-text="{% translate 'Answers saved.' %}"
+        data-save-error-text="{% translate 'Answers could not be saved. Keep this page open and retry.' %}"
+        data-submit-confirm-text="{% translate 'Submit this quiz?' %}"
+        data-submit-warning-text="{% translate 'You can submit now, but unanswered questions will be marked blank.' %}"
+        data-unanswered-singular="{% translate 'You still have 1 unanswered question.' %}"
+        data-unanswered-plural="{% blocktrans %}You still have __count__ unanswered questions.{% endblocktrans %}">
+    {% csrf_token %}
+    {{ snapshot_data|json_script:"quiz-answer-snapshot" }}
+    <header class="sn-exam-top">
+      <div class="sn-exam-title">
+        <span class="sn-exam-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-file"></use></svg></span>
+        <div><b>{{ quiz.name }}</b><span>{{ offering.course.name }}</span></div>
+      </div>
+      <div class="sn-exam-meta">
+        <span class="sn-timer" id="timer" aria-live="off"><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg><span>--:--</span></span>
+        <span class="sn-save-state" id="snapshot-status" role="status" aria-live="polite">{% translate "Autosave is on" %}</span>
+        <span class="sn-exam-progress">{% translate "Question" %} <b id="current-question">1</b> {% translate "of" %} {{ questions|length }}</span>
+      </div>
+    </header>
+    <div class="sn-exam-layout">
+      <div class="sn-exam-main">
+        <div class="sn-question-wrap">
+          {% include "student_next/partials/quiz_questions.html" with mode=mode questions=questions %}
+        </div>
+        <div class="sn-question-warning" id="question-warning" role="status" hidden>
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+          {% translate "This question is unanswered. You can continue, but it will be marked blank." %}
+        </div>
+        <div class="sn-exam-foot">
+          <div>
+            <button class="sn-btn sn-btn--ghost" type="button" data-quiz-prev disabled><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Previous" %}</button>
+            <button class="sn-btn sn-btn--ghost" type="button" data-quiz-next><span>{% translate "Next" %}</span><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+          </div>
+          <div><button class="sn-btn sn-btn--gold" type="button" data-quiz-submit><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg><span>{% translate "Submit quiz" %}</span></button></div>
+        </div>
+      </div>
+      <aside class="sn-exam-side">
+        <section class="sn-card sn-exam-card">
+          <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-grid"></use></svg>{% translate "Questions" %}</h2><p>{% translate "Jump to any question." %}</p></div></div>
+          <div class="sn-card-body">
+            <div class="sn-qnav" aria-label="{% translate 'Question navigation' %}">
+              {% for question in questions %}<button type="button" data-qnav="{{ forloop.counter }}" class="{% if forloop.first %}is-current{% endif %}" aria-label="{% blocktrans with number=forloop.counter %}Question {{ number }}{% endblocktrans %}">{{ forloop.counter }}</button>{% endfor %}
+            </div>
+            <div class="sn-qlegend"><span><i class="is-answered"></i>{% translate "Answered" %}</span><span><i class="is-current"></i>{% translate "Current" %}</span><span><i></i>{% translate "Unanswered" %}</span></div>
+          </div>
+        </section>
+        <section class="sn-card sn-exam-card">
+          <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-refresh"></use></svg>{% translate "Attempt details" %}</h2></div></div>
+          <div class="sn-card-body">
+            <div class="sn-autosave"><span class="sn-autosave-dot"></span><div><b>{% translate "Autosave is on" %}</b><span>{% translate "Your answers are saved as you go." %}</span></div></div>
+            <div class="sn-exam-note"><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg>{% blocktrans with date=quiz_closing_date_str %}Quiz closes {{ date }}{% endblocktrans %}</div>
+          </div>
+        </section>
+      </aside>
+    </div>
+    <dialog class="sn-quiz-confirm-dialog" id="unansweredQuestionsFallback" aria-labelledby="quiz-submit-title" aria-describedby="quiz-submit-description">
+      <div class="sn-quiz-confirm-dialog__surface">
+        <h2 class="sn-quiz-confirm-dialog__title" id="quiz-submit-title">{% translate "Submit quiz?" %}</h2>
+        <p class="sn-quiz-confirm-dialog__description" id="quiz-submit-description">{% translate "Some questions are unanswered. Submit the quiz anyway?" %}</p>
+        <div class="sn-quiz-confirm-dialog__actions">
+          <button class="sn-btn sn-btn--ghost" type="button" data-quiz-cancel>{% translate "Keep working" %}</button>
+          <button class="sn-btn sn-btn--gold" type="button" data-quiz-confirm>{% translate "Submit quiz" %}</button>
+        </div>
+      </div>
+    </dialog>
+  </form>
+{% elif mode == "ready" or mode == "upcoming" %}
+  <section class="sn-quiz-hero">
+    <div class="sn-quiz-hero-icon"><svg class="sn-ico" aria-hidden="true"><use href="{% if mode == 'upcoming' %}#i-calendar{% else %}#i-file{% endif %}"></use></svg></div>
+    <div class="sn-quiz-hero-copy">
+      <span class="sn-eyebrow">{{ offering.course.name }}</span>
+      <h1>{{ quiz.name }}</h1>
+      <p>{% if quiz.quiz_type %}{{ quiz.quiz_type }}{% else %}{% translate "Course quiz" %}{% endif %}</p>
+      <div class="sn-inline-meta">
+        <span><svg class="sn-ico" aria-hidden="true"><use href="#i-grid"></use></svg>{% blocktrans count count=question_count %}{{ count }} question{% plural %}{{ count }} questions{% endblocktrans %}</span>
+        <span><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg>{% blocktrans count minutes=quiz.duration_minutes %}{{ minutes }} minute{% plural %}{{ minutes }} minutes{% endblocktrans %}</span>
+        <span><svg class="sn-ico" aria-hidden="true"><use href="#i-award"></use></svg>{{ quiz.total_grade }} {% translate "points" %}</span>
+      </div>
+    </div>
+    <div class="sn-quiz-hero-status">
+      {% if mode == "ready" %}<span class="sn-pill sn-pill--success">{% translate "Open" %}</span><span>{% translate "Available now" %}</span>
+      {% else %}<span class="sn-pill sn-pill--gold">{% translate "Upcoming" %}</span><span>{% blocktrans with date=quiz_opening_date_str %}Opens {{ date }}{% endblocktrans %}</span>{% endif %}
+      <small>{% blocktrans with date=quiz_closing_date_str %}Closes {{ date }}{% endblocktrans %}</small>
+    </div>
+    {% if mode == "ready" %}
+    <div class="sn-quiz-start">
+      <div><b>{% translate "Ready when you are." %}</b><span>{% blocktrans with minutes=quiz.duration_minutes date=quiz_closing_date_str %}The timer begins when you start. You have {{ minutes }} minutes or until {{ date }}, whichever comes first.{% endblocktrans %}</span></div>
+      <form method="post" action="{{ quiz_start_url }}">{% csrf_token %}<button class="sn-btn sn-btn--gold" type="submit"><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg>{% translate "Start quiz" %}</button></form>
+    </div>
+    {% endif %}
+  </section>
+  {% if mode == "upcoming" %}
+  <div class="sn-alert sn-alert--info" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg></span><div class="sn-alert-copy"><b>{% translate "Quiz not open yet" %}</b><p>{% blocktrans with date=quiz_opening_date_str %}This quiz opens on {{ date }}. Questions will be available after it opens.{% endblocktrans %}</p></div></div>
+  {% else %}
+  <div class="sn-layout-main-aside">
+    <div class="sn-stack">
+      <section class="sn-section">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "Before you begin" %}</h2><p>{% translate "A few reminders before you start your attempt." %}</p></div></div>
+        <div class="sn-rules">
+          <div class="sn-rule"><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg><span>{% translate "The timer starts when you press Start and cannot be paused." %}</span></div>
+          <div class="sn-rule"><svg class="sn-ico" aria-hidden="true"><use href="#i-refresh"></use></svg><span>{% translate "Answers are saved automatically while you work." %}</span></div>
+          <div class="sn-rule"><svg class="sn-ico" aria-hidden="true"><use href="#i-grid"></use></svg><span>{% translate "You can move between questions before submitting." %}</span></div>
+          <div class="sn-rule"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg><span>{% blocktrans with date=quiz_closing_date_str %}The quiz closes at {{ date }}.{% endblocktrans %}</span></div>
+        </div>
+      </section>
+      <section class="sn-section">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-layers"></use></svg>{% translate "Question types" %}</h2><p>{% translate "This quiz may use any of these response formats." %}</p></div></div>
+        <div class="sn-type-grid">
+          <div class="sn-type-card"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg><b>{% translate "Multiple choice" %}</b><span>{% translate "Choose one answer." %}</span></div>
+          <div class="sn-type-card"><svg class="sn-ico" aria-hidden="true"><use href="#i-pen"></use></svg><b>{% translate "Written response" %}</b><span>{% translate "Write a short answer." %}</span></div>
+          <div class="sn-type-card"><svg class="sn-ico" aria-hidden="true"><use href="#i-more"></use></svg><b>{% translate "Ordering" %}</b><span>{% translate "Place items in sequence." %}</span></div>
+          <div class="sn-type-card"><svg class="sn-ico" aria-hidden="true"><use href="#i-link"></use></svg><b>{% translate "Matching" %}</b><span>{% translate "Connect related items." %}</span></div>
+        </div>
+      </section>
+    </div>
+    <aside class="sn-aside">
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-help"></use></svg>{% translate "Need help?" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "If something looks wrong, contact your academic office before the quiz closes." %}</p></div></section>
+    </aside>
+  </div>
+  {% endif %}
+{% elif mode == "view" %}
+  <section class="sn-result-hero">
+    <div class="sn-result-ring"><span class="sn-ring" style="--sn-ring-size:120px;--sn-ring-stroke:9px" role="img" aria-label="{% blocktrans with score=score_percent %}{{ score }} percent{% endblocktrans %}">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="sn-ring-track" cx="60" cy="60" r="51" stroke-width="9"></circle><circle class="sn-ring-value" cx="60" cy="60" r="51" stroke-width="9" stroke-dasharray="320.44" stroke-dashoffset="{{ score_ring_offset }}"></circle></svg><b>{{ score_percent }}%</b>
+    </span></div>
+    <div class="sn-result-copy"><span class="sn-eyebrow">{% translate "Quiz complete" %}</span><h1>{{ quiz.name }}</h1><p>{% translate "Review your answers and the feedback available for this quiz." %}</p>
+      <div class="sn-result-stats">
+        <div class="sn-stat sn-stat--gold"><span class="sn-stat-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-award"></use></svg></span><div><b>{{ total_grade }} / {{ quiz.total_grade }}</b><span>{% translate "Score" %}</span><small>{{ score_percent }}%</small></div></div>
+        <div class="sn-stat sn-stat--teal"><span class="sn-stat-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span><div><b>{{ questions|length }}</b><span>{% translate "Questions reviewed" %}</span></div></div>
+      </div>
+    </div>
+    <div class="sn-result-actions"><a class="sn-btn sn-btn--primary" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span>{% translate "Back to course" %}</span></a><a class="sn-btn sn-btn--ghost" href="{% url 'courses' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg><span>{% translate "My learning" %}</span></a></div>
+  </section>
+  <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% translate "Review answers" %}</h2><p>{% translate "Your submitted answers and any released feedback." %}</p></div></div>{% include "student_next/partials/quiz_questions.html" with mode=mode questions=questions %}</section>
+{% else %}
+  <div class="sn-alert sn-alert--warning" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg></span><div class="sn-alert-copy"><b>{% translate "Quiz closed" %}</b><p>{% blocktrans with date=quiz_closing_date_str %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktrans %}</p></div></div>
+  <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h1>{% translate "Quiz closed" %}</h1><p>{{ quiz.name }} - {{ offering.course.name }}</p></div></div><a class="sn-btn sn-btn--ghost" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to course" %}</a></section>
+{% endif %}
+{% endblock %}

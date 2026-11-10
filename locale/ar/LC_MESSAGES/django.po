@@ -12099,6 +12099,18 @@ msgstr "حساب تيليجرام"
 msgid "Student view"
 msgstr "عرض الطالب"
 
+msgid "Student experience"
+msgstr "تجربة الطالب"
+
+msgid "Current view"
+msgstr "الواجهة الحالية"
+
+msgid "Student view setting updated."
+msgstr "تم تحديث إعداد واجهة الطالب."
+
+msgid "Back to user details"
+msgstr "العودة إلى بيانات المستخدم"
+
 msgid "Read-only preview"
 msgstr "معاينة للقراءة فقط"
 
@@ -14668,6 +14680,863 @@ msgstr "انتهاء رابط الرفع"
 
 msgid "Cleanup last dispatched"
 msgstr "آخر إرسال للتنظيف"
+
+msgid "A calendar appears when you have an active or completed normal enrollment."
+msgstr "يظهر التقويم عند وجود تسجيل عادي نشط أو مكتمل."
+
+msgid "A few details still need your attention."
+msgstr "هناك بعض التفاصيل التي تحتاج إلى انتباهك."
+
+msgid "A few reminders before you start your attempt."
+msgstr "تذكيرات بسيطة قبل بدء المحاولة."
+
+msgid "A quick view of your studies."
+msgstr "نظرة سريعة على دراستك."
+
+msgid "A quiet record of the journey"
+msgstr "سجل هادئ لرحلتك"
+
+msgid "A small archive of a big milestone."
+msgstr "أرشيف صغير لمحطة كبيرة."
+
+msgid "About the gallery"
+msgstr "عن معرض الصور"
+
+msgid "Academic payments"
+msgstr "المدفوعات الدراسية"
+
+msgid "Additional access"
+msgstr "صلاحية وصول إضافية"
+
+msgid "Album pages"
+msgstr "صفحات الألبومات"
+
+msgid "Albums"
+msgstr "الألبومات"
+
+msgid "Albums are grouped by the academic year and level you completed. Download an original file to keep a copy."
+msgstr "تجمع الألبومات حسب السنة الدراسية والمستوى اللذين أتممتهما. نزل الملف الأصلي للاحتفاظ بنسخة."
+
+msgid "Albums will appear here after you complete a graduation year or level."
+msgstr "ستظهر الألبومات هنا بعد إتمام سنة دراسية أو مستوى يتيح التخرج."
+
+msgid "Allow installation"
+msgstr "السماح بالتثبيت"
+
+msgid "Android app"
+msgstr "تطبيق أندرويد"
+
+msgid "Android may ask for permission before installing."
+msgstr "قد يطلب أندرويد إذنا قبل التثبيت."
+
+msgid "Android may show a warning for apps installed outside Google Play. Install only the official file linked from this student page."
+msgstr "قد يعرض أندرويد تحذيرا عند تثبيت تطبيق من خارج متجر Google Play. ثبت الملف الرسمي المرتبط بهذه الصفحة الطلابية فقط."
+
+msgid "Answers are saved automatically while you work."
+msgstr "تحفظ الإجابات تلقائيا أثناء الحل."
+
+msgid "Attempt details"
+msgstr "تفاصيل المحاولة"
+
+msgid "Attendance QR"
+msgstr "رمز QR للحضور"
+
+msgid "Audio lesson"
+msgstr "درس صوتي"
+
+msgid "Autosave is on"
+msgstr "الحفظ التلقائي مفعل"
+
+msgid "Available"
+msgstr "متاح"
+
+msgid "Available now"
+msgstr "متاح الآن"
+
+msgid "Back to My learning"
+msgstr "العودة إلى تعلّمي"
+
+msgid "Back to albums"
+msgstr "العودة إلى الألبومات"
+
+msgid "Back to course"
+msgstr "العودة إلى المقرر"
+
+msgid "Before you begin"
+msgstr "قبل أن تبدأ"
+
+msgid "Before you install"
+msgstr "قبل التثبيت"
+
+msgid "Bible Institute Student"
+msgstr "طالب معهد الكتاب المقدس"
+
+msgid "Bible Institute app"
+msgstr "تطبيق معهد الكتاب المقدس"
+
+msgid "Choose a day to see its meetings and holidays."
+msgstr "اختر يوما لعرض لقاءاته وعطلاته."
+
+msgid "Choose a lesson or quiz to continue."
+msgstr "اختر درسا أو اختبارا للمتابعة."
+
+msgid "Choose one answer."
+msgstr "اختر إجابة واحدة."
+
+msgid "Completed years and levels"
+msgstr "السنوات والمستويات المكتملة"
+
+msgid "Connect Telegram to receive lesson and quiz notifications."
+msgstr "اربط حساب تيليجرام لتصلك إشعارات الدروس والاختبارات."
+
+msgid "Connect related items."
+msgstr "صِل العناصر المرتبطة."
+
+msgid "Continue studying"
+msgstr "تابع الدراسة"
+
+msgid "Continue where you left off"
+msgstr "تابع من حيث توقفت"
+
+msgid "Continue with"
+msgstr "تابع مع"
+
+msgid "Correct"
+msgstr "صحيح"
+
+msgid "Correct answer"
+msgstr "الإجابة الصحيحة"
+
+msgid "Course content"
+msgstr "محتوى المقرر"
+
+msgid "Course details"
+msgstr "تفاصيل المقرر"
+
+msgid "Course filter"
+msgstr "تصفية المقررات"
+
+msgid "Course history"
+msgstr "سجل المقررات"
+
+msgid "Course outline"
+msgstr "محتويات المقرر"
+
+msgid "Course pages"
+msgstr "صفحات المقررات"
+
+msgid "Course progress"
+msgstr "تقدم المقرر"
+
+msgid "Course quiz"
+msgstr "اختبار المقرر"
+
+msgid "Current release"
+msgstr "الإصدار الحالي"
+
+msgid "Current study"
+msgstr "الدراسة الحالية"
+
+msgid "Dismiss announcement"
+msgstr "إخفاء الإعلان"
+
+msgid "Download QR code"
+msgstr "تنزيل رمز QR"
+
+msgid "Download audio"
+msgstr "تنزيل الصوت"
+
+msgid "Download original"
+msgstr "تنزيل الملف الأصلي"
+
+msgid "Download the file"
+msgstr "تنزيل الملف"
+
+msgid "Due soon"
+msgstr "مستحق قريبا"
+
+msgid "File size"
+msgstr "حجم الملف"
+
+msgid "Find the download"
+msgstr "العثور على الملف الذي تم تنزيله"
+
+msgid "Flag for review"
+msgstr "وضع علامة للمراجعة"
+
+msgid "Gallery pages"
+msgstr "صفحات المعرض"
+
+msgid "Graduation album"
+msgstr "ألبوم التخرج"
+
+msgid "Graduation photos and videos"
+msgstr "صور ومقاطع فيديو التخرج"
+
+msgid "How it works"
+msgstr "طريقة الاستخدام"
+
+msgid "How to read the calendar"
+msgstr "كيفية قراءة التقويم"
+
+msgid "If Android asks, allow your browser or Files app to install this app, then continue."
+msgstr "إذا طلب أندرويد ذلك، فاسمح للمتصفح أو تطبيق الملفات بتثبيت التطبيق، ثم تابع."
+
+msgid "If something looks wrong, contact your academic office before the quiz closes."
+msgstr "إذا لاحظت مشكلة، فتواصل مع مكتب الشؤون الأكاديمية قبل إغلاق الاختبار."
+
+msgid "If the download does not start or Android blocks the file, contact the academic office."
+msgstr "إذا لم يبدأ التنزيل أو منع أندرويد الملف، فتواصل مع مكتب الشؤون الأكاديمية."
+
+msgid "Incorrect"
+msgstr "غير صحيح"
+
+msgid "Install the app"
+msgstr "تثبيت التطبيق"
+
+msgid "Jump to any question."
+msgstr "انتقل إلى أي سؤال."
+
+msgid "Keep a copy"
+msgstr "احتفظ بنسخة"
+
+msgid "Keep working"
+msgstr "تابع الحل"
+
+msgid "Keep your contact details up to date."
+msgstr "احرص على تحديث بيانات التواصل."
+
+msgid "Language"
+msgstr "اللغة"
+
+msgid "Learn"
+msgstr "التعلم"
+
+msgid "Lesson material"
+msgstr "مواد الدرس"
+
+msgid "Lesson navigation"
+msgstr "التنقل بين الدروس"
+
+msgid "Lesson parts"
+msgstr "أجزاء الدرس"
+
+msgid "Lesson progress"
+msgstr "تقدم الدرس"
+
+msgid "Lesson updates, quiz openings, and institute announcements."
+msgstr "تحديثات الدروس وفتح الاختبارات وإعلانات المعهد."
+
+msgid "Load more"
+msgstr "تحميل المزيد"
+
+msgid "Log out"
+msgstr "تسجيل الخروج"
+
+msgid "Manage your student record"
+msgstr "إدارة سجلك الدراسي"
+
+msgid "Matching"
+msgstr "مطابقة"
+
+msgid "Media progress"
+msgstr "تقدم مشاهدة الوسائط"
+
+msgid "Meetings and holidays"
+msgstr "اللقاءات والعطلات"
+
+msgid "Missing documents"
+msgstr "المستندات الناقصة"
+
+msgid "More from the institute"
+msgstr "المزيد من المعهد"
+
+msgid "Multiple choice"
+msgstr "اختيار من متعدد"
+
+msgid "My calendar"
+msgstr "تقويمي"
+
+msgid "My learning"
+msgstr "تعلّمي"
+
+msgid "My profile"
+msgstr "ملفي الشخصي"
+
+msgid "Need help?"
+msgstr "هل تحتاج إلى مساعدة؟"
+
+msgid "New lessons, quiz openings, and institute announcements appear here."
+msgstr "تظهر هنا تحديثات الدروس وفتح الاختبارات وإعلانات المعهد."
+
+msgid "Next deadline"
+msgstr "أقرب موعد نهائي"
+
+msgid "Next lesson"
+msgstr "الدرس التالي"
+
+msgid "Next live meeting"
+msgstr "اللقاء المباشر التالي"
+
+msgid "Next meeting"
+msgstr "اللقاء التالي"
+
+msgid "Next seven days"
+msgstr "الأيام السبعة القادمة"
+
+msgid "No academic payment receipts are on file."
+msgstr "لا توجد إيصالات للمدفوعات الدراسية."
+
+msgid "No answer submitted"
+msgstr "لم ترسل إجابة"
+
+msgid "No app release is available"
+msgstr "لا يتوفر إصدار للتطبيق الآن"
+
+msgid "No application documents have been uploaded."
+msgstr "لم ترفع مستندات التقديم."
+
+msgid "No calendar is available"
+msgstr "لا يتوفر تقويم"
+
+msgid "No courses available yet"
+msgstr "لا توجد مقررات متاحة بعد"
+
+msgid "No courses in this view"
+msgstr "لا توجد مقررات في هذا العرض"
+
+msgid "No graduation albums yet"
+msgstr "لا توجد ألبومات تخرج بعد"
+
+msgid "No lesson materials"
+msgstr "لا توجد مواد للدرس"
+
+msgid "No lessons are available yet."
+msgstr "لا توجد دروس متاحة بعد."
+
+msgid "No meetings or holidays on this day."
+msgstr "لا توجد لقاءات أو عطلات في هذا اليوم."
+
+msgid "No meetings scheduled in the next seven days."
+msgstr "لا توجد لقاءات مجدولة خلال الأيام السبعة القادمة."
+
+msgid "No notifications here"
+msgstr "لا توجد إشعارات هنا"
+
+msgid "No photos in this album yet"
+msgstr "لا توجد صور في هذا الألبوم بعد"
+
+msgid "No quizzes are available yet."
+msgstr "لا توجد اختبارات متاحة بعد."
+
+msgid "Notification filter"
+msgstr "تصفية الإشعارات"
+
+msgid "On file"
+msgstr "متوفر"
+
+msgid "One account"
+msgstr "حساب واحد"
+
+msgid "Only students with access to the completed year and level can view these files."
+msgstr "يمكن للطلاب الذين لديهم صلاحية الوصول إلى السنة والمستوى المكتملين فقط عرض هذه الملفات."
+
+msgid "Only the years and levels you completed appear here."
+msgstr "تظهر هنا السنوات والمستويات التي أتممتها فقط."
+
+msgid "Open Bible Institute and use your existing website account."
+msgstr "افتح معهد الكتاب المقدس واستخدم حسابك الحالي على الموقع."
+
+msgid "Open My learning"
+msgstr "افتح صفحة تعلّمي"
+
+msgid "Open album"
+msgstr "فتح الألبوم"
+
+msgid "Open an album to view its photos and videos. Use the download control to save an original file."
+msgstr "افتح ألبوما لعرض صوره ومقاطع الفيديو فيه. استخدم زر التنزيل لحفظ الملف الأصلي."
+
+msgid "Open calendar"
+msgstr "فتح التقويم"
+
+msgid "Open course workspace"
+msgstr "فتح مساحة المقرر"
+
+msgid "Open student record"
+msgstr "فتح السجل الدراسي"
+
+msgid "Open video"
+msgstr "فتح الفيديو"
+
+msgid "Open your browser downloads or the Files app and select the downloaded file."
+msgstr "افتح التنزيلات في المتصفح أو تطبيق الملفات، ثم اختر الملف الذي تم تنزيله."
+
+msgid "Partially correct"
+msgstr "صحيح جزئيا"
+
+msgid "Personal"
+msgstr "شخصي"
+
+msgid "Personal details"
+msgstr "البيانات الشخصية"
+
+msgid "Photos and videos from the years and levels you completed."
+msgstr "صور ومقاطع فيديو من السنوات والمستويات التي أتممتها."
+
+msgid "Place items in sequence."
+msgstr "رتب العناصر بالتسلسل."
+
+msgid "Platform"
+msgstr "المنصة"
+
+msgid "Please check again later or contact the academic office."
+msgstr "يرجى المحاولة لاحقا أو التواصل مع مكتب الشؤون الأكاديمية."
+
+msgid "Previous lesson"
+msgstr "الدرس السابق"
+
+msgid "Private albums"
+msgstr "ألبومات خاصة"
+
+msgid "Private to your student record"
+msgstr "خاصة بسجلك الدراسي"
+
+msgid "Profile health"
+msgstr "اكتمال الملف الشخصي"
+
+msgid "Progress will appear when you begin a lesson."
+msgstr "سيظهر التقدم عند بدء الدرس."
+
+msgid "Question navigation"
+msgstr "التنقل بين الأسئلة"
+
+msgid "Question types"
+msgstr "أنواع الأسئلة"
+
+msgid "Questions reviewed"
+msgstr "الأسئلة التي تمت مراجعتها"
+
+msgid "Quiz closed"
+msgstr "انتهى الاختبار"
+
+msgid "Quiz complete"
+msgstr "اكتمل الاختبار"
+
+msgid "Quiz not open yet"
+msgstr "لم يفتح الاختبار بعد"
+
+msgid "Quizzes still open for your account."
+msgstr "اختبارات ما زالت متاحة لحسابك."
+
+msgid "Reading material"
+msgstr "مادة للقراءة"
+
+msgid "Ready when you are."
+msgstr "ابدأ عندما تكون مستعدا."
+
+msgid "Receipts are recorded for each academic scope."
+msgstr "يسجل إيصال مستقل لكل سنة ومستوى دراسي."
+
+msgid "Release notes for the current build."
+msgstr "ملاحظات الإصدار الحالي."
+
+msgid "Released"
+msgstr "متاح"
+
+msgid "Resume lesson"
+msgstr "استئناف الدرس"
+
+msgid "Review your answers and the feedback available for this quiz."
+msgstr "راجع إجاباتك والملاحظات المتاحة لهذا الاختبار."
+
+msgid "Save profile"
+msgstr "حفظ الملف الشخصي"
+
+msgid "Select a lesson from the outline to begin."
+msgstr "اختر درسا من القائمة لبدء الدراسة."
+
+msgid "Selected day"
+msgstr "اليوم المحدد"
+
+msgid "Show this code when your attendance is scanned."
+msgstr "أظهر هذا الرمز عند تسجيل حضورك."
+
+msgid "Sign in"
+msgstr "تسجيل الدخول"
+
+msgid "Skip to content"
+msgstr "تخط إلى المحتوى"
+
+msgid "Start quiz"
+msgstr "بدء الاختبار"
+
+msgid "Stay connected"
+msgstr "ابق على اتصال"
+
+msgid "Stay connected."
+msgstr "ابق على اتصال."
+
+msgid "Stay up to date"
+msgstr "ابق على اطلاع"
+
+msgid "Student app preview"
+msgstr "معاينة تطبيق الطالب"
+
+msgid "Student navigation"
+msgstr "تنقل الطالب"
+
+msgid "Student record"
+msgstr "السجل الدراسي"
+
+msgid "Student record sections"
+msgstr "أقسام السجل الدراسي"
+
+msgid "Study anywhere."
+msgstr "ادرس من أي مكان."
+
+msgid "Study on Android"
+msgstr "الدراسة على أندرويد"
+
+msgid "Submit quiz"
+msgstr "إرسال الاختبار"
+
+msgid "Submit quiz?"
+msgstr "هل تريد إرسال الاختبار؟"
+
+msgid "Submit this quiz?"
+msgstr "هل تريد إرسال هذا الاختبار؟"
+
+msgid "Take lessons, quizzes and notifications with you on Android."
+msgstr "تابع دروسك واختباراتك وإشعاراتك على أندرويد."
+
+msgid "Tap Download the app and wait for the APK file to finish downloading."
+msgstr "اضغط على تنزيل التطبيق وانتظر حتى يكتمل تنزيل ملف APK."
+
+msgid "The app uses the same student account as the website. Your courses, grades and notifications remain connected to your account."
+msgstr "يستخدم التطبيق حساب الطالب نفسه المستخدم على الموقع. وتظل مقرراتك ودرجاتك وإشعاراتك مرتبطة بحسابك."
+
+msgid "The calendar shows the active academic scope. Meeting dates and institute holidays come from the current academic schedule."
+msgstr "يعرض التقويم النطاق الدراسي النشط. وتستمد مواعيد اللقاءات وعطلات المعهد من الجدول الدراسي الحالي."
+
+msgid "The course outline shows the first 20 lessons."
+msgstr "تعرض قائمة المقرر أول 20 درسا."
+
+msgid "The course outline shows the first 20 quizzes."
+msgstr "تعرض قائمة المقرر أول 20 اختبارا."
+
+msgid "The latest official Android build."
+msgstr "أحدث إصدار رسمي لأندرويد."
+
+msgid "The official Bible Institute app keeps your lessons, quiz alerts and student record close at hand."
+msgstr "يبقيك تطبيق معهد الكتاب المقدس الرسمي قريبا من دروسك وتنبيهات الاختبارات وسجلك الدراسي."
+
+msgid "The timer starts when you press Start and cannot be paused."
+msgstr "يبدأ المؤقت عند الضغط على بدء ولا يمكن إيقافه مؤقتا."
+
+msgid "There are no gallery files to show on this page."
+msgstr "لا توجد ملفات في المعرض لعرضها في هذه الصفحة."
+
+msgid "There are no published materials attached to this lesson."
+msgstr "لا توجد مواد منشورة مرفقة بهذا الدرس."
+
+msgid "There are no selectable days in this month."
+msgstr "لا توجد أيام قابلة للاختيار في هذا الشهر."
+
+msgid "There are no upcoming quiz deadlines."
+msgstr "لا توجد مواعيد نهائية قريبة للاختبارات."
+
+msgid "This question is unanswered. You can continue, but it will be marked blank."
+msgstr "لم تجب عن هذا السؤال. يمكنك المتابعة، لكن ستحتسب إجابته فارغة."
+
+msgid "This quiz may use any of these response formats."
+msgstr "قد يستخدم هذا الاختبار أيا من صيغ الإجابة التالية."
+
+msgid "Try another filter or check back later."
+msgstr "جرب عامل تصفية آخر أو عد لاحقا."
+
+msgid "Unanswered"
+msgstr "بلا إجابة"
+
+msgid "Under review"
+msgstr "قيد المراجعة"
+
+msgid "Unread messages are marked with a gold edge. Open a message to follow its related course or quiz."
+msgstr "تميز الرسائل غير المقروءة بحافة ذهبية. افتح الرسالة للانتقال إلى المقرر أو الاختبار المرتبط بها."
+
+msgid "Upload documents"
+msgstr "رفع المستندات"
+
+msgid "Upload receipt"
+msgstr "رفع الإيصال"
+
+msgid "Video lesson"
+msgstr "درس فيديو"
+
+msgid "View all notifications"
+msgstr "عرض كل الإشعارات"
+
+msgid "View notifications"
+msgstr "عرض الإشعارات"
+
+msgid "View receipt"
+msgstr "عرض الإيصال"
+
+msgid "View your submitted application documents."
+msgstr "اعرض مستندات التقديم التي رفعتها."
+
+msgid "Website and app together."
+msgstr "الموقع والتطبيق معا."
+
+msgid "Welcome to the course"
+msgstr "أهلا بك في المقرر"
+
+msgid "What"
+msgstr "ما"
+
+msgid "Write a short answer."
+msgstr "اكتب إجابة قصيرة."
+
+msgid "Written response"
+msgstr "إجابة كتابية"
+
+msgid "You can move between questions before submitting."
+msgstr "يمكنك التنقل بين الأسئلة قبل الإرسال."
+
+msgid "You can submit now, but unanswered questions will be marked blank."
+msgstr "يمكنك الإرسال الآن، وستحتسب الأسئلة التي بلا إجابة فارغة."
+
+msgid "You have completed the available course work."
+msgstr "لقد أكملت جميع أعمال المقرر المتاحة."
+
+msgid "You still have 1 unanswered question."
+msgstr "ما زال هناك سؤال واحد بلا إجابة."
+
+msgid "Your answer"
+msgstr "إجابتك"
+
+msgid "Your answer will be saved automatically."
+msgstr "ستحفظ إجابتك تلقائيا."
+
+msgid "Your answers are saved as you go."
+msgstr "تحفظ إجاباتك أثناء الحل."
+
+msgid "Your authorized courses will appear here when they are available."
+msgstr "ستظهر هنا المقررات المتاحة لك عند تفعيلها."
+
+msgid "Your browser does not support HTML5 video."
+msgstr "متصفحك لا يدعم فيديو HTML5."
+
+msgid "Your courses"
+msgstr "مقرراتك"
+
+msgid "Your courses, in your pocket"
+msgstr "مقرراتك في متناول يدك"
+
+msgid "Your courses, next steps, and everything due this week."
+msgstr "مقرراتك وخطواتك التالية وكل ما يستحق هذا الأسبوع."
+
+msgid "Your current studies and course history."
+msgstr "دراستك الحالية وسجل مقرراتك."
+
+msgid "Your graduation albums"
+msgstr "ألبومات تخرجك"
+
+msgid "Your meetings and academic holidays for the active study scope."
+msgstr "لقاءاتك وعطلاتك الدراسية ضمن النطاق الدراسي النشط."
+
+msgid "Your next step"
+msgstr "خطوتك التالية"
+
+msgid "Your personal details, documents, and academic payments."
+msgstr "بياناتك الشخصية ومستنداتك ومدفوعاتك الدراسية."
+
+msgid "Your progress"
+msgstr "تقدمك"
+
+msgid "Your progress is saved as you watch or listen."
+msgstr "يحفظ تقدمك أثناء المشاهدة أو الاستماع."
+
+msgid "Your required profile details are complete."
+msgstr "اكتملت بيانات ملفك الشخصي المطلوبة."
+
+msgid "Your student record"
+msgstr "سجلك الدراسي"
+
+msgid "Your study calendar"
+msgstr "تقويمك الدراسي"
+
+msgid "Your submitted answers and any released feedback."
+msgstr "إجاباتك المرسلة وأي ملاحظات متاحة."
+
+msgid "active year"
+msgstr "السنة الدراسية الحالية"
+
+msgid "albums"
+msgstr "ألبومات"
+
+msgid "complete"
+msgstr "مكتمل"
+
+msgid "courses in this view"
+msgstr "مقررات في هذا العرض"
+
+msgid "current courses"
+msgstr "المقررات الحالية"
+
+msgid "from the graduation celebration"
+msgstr "من احتفال التخرج"
+
+msgid "holidays"
+msgstr "عطلات"
+
+msgid "items"
+msgstr "عناصر"
+
+msgid "media parts watched"
+msgstr "أجزاء الوسائط التي تمت مشاهدتها"
+
+msgid "meetings"
+msgstr "لقاءات"
+
+msgid "meetings attended"
+msgstr "لقاءات حضرتها"
+
+msgid "meetings this month"
+msgstr "لقاءات هذا الشهر"
+
+msgid "minutes watched"
+msgstr "دقائق المشاهدة"
+
+msgid "of"
+msgstr "من"
+
+msgid "parts watched"
+msgstr "أجزاء تمت مشاهدتها"
+
+msgid "points"
+msgstr "نقاط"
+
+msgid "quizzes due soon"
+msgstr "اختبارات تقترب مواعيدها"
+
+msgid "videos"
+msgstr "مقاطع فيديو"
+
+msgid "watched"
+msgstr "تمت مشاهدته"
+
+msgid "Legacy student view"
+msgstr "واجهة الطالب القديمة"
+
+msgid "New student view"
+msgstr "واجهة الطالب الجديدة"
+
+msgid "Use global student view"
+msgstr "استخدام واجهة الطالب العامة"
+
+msgid "Student Experience Settings"
+msgstr "إعدادات تجربة الطالب"
+
+msgid "Closes %(date)s"
+msgstr "يغلق في %(date)s"
+
+msgid "Match for %(item)s"
+msgstr "مطابقة لـ %(item)s"
+
+msgid "Opens %(date)s"
+msgstr "يفتح في %(date)s"
+
+msgid "Question %(number)s"
+msgstr "السؤال %(number)s"
+
+msgid "Quiz closes %(date)s"
+msgstr "يغلق الاختبار في %(date)s"
+
+msgid "Showing %(start)s-%(end)s of %(total)s albums"
+msgstr "عرض %(start)s-%(end)s من أصل %(total)s ألبوما"
+
+msgid "Showing %(start)s-%(end)s of %(total)s files"
+msgstr "عرض %(start)s-%(end)s من أصل %(total)s ملفا"
+
+msgid "The quiz closes at %(date)s."
+msgstr "يغلق الاختبار في %(date)s."
+
+msgid "The timer begins when you start. You have %(minutes)s minutes or until %(date)s, whichever comes first."
+msgstr "يبدأ المؤقت عند بدء الاختبار. لديك %(minutes)s دقيقة أو حتى %(date)s، أيهما يحل أولا."
+
+msgid "This quiz opens on %(date)s. Questions will be available after it opens."
+msgstr "يفتح هذا الاختبار في %(date)s. وستتاح الأسئلة بعد فتحه."
+
+msgid "Updated %(date)s - Your account and data stay the same."
+msgstr "آخر تحديث %(date)s - سيبقى حسابك وبياناتك كما هما."
+
+msgid "Version %(version)s"
+msgstr "الإصدار %(version)s"
+
+msgid "Welcome, %(name)s"
+msgstr "مرحبا، %(name)s"
+
+msgid "You have %(count)s unread notifications."
+msgstr "لديك %(count)s إشعارا غير مقروء."
+
+msgid "You still have __count__ unanswered questions."
+msgstr "ما زال لديك __count__ سؤالا بلا إجابة."
+
+
+msgid "%(count)s photo"
+msgid_plural "%(count)s photos"
+msgstr[0] "لا توجد صور"
+msgstr[1] "صورة واحدة"
+msgstr[2] "صورتان"
+msgstr[3] "%(count)s صور"
+msgstr[4] "%(count)s صورة"
+msgstr[5] "%(count)s صورة"
+
+
+msgid "%(count)s video"
+msgid_plural "%(count)s videos"
+msgstr[0] "لا توجد مقاطع فيديو"
+msgstr[1] "مقطع فيديو واحد"
+msgstr[2] "مقطعا فيديو"
+msgstr[3] "%(count)s مقاطع فيديو"
+msgstr[4] "%(count)s مقطع فيديو"
+msgstr[5] "%(count)s مقطع فيديو"
+
+
+msgid "%(count)s question"
+msgid_plural "%(count)s questions"
+msgstr[0] "لا توجد أسئلة"
+msgstr[1] "سؤال واحد"
+msgstr[2] "سؤالان"
+msgstr[3] "%(count)s أسئلة"
+msgstr[4] "%(count)s سؤالا"
+msgstr[5] "%(count)s سؤال"
+
+
+msgid "%(minutes)s minute"
+msgid_plural "%(minutes)s minutes"
+msgstr[0] "%(minutes)s دقيقة"
+msgstr[1] "دقيقة واحدة"
+msgstr[2] "دقيقتان"
+msgstr[3] "%(minutes)s دقائق"
+msgstr[4] "%(minutes)s دقيقة"
+msgstr[5] "%(minutes)s دقيقة"
+
+
+msgid "and %(count)s video"
+msgid_plural "and %(count)s videos"
+msgstr[0] "ولا توجد مقاطع فيديو"
+msgstr[1] "ومقطع فيديو واحد"
+msgstr[2] "ومقطعا فيديو"
+msgstr[3] "و%(count)s مقاطع فيديو"
+msgstr[4] "و%(count)s مقطع فيديو"
+msgstr[5] "و%(count)s مقطع فيديو"
+
+msgid "Showing %(count)s courses"
+msgstr "عرض %(count)s مقررا"
+
+msgid "%(score)s percent"
+msgstr "%(score)s بالمئة"
 
 msgid "Scan mode"
 msgstr "وضع المسح"

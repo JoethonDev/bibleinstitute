@@ -1,0 +1,134 @@
+{% load i18n %}
+<div class="sn-page sn-course-page">
+  {% include "student_next/partials/alerts.html" %}
+  <nav class="sn-breadcrumb" aria-label="{% translate 'Breadcrumb' %}">
+    <a href="{% url 'courses' %}">{% translate "My learning" %}</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ course.name }}</span>
+  </nav>
+  <section class="sn-course-hero">
+    <div class="sn-course-hero-cover">
+      <svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>
+    </div>
+    <div class="sn-course-hero-copy">
+      <span class="sn-course-kicker">{{ offering.academic_year_level.level.display_name }} - {{ offering.academic_year_level.academic_year.name }}</span>
+      <h1>{{ course.name }}</h1>
+      <p>{{ course.description }}</p>
+      <div class="sn-course-meta">
+        <span>{{ offering.published_lesson_count }} {% translate "Lessons" %}</span>
+        <span>{{ offering.published_quiz_count }} {% translate "Quizzes" %}</span>
+        {% if offering.instructor %}<span>{{ offering.instructor }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="sn-course-hero-progress">
+      <span class="sn-ring" role="img" aria-label="{{ progress.watch_percent }}%"><b>{{ progress.watch_percent }}%</b></span>
+      <span>{% translate "Course progress" %}</span>
+    </div>
+  </section>
+  <div class="sn-context-strip">
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-layers"></use></svg>{{ offering.academic_year_level.level.display_name }}</span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{{ offering.academic_year_level.academic_year.name }}</span>
+    {% if management_preview %}<span class="sn-pill sn-pill--warning">{% translate "Preview" %}</span>{% endif %}
+  </div>
+  <div class="sn-layout-main-aside">
+    <div class="sn-stack">
+      <section class="sn-section">
+        <div class="sn-section-head">
+          <div class="sn-section-head-main">
+            <h2><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% translate "Course content" %}</h2>
+            <p>{% translate "Choose a lesson or quiz to continue." %}</p>
+          </div>
+          <span class="sn-pill sn-pill--teal">{{ lessons|length }} {% translate "Lessons" %}</span>
+        </div>
+        <div class="sn-content-group">
+          <div class="sn-content-group-head"><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg><h3>{% translate "Lessons" %}</h3></div>
+          <div class="sn-content-list">
+            {% for row in lessons %}
+            <a class="sn-content-row{% if lesson and lesson.pk == row.pk %} is-current{% endif %}" href="{% url 'lesson-details' offering.pk row.pk %}" hx-get="{% url 'lesson-details' offering.pk row.pk %}" hx-trigger="click" hx-target="#display-page" hx-select="#content-loaded" hx-swap="innerHTML" hx-push-url="true">
+              <span class="sn-content-state">{% if row.student_progress.is_complete %}<svg class="sn-ico" aria-label="{% translate 'Complete' %}"><use href="#i-check-circle"></use></svg>{% else %}<svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg>{% endif %}</span>
+              <span class="sn-content-copy"><b>{{ row.name }}</b><small>{% if row.student_progress.watchable_parts %}{{ row.student_progress.watch_percent }}% {% translate "watched" %}{% else %}{% translate "Lesson" %}{% endif %}</small></span>
+              <svg class="sn-ico sn-content-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+            </a>
+            {% empty %}
+            <p class="sn-empty-note">{% translate "No lessons are available yet." %}</p>
+            {% endfor %}
+          </div>
+        </div>
+        {% if has_more_lessons %}<p class="sn-list-note">{% translate "The course outline shows the first 20 lessons." %}</p>{% endif %}
+        <div class="sn-content-group">
+          <div class="sn-content-group-head"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg><h3>{% translate "Quizzes" %}</h3></div>
+          <div class="sn-content-list">
+            {% for row in quiz_rows %}
+            <a class="sn-content-row sn-content-row--quiz" href="{{ row.url }}">
+              <span class="sn-content-state">
+                {% if row.status == "view" %}<svg class="sn-ico" aria-label="{% translate 'Submitted' %}"><use href="#i-check-circle"></use></svg>
+                {% elif row.status == "ready" or row.status == "exam" %}<svg class="sn-ico" aria-label="{% translate 'Available' %}"><use href="#i-play"></use></svg>
+                {% elif row.status == "upcoming" %}<svg class="sn-ico" aria-label="{% translate 'Upcoming' %}"><use href="#i-clock"></use></svg>
+                {% else %}<svg class="sn-ico" aria-label="{% translate 'Closed' %}"><use href="#i-lock"></use></svg>{% endif %}
+              </span>
+              <span class="sn-content-copy"><b>{{ row.quiz.name }}</b><small>{% if row.grade_value is not None %}{% translate "Result" %}: {{ row.grade_value }} / {{ row.quiz.total_grade }}{% else %}{{ row.quiz.opening_date|date:"D, j M" }}{% endif %}</small></span>
+              <span class="sn-pill{% if row.status == 'view' %} sn-pill--success{% elif row.status == 'ready' or row.status == 'exam' %} sn-pill--gold{% else %} sn-pill--teal{% endif %}">
+                {% if row.status == "view" %}{% translate "Done" %}
+                {% elif row.status == "ready" or row.status == "exam" %}{% translate "Open" %}
+                {% elif row.status == "upcoming" %}{% translate "Upcoming" %}
+                {% else %}{% translate "Closed" %}{% endif %}
+              </span>
+            </a>
+            {% empty %}
+            <p class="sn-empty-note">{% translate "No quizzes are available yet." %}</p>
+            {% endfor %}
+          </div>
+        </div>
+        {% if has_more_quizzes %}<p class="sn-list-note">{% translate "The course outline shows the first 20 quizzes." %}</p>{% endif %}
+      </section>
+
+      <div id="display-page" class="sn-card sn-content-panel">
+        {% if lesson %}
+          {% include "student_next/partials/lesson_content.html" %}
+        {% else %}
+        <div id="content-loaded" class="sn-content-empty">
+          <span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg></span>
+          <h2>{% translate "Welcome to the course" %}</h2>
+          <p>{% translate "Select a lesson from the outline to begin." %}</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <aside class="sn-aside">
+      <section class="sn-card sn-aside-card">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Your progress" %}</h2></div></div>
+        <div class="sn-card-body">
+          {% if progress.watchable_parts %}
+          <div class="sn-progress-summary">
+            <span class="sn-meter-wrap"><span class="sn-meter" role="progressbar" aria-label="{% translate 'Media progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ progress.watch_percent }}"><span style="width:{{ progress.watch_percent }}%"></span></span><b class="sn-meter-label">{{ progress.watch_percent }}%</b></span>
+            <span>{{ progress.watched_parts }}/{{ progress.watchable_parts }} {% translate "media parts watched" %}</span>
+            <span>{{ progress.watch_time_minutes }} {% translate "minutes watched" %}</span>
+          </div>
+          {% elif progress.attendance_total %}
+          <div class="sn-progress-summary"><span>{{ progress.attendance_scanned }}/{{ progress.attendance_total }} {% translate "meetings attended" %}</span></div>
+          {% else %}
+          <p class="sn-muted">{% translate "Progress will appear when you begin a lesson." %}</p>
+          {% endif %}
+        </div>
+      </section>
+      <section class="sn-card sn-aside-card">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Your next step" %}</h2></div></div>
+        <div class="sn-card-body">
+          {% if next_action %}
+          <a class="sn-next-action" href="{{ next_action.url }}"><span class="sn-next-action-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-{% if next_action.kind == 'quiz' %}check-circle{% else %}play{% endif %}"></use></svg></span><span><small>{% translate "Continue with" %}</small><b>{{ next_action.label }}</b></span></a>
+          {% else %}
+          <p class="sn-muted">{% translate "You have completed the available course work." %}</p>
+          {% endif %}
+        </div>
+      </section>
+      {% if next_meeting %}
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next live meeting" %}</h2></div></div><div class="sn-card-body"><b>{{ next_meeting.course }}</b><p>{{ next_meeting.date|date:"D, j M Y" }}</p><a href="{% url 'student-calendar' %}" class="sn-text-link">{% translate "Open calendar" %}</a></div></section>
+      {% endif %}
+      {% if offering.instructor %}
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Instructor" %}</h2></div></div><div class="sn-card-body">{{ offering.instructor }}</div></section>
+      {% endif %}
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Course details" %}</h2></div></div><div class="sn-card-body"><span>{{ offering.academic_year_level.level.display_name }}</span><span>{{ offering.academic_year_level.academic_year.name }}</span><a class="sn-text-link" href="{% url 'courses' %}">{% translate "Back to My learning" %}</a></div></section>
+    </aside>
+  </div>
+</div>

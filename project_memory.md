@@ -34,9 +34,13 @@ session logs and old proposals are in [the archive](docs/archive/README.md).
 | [management_system/models.py](management_system/models.py) | All current model definitions; source catalog below. |
 | [management_system/views.py](management_system/views.py) | Main web endpoints, forms orchestration, student/media/attendance/report adapters. Keep intact except approved domain extraction. |
 | [management_system/urls.py](management_system/urls.py) | Main web route-to-handler map. |
+| [management_system/student_experience_views.py](management_system/student_experience_views.py) | Admin-only per-student experience override POST adapter; uses `can_manage_academic_setup` and the existing User override field. |
 | [management_system/forms.py](management_system/forms.py) | Signup/profile/content/academic forms and validation adapters. |
 | [management_system/admin.py](management_system/admin.py) | Django-admin registration, role gates and list query behavior. |
 | [management_system/academic_access.py](management_system/academic_access.py) | Read/write offering eligibility and canonical enrollment predicates. |
+| [management_system/calendar_grid.py](management_system/calendar_grid.py) | Canonical month-grid day shape and event agenda shared by admin and student calendars. |
+| [management_system/student_experience](management_system/student_experience) | Authenticated student mode resolver, new-shell adapter, bounded page contexts, profile builder and quiz presentation builder; reuses canonical student access/progress data. |
+| [management_system/management/commands/student_experience_mode.py](management_system/management/commands/student_experience_mode.py) | Operator command for per-account override and global student UI rollout; the per-account admin control is on the Users detail page, while the global settings page remains unimplemented. |
 | management_system/academic_*.py | Enrollment/decisions, copy, formula normalization and academic evaluation/promotion. See reuse map. |
 | [management_system/utils](management_system/utils) | Validators, attendance/report/query/localization/storage helpers. The adjacent all-comment utils.py is not this active package. |
 | [management_system/mobile_api.py](management_system/mobile_api.py) | Mobile endpoint adapters; mobile_urls.py maps their routes. |
@@ -90,6 +94,7 @@ Arrows show ownership/reference direction, not permission by themselves.
 | Model | Definition / important boundary |
 |---|---|
 | Role / User | Roles admin/staff/moderator/student are capability categories, not academic levels. User extends AbstractUser with application/identity/private-file/study-mode/timezone fields; CanonicalUserManager owns natural-key username normalization. |
+| StudentExperienceSettings / User.student_experience_override | Global new/legacy default plus inherit/legacy/new per-account override. Only student-role accounts resolve to the new presentation. Migration 0118 seeds legacy. Global updates invalidate the short settings cache on transaction commit. |
 | Level | Ordered reusable academic level with Arabic/English names; ordering is unique. |
 | Course | Catalog item attached to Level; name+level unique. instructor is text, not a User FK. A catalog course is not a particular year's delivered content. |
 | AcademicYear | Named/ordered date range; at most one active year; optional graduation level. Levels are a through relationship. |
@@ -148,6 +153,7 @@ covered_message_ids, sending bot_config),
 | Count/navigation reads | [course_content.py](management_system/course_content.py): with_offering_content_counts, course_navigation | Already-authorized offering input; optional draft flags; card/sidebar fields. Helpers do not independently authorize arbitrary IDs. |
 | Scheduled lesson access | [utils/lesson_access.py](management_system/utils/lesson_access.py): lesson_available_filter, lesson_is_available | Student lesson lists/details, protected media and progress, course counts/navigation, and Telegram lists/callbacks. Null opening means available now; published future lessons stay hidden and media/progress reads recheck the same gate. |
 | Student response data | [utils/student_data.py](management_system/utils/student_data.py): student_courses_data, student_course_data, student_quiz_data, student_progress_data, student_next_actions | Web/mobile adapters, pagination, safe quiz payloads and optional sections. Do not build a read DTO just to execute a command. |
+| Authenticated student UI rollout | [student_experience/mode.py](management_system/student_experience/mode.py), render.py, learning.py, course.py, lesson.py, calendar.py; [student_experience_views.py](management_system/student_experience_views.py); `user_profile` and `user_detail_content.html` | Existing student web handlers select the new shell only for student accounts in new mode. Access, quiz state, media and progress remain owned by their existing domain paths. Admins can set one student's inherit/legacy/new override through the dedicated Users detail card/POST endpoint (or the `student_experience_mode` command); the global setting remains separate. The admin workspace remains in its normal shell. |
 | Management student overview | [student_overview.py](management_system/student_overview.py): build_student_overview | Profile/overview templates, current access labels and count helper. |
 | Application/enrollment transitions | [academic_enrollment.py](management_system/academic_enrollment.py): set_application_status, bulk_set_application_status, set_user_normal_enrollment_scope, activate_academic_year | Locks, forms, application review/bulk callers, payments and delivery callbacks. |
 | Historical intake/promotion | [historical_intake.py](management_system/historical_intake.py), academic_enrollment.py: promote_historical_summary/promote_evaluation_result(s), is_last_academic_level | Preview/apply normalization, source_key idempotency, destination scope, failed-course access and immutable histories. One canonical find/create action plan and one last-level rule are shared by preview and apply. Uploaded intake rows are validated in bounded pages and applied per row by the `HISTORICAL_INTAKE` job executor. |
@@ -208,6 +214,18 @@ route modules for exact names/payloads.
   Today cockpit include; course_detail.html owns the learning shell and lesson
   destination; display_quiz.html/questions_rendering.html own the student exam.
   Keep the authoring quiz_form.html/quizForm.js workflow separate.
+- Legacy and new student exams share `templates/partials/quiz_runtime.html`
+  and `static/js/student_experience/quiz_runtime.js` for snapshot persistence,
+  structured-answer serialization/restoration and the server-deadline timer.
+  `static/js/student_next/quiz.js` owns only the new-mode question navigator.
+- The authenticated new student shell lives under `templates/student_next/`
+  and owns only `sn-*` markup, `static/css/student_next.css`, and
+  `static/js/student_next/`. CSS selectors are rooted under `body.sn-student`
+  or `html.sn-html`; the shell does not load Bootstrap, Font Awesome, or the
+  legacy student shell assets. Arabic labels and plural forms live in the
+  standard `locale/ar/LC_MESSAGES/django.po` catalog. Existing student routes
+  keep their legacy templates as the default until the per-account or global
+  mode is changed.
 - Admin static CSS: `static/css/admin_workspace.css` loads last on admin pages
   only and owns the `aw-*` tokens/components under the `body.aw-admin` theme
   owner (including overlays); `app_admin.css` keeps the legacy `ad-*` layer for

@@ -1,0 +1,54 @@
+{% extends "student_next/base.html" %}
+{% load static i18n %}
+{% block title %}{{ scope.academic_year.name }} - {{ scope.level.display_name }} - {% translate "Graduation album" %}{% endblock %}
+{% block extra_scripts %}<script defer src="{% static 'js/gallery_lightbox.js' %}?v={{ static_asset_version }}"></script>{% endblock %}
+{% block body %}
+{% include "student_next/partials/alerts.html" %}
+<nav class="sn-breadcrumb" aria-label="{% translate 'Breadcrumb' %}"><a href="{% url 'graduates' %}">{% translate "Graduates" %}</a><span class="sn-crumb-sep">/</span><span aria-current="page">{{ scope.academic_year.name }} - {{ scope.level.display_name }}</span></nav>
+<header class="sn-page-head">
+  <div class="sn-page-head-main"><div class="sn-eyebrow">{% translate "Graduation album" %}</div><h1 class="sn-page-title">{{ scope.academic_year.name }} - {{ scope.level.display_name }}</h1><p class="sn-page-desc">{% blocktrans count count=photo_count %}{{ count }} photo{% plural %}{{ count }} photos{% endblocktrans %}{% if video_count %} {% blocktrans count count=video_count %}and {{ count }} video{% plural %}and {{ count }} videos{% endblocktrans %}{% endif %} {% translate "from the graduation celebration" %}.</p></div>
+  <div class="sn-page-actions"><a class="sn-btn sn-btn--ghost" href="{% url 'graduates' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to albums" %}</a></div>
+</header>
+<div class="sn-context-strip">
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{{ scope.academic_year.name }}</span>
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>{{ scope.level.display_name }}</span>
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-image"></use></svg>{{ photo_count }} {% translate "photos" %}</span>
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-video"></use></svg>{{ video_count }} {% translate "videos" %}</span>
+</div>
+{% if page_obj and page_obj.object_list %}
+<section class="sn-gallery-grid" id="gallery-grid" role="list" aria-label="{% translate 'Graduation photos and videos' %}">
+  {% for item in page_obj.object_list %}
+  <figure class="sn-gallery-item" role="listitem">
+    <button type="button" class="sn-gallery-thumb {% if forloop.counter|divisibleby:3 %}sn-tone-c{% elif forloop.counter|divisibleby:2 %}sn-tone-b{% else %}sn-tone-a{% endif %}" data-gallery-open data-kind="{{ item.kind }}" data-display="{{ item.display_url }}" data-download="{{ item.download_url }}" data-index="{{ forloop.counter0 }}" aria-label="{% if item.kind == 'video' %}{% translate 'Open video' %}{% else %}{% translate 'Open photo' %}{% endif %}">
+      {% if item.kind == "video" %}<video class="sn-gallery-media" src="{{ item.display_url }}" preload="metadata" muted playsinline aria-hidden="true"></video>
+      {% else %}<img class="sn-gallery-media" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async">{% endif %}
+      <span class="sn-gallery-icon"><svg class="sn-ico" aria-hidden="true"><use href="{% if item.kind == 'video' %}#i-video{% else %}#i-image{% endif %}"></use></svg></span>
+      {% if item.kind == "video" %}<span class="sn-gallery-play" aria-hidden="true"><svg class="sn-ico"><use href="#i-play"></use></svg></span>{% endif %}
+    </button>
+    <figcaption class="sn-gallery-actions"><a href="{{ item.download_url }}" download aria-label="{% translate 'Download original' %}" title="{% translate 'Download original' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg></a></figcaption>
+  </figure>
+  {% endfor %}
+</section>
+<div class="sn-gallery-foot">
+  <span><svg class="sn-ico" aria-hidden="true"><use href="#i-images"></use></svg>{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} files{% endblocktrans %}</span>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="sn-pagination" aria-label="{% translate 'Gallery pages' %}">
+    {% if page_obj.has_previous %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></a>{% endif %}
+    <span class="sn-pagination-current">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></a>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+{% else %}
+<div class="sn-empty"><span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-images"></use></svg></span><h3>{% translate "No photos in this album yet" %}</h3><p>{% translate "There are no gallery files to show on this page." %}</p></div>
+{% endif %}
+<div class="sn-lightbox" id="gallery-lightbox" hidden role="dialog" aria-modal="true" aria-label="{% translate 'Photo viewer' %}">
+  <div class="sn-lightbox-backdrop" data-gallery-close></div>
+  <div class="sn-lightbox-stage">
+    <button type="button" class="sn-lightbox-nav" data-gallery-prev aria-label="{% translate 'Previous photo' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></button>
+    <div class="sn-lightbox-media" id="gallery-lightbox-media"></div>
+    <button type="button" class="sn-lightbox-nav" data-gallery-next aria-label="{% translate 'Next photo' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></button>
+    <div class="sn-lightbox-bar"><a class="sn-text-link" id="gallery-lightbox-download" href="#" download><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download original" %}</a><button type="button" class="sn-icon-btn" data-gallery-close aria-label="{% translate 'Close' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-x"></use></svg></button></div>
+  </div>
+</div>
+{% endblock %}

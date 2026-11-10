@@ -217,6 +217,10 @@
                 </div>
             </section>
 
+            {% if can_manage_student_experience %}
+            {% include "partials/student_experience_override_card.html" %}
+            {% endif %}
+
             {% if can_view_application_data %}
             <section class="aw-card">
                 <div class="aw-card-head">

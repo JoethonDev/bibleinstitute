@@ -8,6 +8,206 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Current implementation attempt (10 November 2026) - authenticated student experience
+
+Implemented the authenticated student redesign from
+`prototype/student-redesign`, following
+`docs/pending/STUDENT_VIEW_TRANSFORMATION_PLAN.md`. The student shell applies
+only to authenticated accounts selected by the mode resolver; public pages
+remain unchanged. Admin surfaces keep their normal shell, with the one
+per-account override control now authorized on the existing Users detail page.
+The plan file was not edited; its SHA-256 remained
+`A2BE058FCAAABF6ABFB888E0EA1840614B8C6CA721988BD446F6E070E6DAA2DA` at final
+check. In a follow-up, the user explicitly authorized the per-account
+override selector on the existing admin Users detail page. The current unit
+adds only that control; the global settings UI and the plan's public-page guard
+remain out of scope.
+
+Review follow-up completed: all five findings were addressed without changing
+the senior-owned plan or schema. Course progress still computes full offering
+totals, but consumes lessons and progress in 100-lesson batches and retains
+lesson details only for the visible outline IDs (at most 20). New and legacy
+live exams now use one snapshot/structured-answer/timer runtime. Both calendar
+surfaces use the extracted canonical grid and agenda builders. New-profile
+context is built by `student_experience/profile.py`; the legacy context body,
+authorization, locking and POST transaction remain intact. Unused course quiz
+context values and the calendar's unused translation import were removed.
+Preserved the public-page guard, account rollout behavior, admin quiz/correction
+path, and the Users-detail account override.
+
+Final connected-code review found no remaining actionable security, query-bound,
+plan-reuse or runtime-duplication findings in the student rollout. It removed a
+broad exception that hid profile recommendation failures and an unused
+notification-query import. The unrelated attendance scanner edits currently in
+the worktree are preserved and excluded from the student-experience commit.
+
+Changed files:
+
+- `management_system/models.py`,
+  `management_system/migrations/0118_student_experience_mode.py`, and
+  `management_system/management/commands/student_experience_mode.py` add a
+  legacy-by-default global setting, an inherit/legacy/new user override that
+  is not editable in forms, and a rollout command. Mode resolution only
+  selects the new mode for student-role accounts. Global cache invalidation
+  runs after the settings transaction commits.
+- `management_system/student_experience/` contains mode resolution, shell
+  navigation/rendering, and bounded learning, course, lesson, and calendar
+  contexts. `management_system/views.py`, `notification_views.py`,
+  `gallery_views.py`, and `portal_views.py` choose the new shell only for an
+  opted-in student. `management_system/academic_access.py` accepts a bounded,
+  annotated offering queryset while applying the same canonical read access
+  predicate in SQL. `management_system/utils/student_data.py` exposes the
+  authorized-offering quiz read used by the course context while preserving
+  the access-checked legacy/mobile entrypoint.
+- `management_system/forms.py` adds student-next widget classes without
+  changing the inherited form validation contracts.
+- The B2 per-account selector uses `StudentExperienceOverrideForm`,
+  `student_experience_views.py`, the dedicated
+  `student-experience-override` route and an `aw-*` card on the existing Users
+  detail page. Only an admin with `can_manage_academic_setup` can change a
+  student account; the endpoint validates the enum, locks the target user and
+  writes only `student_experience_override`. The separate user-edit form and
+  application/document transaction remain unchanged.
+- `management_system/templates/student_next/`,
+  `management_system/static/css/student_next.css`, and
+  `management_system/static/js/student_next/` implement the isolated shell,
+  pages, fragments and interactions. The new CSS is scoped to the student
+  shell; legacy templates and static assets remain the default.
+- `locale/ar/LC_MESSAGES/django.po` and `django.mo` include Arabic catalog
+  entries for new shell labels, placeholder messages, and six-form Arabic
+  plural messages.
+- `project_memory.md` now maps the mode, command, context package and shell.
+- `management_system/utils/student_data.py` now streams the course-wide lesson
+  and progress aggregates per 100-lesson batch. `course.py` requests detail
+  only for its first 20 visible lesson IDs; `learning.py` no longer requests
+  lesson-level detail. Existing helper callers in profile/overview paths were
+  checked and retain aggregate behavior.
+- `management_system/calendar_grid.py` owns the canonical day shape and
+  agenda filter. Both admin calendar callers normalize holidays to `{id,name}`
+  records before invoking it; the student builder adds only its `selected`
+  presentation field.
+- `management_system/student_experience/quiz.py` owns new-mode quiz display
+  values. `templates/partials/quiz_runtime.html` and
+  `static/js/student_experience/quiz_runtime.js` are included by both student
+  exam templates; the new `student_next/quiz.js` now owns navigator UI only.
+- `management_system/student_experience/profile.py` owns new-mode profile
+  context and shared form selection. `ProfileDetail` dispatches to the builder;
+  its legacy context implementation is restored to the pre-transformation
+  behavior.
+
+Access and behavior invariants preserved: course/offering access still uses
+`academic_access`; lessons keep published and availability gates; quiz state,
+timers, snapshots, submission and answer secrecy stay in `take_exam` and
+existing quiz helpers; protected media, progress, profile writes, gallery
+authorization and notification actions keep their existing owners. Upcoming
+quiz pages expose metadata only. The public home and about pages retain their
+public templates. `/portal/` routes an opted-in student to My Learning and
+keeps the legacy destination otherwise. New-mode login honors safe `next`
+values and defaults to My Learning.
+
+Rollout commands (not executed against a real account or global setting):
+
+- `python manage.py student_experience_mode --username <username> --override new`
+- `python manage.py student_experience_mode --global-mode new`
+
+The global setting remains `legacy`; this unit changed no account override.
+The first per-account selection is an explicit admin action from the Users
+detail page. A global rollout remains a separate decision.
+
+Verification on 10 November 2026:
+
+- Migration 0118 was reversed to 0117 and reapplied on the isolated tmpfs
+  PostgreSQL container; full local `manage.py migrate` then applied Django
+  auth/admin/session tables needed for HTTP smoke. `showmigrations` reports
+  0118 applied. No SQLite source or production database was accessed.
+- `python manage.py check`: passed. `python manage.py makemigrations --check
+  --dry-run`: no changes. `python -m compileall -q management_system`, Node
+  `--check` on all three new JavaScript files, `python manage.py
+  audit_text_encoding` (784 text files), and `git diff --check`: passed.
+- Per-account admin control: Python compilation, template loading, route
+  reversal, form isolation/choices, invalid-choice rejection, Arabic catalog
+  lookup, and `compilemessages -l ar` passed. On the disposable tmpfs
+  PostgreSQL database with 0118 applied, HTTP smoke verified admin card
+  visibility, valid save/redirect, missing-CSRF 403, invalid-choice 400,
+  staff denial, non-student target denial and GET 405. All fixtures rolled
+  back; user count was zero before and after. No schema or production data was
+  changed. The B2 `makemigrations --check --dry-run` found no model changes but
+  warned that the configured default host `postgres` could not resolve.
+- Arabic catalog audit found and translated 248 previously untranslated
+  student-shell labels plus the new placeholder/plural messages. `python
+  manage.py compilemessages -l ar` passed; runtime catalog audit found no
+  untranslated shell strings or missing plural entries.
+- Rollback-only PostgreSQL HTTP smoke passed for new and legacy course pages,
+  lesson page and HTMX fragment, `/portal/`, login with safe/unsafe/missing
+  `next`, an authenticated public about page, and the anonymous public home.
+  The per-account rollout command changed only its fixture user. All smoke
+  fixtures rolled back; global mode remained legacy. The new lesson request
+  used 8 view SQL statements (excluding auth/session middleware; budget <=10).
+- Earlier in the same implementation, the new course workspace measured 10
+  view SQL statements (budget <=10), My Learning measured 7 for one offering
+  (budget <=12), and profile, notifications, calendar, graduates, and
+  download-app new-mode routes returned HTTP 200. Upcoming quiz rendering
+  returned no questions or answer key. The CSS/template/icon isolation audits
+  passed, and all 21 new templates loaded.
+- Review-fix verification: Python compilation, Node syntax checks for both
+  quiz scripts, `manage.py check`, five changed-template loads,
+  `audit_text_encoding` (792 files), and `git diff --check` passed. The shared
+  calendar builder passed a day-shape/agenda smoke. `makemigrations --check
+  --dry-run` reported no changes; its migration-history probe warned that the
+  configured default hostname `postgres` does not resolve from the host.
+- Final review verification: `manage.py check`, AST parsing of 25 changed Python
+  files, Node syntax checks for the shared quiz runtime and all three student
+  scripts, eight affected template loads, the 792-file encoding audit, and
+  `git diff --check` passed. `makemigrations --check --dry-run` reported no
+  model drift with the same unreachable-host warning. The remaining line-ending
+  warning in `git diff --check` belongs to the unrelated scanner.js edit.
+- A rollback-only PostgreSQL smoke on the confirmed tmpfs container used 205
+  lessons and three progress rows: aggregate totals covered all 205 parts,
+  lesson details contained only the 20 requested IDs, and the helper issued
+  three bounded progress queries plus the lesson scan (4 queries total).
+  Post-rollback counts were zero for users, levels, offerings, lessons and
+  lecture progress. No authenticated browser walkthrough or representative
+  production-cardinality `EXPLAIN` was run.
+- Post-smoke PostgreSQL counts remain zero for users, levels, academic years,
+  year-level links, offerings, enrollments, lessons, quizzes, questions,
+  submissions, grades, attendance records, and lecture progress. The seeded
+  mode row is still legacy; the override field is `editable=False`.
+
+Database assumption/evidence: verification used only the disposable
+`lms-student-next-pg-tmpfs` PostgreSQL container on 127.0.0.1:55434, mounted as
+tmpfs. The configured Docker service hostname `postgres` is unreachable from
+the Windows host. Redis is also unreachable from this session; request-mode
+resolution falls back to PostgreSQL and cache invalidation commit/rollback was
+checked with LocMemCache. No populated-data PostgreSQL EXPLAIN or visual browser
+walkthrough was run, so large-table plans and pixel-level browser parity remain
+open release evidence. Do not run the feature against production or alter the
+real SQLite database.
+
+Next safe step: an admin can select the first named student from that student's
+Users detail page, then review the account's authenticated course, lesson,
+calendar, profile and live quiz pages. The global mode remains legacy until
+separately authorized. Repeat query/`EXPLAIN` review against representative
+PostgreSQL population data before a broad rollout.
+
+## Plan unit (10 November 2026) - student view transformation plan
+
+Created [the student view transformation plan](docs/pending/STUDENT_VIEW_TRANSFORMATION_PLAN.md)
+and indexed it in `docs/pending/README.md`. It proposes keeping the legacy
+student UI beside a new `student_next` UI, with a global legacy/new setting and
+an admin-controlled per-account override, defaulting to legacy. New mode hides
+the public/static pages for signed-in students until logout and uses the admin
+workspace component/form/Bootstrap-removal discipline as its reference. The
+plan requires strict legacy/new template, CSS and JS separation with a frozen
+legacy baseline, new-mode `student_experience` read models, mode-aware
+rendering, `SnFormMixin` widget classes instead of crispy, no
+Bootstrap/Font Awesome in the new shell, preservation of the existing HTMX
+targets and Alpine behavior, HTMX fragment/root best practices, bounded query
+budgets, a migration/rollback rehearsal, and a separate legacy removal gate.
+No application, template, static asset, schema, permission, provider or
+dependency change was made as part of writing the plan. `docs/**` is ignored by the current
+`.gitignore`, so the new plan is available locally but not tracked until the
+repository policy changes.
+
 ## Latest implementation unit (10 November 2026) - media worker CPU utilization
 
 The media worker was capped at 2 CPUs but used about one: `process_media_job`
@@ -493,40 +693,6 @@ admin scripts, scoped encoding audit (536 files). Screenshots:
 Risk: iOS Safari can require a gesture before `getUserMedia`, which is why the
 fallback button remains; the five-second code cache is per page load and does
 not replace the server's duplicate rule.
-
-### Fixed: opening the drawer left a gap under the shell (10 November 2026)
-
-Reported as an empty band and a stray scrollbar when the drawer opens on the
-attendance and notification-history pages.
-
-Root cause: the drawer locked the page with `body.aw-drawer-open
-{ overflow: hidden }`, which removes the scrollport the sticky rail and sidebar
-pin to. The page kept its scroll offset, so both columns were laid out at that
-offset (measured: rail top -206, bottom 724 in a 930px viewport) and the shell
-stopped 206px above the bottom - the visible band. `scrollbar-gutter: stable`
-then also reserved the 17px gutter while the scrollbar was gone, shrinking the
-shell to 1909px under a 1926px overlay (a seam at the inline end).
-
-Fix: the page is locked by pinning it to the top instead of hiding the overflow
-in place. `admin_shell.js` remembers `scrollY`, adds `html.aw-scroll-locked`,
-scrolls to 0 while the drawer covers the page, and restores the offset on close;
-the CSS locks `overflow` on the html/body pair and releases the gutter while
-locked (`scrollbar-gutter: auto`), so the shell keeps the full window width and
-the rail/sidebar keep spanning the viewport. No template or query changed.
-
-Evidence (`tmp/ui-audit/verify_all_drawers.py`, Chromium, page scrolled to
-180-240px before opening, at 1919x987 and 1440x900): every drawer entry point -
-attendance row, notification recipients, app-release form, banner form, media
-job, Telegram broadcast and the calendar day agenda - opens with `scrollY` 0,
-rail and sidebar spanning the full viewport, `documentElement.scrollWidth ==
-innerWidth` (no horizontal overflow), drawer content `scrollWidth <=
-clientWidth`, and no descendant painting outside the drawer; Escape restores the
-operator's scroll position and the rail still spans the viewport.
-`tmp/ui-audit/verify_drawer_overflow.py` covers the two reported pages with the
-same assertions plus a horizontal-overflow check after close. `manage.py check`
-clean, `makemigrations --check` no changes, `node --check admin_shell.js`, all
-other suites green, admin sweep 36/36 -> 200, scoped encoding audit clean.
-
 
 ### Fixed: opening the drawer left a gap under the shell (10 November 2026)
 

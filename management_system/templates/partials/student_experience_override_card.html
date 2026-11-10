@@ -1,0 +1,20 @@
+{% load i18n %}
+<section id="student-experience-override-card" class="aw-card" aria-labelledby="student-experience-override-title">
+  <div class="aw-card-head">
+    <div class="aw-card-title">
+      <h3 id="student-experience-override-title">{% translate "Student experience" %}</h3>
+    </div>
+  </div>
+  <div class="aw-card-body">
+    <p><strong>{% translate "Current view" %}:</strong> {{ student_experience_effective_mode_label }}</p>
+    <form method="post" action="{% url 'student-experience-override' profile_user.pk %}">
+      {% csrf_token %}
+      <div class="aw-form-grid">
+        {% include "partials/components/aw_form_fields.html" with form=student_experience_override_form %}
+      </div>
+      <div class="aw-form-actions">
+        <button type="submit" class="aw-btn aw-btn--primary">{% translate "Save changes" %}</button>
+      </div>
+    </form>
+  </div>
+</section>

@@ -82,6 +82,23 @@ from .application_analytics import (
 )
 from .utils.reports import build_report_page_rows, iter_report_data, report_enrollments
 from .utils.student_data import student_course_progress_data, student_next_actions
+from .student_experience.calendar import build_calendar_context
+from .student_experience.course import build_course_context
+from .student_experience.lesson import build_lesson_context
+from .student_experience.learning import build_learning_context
+from .student_experience.quiz import build_quiz_presentation_context
+from .student_experience.profile import (
+    build_student_profile_context,
+    profile_signup_details_form_class,
+)
+from .student_experience.mode import resolve_student_mode
+from .student_experience.render import render_student_page
+from .calendar_grid import build_month_agenda as _build_month_agenda
+from .calendar_grid import build_month_grid as _build_month_grid
+from .models import StudentMode
+from .forms import (
+    StudentExperienceOverrideForm,
+)
 from .command_palette import PALETTE_TYPES, palette_results
 from .admin_today import build_today_context
 from .student_overview import build_student_overview
@@ -277,7 +294,6 @@ from .student_notifications import (
 from .payment_matrix import PAYMENT_MATRIX_PAGE_SIZE, PAYMENT_STATUS_VALUES, payment_matrix_page, payment_matrix_student_queryset
 
 # Standard Library (moved from function-local)
-import calendar as py_calendar
 from datetime import datetime
 from io import BytesIO
 import qrcode
@@ -539,6 +555,11 @@ class LoginView(views.LoginView):
 
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
+            if resolve_student_mode(request) == StudentMode.NEW:
+                redirect_url = self.get_redirect_url()
+                if redirect_url:
+                    return redirect(redirect_url)
+                return redirect(reverse("courses"))
             return redirect(reverse("view-profile"))
         return super().get(request, *args, **kwargs)
 
@@ -558,6 +579,8 @@ class LoginView(views.LoginView):
                 "web login succeeded",
                 extra={"event": "login_succeeded", "username": username or ""},
             )
+            if resolve_student_mode(request) == StudentMode.NEW:
+                response = redirect(self.get_redirect_url() or reverse("courses"))
 
         return response
 
@@ -576,6 +599,8 @@ def index(request):
 
 @login_required(login_url=LOGIN_URL)
 def portal(request):
+    if resolve_student_mode(request) == StudentMode.NEW:
+        return redirect("courses")
     return redirect("home")
 
 def about_page(request):
@@ -590,7 +615,18 @@ class ProfileDetail(LoginProtection, DetailView):
     pk_url_kwarg = "user_id"
     template_name = "profile.html"
 
+    def get_template_names(self):
+        if resolve_student_mode(self.request) == StudentMode.NEW:
+            return ["student_next/profile.html"]
+        return [self.template_name]
+
     def get_context_data(self, **kwargs):
+        if resolve_student_mode(self.request) == StudentMode.NEW:
+            return build_student_profile_context(
+                self.request,
+                self.object,
+                form=kwargs.get("form"),
+            )
         context = super().get_context_data(**kwargs)
         user = self.object
         signup_details_form = kwargs.get("form") or SignupDetailsForm(instance=user)
@@ -736,7 +772,10 @@ class ProfileDetail(LoginProtection, DetailView):
 
         with transaction.atomic():
             locked_user = User.objects.select_for_update().get(pk=request.user.pk)
-            form = SignupDetailsForm(request.POST, instance=locked_user)
+            form = profile_signup_details_form_class(request)(
+                request.POST,
+                instance=locked_user,
+            )
             if form.is_valid():
                 self.object = form.save()
                 password_changed = bool(form.cleaned_data.get("password"))
@@ -762,6 +801,20 @@ class ProfileDetail(LoginProtection, DetailView):
 @login_required(login_url=LOGIN_URL)
 def view_courses(request, course_id=None):
     user = request.user
+    if course_id is None and resolve_student_mode(request) == StudentMode.NEW:
+        context = build_learning_context(request)
+        if request.headers.get("HX-Request") == "true":
+            return render(
+                request,
+                "student_next/partials/learning_list.html",
+                context,
+            )
+        return render_student_page(
+            request,
+            page="courses",
+            template="student_next/courses.html",
+            context=context,
+        )
     management_preview = user_has_management_role(user)
     offerings_queryset = with_offering_content_counts(
         accessible_offerings(user, include_management=management_preview),
@@ -814,8 +867,33 @@ def view_courses(request, course_id=None):
 @login_required(login_url=LOGIN_URL)
 def view_course_details(request, offering_id):
     user = request.user
-    offering = get_accessible_offering_or_403(user, offering_id)
     management_preview = user_has_management_role(user)
+    student_next = (
+        resolve_student_mode(request) == StudentMode.NEW and not management_preview
+    )
+    offering_queryset = (
+        with_offering_content_counts(
+            CourseOffering.objects.all(),
+            include_drafts=False,
+        )
+        if student_next else None
+    )
+    offering = get_accessible_offering_or_403(
+        user,
+        offering_id,
+        offering_queryset=offering_queryset,
+    )
+    if student_next:
+        return render_student_page(
+            request,
+            page="course",
+            template="student_next/course.html",
+            context=build_course_context(
+                user,
+                offering,
+                management_preview=False,
+            ),
+        )
     return render(request, "course_detail.html", {
         "offering": offering,
         "offering_id": offering.pk,
@@ -827,11 +905,25 @@ def view_course_details(request, offering_id):
 @login_required(login_url=LOGIN_URL)
 def view_lesson_details(request, offering_id, lesson_id):
     user = request.user
-    offering = get_accessible_offering_or_403(user, offering_id)
+    management_preview = user_has_management_role(user)
+    student_next = (
+        resolve_student_mode(request) == StudentMode.NEW and not management_preview
+    )
+    offering_queryset = (
+        with_offering_content_counts(
+            CourseOffering.objects.all(),
+            include_drafts=False,
+        )
+        if student_next else None
+    )
+    offering = get_accessible_offering_or_403(
+        user,
+        offering_id,
+        offering_queryset=offering_queryset,
+    )
     lesson = get_object_or_404(Lesson, pk=lesson_id, course_offering=offering)
     if not user_has_management_role(user) and lesson.status != PublicationStatus.PUBLISHED:
         raise PermissionDenied(_("You do not have access to this lesson."))
-    management_preview = user_has_management_role(user)
     if not management_preview and not lesson_is_available(lesson):
         raise PermissionDenied(_("This lesson is not available yet."))
     lesson_links = json.loads(lesson.links)
@@ -857,6 +949,34 @@ def view_lesson_details(request, offering_id, lesson_id):
             ),
         } for file_index, file in enumerate(lesson_links)]
     }
+    if student_next:
+        next_context = build_lesson_context(
+            user,
+            offering,
+            lesson,
+            context["links"],
+            management_preview=False,
+        )
+        target = (request.headers.get("HX-Target") or "").strip()
+        target_id = target.rsplit("#", 1)[-1].strip() if "#" in target else target
+        history_restore = (
+            request.headers.get("HX-History-Restore-Request") or ""
+        ).strip().lower() == "true"
+        if history_restore or (
+            request.headers.get("HX-Request") == "true"
+            and target_id == "display-page"
+        ):
+            return render(
+                request,
+                "student_next/partials/lesson_content.html",
+                next_context,
+            )
+        return render_student_page(
+            request,
+            page="lesson",
+            template="student_next/lesson.html",
+            context=next_context,
+        )
     # Inner lesson navigation swaps #display-page; return only the content
     # wrapper there and keep the complete shell for direct/deep-link requests.
     target = (request.headers.get("HX-Target") or "").strip()
@@ -1001,7 +1121,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
 
             active_snapshot = snapshot if quiz_mode == "exam" else None
             server_time = now()
-            return render(request, "display_quiz.html", {
+            quiz_context = {
                 "snapshot_data": {
                     "answers": active_snapshot.answers if active_snapshot else {},
                     "revision": active_snapshot.revision if active_snapshot else 0,
@@ -1023,7 +1143,17 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "quiz_opening_date_str": format_human_datetime(effective_opening_date, user),
                 "quiz_closing_date_str": format_human_datetime(effective_closing_date, user),
                 "quiz_start_url": reverse("quiz-start", args=[offering_id, quiz_id]),
-            })
+                "offering": offering,
+                "quiz": quiz,
+            }
+            if resolve_student_mode(request) == StudentMode.NEW and not user_has_management_role(user):
+                return render_student_page(
+                    request,
+                    page="quiz",
+                    template="student_next/quiz.html",
+                    context=build_quiz_presentation_context(quiz_context),
+                )
+            return render(request, "display_quiz.html", quiz_context)
         
         elif request.method == "POST":
             # Prevent another submission
@@ -1552,10 +1682,26 @@ def user_profile(request, user_id):
                 })
 
     telegram_account = TelegramAccount.objects.filter(user=user, is_active=True).first()
+    can_manage_student_experience = (
+        can_manage_academic_setup(request.user)
+        and getattr(user.role, "role", None) == "student"
+    )
+    student_experience_effective_mode_label = (
+        dict(StudentMode.choices)[resolve_student_mode(user)]
+        if can_manage_student_experience else None
+    )
     return render_page(request, "user_detail.html", "partials/user_detail_content.html", {
         "profile_user": user,
         "edit_form": form,
         "can_edit_user": can_manage_applications(request.user),
+        "can_manage_student_experience": can_manage_student_experience,
+        "student_experience_override_form": (
+            StudentExperienceOverrideForm(
+                initial={"student_experience_override": user.student_experience_override}
+            )
+            if can_manage_student_experience else None
+        ),
+        "student_experience_effective_mode_label": student_experience_effective_mode_label,
         "active_enrollment": active_enrollment,
         "breadcrumb_items": generate_breadcrumb([
             (_("Admin"), reverse("admin-panel")),
@@ -7139,68 +7285,6 @@ def _calendar_meeting_row(meeting):
     }
 
 
-def _build_month_grid(*, year_start, year_end, cur_year, cur_month, today,
-                      holidays, meetings_by_date, locked_weekdays,
-                      meeting_offerings_by_weekday=None):
-    """Shared month-grid builder: one canonical day-dict shape consumed by
-    partials/calendar_month_grid.html for both admin and student calendars.
-
-    ``meeting_offering_groups`` groups the day's offerings by level because a
-    level can hold at most one meeting per date."""
-    cal = py_calendar.Calendar()
-    month_days = cal.monthdatescalendar(cur_year, cur_month)
-    month_grid = []
-    for week in month_days:
-        week_data = []
-        for d in week:
-            in_year = year_start <= d <= year_end
-            day_meetings = meetings_by_date.get(d, [])
-            is_meeting = d.weekday() in locked_weekdays
-            is_holiday = d in holidays
-            offering_groups = {}
-            for offering in (meeting_offerings_by_weekday or {}).get(d.weekday(), []):
-                academic_year_level = offering.academic_year_level
-                level = academic_year_level.level
-                group = offering_groups.setdefault(
-                    level.pk,
-                    {"level_id": level.pk, "level_name": level.display_name, "offerings": []},
-                )
-                group["offerings"].append(offering)
-            week_data.append({
-                "day": d.day,
-                "date": d.isoformat(),
-                "date_label": formats.date_format(d, "l, j F"),
-                "in_year": in_year,
-                "is_meeting": is_meeting,
-                "is_today": d == today,
-                "is_holiday": is_holiday,
-                "holiday_name": holidays[d].name if is_holiday else "",
-                "holiday_id": holidays[d].id if is_holiday else None,
-                "meetings": day_meetings,
-                "meeting_offering_groups": list(offering_groups.values()),
-                "disabled": not in_year,
-                "outside_month": d.month != cur_month,
-            })
-        month_grid.append(week_data)
-    return month_grid
-
-
-def _build_month_agenda(month_grid):
-    """In-year, in-month days that carry a meeting or holiday, in date order.
-
-    Shared by the admin and student phone agendas; each entry is the canonical
-    month-grid day dict so the agenda and the grid always agree.
-    """
-    if not month_grid:
-        return []
-    return [
-        day
-        for week in month_grid
-        for day in week
-        if day["in_year"] and not day["outside_month"] and (day["meetings"] or day["is_holiday"])
-    ]
-
-
 def _resolve_calendar_month(year, request):
     """Parse and clamp the requested display month within an academic year.
 
@@ -7317,8 +7401,12 @@ def calendar_management(request):
         today_query = _calendar_today_query(year)
 
         holidays = {
-            h.date: h
-            for h in AcademicHoliday.objects.filter(academic_year=year, date__year=cur_year, date__month=cur_month)
+            holiday.date: {"id": holiday.pk, "name": holiday.name}
+            for holiday in AcademicHoliday.objects.filter(
+                academic_year=year,
+                date__year=cur_year,
+                date__month=cur_month,
+            )
         }
         scope_links = list(year.level_links.select_related("level").order_by("level__ordering"))
         weekday_labels = _calendar_weekday_labels()
@@ -7556,6 +7644,13 @@ def delete_holiday(request, holiday_id):
 
 @login_required
 def student_calendar(request):
+    if resolve_student_mode(request) == StudentMode.NEW:
+        return render_student_page(
+            request,
+            page="calendar",
+            template="student_next/calendar.html",
+            context=build_calendar_context(request),
+        )
     enrollments = list(
         Enrollment.objects.filter(
             student=request.user,
@@ -7636,8 +7731,11 @@ def student_calendar(request):
         month_options = _calendar_month_options(year, cur_year, cur_month)
         today_query = _calendar_today_query(year)
         holidays = {
-            h.date: h
-            for h in year.holidays.filter(date__year=cur_year, date__month=cur_month)
+            holiday.date: {"id": holiday.pk, "name": holiday.name}
+            for holiday in year.holidays.filter(
+                date__year=cur_year,
+                date__month=cur_month,
+            )
         }
         month_meetings = list(
             AcademicYearLevelMeeting.objects.filter(
@@ -7865,6 +7963,7 @@ def record_attendance(request, token, action):
         "status": "recorded",
         "action": action,
         "source": rec.source,
+        "source_label": rec.get_source_display(),
         "scanned_at": timezone.localtime(rec.scanned_at).strftime("%H:%M:%S"),
         "student": student_info,
         "course": course_name,

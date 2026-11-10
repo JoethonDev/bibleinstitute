@@ -45,7 +45,16 @@ def accessible_offerings(user: User, include_management: bool = False) -> QueryS
         return CourseOffering.objects.none()
     if _management_user(user):
         return CourseOffering.objects.all() if include_management else CourseOffering.objects.none()
-    return CourseOffering.objects.alias(**readable_offering_access(user)).filter(
+    return _student_accessible_offerings(user, CourseOffering.objects.all())
+
+
+def _student_accessible_offerings(
+    user: User,
+    offerings: QuerySet[CourseOffering],
+) -> QuerySet[CourseOffering]:
+    if not user.is_authenticated:
+        return offerings.none()
+    return offerings.alias(**readable_offering_access(user)).filter(
         Q(student_has_normal_access=True) | Q(student_has_targeted_access=True),
         status=PublicationStatus.PUBLISHED,
     )
@@ -124,19 +133,32 @@ def get_accessible_offering_or_403(
     write: bool = False,
     *,
     allow_management: bool = False,
+    offering_queryset: QuerySet[CourseOffering] | None = None,
 ) -> CourseOffering:
-    offering = CourseOffering.objects.select_related(
-        "course", "academic_year_level__academic_year", "academic_year_level__level"
-    ).filter(pk=offering_id).first()
-    if offering is None:
-        raise PermissionDenied(_("You do not have access to this offering."))
-    allowed = (
-        user_can_write_offering_activity(
-            user, offering, allow_management=allow_management
-        )
-        if write
-        else user_can_read_offering(user, offering)
+    queryset = (
+        offering_queryset
+        if offering_queryset is not None
+        else CourseOffering.objects.all()
     )
-    if not allowed:
+    queryset = queryset.select_related(
+        "course", "academic_year_level__academic_year", "academic_year_level__level"
+    )
+    if write:
+        offering = queryset.filter(pk=offering_id).first()
+        allowed = bool(
+            offering
+            and user_can_write_offering_activity(
+                user, offering, allow_management=allow_management
+            )
+        )
+    elif _management_user(user):
+        offering = queryset.filter(pk=offering_id).first()
+        allowed = offering is not None
+    else:
+        offering = _student_accessible_offerings(user, queryset).filter(
+            pk=offering_id
+        ).first()
+        allowed = offering is not None
+    if not allowed or offering is None:
         raise PermissionDenied(_("You do not have access to this offering."))
     return offering

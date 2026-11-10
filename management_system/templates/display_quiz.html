@@ -100,7 +100,26 @@
                     {% endif %}
 
                     {% if mode != "ready" and mode != "upcoming" %}
-                    <form action="" method="post" id="quiz-form">
+                    <form action="" method="post" id="quiz-form"
+                        {% if mode == "exam" %}
+                        data-deadline="{{ attempt_deadline|default_if_none:0 }}"
+                        data-server-now="{{ server_now_ms|default:0 }}"
+                        data-snapshot-url="{{ snapshot_url }}"
+                        data-saving-text="{% translate 'Saving answers...' %}"
+                        data-saved-text="{% translate 'Answers saved.' %}"
+                        data-save-error-text="{% translate 'Answers could not be saved. Keep this page open and retry.' %}"
+                        data-timer-format="verbose"
+                        data-timer-day="{% translate 'day' %}"
+                        data-timer-days="{% translate 'days' %}"
+                        data-timer-hour="{% translate 'hour' %}"
+                        data-timer-hours="{% translate 'hours' %}"
+                        data-timer-minute="{% translate 'minute' %}"
+                        data-timer-minutes="{% translate 'minutes' %}"
+                        data-timer-second="{% translate 'second' %}"
+                        data-timer-seconds="{% translate 'seconds' %}"
+                        data-timer-list-separator="{% translate ', ' %}"
+                        data-timer-and="{% translate ' and ' %}"
+                        {% endif %}>
                         {% csrf_token %}
                         
                         {% include 'questions_rendering.html' %}
@@ -156,404 +175,135 @@
     {% if snapshot_url and mode == "exam" %}
     {{ snapshot_data|json_script:"quiz-answer-snapshot" }}
     <p id="snapshot-status" role="status" aria-live="polite" class="text-center"></p>
+    {% include "partials/quiz_runtime.html" %}
     {% endif %}
     {% if mode == "exam" or mode == "preview" %}
         <script>
             (() => {
-                const jsTranslations_quiz = {
-                    'graded': '{% translate "Question graded"|escapejs %}',
-                    'underReview': '{% translate "Question under review"|escapejs %}',
-                    'input': '{% translate "input"|escapejs %}',
-                    'textarea': '{% translate "textarea"|escapejs %}',
-                    'day': '{% translate "day"|escapejs %}',
-                    'days': '{% translate "days"|escapejs %}',
-                    'hour': '{% translate "hour"|escapejs %}',
-                    'hours': '{% translate "hours"|escapejs %}',
-                    'minute': '{% translate "minute"|escapejs %}',
-                    'minutes': '{% translate "minutes"|escapejs %}',
-                    'second': '{% translate "second"|escapejs %}',
-                    'seconds': '{% translate "seconds"|escapejs %}',
-                    'listSeparator': '{% translate ", "|escapejs %}',
-                    'and': '{% translate " and "|escapejs %}'
-                };
-
-                function getJsTranslation_quiz(key) {
-                    return jsTranslations_quiz[key] || key;
-                }
-
                 const isPreview = '{{ mode|escapejs }}' === 'preview';
-                let timerEl = document.querySelector("#timer span");
-                const endTime = Number('{{ attempt_deadline|default:0|escapejs }}');
-                const serverTimeAtRender = Number('{{ server_now_ms|default:0|escapejs }}');
-                const monotonicTimeAtRender = performance.now();
                 const form = document.querySelector("#quiz-form");
-                const snapshot = JSON.parse(document.getElementById('quiz-answer-snapshot')?.textContent || '{"answers":{},"revision":0}');
-                let snapshotRevision = snapshot.revision;
-                let snapshotDirty = false, snapshotSaving = false, snapshotBlocked = false, snapshotTimer;
-                let pendingSnapshot = null;
-                const snapshotStatus = document.getElementById('snapshot-status');
-                const snapshotUrl = '{{ snapshot_url|default:""|escapejs }}';
-                const statusText = text => { if (snapshotStatus) snapshotStatus.textContent = text; };
-                function collectAnswers() {
-                    const answers = {};
-                    form.querySelectorAll('[data-question-card]').forEach(card => {
-                        const id = card.querySelector('input[name$="[id]"]')?.value;
-                        // Read the stored value only: serialization happens in the
-                        // actual ordering/matching interaction handlers so an
-                        // untouched structured question stays unanswered.
-                        const structured = card.querySelector('[data-structured-answer]');
-                        const field = structured || card.querySelector('input[type="radio"]:checked, textarea, .answers-section input:not([type="radio"]):not([type="hidden"])');
-                        if (id) answers[id] = field?.value || '';
-                    });
-                    return answers;
-                }
-                async function persistSnapshot() {
-                    if (!snapshotUrl || isPreview || (!snapshotDirty && !pendingSnapshot) || snapshotSaving || snapshotBlocked) return;
-                    snapshotSaving = true;
-                    if (!pendingSnapshot) {
-                        pendingSnapshot = JSON.stringify({revision: snapshotRevision, answers: collectAnswers()});
-                        snapshotDirty = false;
-                    }
-                    // A lost acknowledgement must retry the same revision and answers,
-                    // before newer edits can use the server's acknowledged revision.
-                    const body = pendingSnapshot;
-                    const controller = new AbortController();
-                    const requestTimeout = setTimeout(() => controller.abort(), 15000);
-                    const csrf = form.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-                    try {
-                        // Browsers reject keepalive bodies larger than about 64 KB.
-                        const response = await fetch(snapshotUrl, {method: 'POST', keepalive: new Blob([body]).size <= 60000,
-                            signal: controller.signal,
-                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body});
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok) {
-                            if (response.status === 409 || response.status === 403) snapshotBlocked = true;
-                            if (response.status === 400) {
-                                // Definitive validation failure: let corrected input replace it.
-                                pendingSnapshot = null;
-                                snapshotDirty = true;
-                            }
-                            throw new Error(data.error || '{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}');
-                        }
-                        if (!Number.isSafeInteger(data.revision) || data.revision < 0 || typeof data.submitted !== 'boolean') {
-                            throw new Error('{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}');
-                        }
-                        snapshotRevision = data.revision;
-                        pendingSnapshot = null;
-                        if (data.submitted) snapshotBlocked = true;
-                        statusText(snapshotDirty ? '{% translate "Saving answers..."|escapejs %}' : '{% translate "Answers saved."|escapejs %}');
-                    } catch (error) {
-                        statusText(error.name === 'AbortError'
-                            ? '{% translate "Answers could not be saved. Keep this page open and retry."|escapejs %}' : error.message);
-                    } finally {
-                        clearTimeout(requestTimeout);
-                        snapshotSaving = false;
-                        if ((snapshotDirty || pendingSnapshot) && !snapshotBlocked) {
-                            snapshotTimer = setTimeout(persistSnapshot, 2000);
-                        }
-                    }
-                }
-
-                function formatRemainingTime(totalSeconds) {
-                    let remaining = Math.max(0, Math.floor(totalSeconds));
-                    const days = Math.floor(remaining / 86400);
-                    remaining %= 86400;
-                    const hours = Math.floor(remaining / 3600);
-                    remaining %= 3600;
-                    const minutes = Math.floor(remaining / 60);
-                    const seconds = remaining % 60;
-
-                    const parts = [];
-                    if (days) parts.push(`${days} ${getJsTranslation_quiz(days === 1 ? 'day' : 'days')}`);
-                    if (hours) parts.push(`${hours} ${getJsTranslation_quiz(hours === 1 ? 'hour' : 'hours')}`);
-                    if (minutes) parts.push(`${minutes} ${getJsTranslation_quiz(minutes === 1 ? 'minute' : 'minutes')}`);
-                    if (!parts.length || seconds) parts.push(`${seconds} ${getJsTranslation_quiz(seconds === 1 ? 'second' : 'seconds')}`);
-
-                    if (parts.length === 1) {
-                        return parts[0];
-                    }
-
-                    const lastPart = parts.pop();
-                    return `${parts.join(getJsTranslation_quiz('listSeparator'))}${getJsTranslation_quiz('and')}${lastPart}`;
-                }
-
-                function serializeStructuredAnswer(questionCard) {
-                    const structuredType = questionCard.querySelector('[data-structured-answer]')?.dataset.structuredType;
-
-                    if (structuredType === 'order_events') {
-                        return JSON.stringify([...questionCard.querySelectorAll('[data-order-item-row]')]
-                            .map(row => row.dataset.orderLabel || '')
-                            .filter(Boolean));
-                    }
-
-                    if (structuredType === 'match_related') {
-                        const answer = {};
-                        questionCard.querySelectorAll('[data-match-select]').forEach(select => {
-                            const leftLabel = select.dataset.matchLeftLabel || '';
-                            const rightLabel = select.value || '';
-                            if (leftLabel && rightLabel) {
-                                answer[leftLabel] = rightLabel;
-                            }
-                        });
-                        return JSON.stringify(answer);
-                    }
-
-                    return '';
-                }
-
-                function applyStructuredAnswer(questionCard, answerValue) {
-                    const structuredType = questionCard.querySelector('[data-structured-answer]')?.dataset.structuredType;
-                    if (!structuredType || !answerValue) {
-                        return;
-                    }
-
-                    try {
-                        const parsedAnswer = JSON.parse(answerValue);
-
-                        if (structuredType === 'order_events' && Array.isArray(parsedAnswer)) {
-                            const list = questionCard.querySelector('[data-order-item-list]');
-                            if (!list) {
-                                return;
-                            }
-
-                            const currentRows = [...list.querySelectorAll('[data-order-item-row]')];
-                            const orderedRows = [];
-
-                            parsedAnswer.forEach((label) => {
-                                const row = currentRows.find(item => item.dataset.orderLabel === label);
-                                if (row && !orderedRows.includes(row)) {
-                                    orderedRows.push(row);
-                                }
-                            });
-
-                            currentRows.forEach((row) => {
-                                if (!orderedRows.includes(row)) {
-                                    orderedRows.push(row);
-                                }
-                            });
-
-                            const fragment = document.createDocumentFragment();
-                            orderedRows.forEach((row) => fragment.appendChild(row));
-                            list.appendChild(fragment);
-                        }
-
-                        if (structuredType === 'match_related' && parsedAnswer && typeof parsedAnswer === 'object') {
-                            Object.entries(parsedAnswer).forEach(([leftLabel, rightLabel]) => {
-                                const select = [...questionCard.querySelectorAll('[data-match-select]')].find(item => item.dataset.matchLeftLabel === leftLabel);
-                                if (select) {
-                                    select.value = rightLabel;
-                                }
-                            });
-                        }
-                    } catch (error) {
-                        return;
-                    }
-                }
-
-                function setupInitialAnswers() {
-                    const storedQuestions = Object.entries(snapshot.answers).map(([question_id, answer]) => ({question_id, answer}));
-                    if (storedQuestions) {
-                        const answersArr = storedQuestions;
-                        answersArr.forEach(val => {
-                            const questionIDInput = document.querySelector(`input[type="hidden"][name$="[id]"][value="${val.question_id}"]`);
-                            if (!questionIDInput) return;
-
-                            const questionDiv = questionIDInput.closest('.card-body');
-                            const structuredAnswerInput = questionDiv.querySelector('[data-structured-answer]');
-                            if (structuredAnswerInput) {
-                                structuredAnswerInput.value = val.answer || '';
-                                applyStructuredAnswer(questionDiv, val.answer || '');
-                                return;
-                            }
-
-                            const answerFields = questionDiv.querySelectorAll('.answers-section input, .answers-section textarea');
-                            const answerVal = val.answer;
-
-                            if (answerFields.length > 1) { // MCQ
-                                answerFields.forEach(field => {
-                                    if (field.value == answerVal) {
-                                        field.checked = true;
-                                    }
-                                });
-                            } else if (answerFields.length === 1) { // Written/Complete
-                                const inputField = answerFields[0];
-                                inputField.value = answerVal;
-                            }
-                        });
-                    }
-                }
-
-                function countDown() {
-                    let currentEpoch = Math.floor((serverTimeAtRender + performance.now() - monotonicTimeAtRender) / 1000);
-                    let remainingTime = endTime - currentEpoch;
-
-                    if (remainingTime <= 0) {
-                        clearInterval(timerInterval);
-                        timerEl.innerText = formatRemainingTime(0);
-                        if (form) form.submit();
-                        return;
-                    }
-
-                    timerEl.innerText = formatRemainingTime(remainingTime);
-                }
-                
-                function saveAnswer(event) {
-                    if (isPreview) {
-                        return;
-                    }
-                    const questionCard = event.target.closest('.card-body');
-                    const structuredAnswerInput = questionCard?.querySelector('[data-structured-answer]');
-                    if (structuredAnswerInput) structuredAnswerInput.value = serializeStructuredAnswer(questionCard);
-                    snapshotDirty = true;
-                    statusText('{% translate "Saving answers..."|escapejs %}');
-                    clearTimeout(snapshotTimer);
-                    snapshotTimer = setTimeout(persistSnapshot, 1000);
-                }
+                if (!form) return;
 
                 function moveOrderItem(button, direction) {
-                    const row = button.closest('[data-order-item-row]');
-                    const list = button.closest('[data-order-item-list]');
-                    console.log("Move button clicked deeeper", { button, direction, row, list });
-                    if (!row || !list) {
-                        return;
-                    }
-
-                    if (direction === 'up' && row.previousElementSibling) {
+                    const row = button.closest("[data-order-item-row]");
+                    const list = button.closest("[data-order-item-list]");
+                    if (!row || !list) return;
+                    if (direction === "up" && row.previousElementSibling) {
                         list.insertBefore(row, row.previousElementSibling);
-                    } else if (direction === 'down' && row.nextElementSibling) {
+                    } else if (direction === "down" && row.nextElementSibling) {
                         list.insertBefore(row.nextElementSibling, row);
                     }
-
-                    saveAnswer({ target: button });
+                    if (!isPreview) {
+                        window.StudentQuizRuntime?.markDirty(row.closest("[data-question-card]"));
+                    }
                 }
 
                 function handleOrderMove(event) {
                     event.preventDefault();
                     event.stopPropagation();
-                    console.log("Move button clicked");
                     const button = event.currentTarget;
-                    const direction = button.dataset.action === 'move-order-up' ? 'up' : 'down';
-                    moveOrderItem(button, direction);
+                    moveOrderItem(button, button.dataset.action === "move-order-up" ? "up" : "down");
                 }
-                
-                // Initialize
-                if(timerEl) {
-                    var timerInterval = setInterval(countDown, 1000);
-                }
-                if(form) {
-                    if (isPreview) {
-                        form.addEventListener("submit", (event) => event.preventDefault());
-                    } else {
-                        setupInitialAnswers();
-                        let confirmedUnansweredSubmit = false;
-                        const unansweredModal = document.querySelector("#unansweredQuestionsModal");
-                        const unansweredFallbackDialog = document.querySelector("#unansweredQuestionsFallback");
-                        const submitButton = form.querySelector('button[type="submit"]');
 
-                        function showUnansweredQuestionsModal() {
-                            if (!unansweredModal && !unansweredFallbackDialog) return;
-                            // The shared shell loads Bootstrap after the page body, so resolve it on submit.
-                            const show = () => {
-                                if (unansweredModal && window.bootstrap && window.bootstrap.Modal) {
-                                    window.bootstrap.Modal.getOrCreateInstance(unansweredModal).show();
-                                } else if (unansweredFallbackDialog && typeof unansweredFallbackDialog.showModal === "function") {
-                                    unansweredFallbackDialog.showModal();
-                                }
-                            };
-                            if (window.bootstrap && window.bootstrap.Modal) {
-                                show();
-                            } else if (document.readyState === "loading") {
-                                document.addEventListener("DOMContentLoaded", show, { once: true });
-                            } else {
-                                show();
+                if (isPreview) {
+                    form.addEventListener("submit", (event) => event.preventDefault());
+                } else {
+                    let confirmedUnansweredSubmit = false;
+                    const unansweredModal = document.querySelector("#unansweredQuestionsModal");
+                    const unansweredFallbackDialog = document.querySelector("#unansweredQuestionsFallback");
+                    const submitButton = form.querySelector('button[type="submit"]');
+
+                    function showUnansweredQuestionsModal() {
+                        if (!unansweredModal && !unansweredFallbackDialog) return;
+                        const show = () => {
+                            if (unansweredModal && window.bootstrap && window.bootstrap.Modal) {
+                                window.bootstrap.Modal.getOrCreateInstance(unansweredModal).show();
+                            } else if (
+                                unansweredFallbackDialog
+                                && typeof unansweredFallbackDialog.showModal === "function"
+                            ) {
+                                unansweredFallbackDialog.showModal();
+                            }
+                        };
+                        if (window.bootstrap && window.bootstrap.Modal) {
+                            show();
+                        } else if (document.readyState === "loading") {
+                            document.addEventListener("DOMContentLoaded", show, { once: true });
+                        } else {
+                            show();
+                        }
+                    }
+
+                    function questionIsAnswered(questionCard) {
+                        const answerSection = questionCard.querySelector(".answers-section");
+                        if (!answerSection) return false;
+                        const choiceInputs = answerSection.querySelectorAll('input[type="radio"]');
+                        if (choiceInputs.length) {
+                            return Array.prototype.some.call(choiceInputs, (input) => input.checked);
+                        }
+                        const structured = answerSection.querySelector("[data-structured-answer]");
+                        if (structured && structured.dataset.structuredType === "order_events") {
+                            try {
+                                const answer = JSON.parse(structured.value || "null");
+                                const itemCount = answerSection.querySelectorAll("[data-order-item-row]").length;
+                                return itemCount > 0
+                                    && Array.isArray(answer)
+                                    && answer.length === itemCount
+                                    && answer.every((item) => typeof item === "string" && item.trim());
+                            } catch (error) {
+                                return false;
                             }
                         }
-
-                        function questionIsAnswered(questionCard) {
-                            const answerSection = questionCard.querySelector(".answers-section");
-                            if (!answerSection) return false;
-
-                            const choiceInputs = answerSection.querySelectorAll('input[type="radio"]');
-                            if (choiceInputs.length) {
-                                return Array.prototype.some.call(choiceInputs, input => input.checked);
-                            }
-
-                            const structured = answerSection.querySelector("[data-structured-answer]");
-                            if (structured && structured.dataset.structuredType === "order_events") {
-                                try {
-                                    const answer = JSON.parse(structured.value || "null");
-                                    const itemCount = answerSection.querySelectorAll("[data-order-item-row]").length;
-                                    return itemCount > 0
-                                        && Array.isArray(answer)
-                                        && answer.length === itemCount
-                                        && answer.every(item => typeof item === "string" && item.trim());
-                                } catch (error) {
-                                    return false;
-                                }
-                            }
-                            if (structured && structured.dataset.structuredType === "match_related") {
-                                const matches = answerSection.querySelectorAll("[data-match-select]");
-                                return matches.length > 0 && Array.prototype.every.call(
-                                    matches,
-                                    select => Boolean(select.value.trim())
-                                );
-                            }
-
-                            const answerFields = answerSection.querySelectorAll(
-                                'input:not([type="hidden"]):not([type="radio"]), textarea, select'
-                            );
-                            return answerFields.length > 0 && Array.prototype.some.call(
-                                answerFields,
-                                field => Boolean((field.value || "").trim())
+                        if (structured && structured.dataset.structuredType === "match_related") {
+                            const matches = answerSection.querySelectorAll("[data-match-select]");
+                            return matches.length > 0 && Array.prototype.every.call(
+                                matches,
+                                (select) => Boolean(select.value.trim())
                             );
                         }
+                        const answerFields = answerSection.querySelectorAll(
+                            'input:not([type="hidden"]):not([type="radio"]), textarea, select'
+                        );
+                        return answerFields.length > 0 && Array.prototype.some.call(
+                            answerFields,
+                            (field) => Boolean((field.value || "").trim())
+                        );
+                    }
 
-                        form.addEventListener("submit", event => {
-                            if (confirmedUnansweredSubmit) return;
-                            const unanswered = Array.prototype.filter.call(
-                                form.querySelectorAll("[data-question-card]"),
-                                questionCard => !questionIsAnswered(questionCard)
-                            );
-                            if (!unanswered.length) return;
-                            event.preventDefault();
-                            event.stopImmediatePropagation();
-                            showUnansweredQuestionsModal();
-                        });
-                        const confirmUnansweredButton = document.querySelector("#confirmUnansweredQuizSubmit");
-                        if (confirmUnansweredButton) {
-                            confirmUnansweredButton.addEventListener("click", () => {
-                                confirmedUnansweredSubmit = true;
-                                window.bootstrap.Modal.getOrCreateInstance(unansweredModal).hide();
-                                form.requestSubmit(submitButton);
-                            });
-                        }
-                        const confirmFallbackButton = document.querySelector("#confirmUnansweredQuizFallback");
-                        if (confirmFallbackButton && unansweredFallbackDialog) {
-                            confirmFallbackButton.addEventListener("click", () => {
-                                confirmedUnansweredSubmit = true;
-                                unansweredFallbackDialog.close();
-                                form.requestSubmit(submitButton);
-                            });
-                        }
-                        const reviewFallbackButton = document.querySelector("#reviewUnansweredQuizFallback");
-                        if (reviewFallbackButton && unansweredFallbackDialog) {
-                            reviewFallbackButton.addEventListener("click", () => unansweredFallbackDialog.close());
-                        }
-
-                        form.addEventListener("submit", persistSnapshot);
-                        document.addEventListener('visibilitychange', () => { if (document.hidden) persistSnapshot(); });
-                        window.addEventListener('pagehide', persistSnapshot);
-                        document.querySelectorAll(".answers-section input, .answers-section textarea, .answers-section select").forEach(field => {
-                            field.addEventListener("change", saveAnswer);
-                            field.addEventListener("input", saveAnswer);
+                    form.addEventListener("submit", (event) => {
+                        if (confirmedUnansweredSubmit) return;
+                        const unanswered = Array.prototype.filter.call(
+                            form.querySelectorAll("[data-question-card]"),
+                            (questionCard) => !questionIsAnswered(questionCard)
+                        );
+                        if (!unanswered.length) return;
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        showUnansweredQuestionsModal();
+                    });
+                    document.querySelector("#confirmUnansweredQuizSubmit")?.addEventListener("click", () => {
+                        confirmedUnansweredSubmit = true;
+                        window.bootstrap.Modal.getOrCreateInstance(unansweredModal).hide();
+                        form.requestSubmit(submitButton);
+                    });
+                    const confirmFallbackButton = document.querySelector("#confirmUnansweredQuizFallback");
+                    if (confirmFallbackButton && unansweredFallbackDialog) {
+                        confirmFallbackButton.addEventListener("click", () => {
+                            confirmedUnansweredSubmit = true;
+                            unansweredFallbackDialog.close();
+                            form.requestSubmit(submitButton);
                         });
                     }
-                    form.querySelectorAll('[data-action="move-order-up"], [data-action="move-order-down"]').forEach((button) => {
-                        console.log("Attaching move event to button", button);
-                        button.addEventListener('click', handleOrderMove);
-                    });
+                    const reviewFallbackButton = document.querySelector("#reviewUnansweredQuizFallback");
+                    if (reviewFallbackButton && unansweredFallbackDialog) {
+                        reviewFallbackButton.addEventListener("click", () => unansweredFallbackDialog.close());
+                    }
                 }
-            })()
+
+                form.querySelectorAll(
+                    '[data-action="move-order-up"], [data-action="move-order-down"]'
+                ).forEach((button) => button.addEventListener("click", handleOrderMove));
+            })();
         </script>
     {% endif %}
 </div>

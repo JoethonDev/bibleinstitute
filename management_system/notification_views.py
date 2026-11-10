@@ -27,6 +27,9 @@ from .announcements import (
 from .admin_operations import create_admin_operation, enqueue_admin_operation
 from .forms import AnnouncementForm
 from .models import AdminOperationJob, Announcement, StudentNotification
+from .models import StudentMode
+from .student_experience.mode import resolve_student_mode
+from .student_experience.render import render_student_page
 from .notification_history import notification_message_recipients
 from .notification_withdrawal import (
     NotificationWithdrawalError,
@@ -81,9 +84,14 @@ def _notification_target_url(notification: StudentNotification) -> str | None:
     return None
 
 
-def _notification_item(notification: StudentNotification, language: str) -> dict:
+def _notification_item(
+    notification: StudentNotification,
+    language: str,
+    *,
+    include_kind: bool = False,
+) -> dict:
     title, body = localized_notification_text(notification, language)
-    return {
+    item = {
         "id": notification.pk,
         "title": title,
         "body": body,
@@ -95,6 +103,9 @@ def _notification_item(notification: StudentNotification, language: str) -> dict
         "open_url": reverse("student-notification-open", args=[notification.pk]),
         "read_url": reverse("student-notification-read", args=[notification.pk]),
     }
+    if include_kind:
+        item["kind"] = notification.notification_type
+    return item
 
 
 def _mark_notification_read(notification: StudentNotification) -> None:
@@ -130,22 +141,29 @@ def _live_notification_item(notification: StudentNotification, language: str) ->
     }
 
 
-def _notification_cursor_url(notifications: list[StudentNotification], has_more: bool) -> str:
+def _notification_cursor_url(
+    notifications: list[StudentNotification],
+    has_more: bool,
+    *,
+    selected_filter: str = "",
+) -> str:
     if not notifications or not has_more:
         return ""
     last = notifications[-1]
-    query = urlencode(
-        {
-            "before_created_at": last.created_at.isoformat(),
-            "before_id": last.pk,
-            "fragment": "1",
-        }
-    )
+    values = {
+        "before_created_at": last.created_at.isoformat(),
+        "before_id": last.pk,
+        "fragment": "1",
+    }
+    if selected_filter and selected_filter != "all":
+        values["filter"] = selected_filter
+    query = urlencode(values)
     return f"{reverse('student-notifications')}?{query}"
 
 
 def _panel_context(request) -> dict:
     language = _web_language(request)
+    include_kind = resolve_student_mode(request) == StudentMode.NEW
     notifications = list(
         student_notifications_queryset(request.user)
         .select_related("lesson", "quiz")
@@ -153,7 +171,7 @@ def _panel_context(request) -> dict:
     )
     return {
         "notification_items": [
-            _notification_item(notification, language)
+            _notification_item(notification, language, include_kind=include_kind)
             for notification in notifications
         ],
         "unread_count": unread_notification_count(request.user),
@@ -161,12 +179,72 @@ def _panel_context(request) -> dict:
 
 
 def _panel_response(request, status: int = 200):
+    template = (
+        "student_next/partials/notification_panel.html"
+        if resolve_student_mode(request) == StudentMode.NEW
+        else "partials/notification_panel.html"
+    )
     return render(
         request,
-        "partials/notification_panel.html",
+        template,
         _panel_context(request),
         status=status,
     )
+
+
+_STUDENT_INBOX_FILTERS = {"all", "unread", "lessons", "quizzes", "announcements"}
+
+
+def _student_inbox_filter(request) -> str:
+    selected = (request.GET.get("filter") or "all").strip()
+    return selected if selected in _STUDENT_INBOX_FILTERS else "all"
+
+
+def _student_inbox_counts(request) -> dict[str, int]:
+    queryset = student_notifications_queryset(request.user)
+    counts = queryset.aggregate(
+        all=Count("pk"),
+        unread=Count("pk", filter=Q(read_at__isnull=True)),
+        lessons=Count(
+            "pk",
+            filter=Q(
+                notification_type=StudentNotification.NotificationType.LESSON_PUBLISHED
+            ),
+        ),
+        quizzes=Count(
+            "pk",
+            filter=Q(
+                notification_type=StudentNotification.NotificationType.QUIZ_OPENING
+            ),
+        ),
+        announcements=Count(
+            "pk",
+            filter=Q(
+                notification_type=StudentNotification.NotificationType.ANNOUNCEMENT
+            ),
+        ),
+    )
+    return {key: counts[key] or 0 for key in _STUDENT_INBOX_FILTERS}
+
+
+def _student_inbox_filter_values(selected: str, counts: dict[str, int]) -> list[dict]:
+    labels = {
+        "all": _("All"),
+        "unread": _("Unread"),
+        "lessons": _("Lessons"),
+        "quizzes": _("Quizzes"),
+        "announcements": _("Announcements"),
+    }
+    return [
+        {
+            "key": key,
+            "label": labels[key],
+            "count": counts[key],
+            "url": f"{reverse('student-notifications')}?filter={key}",
+            "active": key == selected,
+        }
+        for key in ("all", "unread", "lessons", "quizzes", "announcements")
+    ]
 
 
 @login_required
@@ -174,6 +252,10 @@ def _panel_response(request, status: int = 200):
 def student_notifications(request):
     """Bounded, paginated notification history for the signed-in account."""
     language = _web_language(request)
+    student_next = resolve_student_mode(request) == StudentMode.NEW
+    selected_filter = _student_inbox_filter(request) if student_next else "all"
+    filter_kind = selected_filter if selected_filter in {"lessons", "quizzes", "announcements"} else None
+    only_unread = selected_filter == "unread"
     if request.GET.get("fragment") == "1":
         before_created_at = parse_datetime(request.GET.get("before_created_at", ""))
         try:
@@ -189,11 +271,38 @@ def student_notifications(request):
                 request.user,
                 before_created_at,
                 before_id,
+                kind=filter_kind if student_next else None,
+                unread=only_unread if student_next else False,
             )
         else:
-            first_page, unused_unread_count = student_notification_data(request.user, 1)
+            first_page, unused_unread_count = student_notification_data(
+                request.user,
+                1,
+                kind=filter_kind if student_next else None,
+                unread=only_unread if student_next else False,
+            )
             notifications = list(first_page.object_list)
             has_more = first_page.has_next()
+        if student_next:
+            return render(
+                request,
+                "student_next/partials/notification_history_page.html",
+                {
+                    "notification_items": [
+                        _notification_item(
+                            notification,
+                            language,
+                            include_kind=student_next,
+                        )
+                        for notification in notifications
+                    ],
+                    "next_url": _notification_cursor_url(
+                        notifications,
+                        has_more,
+                        selected_filter=selected_filter,
+                    ),
+                },
+            )
         return render(
             request,
             "partials/notification_history_page.html",
@@ -209,13 +318,27 @@ def student_notifications(request):
         page_number = max(1, int(request.GET.get("page", 1)))
     except (TypeError, ValueError):
         page_number = 1
-    page_obj, unread_count = student_notification_data(request.user, page_number)
+    page_obj, unread_count = student_notification_data(
+        request.user,
+        page_number,
+        kind=filter_kind if student_next else None,
+        unread=only_unread if student_next else False,
+    )
     notifications = list(page_obj.object_list)
-    next_url = _notification_cursor_url(notifications, page_obj.has_next())
+    next_url = _notification_cursor_url(
+        notifications,
+        page_obj.has_next(),
+        selected_filter=selected_filter if student_next else "",
+    )
     context = {
         "page_obj": page_obj,
         "notification_items": [
-            _notification_item(notification, language) for notification in notifications
+            _notification_item(
+                notification,
+                language,
+                include_kind=student_next,
+            )
+            for notification in notifications
         ],
         "unread_count": unread_count,
         "pagination_query": pagination_query_string(request),
@@ -223,6 +346,20 @@ def student_notifications(request):
         "next_url": next_url,
         "breadcrumb_items": generate_breadcrumb([(_("Notifications"), None)]),
     }
+    if student_next:
+        context.update({
+            "selected_filter": selected_filter,
+            "filter_tabs": _student_inbox_filter_values(
+                selected_filter,
+                _student_inbox_counts(request),
+            ),
+        })
+        return render_student_page(
+            request,
+            page="notifications",
+            template="student_next/notifications.html",
+            context=context,
+        )
     return render(request, "notifications.html", context)
 
 

@@ -1,0 +1,100 @@
+{% extends "student_next/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "My calendar" %} - {% translate "Bible Institute" %}{% endblock %}
+{% block body %}
+<div class="sn-page sn-calendar-page" data-calendar-root>
+  {% include "student_next/partials/alerts.html" %}
+  <header class="sn-page-head">
+    <div class="sn-page-head-main">
+      <div class="sn-eyebrow">{% translate "My calendar" %}</div>
+      <h1 class="sn-page-title">{% if calendar %}{{ calendar.title }}{% else %}{% translate "Your study calendar" %}{% endif %}</h1>
+      <p class="sn-page-desc">{% translate "Your meetings and academic holidays for the active study scope." %}</p>
+    </div>
+    {% if calendar %}
+    <div class="sn-page-actions">
+      {% if calendar.previous_month %}<a class="sn-icon-btn" href="?month={{ calendar.previous_month }}" aria-label="{% translate 'Previous month' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg></a>{% else %}<span class="sn-icon-btn is-disabled" aria-hidden="true"><svg class="sn-ico"><use href="#i-chevron-left"></use></svg></span>{% endif %}
+      {% if calendar.next_month %}<a class="sn-icon-btn" href="?month={{ calendar.next_month }}" aria-label="{% translate 'Next month' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>{% else %}<span class="sn-icon-btn is-disabled" aria-hidden="true"><svg class="sn-ico"><use href="#i-chevron-right"></use></svg></span>{% endif %}
+    </div>
+    {% endif %}
+  </header>
+
+  {% if calendar %}
+  <div class="sn-context-strip">
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-layers"></use></svg>{{ calendar.scope.level }}</span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{{ calendar.scope.academic_year }}</span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{{ calendar.meeting_count }} {% translate "meetings this month" %}</span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-sparkle"></use></svg>{{ calendar.holiday_count }} {% translate "holidays" %}</span>
+  </div>
+  <div class="sn-layout-main-aside">
+    <div class="sn-stack">
+      <section class="sn-card sn-calendar-card">
+        <div class="sn-calendar-month">
+          <a class="sn-icon-btn" href="{% if calendar.previous_month %}?month={{ calendar.previous_month }}{% else %}#{% endif %}"{% if not calendar.previous_month %} aria-disabled="true" tabindex="-1"{% endif %} aria-label="{% translate 'Previous month' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg></a>
+          <b>{{ calendar.title }}</b>
+          <a class="sn-icon-btn" href="{% if calendar.next_month %}?month={{ calendar.next_month }}{% else %}#{% endif %}"{% if not calendar.next_month %} aria-disabled="true" tabindex="-1"{% endif %} aria-label="{% translate 'Next month' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+        </div>
+        <div class="sn-calendar-grid" role="grid" aria-label="{{ calendar.title }}">
+          <div class="sn-calendar-weekdays" role="row">
+            {% for weekday in weekdays %}<span role="columnheader">{{ weekday }}</span>{% endfor %}
+          </div>
+          {% for week in calendar.grid %}
+          <div class="sn-calendar-week" role="row">
+            {% for day in week %}
+            <button type="button" role="gridcell" class="sn-cal-day{% if day.outside_month %} is-outside{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.is_holiday %} is-holiday{% endif %}{% if day.selected %} is-selected{% endif %}" data-calendar-select="{{ day.date }}" aria-pressed="{{ day.selected|yesno:'true,false' }}" aria-label="{{ day.date_label }}{% if day.is_holiday %}, {{ day.holiday_name }}{% endif %}{% if day.meetings %}, {{ day.meetings|length }} {% translate 'meetings' %}{% endif %}" {% if not day.in_year or day.outside_month %}disabled{% endif %}>
+              <span>{{ day.day }}</span>
+              {% if day.is_today %}<i class="sn-cal-marker sn-cal-marker--today" aria-hidden="true"></i>{% endif %}
+              {% if day.is_holiday %}<i class="sn-cal-marker sn-cal-marker--holiday" aria-hidden="true"></i>{% endif %}
+              {% if day.meetings %}<i class="sn-cal-marker sn-cal-marker--meeting" aria-hidden="true"></i>{% elif day.is_meeting and day.in_year %}<i class="sn-cal-marker sn-cal-marker--locked" aria-hidden="true"></i>{% endif %}
+            </button>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="sn-calendar-legend">
+          <span><i class="sn-cal-marker sn-cal-marker--today"></i>{% translate "Today" %}</span>
+          <span><i class="sn-cal-marker sn-cal-marker--meeting"></i>{% translate "Meeting" %}</span>
+          <span><i class="sn-cal-marker sn-cal-marker--holiday"></i>{% translate "Holiday" %}</span>
+        </div>
+      </section>
+      <section class="sn-section">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "How to read the calendar" %}</h2><p>{% translate "Choose a day to see its meetings and holidays." %}</p></div></div>
+        <div class="sn-card sn-card-body">
+          <p>{% translate "The calendar shows the active academic scope. Meeting dates and institute holidays come from the current academic schedule." %}</p>
+        </div>
+      </section>
+    </div>
+    <aside class="sn-aside">
+      <section class="sn-card sn-aside-card">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Selected day" %}</h2><p>{% translate "Meetings and holidays" %}</p></div></div>
+        <div class="sn-card-body">
+          {% for week in calendar.grid %}{% for day in week %}
+          <div data-calendar-panel="{{ day.date }}"{% if not day.selected %} hidden{% endif %}>
+            <b class="sn-selected-day-title">{{ day.date_label }}</b>
+            {% if day.is_holiday %}<div class="sn-holiday-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-sparkle"></use></svg><span>{{ day.holiday_name }}</span></div>{% endif %}
+            {% for meeting in day.meetings %}
+            <div class="sn-agenda-item"><span class="sn-agenda-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg></span><span><b>{{ meeting.course }}</b><small>{{ calendar.scope.level }} - {{ calendar.scope.academic_year }}</small></span></div>
+            {% empty %}{% if not day.is_holiday %}<p class="sn-muted">{% translate "No meetings or holidays on this day." %}</p>{% endif %}
+            {% endfor %}
+          </div>
+          {% endfor %}{% endfor %}
+          {% if not calendar.selected_day %}<p class="sn-muted">{% translate "There are no selectable days in this month." %}</p>{% endif %}
+        </div>
+      </section>
+      <section class="sn-card sn-aside-card">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next seven days" %}</h2></div></div>
+        <div class="sn-card-body">
+          {% for meeting in calendar.next_seven_days %}
+          <div class="sn-week-item"><span class="sn-week-date">{{ meeting.date|date:"d" }}</span><span><b>{{ meeting.course }}</b><small>{{ meeting.date_label }}</small></span></div>
+          {% empty %}<p class="sn-muted">{% translate "No meetings scheduled in the next seven days." %}</p>{% endfor %}
+        </div>
+      </section>
+      {% if next_meeting %}
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next meeting" %}</h2></div></div><div class="sn-card-body"><b>{{ next_meeting.course }}</b><p>{{ next_meeting.date_label }}</p></div></section>
+      {% endif %}
+    </aside>
+  </div>
+  {% else %}
+  <div class="sn-empty-state"><span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg></span><h2>{% translate "No calendar is available" %}</h2><p>{% translate "A calendar appears when you have an active or completed normal enrollment." %}</p></div>
+  {% endif %}
+</div>
+{% endblock %}

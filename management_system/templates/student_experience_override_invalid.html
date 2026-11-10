@@ -1,0 +1,18 @@
+{% extends "admin_panel.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% include "partials/breadcrumbs.html" %}{% endblock %}
+
+{% block body %}
+<div id="content" class="aw-dashboard-page">
+  <div class="aw-page-head">
+    <div class="aw-page-head-main">
+      <h1 class="aw-page-title">{% translate "Student experience" %}</h1>
+    </div>
+    <div class="aw-page-actions">
+      <a class="aw-btn aw-btn--outline" href="{% url 'user-profile' profile_user.pk %}">{% translate "Back to user details" %}</a>
+    </div>
+  </div>
+  {% include "partials/student_experience_override_card.html" %}
+</div>
+{% endblock %}

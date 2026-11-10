@@ -21,6 +21,9 @@ from django.views.decorators.http import require_POST
 from .announcements import AnnouncementError, clean_announcement_action
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
 from .models import MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, StudentBanner
+from .models import StudentMode
+from .student_experience.mode import resolve_student_mode
+from .student_experience.render import render_student_page
 from .storage_coordination import assert_storage_namespace_available, guarded_storage_write, lock_storage_namespace
 from .utils.decorators import capability_required, can_manage_academic_setup
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
@@ -107,6 +110,13 @@ def _safe_version(value: str) -> str:
 @login_required
 def download_app(request):
     release = MobileAppRelease.objects.order_by("-version_code", "-pk").first()
+    if resolve_student_mode(request) == StudentMode.NEW:
+        return render_student_page(
+            request,
+            page="download-app",
+            template="student_next/download_app.html",
+            context={"release": release},
+        )
     return render(request, "download_app.html", {"release": release})
 
 

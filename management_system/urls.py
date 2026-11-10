@@ -44,6 +44,7 @@ from management_system.notification_views import (
 )
 from management_system import gallery_views as graduation_gallery_views
 from management_system import portal_views as portal_extra_views
+from management_system.student_experience_views import student_experience_override
 
 urlpatterns = [
     path('dashboard/background-jobs/', background_jobs, name='background-jobs'),
@@ -130,6 +131,11 @@ urlpatterns = [
     path('dashboard/users/bulk-create/', user_bulk_create, name="user-bulk-create"),
     path('dashboard/users/export-csv/', export_users_csv, name="export-users-csv"),
     path('dashboard/users/<int:user_id>/', user_profile, name="user-profile"),
+    path(
+        'dashboard/users/<int:user_id>/student-experience-override/',
+        student_experience_override,
+        name="student-experience-override",
+    ),
     path('dashboard/users/<int:user_id>/delete/', DeleteUser.as_view(), name="user-delete"),
     path('dashboard/users/<int:user_id>/update/', UpdateUser.as_view(), name="user-update"),
     path('dashboard/users/historical-intake/', historical_intake, name="historical-intake"),

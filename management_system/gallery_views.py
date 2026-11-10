@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, F
+from django.db.models import Count, F, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -19,6 +19,9 @@ from django.views.decorators.http import require_GET, require_POST
 from . import graduation_gallery as gg
 from .gallery_tasks import enqueue_gallery_job
 from .models import AcademicYearLevel, GraduationGalleryItem, GraduationGalleryJob
+from .models import StudentMode
+from .student_experience.mode import resolve_student_mode
+from .student_experience.render import render_student_page
 from .storage_coordination import assert_storage_namespace_available, guarded_storage_write, lock_storage_namespace
 from .utils.decorators import capability_required, can_manage_content
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
@@ -28,9 +31,21 @@ from django.conf import settings
 
 @login_required
 def graduates(request):
+    new_mode = resolve_student_mode(request) == StudentMode.NEW
     scopes = gg.graduation_scopes_for_user(request.user).annotate(
-        items_count=Count("gallery_items")
+        items_count=Count("gallery_items"),
     ).filter(items_count__gt=0)
+    if new_mode:
+        scopes = scopes.annotate(
+            photo_count=Count(
+                "gallery_items",
+                filter=Q(gallery_items__kind=GraduationGalleryItem.Kind.IMAGE),
+            ),
+            video_count=Count(
+                "gallery_items",
+                filter=Q(gallery_items__kind=GraduationGalleryItem.Kind.VIDEO),
+            ),
+        )
     page_obj = Paginator(scopes, gg.GALLERY_PAGE_SIZE).get_page(request.GET.get("page", 1))
     albums = page_obj.object_list
     covers = gg.album_covers([s.pk for s in albums])
@@ -40,12 +55,33 @@ def graduates(request):
         display_url = None
         if cover is not None:
             display_url, _cover_download = gg.gallery_item_urls(cover)
-        cards.append({"scope": scope, "items_count": scope.items_count, "cover_url": display_url, "cover_kind": getattr(cover, "kind", "image")})
-    return render_page(request, "graduation_gallery.html", "partials/graduation_gallery_content.html", {
+        card = {
+            "scope": scope,
+            "items_count": scope.items_count,
+            "cover_url": display_url,
+            "cover_kind": getattr(cover, "kind", "image"),
+        }
+        if new_mode:
+            card.update(photo_count=scope.photo_count, video_count=scope.video_count)
+        cards.append(card)
+    context = {
         "albums": cards,
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
-    })
+    }
+    if new_mode:
+        return render_student_page(
+            request,
+            page="graduates",
+            template="student_next/graduates.html",
+            context=context,
+        )
+    return render_page(
+        request,
+        "graduation_gallery.html",
+        "partials/graduation_gallery_content.html",
+        context,
+    )
 
 
 @login_required
@@ -55,21 +91,40 @@ def graduation_gallery_detail(request, scope_id: int):
     )
     if not gg.gallery_has_access(request.user, scope):
         raise PermissionDenied
+    new_mode = resolve_student_mode(request) == StudentMode.NEW
     items = (
         GraduationGalleryItem.objects.filter(academic_year_level=scope)
         .order_by("-created_at", "-pk")
         .only("kind", "display_key", "original_key", "width", "height", "created_at", "original_filename")
     )
+    item_counts = items.aggregate(
+        photo_count=Count("pk", filter=Q(kind=GraduationGalleryItem.Kind.IMAGE)),
+        video_count=Count("pk", filter=Q(kind=GraduationGalleryItem.Kind.VIDEO)),
+    ) if new_mode else {}
     page_obj = Paginator(items, gg.GALLERY_PAGE_SIZE).get_page(request.GET.get("page", 1))
     for row in page_obj.object_list:
         display_url, download_url = gg.gallery_item_urls(row)
         row.display_url = display_url
         row.download_url = download_url
-    return render_page(request, "graduation_gallery_detail.html", "partials/graduation_gallery_detail_content.html", {
+    context = {
         "scope": scope,
         "page_obj": page_obj,
         "pagination_query": pagination_query_string(request),
-    })
+    }
+    if new_mode:
+        context.update(item_counts)
+        return render_student_page(
+            request,
+            page="graduates",
+            template="student_next/graduate_album.html",
+            context=context,
+        )
+    return render_page(
+        request,
+        "graduation_gallery_detail.html",
+        "partials/graduation_gallery_detail_content.html",
+        context,
+    )
 
 
 @capability_required(can_manage_content)

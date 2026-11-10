@@ -1,0 +1,63 @@
+{% extends "student_next/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "My learning" %} - {% translate "Bible Institute" %}{% endblock %}
+{% block body %}
+<div class="sn-page sn-learning-page">
+  {% include "student_next/partials/alerts.html" %}
+  <header class="sn-page-head">
+    <div class="sn-page-head-main">
+      <div class="sn-eyebrow">{% translate "My learning" %}</div>
+      <h1 class="sn-page-title">{% blocktranslate with name=request.user.first_name|default:request.user.username %}Welcome, {{ name }}{% endblocktranslate %}</h1>
+      <p class="sn-page-desc">{% translate "Your courses, next steps, and everything due this week." %}</p>
+    </div>
+    <div class="sn-page-actions">
+      <a class="sn-btn sn-btn--ghost" href="{% url 'student-calendar' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Open calendar" %}</a>
+    </div>
+  </header>
+
+  {% if active_scope %}
+  <div class="sn-context-strip">
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg><span><b>{{ active_scope.academic_year.name }}</b> {% translate "active year" %}</span></span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-layers"></use></svg><span>{{ active_scope.level.display_name }}</span></span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg><span>{{ filter_counts.current }} {% translate "current courses" %}</span></span>
+    <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg><span>{{ due_soon|length }} {% translate "quizzes due soon" %}</span></span>
+  </div>
+  {% endif %}
+
+  {% if next_meeting %}
+  <section class="sn-upcoming-meeting" data-next-meeting>
+    <span class="sn-upcoming-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg></span>
+    <div class="sn-upcoming-copy">
+      <span class="sn-eyebrow">{% translate "Next meeting" %}</span>
+      <h2>{{ next_meeting.course }}</h2>
+      <p>{{ next_meeting.weekday }}, {{ next_meeting.date|date:"j F Y" }} - {{ next_meeting.scope_label }}</p>
+    </div>
+    <div class="sn-upcoming-actions"><a class="sn-btn sn-btn--ghost" href="{% url 'student-calendar' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Open calendar" %}</a></div>
+  </section>
+  {% endif %}
+
+  {% if resume %}
+  <section class="sn-continue">
+    <div class="sn-continue-main">
+      <span class="sn-continue-kicker">{% translate "Continue where you left off" %}</span>
+      <h2>{{ resume.course_name }}</h2>
+      <p>{{ resume.lesson_name }}</p>
+      <div class="sn-continue-progress">
+        <span>{{ resume.percent|default:0 }}% {% translate "complete" %}</span>
+        <span class="sn-meter-wrap"><span class="sn-meter sn-meter--gold" role="progressbar" aria-label="{% translate 'Lesson progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ resume.percent|default:0 }}"><span style="width:{{ resume.percent|default:0 }}%"></span></span></span>
+      </div>
+      <div class="sn-continue-actions">
+        <a class="sn-btn sn-btn--gold" href="{{ resume.url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg>{% translate "Resume lesson" %}</a>
+        <a class="sn-btn sn-btn--ghost" href="{% url 'course-details' resume.offering_id %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-layers"></use></svg>{% translate "Course outline" %}</a>
+      </div>
+    </div>
+    <div class="sn-continue-side">
+      <div class="sn-continue-ring"><span class="sn-ring" role="img" aria-label="{{ resume.percent|default:0 }}%"><b>{{ resume.percent|default:0 }}%</b></span><span>{% translate "Lesson progress" %}</span></div>
+      {% if due_soon.0 %}<div class="sn-continue-next"><span class="sn-continue-label">{% translate "Next deadline" %}</span><b>{{ due_soon.0.deadline|date:"D, j M" }}</b><span>{{ due_soon.0.name }}</span></div>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% include "student_next/partials/learning_list.html" %}
+</div>
+{% endblock %}

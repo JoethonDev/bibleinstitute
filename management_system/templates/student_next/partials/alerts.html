@@ -1,0 +1,22 @@
+{% load i18n %}
+{% if student_banners %}
+<div class="sn-alert-stack" aria-label="{% translate 'Announcements' %}">
+  {% for banner in student_banners %}
+  <section class="sn-alert sn-alert--info" data-alert-id="banner-{{ banner.pk }}">
+    <span class="sn-alert-icon" aria-hidden="true">
+      <svg class="sn-ico"><use href="#i-info"></use></svg>
+    </span>
+    <div class="sn-alert-copy">
+      <b>{{ banner.title }}</b>
+      <p>{{ banner.body }}</p>
+    </div>
+    {% if banner.action_url %}
+    <a class="sn-alert-action" href="{{ banner.action_url }}">{{ banner.action_label }}</a>
+    {% endif %}
+    <button class="sn-alert-close" type="button" data-alert-dismiss aria-label="{% translate 'Dismiss announcement' %}">
+      <svg class="sn-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+    </button>
+  </section>
+  {% endfor %}
+</div>
+{% endif %}

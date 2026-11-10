@@ -5,7 +5,7 @@ import secrets
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, assign_academic_date
+from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, assign_academic_date
 from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -110,6 +110,15 @@ class AwForm(AwFormMixin, forms.Form):
 
 class AwModelForm(AwFormMixin, forms.ModelForm):
     """Model form rendered by the admin workspace field partial."""
+
+
+class StudentExperienceOverrideForm(AwForm):
+    """Dedicated admin control for one student's presentation mode."""
+
+    student_experience_override = forms.ChoiceField(
+        label=_("Student view"),
+        choices=StudentExperienceOverride.choices,
+    )
 
 
 def _set_password_if_provided(user: User, password: str | None) -> None:
@@ -1692,3 +1701,44 @@ class SignupSettingsForm(AwModelForm):
         if scope and not scope.academic_year.is_active:
             raise forms.ValidationError(_("Select a scope in the active academic year."))
         return scope
+
+
+class SnFormMixin:
+    """Assign the student-next control classes without changing form rules."""
+
+    _retired_classes = frozenset({
+        "form-control",
+        "form-select",
+        "form-check-input",
+        "form-control-sm",
+        "form-select-sm",
+        "is-invalid",
+    })
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            existing = set((widget.attrs.get("class") or "").split())
+            existing.difference_update(self._retired_classes)
+            if isinstance(widget, (forms.CheckboxInput, forms.CheckboxSelectMultiple)):
+                existing.add("sn-checkbox")
+            elif isinstance(widget, forms.Select):
+                existing.add("sn-field-select")
+            elif isinstance(widget, forms.FileInput):
+                existing.add("sn-file-input")
+            else:
+                existing.add("sn-field-control")
+            widget.attrs["class"] = " ".join(sorted(existing))
+
+
+class StudentSignupDetailsForm(SnFormMixin, SignupDetailsForm):
+    """New-shell widget styling for the existing signup-details contract."""
+
+
+class StudentMissingApplicationDocumentsForm(SnFormMixin, MissingApplicationDocumentsForm):
+    """New-shell widget styling for the existing missing-document contract."""
+
+
+class StudentAcademicPaymentForm(SnFormMixin, AcademicPaymentForm):
+    """New-shell widget styling for the existing academic-payment contract."""

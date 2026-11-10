@@ -1,0 +1,4 @@
+{% extends "student_next/base.html" %}
+{% load i18n %}
+{% block title %}{{ course.name }} - {% translate "Bible Institute" %}{% endblock %}
+{% block body %}{% include "student_next/partials/course_workspace.html" %}{% endblock %}

@@ -1,0 +1,111 @@
+{% load i18n %}
+{% if mode == "exam" %}
+{% for question in questions %}
+  {% with counter=forloop.counter0 %}
+    <article class="sn-question" data-question-card data-question="{{ forloop.counter }}"{% if mode == "exam" and not forloop.first %} hidden{% endif %}>
+      <input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">
+      <div class="sn-question-head">
+        <span class="sn-question-num">{% blocktrans with number=forloop.counter %}Question {{ number }}{% endblocktrans %}</span>
+        <span class="sn-question-meta">
+          {% if question.type == "mcq" %}{% translate "Multiple choice" %}
+          {% elif question.type == "written" %}{% translate "Written response" %}
+          {% elif question.type == "complete" %}{% translate "Complete" %}
+          {% elif question.type == "order_events" %}{% translate "Ordering" %}
+          {% elif question.type == "match_related" %}{% translate "Matching" %}
+          {% else %}{% translate "Question" %}{% endif %}
+          - {{ question.grade }} {% translate "Points" %}
+        </span>
+      </div>
+      <h2>{{ question.name }}</h2>
+      <div class="sn-answers-section answers-section">
+        {% if question.type == "mcq" %}
+          <div class="sn-options">
+            {% for choice in question.choices %}
+              <label class="sn-option">
+                <input class="sn-option-input" type="radio" name="questions[{{ counter }}][answer]" value="{{ choice }}" aria-label="{{ choice }}">
+                <span class="sn-option-key">{{ forloop.counter }}</span>
+                <span>{{ choice }}</span>
+                <svg class="sn-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+              </label>
+            {% endfor %}
+          </div>
+        {% elif question.type == "complete" %}
+          <label class="sn-field-label" for="question-{{ counter }}-answer">{% translate "Your answer" %}</label>
+          <input class="sn-field-input" type="text" id="question-{{ counter }}-answer" name="questions[{{ counter }}][answer]" autocomplete="off">
+        {% elif question.type == "written" %}
+          <label class="sn-field-label" for="question-{{ counter }}-answer">{% translate "Your answer" %}</label>
+          <textarea class="sn-field-input sn-field-input--textarea" id="question-{{ counter }}-answer" name="questions[{{ counter }}][answer]" rows="5"></textarea>
+        {% elif question.type == "order_events" %}
+          <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="order_events">
+          <div class="sn-order" data-order-item-list>
+            {% for item in question.exam_items %}
+              <div class="sn-order-row" data-order-item-row data-order-label="{{ item }}">
+                <span class="sn-order-handle"><svg class="sn-ico" aria-hidden="true"><use href="#i-more"></use></svg></span>
+                <b>{{ item }}</b>
+                <span class="sn-order-buttons">
+                  <button type="button" data-action="move-order-up" aria-label="{% translate 'Move up' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-up"></use></svg></button>
+                  <button type="button" data-action="move-order-down" aria-label="{% translate 'Move down' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-down"></use></svg></button>
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% elif question.type == "match_related" %}
+          <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="match_related">
+          <div class="sn-match">
+            {% for pair in question.exam_pairs %}
+              <label class="sn-match-row" data-match-item-row>
+                <span>{{ pair.left }}</span>
+                <select data-match-select data-match-left-label="{{ pair.left }}" aria-label="{% blocktrans with item=pair.left %}Match for {{ item }}{% endblocktrans %}">
+                  <option value="">{% translate "Select match" %}</option>
+                  {% for candidate in question.exam_right_options %}<option value="{{ candidate }}">{{ candidate }}</option>{% endfor %}
+                </select>
+              </label>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="sn-question-foot">
+        <span class="sn-save-state" data-question-save-state aria-live="polite">{% translate "Your answer will be saved automatically." %}</span>
+        <button class="sn-text-link" type="button" data-flag-question aria-pressed="false">
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-flag"></use></svg>{% translate "Flag for review" %}
+        </button>
+      </div>
+    </article>
+  {% endwith %}
+{% endfor %}
+{% endif %}
+
+{% if mode == "view" %}
+  <div class="sn-review-cards">
+    {% for question in questions %}
+      <article class="sn-review-card{% if question.is_graded and question.current_grade < question.grade %} is-wrong{% endif %}">
+        <div class="sn-review-card-head">
+          <span>{{ forloop.counter }}</span>
+          {% if question.is_graded %}
+            {% if question.current_grade == question.grade %}<span class="sn-pill sn-pill--success">{% translate "Correct" %}</span>
+            {% elif question.current_grade %}<span class="sn-pill sn-pill--warning">{% translate "Partially correct" %}</span>
+            {% else %}<span class="sn-pill sn-pill--danger">{% translate "Incorrect" %}</span>{% endif %}
+          {% else %}<span class="sn-pill sn-pill--gold">{% translate "Under review" %}</span>{% endif %}
+          <span class="sn-pill sn-pill--gold">{{ question.current_grade }} / {{ question.grade }}</span>
+        </div>
+        <h3>{{ question.name }}</h3>
+        <div class="sn-review-answer-grid">
+          <div class="sn-review-answer sn-review-answer--given"><span>{% translate "Your answer" %}</span>
+            {% if question.type == "order_events" and question.submitted_answer_payload %}
+              <ol class="sn-review-list">{% for item in question.submitted_answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
+            {% elif question.type == "match_related" and question.submitted_answer_payload.items %}
+              <ul class="sn-review-list">{% for left, right in question.submitted_answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
+            {% elif question.submitted_answer %}{{ question.submitted_answer }}{% else %}{% translate "No answer submitted" %}{% endif %}
+          </div>
+          {% if question.answer_payload or question.correct_answer %}
+            <div class="sn-review-answer sn-review-answer--correct"><span>{% translate "Correct answer" %}</span>
+              {% if question.type == "order_events" %}<ol class="sn-review-list">{% for item in question.answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
+              {% elif question.type == "match_related" %}<ul class="sn-review-list">{% for left, right in question.answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
+              {% else %}{{ question.correct_answer|default:question.answer_payload }}{% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% endif %}
