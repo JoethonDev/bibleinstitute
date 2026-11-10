@@ -85,6 +85,9 @@
         {% elif alert.resolution == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=alert_failed_label %}{% endif %}
         {% elif alert.delivery_status == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=alert_failed_label %}
         {% endif %}
+        {% if alert.telegram_deletion_status == "deleted" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=alert_removed_label %}
+        {% elif alert.telegram_deletion_status == "expired" %}{% include "partials/components/aw_status_pill.html" with status="" tone="muted" label=deletion_expired_label %}
+        {% elif alert.telegram_deletion_status == "failed" %}{% include "partials/components/aw_status_pill.html" with status="" tone="red" label=deletion_failed_label %}{% endif %}
         {% endwith %}
         {% endif %}
         {% if message.direction == "inbound" %}

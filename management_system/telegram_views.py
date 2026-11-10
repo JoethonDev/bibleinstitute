@@ -550,6 +550,11 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
     # message on the admin side and repeated the reply, so the timeline shows
     # only real messages and each inbound row carries its alert state instead.
     def annotate_digest_alerts(messages):
+        # Alerts belong to one admin account. Without a linked chat the viewer
+        # has no alert of their own to act on, and the delete endpoint would
+        # reject the action, so no alert state is attached at all.
+        if own_admin_chat_id is None:
+            return
         inbound_ids = [
             message.pk for message in messages
             if message.direction == TelegramMessage.Direction.INBOUND
@@ -559,9 +564,8 @@ def _conversation_detail_context(request, conversation, reply_form=None, panel_n
         digests = TelegramMessage.objects.filter(
             source_message_id__in=inbound_ids,
             content_type=TelegramMessage.ContentType.DIGEST,
+            telegram_chat_id=own_admin_chat_id,
         ).order_by("pk")
-        if own_admin_chat_id is not None:
-            digests = digests.filter(telegram_chat_id=own_admin_chat_id)
         latest = {}
         for digest in digests:
             latest[digest.source_message_id] = digest
