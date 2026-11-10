@@ -1064,6 +1064,42 @@ fragment 200 with `<form>`, `enctype="multipart/form-data"` and a CSRF token;
 direct hit 302; `?new=1` 200 with the inline form. 188/188 templates compile;
 sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926; encoding clean.
 
+### Fixed: attendance 500, filter chrome, chat layout and drawer/agenda styling (10 November 2026)
+
+- **Attendance 500 (regression from the KPI strip).** `attendance_matrix_meetings`
+  returns column **dicts**, but the new KPI code read `meeting.date`. With a
+  real scope selected the view crashed with
+  `AttributeError: 'dict' object has no attribute 'date'`. Now reads
+  `meeting["date"]`; verified with `?academic_year=1&level=1` -> 200.
+- **Saved filter presets removed.** `static/js/filter_presets.js` injected a
+  localStorage preset select plus Save/Delete into every `.aw-filter-bar`; it
+  was deleted, its script tag removed from `admin_panel.html`, and
+  `.aw-filter-bar` gained `gap: 10px` so stacked filter rows no longer touch.
+  No template or view references it.
+- **Telegram chat layout.** `.aw-chat-panel` is now height-bounded
+  (`calc(100dvh - 208px)`, max `calc(100dvh - 150px)`, `overflow: hidden`), the
+  thread scrolls internally (`overscroll-behavior: contain`) and the student
+  context stays a 300px side rail down to 1024px instead of being hidden below
+  1180px; below 1024 it stacks with a top border. `.aw-chat-context` scrolls on
+  its own.
+- **Chat media.** Images and video are capped at `max-height: 260px`; images are
+  wrapped in a button and both media types open the new full-screen lightbox
+  (`window.awDrawer`-independent, delegated in `admin_shell.js`, Escape/backdrop
+  close, `aw-lightbox` styles). The photo no longer opens a new tab. One new
+  msgid: "Open full screen".
+- **Calendar day agenda in the drawer.** The month-cell styles are compact by
+  design, so `#aw-drawer-body` now gets a readable variant (row layout, borders,
+  uppercase level label, holiday chip, add-action row) instead of inheriting the
+  10px cell typography.
+- **Modal opening no longer shifts the shell.** Bootstrap pads the body when a
+  dialog opens; `body.aw-admin.modal-open { padding-right: 0 !important }` plus
+  `scrollbar-gutter: stable` keeps the grid in place.
+
+Verification: `manage.py check` clean; 187/187 templates compile; 36/36 admin
+routes 200; attendance with a scope 200; DOM and markup audits clean; stylesheet
+braces 948/948; template encoding audit clean; `node --check` on the shell script;
+max 25 queries.
+
 ### Fixed: multi-line `{# ... #}` comments leaked into the admin shell (10 November 2026)
 
 Reported: raw comment text appeared at the top of every admin page and the shell

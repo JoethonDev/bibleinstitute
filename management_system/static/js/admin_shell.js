@@ -398,8 +398,81 @@
         drawerOverlay.addEventListener('click', closeDrawer);
     }
 
+    // ---- Media lightbox ----------------------------------------------------
+    // Chat images and video open in a full-screen overlay instead of a new tab.
+    // Delegated so it also covers fragments swapped in by HTMX.
+    var lightbox = null;
+
+    function ensureLightbox() {
+        if (lightbox) return lightbox;
+        lightbox = document.createElement('div');
+        lightbox.className = 'aw-lightbox';
+        lightbox.hidden = true;
+        lightbox.setAttribute('role', 'dialog');
+        lightbox.setAttribute('aria-modal', 'true');
+        lightbox.innerHTML = '<button type="button" class="aw-lightbox-close" aria-label="Close">&times;</button><div class="aw-lightbox-body"></div>';
+        document.body.appendChild(lightbox);
+        lightbox.addEventListener('click', function (event) {
+            if (event.target === lightbox || (event.target.closest && event.target.closest('.aw-lightbox-close'))) {
+                closeLightbox();
+            }
+        });
+        return lightbox;
+    }
+
+    function openLightbox(src, kind) {
+        if (!src) return;
+        var box = ensureLightbox();
+        var body = box.querySelector('.aw-lightbox-body');
+        body.innerHTML = '';
+        var node = document.createElement(kind === 'video' ? 'video' : 'img');
+        node.setAttribute('src', src);
+        if (kind === 'video') {
+            node.setAttribute('controls', '');
+            node.setAttribute('autoplay', '');
+        } else {
+            node.setAttribute('alt', '');
+        }
+        body.appendChild(node);
+        box.hidden = false;
+        document.body.classList.add('aw-lightbox-open');
+        var close = box.querySelector('.aw-lightbox-close');
+        if (close && typeof close.focus === 'function') close.focus();
+    }
+
+    function closeLightbox() {
+        if (!lightbox || lightbox.hidden) return;
+        lightbox.hidden = true;
+        var body = lightbox.querySelector('.aw-lightbox-body');
+        if (body) body.innerHTML = '';
+        document.body.classList.remove('aw-lightbox-open');
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest) return;
+        var image = event.target.closest('img.aw-msg-image');
+        if (image) {
+            event.preventDefault();
+            openLightbox(image.currentSrc || image.src, 'image');
+            return;
+        }
+        var expand = event.target.closest('[data-aw-lightbox]');
+        if (expand) {
+            event.preventDefault();
+            openLightbox(
+                expand.getAttribute('data-aw-lightbox'),
+                expand.getAttribute('data-aw-lightbox-kind') || 'image'
+            );
+        }
+    });
+
     document.addEventListener('keydown', function (event) {
         if (event.key !== 'Escape') return;
+        if (lightbox && !lightbox.hidden) {
+            event.preventDefault();
+            closeLightbox();
+            return;
+        }
         if (openMenu) {
             closeWorkspaceMenu();
             return;
