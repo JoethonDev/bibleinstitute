@@ -554,25 +554,6 @@ body.aw-admin .aw-grid--2 > :only-child,
 body.aw-admin .aw-grid--2-even > :only-child,
 body.aw-admin .aw-grid--3 > :only-child { grid-column: 1 / -1; }
 
-/* Desktop app shell: the shell owns the viewport and the main column scrolls
-   inside it. Without this the workspace's bottom padding pushed the document
-   past 100dvh on tall pages, so the page scrolled to reveal empty space, and
-   short pages left a dead band under the content. */
-@media (min-width: 993px) {
-    body.aw-admin .aw-shell { height: 100dvh; min-height: 0; overflow: hidden; }
-    body.aw-admin .aw-main { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
-    body.aw-admin .aw-workspace { padding-bottom: 32px; }
-}
-
-/* Printing must show the whole page, not just the visible scroll port. */
-@media print {
-    body.aw-admin .aw-shell { height: auto; overflow: visible; display: block; }
-    body.aw-admin .aw-main { overflow: visible; }
-    body.aw-admin .aw-rail,
-    body.aw-admin .aw-sidebar,
-    body.aw-admin .aw-topbar { display: none; }
-}
-
 /* Base rhythm for card bodies that do not already stack their children. The
    :not(.aw-stack) guard keeps it from doubling the gap on stacked bodies. */
 body.aw-admin .aw-card-body:not(.aw-stack):not(.aw-card-body--flush) > * + *:not(.aw-kv) { margin-top: 10px; }
@@ -779,13 +760,16 @@ body.aw-admin .aw-menu-item--danger .aw-ico { color: var(--aw-red); }
 body.aw-admin .aw-menu-sep { height: 1px; margin: 4px; background: var(--aw-line); }
 
 /* ---- Workspace canvas ---- */
+/* The document is the only scroll container. An earlier attempt made the main
+   column scroll inside the shell; that produced two scrollbars (inner + page)
+   and a sidebar that ended before the page did, so it is gone for good. */
 body.aw-admin .aw-workspace {
     width: 100%;
     /* The top bar spans the whole main column; capping the workspace narrower
        produced cream gutters on wide screens that read as broken layout. */
     max-width: none;
     margin: 0 auto;
-    padding: 24px 28px 64px;
+    padding: 24px 28px 32px;
     min-width: 0;
 }
 
