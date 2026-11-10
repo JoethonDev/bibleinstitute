@@ -1064,6 +1064,46 @@ fragment 200 with `<form>`, `enctype="multipart/form-data"` and a CSRF token;
 direct hit 302; `?new=1` 200 with the inline form. 188/188 templates compile;
 sweep 36/36 -> 200; DOM and markup audits clean; braces 926/926; encoding clean.
 
+### Telegram chat: duplicate bubbles and wrong-side student text fixed (10 November 2026)
+
+Reported: a student's message appeared on the admin side, and an admin reply
+appeared twice.
+
+Cause: the support digest is stored as an **outbound** row whose text contains
+the student's message (`Support message from ... / Level: ... / <student text>`),
+and after a reply `_digest_answer_text` appends `Answered by @admin` to that same
+text. When the signed-in admin had a linked Telegram account, the conversation
+view rendered their own digest rows in the timeline, so the student's text
+appeared inside a right-side bubble and the reply text appeared twice - once
+appended inside the digest, once as the real outbound message.
+
+Fix (presentation only; send/receive logic untouched):
+
+- `_conversation_detail_context` always excludes `content_type=DIGEST` from the
+  timeline and annotates each inbound message with `digest_alert` (the newest
+  digest announcing it, scoped to the admin's own chat when known). The dead
+  `own_admin_chat_id` context key was removed.
+- `telegram_message_items.html` no longer renders digest bubbles. Alert state
+  (removed / edited / expired / unavailable / failed) appears on the inbound
+  message, and "Delete alert from Telegram" posts the existing delete endpoint
+  with the digest id, so the alert is still removable from Telegram.
+
+Media verified, not assumed: an inbound photo and an admin photo reply each
+render one `img.aw-msg-image`. Admin media sent through the bot is already
+archived to R2 by `store_attachment` inside
+`reply_with_provider_media_to_conversation`, which is why it has a preview.
+
+Reproduction: `tmp/ui-audit/repro_chat_duplicate.py` builds a conversation with
+an inbound photo, a text reply, an admin photo reply and a resolved digest, then
+asserts 3 bubbles, student text once, admin reply once, no digest header, 2
+images and 1 alert delete action.
+
+Verification: 187/187 templates compile; `manage.py check` clean; 36/36 admin
+routes 200; DOM and markup audits clean; Telegram verifier green; encoding clean;
+Arabic catalogue recompiled for the two new labels. Shipped as `b379e38`.
+
+### Markup quality gate and the `None` cell fix (9 November 2026)
+
 New audit: `tmp/ui-audit/audit_markup.py` renders all 35 admin routes and checks
 for placeholder links (`href=""` / `href="#"`), template syntax leaking into the
 output, POST forms without a CSRF token, empty `class=""` attributes, and images
