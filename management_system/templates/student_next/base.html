@@ -26,6 +26,7 @@
   <script defer src="{% static 'pwa/register.js' %}?v={{ static_asset_version }}"></script>
   <script defer src="{% static 'pwa/offline-library.js' %}?v={{ static_asset_version }}"></script>
   <script defer src="{% static 'pwa/push.js' %}?v={{ static_asset_version }}"></script>
+  <script defer src="{% static 'pwa/file-inputs.js' %}?v={{ static_asset_version }}"></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="sn-body sn-student sn-page-{{ student_page }}" data-pwa-enabled="true" data-pwa-account="{{ request.user.pk }}">
@@ -98,6 +99,7 @@
     </a>
     {% endfor %}
   </nav>
+  {% include "partials/web_push_prompt.html" %}
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -16579,3 +16579,16 @@ msgstr "اكتب كل زوج على صورة اليسار = اليمين، كل 
 
 msgid "Without JavaScript, type each pair as Left = Right on its own line."
 msgstr "دون JavaScript، اكتب كل زوج على صورة اليسار = اليمين في سطر مستقل."
+
+msgid "Stay updated"
+msgstr "ابق على اطلاع"
+
+msgid "Later"
+msgstr "لاحقا"
+
+msgid "Offline tab"
+msgstr "دون اتصال"
+
+msgctxt "student navigation"
+msgid "Offline"
+msgstr "دون اتصال"

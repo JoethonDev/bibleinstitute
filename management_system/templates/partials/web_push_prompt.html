@@ -1,0 +1,27 @@
+{% load i18n %}
+{% if web_push_enabled and request.resolver_match.url_name != "student-notifications" %}
+<dialog class="pwa-push-dialog" data-push-root data-push-prompt
+        data-status-url="{% url 'web-push-status' %}"
+        data-subscribe-url="{% url 'web-push-subscribe' %}"
+        data-unsubscribe-url="{% url 'web-push-unsubscribe' %}"
+        data-vapid-public-key="{{ web_push_vapid_public_key }}"
+        aria-labelledby="pwa-push-dialog-title">
+  <div class="pwa-push-dialog-card">
+    <div class="pwa-push-dialog-head">
+      <span class="pwa-push-dialog-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+      </span>
+      <div>
+        <small class="pwa-push-dialog-eyebrow">{% translate "Stay updated" %}</small>
+        <h2 id="pwa-push-dialog-title">{% translate "Enable notifications" %}</h2>
+      </div>
+    </div>
+    <p class="pwa-push-dialog-copy">{% translate "Get lesson, quiz and announcement alerts on this device. You can turn them off at any time." %}</p>
+    <div class="pwa-push-dialog-actions">
+      <button type="button" class="pwa-install-button" data-push-enable>{% translate "Enable notifications" %}</button>
+      <button type="button" class="pwa-push-dialog-later" data-push-close>{% translate "Later" %}</button>
+    </div>
+    <p class="pwa-push-dialog-status" data-push-status role="status" aria-live="polite"></p>
+  </div>
+</dialog>
+{% endif %}

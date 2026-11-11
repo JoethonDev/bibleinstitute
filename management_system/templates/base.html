@@ -87,6 +87,7 @@
     <script defer src="{% static 'pwa/register.js' %}?v={{ static_asset_version }}"></script>
     <script defer src="{% static 'pwa/offline-library.js' %}?v={{ static_asset_version }}"></script>
     <script defer src="{% static 'pwa/push.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'pwa/file-inputs.js' %}?v={{ static_asset_version }}"></script>
     <meta name="csrf-token" content="{{ csrf_token }}">
     {% endif %}
 </head>
@@ -137,6 +138,7 @@
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'view-profile' %}">{% translate "Profile" %}</a></li>
               {% if request.user.role.role == "student" %}
                <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-calendar' %}">{% translate "My Calendar" %}</a></li>
+               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'offline-library' %}">{% translate "Offline" context "student navigation" %}</a></li>
                <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-notifications' %}">{% translate "Notifications" %}</a></li>
                {% endif %}
               {% if request.user.role.role == "student" or request.user.role.role == "admin" %}
@@ -187,6 +189,8 @@
     </main>
 
     {% block script %}{% endblock %}
+
+    {% include "partials/web_push_prompt.html" %}
 
     <footer id="site-contact" class="mt-auto institute-footer ps-site-footer" role="contentinfo">
       <div class="container py-5">

@@ -146,10 +146,10 @@
         <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next actions" %}</h2></div></div>
         <div class="sn-card-body">
           {% if next_actions.resume %}
-          <div class="sn-next-card"><span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg></span><div><b>{% translate "Continue studying" %}</b><span dir="auto">{{ next_actions.resume.lesson_name }}</span></div></div>
+          <div class="sn-next-card"><span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg></span><div><span class="sn-next-kind">{% translate "Lesson" %}</span><b>{% translate "Continue studying" %}</b><span dir="auto">{{ next_actions.resume.lesson_name }}</span></div></div>
           {% endif %}
           {% for quiz in next_actions.next_quizzes|slice:":3" %}
-          <div class="sn-next-card"><span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span><div><b><a href="{% url 'quiz-details' quiz.offering_id quiz.id %}" dir="auto">{{ quiz.name }}</a></b><span dir="auto">{{ quiz.course_name }}</span></div></div>
+          <div class="sn-next-card"><span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span><div><span class="sn-next-kind">{% translate "Quiz" %}</span><b><a href="{% url 'quiz-details' quiz.offering_id quiz.id %}" dir="auto">{{ quiz.name }}</a></b><span dir="auto">{{ quiz.course_name }}</span></div></div>
           {% endfor %}
           <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'courses' %}">{% translate "Open My learning" %}</a></div>
         </div>

@@ -3,6 +3,7 @@
   <b>{% translate "Notifications" %}</b>
   {% if unread_count %}<span class="sn-pill sn-pill--gold">{{ unread_count }} {% translate "new" %}</span>{% endif %}
 </div>
+<div class="sn-notif-pop-list">
 {% for item in notification_items %}
   {% if item.target_url %}
   <form method="post" action="{{ item.open_url }}" data-notification-open>
@@ -24,6 +25,7 @@
 {% empty %}
 <p class="sn-muted sn-notif-pop-empty">{% translate "No notifications yet." %}</p>
 {% endfor %}
+</div>
 <div class="sn-notif-pop-foot">
   {% if unread_count %}
   <form method="post" action="{% url 'student-notification-read-all' %}" data-notification-read-all>

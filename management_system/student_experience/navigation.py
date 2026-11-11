@@ -1,10 +1,12 @@
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 
 
 _NAV_ITEMS = (
     ("learn", _("Learn"), "courses", "book-open"),
     ("calendar", _("Calendar"), "student-calendar", "calendar"),
+    ("offline", pgettext_lazy("student navigation", "Offline"), "offline-library", "download"),
     ("notifications", _("Notifications"), "student-notifications", "bell"),
     ("profile", _("Profile"), "view-profile", "user"),
 )

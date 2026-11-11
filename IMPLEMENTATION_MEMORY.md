@@ -63,6 +63,19 @@ Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
   still stored only on the device (encrypted Cache Storage plus IndexedDB
   metadata/key), and the browser is asked for persistent storage. The current
   encryption path buffers one complete file before encryption.
+- Student UI polish: the header notification panel now has a capped flex
+  layout with a scrollable item list and fixed footer; progress-ring labels
+  are absolutely centered; profile/course/lesson next-action cards show a
+  Lesson/Quiz kind and no underlined links; and student file pickers use a
+  localized themed visual layer over the native input. A student-only dialog
+  automatically asks for notification permission when the device has no active
+  browser subscription; the native backdrop covers the full viewport and both
+  `Later` and successful enablement remove the page scroll lock. The
+  notification page keeps its inline toggle and suppresses the dialog. The
+  new shell navigation and the legacy student navbar expose an Offline tab to
+  `/offline-library/`; the service worker serves the cached shell for that
+  route while offline, and the generic offline fallback links to the localized
+  offline library.
 - `deploy/setup_env.sh` copies the non-secret PWA/WebAuthn settings and the
   public VAPID key into `.compose.env`; the private VAPID key remains only in
   `.env`. `compose.application.yml` no longer overrides the private key from

@@ -22,3 +22,64 @@
 .pwa-push-actions{display:flex;gap:8px;flex-wrap:wrap}
 .pwa-push-card .pwa-install-note{flex-basis:100%;margin:0;font-size:.76rem;color:#64777b}
 .pwa-push-card .pwa-save-button{margin:0}
+
+/* Notification permission dialog and themed file inputs. */
+.pwa-push-dialog{
+  width:min(440px,calc(100vw - 32px));max-width:100%;margin:auto;padding:0;
+  border:1px solid #e2d8c6;border-radius:18px;background:#fffdf8;color:#17303a;
+  box-shadow:0 24px 70px rgba(23,48,58,.22);
+}
+.pwa-push-dialog::backdrop{background:rgba(23,48,58,.45);backdrop-filter:blur(2px)}
+.pwa-push-dialog-card{padding:24px}
+.pwa-push-dialog-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.pwa-push-dialog-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;background:#f3e7d1;color:#8a5a12}
+.pwa-push-dialog-eyebrow{margin:0 0 2px;color:#b4863d;font-size:.65rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.pwa-push-dialog h2{margin:0;font-size:1.25rem;line-height:1.25}
+.pwa-push-dialog-copy{margin:0 0 18px;color:#64777b;font-size:.85rem;line-height:1.7}
+.pwa-push-dialog-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pwa-push-dialog-later{border:0;background:transparent;color:#64777b;font:inherit;font-size:.82rem;font-weight:800;padding:10px 8px;cursor:pointer}
+.pwa-push-dialog-later:hover{color:#17303a}
+.pwa-push-dialog-status{min-height:1.2em;margin:10px 0 0;font-size:.78rem;line-height:1.5}
+body.sn-student input[type="file"],.sd-page input[type="file"]{
+  display:block;width:100%;min-height:44px;padding:8px 10px;border:1px solid #d6c5a8;border-radius:12px;
+  background:#fffdf8;color:#17303a;font:inherit;font-size:.82rem;line-height:1.5;text-align:start;vertical-align:middle;cursor:pointer;
+}
+body.sn-student input[type="file"]:hover,.sd-page input[type="file"]:hover{border-color:#b4863d;background:#fffaf0}
+body.sn-student input[type="file"]:focus-visible,.sd-page input[type="file"]:focus-visible{outline:2px solid #b4863d;outline-offset:2px}
+body.sn-student input[type="file"]::file-selector-button,.sd-page input[type="file"]::file-selector-button{
+  margin-inline-end:10px;padding:8px 12px;border:1px solid #d6c5a8;border-radius:9px;
+  background:#f3e7d1;color:#5f421d;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;
+}
+body.sn-student input[type="file"]::file-selector-button:hover,.sd-page input[type="file"]::file-selector-button:hover{background:#ead7b6;border-color:#b4863d}
+body.sn-student input[type="file"]::-webkit-file-upload-button,.sd-page input[type="file"]::-webkit-file-upload-button{
+  margin-inline-end:10px;padding:8px 12px;border:1px solid #d6c5a8;border-radius:9px;
+  background:#f3e7d1;color:#5f421d;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;
+}
+
+/* Progressive file picker: native input stays in the form; visual layer matches the theme. */
+body.sn-student .pwa-file-control,.sd-page .pwa-file-control{position:relative;display:block;width:100%}
+body.sn-student input[type="file"].pwa-file-native,.sd-page input[type="file"].pwa-file-native{
+  position:absolute;inset:0;z-index:2;width:100%;height:100%;min-height:0;margin:0;padding:0;border:0;
+  border-radius:12px;background:transparent;opacity:0;cursor:pointer;
+}
+body.sn-student input[type="file"].pwa-file-native:focus-visible,.sd-page input[type="file"].pwa-file-native:focus-visible{outline:0}
+.pwa-file-visual{
+  display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:6px 8px;
+  border:1px solid #d6c5a8;border-radius:12px;background:#fffdf8;color:#17303a;
+  font:inherit;font-size:.82rem;line-height:1.5;transition:border-color .2s,background .2s;
+}
+body.sn-student .pwa-file-control:hover .pwa-file-visual,.sd-page .pwa-file-control:hover .pwa-file-visual{border-color:#b4863d;background:#fffaf0}
+body.sn-student input[type="file"].pwa-file-native:focus-visible + .pwa-file-visual,.sd-page input[type="file"].pwa-file-native:focus-visible + .pwa-file-visual{outline:2px solid #b4863d;outline-offset:2px}
+.pwa-file-button{
+  display:inline-flex;align-items:center;justify-content:center;flex:none;padding:8px 12px;
+  border:1px solid #d6c5a8;border-radius:9px;background:#f3e7d1;color:#5f421d;
+  font-size:.78rem;font-weight:800;white-space:nowrap;
+}
+.pwa-file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64777b;font-size:.8rem}
+body.sn-student .pwa-file-control.has-file .pwa-file-name,.sd-page .pwa-file-control.has-file .pwa-file-name{color:#17303a}
+
+.pwa-install-button:disabled,.pwa-save-button:disabled{opacity:.62;cursor:not-allowed;transform:none;background:#b9c0bd!important;border-color:#b9c0bd!important;color:#fff!important}
+
+.pwa-push-dialog{position:fixed;inset:0;margin:auto;max-height:calc(100dvh - 32px);overflow:auto}
+.pwa-push-dialog::backdrop{position:fixed;inset:0;width:100vw;height:100dvh;background:rgba(23,48,58,.48);backdrop-filter:blur(2px)}
+html.pwa-push-open,html.pwa-push-open body{overflow:hidden}

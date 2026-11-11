@@ -166,7 +166,7 @@
           {% if next_action %}
           <div class="sn-next-card">
             <span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-{% if next_action.kind == 'quiz' %}check-circle{% else %}play{% endif %}"></use></svg></span>
-            <div><b dir="auto">{{ next_action.label }}</b><span>{% translate "Continue where you left off." %}</span></div>
+            <div><span class="sn-next-kind">{% if next_action.kind == 'quiz' %}{% translate "Quiz" %}{% else %}{% translate "Lesson" %}{% endif %}</span><b dir="auto">{{ next_action.label }}</b><span>{% translate "Continue where you left off." %}</span></div>
           </div>
           <div class="sn-card-actions"><a class="sn-btn sn-btn--gold sn-btn--sm" href="{{ next_action.url }}">{% translate "Open" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a></div>
           {% else %}
