@@ -189,6 +189,7 @@
         } catch (error) {
           // Private mode or storage disabled: the prompt can reappear.
         }
+        window.dispatchEvent(new Event("pwa:push-prompt-closed"));
       });
     }
 

@@ -15,7 +15,10 @@
     removed: "أُزيل مفتاح المرور. جارٍ إعادة التحميل...",
     removeFailed: "تعذر إزالة مفتاح المرور.",
     loginCancelled: "أُلغي تسجيل الدخول بمفتاح المرور.",
-    loginFailed: "تعذر تسجيل الدخول بمفتاح المرور."
+    loginFailed: "تعذر تسجيل الدخول بمفتاح المرور.",
+    defaultLabel: "هذا الجهاز",
+    enabled: "تم تفعيل تسجيل الدخول بالبصمة. جارٍ إعادة التحميل...",
+    enableFailed: "تعذر تفعيل تسجيل الدخول بالبصمة."
   } : {
     unsupported: "This browser does not support passkeys.",
     label: "Enter a name for this passkey.",
@@ -26,7 +29,10 @@
     removed: "Passkey removed. Reloading...",
     removeFailed: "Could not remove the passkey.",
     loginCancelled: "Passkey sign-in was cancelled.",
-    loginFailed: "Could not sign in with a passkey."
+    loginFailed: "Could not sign in with a passkey.",
+    defaultLabel: "This device",
+    enabled: "Biometric sign-in enabled. Reloading...",
+    enableFailed: "Could not enable biometric sign-in."
   };
   function b64(buffer) {
     const bytes = new Uint8Array(buffer);
@@ -90,56 +96,78 @@
     return data;
   }
 
-  const profileRoot = document.querySelector("[data-passkey-root]");
-  if (profileRoot) {
-    const status = profileRoot.querySelector("[data-passkey-status]");
-    const add = profileRoot.querySelector("[data-passkey-add]");
-    const labelInput = profileRoot.querySelector("[data-passkey-label]");
+  const promptRoot = document.querySelector("[data-passkey-prompt]");
+  if (promptRoot) {
+    const status = promptRoot.querySelector("[data-passkey-prompt-status]");
+    const enable = promptRoot.querySelector("[data-passkey-enable]");
+    const close = promptRoot.querySelector("[data-passkey-close]");
+    const dismissedKey = "pwa-passkey-prompt-dismissed";
     const setStatus = (message, error) => {
       if (!status) return;
       status.textContent = message || "";
       status.style.color = error ? "#9a2f2f" : "";
     };
-    if (add) {
-      add.addEventListener("click", async () => {
-        add.disabled = true;
+    const closePrompt = () => {
+      document.documentElement.classList.remove("pwa-passkey-open");
+      if (typeof promptRoot.close === "function" && promptRoot.open) promptRoot.close();
+      else promptRoot.removeAttribute("open");
+    };
+    const openPrompt = () => {
+      if (!window.PublicKeyCredential || !navigator.credentials || !window.isSecureContext) return;
+      if (document.querySelector("dialog.pwa-push-dialog[open]")) {
+        window.addEventListener("pwa:push-prompt-closed", openPrompt, { once: true });
+        return;
+      }
+      document.documentElement.classList.add("pwa-passkey-open");
+      if (typeof promptRoot.showModal === "function") {
+        if (!promptRoot.open) promptRoot.showModal();
+      } else {
+        promptRoot.setAttribute("open", "");
+      }
+    };
+    if (close) close.addEventListener("click", closePrompt);
+    promptRoot.addEventListener("close", () => {
+      document.documentElement.classList.remove("pwa-passkey-open");
+      try {
+        sessionStorage.setItem(dismissedKey, "1");
+      } catch (error) {
+        // Private mode or storage disabled: the prompt can reappear.
+      }
+    });
+    if (enable) {
+      enable.addEventListener("click", async () => {
+        enable.disabled = true;
         try {
           if (!window.PublicKeyCredential || !navigator.credentials || !window.isSecureContext) {
             throw new Error(T.unsupported);
           }
-          const label = (labelInput && labelInput.value || "").trim();
-          if (!label) throw new Error(T.label);
-          const data = await postJson(profileRoot.dataset.optionsUrl, {});
+          const data = await postJson(promptRoot.dataset.optionsUrl, {});
           const publicKey = prepareCreationOptions(data.publicKey);
           const credential = await navigator.credentials.create({ publicKey });
           if (!credential) throw new Error(T.cancelled);
-          await postJson(profileRoot.dataset.verifyUrl, {
+          await postJson(promptRoot.dataset.verifyUrl, {
             challenge_id: data.challenge_id,
-            label,
+            label: T.defaultLabel,
             credential: toCredentialJson(credential),
           });
-          setStatus(T.added, false);
+          setStatus(T.enabled, false);
           window.location.reload();
         } catch (error) {
-          setStatus(error.message || T.addFailed, true);
-          add.disabled = false;
+          setStatus(error.message || T.enableFailed, true);
+          enable.disabled = false;
         }
       });
     }
-    profileRoot.querySelectorAll("[data-passkey-revoke]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        if (!window.confirm(T.removeConfirm)) return;
-        button.disabled = true;
-        try {
-          await postJson(profileRoot.dataset.revokeUrl, { credential_id: button.dataset.passkeyRevoke });
-          setStatus(T.removed, false);
-          window.location.reload();
-        } catch (error) {
-          setStatus(error.message || T.removeFailed, true);
-          button.disabled = false;
-        }
-      });
-    });
+    let dismissed = false;
+    try {
+      dismissed = sessionStorage.getItem(dismissedKey) === "1";
+    } catch (error) {
+      dismissed = false;
+    }
+    if (!dismissed) {
+      // Let the notification prompt claim the first modal slot when both are due.
+      window.setTimeout(openPrompt, 700);
+    }
   }
 
   const loginRoot = document.querySelector("[data-passkey-login]");

@@ -186,9 +186,11 @@
         </div>
       </section>
       {% endif %}
-      {% include "partials/passkey_security.html" %}
     </aside>
   </div>
 </div>
+{% if webauthn_enabled and profile_editable and not passkeys and passkey_fresh %}
+{% include "partials/passkey_prompt.html" %}
+{% endif %}
 <script defer src="{% static 'pwa/passkeys.js' %}?v={{ static_asset_version }}"></script>
 {% endblock %}

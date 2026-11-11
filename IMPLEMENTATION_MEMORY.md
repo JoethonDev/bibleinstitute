@@ -86,7 +86,11 @@ Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
   audio and PDF inline instead of opening a modal. The installed PWA shows an
   "Installed on this device" state and hides the install action when running
   standalone, and the auto notification prompt is dismissed for the rest of
-  the browser/app session only.
+  the browser/app session only. The biometric prompt is new-shell/profile-only
+  and registers a default-label passkey; the old passkey management section is
+  removed, legacy student pages expose neither notification nor biometric
+  prompts, and the legacy notification page no longer shows the browser-push
+  toggle.
 - `deploy/setup_env.sh` copies the non-secret PWA/WebAuthn settings and the
   public VAPID key into `.compose.env`; the private VAPID key remains only in
   `.env`. `compose.application.yml` no longer overrides the private key from

@@ -16598,3 +16598,12 @@ msgstr "مثبت على هذا الجهاز"
 
 msgid "Used is the space taken by saved files; available is this browser's storage limit."
 msgstr "المستخدم هو حجم الملفات المحفوظة، والمتاح هو حد تخزين هذا المتصفح."
+
+msgid "Security"
+msgstr "الأمان"
+
+msgid "Enable biometric sign-in"
+msgstr "تفعيل تسجيل الدخول بالبصمة"
+
+msgid "Enable biometrics"
+msgstr "تفعيل البصمة"
