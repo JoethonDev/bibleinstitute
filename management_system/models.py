@@ -2586,6 +2586,13 @@ class StudentExperienceSettings(models.Model):
         choices=StudentMode.choices,
         default=StudentMode.LEGACY,
     )
+    force_all = models.BooleanField(
+        default=False,
+        help_text=_(
+            "When enabled, the selected global mode applies to every student "
+            "account and per-account overrides are ignored."
+        ),
+    )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         "User",

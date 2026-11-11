@@ -91,6 +91,17 @@ Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
   removed, legacy student pages expose neither notification nor biometric
   prompts, and the legacy notification page no longer shows the browser-push
   toggle.
+- Admin HTMX search persistence: the shared `aw_filter_bar` and every
+  self-replacing search input now carry `hx-preserve` (applications,
+  application analytics city search, notification recipients, Telegram
+  searches). The Applications page keeps its value and focus across the
+  workspace `outerHTML` swap. All HTMX search inputs were audited; inputs that
+  swap only a result list (not their form) are unaffected.
+- Global student-view forcing: `StudentExperienceSettings.force_all` lets the
+  admin force the selected global mode for every student, ignoring per-account
+  overrides. The Student Experience settings page has a force/release toggle
+  and the mode cache now stores `{mode, force_all}` under a v2 key. Migration
+  `0123_student_experience_force_all` adds the field.
 - `deploy/setup_env.sh` copies the non-secret PWA/WebAuthn settings and the
   public VAPID key into `.compose.env`; the private VAPID key remains only in
   `.env`. `compose.application.yml` no longer overrides the private key from

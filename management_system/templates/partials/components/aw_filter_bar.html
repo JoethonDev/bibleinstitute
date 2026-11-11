@@ -35,6 +35,7 @@ view; the table container keeps its single canonical target.
                    aria-label="{{ search_placeholder|default:_('Search') }}"
                    hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}"
                    hx-include=".filters-fields"
+                   hx-preserve
                    hx-trigger="input changed delay:200ms, search"
                    hx-target="#table-container"
                    hx-swap="innerHTML"

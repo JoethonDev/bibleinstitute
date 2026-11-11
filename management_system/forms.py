@@ -1662,8 +1662,8 @@ class StudentExperienceSettingsForm(AwModelForm):
         super().__init__(*args, **kwargs)
         self.fields["mode"].label = _("Default student view")
         self.fields["mode"].help_text = _(
-            "The global mode applies to student accounts that inherit it. "
-            "The legacy view stays available for any account with its own override."
+            "This is the default for students who inherit the global setting. "
+            "Use the force action to apply it to every student and ignore per-account overrides."
         )
 
 

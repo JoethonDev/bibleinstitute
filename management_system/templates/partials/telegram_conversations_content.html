@@ -84,6 +84,7 @@ below are unchanged.
                                    autocomplete="off"
                                    hx-get="{{ conversation_list_url }}?fragment=linked-users"
                                    hx-include="closest form"
+                                   hx-preserve
                                    hx-trigger="input changed delay:200ms, search"
                                    hx-target="#telegram-linked-user-list"
                                    hx-swap="outerHTML"

@@ -33,6 +33,7 @@ conversation while the list is filtered).
                            placeholder="{% translate 'Name or message...' %}"
                            hx-get="{{ conversation_list_url }}"
                            hx-include="closest form"
+                           hx-preserve
                            hx-trigger="input changed delay:250ms, search"
                            hx-target="#telegram-conversation-list"
                            hx-select="#telegram-conversation-list"

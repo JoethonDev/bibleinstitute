@@ -25,6 +25,7 @@ still one request of PAGE_SIZE rows at a time.
                placeholder="{% translate 'Name, username or email' %}"
                hx-get="{{ list_url }}"
                hx-include="closest form"
+               hx-preserve
                hx-trigger="input changed delay:250ms, search"
                hx-target="#notification-group-{{ group_id }}-list"
                hx-swap="innerHTML"

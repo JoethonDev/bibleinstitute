@@ -16607,3 +16607,36 @@ msgstr "تفعيل تسجيل الدخول بالبصمة"
 
 msgid "Enable biometrics"
 msgstr "تفعيل البصمة"
+
+msgid "Forced for all students"
+msgstr "مفروض على جميع الطلاب"
+
+msgid "On"
+msgstr "مفعّل"
+
+msgid "Off"
+msgstr "متوقف"
+
+msgid "Stop forcing all students"
+msgstr "إيقاف فرض الواجهة على جميع الطلاب"
+
+msgid "Force selected view for all students"
+msgstr "فرض الواجهة المختارة على جميع الطلاب"
+
+msgid "Force mode applies the selected view to every student account and ignores per-account overrides."
+msgstr "يطبق وضع الفرض الواجهة المختارة على كل حساب طالب ويتجاهل التخصيصات الفردية."
+
+msgid "Force mode is active. Every student uses the selected global view and per-account overrides are ignored."
+msgstr "وضع الفرض مفعّل. يستخدم كل طالب الواجهة العامة المختارة ويتم تجاهل تخصيصات الحسابات."
+
+msgid "All students are now forced to the selected student view."
+msgstr "تم فرض الواجهة المختارة على جميع الطلاب."
+
+msgid "Forced view disabled. Per-account overrides and the global default apply again."
+msgstr "تم إيقاف وضع الفرض. تعود تخصيصات الحسابات والواجهة الافتراضية العامة للعمل."
+
+msgid "Every student currently uses the selected forced view. Per-account overrides are ignored."
+msgstr "يستخدم كل طالب حاليا الواجهة المفروضة المختارة. يتم تجاهل تخصيصات الحسابات."
+
+msgid "This is the default for students who inherit the global setting. Use the force action to apply it to every student and ignore per-account overrides."
+msgstr "هذه هي الواجهة الافتراضية للطلاب الذين يتبعون الإعداد العام. استخدم زر الفرض لتطبيقها على كل طالب وتجاهل التخصيصات الفردية."

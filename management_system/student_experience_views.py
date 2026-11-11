@@ -9,7 +9,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
 from .forms import StudentExperienceOverrideForm, StudentExperienceSettingsForm
-from .models import StudentExperienceOverride, StudentExperienceSettings, StudentMode, User
+from .models import StudentExperienceSettings, StudentMode, User
 from .student_experience.mode import resolve_student_mode
 from .utils.decorators import can_manage_academic_setup, capability_required
 from .utils.helpers import generate_breadcrumb, render_page
@@ -29,17 +29,28 @@ def student_experience_settings(request):
     if request.method == "POST":
         form = StudentExperienceSettingsForm(request.POST, instance=settings_row)
         if form.is_valid():
-            form.instance.updated_by = request.user
-            form.save()
-            messages.success(request, _("Student experience settings saved."))
+            action = request.POST.get("action", "")
+            settings_row = form.save(commit=False)
+            settings_row.updated_by = request.user
+            if action == "force":
+                settings_row.force_all = True
+                messages.success(
+                    request,
+                    _("All students are now forced to the selected student view."),
+                )
+            elif action == "release":
+                settings_row.force_all = False
+                messages.success(
+                    request,
+                    _("Forced view disabled. Per-account overrides and the global default apply again."),
+                )
+            else:
+                messages.success(request, _("Student experience settings saved."))
+            settings_row.save()
             return redirect("student-experience-settings")
     else:
         form = StudentExperienceSettingsForm(instance=settings_row)
 
-    explicit_new_count = User.objects.filter(
-        role__role="student",
-        student_experience_override=StudentExperienceOverride.NEW,
-    ).count()
     return render_page(
         request,
         "student_experience_settings.html",
@@ -47,7 +58,6 @@ def student_experience_settings(request):
         {
             "settings_row": settings_row,
             "form": form,
-            "explicit_new_count": explicit_new_count,
             "breadcrumb_items": generate_breadcrumb([
                 (_("Admin"), reverse("admin-panel")),
                 (_("Student experience"), None),

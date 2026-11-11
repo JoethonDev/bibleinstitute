@@ -1,7 +1,11 @@
 {% load i18n %}
 {% translate "Site & Apps" as page_eyebrow %}
 {% translate "Student Experience" as page_title %}
+{% if settings_row.force_all %}
+{% translate "Every student currently uses the selected forced view. Per-account overrides are ignored." as page_description %}
+{% else %}
 {% translate "Choose the default authenticated student view. Per-account overrides still win." as page_description %}
+{% endif %}
 <div id="content" class="aw-dashboard-page">
     <div class="aw-page-head aw-flex-wrap">
         {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
@@ -17,16 +21,22 @@
         </div>
         <div class="aw-kpi aw-kpi--gold">
             <div class="aw-kpi-top">
-                <span class="aw-kpi-label">{% translate "Explicit new overrides" %}</span>
+                <span class="aw-kpi-label">{% translate "Forced for all students" %}</span>
                 <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
             </div>
-            <div class="aw-kpi-value">{{ explicit_new_count }}</div>
+            <div class="aw-kpi-value">{% if settings_row.force_all %}{% translate "On" %}{% else %}{% translate "Off" %}{% endif %}</div>
         </div>
     </div>
 
-    <div class="aw-alert aw-alert--warn">
+    <div class="aw-alert {% if settings_row.force_all %}aw-alert--danger{% else %}aw-alert--warn{% endif %}">
         <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
-        <div>{% translate "The legacy student view remains available for every account. Set a named account override from its Users detail page to test the new view before a global switch." %}</div>
+        <div>
+            {% if settings_row.force_all %}
+            {% translate "Force mode is active. Every student uses the selected global view and per-account overrides are ignored." %}
+            {% else %}
+            {% translate "The legacy student view remains available for every account. Set a named account override from its Users detail page to test the new view before a global switch." %}
+            {% endif %}
+        </div>
     </div>
 
     <form method="post" action="{% url 'student-experience-settings' %}" hx-post="{% url 'student-experience-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
@@ -53,12 +63,24 @@
                     {% translate "Last changed" %} {{ settings_row.updated_at|date:"Y-m-d H:i" }} - {{ settings_row.updated_by|default:"-" }}
                 </p>
                 {% endif %}
-                <div class="aw-form-actions">
+                <div class="aw-form-actions aw-flex-wrap">
                     <button type="submit" class="aw-btn aw-btn--primary">
                         <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
                         <span>{% translate "Save settings" %}</span>
                     </button>
+                    {% if settings_row.force_all %}
+                    <button type="submit" name="action" value="release" class="aw-btn aw-btn--outline">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
+                        <span>{% translate "Stop forcing all students" %}</span>
+                    </button>
+                    {% else %}
+                    <button type="submit" name="action" value="force" class="aw-btn aw-btn--gold">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg>
+                        <span>{% translate "Force selected view for all students" %}</span>
+                    </button>
+                    {% endif %}
                 </div>
+                <p class="aw-small aw-muted aw-mt-2">{% translate "Force mode applies the selected view to every student account and ignores per-account overrides." %}</p>
             </div>
         </section>
     </form>
