@@ -10,6 +10,20 @@
     : { saving: "Saving...", saved: "Saved offline", unavailable: "Offline library unavailable", failed: "Could not save this file." };
   let installPrompt = null;
 
+  function isStandalone() {
+    return window.matchMedia?.("(display-mode: standalone)").matches === true
+      || window.navigator.standalone === true;
+  }
+
+  function syncInstallState(installed) {
+    document.querySelectorAll("[data-pwa-install]").forEach((button) => {
+      button.hidden = installed;
+    });
+    document.querySelectorAll("[data-pwa-installed]").forEach((status) => {
+      status.hidden = !installed;
+    });
+  }
+
   if (enabled) {
     const previousAccount = localStorage.getItem("pwa-account");
     if (previousAccount && account && previousAccount !== account) {
@@ -23,18 +37,20 @@
         navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => {});
       });
     }
+    if (isStandalone()) syncInstallState(true);
+    if (navigator.getInstalledRelatedApps) {
+      navigator.getInstalledRelatedApps().then((apps) => {
+        if (apps && apps.length) syncInstallState(true);
+      }).catch(() => {});
+    }
     window.addEventListener("beforeinstallprompt", (event) => {
       event.preventDefault();
       installPrompt = event;
-      document.querySelectorAll("[data-pwa-install]").forEach((button) => {
-        button.hidden = false;
-      });
+      syncInstallState(false);
     });
     window.addEventListener("appinstalled", () => {
       installPrompt = null;
-      document.querySelectorAll("[data-pwa-install]").forEach((button) => {
-        button.hidden = true;
-      });
+      syncInstallState(true);
     });
   }
 
@@ -46,9 +62,9 @@
         return;
       }
       installPrompt.prompt();
-      await installPrompt.userChoice.catch(() => null);
+      const choice = await installPrompt.userChoice.catch(() => null);
       installPrompt = null;
-      installButton.hidden = true;
+      if (choice && choice.outcome === "accepted") syncInstallState(true);
       return;
     }
     const saveButton = event.target.closest("[data-pwa-save]");

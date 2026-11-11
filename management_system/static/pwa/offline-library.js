@@ -3,6 +3,11 @@
   "use strict";
 
   const BODY = document.body;
+  const VIEWER = document.querySelector("[data-offline-viewer]");
+  const VIEWER_TITLE = document.querySelector("[data-viewer-title]");
+  const VIEWER_CONTENT = document.querySelector("[data-viewer-content]");
+  const VIEWER_CLOSE = document.querySelector("[data-viewer-close]");
+  let viewerUrl = "";
   const ACCOUNT = BODY.dataset.accountId || localStorage.getItem("pwa-account") || "";
   const MAX_BYTES = Number(BODY.dataset.maxBytes || 0);
   const VALIDATE_URL = BODY.dataset.validateUrl || "";
@@ -29,7 +34,10 @@
     openAccount: "افتح هذه الصفحة من حساب الطالب.",
     unavailable: "الوسائط دون اتصال غير متاحة في هذا المتصفح.",
     supported: "مدعوم",
-    notSupported: "غير مدعوم في هذا المتصفح"
+    notSupported: "غير مدعوم في هذا المتصفح",
+    close: "إغلاق",
+    openFile: "فتح الملف",
+    openFailed: "تعذر عرض الملف. جرّب فتحه في نافذة جديدة."
   } : {
     saved: "Saved for offline use.",
     unlocked: "Downloads unlocked for this session.",
@@ -40,7 +48,10 @@
     openAccount: "Open this page from your student account.",
     unavailable: "Offline media is unavailable on this browser.",
     supported: "Supported",
-    notSupported: "Not supported on this browser"
+    notSupported: "Not supported on this browser",
+    close: "Close",
+    openFile: "Open file",
+    openFailed: "Could not display the file. Try opening it in a new tab."
   };
   let dbPromise = null;
   let unlocked = false;
@@ -283,30 +294,48 @@
     }
   }
 
-  function openModal(url, type) {
-    const dialog = document.createElement("dialog");
-    dialog.style.cssText = "max-width:min(920px,94vw);width:94vw;border:1px solid var(--pwa-line);border-radius:18px;padding:0;background:var(--pwa-paper)";
-    const close = document.createElement("button");
-    close.type = "button";
-    close.textContent = "Close";
-    close.className = "pwa-btn pwa-btn--small";
-    close.style.cssText = "position:absolute;inset-block-start:8px;inset-inline-end:8px;z-index:2";
-    close.addEventListener("click", () => {
-      dialog.close();
-      URL.revokeObjectURL(url);
-      dialog.remove();
-    });
-    dialog.addEventListener("close", () => {
-      URL.revokeObjectURL(url);
-      dialog.remove();
-    });
+  function closeViewer() {
+    if (viewerUrl) {
+      URL.revokeObjectURL(viewerUrl);
+      viewerUrl = "";
+    }
+    if (VIEWER_CONTENT) VIEWER_CONTENT.replaceChildren();
+    if (VIEWER) VIEWER.hidden = true;
+  }
+
+  function showViewer(url, type, title) {
+    if (!VIEWER || !VIEWER_CONTENT) return;
+    closeViewer();
+    viewerUrl = url;
+    VIEWER.hidden = false;
+    if (VIEWER_TITLE) VIEWER_TITLE.textContent = title || (type === "audio" ? "Audio" : "PDF");
     const content = document.createElement(type === "audio" ? "audio" : "iframe");
     content.src = url;
-    content.controls = type === "audio";
-    content.style.cssText = type === "audio" ? "width:100%;padding:54px 18px 18px" : "width:100%;height:80vh;border:0;border-radius:18px";
-    dialog.append(close, content);
-    document.body.appendChild(dialog);
-    dialog.showModal();
+    if (type === "audio") {
+      content.controls = true;
+      content.autoplay = true;
+      content.preload = "auto";
+      content.playsInline = true;
+      content.addEventListener("error", () => setStatus(T.openFailed, true));
+    } else {
+      content.title = title || "PDF";
+    }
+    VIEWER_CONTENT.replaceChildren(content);
+    if (type !== "audio") {
+      const openLink = document.createElement("a");
+      openLink.className = "pwa-btn pwa-btn--small pwa-viewer-open";
+      openLink.href = url;
+      openLink.target = "_blank";
+      openLink.rel = "noopener";
+      openLink.textContent = T.openFile;
+      VIEWER_CONTENT.appendChild(openLink);
+    }
+    VIEWER.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (type === "audio") {
+      content.load();
+      const playback = content.play();
+      if (playback && typeof playback.catch === "function") playback.catch(() => {});
+    }
   }
 
   async function openItem(item) {
@@ -322,8 +351,9 @@
         key,
         cipher
       );
-      const blob = new Blob([plain], { type: item.mime || "application/octet-stream" });
-      openModal(URL.createObjectURL(blob), item.type);
+      const mime = item.mime || (item.type === "audio" ? "audio/mpeg" : "application/pdf");
+      const blob = new Blob([plain], { type: mime });
+      showViewer(URL.createObjectURL(blob), item.type, item.title);
     } catch (error) {
       setStatus(error.message === "missing" ? T.missing : T.cancelled, true);
     }
@@ -471,6 +501,8 @@
     list: listItems,
     unlock,
   };
+
+  if (VIEWER_CLOSE) VIEWER_CLOSE.addEventListener("click", closeViewer);
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

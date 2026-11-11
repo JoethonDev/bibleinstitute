@@ -16592,3 +16592,9 @@ msgstr "دون اتصال"
 msgctxt "student navigation"
 msgid "Offline"
 msgstr "دون اتصال"
+
+msgid "Installed on this device"
+msgstr "مثبت على هذا الجهاز"
+
+msgid "Used is the space taken by saved files; available is this browser's storage limit."
+msgstr "المستخدم هو حجم الملفات المحفوظة، والمتاح هو حد تخزين هذا المتصفح."

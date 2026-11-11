@@ -41,8 +41,8 @@
   <section class="sn-continue">
     <div class="sn-continue-main">
       <span class="sn-continue-kicker">{% translate "Continue where you left off" %}</span>
-      <h2>{{ resume.course_name }}</h2>
-      <p>{{ resume.lesson_name }}</p>
+      <h2 dir="auto">{{ resume.course_name }}</h2>
+      <p dir="auto">{{ resume.lesson_name }}</p>
       <div class="sn-continue-progress">
         <span>{{ resume.percent|default:0 }}% {% translate "complete" %}</span>
         <span class="sn-meter-wrap"><span class="sn-meter sn-meter--gold" role="progressbar" aria-label="{% translate 'Lesson progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ resume.percent|default:0 }}"><span style="width:{{ resume.percent|default:0 }}%"></span></span></span>

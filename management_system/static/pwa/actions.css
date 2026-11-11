@@ -83,3 +83,9 @@ body.sn-student .pwa-file-control.has-file .pwa-file-name,.sd-page .pwa-file-con
 .pwa-push-dialog{position:fixed;inset:0;margin:auto;max-height:calc(100dvh - 32px);overflow:auto}
 .pwa-push-dialog::backdrop{position:fixed;inset:0;width:100vw;height:100dvh;background:rgba(23,48,58,.48);backdrop-filter:blur(2px)}
 html.pwa-push-open,html.pwa-push-open body{overflow:hidden}
+
+.pwa-installed-status{display:inline-flex;align-items:center;gap:7px;margin:10px 0 0;color:#2f6a4a;background:#eaf5ee;border:1px solid #cfe5d7;border-radius:999px;padding:7px 12px;font-size:.78rem;font-weight:800}
+.pwa-installed-status .sn-ico{width:15px;height:15px}
+.pwa-installed-status[hidden]{display:none}
+
+.pwa-push-dialog .pwa-install-button,.pwa-push-card .pwa-install-button{color:#fff!important}

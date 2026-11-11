@@ -29,15 +29,24 @@
       <p class="pwa-status" data-offline-status role="status" aria-live="polite"></p>
       <dl class="pwa-storage">
         <div><dt>{% translate "Saved files" %}</dt><dd data-offline-count>0</dd></div>
-        <div><dt>{% translate "Storage used" %}</dt><dd data-offline-usage>-</dd></div>
+        <div><dt>{% translate "Storage used" %}</dt><dd data-offline-usage dir="ltr">-</dd></div>
         <div><dt>{% translate "Offline support" %}</dt><dd data-offline-support>{% translate "Checking..." %}</dd></div>
       </dl>
+      <p class="pwa-storage-note">{% translate "Used is the space taken by saved files; available is this browser's storage limit." %}</p>
     </section>
 
     <section class="pwa-card" data-offline-locked hidden>
       <h2>{% translate "Unlock required" %}</h2>
       <p>{% translate "Confirm with your device screen lock or biometrics before opening saved files." %}</p>
       <button type="button" class="pwa-btn pwa-btn--primary" data-offline-unlock>{% translate "Unlock downloads" %}</button>
+    </section>
+
+    <section class="pwa-viewer" data-offline-viewer hidden aria-live="polite">
+      <div class="pwa-viewer-head">
+        <b data-viewer-title dir="auto"></b>
+        <button type="button" class="pwa-btn pwa-btn--small" data-viewer-close>{% translate "Close" %}</button>
+      </div>
+      <div class="pwa-viewer-content" data-viewer-content></div>
     </section>
 
     <section class="pwa-list" data-offline-list aria-live="polite"></section>

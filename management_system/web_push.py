@@ -55,21 +55,20 @@ def _notification_url(notification: StudentNotification, language: str) -> str:
 
 
 def _payload(notification: StudentNotification, language: str) -> str:
-    # Show the real localized notification title. Keep the body generic so
-    # lesson/quiz content is not exposed on the lock screen.
-    title = (
-        notification.title_ar
-        if language == "ar"
-        else notification.title_en
-    ).strip()
+    # Show the real localized notification title and body. The body is capped
+    # to keep lock-screen payloads bounded.
+    is_arabic = language == "ar"
+    title = (notification.title_ar if is_arabic else notification.title_en).strip()
+    body = (notification.body_ar if is_arabic else notification.body_en).strip()
     with translation.override(language):
         if not title:
             title = str(_("Bible Institute"))
-        body = str(_("You have a new notification."))
+        if not body:
+            body = str(_("You have a new notification."))
     return json.dumps(
         {
             "title": title,
-            "body": body,
+            "body": body[:500],
             "notification_id": notification.pk,
             "url": _notification_url(notification, language),
         },

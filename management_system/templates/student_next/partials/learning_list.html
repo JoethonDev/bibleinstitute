@@ -125,7 +125,7 @@
             {% for quiz in due_soon %}
             <a class="sn-due-item" href="{{ quiz.url }}">
               <span class="sn-due-date">{{ quiz.deadline|date:"j" }}<small>{{ quiz.deadline|date:"M" }}</small></span>
-              <span><b>{{ quiz.name }}</b><small>{{ quiz.course_name }}{% if quiz.deadline %} - {{ quiz.deadline|date:"D, j M" }}{% endif %}</small></span>
+              <span><b dir="auto">{{ quiz.name }}</b><small dir="auto">{{ quiz.course_name }}{% if quiz.deadline %} - {{ quiz.deadline|date:"D, j M" }}{% endif %}</small></span>
               <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
             </a>
             {% empty %}
@@ -141,7 +141,7 @@
         <div class="sn-card-body">
           <div class="sn-week-list">
             {% for meeting in week_meetings %}
-            <div class="sn-week-item"><span class="sn-week-day">{{ meeting.meeting_date|date:"D" }}</span><span><b>{{ meeting.course_offering.course.name }}</b><small>{{ meeting.meeting_date|date:"D, j M" }}</small></span></div>
+            <div class="sn-week-item"><span class="sn-week-day">{{ meeting.meeting_date|date:"D" }}</span><span><b dir="auto">{{ meeting.course_offering.course.name }}</b><small>{{ meeting.meeting_date|date:"D, j M" }}</small></span></div>
             {% empty %}
             <p class="sn-muted">{% translate "No meetings scheduled in the next seven days." %}</p>
             {% endfor %}

@@ -3,6 +3,7 @@
   "use strict";
   const roots = Array.from(document.querySelectorAll("[data-push-root]"));
   if (!roots.length) return;
+  const PROMPT_DISMISSED_KEY = "pwa-push-prompt-dismissed";
 
   const csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
   const isArabic = (document.documentElement.lang || "ar").startsWith("ar");
@@ -183,7 +184,25 @@
     if (dialog) {
       dialog.addEventListener("close", () => {
         document.documentElement.classList.remove("pwa-push-open");
+        try {
+          sessionStorage.setItem(PROMPT_DISMISSED_KEY, "1");
+        } catch (error) {
+          // Private mode or storage disabled: the prompt can reappear.
+        }
       });
+    }
+
+    if (isPrompt) {
+      let dismissed = false;
+      try {
+        dismissed = sessionStorage.getItem(PROMPT_DISMISSED_KEY) === "1";
+      } catch (error) {
+        dismissed = false;
+      }
+      if (dismissed) {
+        closePrompt();
+        return;
+      }
     }
 
     load();

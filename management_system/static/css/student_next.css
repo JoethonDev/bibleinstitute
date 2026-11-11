@@ -655,8 +655,8 @@ body.sn-student .sn-content-row.is-current .sn-content-state, body.sn-student .s
 body.sn-student .sn-content-row.is-upcoming .sn-content-state{ background: var(--sn-teal-soft); color: var(--sn-teal-deep); }
 body.sn-student .sn-content-row.is-locked .sn-content-state{ background: var(--sn-mist); color: #aab6bb; }
 body.sn-student .sn-content-copy{ display: flex; flex-direction: column; min-width: 0; }
-body.sn-student .sn-content-copy b{ overflow: hidden; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
-body.sn-student .sn-content-copy small{ color: var(--sn-muted); font-size: .66rem; }
+body.sn-student .sn-content-copy b{ overflow: hidden; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: isolate; text-align: start; }
+body.sn-student .sn-content-copy small{ color: var(--sn-muted); font-size: .66rem; unicode-bidi: isolate; text-align: start; }
 body.sn-student .sn-content-label{ padding: 3px 7px; border-radius: 999px; background: var(--sn-mist); color: var(--sn-muted); font-size: .6rem; font-weight: 800; white-space: nowrap; }
 body.sn-student .sn-content-row.is-current .sn-content-label, body.sn-student .sn-content-row.is-open .sn-content-label{ background: var(--sn-gold-soft); color: var(--sn-gold-deep); }
 body.sn-student .sn-content-row.is-done .sn-content-label{ background: var(--sn-success-soft); color: var(--sn-success); }
@@ -738,7 +738,7 @@ body.sn-student .sn-part{ display: flex; align-items: center; gap: 11px; padding
 body.sn-student .sn-part:hover{ border-color: var(--sn-gold); background: var(--sn-cream); }
 body.sn-student .sn-part > span:first-child{ width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--sn-mist); color: var(--sn-teal-deep); flex: none; }
 body.sn-student .sn-part > div{ display: flex; flex-direction: column; min-width: 0; }
-body.sn-student .sn-part b{ font-size: .78rem; }
+body.sn-student .sn-part b{ font-size: .78rem; unicode-bidi: isolate; text-align: start; }
 body.sn-student .sn-part small{ color: var(--sn-muted); font-size: .66rem; }
 body.sn-student .sn-part > .sn-ico{ width: 16px; height: 16px; margin-inline-start: auto; color: var(--sn-muted); }
 body.sn-student .sn-part.is-done > span:first-child{ background: var(--sn-success-soft); color: var(--sn-success); }
@@ -754,7 +754,7 @@ body.sn-student .sn-next-icon{ width: 34px; height: 34px; display: grid; place-i
 body.sn-student .sn-next-icon .sn-ico{ width: 16px; height: 16px; }
 body.sn-student .sn-next-card > div{ display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 body.sn-student .sn-next-kind{ color: var(--sn-gold-deep); font-size: .6rem; font-weight: 800; letter-spacing: .06em; line-height: 1.2; text-transform: uppercase; }
-body.sn-student .sn-next-card b{ font-size: .78rem; line-height: 1.35; }
+body.sn-student .sn-next-card b{ font-size: .78rem; line-height: 1.35; unicode-bidi: isolate; text-align: start; }
 body.sn-student .sn-next-card b a, body.sn-student .sn-next-card b a:hover, body.sn-student .sn-next-card a{ color: inherit; text-decoration: none; }
 body.sn-student .sn-next-card span:not(.sn-next-kind){ color: var(--sn-muted); font-size: .68rem; line-height: 1.35; }
 body.sn-student .sn-card-actions a, body.sn-student .sn-card-actions button{ text-decoration: none; }
@@ -1594,3 +1594,14 @@ body.sn-student .sn-pagination-current{ color: var(--sn-ink); font-size: .72rem;
     body.sn-student .sn-quiz-confirm-dialog__actions{ flex-direction: column; }
     body.sn-student .sn-quiz-confirm-dialog__actions .sn-btn{ width: 100%; }
 }
+
+/* Keep English titles on the RTL reading edge without reversing their glyphs. */
+html.sn-html[lang="ar"] body.sn-student .sn-content-copy b,
+html.sn-html[lang="ar"] body.sn-student .sn-content-copy small,
+html.sn-html[lang="ar"] body.sn-student .sn-next-card b,
+html.sn-html[lang="ar"] body.sn-student .sn-part b,
+html.sn-html[lang="ar"] body.sn-student .sn-week-item b,
+html.sn-html[lang="ar"] body.sn-student .sn-course-title a{ text-align:right; }
+html.sn-html[lang="ar"] body.sn-student .sn-notif-pop-copy b,
+html.sn-html[lang="ar"] body.sn-student .sn-notif-pop-copy small,
+html.sn-html[lang="ar"] body.sn-student .sn-notif-title b{ text-align:right; }

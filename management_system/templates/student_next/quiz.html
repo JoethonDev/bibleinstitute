@@ -29,7 +29,7 @@
     <header class="sn-exam-top">
       <div class="sn-exam-title">
         <span class="sn-exam-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-file"></use></svg></span>
-        <div><b>{{ quiz.name }}</b><span>{{ offering.course.name }}</span></div>
+        <div><b dir="auto">{{ quiz.name }}</b><span dir="auto">{{ offering.course.name }}</span></div>
       </div>
       <div class="sn-exam-meta">
         <span class="sn-timer" id="timer" aria-live="off"><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg><span>--:--</span></span>
@@ -143,7 +143,7 @@
     <div class="sn-result-ring"><span class="sn-ring" style="--sn-ring-size:120px;--sn-ring-stroke:9px" role="img" aria-label="{% blocktrans with score=score_percent %}{{ score }} percent{% endblocktrans %}">
       <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="sn-ring-track" cx="60" cy="60" r="51" stroke-width="9"></circle><circle class="sn-ring-value" cx="60" cy="60" r="51" stroke-width="9" stroke-dasharray="320.44" stroke-dashoffset="{{ score_ring_offset }}"></circle></svg><b>{{ score_percent }}%</b>
     </span></div>
-    <div class="sn-result-copy"><span class="sn-eyebrow">{% translate "Quiz complete" %}</span><h1>{{ quiz.name }}</h1><p>{% translate "Review your answers and the feedback available for this quiz." %}</p>
+    <div class="sn-result-copy"><span class="sn-eyebrow">{% translate "Quiz complete" %}</span><h1 dir="auto">{{ quiz.name }}</h1><p>{% translate "Review your answers and the feedback available for this quiz." %}</p>
       <div class="sn-result-stats">
         <div class="sn-stat sn-stat--gold"><span class="sn-stat-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-award"></use></svg></span><div><b><bdi dir="ltr">{{ total_grade }} / {{ quiz.total_grade }}</bdi></b><span>{% translate "Score" %}</span><small><bdi dir="ltr">{{ score_percent }}%</bdi></small></div></div>
         <div class="sn-stat sn-stat--teal"><span class="sn-stat-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span><div><b>{{ questions|length }}</b><span>{% translate "Questions reviewed" %}</span></div></div>
@@ -162,6 +162,6 @@
   </div>
 {% else %}
   <div class="sn-alert sn-alert--warning" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg></span><div class="sn-alert-copy"><b>{% translate "Quiz closed" %}</b><p>{% blocktrans with date=quiz_closing_label %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktrans %}</p></div></div>
-  <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h1>{{ quiz.name }}</h1><p>{{ offering.course.name }} - {{ quiz_closing_label }}</p></div><a class="sn-btn sn-btn--ghost" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to course" %}</a></div></section>
+  <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h1 dir="auto">{{ quiz.name }}</h1><p>{{ offering.course.name }} - {{ quiz_closing_label }}</p></div><a class="sn-btn sn-btn--ghost" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to course" %}</a></div></section>
 {% endif %}
 {% endblock %}

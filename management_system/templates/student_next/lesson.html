@@ -71,7 +71,7 @@
         {% if next_quiz %}
         <div class="sn-next-card">
           <span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span>
-          <div><span class="sn-next-kind">{% translate "Quiz" %}</span><b>{{ next_quiz.quiz.name }}</b><span>{% if next_quiz.status == "upcoming" %}{% translate "Opens" %} {{ next_quiz.quiz.opening_date|date:"D, j M" }}{% else %}{% translate "Closes" %} {{ next_quiz.quiz.closing_date|date:"D, j M" }}{% endif %}</span></div>
+          <div><span class="sn-next-kind">{% translate "Quiz" %}</span><b dir="auto">{{ next_quiz.quiz.name }}</b><span>{% if next_quiz.status == "upcoming" %}{% translate "Opens" %} {{ next_quiz.quiz.opening_date|date:"D, j M" }}{% else %}{% translate "Closes" %} {{ next_quiz.quiz.closing_date|date:"D, j M" }}{% endif %}</span></div>
         </div>
         <div class="sn-card-actions"><a class="sn-btn sn-btn--gold sn-btn--sm" href="{{ next_quiz.url }}">{% translate "Open quiz" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a></div>
         {% else %}

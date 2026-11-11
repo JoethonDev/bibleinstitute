@@ -32,7 +32,7 @@
     <div class="sn-audio sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
       <div class="sn-audio-copy">
         <b>{% translate "Audio version" %}</b>
-        <span>{{ part.name }}</span>
+        <span dir="auto">{{ part.name }}</span>
         <audio class="sn-media-element" controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
           <source type="application/x-mpegURL">
         </audio>

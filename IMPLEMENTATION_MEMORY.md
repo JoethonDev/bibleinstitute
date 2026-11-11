@@ -81,8 +81,12 @@ Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
   `notification.created_at >= subscription.enabled_at` and a due
   `scheduled_for`, so enabling or re-enabling notifications only delivers
   events created after opt-in. Migration `0122_web_push_enabled_at` adds the
-  field. Payloads now show the real localized `StudentNotification` title,
-  while the body remains generic to avoid exposing content on the lock screen.
+  field. Payloads now show the real localized `StudentNotification` title and
+  body (body capped at 500 characters); the offline library renders saved
+  audio and PDF inline instead of opening a modal. The installed PWA shows an
+  "Installed on this device" state and hides the install action when running
+  standalone, and the auto notification prompt is dismissed for the rest of
+  the browser/app session only.
 - `deploy/setup_env.sh` copies the non-secret PWA/WebAuthn settings and the
   public VAPID key into `.compose.env`; the private VAPID key remains only in
   `.env`. `compose.application.yml` no longer overrides the private key from
