@@ -9,7 +9,7 @@
       {% endfor %}
     </nav>
     <span class="sn-filter-note">
-      {% blocktranslate with count=total_count %}Showing {{ count }} courses{% endblocktranslate %}
+      {% blocktrans count count=total_count %}Showing {{ count }} course{% plural %}Showing {{ count }} courses{% endblocktrans %}
     </span>
   </div>
 
@@ -19,64 +19,58 @@
         <div class="sn-section-head">
           <div class="sn-section-head-main">
             <h2><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Your courses" %}</h2>
-            <p>{% translate "Your current studies and course history." %}</p>
+            <p>{% translate "Grouped by your current academic scope." %}</p>
           </div>
         </div>
         {% if sections %}
-        <div class="sn-year-list">
+        <div class="sn-course-years">
           {% for section in sections %}
-          <section class="sn-year-section">
+          <section class="sn-year-section{% if not forloop.first %} is-collapsed{% endif %}" data-year-section data-access="{{ section.access_kind }}">
             <button class="sn-year-toggle" type="button" data-collapse-trigger aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="student-year-{{ forloop.counter }}">
-              <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
               <span class="sn-year-copy">
                 <b>{{ section.academic_year.name }} - {{ section.level_name }}</b>
                 <small>
                   {% if section.access_kind == "current" %}{% translate "Current study" %}
                   {% elif section.access_kind == "historical" %}{% translate "Course history" %}
                   {% else %}{% translate "Additional access" %}{% endif %}
+                  - {{ section.offerings|length }} {% translate "courses" %}
                 </small>
               </span>
               <span class="sn-year-count">{{ section.offerings|length }} {% translate "courses" %}</span>
+              <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
             </button>
             <div id="student-year-{{ forloop.counter }}" data-year-body{% if not forloop.first %} hidden{% endif %}>
               <div class="sn-course-grid">
                 {% for offering in section.offerings %}
-                <article class="sn-course-card">
-                  <a class="sn-course-thumb" href="{% url 'course-details' offering.pk %}" aria-label="{{ offering.course.name }}">
-                    <svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>
+                <article class="sn-course-card" data-access="{{ section.access_kind }}" data-course="{{ offering.pk }}">
+                  <a class="sn-course-cover sn-tone-{% cycle 'a' 'b' 'c' 'd' %}" href="{% url 'course-details' offering.pk %}" aria-label="{{ offering.course.name }}">
+                    <span class="sn-cover-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg></span>
+                    <span class="sn-cover-level">{{ section.level_name }}</span>
+                    {% if offering.student_progress.completion_percent is not None %}
+                    <span class="sn-cover-ring">
+                      {% include "student_next/partials/ring.html" with value=offering.student_progress.completion_percent offset=offering.student_progress.ring_offset size=46 stroke=4 label=offering.course.name %}
+                    </span>
+                    {% endif %}
                   </a>
                   <div class="sn-course-body">
-                    <div class="sn-course-kicker">{{ section.level_name }} <span aria-hidden="true">-</span> {{ section.academic_year.name }}</div>
-                    <h3 class="sn-course-title"><a href="{% url 'course-details' offering.pk %}">{{ offering.course.name }}</a></h3>
-                    {% if offering.instructor %}<p class="sn-course-instructor">{{ offering.instructor }}</p>{% endif %}
-                    {% if offering.course.description %}<p class="sn-course-desc">{{ offering.course.description|truncatechars:145 }}</p>{% endif %}
+                    <div class="sn-course-kicker">{{ section.level_name }} - {{ section.academic_year.name }}</div>
+                    <h3 class="sn-course-title"><a href="{% url 'course-details' offering.pk %}" dir="auto">{{ offering.course.name }}</a></h3>
+                    {% if offering.course.description %}<p class="sn-course-desc" dir="auto">{{ offering.course.description|truncatechars:145 }}</p>{% endif %}
                     <div class="sn-course-meta">
-                      <span><svg class="sn-ico" aria-hidden="true"><use href="#i-play"></use></svg>{{ offering.published_lesson_count }} {% translate "Lessons" %}</span>
-                      <span><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{{ offering.published_quiz_count }} {% translate "Quizzes" %}</span>
-                      {% if offering.student_progress.completion_kind %}
-                      <span>
-                        {% if offering.student_progress.completion_kind == "parts" %}
-                          {{ offering.student_progress.watched_parts }}/{{ offering.student_progress.watchable_parts }} {% translate "parts watched" %}
-                        {% else %}
-                          {{ offering.student_progress.attendance_scanned }}/{{ offering.student_progress.attendance_total }} {% translate "meetings attended" %}
-                        {% endif %}
-                      </span>
-                      {% endif %}
+                      <span dir="ltr"><svg class="sn-ico" aria-hidden="true"><use href="#i-video"></use></svg>{% blocktrans count count=offering.published_lesson_count %}{{ count }} lesson{% plural %}{{ count }} lessons{% endblocktrans %}</span>
+                      <span dir="ltr"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{% blocktrans count count=offering.published_quiz_count %}{{ count }} quiz{% plural %}{{ count }} quizzes{% endblocktrans %}</span>
+                      {% if offering.instructor %}<span><svg class="sn-ico" aria-hidden="true"><use href="#i-user"></use></svg>{{ offering.instructor }}</span>{% endif %}
                     </div>
                     {% if offering.student_progress.completion_percent is not None %}
                     <div class="sn-course-progress">
-                      <span class="sn-meter-wrap">
-                        <span class="sn-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ offering.student_progress.completion_percent }}" aria-label="{% translate 'Course progress' %}">
-                          <span style="width:{{ offering.student_progress.completion_percent }}%"></span>
-                        </span>
-                        <b class="sn-meter-label">{{ offering.student_progress.completion_percent }}%</b>
-                      </span>
+                      <span dir="ltr">{% blocktrans with percent=offering.student_progress.completion_percent %}{{ percent }}% complete{% endblocktrans %}</span>
+                      <span class="sn-meter-wrap"><span class="sn-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ offering.student_progress.completion_percent }}" aria-label="{% translate 'Course progress' %}"><span style="width:{{ offering.student_progress.completion_percent }}%"></span></span></span>
                     </div>
                     {% endif %}
-                    <a class="sn-course-next" href="{% url 'course-details' offering.pk %}">
-                      {% translate "Open course workspace" %}
-                      <svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
-                    </a>
+                    <div class="sn-course-foot">
+                      <span class="sn-course-next">{% if offering.student_progress.completion_percent == 100 %}{% translate "Review" %}{% else %}{% translate "Next" %}: {% translate "Continue" %}{% endif %}</span>
+                      <a class="sn-text-link" href="{% url 'course-details' offering.pk %}">{% translate "Open course workspace" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+                    </div>
                   </div>
                 </article>
                 {% endfor %}
@@ -86,21 +80,36 @@
           {% endfor %}
         </div>
         {% else %}
-        <div class="sn-empty-state">
+        <div class="sn-empty">
           <span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg></span>
           <h3>{% if is_empty %}{% translate "No courses in this view" %}{% else %}{% translate "No courses available yet" %}{% endif %}</h3>
           <p>{% translate "Your authorized courses will appear here when they are available." %}</p>
         </div>
         {% endif %}
       </section>
+
+      {% if announcements %}
+      <section class="sn-section">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-bell"></use></svg>{% translate "From the institute" %}</h2><p>{% translate "Recent announcements for your scope." %}</p></div></div>
+        <div class="sn-announcement-grid">
+          {% for announcement in announcements %}
+          <article class="sn-announcement">
+            <span class="sn-announcement-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-bell"></use></svg></span>
+            <div><b dir="auto">{{ announcement.title }}</b><p dir="auto">{{ announcement.body|truncatechars:140 }}</p><time>{{ announcement.created_at|date:"D, j M" }}</time></div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if page_obj.paginator.num_pages > 1 %}
       <nav class="sn-pager" aria-label="{% translate 'Course pages' %}">
         {% if page_obj.has_previous %}
-        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?filter={{ selected_filter }}&page={{ page_obj.previous_page_number }}" hx-get="?filter={{ selected_filter }}&page={{ page_obj.previous_page_number }}" hx-target="#student-learning-list" hx-select="#student-learning-list" hx-swap="outerHTML" hx-push-url="true">{% translate "Previous" %}</a>
+        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?filter={{ selected_filter }}&page={{ page_obj.previous_page_number }}">{% translate "Previous" %}</a>
         {% endif %}
-        <span>{% blocktranslate with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktranslate %}</span>
+        <span>{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktrans %}</span>
         {% if page_obj.has_next %}
-        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?filter={{ selected_filter }}&page={{ page_obj.next_page_number }}" hx-get="?filter={{ selected_filter }}&page={{ page_obj.next_page_number }}" hx-target="#student-learning-list" hx-select="#student-learning-list" hx-swap="outerHTML" hx-push-url="true">{% translate "Next" %}</a>
+        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?filter={{ selected_filter }}&page={{ page_obj.next_page_number }}">{% translate "Next" %}</a>
         {% endif %}
       </nav>
       {% endif %}
@@ -109,38 +118,53 @@
     <aside class="sn-aside">
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head">
-          <div class="sn-section-head-main">
-            <h2><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg>{% translate "Due soon" %}</h2>
-            <p>{% translate "Quizzes still open for your account." %}</p>
-          </div>
+          <div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg>{% translate "Due soon" %}</h2><p>{% translate "Quizzes still open for your account." %}</p></div>
         </div>
         <div class="sn-card-body">
-          {% for quiz in due_soon %}
-          <a class="sn-due-item" href="{{ quiz.url }}">
-            <span class="sn-due-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span>
-            <span><b>{{ quiz.name }}</b><small>{{ quiz.course_name }}{% if quiz.deadline %} - {{ quiz.deadline|date:"D, j M" }}{% endif %}</small></span>
-          </a>
-          {% empty %}
-          <p class="sn-muted">{% translate "There are no upcoming quiz deadlines." %}</p>
-          {% endfor %}
-          <a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'student-notifications' %}">{% translate "View notifications" %}</a>
+          <div class="sn-due-list">
+            {% for quiz in due_soon %}
+            <a class="sn-due-item" href="{{ quiz.url }}">
+              <span class="sn-due-date">{{ quiz.deadline|date:"j" }}<small>{{ quiz.deadline|date:"M" }}</small></span>
+              <span><b>{{ quiz.name }}</b><small>{{ quiz.course_name }}{% if quiz.deadline %} - {{ quiz.deadline|date:"D, j M" }}{% endif %}</small></span>
+              <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+            </a>
+            {% empty %}
+            <p class="sn-muted">{% translate "There are no upcoming quiz deadlines." %}</p>
+            {% endfor %}
+          </div>
+          <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'student-notifications' %}">{% translate "View notifications" %}</a></div>
         </div>
       </section>
+
       <section class="sn-card sn-aside-card">
-        <div class="sn-section-head">
-          <div class="sn-section-head-main">
-            <h2><svg class="sn-ico" aria-hidden="true"><use href="#i-sparkle"></use></svg>{% translate "Your progress" %}</h2>
-            <p>{% translate "A quick view of your studies." %}</p>
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "This week" %}</h2><p>{% translate "Your next meetings." %}</p></div></div>
+        <div class="sn-card-body">
+          <div class="sn-week-list">
+            {% for meeting in week_meetings %}
+            <div class="sn-week-item"><span class="sn-week-day">{{ meeting.meeting_date|date:"D" }}</span><span><b>{{ meeting.course_offering.course.name }}</b><small>{{ meeting.meeting_date|date:"D, j M" }}</small></span></div>
+            {% empty %}
+            <p class="sn-muted">{% translate "No meetings scheduled in the next seven days." %}</p>
+            {% endfor %}
           </div>
+          <div class="sn-card-actions"><a class="sn-text-link" href="{% url 'student-calendar' %}">{% translate "Open calendar" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a></div>
         </div>
+      </section>
+
+      <section class="sn-card sn-aside-card">
+        <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-chart"></use></svg>{% translate "Your progress" %}</h2><p>{% translate "A quick view of your studies." %}</p></div></div>
         <div class="sn-card-body">
           <div class="sn-progress-summary">
-            <span><b>{{ total_count }}</b> {% translate "courses in this view" %}</span>
-            {% if active_scope %}<span>{{ active_scope.academic_year.name }} - {{ active_scope.level.display_name }}</span>{% endif %}
+            {% translate "Progress in this view" as overall_label %}
+            {% include "student_next/partials/ring.html" with value=overall_percent offset=overall_ring_offset size=64 stroke=5 label=overall_label %}
+            <div>
+              <b>{% blocktrans with count=total_count %}{{ count }} courses in this view{% endblocktrans %}</b>
+              {% if active_scope %}<span>{{ active_scope.academic_year.name }} - {{ active_scope.level.display_name }}</span>{% endif %}
+            </div>
           </div>
-          <a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'view-profile' %}">{% translate "Open student record" %}</a>
+          <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'view-profile' %}">{% translate "Open student record" %}</a></div>
         </div>
       </section>
+
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "More from the institute" %}</h2></div></div>
         <div class="sn-card-body">

@@ -1,0 +1,82 @@
+{% load i18n %}
+<div class="sn-lesson-parts">
+  {% for part in links %}
+  <article class="sn-lesson-part">
+    <header class="sn-lesson-part-head">
+      <span class="sn-part-index">{% translate "Part" %} {{ forloop.counter }} {% translate "of" %} {{ links|length }}</span>
+      <div>
+        <h3 dir="auto">{% if part.name %}{{ part.name }}{% else %}{% translate "Lesson material" %}{% endif %}</h3>
+        <p>{% if part.type == "video" %}{% translate "Video" %}{% elif part.type == "audio" %}{% translate "Audio" %}{% else %}PDF{% endif %}</p>
+      </div>
+      <span class="sn-pill">
+        {% if part.type == "video" %}{% translate "Video" %}{% elif part.type == "audio" %}{% translate "Audio" %}{% else %}PDF{% endif %}
+      </span>
+    </header>
+
+    {% if part.type == "video" %}
+    <div class="sn-player">
+      <div class="lesson-video-wrapper sd-live-player sn-video-wrapper" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+        <video class="sn-media-element" playsinline controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
+          <source type="application/x-mpegURL">
+          <p>{% translate "Your browser does not support HTML5 video." %}</p>
+        </video>
+        <div class="sn-media-progress">
+          <span>{% translate "Progress" %}</span>
+          <progress :value="progressPercent" max="100" :aria-valuenow="progressPercent">0%</progress>
+          <b x-text="progressPercent + '%'">0%</b>
+        </div>
+      </div>
+    </div>
+    <p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "Your progress is saved as you watch or listen." %}</p>
+    {% elif part.type == "audio" %}
+    <div class="sn-audio sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+      <div class="sn-audio-copy">
+        <b>{% translate "Audio version" %}</b>
+        <span>{{ part.name }}</span>
+        <audio class="sn-media-element" controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
+          <source type="application/x-mpegURL">
+        </audio>
+        <div class="sn-media-progress">
+          <span>{% translate "Progress" %}</span>
+          <progress :value="progressPercent" max="100" :aria-valuenow="progressPercent">0%</progress>
+          <b x-text="progressPercent + '%'">0%</b>
+        </div>
+      </div>
+      {% if part.download_url %}<a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ part.download_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download audio" %}</a>{% endif %}
+    </div>
+    <p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "Listen on the go. The download is available for offline study." %}</p>
+    {% else %}
+    <div class="pdf-viewer sn-pdf-viewer" data-url="{{ part.url }}">
+      <div class="pdf-controls sn-pdf-toolbar sn-pdf-controls" role="toolbar" aria-label="{% translate 'PDF reading controls' %}">
+        <div class="pdf-controls__group">
+          <button type="button" class="pdf-zoom-out sn-pdf-control" aria-label="{% translate 'Zoom out' %}" title="{% translate 'Zoom out' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-minus"></use></svg></button>
+          <span class="pdf-zoom-level" aria-live="polite">100%</span>
+          <button type="button" class="pdf-zoom-in sn-pdf-control" aria-label="{% translate 'Zoom in' %}" title="{% translate 'Zoom in' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-plus"></use></svg></button>
+          <button type="button" class="pdf-fit-width sn-pdf-control" aria-label="{% translate 'Fit width' %}" title="{% translate 'Fit width' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-expand"></use></svg><span>{% translate "Fit width" %}</span></button>
+        </div>
+        <div class="pdf-controls__group pdf-controls__pages">
+          <button type="button" class="prev sn-pdf-control" aria-label="{% translate 'Previous page' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
+          <span class="page-info" aria-live="polite">{% translate "Page" %} 1 / ?</span>
+          <button type="button" class="next sn-pdf-control" aria-label="{% translate 'Next page' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
+        </div>
+        <button type="button" class="pdf-fullscreen sn-pdf-control" aria-label="{% translate 'Enter fullscreen' %}" title="{% translate 'Enter fullscreen' %}" aria-pressed="false"><svg class="sn-ico" aria-hidden="true"><use href="#i-expand"></use></svg><span>{% translate "Enter fullscreen" %}</span></button>
+      </div>
+      <div class="pdf-stage sn-pdf-stage" tabindex="0" aria-label="{% translate 'PDF page' %}"><canvas class="pdf-canvas"></canvas></div>
+    </div>
+    <p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "The handout uses the same viewer controls as the rest of your lessons." %}</p>
+    {% endif %}
+  </article>
+  {% empty %}
+  <div class="sn-empty">
+    <span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-document"></use></svg></span>
+    <h3>{% translate "No lesson materials" %}</h3>
+    <p>{% translate "There are no published materials attached to this lesson." %}</p>
+  </div>
+  {% endfor %}
+</div>
+{% if show_nav %}
+<nav class="sn-lesson-navigation" aria-label="{% translate 'Lesson navigation' %}">
+  {% if previous_url %}<a class="sn-btn sn-btn--ghost" href="{{ previous_url }}" hx-get="{{ previous_url }}" hx-target="#display-page" hx-select="#content-loaded" hx-swap="innerHTML" hx-push-url="true"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Previous lesson" %}</a>{% endif %}
+  {% if next_url %}<a class="sn-btn sn-btn--primary" href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#display-page" hx-select="#content-loaded" hx-swap="innerHTML" hx-push-url="true">{% translate "Next lesson" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>{% endif %}
+</nav>
+{% endif %}

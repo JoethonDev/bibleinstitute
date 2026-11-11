@@ -152,6 +152,7 @@
     var status = document.querySelector("[data-notification-status]");
     var nextUrl = history && history.dataset.nextUrl;
     if (!nextUrl || !items || button.disabled) return;
+    event.preventDefault();
     button.disabled = true;
     if (status) status.textContent = button.dataset.loadingLabel || "";
     fetch(nextUrl, { credentials: "same-origin", headers: { "Accept": "text/html" } })

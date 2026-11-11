@@ -53,6 +53,27 @@ def build_course_context(user, offering, *, management_preview: bool = False) ->
             >= lesson.student_progress["watchable_parts"]
         )
 
+    grade_percents = [
+        round(100 * row["grade"].total_grade / row["quiz"].total_grade)
+        for row in quiz_rows
+        if row["grade"] is not None and row["quiz"].total_grade
+    ]
+    quiz_average = (
+        round(sum(grade_percents) / len(grade_percents))
+        if grade_percents else None
+    )
+    if progress.get("watchable_parts"):
+        completion_percent = progress.get("watch_percent", 0)
+    elif progress.get("attendance_total"):
+        completion_percent = round(
+            100 * progress.get("attendance_scanned", 0) / progress["attendance_total"]
+        )
+    else:
+        completion_percent = 0
+    progress["completion_percent"] = completion_percent
+    progress["ring_offset"] = 100 - completion_percent
+    progress["quiz_average"] = quiz_average
+
     for row in quiz_rows:
         row["url"] = reverse(
             "quiz-details", args=[offering.pk, row["id"]]
@@ -91,6 +112,9 @@ def build_course_context(user, offering, *, management_preview: bool = False) ->
     return {
         "offering": offering,
         "course": offering.course,
+        "course_short": (
+            offering.course.name.split()[0] if offering.course.name else ""
+        ),
         "lessons": lessons,
         "quiz_rows": quiz_rows,
         "progress": progress,

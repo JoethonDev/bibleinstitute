@@ -1,17 +1,17 @@
 {% load i18n %}
 {% if student_banners %}
-<div class="sn-alert-stack" aria-label="{% translate 'Announcements' %}">
+<div class="sn-alert-stack" data-alert-stack aria-label="{% translate 'Student alerts' %}">
   {% for banner in student_banners %}
-  <section class="sn-alert sn-alert--info" data-alert-id="banner-{{ banner.pk }}">
+  <section class="sn-alert sn-alert--{{ banner.severity|default:'info' }}" data-alert-id="banner-{{ banner.pk }}" data-alert-key="{{ banner.pk }}-{{ banner.created_at|date:'U' }}">
     <span class="sn-alert-icon" aria-hidden="true">
-      <svg class="sn-ico"><use href="#i-info"></use></svg>
+      <svg class="sn-ico"><use href="{% if banner.severity == 'critical' or banner.severity == 'warning' %}#i-alert{% else %}#i-info{% endif %}"></use></svg>
     </span>
     <div class="sn-alert-copy">
-      <b>{{ banner.title }}</b>
-      <p>{{ banner.body }}</p>
+      <b dir="auto">{{ banner.title }}</b>
+      <p dir="auto">{{ banner.body }}</p>
     </div>
     {% if banner.action_url %}
-    <a class="sn-alert-action" href="{{ banner.action_url }}">{{ banner.action_label }}</a>
+    <a class="sn-alert-action" href="{{ banner.action_url }}" dir="auto">{{ banner.action_label }}</a>
     {% endif %}
     <button class="sn-alert-close" type="button" data-alert-dismiss aria-label="{% translate 'Dismiss announcement' %}">
       <svg class="sn-ico" aria-hidden="true"><use href="#i-x"></use></svg>

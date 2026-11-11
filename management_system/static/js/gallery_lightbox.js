@@ -1,5 +1,6 @@
 /* Graduation gallery lightbox: smooth fade/slide, keyboard, swipe, video support. */
 (function () {
+  var lastOpener = null;
   function collectCells() {
     return Array.prototype.slice.call(document.querySelectorAll("[data-gallery-open]"));
   }
@@ -41,6 +42,8 @@
     media.classList.add("is-enter");
     if (dir) media.setAttribute("data-dir", dir); else media.removeAttribute("data-dir");
     if (link) link.href = download;
+    var counter = document.getElementById("gallery-lightbox-count");
+    if (counter) counter.textContent = (idx + 1) + " / " + cells.length;
   }
   function openAt(idx) {
     var box = document.getElementById("gallery-lightbox");
@@ -49,7 +52,7 @@
     box.hidden = false;
     document.body.classList.add("gg-lock");
     render("");
-    var closeBtn = box.querySelector("[data-gallery-close]");
+    var closeBtn = document.getElementById("gallery-lightbox-close") || box.querySelector("[data-gallery-close]");
     if (closeBtn) closeBtn.focus({preventScroll: true});
   }
   function close() {
@@ -59,6 +62,7 @@
     document.body.classList.remove("gg-lock");
     var media = document.getElementById("gallery-lightbox-media");
     if (media) media.innerHTML = "";
+    if (lastOpener && lastOpener.isConnected) lastOpener.focus({preventScroll: true});
   }
   function step(delta) {
     var cells = collectCells();
@@ -74,6 +78,7 @@
       btn.dataset.galleryBound = "1";
       btn.addEventListener("click", function () {
         var cells = collectCells();
+        lastOpener = btn;
         openAt(cells.indexOf(btn));
       });
     });
@@ -92,6 +97,21 @@
         if (ev.key === "Escape") close();
         else if (ev.key === "ArrowRight") step(document.dir === "rtl" ? -1 : 1);
         else if (ev.key === "ArrowLeft") step(document.dir === "rtl" ? 1 : -1);
+        else if (ev.key === "Tab") {
+          var focusable = Array.prototype.slice.call(box.querySelectorAll(
+            'a[href], button:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])'
+          )).filter(function (node) { return node.offsetParent !== null; });
+          if (!focusable.length) return;
+          var first = focusable[0];
+          var last = focusable[focusable.length - 1];
+          if (ev.shiftKey && document.activeElement === first) {
+            ev.preventDefault();
+            last.focus();
+          } else if (!ev.shiftKey && document.activeElement === last) {
+            ev.preventDefault();
+            first.focus();
+          }
+        }
       });
       var startX = null;
       box.addEventListener("touchstart", function (ev) {
@@ -106,6 +126,6 @@
     }
   }
   document.addEventListener("DOMContentLoaded", function () { bind(document); });
-  document.addEventListener("htmx:afterSwap", function (ev) { bind(ev.target || document); });
+  document.addEventListener("htmx:after:swap", function (ev) { bind(ev.target || document); });
   window.galleryLightbox = {openAt: openAt, close: close, step: step};
 })();

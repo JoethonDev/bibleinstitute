@@ -2254,8 +2254,18 @@ class MobileAppRelease(models.Model):
 class StudentBanner(models.Model):
     """One banner strip message shown on signed-in student pages."""
 
+    class Severity(models.TextChoices):
+        CRITICAL = "critical", _("Critical")
+        WARNING = "warning", _("Warning")
+        INFO = "info", _("Info")
+
     title = models.CharField(max_length=200)
     body = models.TextField()
+    severity = models.CharField(
+        max_length=10,
+        choices=Severity.choices,
+        default=Severity.INFO,
+    )
     action_label = models.CharField(max_length=80, blank=True, default="")
     action_url = models.CharField(max_length=2048, blank=True, default="")
     is_active = models.BooleanField(default=True)
@@ -2420,8 +2430,12 @@ class StudentExperienceSettings(models.Model):
         return str(_("Student Experience Settings"))
 
     @classmethod
-    def load(cls) -> "StudentExperienceSettings | None":
-        return cls.objects.filter(singleton="default").first()
+    def load(cls) -> "StudentExperienceSettings":
+        row, _ = cls.objects.get_or_create(
+            singleton="default",
+            defaults={"mode": StudentMode.LEGACY},
+        )
+        return row
 
     def save(self, *args, **kwargs):
         result = super().save(*args, **kwargs)

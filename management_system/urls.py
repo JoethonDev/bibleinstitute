@@ -44,7 +44,10 @@ from management_system.notification_views import (
 )
 from management_system import gallery_views as graduation_gallery_views
 from management_system import portal_views as portal_extra_views
-from management_system.student_experience_views import student_experience_override
+from management_system.student_experience_views import (
+    student_experience_override,
+    student_experience_settings,
+)
 
 urlpatterns = [
     path('dashboard/background-jobs/', background_jobs, name='background-jobs'),
@@ -277,6 +280,7 @@ urlpatterns = [
     path('signup/', signup, name="signup"),
     path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
     path('dashboard/signup-settings/', signup_settings, name="signup-settings"),
+    path('dashboard/student-experience/', student_experience_settings, name="student-experience-settings"),
     path('dashboard/applications/<int:user_id>/', application_review, name="application-review"),
     path('dashboard/applications/<int:user_id>/document/<str:document_type>/', application_document, name="application-document"),
     path('dashboard/applications/<int:user_id>/delete/', application_delete, name="application-delete"),

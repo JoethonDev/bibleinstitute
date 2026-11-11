@@ -8,6 +8,100 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Repair unit (11 November 2026) - opt-in new student UI
+
+Repaired the new `student_next` experience after the audit above. The global mode
+remains `legacy`; only accounts with an explicit `new` override render the new
+shell. Legacy templates and legacy CSS/assets remain the default for every other
+student.
+
+Changed areas: `templates/student_next/*` (shell, learning/course/lesson, quiz,
+calendar, profile, notifications, graduates/album, download), new `sn-*` CSS and
+`static/js/student_next/*`, `student_experience/{learning,course,lesson,calendar,
+profile,quiz,navigation,render}.py`, `student_experience/middleware.py`,
+`context_processors.py`, `Calendar` firstweekday, `StudentBanner.severity` +
+migration 0119, admin global-mode page and Site & Apps nav, and the Arabic
+catalog. Shared behavior-only changes are `lesson_media.js`,
+`gallery_lightbox.js`, the `display_quiz.html`/`quiz_runtime.html` shared quiz
+runtime (pre-existing in this tree), and `take_exam`'s `select_related`.
+
+Repair outcome: new pages are responsive at 1440/1024/768/390 in English and
+Arabic, use no legacy shell assets, and have no duplicate IDs, unlabelled visible
+controls or horizontal overflow. Course outline -> lesson HTMX, lesson media
+runtime, notification panel, alert dismissal, calendar selection, quiz
+start/submit dialog, profile tabs, language switch and gallery lightbox were
+verified live. Legacy pages still return 200 with Bootstrap and three banners.
+
+Second review: three independent reviewers (code/security/legacy, live UI/UX,
+plan conformance) found no authorization blocker. Their blocking UI defects were
+fixed: mobile quiz result now shows answers, mobile notification popover is
+viewport-fixed, Arabic scores/ordering use bidi isolation, profile tabs switch
+and support arrow keys, alert close stays top-end, album/photo/video plurals are
+correct, calendar controls mirror in RTL, and the empty course stage is compact.
+Code-review fixes: announcement cards now use the canonical per-student inbox
+(`student_notifications_queryset`), profile health derives from the same gaps as
+the canonical completeness list, hero CTA follows the next-action kind, help-text
+IDs match `aria-describedby`, form widget classes match CSS, the icon settings
+loader uses `get_or_create`, the shell context helper is shared, quiz has a native
+submit fallback, and invalid document/payment uploads preserve the bound form and
+show an error.
+
+Verification: `manage.py check` clean; `makemigrations --check --dry-run` no
+changes; `audit_text_encoding` passed (800 files); `msgfmt -c` clean; JS syntax
+checked; 60-page browser matrix across the four widths/EN-AR passed with only the
+disposable lesson fixture's expected R2 400/404 media errors. Query counts
+(including auth/context): courses 16, course 14, lesson 15, quiz 18, calendar 9,
+profile 18, notifications 8, graduates 7, album 9, download 5; no per-row N+1
+found.
+
+Remaining risk / next safe step: do not set the global mode to `new` until the
+following are either accepted or closed: (1) `display_quiz.html` is a legacy
+template changed by the pre-existing shared quiz-runtime extraction; it was
+verified functionally but no normalized baseline exists; (2) staff/admin preview
+through an override is deliberately not supported - use a test student account;
+(3) notification/quiz query counts exceed the plan budgets (8 vs 4, 18 vs 10 with
+middleware/context); (4) structured ordering/matching quiz answers still require
+JavaScript even though a native submit fallback now exists; (5) PostgreSQL
+`EXPLAIN`, 1/20/50-offering scale runs and the plan's in-repo B13 audit scripts
+were not produced - the browser/query evidence is disposable SQLite in `%TEMP%`.
+Re-run the matrix against PostgreSQL before global enablement.
+
+## Audit unit (10 November 2026) - new student UI against the plan and prototype
+
+Audited the opt-in authenticated student experience against
+`docs/pending/STUDENT_VIEW_TRANSFORMATION_PLAN.md` and
+`prototype/student-redesign`. Report:
+[docs/pending/STUDENT_VIEW_IMPLEMENTATION_AUDIT.md](docs/pending/STUDENT_VIEW_IMPLEMENTATION_AUDIT.md).
+No application, template, static asset, schema or data change was made.
+
+Method: disposable SQLite schema in `%TEMP%`, seeded two academic years, six
+offerings, nine lessons, four quizzes, grades/submissions, banners,
+notifications, meetings, gallery items and an app release; live Django server on
+127.0.0.1:8911; Chromium at 1440 and 390, English and Arabic; a second student
+account in legacy mode; HTTP checks with the Django test client. R2, real
+SQLite and PostgreSQL were not used, so media playback and production query
+plans are not part of this evidence.
+
+Result: the mode resolver, routes, access checks, quiz state machine and
+notification filters work, and legacy pages still render with their own shell
+and assets. The presentation layer is not a prototype port. The stylesheet is a
+direct `st-*` -> `sn-*` copy of the prototype, while many templates use older
+or invented class names. The audit counted 74 template class tokens with no CSS
+rule and 157 defined component classes with no template consumer.
+
+Blocking defects: calendar month grid has no layout; notification popover is
+unstyled; the course workspace cannot play a lesson opened through HTMX because
+the lesson runtime is only loaded on the direct lesson page; quiz, graduates,
+album and download have no `.sn-page` container; course/lesson overflow at
+390px; progress rings have no SVG; filter chips are unstyled links; profile
+has no top navigation because `ProfileDetail.get_context_data` bypasses
+`render_student_page`, plus a duplicate `id_payment`; alerts render all three
+banners as info and do not persist dismissal; the public-page guard, global
+admin mode page and `StudentBanner.severity` are not implemented.
+
+Superseded by the repair unit above; keep this audit as historical evidence. The
+global setting remains `legacy`.
+
 ## Current implementation attempt (10 November 2026) - authenticated student experience
 
 Implemented the authenticated student redesign from

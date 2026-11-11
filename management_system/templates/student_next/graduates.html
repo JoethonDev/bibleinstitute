@@ -8,7 +8,7 @@
   <div class="sn-page-actions"><a class="sn-btn sn-btn--ghost" href="{% url 'courses' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to My learning" %}</a></div>
 </header>
 <div class="sn-context-strip">
-  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-grid"></use></svg><b>{{ page_obj.paginator.count }}</b> {% translate "albums" %}</span>
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-grid"></use></svg>{% blocktrans count count=page_obj.paginator.count %}{{ count }} album{% plural %}{{ count }} albums{% endblocktrans %}</span>
   <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>{% translate "Completed years and levels" %}</span>
   <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg>{% translate "Private to your student record" %}</span>
 </div>
@@ -20,13 +20,13 @@
       <div class="sn-album-grid">
         {% for album in albums %}
         <a class="sn-album-card" href="{% url 'graduation-gallery-detail' album.scope.pk %}">
-          <span class="sn-album-cover {% if forloop.counter|divisibleby:2 %}sn-tone-b{% else %}sn-tone-a{% endif %}">
+          <span class="sn-album-cover sn-tone-{% cycle 'a' 'b' 'c' 'd' %}">
             {% if album.cover_url %}
               {% if album.cover_kind == "video" %}<video src="{{ album.cover_url }}" preload="metadata" muted playsinline aria-hidden="true"></video>
               {% else %}<img src="{{ album.cover_url }}" alt="" loading="lazy" decoding="async">{% endif %}
             {% endif %}
             <span class="sn-album-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-graduation"></use></svg></span>
-            <span class="sn-album-count">{{ album.items_count }} {% translate "items" %}</span>
+            <span class="sn-album-count">{% blocktrans count count=album.items_count %}{{ count }} item{% plural %}{{ count }} items{% endblocktrans %}</span>
           </span>
           <span class="sn-album-body"><b>{{ album.scope.academic_year.name }} - {{ album.scope.level.display_name }}</b>
             <small>{% blocktrans count count=album.photo_count %}{{ count }} photo{% plural %}{{ count }} photos{% endblocktrans %}{% if album.video_count %} - {% blocktrans count count=album.video_count %}{{ count }} video{% plural %}{{ count }} videos{% endblocktrans %}{% endif %}</small>
@@ -39,9 +39,9 @@
       <div class="sn-gallery-foot">
         <span>{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} albums{% endblocktrans %}</span>
         <nav class="sn-pagination" aria-label="{% translate 'Album pages' %}">
-          {% if page_obj.has_previous %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></a>{% endif %}
+          {% if page_obj.has_previous %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg></a>{% endif %}
           <span class="sn-pagination-current">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-          {% if page_obj.has_next %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></a>{% endif %}
+          {% if page_obj.has_next %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>{% endif %}
         </nav>
       </div>
       {% endif %}

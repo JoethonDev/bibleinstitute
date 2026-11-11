@@ -16,7 +16,7 @@
           - {{ question.grade }} {% translate "Points" %}
         </span>
       </div>
-      <h2>{{ question.name }}</h2>
+      <h2 dir="auto">{{ question.name }}</h2>
       <div class="sn-answers-section answers-section">
         {% if question.type == "mcq" %}
           <div class="sn-options">
@@ -86,22 +86,22 @@
             {% elif question.current_grade %}<span class="sn-pill sn-pill--warning">{% translate "Partially correct" %}</span>
             {% else %}<span class="sn-pill sn-pill--danger">{% translate "Incorrect" %}</span>{% endif %}
           {% else %}<span class="sn-pill sn-pill--gold">{% translate "Under review" %}</span>{% endif %}
-          <span class="sn-pill sn-pill--gold">{{ question.current_grade }} / {{ question.grade }}</span>
+          <span class="sn-pill sn-pill--gold"><bdi dir="ltr">{{ question.current_grade }} / {{ question.grade }}</bdi></span>
         </div>
-        <h3>{{ question.name }}</h3>
+        <h3 dir="auto">{{ question.name }}</h3>
         <div class="sn-review-answer-grid">
           <div class="sn-review-answer sn-review-answer--given"><span>{% translate "Your answer" %}</span>
             {% if question.type == "order_events" and question.submitted_answer_payload %}
-              <ol class="sn-review-list">{% for item in question.submitted_answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
+              <ol class="sn-review-list" dir="auto">{% for item in question.submitted_answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
             {% elif question.type == "match_related" and question.submitted_answer_payload.items %}
-              <ul class="sn-review-list">{% for left, right in question.submitted_answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
-            {% elif question.submitted_answer %}{{ question.submitted_answer }}{% else %}{% translate "No answer submitted" %}{% endif %}
+              <ul class="sn-review-list" dir="auto">{% for left, right in question.submitted_answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
+            {% elif question.submitted_answer %}<b dir="auto">{{ question.submitted_answer }}</b>{% else %}{% translate "No answer submitted" %}{% endif %}
           </div>
           {% if question.answer_payload or question.correct_answer %}
             <div class="sn-review-answer sn-review-answer--correct"><span>{% translate "Correct answer" %}</span>
-              {% if question.type == "order_events" %}<ol class="sn-review-list">{% for item in question.answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
-              {% elif question.type == "match_related" %}<ul class="sn-review-list">{% for left, right in question.answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
-              {% else %}{{ question.correct_answer|default:question.answer_payload }}{% endif %}
+              {% if question.type == "order_events" %}<ol class="sn-review-list" dir="auto">{% for item in question.answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
+              {% elif question.type == "match_related" %}<ul class="sn-review-list" dir="auto">{% for left, right in question.answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
+              {% else %}<b dir="auto">{{ question.correct_answer|default:question.answer_payload }}</b>{% endif %}
             </div>
           {% endif %}
         </div>

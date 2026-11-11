@@ -34,24 +34,36 @@ def build_student_profile_context(
     user: User,
     *,
     form: SignupDetailsForm | None = None,
+    missing_documents_form=None,
+    academic_payment_form=None,
 ) -> dict:
     """Build the bounded profile data consumed by the new student template."""
     profile_editable = user == request.user
-    signup_details_form = form or StudentSignupDetailsForm(instance=user)
+    signup_details_form = form or StudentSignupDetailsForm(
+        instance=user,
+        auto_id="profile_%s",
+    )
     if not profile_editable:
         for field in signup_details_form.fields.values():
             field.disabled = True
             field.required = False
 
-    missing_documents_form = StudentMissingApplicationDocumentsForm(instance=user)
+    missing_documents_form = missing_documents_form or StudentMissingApplicationDocumentsForm(
+        instance=user,
+        auto_id="document_%s",
+    )
     payment_scopes = (
         list(academic_payment_scopes_for_student(user)) if profile_editable else []
     )
     missing_profile_items = []
+    profile_required_total = 0
     if profile_editable:
         for field_name in sorted(SignupDetailsForm.SIGNUP_REQUIRED_FIELDS | {"full_name"}):
             field = signup_details_form.fields.get(field_name)
-            if field and not field.disabled and field.required:
+            if field is None:
+                continue
+            profile_required_total += 1
+            if not field.disabled and field.required:
                 missing_profile_items.append(str(field.label))
         missing_profile_items.extend(
             str(field.label) for field in missing_documents_form.fields.values()
@@ -108,6 +120,22 @@ def build_student_profile_context(
     if not initials:
         initials = user.username[0].upper() if user.username else "?"
 
+    paid_payment_scopes = {
+        payment.academic_year_level_id for payment in academic_payments
+    }
+    health_total = (
+        profile_required_total
+        + len(application_documents)
+        + len(missing_documents_form.fields)
+        + len(payment_scopes)
+        + len(paid_payment_scopes)
+    )
+    health_missing = len(missing_profile_items)
+    health_percent = (
+        max(0, min(100, round(100 * (health_total - health_missing) / health_total)))
+        if health_total else 100
+    )
+
     return {
         "object": user,
         "signup_details_form": signup_details_form,
@@ -117,7 +145,9 @@ def build_student_profile_context(
         "missing_documents_form": missing_documents_form,
         "academic_payment_scopes": payment_scopes,
         "academic_payment_form": (
-            StudentAcademicPaymentForm(student=user) if profile_editable else None
+            academic_payment_form
+            or StudentAcademicPaymentForm(student=user, auto_id="academic_payment_%s")
+            if profile_editable else None
         ),
         "missing_profile_items": missing_profile_items,
         "has_profile_gaps": bool(missing_profile_items),
@@ -133,4 +163,6 @@ def build_student_profile_context(
         "telegram_can_unlink": telegram_can_unlink,
         "next_actions": next_actions,
         "initials": initials,
+        "profile_health_percent": health_percent,
+        "profile_health_offset": 100 - health_percent,
     }

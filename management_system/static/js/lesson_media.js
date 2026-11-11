@@ -297,7 +297,8 @@
         const zoomLabel = viewer.querySelector('.pdf-zoom-level');
         if (!canvas || !stage || !pageInfo) return;
 
-        const bookTitle = viewer.closest('.lesson-media-card')?.querySelector('.lesson-media-header h6');
+        const bookTitle = viewer.closest('.lesson-media-card')?.querySelector('.lesson-media-header h6')
+            || viewer.closest('.sn-lesson-part')?.querySelector('.sn-lesson-part-head h3');
         if (bookTitle) stage.dir = getComputedStyle(bookTitle).direction;
 
         let currentPage = 1;
@@ -382,6 +383,10 @@
                 if (icon) {
                     icon.classList.toggle('fa-expand', !isFullscreen);
                     icon.classList.toggle('fa-compress', isFullscreen);
+                }
+                const iconUse = fullscreenBtn.querySelector('svg use');
+                if (iconUse) {
+                    iconUse.setAttribute('href', isFullscreen ? '#i-compress' : '#i-expand');
                 }
             }
         };

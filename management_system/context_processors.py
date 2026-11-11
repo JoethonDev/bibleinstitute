@@ -7,10 +7,12 @@ one request need the same value.
 """
 
 from django.conf import settings
+from django.db.models import Case, IntegerField, Value, When
 from django.urls import translate_url
 
 from management_system.graduation_gallery import graduation_scopes_for_user
-from management_system.models import StudentBanner
+from management_system.models import StudentBanner, StudentMode
+from management_system.student_experience.mode import resolve_student_mode
 
 
 def static_asset_version(request):
@@ -68,8 +70,21 @@ def student_banners(request):
         try:
             if getattr(getattr(user, "role", None), "role", None) != "student":
                 return []
+            if resolve_student_mode(request) != StudentMode.NEW:
+                return list(
+                    StudentBanner.objects.filter(is_active=True)
+                    .order_by("-created_at", "-pk")[:3]
+                )
+            severity_order = Case(
+                When(severity=StudentBanner.Severity.CRITICAL, then=Value(0)),
+                When(severity=StudentBanner.Severity.WARNING, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
             return list(
-                StudentBanner.objects.filter(is_active=True).order_by("-created_at", "-pk")[:3]
+                StudentBanner.objects.filter(is_active=True)
+                .annotate(_severity_order=severity_order)
+                .order_by("_severity_order", "-created_at", "-pk")[:2]
             )
         except Exception:
             return []

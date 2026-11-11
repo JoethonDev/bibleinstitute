@@ -15582,3 +15582,629 @@ msgstr "تم مسح هذا الطالب قبل لحظات."
 
 msgid "Your session ended. Sign in again and reload the scanner."
 msgstr "انتهت جلستك. سجّل الدخول من جديد وأعد تحميل الماسح."
+
+#: .\management_system\admin_navigation.py:487
+#: .\management_system\templates\partials\student_experience_settings_content.html:3
+msgid "Student Experience"
+msgstr "تجربة الطالب"
+
+#: .\management_system\forms.py:1663
+#: .\management_system\templates\partials\student_experience_settings_content.html:38
+msgid "Default student view"
+msgstr "واجهة الطالب الافتراضية"
+
+#: .\management_system\forms.py:1665
+msgid ""
+"The global mode applies to student accounts that inherit it. The legacy view"
+" stays available for any account with its own override."
+msgstr ""
+"يسري الوضع العام على حسابات الطلاب التي ترثه. ويظل العرض القديم متاحاً لأي "
+"حساب له إعداد خاص به."
+
+#: .\management_system\media_processing.py:950
+msgid "This upload cannot continue publication."
+msgstr "لا يمكن متابعة نشر هذا الملف المرفوع."
+
+#: .\management_system\models.py:640
+msgid "Arabic"
+msgstr "العربية"
+
+#: .\management_system\models.py:641
+msgid "English"
+msgstr "الإنجليزية"
+
+#: .\management_system\models.py:990
+msgid "Resolved"
+msgstr "تم الحل"
+
+#: .\management_system\models.py:1077
+msgid "Bot unavailable"
+msgstr "البوت غير متاح"
+
+#: .\management_system\models.py:2258
+msgid "Critical"
+msgstr "حرج"
+
+#: .\management_system\models.py:3329 .\management_system\models.py:3333
+msgid "Mobile Download Policy"
+msgstr "سياسة تنزيل تطبيق الجوال"
+
+#: .\management_system\models.py:3330
+msgid "Mobile Download Policies"
+msgstr "سياسات تنزيل تطبيق الجوال"
+
+#: .\management_system\notification_views.py:555
+msgid ""
+"This notification was already withdrawn. Telegram removal was retried where "
+"possible."
+msgstr ""
+"تم سحب هذا الإشعار بالفعل، وأُعيدت محاولة إزالته من تيليجرام حيث أمكن."
+
+#: .\management_system\notification_views.py:581
+#, python-format
+msgid ""
+"The mobile app will remove this push notification when it next syncs "
+"(%(count)s device(s))."
+msgstr "سيحذف تطبيق الجوال هذا الإشعار عند المزامنة التالية (%(count)s جهاز)."
+
+#: .\management_system\portal_views.py:69
+msgid "Severity"
+msgstr "درجة الأهمية"
+
+#: .\management_system\portal_views.py:210
+msgid "Download policy saved."
+msgstr "تم حفظ سياسة التنزيل."
+
+#: .\management_system\portal_views.py:286
+msgid "The release could not be saved. Please retry."
+msgstr "تعذّر حفظ الإصدار. أعد المحاولة."
+
+#: .\management_system\quiz_attempts.py:21
+msgid "Management users cannot start a student exam attempt."
+msgstr "لا يمكن لمستخدمي الإدارة بدء محاولة اختبار طالب."
+
+#: .\management_system\quiz_attempts.py:66
+#: .\management_system\quiz_attempts.py:122
+msgid "The time allowed for this quiz has expired."
+msgstr "انتهى الوقت المسموح لهذا الاختبار."
+
+#: .\management_system\student_experience\learning.py:172
+msgid "Good morning"
+msgstr "صباح الخير"
+
+#: .\management_system\student_experience\learning.py:174
+msgid "Good afternoon"
+msgstr "طاب مساؤك"
+
+#: .\management_system\student_experience\learning.py:176
+msgid "Good evening"
+msgstr "مساء الخير"
+
+#: .\management_system\student_experience_views.py:34
+msgid "Student experience settings saved."
+msgstr "تم حفظ إعدادات تجربة الطالب."
+
+#: .\management_system\telegram\support.py:997
+msgid "The reply status changed. Refresh before sending another reply."
+msgstr "تغيّرت حالة الرد. حدّث الصفحة قبل إرسال رد آخر."
+
+#: .\management_system\templates\display_quiz.html:79
+#, python-format
+msgid ""
+"You have %(minutes)s minutes after starting. Your attempt ends at this time "
+"limit or when the exam closes at %(close)s, whichever comes first."
+msgstr ""
+"لديك %(minutes)s دقيقة بعد البدء. تنتهي محاولتك عند هذا الحد أو عند إغلاق "
+"الاختبار في %(close)s، أيهما أسبق."
+
+#: .\management_system\templates\partials\scanner_content.html:44
+msgid "Align the QR inside the frame"
+msgstr "اضبط رمز QR داخل الإطار"
+
+#: .\management_system\templates\partials\student_experience_settings_content.html:4
+msgid ""
+"Choose the default authenticated student view. Per-account overrides still "
+"win."
+msgstr ""
+"اختر العرض الافتراضي للطالب بعد تسجيل الدخول. وتبقى الإعدادات الخاصة بكل "
+"حساب هي الأولوية."
+
+#: .\management_system\templates\partials\student_experience_settings_content.html:13
+msgid "Global mode"
+msgstr "الوضع العام"
+
+#: .\management_system\templates\partials\student_experience_settings_content.html:20
+msgid "Explicit new overrides"
+msgstr "حسابات مُحوّلة صراحةً إلى العرض الجديد"
+
+#: .\management_system\templates\partials\student_experience_settings_content.html:29
+msgid ""
+"The legacy student view remains available for every account. Set a named "
+"account override from its Users detail page to test the new view before a "
+"global switch."
+msgstr ""
+"يظل عرض الطالب القديم متاحاً لكل حساب. حدّد إعداداً خاصاً بحساب من صفحة "
+"تفاصيل المستخدم لاختبار العرض الجديد قبل التحويل العام."
+
+#: .\management_system\templates\partials\student_experience_settings_content.html:53
+msgid "Last changed"
+msgstr "آخر تغيير"
+
+#: .\management_system\templates\partials\submission_detail_content.html:99
+msgid ""
+"Manual corrections are saved against this quiz and preserve the student's "
+"submitted answers."
+msgstr ""
+"تُحفظ التصحيحات اليدوية لهذا الاختبار مع الحفاظ على إجابات الطالب المرسلة."
+
+#: .\management_system\templates\partials\telegram_chat_panel.html:164
+msgid "Access to this conversation is admin-only. Replies are sent as \"Admin\"."
+msgstr ""
+"الوصول إلى هذه المحادثة مقصور على الإدارة. وتُرسل الردود باسم \"الإدارة\"."
+
+#: .\management_system\templates\student_next\base.html:24
+msgid "Bible Institute student learning"
+msgstr "تعلّم طالب معهد الكتاب المقدس"
+
+#: .\management_system\templates\student_next\base.html:30
+msgid "Student learning"
+msgstr "التعلم الطلابي"
+
+#: .\management_system\templates\student_next\base.html:59
+msgid "Open profile"
+msgstr "فتح الملف الشخصي"
+
+#: .\management_system\templates\student_next\calendar.html:11
+msgid "Meetings, deadlines and holidays for your current academic scope."
+msgstr "الاجتماعات والمواعيد النهائية والعطلات لنطاقك الدراسي الحالي."
+
+#: .\management_system\templates\student_next\calendar.html:23
+#, python-format
+msgid "%(count)s meeting this month"
+msgid_plural "%(count)s meetings this month"
+msgstr[0] "لا لقاءات هذا الشهر"
+msgstr[1] "لقاء واحد هذا الشهر"
+msgstr[2] "لقاءان هذا الشهر"
+msgstr[3] "%(count)s لقاءات هذا الشهر"
+msgstr[4] "%(count)s لقاءً هذا الشهر"
+msgstr[5] "%(count)s لقاء هذا الشهر"
+
+#: .\management_system\templates\student_next\calendar.html:24
+#, python-format
+msgid "%(count)s holiday"
+msgid_plural "%(count)s holidays"
+msgstr[0] "لا عطلات"
+msgstr[1] "عطلة واحدة"
+msgstr[2] "عطلتان"
+msgstr[3] "%(count)s عطلات"
+msgstr[4] "%(count)s عطلة"
+msgstr[5] "%(count)s عطلة"
+
+#: .\management_system\templates\student_next\calendar.html:47
+#: .\management_system\templates\student_next\calendar.html:76
+msgid "Class meeting"
+msgstr "لقاء صفّي"
+
+#: .\management_system\templates\student_next\calendar.html:56
+msgid "The month grid and the agenda use the same data."
+msgstr "يستخدم تقويم الشهر وقائمة المواعيد البيانات نفسها."
+
+#: .\management_system\templates\student_next\calendar.html:69
+msgid "Choose any day in the grid."
+msgstr "اختر يوماً من التقويم."
+
+#: .\management_system\templates\student_next\calendar.html:74
+msgid "Institute holiday"
+msgstr "عطلة المعهد"
+
+#: .\management_system\templates\student_next\calendar.html:93
+msgid "Next 7 days"
+msgstr "الأيام السبعة القادمة"
+
+#: .\management_system\templates\student_next\calendar.html:93
+msgid "Your nearest commitments."
+msgstr "أقرب مواعيدك."
+
+#: .\management_system\templates\student_next\calendar.html:104
+msgid "Good to know"
+msgstr "معلومات مفيدة"
+
+#: .\management_system\templates\student_next\calendar.html:107
+msgid "Meeting days are set by your academic scope."
+msgstr "تُحدد أيام الاجتماعات حسب نطاقك الدراسي."
+
+#: .\management_system\templates\student_next\calendar.html:108
+msgid "Holidays apply to the whole academic year."
+msgstr "تسري العطلات على السنة الأكاديمية بأكملها."
+
+#: .\management_system\templates\student_next\calendar.html:109
+msgid "Quiz deadlines appear in your notifications too."
+msgstr "تظهر مواعيد الاختبارات في إشعاراتك أيضاً."
+
+#: .\management_system\templates\student_next\courses.html:34
+msgid "Your next scheduled class in the active academic year."
+msgstr "حصتك القادمة في السنة الأكاديمية النشطة."
+
+#: .\management_system\templates\student_next\download_app.html:36
+msgid "What's new"
+msgstr "الجديد"
+
+#: .\management_system\templates\student_next\lesson.html:15
+#: .\management_system\templates\student_next\partials\lesson_content.html:5
+#, python-format
+msgid "Lesson %(position)s of %(total)s"
+msgstr "الدرس %(position)s من %(total)s"
+
+#: .\management_system\templates\student_next\lesson.html:18
+#: .\management_system\templates\student_next\partials\lesson_content.html:7
+#, python-format
+msgid "%(count)s part"
+msgid_plural "%(count)s parts"
+msgstr[0] "لا أجزاء"
+msgstr[1] "جزء واحد"
+msgstr[2] "جزآن"
+msgstr[3] "%(count)s أجزاء"
+msgstr[4] "%(count)s جزءاً"
+msgstr[5] "%(count)s جزء"
+
+#: .\management_system\templates\student_next\lesson.html:31
+#: .\management_system\templates\student_next\partials\lesson_content.html:15
+#, python-format
+#| msgid "%(watched)s of %(total)s parts complete"
+msgid "%(watched)s of %(total)s parts completed"
+msgstr "%(watched)s من %(total)s أجزاء مكتملة"
+
+#: .\management_system\templates\student_next\lesson.html:42
+msgid "Every part is visible; no tabs."
+msgstr "كل الأجزاء ظاهرة، دون تبويبات."
+
+#: .\management_system\templates\student_next\lesson.html:45
+#| msgid ""
+#| "Both parts are visible on this page. There are no tabs and no hidden second "
+#| "part."
+msgid ""
+"All parts are visible on this page. There are no tabs and no hidden part."
+msgstr "كل الأجزاء ظاهرة في هذه الصفحة. لا توجد تبويبات ولا جزء ثانٍ مخفي."
+
+#: .\management_system\templates\student_next\lesson.html:56
+msgid "This lesson."
+msgstr "هذا الدرس."
+
+#: .\management_system\templates\student_next\lesson.html:61
+#: .\management_system\templates\student_next\partials\course_workspace.html:149
+#, python-format
+msgid "%(percent)s%% watched"
+msgstr "تمت مشاهدة %(percent)s%%"
+
+#: .\management_system\templates\student_next\lesson.html:62
+#: .\management_system\templates\student_next\partials\course_workspace.html:148
+#, python-format
+msgid "%(watched)s of %(total)s parts"
+msgstr "%(watched)s من %(total)s أجزاء"
+
+#: .\management_system\templates\student_next\lesson.html:63
+msgid "Progress is saved as you watch or listen."
+msgstr "يُحفظ تقدمك أثناء المشاهدة أو الاستماع."
+
+#: .\management_system\templates\student_next\lesson.html:70
+msgid "Next up"
+msgstr "التالي"
+
+#: .\management_system\templates\student_next\lesson.html:70
+msgid "Check your understanding."
+msgstr "تحقق من فهمك."
+
+#: .\management_system\templates\student_next\lesson.html:77
+msgid "Open quiz"
+msgstr "فتح الاختبار"
+
+#: .\management_system\templates\student_next\lesson.html:79
+msgid "No quiz is waiting for this course."
+msgstr "لا يوجد اختبار بانتظارك في هذه المادة."
+
+#: .\management_system\templates\student_next\lesson.html:87
+msgid ""
+"If a part does not open or the handout is missing, contact the academic "
+"office."
+msgstr "إذا لم يُفتح جزء أو كانت المذكرة مفقودة، فتواصل مع المكتب الأكاديمي."
+
+#: .\management_system\templates\student_next\notifications.html:17
+#, python-format
+msgid "%(count)s unread notification"
+msgid_plural "%(count)s unread notifications"
+msgstr[0] "لا إشعارات غير مقروءة"
+msgstr[1] "إشعار واحد غير مقروء"
+msgstr[2] "إشعاران غير مقروءان"
+msgstr[3] "%(count)s إشعارات غير مقروءة"
+msgstr[4] "%(count)s إشعاراً غير مقروء"
+msgstr[5] "%(count)s إشعار غير مقروء"
+
+#: .\management_system\templates\student_next\notifications.html:29
+msgid "Loading more notifications..."
+msgstr "جارٍ تحميل مزيد من الإشعارات..."
+
+#: .\management_system\templates\student_next\partials\alerts.html:3
+msgid "Student alerts"
+msgstr "تنبيهات الطالب"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:22
+#: .\management_system\templates\student_next\partials\learning_list.html:60
+#, python-format
+msgid "%(count)s lesson"
+msgid_plural "%(count)s lessons"
+msgstr[0] "لا دروس"
+msgstr[1] "درس واحد"
+msgstr[2] "درسان"
+msgstr[3] "%(count)s دروس"
+msgstr[4] "%(count)s درساً"
+msgstr[5] "%(count)s درس"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:23
+#: .\management_system\templates\student_next\partials\course_workspace.html:89
+#: .\management_system\templates\student_next\partials\learning_list.html:61
+#, python-format
+msgid "%(count)s quiz"
+msgid_plural "%(count)s quizzes"
+msgstr[0] "لا اختبارات"
+msgstr[1] "اختبار واحد"
+msgstr[2] "اختباران"
+msgstr[3] "%(count)s اختبارات"
+msgstr[4] "%(count)s اختباراً"
+msgstr[5] "%(count)s اختبار"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:30
+#, python-format
+msgid "%(watched)s of %(total)s parts complete"
+msgstr "%(watched)s من %(total)s أجزاء مكتملة"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:31
+#, python-format
+msgid "%(scanned)s of %(total)s meetings attended"
+msgstr "حضرت %(scanned)s من %(total)s لقاءات"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:32
+msgid "Progress appears after you begin."
+msgstr "يظهر التقدم بعد أن تبدأ."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:44
+#: .\management_system\templates\student_next\partials\course_workspace.html:158
+#, python-format
+msgid "Average quiz score: %(score)s%%"
+msgstr "متوسط درجات الاختبارات: %(score)s%%"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:55
+msgid "All lectures are listed directly. Quizzes are kept separate."
+msgstr "تُعرض المحاضرات كلها مباشرة، وتُفصل الاختبارات في مجموعة مستقلة."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:66
+msgid "Lectures"
+msgstr "المحاضرات"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:67
+#, python-format
+msgid "%(count)s direct lecture"
+msgid_plural "%(count)s direct lectures"
+msgstr[0] "لا محاضرات"
+msgstr[1] "محاضرة واحدة"
+msgstr[2] "محاضرتان"
+msgstr[3] "%(count)s محاضرات"
+msgstr[4] "%(count)s محاضرة"
+msgstr[5] "%(count)s محاضرة"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:76
+msgid "Ready"
+msgstr "جاهز"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:102
+#, python-format
+msgid "Result: %(score)s / %(total)s"
+msgstr "النتيجة: %(score)s / %(total)s"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:121
+msgid "You are here"
+msgstr "أنت هنا"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:121
+#, python-format
+msgid "Continue with %(label)s."
+msgstr "تابع مع %(label)s."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:142
+msgid "This course."
+msgstr "هذه المادة."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:152
+#, python-format
+msgid "%(scanned)s of %(total)s meetings"
+msgstr "%(scanned)s من %(total)s لقاءات"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:153
+msgid "Attendance-based course"
+msgstr "مادة قائمة على الحضور"
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:156
+msgid "Begin a lesson to track progress."
+msgstr "ابدأ درساً لتتبع تقدمك."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:165
+msgid "The course keeps one clear next action."
+msgstr "تعرض المادة إجراءً تالياً واحداً واضحاً."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:170
+msgid "Continue where you left off."
+msgstr "تابع من حيث توقفت."
+
+#: .\management_system\templates\student_next\partials\course_workspace.html:181
+msgid "Your next scheduled class."
+msgstr "حصتك القادمة."
+
+#: .\management_system\templates\student_next\partials\learning_list.html:12
+#, python-format
+msgid "Showing %(count)s course"
+msgid_plural "Showing %(count)s courses"
+msgstr[0] "لا مقررات"
+msgstr[1] "عرض مقرر واحد"
+msgstr[2] "عرض مقررين"
+msgstr[3] "عرض %(count)s مقررات"
+msgstr[4] "عرض %(count)s مقرراً"
+msgstr[5] "عرض %(count)s مقرر"
+
+#: .\management_system\templates\student_next\partials\learning_list.html:22
+msgid "Grouped by your current academic scope."
+msgstr "مجموعة حسب نطاقك الدراسي الحالي."
+
+#: .\management_system\templates\student_next\partials\learning_list.html:66
+#: .\management_system\templates\student_next\profile.html:134
+#, python-format
+msgid "%(percent)s%% complete"
+msgstr "%(percent)s%% مكتمل"
+
+#: .\management_system\templates\student_next\partials\learning_list.html:93
+msgid "From the institute"
+msgstr "من المعهد"
+
+#: .\management_system\templates\student_next\partials\learning_list.html:93
+msgid "Recent announcements for your scope."
+msgstr "أحدث الإعلانات الخاصة بنطاقك الدراسي."
+
+#: .\management_system\templates\student_next\partials\learning_list.html:140
+msgid "This week"
+msgstr "هذا الأسبوع"
+
+#: .\management_system\templates\student_next\partials\learning_list.html:140
+msgid "Your next meetings."
+msgstr "لقاءاتك القادمة."
+
+#: .\management_system\templates\student_next\partials\learning_list.html:157
+msgid "Progress in this view"
+msgstr "التقدم في هذا العرض"
+
+#: .\management_system\templates\student_next\partials\learning_list.html:160
+#, python-format
+#| msgid "%(count)s courses in this view"
+#| msgid_plural "%(count)s courses in this view"
+msgid "%(count)s courses in this view"
+msgstr "%(count)s مقرر في هذا العرض"
+
+#: .\management_system\templates\student_next\partials\lesson_body.html:34
+msgid "Audio version"
+msgstr "النسخة الصوتية"
+
+#: .\management_system\templates\student_next\partials\lesson_body.html:47
+msgid "Listen on the go. The download is available for offline study."
+msgstr "استمع أثناء التنقل، والتنزيل متاح للدراسة دون اتصال."
+
+#: .\management_system\templates\student_next\partials\lesson_body.html:66
+msgid "The handout uses the same viewer controls as the rest of your lessons."
+msgstr "تستخدم المذكرة أدوات العرض نفسها المستخدمة في بقية دروسك."
+
+#: .\management_system\templates\student_next\partials\notification_panel.html:4
+msgid "new"
+msgstr "جديد"
+
+#: .\management_system\templates\student_next\profile.html:3
+msgid "Profile completeness"
+msgstr "اكتمال الملف"
+
+#: .\management_system\templates\student_next\profile.html:11
+msgid "Download QR"
+msgstr "تنزيل رمز QR"
+
+#: .\management_system\templates\student_next\profile.html:51
+msgid "Identity and contact"
+msgstr "الهوية وبيانات الاتصال"
+
+#: .\management_system\templates\student_next\profile.html:130
+msgid "The details your record still needs."
+msgstr "البيانات التي يحتاجها سجلك."
+
+#: .\management_system\templates\student_next\profile.html:134
+msgid "Your required details are complete."
+msgstr "بياناتك المطلوبة مكتملة."
+
+#: .\management_system\templates\student_next\profile.html:168
+msgid "Lesson and quiz alerts can reach you there."
+msgstr "يمكن أن تصلك تنبيهات الدروس والاختبارات هناك."
+
+#: .\management_system\templates\student_next\profile.html:171
+msgid "Receive lesson and quiz notifications there."
+msgstr "استقبل إشعارات الدروس والاختبارات هناك."
+
+#: .\management_system\templates\student_next\quiz.html:97
+#, python-format
+msgid "%(count)s point"
+msgid_plural "%(count)s points"
+msgstr[0] "لا نقاط"
+msgstr[1] "نقطة واحدة"
+msgstr[2] "نقطتان"
+msgstr[3] "%(count)s نقاط"
+msgstr[4] "%(count)s نقطة"
+msgstr[5] "%(count)s نقطة"
+
+#: .\management_system\templates\student_next\quiz.html:159
+msgid ""
+"If a score looks wrong, contact your academic office before the review "
+"window closes."
+msgstr ""
+"إذا بدت الدرجة غير صحيحة، فتواصل مع مكتبك الأكاديمي قبل إغلاق نافذة "
+"المراجعة."
+
+#: .\management_system\templates\student_next\quiz.html:160
+msgid "What happens next"
+msgstr "ما يحدث بعد ذلك"
+
+#: .\management_system\templates\student_next\quiz.html:160
+msgid ""
+"Your result is saved to your student record and appears in your course "
+"progress."
+msgstr "تُحفظ نتيجتك في سجلك الدراسي وتظهر في تقدمك في المادة."
+
+#, python-format
+#~ msgid "%(watched)s of %(total)s parts watched"
+#~ msgstr "%(watched)s من %(total)s أجزاء تمت مشاهدتها"
+
+#~ msgid "Overall progress"
+#~ msgstr "التقدم الإجمالي"
+
+#~ msgid "Lesson %(position)s of %(total)s - %(course)s"
+#~ msgstr "الدرس %(position)s من %(total)s - %(course)s"
+
+#: management_system/templates/student_next/base.html
+msgid "Mobile student navigation"
+msgstr "تنقل الطالب على الجوال"
+
+#: management_system/templates/student_next/graduates.html
+#: management_system/templates/student_next/graduate_album.html
+#: management_system/templates/student_next/calendar.html
+msgid "%(count)s album"
+msgid_plural "%(count)s albums"
+msgstr[0] "لا ألبومات"
+msgstr[1] "ألبوم واحد"
+msgstr[2] "ألبومان"
+msgstr[3] "%(count)s ألبومات"
+msgstr[4] "%(count)s ألبوماً"
+msgstr[5] "%(count)s ألبوم"
+
+#: management_system/templates/student_next/graduates.html
+#: management_system/templates/student_next/graduate_album.html
+#: management_system/templates/student_next/calendar.html
+msgid "%(count)s item"
+msgid_plural "%(count)s items"
+msgstr[0] "لا عناصر"
+msgstr[1] "عنصر واحد"
+msgstr[2] "عنصران"
+msgstr[3] "%(count)s عناصر"
+msgstr[4] "%(count)s عنصراً"
+msgstr[5] "%(count)s عنصر"
+
+#: management_system/templates/student_next/graduates.html
+#: management_system/templates/student_next/graduate_album.html
+#: management_system/templates/student_next/calendar.html
+msgid "%(count)s meeting"
+msgid_plural "%(count)s meetings"
+msgstr[0] "لا اجتماعات"
+msgstr[1] "اجتماع واحد"
+msgstr[2] "اجتماعان"
+msgstr[3] "%(count)s اجتماعات"
+msgstr[4] "%(count)s اجتماعاً"
+msgstr[5] "%(count)s اجتماع"

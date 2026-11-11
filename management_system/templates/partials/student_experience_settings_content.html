@@ -1,0 +1,65 @@
+{% load i18n %}
+{% translate "Site & Apps" as page_eyebrow %}
+{% translate "Student Experience" as page_title %}
+{% translate "Choose the default authenticated student view. Per-account overrides still win." as page_description %}
+<div id="content" class="aw-dashboard-page">
+    <div class="aw-page-head aw-flex-wrap">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+    </div>
+
+    <div class="aw-kpi-grid">
+        <div class="aw-kpi">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Global mode" %}</span>
+                <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg></span>
+            </div>
+            <div class="aw-kpi-value">{{ settings_row.get_mode_display }}</div>
+        </div>
+        <div class="aw-kpi aw-kpi--gold">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Explicit new overrides" %}</span>
+                <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
+            </div>
+            <div class="aw-kpi-value">{{ explicit_new_count }}</div>
+        </div>
+    </div>
+
+    <div class="aw-alert aw-alert--warn">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>{% translate "The legacy student view remains available for every account. Set a named account override from its Users detail page to test the new view before a global switch." %}</div>
+    </div>
+
+    <form method="post" action="{% url 'student-experience-settings' %}" hx-post="{% url 'student-experience-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+        {% csrf_token %}
+        <section class="aw-card">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg>
+                    <h3>{% translate "Default student view" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-form-grid">
+                    {% include "partials/components/aw_field.html" with field=form.mode %}
+                </div>
+                {% if form.non_field_errors %}
+                <div class="aw-alert aw-alert--danger aw-mt-3" role="alert">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                    <div>{{ form.non_field_errors }}</div>
+                </div>
+                {% endif %}
+                {% if settings_row.updated_at %}
+                <p class="aw-small aw-muted aw-mt-3">
+                    {% translate "Last changed" %} {{ settings_row.updated_at|date:"Y-m-d H:i" }} - {{ settings_row.updated_by|default:"-" }}
+                </p>
+                {% endif %}
+                <div class="aw-form-actions">
+                    <button type="submit" class="aw-btn aw-btn--primary">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                        <span>{% translate "Save settings" %}</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </form>
+</div>

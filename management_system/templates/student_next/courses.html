@@ -2,12 +2,12 @@
 {% load i18n %}
 {% block title %}{% translate "My learning" %} - {% translate "Bible Institute" %}{% endblock %}
 {% block body %}
-<div class="sn-page sn-learning-page">
+<div class="sn-learning-page">
   {% include "student_next/partials/alerts.html" %}
   <header class="sn-page-head">
     <div class="sn-page-head-main">
       <div class="sn-eyebrow">{% translate "My learning" %}</div>
-      <h1 class="sn-page-title">{% blocktranslate with name=request.user.first_name|default:request.user.username %}Welcome, {{ name }}{% endblocktranslate %}</h1>
+      <h1 class="sn-page-title">{{ greeting }}, {{ request.user.first_name|default:request.user.username }}</h1>
       <p class="sn-page-desc">{% translate "Your courses, next steps, and everything due this week." %}</p>
     </div>
     <div class="sn-page-actions">
@@ -31,6 +31,7 @@
       <span class="sn-eyebrow">{% translate "Next meeting" %}</span>
       <h2>{{ next_meeting.course }}</h2>
       <p>{{ next_meeting.weekday }}, {{ next_meeting.date|date:"j F Y" }} - {{ next_meeting.scope_label }}</p>
+      <p class="sn-upcoming-note">{% translate "Your next scheduled class in the active academic year." %}</p>
     </div>
     <div class="sn-upcoming-actions"><a class="sn-btn sn-btn--ghost" href="{% url 'student-calendar' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Open calendar" %}</a></div>
   </section>
@@ -52,7 +53,11 @@
       </div>
     </div>
     <div class="sn-continue-side">
-      <div class="sn-continue-ring"><span class="sn-ring" role="img" aria-label="{{ resume.percent|default:0 }}%"><b>{{ resume.percent|default:0 }}%</b></span><span>{% translate "Lesson progress" %}</span></div>
+      <div class="sn-continue-ring">
+        {% translate "Lesson progress" as lesson_progress_label %}
+        {% include "student_next/partials/ring.html" with value=resume.percent|default:0 offset=resume.ring_offset|default:100 size=88 stroke=7 label=lesson_progress_label %}
+        <span>{% translate "Lesson progress" %}</span>
+      </div>
       {% if due_soon.0 %}<div class="sn-continue-next"><span class="sn-continue-label">{% translate "Next deadline" %}</span><b>{{ due_soon.0.deadline|date:"D, j M" }}</b><span>{{ due_soon.0.name }}</span></div>{% endif %}
     </div>
   </section>

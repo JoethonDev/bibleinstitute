@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"defaultTimeout":10000,"defaultSwap":"innerHTML","includeIndicatorCSS":false,"history":true,"morphIgnore":["data-","x-","@",":"]}'>
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}{% translate "Bible Institute Student" %}{% endblock %}</title>
   <link rel="icon" type="image/png" href="{% static 'login-logo.png' %}?v={{ static_asset_version }}">
@@ -21,13 +22,13 @@
   {% include "student_next/partials/icon_sprite.html" %}
   <header class="sn-topbar">
     <div class="sn-topbar-inner">
-      <a class="sn-brand" href="{% url 'courses' %}">
+      <a class="sn-brand" href="{% url 'courses' %}" aria-label="{% translate 'Bible Institute student learning' %}">
         <span class="sn-brand-mark" aria-hidden="true">
           <svg class="sn-ico"><use href="#i-book-open"></use></svg>
         </span>
         <span class="sn-brand-copy">
           <strong>{% translate "Bible Institute" %}</strong>
-          <small>{% translate "Student" %}</small>
+          <small>{% translate "Student learning" %}</small>
         </span>
       </a>
       <nav class="sn-nav" aria-label="{% translate 'Student navigation' %}">
@@ -39,24 +40,28 @@
         {% endfor %}
       </nav>
       <div class="sn-actions">
-        <form action="{% url 'set_language' %}" method="post" class="sn-language-form">
+        {% get_current_language as LANGUAGE_CODE %}
+        <form action="{% url 'set_language' %}" method="post" class="sn-lang-form">
           {% csrf_token %}
-          <input name="next" type="hidden" value="{{ request.get_full_path }}">
-          {% get_current_language as LANGUAGE_CODE %}
-          <select name="language" aria-label="{% translate 'Language' %}" onchange="this.form.submit()">
-            <option value="ar"{% if LANGUAGE_CODE == 'ar' %} selected{% endif %}>العربية</option>
-            <option value="en"{% if LANGUAGE_CODE == 'en' %} selected{% endif %}>English</option>
-          </select>
+          <input name="next" type="hidden" value="{% if LANGUAGE_CODE == 'ar' %}{{ localized_url_en }}{% else %}{{ localized_url_ar }}{% endif %}">
+          <input name="language" type="hidden" value="{% if LANGUAGE_CODE == 'ar' %}en{% else %}ar{% endif %}">
+          <button type="submit" class="sn-lang" lang="{% if LANGUAGE_CODE == 'ar' %}en{% else %}ar{% endif %}" aria-label="{% translate 'Switch language' %}">
+            {% if LANGUAGE_CODE == 'ar' %}English{% else %}العربية{% endif %}
+          </button>
         </form>
         <div id="notification-root" class="sn-notification-root" data-live-url="{% url 'student-notification-live' %}">
-          <button id="notification-bell-button" class="sn-icon-btn sn-bell-button" type="button" aria-expanded="false" aria-controls="notification-panel" aria-label="{% translate 'Notifications' %}">
+          <button id="notification-bell-button" class="sn-icon-btn sn-bell" type="button" aria-expanded="false" aria-controls="notification-panel" aria-label="{% translate 'Notifications' %}">
             <svg class="sn-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
-            <span id="notification-badge" class="sn-notif-badge" hidden></span>
+            <span id="notification-badge" class="sn-badge" hidden></span>
           </button>
-          <div id="notification-panel" class="sn-notification-panel" hidden role="dialog" aria-label="{% translate 'Notifications' %}" hx-get="{% url 'student-notification-panel' %}" hx-trigger="click from:#notification-bell-button" hx-target="#notification-panel" hx-swap="innerHTML"></div>
+          <div id="notification-panel" class="sn-notif-pop" hidden role="dialog" aria-label="{% translate 'Notifications' %}" hx-get="{% url 'student-notification-panel' %}" hx-trigger="click from:#notification-bell-button" hx-target="this" hx-swap="innerHTML"></div>
           <div id="notification-popups" class="sn-notification-popups" aria-live="polite"></div>
         </div>
-        <span class="sn-avatar sn-avatar--top" aria-label="{{ request.user.get_full_name|default:request.user.username }}">{{ initials|default:request.user.username|slice:":1"|upper }}</span>
+        <a class="sn-account" href="{% url 'view-profile' %}" aria-label="{% translate 'Open profile' %}">
+          <span class="sn-avatar sn-avatar--sm sn-avatar--gold">
+            {% if request.user.first_name or request.user.last_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}{% else %}{{ request.user.username|slice:":1"|upper }}{% endif %}
+          </span>
+        </a>
         <form method="post" action="{% url 'logout' %}" class="sn-logout-form">
           {% csrf_token %}
           <button class="sn-icon-btn" type="submit" aria-label="{% translate 'Log out' %}" title="{% translate 'Log out' %}">
@@ -66,17 +71,15 @@
       </div>
     </div>
   </header>
-  {% if messages %}
-  <div class="sn-message-stack" role="status">
+  <div id="toast-stack" class="sn-toast-stack" role="status" aria-live="polite">
     {% for message in messages %}
-    <div class="sn-message{% if message.tags %} sn-message--{{ message.tags }}{% endif %}">{{ message }}</div>
+    <div class="sn-toast{% if message.tags %} sn-toast--{{ message.tags }}{% endif %}">{{ message }}</div>
     {% endfor %}
   </div>
-  {% endif %}
-  <main id="main" class="sn-main">
+  <main id="main" class="sn-page {% block page_class %}{% endblock %}">
     {% block body %}{% endblock %}
   </main>
-  <nav class="sn-mobile-nav" aria-label="{% translate 'Student navigation' %}">
+  <nav class="sn-mobile-nav" aria-label="{% translate 'Mobile student navigation' %}">
     {% for item in student_nav %}
     <a class="sn-mobile-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}"{% if item.active %} aria-current="page"{% endif %}>
       <svg class="sn-ico" aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>

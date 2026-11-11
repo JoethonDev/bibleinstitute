@@ -1,15 +1,22 @@
 from collections import defaultdict
+from datetime import timedelta
 
 from django.core.paginator import Paginator
 from django.db.models import Count, Exists, OuterRef, Q
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext_lazy as _
 
 from ..academic_access import accessible_offerings
 from ..course_content import with_offering_content_counts
-from ..models import Enrollment
-from ..utils.student_data import student_course_progress_data, student_next_actions
+from ..models import AcademicYearLevelMeeting, Enrollment, StudentNotification
+from ..utils.student_data import (
+    localized_notification_text,
+    student_course_progress_data,
+    student_next_actions,
+    student_notifications_queryset,
+)
 from ..utils.helpers import pagination_query_string
 from .calendar import next_student_meeting
 
@@ -95,6 +102,10 @@ def build_learning_context(request) -> dict:
             progress["completion_percent"] = None
             progress["completion_kind"] = ""
         offering.student_progress = progress
+        if progress["completion_percent"] is None:
+            progress["ring_offset"] = 100
+        else:
+            progress["ring_offset"] = 100 - progress["completion_percent"]
         access_kind = (
             "current"
             if offering.has_normal_active_access
@@ -131,6 +142,7 @@ def build_learning_context(request) -> dict:
             "lesson-details",
             args=[resume["offering_id"], resume["lesson_id"]],
         )
+        resume["ring_offset"] = 100 - (resume.get("percent") or 0)
     due_soon = [
         {
             **quiz,
@@ -147,12 +159,60 @@ def build_learning_context(request) -> dict:
     if active_scope is None and next_meeting:
         active_scope = next_meeting["scope"]
 
+    completion_values = [
+        offering.student_progress["completion_percent"]
+        for section in sections
+        for offering in section["offerings"]
+        if offering.student_progress["completion_percent"] is not None
+    ]
+    overall_percent = (
+        round(sum(completion_values) / len(completion_values))
+        if completion_values else 0
+    )
+
+    announcements = []
+    week_meetings = []
+    hour = timezone.localtime().hour
+    if 5 <= hour < 12:
+        greeting = _("Good morning")
+    elif 12 <= hour < 17:
+        greeting = _("Good afternoon")
+    else:
+        greeting = _("Good evening")
+    if active_scope is not None:
+        language = (request.LANGUAGE_CODE or "ar").split("-")[0]
+        announcement_rows = student_notifications_queryset(user).filter(
+            notification_type=StudentNotification.NotificationType.ANNOUNCEMENT,
+        ).order_by("-created_at", "-pk")[:2]
+        for notification in announcement_rows:
+            title, body = localized_notification_text(notification, language)
+            announcements.append({
+                "title": title,
+                "body": body,
+                "created_at": notification.created_at,
+            })
+        today = timezone.localdate()
+        week_meetings = list(
+            AcademicYearLevelMeeting.objects.filter(
+                academic_year_level=active_scope,
+                meeting_date__gte=today,
+                meeting_date__lt=today + timedelta(days=7),
+            )
+            .select_related("course_offering__course")
+            .order_by("meeting_date", "pk")[:7]
+        )
+
     return {
         "sections": sections,
         "active_scope": active_scope,
         "next_meeting": next_meeting,
         "resume": resume,
         "due_soon": due_soon,
+        "announcements": announcements,
+        "week_meetings": week_meetings,
+        "greeting": greeting,
+        "overall_percent": overall_percent,
+        "overall_ring_offset": 100 - overall_percent,
         "selected_filter": selected_filter,
         "filter_counts": counts,
         "filter_tabs": [

@@ -116,7 +116,10 @@
     form.querySelectorAll("[data-quiz-prev]").forEach((button) => button.addEventListener("click", () => showQuestion(current - 1, true)));
     form.querySelectorAll("[data-quiz-next]").forEach((button) => button.addEventListener("click", () => showQuestion(current + 1, true)));
     navButtons.forEach((button) => button.addEventListener("click", () => showQuestion(Number(button.dataset.qnav), true)));
-    form.querySelector("[data-quiz-submit]")?.addEventListener("click", showSubmitDialog);
+    form.querySelector("[data-quiz-submit]")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        showSubmitDialog();
+    });
     dialog?.querySelector("[data-quiz-cancel]")?.addEventListener("click", () => dialog.close());
     dialog?.querySelector("[data-quiz-confirm]")?.addEventListener("click", () => {
         confirmedSubmit = true;

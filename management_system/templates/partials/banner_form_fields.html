@@ -19,6 +19,11 @@ through ?fragment=form. Wrapping cards differ, the form contract does not.
                 {% if form.body.errors %}<div class="aw-field-error">{{ form.body.errors }}</div>{% endif %}
             </div>
             <div class="aw-field">
+                <label for="{{ form.severity.id_for_label }}">{{ form.severity.label }}</label>
+                {{ form.severity }}
+                {% if form.severity.errors %}<div class="aw-field-error">{{ form.severity.errors }}</div>{% endif %}
+            </div>
+            <div class="aw-field">
                 <label for="{{ form.action_label.id_for_label }}">{{ form.action_label.label }}</label>
                 {{ form.action_label }}
                 {% if form.action_label.errors %}<div class="aw-field-error">{{ form.action_label.errors }}</div>{% endif %}

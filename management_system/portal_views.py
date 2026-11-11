@@ -53,10 +53,11 @@ APK_MIME_TYPES = {"application/vnd.android.package-archive", "application/octet-
 class BannerForm(forms.ModelForm):
     class Meta:
         model = StudentBanner
-        fields = ["title", "body", "action_label", "action_url"]
+        fields = ["title", "body", "severity", "action_label", "action_url"]
         widgets = {
             "title": forms.TextInput(attrs={"class": "aw-input", "required": True, "maxlength": 200}),
             "body": forms.Textarea(attrs={"class": "aw-textarea", "required": True, "rows": 3, "maxlength": 500}),
+            "severity": forms.Select(attrs={"class": "aw-select"}),
             "action_label": forms.TextInput(attrs={"class": "aw-input", "maxlength": 80}),
             "action_url": forms.TextInput(attrs={"class": "aw-input", "maxlength": 2048}),
         }
@@ -65,6 +66,7 @@ class BannerForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["title"].label = _("Title")
         self.fields["body"].label = _("Message")
+        self.fields["severity"].label = _("Severity")
         self.fields["action_label"].label = _("Button label (optional)")
         self.fields["action_url"].label = _("Button link (optional)")
 

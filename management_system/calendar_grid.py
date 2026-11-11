@@ -19,9 +19,10 @@ def build_month_grid(
     meetings_by_date: dict[date, list],
     locked_weekdays: set[int],
     meeting_offerings_by_weekday: dict[int, list] | None = None,
+    firstweekday: int = 0,
 ) -> list[list[dict]]:
     """Return the canonical day shape consumed by admin and student calendars."""
-    month_days = Calendar().monthdatescalendar(cur_year, cur_month)
+    month_days = Calendar(firstweekday).monthdatescalendar(cur_year, cur_month)
     month_grid = []
     for week in month_days:
         week_data = []
@@ -51,6 +52,7 @@ def build_month_grid(
                 "holiday_name": holiday.get("name", "") if is_holiday else "",
                 "holiday_id": holiday.get("id") if is_holiday else None,
                 "meetings": day_meetings,
+                "meeting_count": len(day_meetings),
                 "meeting_offering_groups": list(offering_groups.values()),
                 "disabled": not in_year,
                 "outside_month": day.month != cur_month,

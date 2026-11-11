@@ -482,6 +482,13 @@ ADMIN_DOMAINS: tuple[AdminDomain, ...] = (
                 capability=can_manage_academic_setup,
                 aliases=("banner-toggle", "banner-delete"),
             ),
+            AdminSection(
+                key="student-experience",
+                label=_("Student Experience"),
+                url_name="student-experience-settings",
+                icon="i-settings",
+                capability=can_manage_academic_setup,
+            ),
         ),
     ),
 )

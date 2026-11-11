@@ -5,7 +5,7 @@ import secrets
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, assign_academic_date
+from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, assign_academic_date
 from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -1648,6 +1648,25 @@ class AnnouncementForm(AwForm):
         return cleaned_data
 
 
+class StudentExperienceSettingsForm(AwModelForm):
+    """Admin control over the global authenticated student experience."""
+
+    class Meta:
+        model = StudentExperienceSettings
+        fields = ["mode"]
+        widgets = {
+            "mode": forms.Select(attrs={"class": "aw-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["mode"].label = _("Default student view")
+        self.fields["mode"].help_text = _(
+            "The global mode applies to student accounts that inherit it. "
+            "The legacy view stays available for any account with its own override."
+        )
+
+
 class SignupSettingsForm(AwModelForm):
     """Admin control over the public signup form: open/close, titles, intake scope."""
 
@@ -1722,13 +1741,15 @@ class SnFormMixin:
             existing = set((widget.attrs.get("class") or "").split())
             existing.difference_update(self._retired_classes)
             if isinstance(widget, (forms.CheckboxInput, forms.CheckboxSelectMultiple)):
-                existing.add("sn-checkbox")
+                existing.add("sn-check-input")
             elif isinstance(widget, forms.Select):
-                existing.add("sn-field-select")
+                existing.add("sn-select")
+            elif isinstance(widget, forms.Textarea):
+                existing.add("sn-textarea")
             elif isinstance(widget, forms.FileInput):
                 existing.add("sn-file-input")
             else:
-                existing.add("sn-field-control")
+                existing.add("sn-input")
             widget.attrs["class"] = " ".join(sorted(existing))
 
 

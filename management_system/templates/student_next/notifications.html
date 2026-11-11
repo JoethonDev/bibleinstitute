@@ -2,11 +2,11 @@
 {% load i18n %}
 {% block title %}{% translate "Notifications" %} - {% translate "Bible Institute" %}{% endblock %}
 {% block body %}
-<div class="sn-page sn-notifications-page">
+<div class="sn-notifications-page">
   {% include "student_next/partials/alerts.html" %}
   <header class="sn-page-head">
     <div class="sn-page-head-main"><div class="sn-eyebrow">{% translate "Notifications" %}</div><h1 class="sn-page-title">{% translate "Stay up to date" %}</h1><p class="sn-page-desc">{% translate "Lesson updates, quiz openings, and institute announcements." %}</p></div>
-    {% if unread_count %}<form method="post" action="{{ read_all_url }}" data-notification-read-all>{% csrf_token %}<button type="submit" class="sn-btn sn-btn--ghost"><svg class="sn-ico" aria-hidden="true"><use href="#i-check"></use></svg>{% translate "Mark all as read" %}</button></form>{% endif %}
+    {% if unread_count %}<div class="sn-page-actions"><form method="post" action="{{ read_all_url }}" data-notification-read-all>{% csrf_token %}<button type="submit" class="sn-btn sn-btn--ghost"><svg class="sn-ico" aria-hidden="true"><use href="#i-check"></use></svg>{% translate "Mark all as read" %}</button></form></div>{% endif %}
   </header>
   <div class="sn-notif-toolbar">
     <nav class="sn-filter-tabs" aria-label="{% translate 'Notification filter' %}">
@@ -14,7 +14,7 @@
       <a href="{{ tab.url }}" class="{% if tab.active %}is-active{% endif %}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }} <span>{{ tab.count }}</span></a>
       {% endfor %}
     </nav>
-    <span class="sn-notif-toolbar-note">{% blocktranslate with count=unread_count %}You have {{ count }} unread notifications.{% endblocktranslate %}</span>
+    <span class="sn-notif-toolbar-note">{% blocktrans count count=unread_count %}{{ count }} unread notification{% plural %}{{ count }} unread notifications{% endblocktrans %}</span>
   </div>
   <div class="sn-layout-main-aside">
     <div class="sn-stack">
@@ -24,15 +24,15 @@
         </div>
         <div class="sn-empty" id="notification-empty"{% if notification_items %} hidden{% endif %}>
           <span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-bell"></use></svg></span>
-          <h2>{% translate "No notifications here" %}</h2><p>{% translate "Try another filter or check back later." %}</p>
+          <h3>{% translate "No notifications here" %}</h3><p>{% translate "Try another filter or check back later." %}</p>
         </div>
-        {% if next_url %}<button type="button" class="sn-btn sn-btn--ghost sn-load-more" data-notification-load-more>{% translate "Load more" %}</button>{% endif %}
+        {% if next_url %}<a href="{{ next_url }}" class="sn-btn sn-btn--ghost sn-load-more" data-notification-load-more data-loading-label="{% translate 'Loading more notifications...' %}">{% translate "Load more" %}</a>{% endif %}
         <p class="sn-sr-only" data-notification-status role="status" aria-live="polite"></p>
       </div>
     </div>
     <aside class="sn-aside">
-      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Stay connected" %}</h2></div></div><div class="sn-card-body"><p>{% translate "New lessons, quiz openings, and institute announcements appear here." %}</p><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'view-profile' %}">{% translate "Manage your student record" %}</a></div></section>
-      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "How it works" %}</h2></div></div><div class="sn-card-body"><p>{% translate "Unread messages are marked with a gold edge. Open a message to follow its related course or quiz." %}</p></div></section>
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Stay connected" %}</h2></div></div><div class="sn-card-body"><p>{% translate "New lessons, quiz openings, and institute announcements appear here." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'view-profile' %}">{% translate "Manage your student record" %}</a></div></div></section>
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "How it works" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Unread messages are marked with a gold edge. Open a message to follow its related course or quiz." %}</p></div></section>
     </aside>
   </div>
 </div>

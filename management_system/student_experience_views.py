@@ -8,16 +8,52 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
-from .forms import StudentExperienceOverrideForm
-from .models import StudentMode, User
+from .forms import StudentExperienceOverrideForm, StudentExperienceSettingsForm
+from .models import StudentExperienceOverride, StudentExperienceSettings, StudentMode, User
 from .student_experience.mode import resolve_student_mode
 from .utils.decorators import can_manage_academic_setup, capability_required
-from .utils.helpers import generate_breadcrumb
+from .utils.helpers import generate_breadcrumb, render_page
 
 
 def _require_student_account(user: User) -> None:
     if getattr(user.role, "role", None) != "student":
         raise PermissionDenied
+
+
+@capability_required(can_manage_academic_setup)
+def student_experience_settings(request):
+    """Set the global student presentation mode for inheriting accounts."""
+    settings_row = StudentExperienceSettings.load()
+    if settings_row is None:
+        settings_row = StudentExperienceSettings(singleton="default")
+    if request.method == "POST":
+        form = StudentExperienceSettingsForm(request.POST, instance=settings_row)
+        if form.is_valid():
+            form.instance.updated_by = request.user
+            form.save()
+            messages.success(request, _("Student experience settings saved."))
+            return redirect("student-experience-settings")
+    else:
+        form = StudentExperienceSettingsForm(instance=settings_row)
+
+    explicit_new_count = User.objects.filter(
+        role__role="student",
+        student_experience_override=StudentExperienceOverride.NEW,
+    ).count()
+    return render_page(
+        request,
+        "student_experience_settings.html",
+        "partials/student_experience_settings_content.html",
+        {
+            "settings_row": settings_row,
+            "form": form,
+            "explicit_new_count": explicit_new_count,
+            "breadcrumb_items": generate_breadcrumb([
+                (_("Admin"), reverse("admin-panel")),
+                (_("Student experience"), None),
+            ]),
+        },
+    )
 
 
 @capability_required(can_manage_academic_setup)

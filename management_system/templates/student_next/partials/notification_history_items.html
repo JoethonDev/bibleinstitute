@@ -5,15 +5,15 @@
     <svg class="sn-ico"><use href="#i-{% if item.kind == 'quiz_opening' %}check-circle{% elif item.kind == 'lesson_published' %}play{% else %}bell{% endif %}"></use></svg>
   </span>
   <div class="sn-notif-copy">
-    <div class="sn-notif-title"><b>{{ item.title }}</b>{% if not item.is_read %}<i class="sn-unread-dot" aria-label="{% translate 'Unread' %}"></i>{% endif %}</div>
-    <p>{{ item.body|urlize }}</p>
+    <div class="sn-notif-title"><b dir="auto">{{ item.title }}</b>{% if not item.is_read %}<i class="sn-unread-dot" aria-label="{% translate 'Unread' %}"></i>{% endif %}</div>
+    <p dir="auto">{{ item.body|urlize }}</p>
     <div class="sn-notif-meta">
       <time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"D, j M Y - H:i" }}</time>
       {% if item.target_url %}
       <form method="post" action="{{ item.open_url }}" data-notification-open>
         {% csrf_token %}
         <input type="hidden" name="target_url" value="{{ item.target_url }}">
-        <button type="submit" class="sn-text-link">{% if item.action_label %}{{ item.action_label }}{% else %}{% translate "Open" %}{% endif %}</button>
+        <button type="submit" class="sn-text-link" dir="auto">{% if item.action_label %}{{ item.action_label }}{% else %}{% translate "Open" %}{% endif %}</button>
       </form>
       {% elif item.action_url %}
       <a class="sn-text-link" href="{{ item.action_url }}">{{ item.action_label }}</a>

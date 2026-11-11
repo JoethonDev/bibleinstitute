@@ -11,7 +11,9 @@ _NAV_ITEMS = (
 
 
 def student_navigation(active_page: str) -> list[dict[str, object]]:
-    active_key = "learn" if active_page in {"courses", "course", "lesson", "quiz"} else active_page
+    active_key = "learn" if active_page in {
+        "courses", "course", "lesson", "quiz", "graduates", "download",
+    } else active_page
     return [
         {
             "key": key,

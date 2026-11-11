@@ -12,8 +12,8 @@
 <div class="sn-context-strip">
   <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{{ scope.academic_year.name }}</span>
   <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-graduation"></use></svg>{{ scope.level.display_name }}</span>
-  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-image"></use></svg>{{ photo_count }} {% translate "photos" %}</span>
-  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-video"></use></svg>{{ video_count }} {% translate "videos" %}</span>
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-image"></use></svg>{% blocktrans count count=photo_count %}{{ count }} photo{% plural %}{{ count }} photos{% endblocktrans %}</span>
+  <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-video"></use></svg>{% blocktrans count count=video_count %}{{ count }} video{% plural %}{{ count }} videos{% endblocktrans %}</span>
 </div>
 {% if page_obj and page_obj.object_list %}
 <section class="sn-gallery-grid" id="gallery-grid" role="list" aria-label="{% translate 'Graduation photos and videos' %}">
@@ -21,7 +21,7 @@
   <figure class="sn-gallery-item" role="listitem">
     <button type="button" class="sn-gallery-thumb {% if forloop.counter|divisibleby:3 %}sn-tone-c{% elif forloop.counter|divisibleby:2 %}sn-tone-b{% else %}sn-tone-a{% endif %}" data-gallery-open data-kind="{{ item.kind }}" data-display="{{ item.display_url }}" data-download="{{ item.download_url }}" data-index="{{ forloop.counter0 }}" aria-label="{% if item.kind == 'video' %}{% translate 'Open video' %}{% else %}{% translate 'Open photo' %}{% endif %}">
       {% if item.kind == "video" %}<video class="sn-gallery-media" src="{{ item.display_url }}" preload="metadata" muted playsinline aria-hidden="true"></video>
-      {% else %}<img class="sn-gallery-media" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async">{% endif %}
+      {% else %}<img class="sn-gallery-media" src="{{ item.display_url }}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'">{% endif %}
       <span class="sn-gallery-icon"><svg class="sn-ico" aria-hidden="true"><use href="{% if item.kind == 'video' %}#i-video{% else %}#i-image{% endif %}"></use></svg></span>
       {% if item.kind == "video" %}<span class="sn-gallery-play" aria-hidden="true"><svg class="sn-ico"><use href="#i-play"></use></svg></span>{% endif %}
     </button>
@@ -33,9 +33,9 @@
   <span><svg class="sn-ico" aria-hidden="true"><use href="#i-images"></use></svg>{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} files{% endblocktrans %}</span>
   {% if page_obj.paginator.num_pages > 1 %}
   <nav class="sn-pagination" aria-label="{% translate 'Gallery pages' %}">
-    {% if page_obj.has_previous %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></a>{% endif %}
+    {% if page_obj.has_previous %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="{% translate 'Previous page' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg></a>{% endif %}
     <span class="sn-pagination-current">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></a>{% endif %}
+    {% if page_obj.has_next %}<a class="sn-pagination-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="{% translate 'Next page' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>{% endif %}
   </nav>
   {% endif %}
 </div>
@@ -45,10 +45,10 @@
 <div class="sn-lightbox" id="gallery-lightbox" hidden role="dialog" aria-modal="true" aria-label="{% translate 'Photo viewer' %}">
   <div class="sn-lightbox-backdrop" data-gallery-close></div>
   <div class="sn-lightbox-stage">
-    <button type="button" class="sn-lightbox-nav" data-gallery-prev aria-label="{% translate 'Previous photo' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></button>
+    <button type="button" class="sn-lightbox-nav" data-gallery-prev aria-label="{% translate 'Previous photo' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
     <div class="sn-lightbox-media" id="gallery-lightbox-media"></div>
-    <button type="button" class="sn-lightbox-nav" data-gallery-next aria-label="{% translate 'Next photo' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></button>
-    <div class="sn-lightbox-bar"><a class="sn-text-link" id="gallery-lightbox-download" href="#" download><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download original" %}</a><button type="button" class="sn-icon-btn" data-gallery-close aria-label="{% translate 'Close' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-x"></use></svg></button></div>
+    <button type="button" class="sn-lightbox-nav" data-gallery-next aria-label="{% translate 'Next photo' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
+    <div class="sn-lightbox-bar"><span id="gallery-lightbox-count">1 / {{ page_obj.paginator.count }}</span><a class="sn-text-link" id="gallery-lightbox-download" href="#" download><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download original" %}</a><button type="button" class="sn-icon-btn" id="gallery-lightbox-close" data-gallery-close aria-label="{% translate 'Close' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-x"></use></svg></button></div>
   </div>
 </div>
 {% endblock %}

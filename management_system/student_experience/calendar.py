@@ -70,8 +70,8 @@ def build_calendar_context(request) -> dict:
             "calendar": None,
             "next_meeting": next_meeting,
             "weekdays": [
-                formats.date_format(date(2000, 1, day), "D")
-                for day in range(3, 10)
+                formats.date_format(date(2000, 1, 2) + timedelta(days=offset), "D")
+                for offset in range(7)
             ],
         }
 
@@ -98,6 +98,7 @@ def build_calendar_context(request) -> dict:
         holidays=holidays,
         meetings_by_date=meetings_by_date,
         locked_weekdays=meeting_weekdays,
+        firstweekday=6,
     )
     for week in grid:
         for day in week:
@@ -141,6 +142,10 @@ def build_calendar_context(request) -> dict:
             "selected_day": selected_day,
             "previous_month": previous_month,
             "next_month": following_month,
+            "today_month": (
+                today.strftime("%Y-%m") if today.strftime("%Y-%m") in available_months
+                else available_months[0]
+            ),
             "meeting_count": sum(len(row) for row in meetings_by_date.values()),
             "holiday_count": len(holidays),
             "next_seven_days": [
@@ -154,7 +159,7 @@ def build_calendar_context(request) -> dict:
         },
         "next_meeting": next_meeting,
         "weekdays": [
-            formats.date_format(date(2000, 1, day), "D")
-            for day in range(3, 10)
+            formats.date_format(date(2000, 1, 2) + timedelta(days=offset), "D")
+            for offset in range(7)
         ],
     }

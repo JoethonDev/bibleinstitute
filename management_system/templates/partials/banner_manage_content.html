@@ -80,6 +80,7 @@ still set Bootstrap classes in the view module (outside this file's scope).
                         <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
                         <div>
                             <b>{{ banner.title }}</b>
+                            <span class="aw-pill aw-pill--plain">{{ banner.get_severity_display }}</span>
                             <div class="aw-small aw-muted">{{ banner.body }}</div>
                             {% if banner.action_label %}
                             <div class="aw-small aw-muted aw-mt-2">

@@ -1,25 +1,92 @@
 {% extends "student_next/base.html" %}
-{% load static i18n %}
+{% load i18n %}
 {% block title %}{{ lesson.name }} - {{ course.name }}{% endblock %}
-{% block alpine_components %}
-<script defer src="{% static 'js/alpine/components/progressTracker.js' %}?v={{ static_asset_version }}"></script>
-{% endblock %}
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'videojs/video-js.css' %}?v={{ static_asset_version }}">
-<script defer src="{% static 'vendor/pdfjs/3.11.174/pdf.min.js' %}?v={{ static_asset_version }}"></script>
-<script defer src="{% static 'videojs/video.min.js' %}?v={{ static_asset_version }}"></script>
-<script defer src="{% static 'videojs/videojs-seek-buttons.min.js' %}?v={{ static_asset_version }}"></script>
-<script defer src="{% static 'js/lesson_media.js' %}?v={{ static_asset_version }}"></script>
-{% endblock %}
+{% block alpine_components %}{% include "student_next/partials/lesson_runtime.html" %}{% endblock %}
 {% block body %}
-<script>
-document.addEventListener("alpine:init", function () { Alpine.data("progressTracker", progressTracker); });
-window.pdfViewerAssets = {
-  workerSrc: "{% static 'vendor/pdfjs/3.11.174/pdf.worker.min.js' %}?v={{ static_asset_version }}",
-  cMapUrl: "{% static 'vendor/pdfjs/3.11.174/cmaps/' %}",
-  standardFontDataUrl: "{% static 'vendor/pdfjs/3.11.174/standard_fonts/' %}"
-};
-window.lessonMediaTranslations = { language: "{{ request.LANGUAGE_CODE|escapejs }}" };
-</script>
-{% include "student_next/partials/course_workspace.html" %}
+{% include "student_next/partials/alerts.html" %}
+<nav class="sn-breadcrumb" aria-label="{% translate 'Breadcrumb' %}">
+  <a href="{% url 'courses' %}">{% translate "My learning" %}</a><span aria-hidden="true">/</span>
+  <a href="{% url 'course-details' offering_id %}">{{ course.name }}</a><span aria-hidden="true">/</span>
+  <span aria-current="page">{{ lesson.name }}</span>
+</nav>
+
+<header class="sn-lesson-head">
+  <div>
+    <span class="sn-eyebrow" dir="auto">{% if lesson_position %}{% blocktrans with position=lesson_position total=lesson_total %}Lesson {{ position }} of {{ total }}{% endblocktrans %} - {% endif %}{{ course.name }}</span>
+    <h1 dir="auto">{{ lesson.name }}</h1>
+    <div class="sn-inline-meta">
+      <span><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% blocktrans count count=lesson_parts_count %}{{ count }} part{% plural %}{{ count }} parts{% endblocktrans %}</span>
+      <span><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{% translate "Published" %}</span>
+      {% if next_meeting %}<span><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Next meeting" %}: {{ next_meeting.date|date:"D, j M" }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="sn-lesson-actions">
+    {% if previous_url %}<a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ previous_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Previous lesson" %}</a>{% endif %}
+    {% if next_url %}<a class="sn-btn sn-btn--primary sn-btn--sm" href="{{ next_url }}">{% translate "Next lesson" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>{% endif %}
+  </div>
+</header>
+
+{% if lesson_progress.watchable_parts %}
+<div class="sn-lesson-progress">
+  <div class="sn-lesson-progress-copy"><b>{{ lesson_progress.watch_percent }}% {% translate "watched" %}</b><span>{% blocktrans with watched=lesson_progress.watched_parts total=lesson_progress.watchable_parts %}{{ watched }} of {{ total }} parts completed{% endblocktrans %}</span></div>
+  <span class="sn-meter-wrap"><span class="sn-meter sn-meter--gold" role="progressbar" aria-label="{% translate 'Lesson progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ lesson_progress.watch_percent }}"><span style="width:{{ lesson_progress.watch_percent }}%"></span></span></span>
+</div>
+{% endif %}
+
+<div class="sn-layout-main-aside">
+  <div class="sn-stack">
+    <section class="sn-section sn-lesson-parts-section">
+      <div class="sn-section-head">
+        <div class="sn-section-head-main">
+          <h2><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% translate "Lesson parts" %}</h2>
+        </div>
+      </div>
+      <p class="sn-lesson-part-note"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "All parts are visible on this page. There are no tabs and no hidden part." %}</p>
+      <div id="display-page" class="sn-card sn-card-body sn-content-panel">
+        <div id="content-loaded">
+          {% include "student_next/partials/lesson_body.html" with show_nav=False %}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="sn-aside">
+    <section class="sn-card sn-aside-card">
+      <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Your progress" %}</h2><p>{% translate "This lesson." %}</p></div></div>
+      <div class="sn-card-body">
+        <div class="sn-progress-summary">
+          {% include "student_next/partials/ring.html" with value=lesson_progress.watch_percent offset=lesson_progress.ring_offset size=64 stroke=5 label=lesson.name %}
+          <div>
+            <b>{% blocktrans with percent=lesson_progress.watch_percent %}{{ percent }}% watched{% endblocktrans %}</b>
+            <span>{% blocktrans with watched=lesson_progress.watched_parts total=lesson_progress.watchable_parts %}{{ watched }} of {{ total }} parts{% endblocktrans %}</span>
+            <span>{% translate "Progress is saved as you watch or listen." %}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sn-card sn-aside-card">
+      <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next up" %}</h2><p>{% translate "Check your understanding." %}</p></div></div>
+      <div class="sn-card-body">
+        {% if next_quiz %}
+        <div class="sn-next-card">
+          <span class="sn-next-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span>
+          <div><b>{{ next_quiz.quiz.name }}</b><span>{% if next_quiz.status == "upcoming" %}{% translate "Opens" %} {{ next_quiz.quiz.opening_date|date:"D, j M" }}{% else %}{% translate "Closes" %} {{ next_quiz.quiz.closing_date|date:"D, j M" }}{% endif %}</span></div>
+        </div>
+        <div class="sn-card-actions"><a class="sn-btn sn-btn--gold sn-btn--sm" href="{{ next_quiz.url }}">{% translate "Open quiz" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a></div>
+        {% else %}
+        <p class="sn-small-copy">{% translate "No quiz is waiting for this course." %}</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="sn-card sn-aside-card">
+      <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Need help?" %}</h2></div></div>
+      <div class="sn-card-body">
+        <p class="sn-small-copy">{% translate "If a part does not open or the handout is missing, contact the academic office." %}</p>
+        <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'courses' %}">{% translate "Back to My learning" %}</a></div>
+      </div>
+    </section>
+  </aside>
+</div>
 {% endblock %}

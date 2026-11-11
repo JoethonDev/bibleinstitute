@@ -203,6 +203,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'management_system.student_experience.middleware.StudentExperienceMiddleware',
     'management_system.middleware.RequestObservabilityMiddleware',
     'management_system.middleware.MobileApiCorsMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',

@@ -92,7 +92,7 @@ from .student_experience.profile import (
     profile_signup_details_form_class,
 )
 from .student_experience.mode import resolve_student_mode
-from .student_experience.render import render_student_page
+from .student_experience.render import render_student_page, student_shell_context
 from .calendar_grid import build_month_agenda as _build_month_agenda
 from .calendar_grid import build_month_grid as _build_month_grid
 from .models import StudentMode
@@ -622,11 +622,13 @@ class ProfileDetail(LoginProtection, DetailView):
 
     def get_context_data(self, **kwargs):
         if resolve_student_mode(self.request) == StudentMode.NEW:
-            return build_student_profile_context(
+            context = build_student_profile_context(
                 self.request,
                 self.object,
                 form=kwargs.get("form"),
             )
+            context.update(student_shell_context("profile"))
+            return context
         context = super().get_context_data(**kwargs)
         user = self.object
         signup_details_form = kwargs.get("form") or SignupDetailsForm(instance=user)
@@ -1083,7 +1085,10 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             elif grade:
                 # Student has already submitted - always show their submission
                 quiz_mode = "view"
-                query_set = Submission.objects.filter(question__quiz_id=quiz_id, user=user)
+                query_set = Submission.objects.filter(
+                    question__quiz_id=quiz_id,
+                    user=user,
+                ).select_related("question")
             elif quiz_mode == "exam":
                 quiz_mode = "exam"
                 query_set = Question.objects.filter(quiz_id=quiz_id)
@@ -1142,6 +1147,8 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "back_url": reverse("quiz-view", args=[quiz_id]) if preview_requested else reverse("course-details", args=[offering_id]),
                 "quiz_opening_date_str": format_human_datetime(effective_opening_date, user),
                 "quiz_closing_date_str": format_human_datetime(effective_closing_date, user),
+                "effective_opening_date": effective_opening_date,
+                "effective_closing_date": effective_closing_date,
                 "quiz_start_url": reverse("quiz-start", args=[offering_id, quiz_id]),
                 "offering": offering,
                 "quiz": quiz,
@@ -1151,7 +1158,10 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                     request,
                     page="quiz",
                     template="student_next/quiz.html",
-                    context=build_quiz_presentation_context(quiz_context),
+                    context=build_quiz_presentation_context(
+                        quiz_context,
+                        user=request.user,
+                    ),
                 )
             return render(request, "display_quiz.html", quiz_context)
         
@@ -6497,6 +6507,18 @@ def profile_missing_documents(request):
         delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
         if isinstance(exc, User.DoesNotExist):
             raise Http404 from exc
+        if resolve_student_mode(request) == StudentMode.NEW:
+            messages.error(request, str(exc))
+            context = build_student_profile_context(
+                request,
+                request.user,
+                missing_documents_form=form,
+            )
+            return render(
+                request,
+                "student_next/profile.html",
+                {**context, **student_shell_context("profile")},
+            )
         messages.error(request, str(exc))
         return redirect("view-profile")
     except Exception:
@@ -6548,6 +6570,18 @@ def profile_academic_payment(request):
         delete_application_files(CLOUD_CLIENT, bucket_name, uploaded_keys)
         if isinstance(exc, User.DoesNotExist):
             raise Http404 from exc
+        if resolve_student_mode(request) == StudentMode.NEW:
+            messages.error(request, str(exc))
+            context = build_student_profile_context(
+                request,
+                request.user,
+                academic_payment_form=form,
+            )
+            return render(
+                request,
+                "student_next/profile.html",
+                {**context, **student_shell_context("profile")},
+            )
         messages.error(request, str(exc))
         return redirect("view-profile")
     except Exception:
