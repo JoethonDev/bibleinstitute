@@ -1016,6 +1016,7 @@ class WebPushSubscription(models.Model):
     is_active = models.BooleanField(default=True)
     disabled_at = models.DateTimeField(null=True, blank=True)
     last_success_at = models.DateTimeField(null=True, blank=True)
+    enabled_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

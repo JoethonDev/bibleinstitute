@@ -76,6 +76,13 @@ Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
   `/offline-library/`; the service worker serves the cached shell for that
   route while offline, and the generic offline fallback links to the localized
   offline library.
+- Web Push no longer backfills the historical inbox. `WebPushSubscription`
+  stores `enabled_at`; materialization and claim both require
+  `notification.created_at >= subscription.enabled_at` and a due
+  `scheduled_for`, so enabling or re-enabling notifications only delivers
+  events created after opt-in. Migration `0122_web_push_enabled_at` adds the
+  field. Payloads now show the real localized `StudentNotification` title,
+  while the body remains generic to avoid exposing content on the lock screen.
 - `deploy/setup_env.sh` copies the non-secret PWA/WebAuthn settings and the
   public VAPID key into `.compose.env`; the private VAPID key remains only in
   `.env`. `compose.application.yml` no longer overrides the private key from

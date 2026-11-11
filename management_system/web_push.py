@@ -55,8 +55,16 @@ def _notification_url(notification: StudentNotification, language: str) -> str:
 
 
 def _payload(notification: StudentNotification, language: str) -> str:
+    # Show the real localized notification title. Keep the body generic so
+    # lesson/quiz content is not exposed on the lock screen.
+    title = (
+        notification.title_ar
+        if language == "ar"
+        else notification.title_en
+    ).strip()
     with translation.override(language):
-        title = str(_("Bible Institute"))
+        if not title:
+            title = str(_("Bible Institute"))
         body = str(_("You have a new notification."))
     return json.dumps(
         {
@@ -84,12 +92,14 @@ def _active_delivery_scan():
         user=OuterRef("student"),
         is_active=True,
         disabled_at__isnull=True,
+        enabled_at__lte=OuterRef("created_at"),
     ).exclude(deliveries__notification_id=OuterRef("pk"))
     return StudentNotification.objects.filter(
         student__is_active=True,
         student__role__role="student",
         cancelled_at__isnull=True,
         withdrawn_at__isnull=True,
+        scheduled_for__lte=timezone.now(),
         push_expires_at__gt=timezone.now(),
     ).filter(Exists(missing_subscription))
 
@@ -172,7 +182,9 @@ def _claim_due(limit: int) -> list[WebPushDelivery]:
                 attempt_count__lt=MAX_ATTEMPTS,
                 notification__cancelled_at__isnull=True,
                 notification__withdrawn_at__isnull=True,
+                notification__scheduled_for__lte=now,
                 notification__push_expires_at__gt=now,
+                notification__created_at__gte=F("subscription__enabled_at"),
                 notification__student__is_active=True,
                 notification__student__role__role="student",
                 subscription__is_active=True,

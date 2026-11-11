@@ -54,7 +54,6 @@ from .passkey_auth import (
     revoke_credential,
 )
 from .utils.lesson_access import lesson_is_available
-from .utils.student_data import student_notifications_queryset
 
 logger = logging.getLogger(__name__)
 STUDENT_ROLE = "student"
@@ -426,24 +425,11 @@ def web_push_subscribe(request):
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:255],
                 "is_active": True,
                 "disabled_at": None,
+                "enabled_at": now,
             },
         )
-        notification_ids = list(
-            student_notifications_queryset(request.user)
-            .filter(push_expires_at__gt=now)
-            .order_by("-created_at", "-pk")
-            .values_list("pk", flat=True)[:100]
-        )
-        WebPushDelivery.objects.bulk_create(
-            [
-                WebPushDelivery(
-                    notification_id=notification_id,
-                    subscription=subscription,
-                )
-                for notification_id in notification_ids
-            ],
-            ignore_conflicts=True,
-        )
+        # No backfill: a student who enables notifications must not receive
+        # the historical inbox as a burst of push notifications.
     return JsonResponse({"ok": True, "active": True, "language": subscription.language})
 
 
