@@ -126,14 +126,21 @@ a message sent in the app appears in the admin chat workspace.
 - App-originated messages alert admins through
   `telegram_tasks.send_web_support_digest`, which reuses `send_support_digest`
   and skips silently when no bot is configured.
-- Front end: `templates/student_next/support.html` plus three partials,
-  `static/js/student_next/support_chat.js` (5s poll with backoff, older-page
-  load on scroll or button, fetch send, MediaRecorder with a 60s cap, delete)
-  and a `.sn-chat*` block in `static/css/student_next.css`. The chat owns the
-  mobile viewport above the fixed mobile nav so the composer never sits below
-  the fold. `static/pwa/file-inputs.js` now honours
-  `data-pwa-file-skip="1"` so an icon-sized picker is not replaced by the
-  full-width themed control.
+- Front end: `templates/student_next/support.html` is a standalone
+  full-screen document with only a back-to-learning control; it does not
+  extend the student shell, so no topbar, navigation, footer, push or biometric
+  prompt appears. `support_chat.js` owns the 5s poll/backoff, older-page load,
+  fetch send, MediaRecorder with a 60s cap, image preparation, and delete.
+  The `.sn-chat*` styles remain shared; the support shell fills `100dvh`.
+- Support attachments prefer `TELEGRAM_R2_BUCKET_NAME` and fall back to the
+  existing `R2_BUCKET_NAME` when the dedicated bucket is not configured.
+  Images are normalized to JPEG/PNG in the browser (including large and
+  non-JPEG/PNG images), and recordings use the actual MediaRecorder MIME type
+  (`.webm`, `.m4a`, `.ogg`, or `.mp3`) instead of always claiming WebM.
+- Student deletion still hides the durable row from the student immediately;
+  `telegram_tasks.delete_web_support_digest` then best-effort deletes the
+  Telegram digest copies (and the original Telegram message when applicable)
+  after commit.
 - Migration `0124_support_chat` adds `TelegramMessage.student_deleted_at`,
   the `support_message`/`support` choices and their constraint branches.
   Reversing it requires no `support_message` notifications to exist, because

@@ -633,3 +633,62 @@ def send_web_support_digest(message_id: int) -> None:
     bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
     with translation.override("ar"):
         send_support_digest(bot, message.conversation_id, message_id=message.pk)
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 2},
+    ignore_result=True,
+)
+def delete_web_support_digest(self, message_id: int) -> int:
+    """Best-effort removal of a support message's Telegram copies."""
+    source = (
+        TelegramMessage.objects.filter(pk=message_id)
+        .only("id", "origin", "telegram_chat_id", "telegram_message_id")
+        .first()
+    )
+    targets = []
+    if (
+        source is not None
+        and source.origin == TelegramMessage.Origin.TELEGRAM
+        and source.telegram_chat_id is not None
+        and source.telegram_message_id is not None
+    ):
+        targets.append((source.telegram_chat_id, source.telegram_message_id))
+    digests = list(
+        TelegramMessage.objects.filter(
+            source_message_id=message_id,
+            content_type=TelegramMessage.ContentType.DIGEST,
+            telegram_chat_id__isnull=False,
+            telegram_message_id__isnull=False,
+        ).only("id", "telegram_chat_id", "telegram_message_id")
+    )
+    targets.extend(
+        (digest.telegram_chat_id, digest.telegram_message_id)
+        for digest in digests
+        if (digest.telegram_chat_id, digest.telegram_message_id) not in targets
+    )
+    if not targets:
+        return 0
+    config = TelegramBotConfig.objects.filter(is_active=True).first()
+    if config is None:
+        return 0
+    bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
+    deleted = 0
+    for chat_id, telegram_message_id in targets:
+        try:
+            bot.delete_message(chat_id, telegram_message_id)
+            deleted += 1
+        except Exception:
+            logger.warning(
+                "support chat telegram message deletion failed",
+                extra={
+                    "event": "support_telegram_delete_failed",
+                    "message_id": message_id,
+                },
+            )
+    return deleted

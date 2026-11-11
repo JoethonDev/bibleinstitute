@@ -45,6 +45,20 @@ CHAT_ATTACHMENT_KINDS = frozenset({"photo", "voice", "audio"})
 CHAT_ATTACHMENT_PREFIX = "Telegram Support/Web"
 
 
+def _support_bucket_name() -> str:
+    """Prefer the dedicated private support bucket.
+
+    Existing deployments may not have a separate Telegram bucket; in that case
+    the already-private media bucket is a safe fallback because support files
+    are written under their own unguessable prefix and are streamed only
+    through the authenticated attachment view.
+    """
+    return (
+        getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
+        or getattr(settings, "R2_BUCKET_NAME", "")
+    )
+
+
 class SupportChatError(Exception):
     """A localized, student-safe failure from the in-app support chat."""
 
@@ -288,7 +302,7 @@ def _store_attachment(
 ) -> TelegramAttachment:
     """Store one bounded upload privately and record its metadata."""
     client = get_r2_client()
-    bucket = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
+    bucket = _support_bucket_name()
     if client is None or not bucket:
         raise SupportChatError(_("Support attachments are unavailable right now."))
     key = (
@@ -333,7 +347,7 @@ def _store_attachment(
 
 def chat_storage_configured() -> bool:
     """Return whether private support attachment storage is configured."""
-    return bool(getattr(settings, "TELEGRAM_R2_BUCKET_NAME", ""))
+    return bool(_support_bucket_name())
 
 
 def _enqueue_admin_digest(message_id: int) -> None:
@@ -353,12 +367,26 @@ def _enqueue_admin_digest(message_id: int) -> None:
         )
 
 
-def delete_student_message(*, user, message_id: int) -> bool:
-    """Remove one of the student's own messages from his chat.
+def _enqueue_support_digest_delete(message_id: int) -> None:
+    """Remove the Telegram digest copies after a student hides a message."""
+    try:
+        from .telegram_tasks import delete_web_support_digest
 
-    The row is kept because the support workspace, the Telegram digest and the
-    answer attribution still reference it. Only the student's own view is
-    affected, and only inbound, non-digest messages can be removed.
+        delete_web_support_digest.delay(message_id)
+    except Exception:
+        logger.warning(
+            "support chat telegram digest deletion not queued",
+            extra={"event": "support_digest_delete_enqueue_failed", "message_id": message_id},
+        )
+
+
+def delete_student_message(*, user, message_id: int) -> bool:
+    """Remove one of the student's own messages from the in-app chat.
+
+    The durable row is retained for the support workspace and answer
+    attribution. The student's view is hidden immediately, and the Telegram
+    digest copies are removed best-effort by a background task. Only inbound,
+    non-digest messages can be removed.
     """
     with transaction.atomic():
         message = (
@@ -377,6 +405,9 @@ def delete_student_message(*, user, message_id: int) -> bool:
             return False
         message.student_deleted_at = timezone.now()
         message.save(update_fields=["student_deleted_at"])
+        transaction.on_commit(
+            lambda: _enqueue_support_digest_delete(message.pk)
+        )
     return True
 
 
@@ -413,7 +444,7 @@ def _attachment_chunks(body):
 
 def stream_support_attachment(request, attachment: TelegramAttachment) -> HttpResponse:
     """Stream one private support attachment for an authorized caller."""
-    bucket = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
+    bucket = _support_bucket_name()
     if not bucket:
         raise Http404
     client = get_r2_client()

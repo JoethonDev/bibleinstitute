@@ -24,6 +24,7 @@
   const POLL_MS = 5000;
   const POLL_BACKOFF_MS = 30000;
   const OLDER_TRIGGER_PX = 80;
+  const isArabic = (document.documentElement.lang || "ar").startsWith("ar");
   const TEXT = {
     recording: root.dataset.textRecording || "Recording... tap to send",
     record: root.dataset.textRecord || "Record an audio message",
@@ -32,6 +33,7 @@
     micMissing: root.dataset.textMicMissing || "This browser cannot record audio.",
     failed: root.dataset.textFailed || "The message could not be sent.",
     upload: root.dataset.textUpload || "Attaching file...",
+    imageFailed: isArabic ? "تعذر تجهيز الصورة. اختر صورة JPEG أو PNG." : "Could not prepare the image. Choose a JPEG or PNG.",
   };
   const MAX_SECONDS = Math.max(1, parseInt(root.dataset.maxSeconds || "60", 10) || 60);
   const MAX_CHARS = Math.max(1, parseInt(root.dataset.maxChars || "4000", 10) || 4000);
@@ -50,6 +52,7 @@
   let recordedChunks = [];
   let recordTimer = null;
   let recordSeconds = 0;
+  let selectedFile = null;
 
   function showError(message) {
     if (!errorBox) return;
@@ -179,6 +182,7 @@
   }
 
   function clearMedia() {
+    selectedFile = null;
     if (fileInput) fileInput.value = "";
     if (fileName) {
       fileName.textContent = "";
@@ -239,7 +243,7 @@
     event.preventDefault();
     if (busy) return;
     const text = input.value.trim();
-    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+    const file = selectedFile || (fileInput && fileInput.files ? fileInput.files[0] : null);
     if (!text && !file) {
       showError(TEXT.failed);
       input.focus();
@@ -249,10 +253,19 @@
       showError(TEXT.failed);
       return;
     }
+    let preparedFile = null;
+    if (file) {
+      try {
+        preparedFile = await prepareImage(file);
+      } catch (error) {
+        showError(TEXT.imageFailed);
+        return;
+      }
+    }
     const payload = new FormData();
     payload.append("message", text);
     payload.append("csrfmiddlewaretoken", csrfToken);
-    if (file) payload.append("attachment", file, file.name);
+    if (preparedFile) payload.append("attachment", preparedFile, preparedFile.name);
     const label = sendButton.querySelector("span");
     const original = label ? label.textContent : "";
     if (label) label.textContent = TEXT.sending;
@@ -309,10 +322,46 @@
   if (fileInput) {
     fileInput.addEventListener("change", function () {
       const file = fileInput.files && fileInput.files[0];
+      selectedFile = file || null;
       if (!fileName) return;
       fileName.textContent = file ? file.name : "";
       fileName.hidden = !file;
     });
+  }
+
+  function loadImage(file) {
+    return new Promise(function (resolve, reject) {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(image);
+      };
+      image.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("image"));
+      };
+      image.src = url;
+    });
+  }
+
+  async function prepareImage(file) {
+    if (!file) return null;
+    const alreadySupported = file.type === "image/jpeg" || file.type === "image/png";
+    if (alreadySupported && file.size <= 8 * 1024 * 1024) return file;
+    const image = await loadImage(file);
+    const scale = Math.min(1, 1600 / Math.max(image.naturalWidth || 1, image.naturalHeight || 1));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round((image.naturalWidth || 1) * scale));
+    canvas.height = Math.max(1, Math.round((image.naturalHeight || 1) * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("image");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(function (resolve) {
+      canvas.toBlob(resolve, "image/jpeg", 0.9);
+    });
+    if (!blob) throw new Error("image");
+    return new File([blob], "support-image.jpg", { type: "image/jpeg" });
   }
 
   function stopRecordingStream() {
@@ -326,12 +375,23 @@
     }
   }
 
+  function audioInfo(blob) {
+    const mime = ((blob && blob.type) || "audio/webm").split(";")[0].trim().toLowerCase();
+    if (mime === "audio/mp4" || mime === "audio/x-m4a" || mime === "audio/aac") {
+      return { mime: "audio/mp4", ext: ".m4a" };
+    }
+    if (mime === "audio/ogg") return { mime: "audio/ogg", ext: ".ogg" };
+    if (mime === "audio/mpeg") return { mime: "audio/mpeg", ext: ".mp3" };
+    return { mime: "audio/webm", ext: ".webm" };
+  }
+
   async function uploadRecording(blob) {
     if (!blob || !blob.size) return;
+    const info = audioInfo(blob);
     const payload = new FormData();
     payload.append("message", "");
     payload.append("csrfmiddlewaretoken", csrfToken);
-    payload.append("attachment", blob, "voice.webm");
+    payload.append("attachment", blob, "voice" + info.ext);
     if (fileName) {
       fileName.textContent = TEXT.upload;
       fileName.hidden = false;
@@ -359,7 +419,18 @@
     }
     recordedChunks = [];
     try {
-      mediaRecorder = new MediaRecorder(mediaStream);
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ];
+      const mimeType = candidates.find(function (type) {
+        return typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(type);
+      });
+      mediaRecorder = mimeType
+        ? new MediaRecorder(mediaStream, { mimeType: mimeType })
+        : new MediaRecorder(mediaStream);
     } catch (error) {
       stopRecordingStream();
       showError(TEXT.micMissing);
@@ -369,7 +440,8 @@
       if (event.data && event.data.size) recordedChunks.push(event.data);
     });
     mediaRecorder.addEventListener("stop", function () {
-      const blob = new Blob(recordedChunks, { type: "audio/webm" });
+      const mimeType = mediaRecorder.mimeType || (recordedChunks[0] && recordedChunks[0].type) || "audio/webm";
+      const blob = new Blob(recordedChunks, { type: mimeType });
       recordedChunks = [];
       stopRecordingStream();
       mediaRecorder = null;
